@@ -21,11 +21,13 @@
             <groupId>org.paramixel</groupId>
             <artifactId>paramixel-api</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.paramixel</groupId>
             <artifactId>paramixel-engine</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.assertj</groupId>
@@ -43,6 +45,7 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
             <version>2.0.3</version>
+            <scope>test</scope>
             <exclusions>
                 <exclusion>
                     <groupId>org.apache.commons</groupId>
@@ -54,6 +57,7 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
             <version>1.28.0</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -83,6 +87,7 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>nginx</artifactId>
             <version>1.21.4</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

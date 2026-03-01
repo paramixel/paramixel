@@ -21,11 +21,13 @@
             <groupId>org.paramixel</groupId>
             <artifactId>paramixel-api</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.paramixel</groupId>
             <artifactId>paramixel-engine</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.assertj</groupId>
