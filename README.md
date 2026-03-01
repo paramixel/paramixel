@@ -41,6 +41,12 @@ paramixel/
     <version>0.0.1</version>
     <scope>test</scope>
 </dependency>
+<dependency>
+    <groupId>com.paramixel</groupId>
+    <artifactId>paramixel-engine</artifactId>
+    <version>0.0.1</version>
+    <scope>test</scope>
+</dependency>
 ```
 
 ### Configure Maven Plugin
