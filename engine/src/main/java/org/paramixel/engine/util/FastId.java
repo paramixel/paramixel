@@ -1,0 +1,130 @@
+/*
+ * Copyright 2006-present Douglas Hoard. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.paramixel.engine.util;
+
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * Fast ID generator for alphanumeric strings that guarantees generated IDs
+ * never contain restricted words (case-insensitive).
+ *
+ * <p>Restricted substrings:</p>
+ * <ul>
+ *   <li>PASS</li>
+ *   <li>TEST</li>
+ *   <li>FAIL</li>
+ *   <li>SKIP</li>
+ * </ul>
+ */
+public final class FastId {
+
+    /**
+     * Character set containing all valid ID characters.
+     */
+    private static final char[] CHARS = new char[62];
+
+    /**
+     * Forbidden words (uppercase).
+     */
+    private static final String[] FORBIDDEN = {"PASS", "TEST", "FAIL", "SKIP"};
+
+    static {
+        int idx = 0;
+
+        for (char c = '0'; c <= '9'; c++) {
+            CHARS[idx++] = c;
+        }
+        for (char c = 'A'; c <= 'Z'; c++) {
+            CHARS[idx++] = c;
+        }
+        for (char c = 'a'; c <= 'z'; c++) {
+            CHARS[idx++] = c;
+        }
+    }
+
+    private FastId() {
+        // utility class
+    }
+
+    /**
+     * Generates a random alphanumeric ID that does not contain
+     * restricted substrings (case-insensitive).
+     *
+     * @param length ID length (must be positive)
+     * @return valid random ID
+     */
+    public static String getId(final int length) {
+        if (length <= 0) {
+            throw new IllegalArgumentException("Length must be positive, got: " + length);
+        }
+
+        final ThreadLocalRandom random = ThreadLocalRandom.current();
+        final char[] buffer = new char[length];
+
+        // retry loop (almost never repeats)
+        while (true) {
+
+            for (int i = 0; i < length; i++) {
+                buffer[i] = CHARS[random.nextInt(62)];
+            }
+
+            if (!containsForbidden(buffer)) {
+                return new String(buffer);
+            }
+        }
+    }
+
+    /**
+     * Checks buffer for forbidden substrings using
+     * allocation-free case-insensitive matching.
+     */
+    private static boolean containsForbidden(final char[] buffer) {
+        final int len = buffer.length;
+
+        for (String word : FORBIDDEN) {
+            final int wlen = word.length();
+
+            if (wlen > len) {
+                continue;
+            }
+
+            for (int i = 0; i <= len - wlen; i++) {
+                boolean match = true;
+
+                for (int j = 0; j < wlen; j++) {
+                    char c = buffer[i + j];
+
+                    // fast ASCII uppercase conversion
+                    if (c >= 'a' && c <= 'z') {
+                        c -= 32;
+                    }
+
+                    if (c != word.charAt(j)) {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+}

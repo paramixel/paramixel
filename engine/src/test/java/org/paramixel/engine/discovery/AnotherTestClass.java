@@ -1,0 +1,42 @@
+/*
+ * Copyright 2006-present Douglas Hoard. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.paramixel.engine.discovery;
+
+import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.Paramixel;
+
+/**
+ * Sample test class used by discovery tests.
+ */
+@Paramixel.TestClass
+public class AnotherTestClass {
+    /**
+     * Sample test method.
+     *
+     * @param context the argument context
+     */
+    @Paramixel.Test
+    public void anotherTest(final ArgumentContext context) {}
+
+    /**
+     * Sample test method used for method selector coverage.
+     *
+     * @param context the argument context
+     */
+    @Paramixel.Test
+    public void testWithAnnotation(final ArgumentContext context) {}
+}

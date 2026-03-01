@@ -1,0 +1,5 @@
+# This file lists all Nginx Docker images to be used in the tests.
+# Each line represents a different version of the Nginx image.
+nginx:1.27.5
+nginx:1.28.2
+nginx:1.29.5

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "dependencyDashboard": true,
+  "packageRules": [
+    {
+      "matchManagers": ["maven-wrapper"],
+      "allowedVersions": "3.9.12",
+      "groupName": "Maven wrapper pinned to 3.9.12"
+    },
+    {
+      "matchPackageNames": ["org.apache.maven:maven-core"],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": ["org.apache.maven:maven-plugin-api"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["maven"],
+      "groupName": "Maven dependencies"
+    }
+  ]
+}
