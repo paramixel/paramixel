@@ -321,7 +321,7 @@ For questions and support:
 
 ## License
 
-Copyright (C) Douglas Hoard. All Rights Reserved.
+Copyright 2006-present Douglas Hoard. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
 
