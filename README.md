@@ -1,9 +1,9 @@
-# Paramixel Test Engine
-
 [![Build](https://github.com/paramixel/paramixel/actions/workflows/build.yaml/badge.svg?branch=main)](https://github.com/dhoard/paramixel/actions/workflows/build.yaml)
 [![Java 21](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![DCO](https://img.shields.io/badge/DCO-1.1-brightgreen.svg)](https://developercertificate.org/)
+
+# Paramixel Test Engine
 
 A powerful and flexible JUnit platform based Java test engine designed for parallel test execution with lifecycle management.
 
