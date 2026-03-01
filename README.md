@@ -315,7 +315,7 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 
 For questions and support:
 - Create an issue in the GitHub repository
-- Check the sample tests in the `tests/` module
+- Check the tests in the `tests/` module
 - Check the sample examples in the `examples/` module
 - Review the API documentation in the `api/` module
 
