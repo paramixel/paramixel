@@ -76,7 +76,7 @@ paramixel/
 
 ```java
 import com.paramixel.api.Paramixel;
-import com.paramixel.api.context.ArgumentContext;
+import com.paramixel.api.ArgumentContext;
 
 @Paramixel.TestClass
 public class MyTest {
@@ -92,7 +92,7 @@ public class MyTest {
 
 ```java
 import com.paramixel.api.Paramixel;
-import com.paramixel.api.context.ArgumentContext;
+import com.paramixel.api.ArgumentContext;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -116,8 +116,8 @@ public class ParameterizedTest {
 
 ```java
 import com.paramixel.api.Paramixel;
-import com.paramixel.api.context.ArgumentContext;
-import com.paramixel.api.context.ClassContext;
+import com.paramixel.api.ArgumentContext;
+import com.paramixel.api.ClassContext;
 
 @Paramixel.TestClass
 public class LifecycleTest {
