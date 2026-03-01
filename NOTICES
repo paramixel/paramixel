@@ -1,0 +1,66 @@
+Paramixel
+Copyright 2006-present Douglas Hoard
+
+This project is licensed under the Apache License, Version 2.0.
+See: LICENSE
+
+Third-Party Notices
+
+Test and examples are adapted from the following third-party projects
+
+- Verifyica
+  - Website: https://github.com/verifyica-team/verifyica
+  - License: Apache License 2.0
+
+Direct Dependency Inventory (as declared in Maven POM files)
+
+- Apache Commons Compress
+  - Coordinates: org.apache.commons:commons-compress
+  - Website: https://commons.apache.org/proper/commons-compress/
+  - License: Apache License 2.0
+
+- Apache Kafka Clients
+  - Coordinates: org.apache.kafka:kafka-clients
+  - Website: https://kafka.apache.org/
+  - License: Apache License 2.0
+
+- Apache Maven (and related Maven components)
+  - Coordinates: org.apache.maven:* and org.apache.maven.resolver:*
+  - Website: https://maven.apache.org/
+  - License: Apache License 2.0
+
+- ASCII Table (freva/ascii-table)
+  - Coordinates: com.github.freva:ascii-table
+  - Website: https://github.com/freva/ascii-table
+  - License: MIT
+  - Copyright: 2017-2026 freva
+
+- AssertJ
+  - Coordinates: org.assertj:assertj-core
+  - Website: https://assertj.github.io/doc/
+  - License: Apache License 2.0
+
+- JUnit Platform / JUnit Jupiter (JUnit Project)
+  - Coordinates: org.junit.platform:* and org.junit.jupiter:*
+  - Website: https://junit.org/
+  - License: Eclipse Public License 2.0 (EPL-2.0)
+
+- MongoDB Java Driver
+  - Coordinates: org.mongodb:mongodb-driver-sync
+  - Website: https://mongodb.github.io/mongo-java-driver/
+  - License: Apache License 2.0
+
+- SLF4J
+  - Coordinates: org.slf4j:slf4j-api and org.slf4j:slf4j-nop
+  - Website: https://www.slf4j.org/
+  - License: MIT
+
+- Testcontainers
+  - Coordinates: org.testcontainers:*
+  - Website: https://testcontainers.com/
+  - License: MIT
+  - Copyright: (c) 2015-2019 Richard North
+
+Note: Transitive dependencies pulled in by the above components may carry
+additional license obligations. When redistributing binaries, you must ensure
+compliance with all applicable licenses.
