@@ -1,10 +1,10 @@
-# Paramixel Test Framework
+# Paramixel Test Engine
 
-A powerful and flexible Java test execution framework designed for parallel test execution with lifecycle management.
+A powerful and flexible JUnit platform based Java test engine designed for parallel test execution with lifecycle management.
 
 ## Overview
 
-Paramixel is a test execution framework built on top of JUnit Platform that provides:
+Paramixel is a test engine built on top of JUnit Platform that provides:
 
 - **Parallel Test Execution** - Run tests concurrently with configurable parallelism
 - **Lifecycle Management** - Comprehensive before/after hooks for tests and classes
@@ -21,8 +21,8 @@ paramixel/
 ├── api/                    - Public API with annotations and context classes
 ├── engine/                 - Test discovery, scheduling, and execution engine
 ├── maven-plugin/           - Maven plugin for build integration
-├── tests/                  - Tests validating framework capabilities
-└── examples/               - Example tests showing framework capabilities
+├── tests/                  - Tests validating test engine functionality
+└── examples/               - Example tests showing test engine capabilities
 ```
 
 ## Quick Start
@@ -299,7 +299,7 @@ Sample tests demonstrating:
 
 ### Examples (`paramixel-examples`)
 
-Practical examples showcasing framework capabilities:
+Practical examples showcasing test engine capabilities:
 - **Simple Tests** - Basic sequential and parallel argument tests
 - **Complex Tests** - Advanced parameterized test patterns
 - **Testcontainers Integration** - Integration tests with Docker containers (Nginx, Kafka, MongoDB)
