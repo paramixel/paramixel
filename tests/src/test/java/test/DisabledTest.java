@@ -18,7 +18,7 @@ package test;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -32,13 +32,13 @@ public class DisabledTest {
     /**
      * Supplies arguments for parameterized execution.
      *
-     * @param argumentSupplierContext the argument supplier context
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
         System.out.println("[ARGUMENT_SUPPLIER] Providing arguments for test methods");
-        argumentSupplierContext.setParallelism(1);
-        argumentSupplierContext.addArguments("Argument 1", "Argument 2", "Argument 3");
+        collector.setParallelism(1);
+        collector.addArguments("Argument 1", "Argument 2", "Argument 3");
     }
 
     /**

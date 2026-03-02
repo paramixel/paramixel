@@ -33,7 +33,7 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 import org.paramixel.engine.api.ConcreteEngineContext;
@@ -214,10 +214,10 @@ public class ParamixelConcurrencyModelTest {
         static volatile CountDownLatch arg1Entered;
         static volatile CountDownLatch releaseArg1;
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.setParallelism(2);
-            context.addArguments("a0", "a1");
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.setParallelism(2);
+            collector.addArguments("a0", "a1");
         }
 
         @Paramixel.Test
@@ -234,10 +234,10 @@ public class ParamixelConcurrencyModelTest {
         static volatile AtomicInteger running;
         static volatile AtomicInteger max;
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.setParallelism(4);
-            context.addArgument("arg");
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.setParallelism(4);
+            collector.addArgument("arg");
         }
 
         @Paramixel.Test

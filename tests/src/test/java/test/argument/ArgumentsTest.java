@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
@@ -38,23 +38,23 @@ public class ArgumentsTest {
     /**
      * Supplies a heterogeneous set of {@link NamedValue} arguments.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArgument(NamedValue.of("bigDecimal:fromBigDecimal", new BigDecimal("1.0")));
-        argumentSupplierContext.addArgument(NamedValue.of("bigDecimal:fromString", new BigDecimal("1.0")));
-        argumentSupplierContext.addArgument(NamedValue.of("bigInteger:fromBigInteger", new BigInteger("1")));
-        argumentSupplierContext.addArgument(NamedValue.of("bigInteger:fromString", new BigInteger("1")));
-        argumentSupplierContext.addArgument(NamedValue.of("boolean", true));
-        argumentSupplierContext.addArgument(NamedValue.of("byte", (byte) 1));
-        argumentSupplierContext.addArgument(NamedValue.of("char", 'a'));
-        argumentSupplierContext.addArgument(NamedValue.of("double", 1d));
-        argumentSupplierContext.addArgument(NamedValue.of("float", 1.0f));
-        argumentSupplierContext.addArgument(NamedValue.of("int", 1));
-        argumentSupplierContext.addArgument(NamedValue.of("long", 1L));
-        argumentSupplierContext.addArgument(NamedValue.of("short", (short) 1));
-        argumentSupplierContext.addArgument(NamedValue.of("string", "a"));
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArgument(NamedValue.of("bigDecimal:fromBigDecimal", new BigDecimal("1.0")));
+        collector.addArgument(NamedValue.of("bigDecimal:fromString", new BigDecimal("1.0")));
+        collector.addArgument(NamedValue.of("bigInteger:fromBigInteger", new BigInteger("1")));
+        collector.addArgument(NamedValue.of("bigInteger:fromString", new BigInteger("1")));
+        collector.addArgument(NamedValue.of("boolean", true));
+        collector.addArgument(NamedValue.of("byte", (byte) 1));
+        collector.addArgument(NamedValue.of("char", 'a'));
+        collector.addArgument(NamedValue.of("double", 1d));
+        collector.addArgument(NamedValue.of("float", 1.0f));
+        collector.addArgument(NamedValue.of("int", 1));
+        collector.addArgument(NamedValue.of("long", 1L));
+        collector.addArgument(NamedValue.of("short", (short) 1));
+        collector.addArgument(NamedValue.of("string", "a"));
     }
 
     /**

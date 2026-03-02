@@ -35,7 +35,7 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Paramixel;
 import org.paramixel.engine.api.ConcreteClassContext;
 import org.paramixel.engine.api.ConcreteEngineContext;
@@ -198,10 +198,10 @@ public class ParamixelInvocationRunnerTest {
             this.maxConcurrent = maxConcurrent;
         }
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.setParallelism(4);
-            context.addArgument("arg");
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.setParallelism(4);
+            collector.addArgument("arg");
         }
 
         @Paramixel.Test
@@ -247,10 +247,10 @@ public class ParamixelInvocationRunnerTest {
             this.maxConcurrent = maxConcurrent;
         }
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.setParallelism(4);
-            context.addArgument("arg");
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.setParallelism(4);
+            collector.addArgument("arg");
         }
 
         @Paramixel.Test
@@ -289,10 +289,10 @@ public class ParamixelInvocationRunnerTest {
 
     public static class OrderingTest extends OrderingBase {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.setParallelism(1);
-            context.addArgument("arg");
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.setParallelism(1);
+            collector.addArgument("arg");
         }
 
         @Paramixel.BeforeEach

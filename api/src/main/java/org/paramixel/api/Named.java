@@ -66,7 +66,7 @@ package org.paramixel.api;
  * @Paramixel.TestClass
  * public class ParameterizedTests {
  *
- *     @Paramixel.ArgumentSupplier
+ *     @Paramixel.ArgumentsCollector
  *     public static List<TestScenario> provideScenarios() {
  *         return Arrays.asList(
  *             new TestScenario("empty string", "", ""),
@@ -84,7 +84,7 @@ package org.paramixel.api;
  * }
  * }</pre>
  *
- * @see Paramixel.ArgumentSupplier
+ * @see Paramixel.ArgumentsCollector
  * @see ArgumentContext
  * @since 0.0.1
  */

@@ -31,7 +31,7 @@ import java.io.IOException;
 import org.bson.Document;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Paramixel;
 import org.testcontainers.containers.Network;
 
@@ -50,12 +50,12 @@ public class MongoDBTest {
     /**
      * Supplies {@link MongoDBTestEnvironment} instances as test arguments.
      *
-     * @param argumentSupplierContext the argument supplier context
+     * @param collector the arguments collector
      * @throws IOException if environment creation fails
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) throws IOException {
-        MongoDBTestEnvironment.createTestEnvironments().forEach(argumentSupplierContext::addArgument);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) throws IOException {
+        MongoDBTestEnvironment.createTestEnvironments().forEach(collector::addArgument);
     }
 
     /**

@@ -34,7 +34,7 @@ import java.lang.annotation.Target;
  * <ul>
  *   <li>{@link TestClass} - Marks a class as containing test methods</li>
  *   <li>{@link Test} - Marks a method as a test case</li>
- *   <li>{@link ArgumentSupplier} - Provides data for parameterized tests</li>
+ *   <li>{@link ArgumentsCollector} - Provides data for parameterized tests</li>
  * </ul>
  *
  * <p><b>Lifecycle Annotations:</b></p>
@@ -204,30 +204,35 @@ public class Paramixel {
     public @interface AfterEach {}
 
     /**
-     * Marks a method as a supplier of test arguments for parameterized test execution.
+     * Marks a method as a collector of test arguments for parameterized test execution.
      *
-     * <p>This annotation enables data-driven testing by designating a method that provides
-     * arguments for test method invocations. Each argument returned by the supplier results
-     * in a separate invocation of all test methods in the class.</p>
+     * <p>This annotation enables data-driven testing by designating a method that produces
+     * arguments for test method invocations. Each collected/provided argument results in a
+     * separate invocation of all test methods in the class.</p>
      *
      * <p><b>Method Signature Requirements:</b></p>
      * <ul>
      *   <li>Must be declared {@code public static}</li>
-     *   <li>Must accept zero parameters</li>
-     *   <li>Return type must be one of:
+     *   <li>Must be either:
      *     <ul>
-     *       <li>{@link java.util.stream.Stream}</li>
-     *       <li>{@link java.util.Collection}</li>
-     *       <li>{@link java.lang.Iterable}</li>
-     *       <li>Array ({@code Object[]})</li>
-     *       <li>Single {@code Object} (treated as a single-element collection)</li>
+     *       <li>Collector-driven: accept exactly one parameter of type {@link org.paramixel.api.ArgumentsCollector} and
+     *           return {@code void}</li>
+     *       <li>Return-based: accept zero parameters and return one of:
+     *         <ul>
+     *           <li>{@link java.util.stream.Stream}</li>
+     *           <li>{@link java.util.Collection}</li>
+     *           <li>{@link java.lang.Iterable}</li>
+     *           <li>Array ({@code Object[]})</li>
+     *           <li>Single {@code Object} (treated as a single-element collection)</li>
+     *         </ul>
+     *       </li>
      *     </ul>
      *   </li>
      * </ul>
      *
      * <p><b>Constraints:</b></p>
      * <ul>
-     *   <li>Only one argument supplier allowed per test class</li>
+     *   <li>Only one arguments collector allowed per test class</li>
      *   <li>Invoked during the preparation phase before test execution</li>
      * </ul>
      *
@@ -238,7 +243,7 @@ public class Paramixel {
     @Documented
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
-    public @interface ArgumentSupplier {}
+    public @interface ArgumentsCollector {}
 
     /**
      * Marks a method to be invoked once before all test methods within a test class.
@@ -290,7 +295,7 @@ public class Paramixel {
      * <p><b>Execution Guarantees:</b></p>
      * <ul>
      *   <li>Executes before every test method invocation</li>
-     *   <li>Executes after arguments are provided (if {@link ArgumentSupplier} present)</li>
+     *   <li>Executes after arguments are provided (if {@link ArgumentsCollector} present)</li>
      *   <li>Receives the {@link ArgumentContext} with the current invocation's argument</li>
      *   <li>Exceptions cause the corresponding test invocation to fail</li>
      *   <li>Paired with {@link AfterEach} (always executes if this method executes)</li>
@@ -479,7 +484,7 @@ public class Paramixel {
      * <p>This annotation designates a method as a test case. The framework discovers
      * and executes all methods annotated with {@code @Test}. Each test method receives
      * an {@link ArgumentContext} parameter providing access to the current invocation's
-     * context and argument (if provided by an {@link ArgumentSupplier}).</p>
+     * context and argument (if provided by an {@link ArgumentsCollector}).</p>
      *
      * <p><b>Method Signature Requirements:</b></p>
      * <ul>
@@ -493,13 +498,13 @@ public class Paramixel {
      * <ul>
      *   <li>Discovered during the test discovery phase</li>
      *   <li>Executed according to the test class lifecycle</li>
-     *   <li>With {@link ArgumentSupplier}: executed once per argument</li>
-     *   <li>Without {@link ArgumentSupplier}: executed once with null argument</li>
+     *   <li>With {@link ArgumentsCollector}: executed once per argument</li>
+     *   <li>Without {@link ArgumentsCollector}: executed once with null argument</li>
      *   <li>Exceptions indicate test failure</li>
      * </ul>
      *
      * @see TestClass
-     * @see ArgumentSupplier
+     * @see ArgumentsCollector
      * @see BeforeEach
      * @see AfterEach
      * @since 0.0.1

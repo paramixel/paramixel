@@ -23,7 +23,7 @@ import java.math.BigInteger;
 import java.util.Date;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
@@ -36,24 +36,24 @@ public class CollectionOfMixedObjectsArgumentTest {
     /**
      * Supplies a heterogeneous set of arguments.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArgument(null);
-        argumentSupplierContext.addArgument(Boolean.TRUE);
-        argumentSupplierContext.addArgument((short) 1);
-        argumentSupplierContext.addArgument((byte) 2);
-        argumentSupplierContext.addArgument('x');
-        argumentSupplierContext.addArgument(4);
-        argumentSupplierContext.addArgument(5L);
-        argumentSupplierContext.addArgument(6f);
-        argumentSupplierContext.addArgument(7d);
-        argumentSupplierContext.addArgument(new BigInteger("8"));
-        argumentSupplierContext.addArgument(new BigDecimal("9"));
-        argumentSupplierContext.addArgument("test");
-        argumentSupplierContext.addArgument(new Date());
-        argumentSupplierContext.addArgument(NamedValue.of("test", "test"));
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArgument(null);
+        collector.addArgument(Boolean.TRUE);
+        collector.addArgument((short) 1);
+        collector.addArgument((byte) 2);
+        collector.addArgument('x');
+        collector.addArgument(4);
+        collector.addArgument(5L);
+        collector.addArgument(6f);
+        collector.addArgument(7d);
+        collector.addArgument(new BigInteger("8"));
+        collector.addArgument(new BigDecimal("9"));
+        collector.addArgument("test");
+        collector.addArgument(new Date());
+        collector.addArgument(NamedValue.of("test", "test"));
     }
 
     /**

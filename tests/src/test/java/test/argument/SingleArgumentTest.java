@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
@@ -33,11 +33,11 @@ public class SingleArgumentTest {
     /**
      * Supplies a single {@link NamedValue} argument.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArgument(NamedValue.of("test", "test"));
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArgument(NamedValue.of("test", "test"));
     }
 
     /**

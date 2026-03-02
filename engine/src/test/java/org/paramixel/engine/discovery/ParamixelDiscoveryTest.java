@@ -52,7 +52,7 @@ import org.junit.platform.engine.discovery.PackageSelector;
 import org.junit.platform.engine.discovery.UniqueIdSelector;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
 import org.paramixel.engine.descriptor.ParamixelEngineDescriptor;
@@ -518,8 +518,8 @@ public class ParamixelDiscoveryTest {
         }
 
         @Test
-        @DisplayName("Should handle argument supplier returning null or throwing by discovering no arguments")
-        public void shouldHandleNullOrThrowingArgumentSupplier() {
+        @DisplayName("Should handle arguments collector returning null or throwing by discovering no arguments")
+        public void shouldHandleNullOrThrowingArgumentsCollector() {
             assertArgumentCount(SupplierNullTestClass.class, 0);
             assertArgumentCount(SupplierThrowsTestClass.class, 0);
         }
@@ -682,9 +682,9 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierStreamTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            Stream.of("a", new NamedArg("b")).forEach(context::addArgument);
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            Stream.of("a", new NamedArg("b")).forEach(collector::addArgument);
         }
 
         @Paramixel.Test
@@ -694,9 +694,9 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierCollectionTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            List.of("a", new NamedArg("b")).forEach(context::addArgument);
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            List.of("a", new NamedArg("b")).forEach(collector::addArgument);
         }
 
         @Paramixel.Test
@@ -706,10 +706,10 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierIterableTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
             for (Object o : List.of("a", new NamedArg("b"))) {
-                context.addArgument(o);
+                collector.addArgument(o);
             }
         }
 
@@ -720,12 +720,12 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierIterableOnlyTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
             final List<Object> list = List.of("a", new NamedArg("b"));
             final Iterable<Object> iterable = (Iterable<Object>) () -> list.iterator();
             for (Object o : iterable) {
-                context.addArgument(o);
+                collector.addArgument(o);
             }
         }
 
@@ -736,10 +736,10 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierArrayTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.addArgument("a");
-            context.addArgument(new NamedArg("b"));
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.addArgument("a");
+            collector.addArgument(new NamedArg("b"));
         }
 
         @Paramixel.Test
@@ -749,9 +749,9 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierSingleObjectTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.addArgument(new NamedArg("only"));
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.addArgument(new NamedArg("only"));
         }
 
         @Paramixel.Test
@@ -761,8 +761,8 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierNullTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
             // Intentionally add no arguments.
         }
 
@@ -773,8 +773,8 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierThrowsTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
             throw new RuntimeException("boom");
         }
 
@@ -785,9 +785,9 @@ public class ParamixelDiscoveryTest {
     @Paramixel.TestClass
     public static class SupplierContextTestClass {
 
-        @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext context) {
-            context.addArguments("a", new NamedArg("b"));
+        @Paramixel.ArgumentsCollector
+        public static void arguments(final ArgumentsCollector collector) {
+            collector.addArguments("a", new NamedArg("b"));
         }
 
         @Paramixel.Test

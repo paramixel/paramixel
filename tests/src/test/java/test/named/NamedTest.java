@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
 
@@ -35,12 +35,12 @@ public class NamedTest {
      *
      * @return the collection of named arguments
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
         System.out.println("[ARGUMENT_SUPPLIER] Providing named arguments");
-        argumentSupplierContext.addArgument(new NamedString("First Argument"));
-        argumentSupplierContext.addArgument(new NamedString("Second Argument"));
-        argumentSupplierContext.addArgument(new NamedString("Third Argument"));
+        collector.addArgument(new NamedString("First Argument"));
+        collector.addArgument(new NamedString("Second Argument"));
+        collector.addArgument(new NamedString("Third Argument"));
     }
 
     /**

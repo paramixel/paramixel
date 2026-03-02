@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -38,11 +38,11 @@ public class StreamArgumentsTest {
     /**
      * Supplies a small set of string arguments.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArguments("stream1", "stream2");
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArguments("stream1", "stream2");
     }
 
     /**

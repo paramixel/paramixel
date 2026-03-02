@@ -19,7 +19,7 @@ package examples.simple;
 import examples.support.Logger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -37,13 +37,13 @@ public class ParallelArgumentTest {
     /**
      * Supplies a collection of string arguments.
      *
-     * @param argumentSupplierContext the argument supplier context
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.setParallelism(2);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.setParallelism(2);
         for (int i = 0; i < 10; i++) {
-            argumentSupplierContext.addArgument("string-" + i);
+            collector.addArgument("string-" + i);
         }
     }
 

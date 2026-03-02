@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -35,7 +35,7 @@ import org.paramixel.api.Paramixel;
  */
 public class ParallelArgumentTest {
 
-    /** Number of arguments supplied by {@link #arguments(ArgumentSupplierContext)}. */
+    /** Number of arguments supplied by {@link #arguments(ArgumentsCollector)}. */
     private static final int ARGUMENT_COUNT = 6;
 
     /** Number of times {@link #beforeAll(ArgumentContext)} is invoked. */
@@ -50,13 +50,13 @@ public class ParallelArgumentTest {
     /**
      * Supplies arguments and configures argument-level parallelism.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.setParallelism(2);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.setParallelism(2);
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
-            argumentSupplierContext.addArgument("String " + i);
+            collector.addArgument("String " + i);
         }
     }
 

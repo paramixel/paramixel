@@ -37,7 +37,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Paramixel;
 import org.testcontainers.containers.Network;
 
@@ -53,9 +53,9 @@ public class BufstreamTest {
     private static final String MESSAGE = "message";
     private static final String NETWORK = "network";
 
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) throws IOException {
-        BufstreamTestEnvironment.createTestEnvironments().forEach(argumentSupplierContext::addArgument);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) throws IOException {
+        BufstreamTestEnvironment.createTestEnvironments().forEach(collector::addArgument);
     }
 
     @Paramixel.BeforeAll

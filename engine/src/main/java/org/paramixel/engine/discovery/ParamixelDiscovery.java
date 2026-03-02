@@ -47,11 +47,11 @@ import org.junit.platform.engine.discovery.NestedClassSelector;
 import org.junit.platform.engine.discovery.PackageNameFilter;
 import org.junit.platform.engine.discovery.PackageSelector;
 import org.junit.platform.engine.discovery.UniqueIdSelector;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.EngineContext;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
-import org.paramixel.engine.api.ConcreteArgumentSupplierContext;
+import org.paramixel.engine.api.ConcreteArgumentsCollector;
 import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
@@ -120,7 +120,7 @@ public final class ParamixelDiscovery {
      * Engine context used during discovery-time argument supplier invocation.
      *
      * <p>Discovery occurs before engine execution, so full runtime configuration is not available.
-     * This context is provided to satisfy {@link ArgumentSupplierContext#getEngineContext()}.
+     * This context is provided to satisfy {@link ArgumentsCollector#getEngineContext()}.
      */
     private static final EngineContext DISCOVERY_ENGINE_CONTEXT =
             new ConcreteEngineContext(ENGINE_ID_SEGMENT, new Properties(), 1);
@@ -502,19 +502,19 @@ public final class ParamixelDiscovery {
      */
     private SupplierArguments getSupplierArguments(final @NonNull Class<?> testClass) {
         for (Method method : testClass.getDeclaredMethods()) {
-            if (method.isAnnotationPresent(Paramixel.ArgumentSupplier.class)) {
+            if (method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
                 try {
                     method.setAccessible(true);
 
-                    // Context-driven supplier: public static void arguments(ArgumentSupplierContext context)
+                    // Collector-driven: public static void arguments(ArgumentsCollector collector)
                     if (method.getParameterCount() == 1
-                            && method.getParameterTypes()[0].equals(ArgumentSupplierContext.class)
+                            && method.getParameterTypes()[0].equals(ArgumentsCollector.class)
                             && method.getReturnType().equals(void.class)
                             && Modifier.isStatic(method.getModifiers())) {
-                        final ConcreteArgumentSupplierContext context =
-                                new ConcreteArgumentSupplierContext(DISCOVERY_ENGINE_CONTEXT);
-                        method.invoke(null, context);
-                        return new SupplierArguments(context.toArray(), context.getParallelism());
+                        final ConcreteArgumentsCollector collector =
+                                new ConcreteArgumentsCollector(DISCOVERY_ENGINE_CONTEXT);
+                        method.invoke(null, collector);
+                        return new SupplierArguments(collector.toArray(), collector.getParallelism());
                     }
 
                     // Return-based supplier: public static Object arguments()
@@ -544,10 +544,10 @@ public final class ParamixelDiscovery {
                         return new SupplierArguments(new Object[] {result}, SupplierArguments.DEFAULT_PARALLELISM);
                     }
 
-                    LOGGER.warning("Invalid @ArgumentSupplier method signature: " + method);
+                    LOGGER.warning("Invalid @ArgumentsCollector method signature: " + method);
                     return SupplierArguments.empty();
                 } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "Failed to invoke argument supplier: " + method.getName(), e);
+                    LOGGER.log(Level.WARNING, "Failed to invoke arguments collector: " + method.getName(), e);
                     return SupplierArguments.empty();
                 }
             }

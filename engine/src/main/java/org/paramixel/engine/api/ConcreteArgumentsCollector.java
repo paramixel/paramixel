@@ -21,13 +21,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.NonNull;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.EngineContext;
 
 /**
  * Collects argument values and per-class parallelism during discovery.
  *
- * <p>This type implements {@link ArgumentSupplierContext} for the engine. Suppliers add argument
+ * <p>This type implements {@link ArgumentsCollector} for the engine. Collector methods add argument
  * values via {@link #addArgument(Object)} / {@link #addArguments(Object...)} and may override
  * per-test-class parallelism via {@link #setParallelism(int)}.
  *
@@ -37,7 +37,7 @@ import org.paramixel.api.EngineContext;
  *
  * @author Douglas Hoard
  */
-public final class ConcreteArgumentSupplierContext implements ArgumentSupplierContext {
+public final class ConcreteArgumentsCollector implements ArgumentsCollector {
 
     /** Parent engine context associated with the supplier; immutable. */
     private final EngineContext engineContext;
@@ -61,7 +61,7 @@ public final class ConcreteArgumentSupplierContext implements ArgumentSupplierCo
      *
      * @param engineContext the engine context associated with the class; never {@code null}
      */
-    public ConcreteArgumentSupplierContext(final @NonNull EngineContext engineContext) {
+    public ConcreteArgumentsCollector(final @NonNull EngineContext engineContext) {
         this.engineContext = Objects.requireNonNull(engineContext, "engineContext must not be null");
     }
 
@@ -71,13 +71,13 @@ public final class ConcreteArgumentSupplierContext implements ArgumentSupplierCo
     }
 
     @Override
-    public ArgumentSupplierContext addArgument(final Object argument) {
+    public ArgumentsCollector addArgument(final Object argument) {
         arguments.add(argument);
         return this;
     }
 
     @Override
-    public ArgumentSupplierContext addArguments(final Object... arguments) {
+    public ArgumentsCollector addArguments(final Object... arguments) {
         if (arguments == null) {
             return this;
         }
@@ -86,13 +86,13 @@ public final class ConcreteArgumentSupplierContext implements ArgumentSupplierCo
     }
 
     @Override
-    public ArgumentSupplierContext addArguments(final @NonNull List<?> arguments) {
+    public ArgumentsCollector addArguments(final @NonNull List<?> arguments) {
         this.arguments.addAll(arguments);
         return this;
     }
 
     @Override
-    public ArgumentSupplierContext setParallelism(final int parallelism) {
+    public ArgumentsCollector setParallelism(final int parallelism) {
         if (parallelism < 1) {
             throw new IllegalArgumentException("parallelism must be >= 1");
         }

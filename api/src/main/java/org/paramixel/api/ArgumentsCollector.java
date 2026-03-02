@@ -21,14 +21,14 @@ import java.util.List;
 /**
  * Collector-style context for building argument sets for Paramixel test execution.
  *
- * <p>An {@code ArgumentSupplierContext} is intended for use by argument suppliers that want to
+ * <p>An {@code ArgumentsCollector} is intended for use by collector methods that want to
  * programmatically register one or more argument values rather than returning an argument
  * container (for example, a {@link java.util.stream.Stream}, {@link java.util.Collection},
  * {@link Iterable}, array, or single object).
  *
- * <p>The context acts as an append-only sink: suppliers call one of the {@code add*} methods to
- * contribute argument values. The Paramixel engine (or a higher-level integration) is then
- * responsible for consuming the collected arguments and scheduling test invocations.
+ * <p>The collector acts as an append-only sink: implementations call one of the {@code add*}
+ * methods to contribute argument values. The Paramixel engine (or a higher-level integration)
+ * is then responsible for consuming the collected arguments and scheduling test invocations.
  *
  * <h2>Argument Semantics</h2>
  * <ul>
@@ -44,32 +44,32 @@ import java.util.List;
  *
  * <h2>Threading</h2>
  * <p>Unless explicitly documented by a concrete implementation, callers should assume this
- * context is not thread-safe. Populate arguments from a single thread during supplier execution.
+ * collector is not thread-safe. Populate arguments from a single thread during collection.
  *
  * <h2>Example</h2>
  * <pre>{@code
  * @Paramixel.TestClass
  * public final class MyTest {
  *
- *     @Paramixel.ArgumentSupplier
- *     public static void arguments(ArgumentSupplierContext context) {
- *         context.addArgument(1);
- *         context.addArguments(2, 3, 4);
- *         context.addArguments(List.of(5, 6));
+ *     @Paramixel.ArgumentsCollector
+ *     public static void arguments(ArgumentsCollector collector) {
+ *         collector.addArgument(1);
+ *         collector.addArguments(2, 3, 4);
+ *         collector.addArguments(List.of(5, 6));
  *     }
  *
  *     @Paramixel.Test
  *     public void test(ArgumentContext argumentContext) {
- *         // context.getArgument() is 1, then 2, then 3, etc.
+ *         // argumentContext.getArgument() is 1, then 2, then 3, etc.
  *     }
  * }
  * }</pre>
  *
- * <p><b>Compatibility note:</b> The signature shown in the example ({@code arguments(ArgumentSupplierContext)})
- * depends on whether/where the context-driven supplier pattern is supported by the calling
- * integration. This interface defines the contract for the collector itself.
+ * <p><b>Compatibility note:</b> The signature shown in the example ({@code arguments(ArgumentsCollector)})
+ * depends on whether/where the collector-driven pattern is supported by the calling integration.
+ * This interface defines the contract for the collector itself.
  */
-public interface ArgumentSupplierContext {
+public interface ArgumentsCollector {
 
     /**
      * Returns the parent {@link EngineContext} associated with this test class.
@@ -93,7 +93,7 @@ public interface ArgumentSupplierContext {
      *     implementation
      * @return this argument supplier context
      */
-    ArgumentSupplierContext addArgument(Object argument);
+    ArgumentsCollector addArgument(Object argument);
 
     /**
      * Adds multiple argument values to the supplier output.
@@ -105,7 +105,7 @@ public interface ArgumentSupplierContext {
      *     values if supported by the implementation
      * @return this argument supplier context
      */
-    ArgumentSupplierContext addArguments(Object... arguments);
+    ArgumentsCollector addArguments(Object... arguments);
 
     /**
      * Adds multiple argument values to the supplier output.
@@ -118,7 +118,7 @@ public interface ArgumentSupplierContext {
      * @return this argument supplier context
      * @throws NullPointerException if {@code arguments} is {@code null}
      */
-    ArgumentSupplierContext addArguments(List<?> arguments);
+    ArgumentsCollector addArguments(List<?> arguments);
 
     /**
      * Sets the parallelism level for test execution based on the arguments supplied by this
@@ -131,5 +131,5 @@ public interface ArgumentSupplierContext {
      * @return this argument supplier context
      * @throws IllegalArgumentException if {@code parallelism} is not a positive integer
      */
-    ArgumentSupplierContext setParallelism(int parallelism);
+    ArgumentsCollector setParallelism(int parallelism);
 }

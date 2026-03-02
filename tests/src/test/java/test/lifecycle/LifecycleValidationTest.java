@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -42,14 +42,14 @@ public class LifecycleValidationTest {
     /**
      * Supplies arguments for parameterized execution.
      *
-     * @param argumentSupplierContext the argument supplier context
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        stateMap.computeIfAbsent("@Paramixel.ArgumentSupplier", k -> new ArrayList<>())
-                .add("@Paramixel.ArgumentSupplier");
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        stateMap.computeIfAbsent("@Paramixel.ArgumentsCollector", k -> new ArrayList<>())
+                .add("@Paramixel.ArgumentsCollector");
         System.out.println("[ARGUMENT_SUPPLIER] Providing arguments for test methods");
-        argumentSupplierContext.addArguments("Argument 1", "Argument 2", "Argument 3");
+        collector.addArguments("Argument 1", "Argument 2", "Argument 3");
     }
 
     /**
@@ -173,8 +173,8 @@ public class LifecycleValidationTest {
         System.out.println(
                 "[FINALIZE] Test class completed: " + context.getTestClass().getName());
 
-        assertThat(stateMap.get("@Paramixel.ArgumentSupplier"))
-                .as("ArgumentSupplier list")
+        assertThat(stateMap.get("@Paramixel.ArgumentsCollector"))
+                .as("ArgumentsCollector list")
                 .isNotNull()
                 .hasSize(1);
         assertThat(stateMap.get("@Paramixel.Initialize"))
