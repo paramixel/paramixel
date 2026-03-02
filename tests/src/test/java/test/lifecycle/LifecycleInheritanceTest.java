@@ -22,12 +22,12 @@ import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
-@Paramixel.TestClass
 /**
  * Verifies lifecycle hook inheritance between a base class and a subclass.
  *
  * <p>The expected ordering is asserted in {@link LifecycleInheritanceBase#baseClassFinalize(ClassContext)}.
  */
+@Paramixel.TestClass
 public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
 
     /**
@@ -37,6 +37,7 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      */
     @Paramixel.ArgumentsCollector
     public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.setParallelism(1);
         collector.addArgument("argument[0]");
     }
 
@@ -46,7 +47,8 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current class
      */
     @Paramixel.Initialize
-    public void subClassInitialize(final ClassContext context) {
+    @Paramixel.Order(2)
+    public void subClassInitialize(final @NonNull ClassContext context) {
         actual.add("subClassInitialize");
     }
 
@@ -56,6 +58,7 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.BeforeAll
+    @Paramixel.Order(10)
     public void subClassBeforeAll(final @NonNull ArgumentContext context) {
         actual.add("subClassBeforeAll");
     }
@@ -66,6 +69,7 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.BeforeEach
+    @Paramixel.Order(20)
     public void subClassBeforeEach(final @NonNull ArgumentContext context) {
         actual.add("subClassBeforeEach");
     }
@@ -76,6 +80,7 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.Test
+    @Paramixel.Order(2)
     public void test1(final @NonNull ArgumentContext context) {
         actual.add("test1");
     }
@@ -86,6 +91,7 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.Test
+    @Paramixel.Order(1)
     public void test2(final @NonNull ArgumentContext context) {
         actual.add("test2");
     }
@@ -96,6 +102,7 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.AfterEach
+    @Paramixel.Order(10)
     public void subClassAfterEach(final @NonNull ArgumentContext context) {
         actual.add("subClassAfterEach");
     }
@@ -106,6 +113,7 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.AfterAll
+    @Paramixel.Order(10)
     public void subClassAfterAll(final @NonNull ArgumentContext context) {
         actual.add("subClassAfterAll");
     }
@@ -116,7 +124,8 @@ public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
      * @param context for the current class
      */
     @Paramixel.Finalize
-    public void subClassFinalize(final ClassContext context) {
+    @Paramixel.Order(10)
+    public void subClassFinalize(final @NonNull ClassContext context) {
         actual.add("subClassFinalize");
     }
 }

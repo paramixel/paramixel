@@ -18,6 +18,8 @@ package org.paramixel.engine.listener;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
@@ -37,7 +39,6 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
  * <p>This class is thread-safe for concurrent event dispatch. It updates shared counters via
  * {@link AbstractEngineExecutionListener.ExecutionSummary}.
  *
- * @author Douglas Hoard
  */
 public class ParamixelEngineExecutionListener extends AbstractEngineExecutionListener {
 
@@ -49,16 +50,34 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
      *
      * <p>This map is initialized once and not mutated afterward.
      */
-    private static final Map<Class<?>, EngineExecutionListener> engineListeners = new HashMap<>();
+    private final Consumer<String> printer;
 
-    static {
-        engineListeners.put(ParamixelEngineDescriptor.class, new ParamixelEngineDescriptorEngineExecutionListener());
+    private final EngineExecutionListener delegate;
+
+    private final Map<Class<?>, EngineExecutionListener> engineListeners;
+
+    public ParamixelEngineExecutionListener() {
+        this(System.out::println, new EngineExecutionListener() {});
+    }
+
+    public ParamixelEngineExecutionListener(final @NonNull Consumer<String> printer) {
+        this(printer, new EngineExecutionListener() {});
+    }
+
+    public ParamixelEngineExecutionListener(
+            final @NonNull Consumer<String> printer, final @NonNull EngineExecutionListener delegate) {
+        this.printer = Objects.requireNonNull(printer, "printer must not be null");
+        this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
+        this.engineListeners = new HashMap<>();
         engineListeners.put(
-                ParamixelTestClassDescriptor.class, new ParamixelTestClassDescriptorEngineExecutionListener());
+                ParamixelEngineDescriptor.class, new ParamixelEngineDescriptorEngineExecutionListener(printer));
         engineListeners.put(
-                ParamixelTestArgumentDescriptor.class, new ParamixelTestArgumentDescriptorEngineExecutionListener());
+                ParamixelTestClassDescriptor.class, new ParamixelTestClassDescriptorEngineExecutionListener(printer));
         engineListeners.put(
-                ParamixelTestMethodDescriptor.class, new ParamixelTestMethodDescriptorEngineExecutionListener());
+                ParamixelTestArgumentDescriptor.class,
+                new ParamixelTestArgumentDescriptorEngineExecutionListener(printer));
+        engineListeners.put(
+                ParamixelTestMethodDescriptor.class, new ParamixelTestMethodDescriptorEngineExecutionListener(printer));
     }
 
     /**
@@ -89,6 +108,8 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
 
     @Override
     public void executionStarted(final @NonNull TestDescriptor testDescriptor) {
+        delegate.executionStarted(testDescriptor);
+
         ExecutionSummary summary = getExecutionSummary();
 
         if (testDescriptor instanceof ParamixelTestClassDescriptor) {
@@ -113,11 +134,13 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
         }
 
         String threadName = Thread.currentThread().getName();
-        System.out.println(INFO + " " + threadName + " | START | " + testDescriptor.getUniqueId());
+        printer.accept(INFO + " " + threadName + " | START | " + testDescriptor.getUniqueId());
     }
 
     @Override
     public void executionSkipped(final @NonNull TestDescriptor testDescriptor, @NonNull final String reason) {
+        delegate.executionSkipped(testDescriptor, reason);
+
         ExecutionSummary summary = getExecutionSummary();
         if (testDescriptor instanceof ParamixelTestClassDescriptor) {
             summary.incrementTestClassSkipped();
@@ -134,13 +157,14 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
         }
 
         String threadName = Thread.currentThread().getName();
-        System.out.println(
-                "[INFO] " + threadName + " | SKIPPED | " + testDescriptor.getUniqueId() + ", reason: " + reason);
+        printer.accept("[INFO] " + threadName + " | SKIPPED | " + testDescriptor.getUniqueId() + ", reason: " + reason);
     }
 
     @Override
     public void executionFinished(
             final @NonNull TestDescriptor testDescriptor, final @NonNull TestExecutionResult testExecutionResult) {
+        delegate.executionFinished(testDescriptor, testExecutionResult);
+
         ExecutionSummary summary = getExecutionSummary();
         switch (testExecutionResult.getStatus()) {
             case SUCCESSFUL: {
@@ -189,7 +213,7 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
         }
 
         String threadName = Thread.currentThread().getName();
-        System.out.println(INFO + " " + threadName + " | FINISH | " + testDescriptor.getUniqueId() + ", result: "
+        printer.accept(INFO + " " + threadName + " | FINISH | " + testDescriptor.getUniqueId() + ", result: "
                 + testExecutionResult.getStatus());
     }
 }

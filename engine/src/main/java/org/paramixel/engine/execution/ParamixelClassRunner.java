@@ -60,7 +60,6 @@ import org.paramixel.engine.util.FastId;
  * {@code classContexts} and {@code testInstances} maps. When the engine executes multiple test
  * classes concurrently, the caller must provide thread-safe map implementations.
  *
- * @author Douglas Hoard
  */
 public final class ParamixelClassRunner {
 
@@ -440,7 +439,8 @@ public final class ParamixelClassRunner {
     /**
      * Executes {@link Paramixel.Initialize} methods for the class hierarchy.
      *
-     * <p>This method executes initialize hooks in "before" order (superclass first). When any
+     * <p>This method executes initialize hooks in deterministic order (flattened across the class
+     * hierarchy; ordered by {@link Paramixel.Order} value and then method name). When any
      * initialize method fails, it records the failure and aborts further initialization.
      *
      * @param testClass the test class; never {@code null}
@@ -450,7 +450,7 @@ public final class ParamixelClassRunner {
      */
     private boolean runInitialize(
             final Class<?> testClass, final ConcreteClassContext classContext, final Object testInstance) {
-        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Initialize.class, true);
+        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Initialize.class);
         for (Method method : methods) {
             try {
                 ParamixelReflectionInvoker.invokeInitialize(method, testInstance, classContext);
@@ -466,7 +466,8 @@ public final class ParamixelClassRunner {
     /**
      * Executes {@link Paramixel.Finalize} methods for the class hierarchy.
      *
-     * <p>This method executes finalize hooks in "after" order (subclass first). It records any
+     * <p>This method executes finalize hooks in deterministic order (flattened across the class
+     * hierarchy; ordered by {@link Paramixel.Order} value and then method name). It records any
      * thrown exception and continues executing remaining finalize hooks.
      *
      * @param testClass the test class; never {@code null}
@@ -477,7 +478,7 @@ public final class ParamixelClassRunner {
             final @NonNull Class<?> testClass,
             final @NonNull ConcreteClassContext classContext,
             final @NonNull Object testInstance) {
-        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Finalize.class, false);
+        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Finalize.class);
         for (Method method : methods) {
             try {
                 ParamixelReflectionInvoker.invokeFinalize(method, testInstance, classContext);
@@ -491,8 +492,9 @@ public final class ParamixelClassRunner {
     /**
      * Executes {@link Paramixel.BeforeAll} methods for a specific argument.
      *
-     * <p>This method executes before-all hooks in "before" order (superclass first) and aborts
-     * on the first failure.
+     * <p>This method executes before-all hooks in deterministic order (flattened across the class
+     * hierarchy; ordered by {@link Paramixel.Order} value and then method name) and aborts on the
+     * first failure.
      *
      * @param testClass the test class; never {@code null}
      * @param classContext the class context used for context lookup and failure recording; never {@code null}
@@ -508,7 +510,7 @@ public final class ParamixelClassRunner {
             final @NonNull Object argument,
             final int argumentIndex) {
         final ArgumentContext argumentContext = classContext.getOrCreateArgumentContext(argument, argumentIndex);
-        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeAll.class, true);
+        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeAll.class);
 
         for (Method method : methods) {
             try {
@@ -526,7 +528,8 @@ public final class ParamixelClassRunner {
     /**
      * Executes {@link Paramixel.AfterAll} methods for a specific argument.
      *
-     * <p>This method executes after-all hooks in "after" order (subclass first). It records all
+     * <p>This method executes after-all hooks in deterministic order (flattened across the class
+     * hierarchy; ordered by {@link Paramixel.Order} value and then method name). It records all
      * failures and returns the first encountered exception.
      *
      * <p>After hook execution, this method removes the per-argument context via
@@ -546,7 +549,7 @@ public final class ParamixelClassRunner {
             final @NonNull Object argument,
             final int argumentIndex) {
         final ArgumentContext argumentContext = classContext.getOrCreateArgumentContext(argument, argumentIndex);
-        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterAll.class, false);
+        final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterAll.class);
         Throwable firstFailure = null;
 
         for (Method method : methods) {
@@ -568,40 +571,66 @@ public final class ParamixelClassRunner {
     /**
      * Returns lifecycle methods annotated with the given annotation.
      *
-     * <p>The method list includes declared methods from the class hierarchy, optionally reversed
-     * to support "before" ordering. The returned list is immutable.
+     * <p>The method list includes declared methods from the class hierarchy, flattened and de-duped
+     * by signature (most specific declaration wins), and ordered deterministically by
+     * {@link Paramixel.Order} value (unordered last) and then by method name. The returned list is
+     * immutable.
      *
      * @param testClass the root test class; never {@code null}
      * @param annotationType the lifecycle annotation type to match; never {@code null}
-     * @param beforeOrder {@code true} to order superclass first; {@code false} for subclass first
      * @return an immutable list of lifecycle methods; never {@code null}
      */
     private List<Method> getLifecycleMethods(
-            final Class<?> testClass, final Class<? extends Annotation> annotationType, final boolean beforeOrder) {
-        final LifecycleCacheKey cacheKey = new LifecycleCacheKey(testClass, annotationType, beforeOrder);
+            final Class<?> testClass, final Class<? extends Annotation> annotationType) {
+        final LifecycleCacheKey cacheKey = new LifecycleCacheKey(testClass, annotationType);
         return LIFECYCLE_METHOD_CACHE.computeIfAbsent(cacheKey, key -> {
-            final List<Class<?>> classHierarchy = new ArrayList<>();
+            final Map<String, Method> bySignature = new ConcurrentHashMap<>();
             for (Class<?> current = testClass;
                     current != null && current != Object.class;
                     current = current.getSuperclass()) {
-                classHierarchy.add(current);
-            }
-
-            if (beforeOrder) {
-                Collections.reverse(classHierarchy);
-            }
-
-            final List<Method> methods = new ArrayList<>();
-            for (Class<?> current : classHierarchy) {
                 for (Method method : current.getDeclaredMethods()) {
-                    if (method.isAnnotationPresent(annotationType)) {
-                        methods.add(method);
+                    if (!method.isAnnotationPresent(annotationType)) {
+                        continue;
                     }
+                    if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
+                        continue;
+                    }
+
+                    final String signatureKey = signatureKey(method);
+
+                    // Most-specific (subclass) declaration wins.
+                    bySignature.putIfAbsent(signatureKey, method);
                 }
             }
 
+            final List<Method> methods = new ArrayList<>(bySignature.values());
+            methods.sort(
+                    Comparator.comparingInt(ParamixelClassRunner::getOrderValue).thenComparing(Method::getName));
             return Collections.unmodifiableList(methods);
         });
+    }
+
+    private static int getOrderValue(final @NonNull Method method) {
+        final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
+        if (order == null) {
+            return Integer.MAX_VALUE;
+        }
+        return order.value();
+    }
+
+    private static String signatureKey(final @NonNull Method method) {
+        final StringBuilder builder = new StringBuilder();
+        builder.append(method.getName());
+        builder.append('(');
+        final Class<?>[] parameterTypes = method.getParameterTypes();
+        for (int i = 0; i < parameterTypes.length; i++) {
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append(parameterTypes[i].getName());
+        }
+        builder.append(')');
+        return builder.toString();
     }
 
     /**
@@ -686,21 +715,15 @@ public final class ParamixelClassRunner {
         /** Lifecycle annotation type used for matching; immutable. */
         private final Class<? extends Annotation> annotationType;
 
-        /** Ordering flag used for before/after semantics; immutable. */
-        private final boolean beforeOrder;
-
         /**
          * Creates a cache key.
          *
          * @param testClass the test class; never {@code null}
          * @param annotationType the lifecycle annotation type; never {@code null}
-         * @param beforeOrder ordering flag
          */
-        private LifecycleCacheKey(
-                final Class<?> testClass, final Class<? extends Annotation> annotationType, final boolean beforeOrder) {
+        private LifecycleCacheKey(final Class<?> testClass, final Class<? extends Annotation> annotationType) {
             this.testClass = testClass;
             this.annotationType = annotationType;
-            this.beforeOrder = beforeOrder;
         }
 
         @Override
@@ -712,16 +735,13 @@ public final class ParamixelClassRunner {
                 return false;
             }
             LifecycleCacheKey that = (LifecycleCacheKey) o;
-            return beforeOrder == that.beforeOrder
-                    && testClass.equals(that.testClass)
-                    && annotationType.equals(that.annotationType);
+            return testClass.equals(that.testClass) && annotationType.equals(that.annotationType);
         }
 
         @Override
         public int hashCode() {
             int result = testClass.hashCode();
             result = 31 * result + annotationType.hashCode();
-            result = 31 * result + (beforeOrder ? 1 : 0);
             return result;
         }
     }

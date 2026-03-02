@@ -18,10 +18,6 @@ package org.paramixel.engine.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
@@ -31,23 +27,12 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 
 public class DescriptorExecutionListenersTest {
 
-    private PrintStream originalOut;
-    private ByteArrayOutputStream out;
-
-    @BeforeEach
-    public void setUp() {
-        originalOut = System.out;
-        out = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(out));
-    }
-
-    @AfterEach
-    public void tearDown() {
-        System.setOut(originalOut);
-    }
-
     @Test
     public void descriptorSpecificListeners_printStartAndEndLines() throws Exception {
+        final StringBuilder out = new StringBuilder();
+        final var printer =
+                (java.util.function.Consumer<String>) line -> out.append(line).append("\n");
+
         final UniqueId rootId = UniqueId.forEngine("paramixel");
         final ParamixelTestClassDescriptor clazz =
                 new ParamixelTestClassDescriptor(rootId.append("class", "c"), String.class, "C");
@@ -59,15 +44,15 @@ public class DescriptorExecutionListenersTest {
         clazz.addChild(arg);
         arg.addChild(method);
 
-        final var classListener = new ParamixelTestClassDescriptorEngineExecutionListener();
+        final var classListener = new ParamixelTestClassDescriptorEngineExecutionListener(printer);
         classListener.executionStarted(clazz);
         classListener.executionFinished(clazz, TestExecutionResult.successful());
 
-        final var argListener = new ParamixelTestArgumentDescriptorEngineExecutionListener();
+        final var argListener = new ParamixelTestArgumentDescriptorEngineExecutionListener(printer);
         argListener.executionStarted(arg);
         argListener.executionFinished(arg, TestExecutionResult.failed(new RuntimeException("boom")));
 
-        final var methodListener = new ParamixelTestMethodDescriptorEngineExecutionListener();
+        final var methodListener = new ParamixelTestMethodDescriptorEngineExecutionListener(printer);
         methodListener.executionStarted(method);
         methodListener.executionFinished(method, TestExecutionResult.aborted(new RuntimeException("abort")));
 

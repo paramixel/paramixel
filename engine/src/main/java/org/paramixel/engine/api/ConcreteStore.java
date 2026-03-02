@@ -134,9 +134,10 @@ public final class ConcreteStore implements Store {
             return null;
         });
 
-        @SuppressWarnings("unchecked")
-        final T result = (T) removed[0];
-        return result;
+        if (removed[0] == null) {
+            return null;
+        }
+        return type.cast(removed[0]);
     }
 
     @Override

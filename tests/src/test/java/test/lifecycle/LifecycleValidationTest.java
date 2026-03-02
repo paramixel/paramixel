@@ -19,9 +19,10 @@ package test.lifecycle;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ArgumentsCollector;
@@ -37,7 +38,7 @@ public class LifecycleValidationTest {
     /**
      * Captures lifecycle events by annotation name.
      */
-    private static final Map<String, List<String>> stateMap = new HashMap<>();
+    private static final Map<String, List<String>> stateMap = new ConcurrentHashMap<>();
 
     /**
      * Supplies arguments for parameterized execution.
@@ -46,9 +47,9 @@ public class LifecycleValidationTest {
      */
     @Paramixel.ArgumentsCollector
     public static void arguments(final @NonNull ArgumentsCollector collector) {
-        stateMap.computeIfAbsent("@Paramixel.ArgumentsCollector", k -> new ArrayList<>())
+        stateMap.clear();
+        stateMap.computeIfAbsent("@Paramixel.ArgumentsCollector", k -> Collections.synchronizedList(new ArrayList<>()))
                 .add("@Paramixel.ArgumentsCollector");
-        System.out.println("[ARGUMENT_SUPPLIER] Providing arguments for test methods");
         collector.addArguments("Argument 1", "Argument 2", "Argument 3");
     }
 
@@ -59,10 +60,8 @@ public class LifecycleValidationTest {
      */
     @Paramixel.Initialize
     public void initialize(final @NonNull ClassContext context) {
-        stateMap.computeIfAbsent("@Paramixel.Initialize", k -> new ArrayList<>())
+        stateMap.computeIfAbsent("@Paramixel.Initialize", k -> Collections.synchronizedList(new ArrayList<>()))
                 .add("@Paramixel.Initialize");
-        System.out.println("[INITIALIZE] Test class: " + context.getTestClass().getName());
-        System.out.println("[INITIALIZE] Test instance: " + context.getTestInstance());
     }
 
     /**
@@ -72,9 +71,8 @@ public class LifecycleValidationTest {
      */
     @Paramixel.BeforeAll
     public void beforeAll(final @NonNull ArgumentContext context) {
-        stateMap.computeIfAbsent("@Paramixel.BeforeAll", k -> new ArrayList<>()).add("@Paramixel.BeforeAll");
-        System.out.println("[BEFORE_ALL] Executing before all test methods");
-        System.out.println("[BEFORE_ALL] Argument: " + context.getArgument());
+        stateMap.computeIfAbsent("@Paramixel.BeforeAll", k -> Collections.synchronizedList(new ArrayList<>()))
+                .add("@Paramixel.BeforeAll");
     }
 
     /**
@@ -84,10 +82,8 @@ public class LifecycleValidationTest {
      */
     @Paramixel.BeforeEach
     public void beforeEach(final @NonNull ArgumentContext context) {
-        stateMap.computeIfAbsent("@Paramixel.BeforeEach", k -> new ArrayList<>())
+        stateMap.computeIfAbsent("@Paramixel.BeforeEach", k -> Collections.synchronizedList(new ArrayList<>()))
                 .add("@Paramixel.BeforeEach");
-        System.out.println("[BEFORE_EACH] Before test execution");
-        System.out.println("[BEFORE_EACH] Argument: " + context.getArgument());
     }
 
     /**
@@ -97,13 +93,9 @@ public class LifecycleValidationTest {
      */
     @Paramixel.Test
     public void testMethod1(final @NonNull ArgumentContext context) {
-        stateMap.computeIfAbsent("@Paramixel.Test", k -> new ArrayList<>()).add("@Paramixel.Test");
-        Object argument = context.getArgument();
-        System.out.println("[TEST_METHOD] Executing test with argument: " + argument);
-        if (argument != null) {
-            System.out.println(
-                    "[TEST_METHOD] Argument class: " + argument.getClass().getName());
-        }
+        stateMap.computeIfAbsent("@Paramixel.Test", k -> Collections.synchronizedList(new ArrayList<>()))
+                .add("@Paramixel.Test");
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
@@ -113,13 +105,9 @@ public class LifecycleValidationTest {
      */
     @Paramixel.Test
     public void testMethod2(final @NonNull ArgumentContext context) {
-        stateMap.computeIfAbsent("@Paramixel.Test", k -> new ArrayList<>()).add("@Paramixel.Test");
-        Object argument = context.getArgument();
-        System.out.println("[TEST_METHOD] Executing test with argument: " + argument);
-        if (argument != null) {
-            System.out.println(
-                    "[TEST_METHOD] Argument class: " + argument.getClass().getName());
-        }
+        stateMap.computeIfAbsent("@Paramixel.Test", k -> Collections.synchronizedList(new ArrayList<>()))
+                .add("@Paramixel.Test");
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
@@ -129,13 +117,9 @@ public class LifecycleValidationTest {
      */
     @Paramixel.Test
     public void testMethod3(final @NonNull ArgumentContext context) {
-        stateMap.computeIfAbsent("@Paramixel.Test", k -> new ArrayList<>()).add("@Paramixel.Test");
-        Object argument = context.getArgument();
-        System.out.println("[TEST_METHOD] Executing test with argument: " + argument);
-        if (argument != null) {
-            System.out.println(
-                    "[TEST_METHOD] Argument class: " + argument.getClass().getName());
-        }
+        stateMap.computeIfAbsent("@Paramixel.Test", k -> Collections.synchronizedList(new ArrayList<>()))
+                .add("@Paramixel.Test");
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
@@ -145,9 +129,8 @@ public class LifecycleValidationTest {
      */
     @Paramixel.AfterEach
     public void afterEach(final @NonNull ArgumentContext context) {
-        stateMap.computeIfAbsent("@Paramixel.AfterEach", k -> new ArrayList<>()).add("@Paramixel.AfterEach");
-        System.out.println("[AFTER_EACH] After test execution");
-        System.out.println("[AFTER_EACH] Argument: " + context.getArgument());
+        stateMap.computeIfAbsent("@Paramixel.AfterEach", k -> Collections.synchronizedList(new ArrayList<>()))
+                .add("@Paramixel.AfterEach");
     }
 
     /**
@@ -157,9 +140,8 @@ public class LifecycleValidationTest {
      */
     @Paramixel.AfterAll
     public void afterAll(final @NonNull ArgumentContext context) {
-        stateMap.computeIfAbsent("@Paramixel.AfterAll", k -> new ArrayList<>()).add("@Paramixel.AfterAll");
-        System.out.println("[AFTER_ALL] Executing after all test methods");
-        System.out.println("[AFTER_ALL] Argument: " + context.getArgument());
+        stateMap.computeIfAbsent("@Paramixel.AfterAll", k -> Collections.synchronizedList(new ArrayList<>()))
+                .add("@Paramixel.AfterAll");
     }
 
     /**
@@ -169,9 +151,8 @@ public class LifecycleValidationTest {
      */
     @Paramixel.Finalize
     public void finalize(final @NonNull ClassContext context) {
-        stateMap.computeIfAbsent("@Paramixel.Finalize", k -> new ArrayList<>()).add("@Paramixel.Finalize");
-        System.out.println(
-                "[FINALIZE] Test class completed: " + context.getTestClass().getName());
+        stateMap.computeIfAbsent("@Paramixel.Finalize", k -> Collections.synchronizedList(new ArrayList<>()))
+                .add("@Paramixel.Finalize");
 
         assertThat(stateMap.get("@Paramixel.ArgumentsCollector"))
                 .as("ArgumentsCollector list")

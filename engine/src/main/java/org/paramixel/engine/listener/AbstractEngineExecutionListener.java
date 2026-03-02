@@ -36,7 +36,6 @@ import org.junit.platform.engine.TestExecutionResult;
  * <p>This type is thread-safe with respect to summary updates. It uses thread-safe counters and
  * concurrent maps inside {@link ExecutionSummary}.
  *
- * @author Douglas Hoard
  */
 public class AbstractEngineExecutionListener implements EngineExecutionListener {
 

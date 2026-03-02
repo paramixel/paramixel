@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -30,6 +31,7 @@ import org.paramixel.api.Paramixel;
  *
  * <p>This validator enforces framework-level contracts such as visibility, return type,
  * and parameter types for methods annotated with {@link Paramixel.Test},
+ * {@link Paramixel.ArgumentsCollector},
  * {@link Paramixel.BeforeEach}, {@link Paramixel.AfterEach}, {@link Paramixel.BeforeAll},
  * {@link Paramixel.AfterAll}, {@link Paramixel.Initialize}, and {@link Paramixel.Finalize}.</p>
  *
@@ -38,9 +40,10 @@ import org.paramixel.api.Paramixel;
  * Callers are expected to decide whether to skip or fail test discovery based on
  * the returned failures.</p>
  *
- * @author Douglas Hoard
  */
-public class MethodValidator {
+public final class MethodValidator {
+
+    private MethodValidator() {}
 
     /**
      * Validates a test class and its annotated methods.
@@ -52,46 +55,121 @@ public class MethodValidator {
      * @return a list of validation failures; empty when the class is valid
      */
     public static List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
-        List<ValidationFailure> failures = new ArrayList<>();
+        final List<ValidationFailure> failures = new ArrayList<>();
+        final List<Class<?>> classHierarchy = buildClassHierarchy(testClass);
 
-        // Validate test methods
-        for (Method method : testClass.getMethods()) {
-            final boolean isTestMethod = method.isAnnotationPresent(Paramixel.Test.class);
+        for (Class<?> current : classHierarchy) {
+            for (Method method : current.getDeclaredMethods()) {
+                final boolean isTestMethod = method.isAnnotationPresent(Paramixel.Test.class);
+                final boolean isLifecycleMethod = method.isAnnotationPresent(Paramixel.Initialize.class)
+                        || method.isAnnotationPresent(Paramixel.BeforeAll.class)
+                        || method.isAnnotationPresent(Paramixel.BeforeEach.class)
+                        || method.isAnnotationPresent(Paramixel.AfterEach.class)
+                        || method.isAnnotationPresent(Paramixel.AfterAll.class)
+                        || method.isAnnotationPresent(Paramixel.Finalize.class);
 
-            if (method.isAnnotationPresent(Paramixel.Test.class)) {
-                failures.addAll(validateTestMethod(method));
-            }
-            if (method.isAnnotationPresent(Paramixel.BeforeEach.class)) {
-                failures.addAll(validateBeforeEachMethod(method));
-            }
-            if (method.isAnnotationPresent(Paramixel.AfterEach.class)) {
-                failures.addAll(validateAfterEachMethod(method));
-            }
-            if (method.isAnnotationPresent(Paramixel.BeforeAll.class)) {
-                failures.addAll(validateBeforeAllMethod(method));
-            }
-            if (method.isAnnotationPresent(Paramixel.AfterAll.class)) {
-                failures.addAll(validateAfterAllMethod(method));
-            }
-            if (method.isAnnotationPresent(Paramixel.Initialize.class)) {
-                failures.addAll(validateInitializeMethod(method));
-            }
-            if (method.isAnnotationPresent(Paramixel.Finalize.class)) {
-                failures.addAll(validateFinalizeMethod(method));
-            }
-
-            if (method.isAnnotationPresent(Paramixel.Order.class)) {
-                if (!isTestMethod) {
-                    failures.add(new ValidationFailure(
-                            "Order annotation is only allowed on @Test methods: " + method.getName()));
+                if (method.isAnnotationPresent(Paramixel.Test.class)) {
+                    failures.addAll(validateTestMethod(method));
                 }
-                final int orderValue =
-                        method.getAnnotation(Paramixel.Order.class).value();
-                if (orderValue <= 0) {
-                    failures.add(
-                            new ValidationFailure("Order value must be greater than 0 for method " + method.getName()));
+                if (method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
+                    failures.addAll(validateArgumentsCollectorMethod(method));
+                }
+                if (method.isAnnotationPresent(Paramixel.BeforeEach.class)) {
+                    failures.addAll(validateBeforeEachMethod(method));
+                }
+                if (method.isAnnotationPresent(Paramixel.AfterEach.class)) {
+                    failures.addAll(validateAfterEachMethod(method));
+                }
+                if (method.isAnnotationPresent(Paramixel.BeforeAll.class)) {
+                    failures.addAll(validateBeforeAllMethod(method));
+                }
+                if (method.isAnnotationPresent(Paramixel.AfterAll.class)) {
+                    failures.addAll(validateAfterAllMethod(method));
+                }
+                if (method.isAnnotationPresent(Paramixel.Initialize.class)) {
+                    failures.addAll(validateInitializeMethod(method));
+                }
+                if (method.isAnnotationPresent(Paramixel.Finalize.class)) {
+                    failures.addAll(validateFinalizeMethod(method));
+                }
+                if (method.isAnnotationPresent(Paramixel.Order.class)) {
+                    failures.addAll(validateOrderAnnotationUsage(method, isTestMethod, isLifecycleMethod));
                 }
             }
+        }
+
+        return failures;
+    }
+
+    private static List<Class<?>> buildClassHierarchy(final @NonNull Class<?> testClass) {
+        final List<Class<?>> result = new ArrayList<>();
+        for (Class<?> current = testClass;
+                current != null && current != Object.class;
+                current = current.getSuperclass()) {
+            result.add(current);
+        }
+        return result;
+    }
+
+    private static List<ValidationFailure> validateArgumentsCollectorMethod(final @NonNull Method method) {
+        final List<ValidationFailure> failures = new ArrayList<>();
+
+        if (!Modifier.isPublic(method.getModifiers())) {
+            failures.add(new ValidationFailure("@Paramixel.ArgumentsCollector method must be public: "
+                    + method.getDeclaringClass().getName() + "#" + method.getName()));
+        }
+
+        if (!Modifier.isStatic(method.getModifiers())) {
+            failures.add(new ValidationFailure("@Paramixel.ArgumentsCollector method must be static: "
+                    + method.getDeclaringClass().getName() + "#" + method.getName()));
+        }
+
+        final boolean isCollectorDriven = method.getParameterCount() == 1
+                && method.getParameterTypes()[0].equals(ArgumentsCollector.class)
+                && method.getReturnType().equals(void.class);
+        if (isCollectorDriven) {
+            return failures;
+        }
+
+        final boolean isReturnBased =
+                method.getParameterCount() == 0 && !method.getReturnType().equals(void.class);
+        if (!isReturnBased) {
+            failures.add(new ValidationFailure("Invalid @Paramixel.ArgumentsCollector method signature: "
+                    + method.getDeclaringClass().getName() + "#" + method.getName()));
+            return failures;
+        }
+
+        if (method.getReturnType().isPrimitive()) {
+            failures.add(new ValidationFailure("Invalid @Paramixel.ArgumentsCollector return type (primitive): "
+                    + method.getDeclaringClass().getName() + "#" + method.getName()));
+        }
+
+        if (method.getReturnType().isArray()
+                && method.getReturnType().getComponentType().isPrimitive()) {
+            failures.add(new ValidationFailure("Invalid @Paramixel.ArgumentsCollector return type (primitive array): "
+                    + method.getDeclaringClass().getName() + "#" + method.getName()));
+        }
+
+        return failures;
+    }
+
+    private static List<ValidationFailure> validateOrderAnnotationUsage(
+            final @NonNull Method method, final boolean isTestMethod, final boolean isLifecycleMethod) {
+        final List<ValidationFailure> failures = new ArrayList<>();
+        final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
+        if (order == null) {
+            return failures;
+        }
+
+        if (!isTestMethod && !isLifecycleMethod) {
+            failures.add(new ValidationFailure(
+                    "@Paramixel.Order annotation is only allowed on @Paramixel.Test and lifecycle hook methods: "
+                            + method.getDeclaringClass().getName() + "#" + method.getName()));
+        }
+
+        if (order.value() <= 0) {
+            failures.add(new ValidationFailure("@Paramixel.Order value must be greater than 0 for method "
+                    + method.getDeclaringClass().getName() + "#" + method.getName()));
         }
 
         return failures;
@@ -107,20 +185,20 @@ public class MethodValidator {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
-            failures.add(new ValidationFailure("Test method " + method.getName() + " must be public"));
+            failures.add(new ValidationFailure("@Paramixel.Test method " + method.getName() + " must be public"));
         }
 
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
-            failures.add(new ValidationFailure(
-                    "Test method " + method.getName() + " must accept exactly one ArgumentContext parameter"));
+            failures.add(new ValidationFailure("@Paramixel.Test method " + method.getName()
+                    + " must accept exactly one ArgumentContext parameter"));
         }
 
         if (!method.getReturnType().equals(void.class)) {
-            failures.add(new ValidationFailure("Test method " + method.getName() + " must return void"));
+            failures.add(new ValidationFailure("@Paramixel.Test method " + method.getName() + " must return void"));
         }
 
         if (Modifier.isStatic(method.getModifiers())) {
-            failures.add(new ValidationFailure("Test method " + method.getName() + " must not be static"));
+            failures.add(new ValidationFailure("@Paramixel.Test method " + method.getName() + " must not be static"));
         }
 
         return failures;
@@ -136,20 +214,22 @@ public class MethodValidator {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
-            failures.add(new ValidationFailure("BeforeEach method " + method.getName() + " must be public"));
+            failures.add(new ValidationFailure("@Paramixel.BeforeEach method " + method.getName() + " must be public"));
         }
 
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
-            failures.add(new ValidationFailure(
-                    "BeforeEach method " + method.getName() + " must accept exactly one ArgumentContext parameter"));
+            failures.add(new ValidationFailure("@Paramixel.BeforeEach method " + method.getName()
+                    + " must accept exactly one ArgumentContext parameter"));
         }
 
         if (!method.getReturnType().equals(void.class)) {
-            failures.add(new ValidationFailure("BeforeEach method " + method.getName() + " must return void"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.BeforeEach method " + method.getName() + " must return void"));
         }
 
         if (Modifier.isStatic(method.getModifiers())) {
-            failures.add(new ValidationFailure("BeforeEach method " + method.getName() + " must not be static"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.BeforeEach method " + method.getName() + " must not be static"));
         }
 
         return failures;
@@ -165,20 +245,22 @@ public class MethodValidator {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
-            failures.add(new ValidationFailure("AfterEach method " + method.getName() + " must be public"));
+            failures.add(new ValidationFailure("@Paramixel.AfterEach method " + method.getName() + " must be public"));
         }
 
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
-            failures.add(new ValidationFailure(
-                    "AfterEach method " + method.getName() + " must accept exactly one ArgumentContext parameter"));
+            failures.add(new ValidationFailure("@Paramixel.AfterEach method " + method.getName()
+                    + " must accept exactly one ArgumentContext parameter"));
         }
 
         if (!method.getReturnType().equals(void.class)) {
-            failures.add(new ValidationFailure("AfterEach method " + method.getName() + " must return void"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.AfterEach method " + method.getName() + " must return void"));
         }
 
         if (Modifier.isStatic(method.getModifiers())) {
-            failures.add(new ValidationFailure("AfterEach method " + method.getName() + " must not be static"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.AfterEach method " + method.getName() + " must not be static"));
         }
 
         return failures;
@@ -194,16 +276,17 @@ public class MethodValidator {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
-            failures.add(new ValidationFailure("BeforeAll method " + method.getName() + " must be public"));
+            failures.add(new ValidationFailure("@Paramixel.BeforeAll method " + method.getName() + " must be public"));
         }
 
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
-            failures.add(new ValidationFailure(
-                    "BeforeAll method " + method.getName() + " must accept exactly one ArgumentContext parameter"));
+            failures.add(new ValidationFailure("@Paramixel.BeforeAll method " + method.getName()
+                    + " must accept exactly one ArgumentContext parameter"));
         }
 
         if (!method.getReturnType().equals(void.class)) {
-            failures.add(new ValidationFailure("BeforeAll method " + method.getName() + " must return void"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.BeforeAll method " + method.getName() + " must return void"));
         }
 
         return failures;
@@ -219,16 +302,16 @@ public class MethodValidator {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
-            failures.add(new ValidationFailure("AfterAll method " + method.getName() + " must be public"));
+            failures.add(new ValidationFailure("@Paramixel.AfterAll method " + method.getName() + " must be public"));
         }
 
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
-            failures.add(new ValidationFailure(
-                    "AfterAll method " + method.getName() + " must accept exactly one ArgumentContext parameter"));
+            failures.add(new ValidationFailure("@Paramixel.AfterAll method " + method.getName()
+                    + " must accept exactly one ArgumentContext parameter"));
         }
 
         if (!method.getReturnType().equals(void.class)) {
-            failures.add(new ValidationFailure("AfterAll method " + method.getName() + " must return void"));
+            failures.add(new ValidationFailure("@Paramixel.AfterAll method " + method.getName() + " must return void"));
         }
 
         return failures;
@@ -244,20 +327,22 @@ public class MethodValidator {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
-            failures.add(new ValidationFailure("Initialize method " + method.getName() + " must be public"));
+            failures.add(new ValidationFailure("@Paramixel.Initialize method " + method.getName() + " must be public"));
         }
 
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ClassContext.class)) {
-            failures.add(new ValidationFailure(
-                    "Initialize method " + method.getName() + " must accept exactly one ClassContext parameter"));
+            failures.add(new ValidationFailure("@Paramixel.Initialize method " + method.getName()
+                    + " must accept exactly one ClassContext parameter"));
         }
 
         if (!method.getReturnType().equals(void.class)) {
-            failures.add(new ValidationFailure("Initialize method " + method.getName() + " must return void"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.Initialize method " + method.getName() + " must return void"));
         }
 
         if (Modifier.isStatic(method.getModifiers())) {
-            failures.add(new ValidationFailure("Initialize method " + method.getName() + " must not be static"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.Initialize method " + method.getName() + " must not be static"));
         }
 
         return failures;
@@ -273,49 +358,23 @@ public class MethodValidator {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
-            failures.add(new ValidationFailure("Finalize method " + method.getName() + " must be public"));
+            failures.add(new ValidationFailure("@Paramixel.Finalize method " + method.getName() + " must be public"));
         }
 
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ClassContext.class)) {
-            failures.add(new ValidationFailure(
-                    "Finalize method " + method.getName() + " must accept exactly one ClassContext parameter"));
+            failures.add(new ValidationFailure("@Paramixel.Finalize method " + method.getName()
+                    + " must accept exactly one ClassContext parameter"));
         }
 
         if (!method.getReturnType().equals(void.class)) {
-            failures.add(new ValidationFailure("Finalize method " + method.getName() + " must return void"));
+            failures.add(new ValidationFailure("@Paramixel.Finalize method " + method.getName() + " must return void"));
         }
 
         if (Modifier.isStatic(method.getModifiers())) {
-            failures.add(new ValidationFailure("Finalize method " + method.getName() + " must not be static"));
+            failures.add(
+                    new ValidationFailure("@Paramixel.Finalize method " + method.getName() + " must not be static"));
         }
 
         return failures;
-    }
-
-    /**
-     * Represents a validation failure with a descriptive message.
-     */
-    public static class ValidationFailure {
-
-        /** Human-readable validation failure message; immutable. */
-        private final String message;
-
-        /**
-         * Creates a new validation failure.
-         *
-         * @param message the failure description
-         */
-        public ValidationFailure(final @NonNull String message) {
-            this.message = message;
-        }
-
-        /**
-         * Returns the failure description.
-         *
-         * @return the failure message
-         */
-        public String getMessage() {
-            return message;
-        }
     }
 }

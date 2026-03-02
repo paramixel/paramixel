@@ -16,6 +16,8 @@
 
 package org.paramixel.engine.listener;
 
+import java.util.Objects;
+import java.util.function.Consumer;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
@@ -25,15 +27,20 @@ import org.junit.platform.engine.TestExecutionResult;
  *
  * <p>This listener prints a single line on start and finish using the class-level display name.
  *
- * @author Douglas Hoard
  */
 public class ParamixelTestClassDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
+
+    private final Consumer<String> printer;
+
+    public ParamixelTestClassDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
+        this.printer = Objects.requireNonNull(printer, "printer must not be null");
+    }
 
     @Override
     public void executionStarted(final @NonNull TestDescriptor testDescriptor) {
         String threadName = Thread.currentThread().getName();
         String displayName = getDisplayName(1, testDescriptor);
-        System.out.println(INFO + " " + TEST + " | " + threadName + " | " + displayName);
+        printer.accept(INFO + " " + TEST + " | " + threadName + " | " + displayName);
     }
 
     @Override
@@ -42,6 +49,6 @@ public class ParamixelTestClassDescriptorEngineExecutionListener extends Abstrac
         String threadName = Thread.currentThread().getName();
         String displayName = getDisplayName(1, testDescriptor);
         String message = getStatusMessage(testExecutionResult, threadName, displayName);
-        System.out.println(message);
+        printer.accept(message);
     }
 }

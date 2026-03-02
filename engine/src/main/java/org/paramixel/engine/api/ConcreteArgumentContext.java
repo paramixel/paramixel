@@ -17,6 +17,7 @@
 package org.paramixel.engine.api;
 
 import java.util.Objects;
+import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Store;
@@ -63,7 +64,7 @@ public final class ConcreteArgumentContext implements ArgumentContext {
      * @throws NullPointerException if classContext is null
      */
     public ConcreteArgumentContext(
-            final ConcreteClassContext classContext, final Object argument, final int argumentIndex) {
+            final @NonNull ConcreteClassContext classContext, final Object argument, final int argumentIndex) {
         this.classContext = Objects.requireNonNull(classContext, "classContext must not be null");
         this.argument = argument;
         this.argumentIndex = argumentIndex;

@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ClassContext;
@@ -77,14 +76,26 @@ public class ParamixelReflectionInvokerTest {
         final Field cacheField = ParamixelReflectionInvoker.class.getDeclaredField("ACCESSIBLE_CACHE");
         cacheField.setAccessible(true);
 
-        @SuppressWarnings("unchecked")
-        final ConcurrentHashMap<Method, Boolean> cache = (ConcurrentHashMap<Method, Boolean>) cacheField.get(null);
-
-        cache.put(beforeEach, Boolean.TRUE);
+        final Object rawCache = cacheField.get(null);
+        rawCache.getClass().getMethod("put", Object.class, Object.class).invoke(rawCache, beforeEach, Boolean.TRUE);
 
         assertThatThrownBy(() -> ParamixelReflectionInvoker.invokeBeforeEach(beforeEach, target, argumentContext))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Failed to invoke method");
+    }
+
+    @Test
+    public void invokeStatic_invokesPrivateStaticMethod_andReturnsValue() throws Throwable {
+        final Method supplier = StaticTarget.class.getDeclaredMethod("supplier");
+        assertThat(ParamixelReflectionInvoker.invokeStatic(supplier)).isEqualTo("value");
+    }
+
+    @Test
+    public void invokeStatic_unwrapsInvocationTargetExceptionCause() throws Exception {
+        final Method m = StaticTarget.class.getDeclaredMethod("throwsBoom");
+        assertThatThrownBy(() -> ParamixelReflectionInvoker.invokeStatic(m))
+                .isInstanceOf(Boom.class)
+                .hasMessage("boom");
     }
 
     private static final class Target {
@@ -117,6 +128,17 @@ public class ParamixelReflectionInvokerTest {
 
         private Boom(final String message) {
             super(message);
+        }
+    }
+
+    private static final class StaticTarget {
+
+        private static String supplier() {
+            return "value";
+        }
+
+        private static void throwsBoom() {
+            throw new Boom("boom");
         }
     }
 }

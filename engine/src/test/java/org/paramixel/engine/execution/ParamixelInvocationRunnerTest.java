@@ -173,8 +173,8 @@ public class ParamixelInvocationRunnerTest {
         assertThat(listener.results.get("fails").getStatus()).isEqualTo(TestExecutionResult.Status.FAILED);
 
         assertThat(instance.calls)
-                .containsSubsequence("baseBeforeEach", "subBeforeEach", "ok", "subAfterEach", "baseAfterEach")
-                .containsSubsequence("baseBeforeEach", "subBeforeEach", "fails", "subAfterEach", "baseAfterEach");
+                .containsSubsequence("baseBeforeEach", "subBeforeEach", "ok", "baseAfterEach", "subAfterEach")
+                .containsSubsequence("baseBeforeEach", "subBeforeEach", "fails", "baseAfterEach", "subAfterEach");
     }
 
     public static final class ParallelInvocationTest {
