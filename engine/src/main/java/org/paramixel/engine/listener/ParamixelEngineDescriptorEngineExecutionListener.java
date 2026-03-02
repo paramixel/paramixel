@@ -172,8 +172,6 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
             printer.accept(
                     INFO + "\033[1;31m" + " TESTS FAILED (" + totalPassed + "/" + grandTotal + " passed)" + "\033[0m");
         }
-
-        printer.accept(INFO);
     }
 
     /**
