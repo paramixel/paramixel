@@ -171,12 +171,12 @@ public class MethodValidatorTest {
     public static class BadTestMethods {
 
         @Paramixel.Test
-        public int badReturn(final ArgumentContext ctx) {
+        public int badReturn(final ArgumentContext context) {
             return 1;
         }
 
         @Paramixel.Test
-        public static void staticTest(final ArgumentContext ctx) {}
+        public static void staticTest(final ArgumentContext context) {}
 
         @Paramixel.Test
         public void badParam(final String notAContext) {}
@@ -185,35 +185,35 @@ public class MethodValidatorTest {
     public static class BadLifecycleMethods {
 
         @Paramixel.BeforeEach
-        public static void beforeEachStatic(final ArgumentContext ctx) {}
+        public static void beforeEachStatic(final ArgumentContext context) {}
 
         @Paramixel.AfterEach
-        public void afterEachWrongParam(final ClassContext ctx) {}
+        public void afterEachWrongParam(final ClassContext context) {}
 
         @Paramixel.Initialize
-        public void initializeWrongParam(final ArgumentContext ctx) {}
+        public void initializeWrongParam(final ArgumentContext context) {}
 
         @Paramixel.Finalize
-        public static void finalizeStatic(final ClassContext ctx) {}
+        public static void finalizeStatic(final ClassContext context) {}
     }
 
     public static class StaticBeforeAfterAllOk {
 
         @Paramixel.BeforeAll
-        public static void beforeAll(final ArgumentContext ctx) {}
+        public static void beforeAll(final ArgumentContext context) {}
 
         @Paramixel.AfterAll
-        public static void afterAll(final ArgumentContext ctx) {}
+        public static void afterAll(final ArgumentContext context) {}
     }
 
     public static class OrderRules {
 
         @Paramixel.Order(1)
-        public void orderOnNonTest(final ArgumentContext ctx) {}
+        public void orderOnNonTest(final ArgumentContext context) {}
 
         @Paramixel.Test
         @Paramixel.Order(0)
-        public void badOrderValue(final ArgumentContext ctx) {}
+        public void badOrderValue(final ArgumentContext context) {}
     }
 
     public static class BadBeforeAfterAllMethods {
@@ -229,10 +229,10 @@ public class MethodValidatorTest {
         }
 
         @Paramixel.BeforeAll
-        private void privateBeforeAll(final ArgumentContext ctx) {}
+        private void privateBeforeAll(final ArgumentContext context) {}
 
         @Paramixel.AfterAll
-        private void privateAfterAll(final ArgumentContext ctx) {}
+        private void privateAfterAll(final ArgumentContext context) {}
     }
 
     public static class PrivateInvalidMethods {

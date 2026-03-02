@@ -506,7 +506,7 @@ public final class ParamixelDiscovery {
                 try {
                     method.setAccessible(true);
 
-                    // Context-driven supplier: public static void arguments(ArgumentSupplierContext ctx)
+                    // Context-driven supplier: public static void arguments(ArgumentSupplierContext context)
                     if (method.getParameterCount() == 1
                             && method.getParameterTypes()[0].equals(ArgumentSupplierContext.class)
                             && method.getReturnType().equals(void.class)

@@ -89,10 +89,11 @@ public class ParamixelClassRunnerTest {
                 .containsSequence(
                         "initialize", "beforeAll", "beforeEach", "test", "afterEach", "afterAll", "finalize", "close");
 
-        final ConcreteClassContext ctx = (ConcreteClassContext) classContexts.get(SuccessfulLifecycleTest.class);
-        assertThat(ctx).isNotNull();
-        assertThat(ctx.getFirstFailure()).isNull();
-        assertThat(ctx.removeArgumentContext(0)).isNull();
+        final ConcreteClassContext classContext =
+                (ConcreteClassContext) classContexts.get(SuccessfulLifecycleTest.class);
+        assertThat(classContext).isNotNull();
+        assertThat(classContext.getFirstFailure()).isNull();
+        assertThat(classContext.removeArgumentContext(0)).isNull();
     }
 
     @Test
@@ -134,8 +135,8 @@ public class ParamixelClassRunnerTest {
         assertThat(instance.calls).contains("finalize");
         assertThat(instance.closed.get()).isTrue();
 
-        final ConcreteClassContext ctx = (ConcreteClassContext) classContexts.get(FailingTest.class);
-        assertThat(ctx.getFirstFailure()).isNotNull();
+        final ConcreteClassContext classContext = (ConcreteClassContext) classContexts.get(FailingTest.class);
+        assertThat(classContext.getFirstFailure()).isNotNull();
     }
 
     public static final class CloseableArgument implements AutoCloseable {
@@ -154,37 +155,37 @@ public class ParamixelClassRunnerTest {
         final AtomicBoolean closed = new AtomicBoolean(false);
 
         @Paramixel.Initialize
-        public void initialize(final ClassContext ctx) {
+        public void initialize(final ClassContext context) {
             calls.add("initialize");
         }
 
         @Paramixel.BeforeAll
-        public void beforeAll(final ArgumentContext ctx) {
+        public void beforeAll(final ArgumentContext context) {
             calls.add("beforeAll");
         }
 
         @Paramixel.BeforeEach
-        public void beforeEach(final ArgumentContext ctx) {
+        public void beforeEach(final ArgumentContext context) {
             calls.add("beforeEach");
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext ctx) {
+        public void test(final ArgumentContext context) {
             calls.add("test");
         }
 
         @Paramixel.AfterEach
-        public void afterEach(final ArgumentContext ctx) {
+        public void afterEach(final ArgumentContext context) {
             calls.add("afterEach");
         }
 
         @Paramixel.AfterAll
-        public void afterAll(final ArgumentContext ctx) {
+        public void afterAll(final ArgumentContext context) {
             calls.add("afterAll");
         }
 
         @Paramixel.Finalize
-        public void finalizeClass(final ClassContext ctx) {
+        public void finalizeClass(final ClassContext context) {
             calls.add("finalize");
         }
 
@@ -201,33 +202,33 @@ public class ParamixelClassRunnerTest {
         final AtomicBoolean closed = new AtomicBoolean(false);
 
         @Paramixel.BeforeAll
-        public void beforeAll(final ArgumentContext ctx) {
+        public void beforeAll(final ArgumentContext context) {
             calls.add("beforeAll");
         }
 
         @Paramixel.BeforeEach
-        public void beforeEach(final ArgumentContext ctx) {
+        public void beforeEach(final ArgumentContext context) {
             calls.add("beforeEach");
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext ctx) {
+        public void test(final ArgumentContext context) {
             calls.add("test");
             throw new RuntimeException("boom");
         }
 
         @Paramixel.AfterEach
-        public void afterEach(final ArgumentContext ctx) {
+        public void afterEach(final ArgumentContext context) {
             calls.add("afterEach");
         }
 
         @Paramixel.AfterAll
-        public void afterAll(final ArgumentContext ctx) {
+        public void afterAll(final ArgumentContext context) {
             calls.add("afterAll");
         }
 
         @Paramixel.Finalize
-        public void finalizeClass(final ClassContext ctx) {
+        public void finalizeClass(final ClassContext context) {
             calls.add("finalize");
         }
 

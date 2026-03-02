@@ -33,12 +33,12 @@ public class ConcreteArgumentContextTest {
     public void getters_returnExpectedValues_andStoreIsNonNull() {
         final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
         final ConcreteClassContext classContext = new ConcreteClassContext(String.class, engineContext, null);
-        final ConcreteArgumentContext ctx = new ConcreteArgumentContext(classContext, "arg", 3);
+        final ConcreteArgumentContext argumentContext = new ConcreteArgumentContext(classContext, "arg", 3);
 
-        assertThat(ctx.getClassContext()).isSameAs(classContext);
-        assertThat(ctx.getArgument()).isEqualTo("arg");
-        assertThat(ctx.getArgumentIndex()).isEqualTo(3);
-        assertThat(ctx.getStore()).isNotNull();
+        assertThat(argumentContext.getClassContext()).isSameAs(classContext);
+        assertThat(argumentContext.getArgument()).isEqualTo("arg");
+        assertThat(argumentContext.getArgumentIndex()).isEqualTo(3);
+        assertThat(argumentContext.getStore()).isNotNull();
     }
 
     @Test
@@ -62,9 +62,9 @@ public class ConcreteArgumentContextTest {
     public void toString_includesClassNameAndIndex() {
         final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
         final ConcreteClassContext classContext = new ConcreteClassContext(String.class, engineContext, null);
-        final ConcreteArgumentContext ctx = new ConcreteArgumentContext(classContext, "arg", 7);
+        final ConcreteArgumentContext argumentContext = new ConcreteArgumentContext(classContext, "arg", 7);
 
-        assertThat(ctx.toString()).contains("testClass=");
-        assertThat(ctx.toString()).contains("invocationIndex=7");
+        assertThat(argumentContext.toString()).contains("testClass=");
+        assertThat(argumentContext.toString()).contains("invocationIndex=7");
     }
 }
