@@ -31,20 +31,20 @@ import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 
-class ParamixelEngineDescriptorEngineExecutionListenerTest {
+public class ParamixelEngineDescriptorEngineExecutionListenerTest {
 
     private PrintStream originalOut;
     private ByteArrayOutputStream out;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() {
         originalOut = System.out;
         out = new ByteArrayOutputStream();
         System.setOut(new PrintStream(out));
     }
 
     @AfterEach
-    void tearDown() {
+    public void tearDown() {
         System.setOut(originalOut);
     }
 

@@ -33,6 +33,8 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
@@ -40,12 +42,13 @@ import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 import org.paramixel.engine.util.FastId;
 
-class ParamixelConcurrencyModelTest {
+public class ParamixelConcurrencyModelTest {
 
     @Test
     public void classProgresses_whenArgumentSlotsUnavailable_andFallsBackToInline() throws Exception {
+
         final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
-        final Map<Class<?>, org.paramixel.api.ClassContext> classContexts = new ConcurrentHashMap<>();
+        final Map<Class<?>, ClassContext> classContexts = new ConcurrentHashMap<>();
         final Map<Class<?>, Object> testInstances = new ConcurrentHashMap<>();
 
         final UniqueId rootId = UniqueId.forEngine("paramixel");
@@ -53,6 +56,7 @@ class ParamixelConcurrencyModelTest {
                 rootId.append("class", SaturationTest.class.getName()),
                 SaturationTest.class,
                 SaturationTest.class.getName());
+        classDescriptor.setArgumentParallelism(2);
 
         final ParamixelTestArgumentDescriptor arg0 = new ParamixelTestArgumentDescriptor(
                 classDescriptor.getUniqueId().append("argument", "0"), 0, "a0", "argument:0");
@@ -98,12 +102,13 @@ class ParamixelConcurrencyModelTest {
 
     @Test
     public void globalConcurrencyNeverExceedsTwoTimesCores_underInvocationParallelism() throws Exception {
+
         final int cores = 1;
         final AtomicInteger running = new AtomicInteger(0);
         final AtomicInteger max = new AtomicInteger(0);
 
         final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
-        final Map<Class<?>, org.paramixel.api.ClassContext> classContexts = new ConcurrentHashMap<>();
+        final Map<Class<?>, ClassContext> classContexts = new ConcurrentHashMap<>();
         final Map<Class<?>, Object> testInstances = new ConcurrentHashMap<>();
 
         final UniqueId rootId = UniqueId.forEngine("paramixel");
@@ -111,6 +116,7 @@ class ParamixelConcurrencyModelTest {
                 rootId.append("class", MaxConcurrencyTest.class.getName()),
                 MaxConcurrencyTest.class,
                 MaxConcurrencyTest.class.getName());
+        classDescriptor.setArgumentParallelism(4);
 
         final ParamixelTestArgumentDescriptor arg0 = new ParamixelTestArgumentDescriptor(
                 classDescriptor.getUniqueId().append("argument", "0"), 0, "arg", "argument:0");
@@ -146,9 +152,10 @@ class ParamixelConcurrencyModelTest {
 
     @Test
     public void multipleClassesRunConcurrently_upToCoreCount() throws Exception {
+
         final int cores = 2;
         final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
-        final Map<Class<?>, org.paramixel.api.ClassContext> classContexts = new ConcurrentHashMap<>();
+        final Map<Class<?>, ClassContext> classContexts = new ConcurrentHashMap<>();
         final Map<Class<?>, Object> testInstances = new ConcurrentHashMap<>();
 
         final UniqueId rootId = UniqueId.forEngine("paramixel");
@@ -156,6 +163,8 @@ class ParamixelConcurrencyModelTest {
                 rootId.append("class", BlockingClassTest.class.getName() + "#1"), BlockingClassTest.class, "Blocking1");
         final ParamixelTestClassDescriptor d2 = new ParamixelTestClassDescriptor(
                 rootId.append("class", BlockingClassTest.class.getName() + "#2"), BlockingClassTest.class, "Blocking2");
+        d1.setArgumentParallelism(1);
+        d2.setArgumentParallelism(1);
 
         final ParamixelTestArgumentDescriptor a1 =
                 new ParamixelTestArgumentDescriptor(d1.getUniqueId().append("argument", "0"), 0, "arg", "argument:0");
@@ -201,12 +210,14 @@ class ParamixelConcurrencyModelTest {
     }
 
     public static final class SaturationTest {
+
         static volatile CountDownLatch arg1Entered;
         static volatile CountDownLatch releaseArg1;
 
-        @Paramixel.ArgumentSupplier(parallelism = 2)
-        public static Object[] args() {
-            return new Object[] {"a0", "a1"};
+        @Paramixel.ArgumentSupplier
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.setParallelism(2);
+            ctx.addArguments("a0", "a1");
         }
 
         @Paramixel.Test
@@ -219,12 +230,14 @@ class ParamixelConcurrencyModelTest {
     }
 
     public static final class MaxConcurrencyTest {
+
         static volatile AtomicInteger running;
         static volatile AtomicInteger max;
 
-        @Paramixel.ArgumentSupplier(parallelism = 4)
-        public static Object[] args() {
-            return new Object[] {"arg"};
+        @Paramixel.ArgumentSupplier
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.setParallelism(4);
+            ctx.addArgument("arg");
         }
 
         @Paramixel.Test
@@ -256,6 +269,7 @@ class ParamixelConcurrencyModelTest {
     }
 
     public static final class BlockingClassTest {
+
         static volatile CountDownLatch entered;
         static volatile CountDownLatch release;
 
@@ -267,6 +281,7 @@ class ParamixelConcurrencyModelTest {
     }
 
     private static final class RecordingListener implements EngineExecutionListener {
+
         @Override
         public void executionFinished(
                 final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {

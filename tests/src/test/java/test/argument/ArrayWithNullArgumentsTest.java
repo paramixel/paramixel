@@ -23,24 +23,41 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that {@code null} values can be supplied as arguments alongside non-null values.
+ */
 public class ArrayWithNullArgumentsTest {
 
+    /** Tracks which non-null string arguments were observed. */
     private static final Set<String> seen = ConcurrentHashMap.newKeySet();
+
+    /** Counts how many {@code null} arguments were observed. */
     private static final AtomicInteger nullCount = new AtomicInteger(0);
 
+    /**
+     * Supplies three arguments, two of which are {@code null}.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object[] arguments() {
-        return new Object[] {null, "value", null};
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArguments((Object) null, "value", null);
     }
 
+    /**
+     * Records whether the current argument is {@code null}.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext.getStore()).isNotNull();
-        Object argument = argumentContext.getArgument();
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context.getStore()).isNotNull();
+        Object argument = context.getArgument();
         if (argument == null) {
             nullCount.incrementAndGet();
             return;
@@ -49,8 +66,13 @@ public class ArrayWithNullArgumentsTest {
         seen.add((String) argument);
     }
 
+    /**
+     * Verifies that two {@code null} values were observed and that the non-null value was recorded.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final ClassContext classContext) {
+    public void finalize(final ClassContext context) {
         assertThat(nullCount.get()).isEqualTo(2);
         assertThat(seen).contains("value");
     }

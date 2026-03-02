@@ -18,60 +18,97 @@ package test.store;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies per-argument keying in the class store when multiple arguments are supplied.
+ */
 public class StoreTest4 {
 
+    /**
+     * Keys used to create scoped store key names.
+     */
     enum Key {
+
+        /** Key used in the argument store. */
         ARGUMENT_CONTEXT_KEY;
 
+        /**
+         * Creates a globally-scoped key name for this enum constant.
+         *
+         * @return scoped key name
+         */
         public String scopedName() {
             return getClass().getName() + "." + name();
         }
     }
 
-    @Paramixel.ArgumentSupplier(parallelism = Integer.MAX_VALUE)
-    public static Iterable<String> arguments() {
-        Collection<String> collection = new ArrayList<>();
+    /**
+     * Supplies multiple string arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+
         for (int i = 0; i < 10; i++) {
-            collection.add("test-" + i);
+            argumentSupplierContext.addArgument("test-" + i);
         }
-        return collection;
     }
 
+    /**
+     * Stores a per-argument value in the class store.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeAll
-    public void beforeAll(final @NonNull ArgumentContext argumentContext) {
-        String payload = argumentContext.getArgument(String.class);
+    public void beforeAll(final @NonNull ArgumentContext context) {
+        String payload = context.getArgument(String.class);
         System.out.printf("beforeAll(%s)%n", payload);
-        argumentContext.getClassContext().getStore().put(argumentKey(argumentContext), "argument." + payload);
+        context.getClassContext().getStore().put(argumentKey(context), "argument." + payload);
     }
 
+    /**
+     * Verifies the stored value for the current argument.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void verifyMaps(final @NonNull ArgumentContext argumentContext) {
-        String payload = argumentContext.getArgument(String.class);
+    public void verifyMaps(final @NonNull ArgumentContext context) {
+        String payload = context.getArgument(String.class);
         System.out.printf("verifyMaps(%s)%n", payload);
 
-        Object value = argumentContext.getClassContext().getStore().get(argumentKey(argumentContext));
+        Object value = context.getClassContext().getStore().get(argumentKey(context));
         assertThat(value).isEqualTo("argument." + payload);
 
-        argumentContext.getStore().put(Key.ARGUMENT_CONTEXT_KEY.scopedName(), "argument." + payload);
-        assertThat(argumentContext.getStore().get(Key.ARGUMENT_CONTEXT_KEY.scopedName()))
+        context.getStore().put(Key.ARGUMENT_CONTEXT_KEY.scopedName(), "argument." + payload);
+        assertThat(context.getStore().get(Key.ARGUMENT_CONTEXT_KEY.scopedName()))
                 .isEqualTo("argument." + payload);
     }
 
+    /**
+     * Removes the per-argument value from the class store.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterAll
-    public void afterAll(final @NonNull ArgumentContext argumentContext) {
-        String payload = argumentContext.getArgument(String.class);
-        Object removed = argumentContext.getClassContext().getStore().remove(argumentKey(argumentContext));
+    public void afterAll(final @NonNull ArgumentContext context) {
+        String payload = context.getArgument(String.class);
+        Object removed = context.getClassContext().getStore().remove(argumentKey(context));
         assertThat(removed).isEqualTo("argument." + payload);
     }
 
-    private static String argumentKey(final @NonNull ArgumentContext argumentContext) {
-        return Key.ARGUMENT_CONTEXT_KEY.scopedName() + "." + argumentContext.getArgumentIndex();
+    /**
+     * Builds a unique per-argument key name.
+     *
+     * @param context for the current argument
+     * @return a key including the argument index
+     */
+    private static String argumentKey(final @NonNull ArgumentContext context) {
+        return Key.ARGUMENT_CONTEXT_KEY.scopedName() + "." + context.getArgumentIndex();
     }
 }

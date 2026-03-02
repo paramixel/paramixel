@@ -24,6 +24,7 @@ import org.paramixel.api.Paramixel;
  */
 @Paramixel.TestClass
 public class AnotherTestClass {
+
     /**
      * Sample test method.
      *

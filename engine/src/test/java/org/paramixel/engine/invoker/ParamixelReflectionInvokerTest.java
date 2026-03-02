@@ -29,7 +29,7 @@ import org.paramixel.api.ClassContext;
 import org.paramixel.engine.api.ConcreteClassContext;
 import org.paramixel.engine.api.ConcreteEngineContext;
 
-class ParamixelReflectionInvokerTest {
+public class ParamixelReflectionInvokerTest {
 
     @Test
     public void invokesPrivateLifecycleMethodsByMakingAccessible() throws Throwable {
@@ -88,6 +88,7 @@ class ParamixelReflectionInvokerTest {
     }
 
     private static final class Target {
+
         private int initializeCalls;
         private int beforeEachCalls;
 
@@ -101,16 +102,19 @@ class ParamixelReflectionInvokerTest {
     }
 
     private static final class ThrowingTarget {
+
         private void test(final ArgumentContext ctx) {
             throw new Boom("boom");
         }
     }
 
     private static final class InaccessibleTarget {
+
         private void beforeEach(final ArgumentContext ctx) {}
     }
 
     private static final class Boom extends RuntimeException {
+
         private Boom(final String message) {
             super(message);
         }

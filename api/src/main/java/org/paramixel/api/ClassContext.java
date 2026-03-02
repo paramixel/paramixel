@@ -60,7 +60,7 @@ package org.paramixel.api;
  *     public void testMethod(ArgumentContext context) {
  *         // Access parent class context
  *         ClassContext classContext = context.getClassContext();
- *         Object testInstance = classContext.getTestInstance();
+ *         Object testInstance = context.getTestInstance();
  *         // Perform test logic
  *     }
  * }

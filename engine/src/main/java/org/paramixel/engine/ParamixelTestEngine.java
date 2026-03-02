@@ -48,22 +48,25 @@ import org.paramixel.engine.listener.ParamixelEngineExecutionListener;
 import org.paramixel.engine.util.FastId;
 
 /**
- * Implementation of the JUnit Platform {@link TestEngine} for the Paramixel test framework.
+ * Provides the Paramixel JUnit Platform {@link TestEngine} implementation.
  *
- * <p>This engine discovers and executes tests annotated with {@code @Paramixel.TestClass}
- * annotations. It provides:</p>
+ * <p>This engine discovers tests annotated with {@link Paramixel.TestClass} and executes them
+ * through the Paramixel engine runtime. It builds a descriptor tree during
+ * {@link #discover(EngineDiscoveryRequest, UniqueId)} and schedules class-level execution during
+ * {@link #execute(ExecutionRequest)}.
+ *
+ * <p><b>Execution model</b>
  * <ul>
- *   <li>Test discovery with hierarchical descriptors</li>
- *   <li>Virtual-thread execution with a hard global concurrency cap</li>
- *   <li>Semaphore-based concurrency limiting (classes + extra parallel work)</li>
- *   <li>Full lifecycle method execution with pairing guarantees</li>
+ *   <li>Uses virtual threads for concurrency.
+ *   <li>Applies a global concurrency cap via {@link ParamixelConcurrencyLimiter}.
+ *   <li>Delegates test-class execution to {@link ParamixelClassRunner}.
  * </ul>
  *
- * <p>Engine ID: {@code paramixel}</p>
+ * <p><b>Thread safety</b>
+ * <p>This class is stateless and thread-safe. It creates per-execution state inside
+ * {@link #execute(ExecutionRequest)}.
  *
- * @see Paramixel.TestClass
- * @see ParamixelDiscovery
- * @see ParamixelExecutionRuntime
+ * @author Douglas Hoard
  */
 public class ParamixelTestEngine implements TestEngine {
 
@@ -89,7 +92,6 @@ public class ParamixelTestEngine implements TestEngine {
     @Override
     public @NonNull TestDescriptor discover(
             final @NonNull EngineDiscoveryRequest engineDiscoveryRequest, final @NonNull UniqueId uniqueId) {
-
         final TestDescriptor engineDescriptor = new ParamixelEngineDescriptor(uniqueId, ENGINE_ID);
 
         new ParamixelDiscovery().discoverTests(engineDiscoveryRequest, engineDescriptor);
@@ -99,7 +101,6 @@ public class ParamixelTestEngine implements TestEngine {
 
     @Override
     public void execute(final @NonNull ExecutionRequest executionRequest) {
-        // Backward compatible: historically this was "paramixel.invokedBy".
         final boolean invokedByMaven = executionRequest
                 .getConfigurationParameters()
                 .get("invokedBy")
@@ -133,11 +134,14 @@ public class ParamixelTestEngine implements TestEngine {
             properties.setProperty("invokedBy", invokedByMaven ? "maven" : "junit");
             properties.setProperty("parallelism", String.valueOf(classParallelism));
 
-            System.out.println("Paramixel Engine Configuration:");
+            if (invokedByMaven) {
+                System.out.println("Paramixel Engine invoked by Maven");
+                System.out.println("Paramixel Engine Configuration:");
 
-            properties.stringPropertyNames().stream()
-                    .sorted()
-                    .forEach(k -> System.out.println("  " + k + " = " + properties.getProperty(k)));
+                properties.stringPropertyNames().stream()
+                        .sorted()
+                        .forEach(k -> System.out.println("  " + k + " = " + properties.getProperty(k)));
+            }
 
             final ConcreteEngineContext engineContext =
                     new ConcreteEngineContext(ENGINE_ID, properties, classParallelism);

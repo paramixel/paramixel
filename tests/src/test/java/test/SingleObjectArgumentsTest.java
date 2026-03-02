@@ -21,28 +21,48 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that a single supplied argument results in a single test invocation.
+ */
 public class SingleObjectArgumentsTest {
 
+    /** Counts the number of test invocations observed. */
     private static final AtomicInteger count = new AtomicInteger(0);
 
+    /**
+     * Supplies a single argument.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        return "single";
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument("single");
     }
 
+    /**
+     * Verifies the argument payload and records the invocation.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isEqualTo("single");
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isEqualTo("single");
         count.incrementAndGet();
     }
 
+    /**
+     * Verifies that exactly one invocation occurred.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final ClassContext classContext) {
+    public void finalize(final ClassContext context) {
         assertThat(count.get()).isEqualTo(1);
     }
 }

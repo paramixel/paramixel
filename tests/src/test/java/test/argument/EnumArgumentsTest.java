@@ -18,46 +18,70 @@ package test.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Arrays;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies delivery of enum arguments and access by argument index.
+ */
 public class EnumArgumentsTest {
 
+    /** Enum values used as test arguments. */
     public enum EnumArgument {
+
+        /** First value. */
         ZERO,
+
+        /** Second value. */
         ONE,
+
+        /** Third value. */
         TWO
     }
 
+    /**
+     * Supplies all {@link EnumArgument} values as arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        return Arrays.asList(EnumArgument.ZERO, EnumArgument.ONE, EnumArgument.TWO);
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArguments(EnumArgument.ZERO, EnumArgument.ONE, EnumArgument.TWO);
     }
 
+    /**
+     * Asserts that the direct argument is an {@link EnumArgument}.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
     @Paramixel.Order(1)
-    public void testDirectArgument(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(EnumArgument.class);
+    public void testDirectArgument(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(EnumArgument.class);
     }
 
+    /**
+     * Asserts that the argument value matches the expected enum constant for the current index.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
     @Paramixel.Order(2)
-    public void testArgumentContext(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(EnumArgument.class);
+    public void testArgumentContext(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(EnumArgument.class);
 
-        EnumArgument enumArgument = (EnumArgument) argumentContext.getArgument();
+        EnumArgument enumArgument = (EnumArgument) context.getArgument();
 
-        switch (argumentContext.getArgumentIndex()) {
+        switch (context.getArgumentIndex()) {
             case 0 -> assertThat(enumArgument).isEqualTo(EnumArgument.ZERO);
             case 1 -> assertThat(enumArgument).isEqualTo(EnumArgument.ONE);
             case 2 -> assertThat(enumArgument).isEqualTo(EnumArgument.TWO);
-            default ->
-                throw new IllegalStateException("unexpected argumentIndex: " + argumentContext.getArgumentIndex());
+            default -> throw new IllegalStateException("unexpected argumentIndex: " + context.getArgumentIndex());
         }
     }
 }

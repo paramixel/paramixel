@@ -20,52 +20,78 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies handling of {@code null} arguments mixed with custom {@link Named} arguments.
+ */
 public class CustomArgumentWithNullTest {
 
-    @Paramixel.ArgumentSupplier(parallelism = 2)
-    public static CustomArgument[] arguments() {
-        CustomArgument[] customArguments = new CustomArgument[10];
-
+    /**
+     * Supplies alternating {@code null} and custom argument values.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.setParallelism(2);
         for (int i = 0; i < 10; i++) {
             if (i % 2 == 0) {
-                customArguments[i] = null;
+                argumentSupplierContext.addArgument(null);
             } else {
-                customArguments[i] = new CustomArgument("String " + i);
+                argumentSupplierContext.addArgument(new CustomArgument("String " + i));
             }
         }
-
-        return customArguments;
     }
 
+    /**
+     * Verifies that the class context and store are available.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Initialize
-    public void initialize(final @NonNull ClassContext classContext) {
-        assertThat(classContext).isNotNull();
-        assertThat(classContext.getStore()).isNotNull();
+    public void initialize(final @NonNull ClassContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Verifies that the argument context and store are available.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeAll
-    public void beforeAll(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void beforeAll(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Verifies that the argument context and store are available.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeEach
-    public void beforeEach(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void beforeEach(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Validates non-null arguments for the first test method.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test1(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void test1(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
 
-        Object argument = argumentContext.getArgument();
+        Object argument = context.getArgument();
         if (argument == null) {
             return;
         }
@@ -74,12 +100,17 @@ public class CustomArgumentWithNullTest {
         assertThat(((CustomArgument) argument).getName()).startsWith("CustomArgument(");
     }
 
+    /**
+     * Validates non-null arguments for the second test method.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test2(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void test2(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
 
-        Object argument = argumentContext.getArgument();
+        Object argument = context.getArgument();
         if (argument == null) {
             return;
         }
@@ -88,28 +119,52 @@ public class CustomArgumentWithNullTest {
         assertThat(argument).isInstanceOf(Named.class);
     }
 
+    /**
+     * Verifies that the argument context and store are available.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterEach
-    public void afterEach(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void afterEach(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Verifies that the argument context and store are available.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterAll
-    public void afterAll(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void afterAll(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Verifies that the class context and store remain available during finalize.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final @NonNull ClassContext classContext) {
-        assertThat(classContext).isNotNull();
-        assertThat(classContext.getStore()).isNotNull();
+    public void finalize(final @NonNull ClassContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Custom {@link Named} argument implementation.
+     */
     public static final class CustomArgument implements Named {
 
+        /** Value used to generate the name. */
         private final String value;
 
+        /**
+         * Creates a new argument.
+         *
+         * @param value payload used for naming
+         */
         public CustomArgument(final @NonNull String value) {
             this.value = value;
         }

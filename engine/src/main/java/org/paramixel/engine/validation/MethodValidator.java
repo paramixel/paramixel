@@ -37,6 +37,8 @@ import org.paramixel.api.Paramixel;
  * {@link ValidationFailure} instances and does not perform invocation or execution.
  * Callers are expected to decide whether to skip or fail test discovery based on
  * the returned failures.</p>
+ *
+ * @author Douglas Hoard
  */
 public class MethodValidator {
 
@@ -294,6 +296,8 @@ public class MethodValidator {
      * Represents a validation failure with a descriptive message.
      */
     public static class ValidationFailure {
+
+        /** Human-readable validation failure message; immutable. */
         private final String message;
 
         /**

@@ -18,38 +18,53 @@ package test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that a collection of string arguments are delivered across invocations.
+ */
 public class CollectionArgumentsTest {
 
+    /** Tracks which string arguments were observed during execution. */
     private static final Set<String> seen = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Supplies a small set of string arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        Collection<String> collection = new ArrayList<>();
-        collection.add("test1");
-        collection.add("test2");
-        return collection;
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArguments("test1", "test2");
     }
 
+    /**
+     * Records the argument payload for later verification.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext.getStore()).isNotNull();
-        Object argument = argumentContext.getArgument();
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context.getStore()).isNotNull();
+        Object argument = context.getArgument();
         assertThat(argument).isInstanceOf(String.class);
         seen.add((String) argument);
     }
 
+    /**
+     * Verifies that each supplied argument was observed.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final ClassContext classContext) {
+    public void finalize(final ClassContext context) {
         assertThat(seen).contains("test1", "test2");
     }
 }

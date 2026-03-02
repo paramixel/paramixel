@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.TestDescriptor.Type;
 import org.junit.platform.engine.UniqueId;
 
-class AbstractParamixelDescriptorTest {
+public class AbstractParamixelDescriptorTest {
 
     @Test
     public void addChild_setsParent_andFindByUniqueIdSearchesRecursively() {
@@ -96,6 +96,7 @@ class AbstractParamixelDescriptorTest {
     }
 
     private static final class DummyDescriptor extends AbstractParamixelDescriptor {
+
         private DummyDescriptor(final UniqueId uniqueId, final String displayName, final Type type) {
             super(uniqueId, displayName, type);
         }

@@ -28,42 +28,63 @@ import examples.support.Logger;
 import examples.testcontainers.util.CleanupExecutor;
 import examples.testcontainers.util.RandomUtil;
 import java.io.IOException;
-import java.util.stream.Stream;
 import org.bson.Document;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 import org.testcontainers.containers.Network;
 
 @Paramixel.TestClass
+/**
+ * Demonstrates using Paramixel to run Testcontainers-backed MongoDB tests across environments.
+ */
 public class MongoDBTest {
 
+    /** Logger for lifecycle output. */
     private static final Logger LOGGER = Logger.createLogger(MongoDBTest.class);
 
+    /** Store key for the shared Testcontainers {@link Network}. */
     private static final String NETWORK = "network";
 
-    @Paramixel.ArgumentSupplier(parallelism = Integer.MAX_VALUE)
-    public static Stream<MongoDBTestEnvironment> arguments() throws IOException {
-        return MongoDBTestEnvironment.createTestEnvironments();
+    /**
+     * Supplies {@link MongoDBTestEnvironment} instances as test arguments.
+     *
+     * @param argumentSupplierContext the argument supplier context
+     * @throws IOException if environment creation fails
+     */
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) throws IOException {
+        MongoDBTestEnvironment.createTestEnvironments().forEach(argumentSupplierContext::addArgument);
     }
 
+    /**
+     * Initializes the MongoDB environment for the current argument.
+     *
+     * @param context the argument context
+     */
     @Paramixel.BeforeAll
-    public void initializeTestEnvironment(final @NonNull ArgumentContext argumentContext) {
-        MongoDBTestEnvironment testEnvironment = argumentContext.getArgument(MongoDBTestEnvironment.class);
+    public void initializeTestEnvironment(final @NonNull ArgumentContext context) {
+        MongoDBTestEnvironment testEnvironment = context.getArgument(MongoDBTestEnvironment.class);
         LOGGER.info("[%s] initialize test environment ...", testEnvironment.getName());
 
         Network network = Network.newNetwork();
         network.getId();
 
-        argumentContext.getClassContext().getStore().put(NETWORK, network);
+        context.getClassContext().getStore().put(NETWORK, network);
         testEnvironment.initialize(network);
 
         assertThat(testEnvironment.isRunning()).isTrue();
     }
 
+    /**
+     * Inserts a document and queries it back using the environment's connection string.
+     *
+     * @param context the argument context
+     */
     @Paramixel.Test
-    public void testInsertQuery(final @NonNull ArgumentContext argumentContext) {
-        MongoDBTestEnvironment testEnvironment = argumentContext.getArgument(MongoDBTestEnvironment.class);
+    public void testInsertQuery(final @NonNull ArgumentContext context) {
+        MongoDBTestEnvironment testEnvironment = context.getArgument(MongoDBTestEnvironment.class);
         LOGGER.info("[%s] testing testInsertQuery() ...", testEnvironment.getName());
 
         String name = RandomUtil.getRandomString(16);
@@ -89,16 +110,21 @@ public class MongoDBTest {
         LOGGER.info("[%s] name [%s] inserted", testEnvironment.getName(), name);
     }
 
+    /**
+     * Destroys the MongoDB environment and closes the shared network.
+     *
+     * @param context the argument context
+     * @throws Throwable if cleanup fails
+     */
     @Paramixel.AfterAll
-    public void destroyTestEnvironment(final @NonNull ArgumentContext argumentContext) throws Throwable {
-        MongoDBTestEnvironment testEnvironment = argumentContext.getArgument(MongoDBTestEnvironment.class);
+    public void destroyTestEnvironment(final @NonNull ArgumentContext context) throws Throwable {
+        MongoDBTestEnvironment testEnvironment = context.getArgument(MongoDBTestEnvironment.class);
         LOGGER.info("[%s] destroy test environment ...", testEnvironment.getName());
 
         new CleanupExecutor()
                 .addTask(testEnvironment::destroy)
                 .addTaskIfPresent(
-                        () -> argumentContext.getClassContext().getStore().remove(NETWORK, Network.class),
-                        Network::close)
+                        () -> context.getClassContext().getStore().remove(NETWORK, Network.class), Network::close)
                 .throwIfFailed();
     }
 }

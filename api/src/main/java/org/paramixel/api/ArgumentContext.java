@@ -50,7 +50,7 @@ package org.paramixel.api;
  * public class ParameterizedTests {
  *
  *     @Paramixel.ArgumentSupplier
- *     public static List<String> provideArguments() {
+ *     public static List<String> arguments() {
  *         return Arrays.asList("input1", "input2", "input3");
  *     }
  *

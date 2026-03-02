@@ -20,6 +20,7 @@ package org.paramixel.engine.discovery;
  * Non-test class used to validate discovery filtering.
  */
 public class NonTestClass {
+
     /**
      * Placeholder method that should not be treated as a test.
      */

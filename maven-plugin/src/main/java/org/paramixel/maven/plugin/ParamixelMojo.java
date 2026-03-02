@@ -129,10 +129,9 @@ public class ParamixelMojo extends AbstractMojo {
             return;
         }
 
-        getLog().info("Starting Paramixel test execution");
-
         /*
         if (verbose) {
+            getLog().info("Starting Paramixel test execution");
             getLog().info("Class parallelism: " + classParallelism);
             getLog().info("Fail if no tests: " + failIfNoTests);
         }

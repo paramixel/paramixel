@@ -18,10 +18,9 @@ package test.named;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Collections;
-import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
@@ -32,13 +31,13 @@ import org.paramixel.api.Paramixel;
 public class NamedValueTest3 {
 
     @Paramixel.ArgumentSupplier
-    public static List<NamedValue<Object>> arguments() {
-        return Collections.singletonList(NamedValue.of("null payload", null));
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument(NamedValue.of("null payload", null));
     }
 
     @Paramixel.Test
-    public void permitsNullValue(final @NonNull ArgumentContext argumentContext) {
-        NamedValue<?> argument = argumentContext.getArgument(NamedValue.class);
+    public void permitsNullValue(final @NonNull ArgumentContext context) {
+        NamedValue<?> argument = context.getArgument(NamedValue.class);
 
         assertThat(argument.getName()).isEqualTo("null payload");
         assertThat(argument.getValue()).isNull();

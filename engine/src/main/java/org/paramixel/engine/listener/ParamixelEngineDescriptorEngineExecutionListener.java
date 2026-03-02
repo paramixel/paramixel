@@ -24,10 +24,20 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 
 /**
- * Execution listener for the engine root descriptor.
+ * Reports a summarized execution report for the engine root descriptor.
+ *
+ * <p>This listener resets the shared execution summary at engine start and prints an aggregated
+ * report at engine finish.
+ *
+ * <p><b>Thread safety</b>
+ * <p>This class is not thread-safe for concurrent engine executions because it stores
+ * {@code startTimeMillis} as mutable state. The engine constructs a new listener per execution.
+ *
+ * @author Douglas Hoard
  */
 public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
+    /** Start time for the current engine execution in epoch milliseconds. */
     private long startTimeMillis;
 
     @Override
@@ -158,10 +168,22 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         }
     }
 
+    /**
+     * Prints a formatted line using {@link String#format(String, Object...)}.
+     *
+     * @param format the format string; never {@code null}
+     * @param args format arguments; may be empty
+     */
     private void printLine(String format, Object... args) {
         System.out.println(String.format(format, args));
     }
 
+    /**
+     * Formats a duration in milliseconds for human-readable output.
+     *
+     * @param millis duration in milliseconds; must be {@code >= 0}
+     * @return formatted duration string; never {@code null}
+     */
     private String formatDuration(long millis) {
         if (millis < 1000) {
             return millis + "ms";
@@ -175,6 +197,11 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         }
     }
 
+    /**
+     * Prints a table separator line sized for the class-name column width.
+     *
+     * @param classWidth the class column width in characters; must be {@code >= 0}
+     */
     private void printSeparatorLine(int classWidth) {
         StringBuilder sep = new StringBuilder();
         sep.append("+");
@@ -211,6 +238,17 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         printLine(INFO + " " + sep.toString());
     }
 
+    /**
+     * Prints a single table row.
+     *
+     * @param classWidth the class-name column width
+     * @param className the class display name to print
+     * @param args argument bucket count
+     * @param methods method count
+     * @param passed passed count
+     * @param failed failed count
+     * @param status status marker
+     */
     private void printTableRow(
             int classWidth,
             String className,

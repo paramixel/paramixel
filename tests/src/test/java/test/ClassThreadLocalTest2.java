@@ -18,93 +18,149 @@ package test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Exercises per-class instance state under high argument parallelism.
+ *
+ * <p>This test mirrors {@link ClassThreadLocalTest1} and uses a {@link ThreadLocal} field to
+ * validate that initialization can safely interact with instance state when arguments execute in
+ * parallel.
+ */
 public class ClassThreadLocalTest2 {
 
+    /** Thread-local value used to validate initialization behavior. */
     private final ThreadLocal<Integer> threadLocalValue = new ThreadLocal<>();
 
-    @Paramixel.ArgumentSupplier(parallelism = 10)
-    public static Collection<String> arguments() {
-        Collection<String> collection = new ArrayList<>();
+    /**
+     * Supplies arguments and configures a high argument parallelism.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.setParallelism(10);
         for (int i = 0; i < 10; i++) {
-            collection.add("String " + i);
+            argumentSupplierContext.addArgument("String " + i);
         }
-        return collection;
     }
 
+    /**
+     * Initializes class state and validates {@link ThreadLocal} access.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Initialize
-    public void initialize(final ClassContext classContext) {
+    public void initialize(final ClassContext context) {
         System.out.println("initialize()");
-        assertThat(classContext).isNotNull();
-        assertThat(classContext.getStore()).isNotNull();
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
 
-        synchronized (classContext.getTestInstance()) {
+        synchronized (context.getTestInstance()) {
             assertThat(threadLocalValue.get()).isNull();
             threadLocalValue.set(1);
             assertThat(threadLocalValue.get()).isEqualTo(1);
         }
     }
 
+    /**
+     * Runs once per argument before tests for that argument.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeAll
-    public void beforeAll(final @NonNull ArgumentContext argumentContext) {
-        System.out.printf("beforeAll(index=[%d])%n", argumentContext.getArgumentIndex());
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void beforeAll(final @NonNull ArgumentContext context) {
+        System.out.printf("beforeAll(index=[%d])%n", context.getArgumentIndex());
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
     }
 
+    /**
+     * Runs before each test invocation.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeEach
-    public void beforeEach(final @NonNull ArgumentContext argumentContext) {
-        System.out.printf("beforeEach(index=[%d])%n", argumentContext.getArgumentIndex());
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void beforeEach(final @NonNull ArgumentContext context) {
+        System.out.printf("beforeEach(index=[%d])%n", context.getArgumentIndex());
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
     }
 
+    /**
+     * First test method.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test1(final @NonNull ArgumentContext argumentContext) {
-        System.out.printf("test1(index=[%d])%n", argumentContext.getArgumentIndex());
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void test1(final @NonNull ArgumentContext context) {
+        System.out.printf("test1(index=[%d])%n", context.getArgumentIndex());
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
     }
 
+    /**
+     * Second test method.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test2(final @NonNull ArgumentContext argumentContext) {
-        System.out.printf("test2(index=[%d])%n", argumentContext.getArgumentIndex());
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void test2(final @NonNull ArgumentContext context) {
+        System.out.printf("test2(index=[%d])%n", context.getArgumentIndex());
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
     }
 
+    /**
+     * Third test method.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test3(final @NonNull ArgumentContext argumentContext) {
-        System.out.printf("test3(index=[%d])%n", argumentContext.getArgumentIndex());
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void test3(final @NonNull ArgumentContext context) {
+        System.out.printf("test3(index=[%d])%n", context.getArgumentIndex());
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
     }
 
+    /**
+     * Runs after each test invocation.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterEach
-    public void afterEach(final @NonNull ArgumentContext argumentContext) {
-        System.out.printf("afterEach(index=[%d])%n", argumentContext.getArgumentIndex());
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void afterEach(final @NonNull ArgumentContext context) {
+        System.out.printf("afterEach(index=[%d])%n", context.getArgumentIndex());
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
     }
 
+    /**
+     * Runs once per argument after tests for that argument.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterAll
-    public void afterAll(final @NonNull ArgumentContext argumentContext) {
-        System.out.printf("afterAll(index=[%d])%n", argumentContext.getArgumentIndex());
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void afterAll(final @NonNull ArgumentContext context) {
+        System.out.printf("afterAll(index=[%d])%n", context.getArgumentIndex());
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
     }
 
+    /**
+     * Finalizes and validates that the class context is still available.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final ClassContext classContext) {
+    public void finalize(final ClassContext context) {
         System.out.println("finalize()");
-        assertThat(classContext).isNotNull();
-        assertThat(classContext.getStore()).isNotNull();
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 }

@@ -21,28 +21,51 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies behavior when the argument supplier registers no arguments.
+ *
+ * <p>The test method throws if executed. The finalize hook asserts that the test method was never
+ * invoked.
+ */
 public class NullArgumentTest {
 
+    /** Set to {@code true} if the test method is invoked unexpectedly. */
     private static final AtomicBoolean TEST_EXECUTED = new AtomicBoolean(false);
 
+    /**
+     * Supplies no arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        return null;
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        // Intentionally add no arguments.
     }
 
+    /**
+     * Should not be invoked because no arguments are supplied.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
+    public void test(final @NonNull ArgumentContext context) {
         TEST_EXECUTED.set(true);
         throw new IllegalStateException("Should not be executed");
     }
 
+    /**
+     * Asserts that the test method was not executed.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final @NonNull ClassContext classContext) {
-        assertThat(classContext).isNotNull();
+    public void finalize(final @NonNull ClassContext context) {
+        assertThat(context).isNotNull();
         assertThat(TEST_EXECUTED.get()).isFalse();
     }
 }

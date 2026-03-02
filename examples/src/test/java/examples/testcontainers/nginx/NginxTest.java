@@ -25,41 +25,63 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URLConnection;
-import java.util.stream.Stream;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 import org.testcontainers.containers.Network;
 
 @Paramixel.TestClass
+/**
+ * Demonstrates using Paramixel to run Testcontainers-backed Nginx tests across environments.
+ */
 public class NginxTest {
 
+    /** Logger for lifecycle output. */
     private static final Logger LOGGER = Logger.createLogger(NginxTest.class);
 
+    /** Store key for the shared Testcontainers {@link Network}. */
     private static final String NETWORK = "network";
 
-    @Paramixel.ArgumentSupplier(parallelism = Integer.MAX_VALUE)
-    public static Stream<NginxTestEnvironment> arguments() throws IOException {
-        return NginxTestEnvironment.createTestEnvironments();
+    /**
+     * Supplies {@link NginxTestEnvironment} instances as test arguments.
+     *
+     * @param argumentSupplierContext the argument supplier context
+     * @throws IOException if environment creation fails
+     */
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) throws IOException {
+        NginxTestEnvironment.createTestEnvironments().forEach(argumentSupplierContext::addArgument);
     }
 
+    /**
+     * Initializes the Nginx environment for the current argument.
+     *
+     * @param context the argument context
+     */
     @Paramixel.BeforeAll
-    public void initializeTestEnvironment(final @NonNull ArgumentContext argumentContext) {
-        NginxTestEnvironment testEnvironment = argumentContext.getArgument(NginxTestEnvironment.class);
+    public void initializeTestEnvironment(final @NonNull ArgumentContext context) {
+        NginxTestEnvironment testEnvironment = context.getArgument(NginxTestEnvironment.class);
         LOGGER.info("[%s] initialize test environment ...", testEnvironment.getName());
 
         Network network = Network.newNetwork();
         network.getId();
 
-        argumentContext.getClassContext().getStore().put(NETWORK, network);
+        context.getClassContext().getStore().put(NETWORK, network);
         testEnvironment.initialize(network);
 
         assertThat(testEnvironment.isRunning()).isTrue();
     }
 
+    /**
+     * Performs a simple HTTP GET against the mapped Nginx port and asserts the welcome page.
+     *
+     * @param context the argument context
+     * @throws Throwable if the request fails
+     */
     @Paramixel.Test
-    public void testGet(final @NonNull ArgumentContext argumentContext) throws Throwable {
-        NginxTestEnvironment testEnvironment = argumentContext.getArgument(NginxTestEnvironment.class);
+    public void testGet(final @NonNull ArgumentContext context) throws Throwable {
+        NginxTestEnvironment testEnvironment = context.getArgument(NginxTestEnvironment.class);
         LOGGER.info("[%s] testing testGet() ...", testEnvironment.getName());
 
         int port = testEnvironment.getNginxContainer().getMappedPort(80);
@@ -69,19 +91,31 @@ public class NginxTest {
         assertThat(content).contains("Welcome to nginx!");
     }
 
+    /**
+     * Destroys the Nginx environment and closes the shared network.
+     *
+     * @param context the argument context
+     * @throws Throwable if cleanup fails
+     */
     @Paramixel.AfterAll
-    public void destroyTestEnvironment(final @NonNull ArgumentContext argumentContext) throws Throwable {
-        NginxTestEnvironment testEnvironment = argumentContext.getArgument(NginxTestEnvironment.class);
+    public void destroyTestEnvironment(final @NonNull ArgumentContext context) throws Throwable {
+        NginxTestEnvironment testEnvironment = context.getArgument(NginxTestEnvironment.class);
         LOGGER.info("[%s] destroy test environment ...", testEnvironment.getName());
 
         new CleanupExecutor()
                 .addTask(testEnvironment::destroy)
                 .addTaskIfPresent(
-                        () -> argumentContext.getClassContext().getStore().remove(NETWORK, Network.class),
-                        Network::close)
+                        () -> context.getClassContext().getStore().remove(NETWORK, Network.class), Network::close)
                 .throwIfFailed();
     }
 
+    /**
+     * Performs a blocking HTTP GET and returns the response body.
+     *
+     * @param url URL to fetch
+     * @return response body as a string
+     * @throws Throwable if the connection or read fails
+     */
     private static String doGet(final @NonNull String url) throws Throwable {
         StringBuilder result = new StringBuilder();
         URLConnection connection = URI.create(url).toURL().openConnection();

@@ -19,17 +19,21 @@ package org.paramixel.engine.discovery;
 import java.io.File;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.commons.util.ClassLoaderUtils;
 import org.junit.platform.engine.EngineDiscoveryRequest;
@@ -43,45 +47,47 @@ import org.junit.platform.engine.discovery.NestedClassSelector;
 import org.junit.platform.engine.discovery.PackageNameFilter;
 import org.junit.platform.engine.discovery.PackageSelector;
 import org.junit.platform.engine.discovery.UniqueIdSelector;
+import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.EngineContext;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
+import org.paramixel.engine.api.ConcreteArgumentSupplierContext;
+import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 import org.paramixel.engine.validation.MethodValidator;
 
 /**
- * Discovers Paramixel test classes and their methods from a JUnit Platform discovery request.
+ * Discovers Paramixel tests from a JUnit Platform discovery request.
  *
- * <p>This class is responsible for:
+ * <p>This class parses JUnit Platform selectors and filters to identify Paramixel test classes
+ * annotated with {@link Paramixel.TestClass}. It then validates annotated methods using
+ * {@link MethodValidator} and builds a descriptor hierarchy rooted under the engine descriptor.
+ *
+ * <p><b>Selectors</b>
  * <ul>
- *   <li>Scanning classpath for classes annotated with {@code @Paramixel.TestClass}</li>
- *   <li>Validating method signatures for all annotated methods</li>
- *   <li>Building a hierarchical test descriptor tree</li>
- *   <li>Filtering tests based on engine discovery filters</li>
+ *   <li>{@link ClassSelector}: selects a concrete Java class</li>
+ *   <li>{@link MethodSelector}: selects the declaring class of a method</li>
+ *   <li>{@link PackageSelector}: scans classes in a package</li>
+ *   <li>{@link ClasspathRootSelector}: scans classes beneath a classpath root</li>
+ *   <li>{@link NestedClassSelector}: selects a nested class</li>
+ *   <li>{@link UniqueIdSelector}: selects by unique id segments</li>
  * </ul>
  *
- * <p>Discovery supports the following JUnit Platform selectors:
- * <ul>
- *   <li>{@link ClassSelector} - Select specific classes by Java class</li>
- *   <li>{@link MethodSelector} - Select specific test methods by class and method name</li>
- *   <li>{@link PackageSelector} - Select all test classes in a package</li>
- *   <li>{@link ClasspathRootSelector} - Select all test classes in a classpath root</li>
- *   <li>{@link NestedClassSelector} - Select nested classes</li>
- *   <li>{@link UniqueIdSelector} - Select tests by unique ID</li>
- * </ul>
- *
- * <p>Discovery creates a descriptor tree with the following hierarchy:
+ * <p><b>Descriptor structure</b>
  * <pre>
- * Engine (paramixel)
- *   └── ClassDescriptor (class:com.example.MyTests)
- *         └── Method:testSomethingDescriptor (method)
- *               └── InvocationDescriptor (invocation:0)
+ * engine:paramixel
+ *   class:&lt;fqcn&gt;
+ *     argument:&lt;index&gt;
+ *       method:&lt;name&gt;
  * </pre>
  *
- * @see ParamixelTestClassDescriptor
- * @see ParamixelTestArgumentDescriptor
- * @see ParamixelTestMethodDescriptor
+ * <p><b>Thread safety</b>
+ * <p>This type is stateless. It uses a JVM logger for diagnostics and does not require external
+ * synchronization.
+ *
+ * @author Douglas Hoard
  */
 public final class ParamixelDiscovery {
 
@@ -109,6 +115,15 @@ public final class ParamixelDiscovery {
      * Unique ID segment name for method descriptors.
      */
     private static final String METHOD_SEGMENT = "method";
+
+    /**
+     * Engine context used during discovery-time argument supplier invocation.
+     *
+     * <p>Discovery occurs before engine execution, so full runtime configuration is not available.
+     * This context is provided to satisfy {@link ArgumentSupplierContext#getEngineContext()}.
+     */
+    private static final EngineContext DISCOVERY_ENGINE_CONTEXT =
+            new ConcreteEngineContext(ENGINE_ID_SEGMENT, new Properties(), 1);
 
     /**
      * Discovers test classes from the given discovery request and populates the engine descriptor.
@@ -387,6 +402,7 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the test class to discover
      * @param engineDescriptor the parent engine descriptor
+     * @throws IllegalStateException if {@code testClass} fails validation
      */
     private void discoverTestClass(final @NonNull Class<?> testClass, final @NonNull TestDescriptor engineDescriptor) {
         if (isDisabled(testClass)) {
@@ -442,7 +458,9 @@ public final class ParamixelDiscovery {
             return;
         }
 
-        final Object[] arguments = getSupplierArguments(testClass);
+        final SupplierArguments supplierArguments = getSupplierArguments(testClass);
+        classDescriptor.setArgumentParallelism(supplierArguments.parallelism);
+        final Object[] arguments = supplierArguments.arguments;
 
         for (int argumentIndex = 0; argumentIndex < arguments.length; argumentIndex++) {
             final Object argument = arguments[argumentIndex];
@@ -482,39 +500,120 @@ public final class ParamixelDiscovery {
      * @param testClass the test class
      * @return array of arguments, or single null element if no supplier
      */
-    private Object[] getSupplierArguments(final @NonNull Class<?> testClass) {
+    private SupplierArguments getSupplierArguments(final @NonNull Class<?> testClass) {
         for (Method method : testClass.getDeclaredMethods()) {
             if (method.isAnnotationPresent(Paramixel.ArgumentSupplier.class)) {
                 try {
                     method.setAccessible(true);
-                    final Object result = method.invoke(null);
-                    if (result == null) {
-                        return new Object[0];
+
+                    // Context-driven supplier: public static void arguments(ArgumentSupplierContext ctx)
+                    if (method.getParameterCount() == 1
+                            && method.getParameterTypes()[0].equals(ArgumentSupplierContext.class)
+                            && method.getReturnType().equals(void.class)
+                            && Modifier.isStatic(method.getModifiers())) {
+                        final ConcreteArgumentSupplierContext context =
+                                new ConcreteArgumentSupplierContext(DISCOVERY_ENGINE_CONTEXT);
+                        method.invoke(null, context);
+                        return new SupplierArguments(context.toArray(), context.getParallelism());
                     }
-                    if (result instanceof java.util.stream.Stream) {
-                        return ((java.util.stream.Stream<?>) result).toArray();
-                    }
-                    if (result instanceof java.util.Collection) {
-                        return ((java.util.Collection<?>) result).toArray();
-                    }
-                    if (result instanceof Iterable) {
-                        final List<Object> list = new ArrayList<>();
-                        for (Object item : (Iterable<?>) result) {
-                            list.add(item);
+
+                    // Return-based supplier: public static Object arguments()
+                    if (method.getParameterCount() == 0 && Modifier.isStatic(method.getModifiers())) {
+                        final Object result = method.invoke(null);
+                        if (result == null) {
+                            return SupplierArguments.empty();
                         }
-                        return list.toArray();
+                        if (result instanceof Stream) {
+                            return new SupplierArguments(
+                                    ((Stream<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
+                        }
+                        if (result instanceof Collection) {
+                            return new SupplierArguments(
+                                    ((Collection<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
+                        }
+                        if (result instanceof Iterable) {
+                            final List<Object> list = new ArrayList<>();
+                            for (Object item : (Iterable<?>) result) {
+                                list.add(item);
+                            }
+                            return new SupplierArguments(list.toArray(), SupplierArguments.DEFAULT_PARALLELISM);
+                        }
+                        if (result instanceof Object[]) {
+                            return new SupplierArguments((Object[]) result, SupplierArguments.DEFAULT_PARALLELISM);
+                        }
+                        return new SupplierArguments(new Object[] {result}, SupplierArguments.DEFAULT_PARALLELISM);
                     }
-                    if (result instanceof Object[]) {
-                        return (Object[]) result;
-                    }
-                    return new Object[] {result};
+
+                    LOGGER.warning("Invalid @ArgumentSupplier method signature: " + method);
+                    return SupplierArguments.empty();
                 } catch (Exception e) {
                     LOGGER.log(Level.WARNING, "Failed to invoke argument supplier: " + method.getName(), e);
-                    return new Object[0];
+                    return SupplierArguments.empty();
                 }
             }
         }
-        return new Object[] {null};
+        return SupplierArguments.noSupplier();
+    }
+
+    /**
+     * Holds supplier output and the resolved per-class parallelism.
+     *
+     * <p>This type is private because it is an internal transport between supplier invocation and
+     * descriptor construction.
+     */
+    private static final class SupplierArguments {
+
+        /**
+         * Default parallelism used when no supplier overrides it.
+         *
+         * <p>The value is initialized to {@code max(1, availableProcessors)}.
+         */
+        private static final int DEFAULT_PARALLELISM =
+                Math.max(1, Runtime.getRuntime().availableProcessors());
+
+        /** Collected argument values in iteration order; never {@code null}. */
+        private final Object[] arguments;
+
+        /**
+         * Resolved parallelism for the test class.
+         *
+         * <p>The value is always {@code >= 1}.
+         */
+        private final int parallelism;
+
+        /**
+         * Creates a supplier result container.
+         *
+         * @param arguments the collected arguments; never {@code null}
+         * @param parallelism the resolved parallelism; must be {@code >= 1}
+         */
+        private SupplierArguments(final Object[] arguments, final int parallelism) {
+            this.arguments = arguments;
+            this.parallelism = parallelism;
+        }
+
+        /**
+         * Returns an empty supplier result.
+         *
+         * <p>This result indicates that a supplier exists but does not provide any arguments.
+         *
+         * @return an empty supplier result; never {@code null}
+         */
+        private static SupplierArguments empty() {
+            return new SupplierArguments(new Object[0], DEFAULT_PARALLELISM);
+        }
+
+        /**
+         * Returns a result indicating that no argument supplier exists.
+         *
+         * <p>The engine uses this sentinel value to create a single argument bucket with
+         * {@code null} so that non-parameterized test classes still execute.
+         *
+         * @return a sentinel supplier result; never {@code null}
+         */
+        private static SupplierArguments noSupplier() {
+            return new SupplierArguments(new Object[] {null}, DEFAULT_PARALLELISM);
+        }
     }
 
     /**
@@ -567,6 +666,15 @@ public final class ParamixelDiscovery {
         return null;
     }
 
+    /**
+     * Returns the effective ordering value for a test method.
+     *
+     * <p>This method reads {@link Paramixel.Order} and falls back to {@link Integer#MAX_VALUE}
+     * when the annotation is absent.
+     *
+     * @param method the method to inspect; never {@code null}
+     * @return the configured order value, or {@link Integer#MAX_VALUE} when unordered
+     */
     private static int getOrderValue(final Method method) {
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {

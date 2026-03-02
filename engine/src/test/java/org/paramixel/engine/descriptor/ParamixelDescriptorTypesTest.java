@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.UniqueId;
 
-class ParamixelDescriptorTypesTest {
+public class ParamixelDescriptorTypesTest {
 
     @Test
     public void classAndArgumentAndMethodDescriptors_exposeExpectedState() throws Exception {

@@ -49,6 +49,7 @@ public class ParamixelClassRunnerTest {
                 rootId.append("class", SuccessfulLifecycleTest.class.getName()),
                 SuccessfulLifecycleTest.class,
                 SuccessfulLifecycleTest.class.getName());
+        classDescriptor.setArgumentParallelism(1);
 
         final CloseableArgument arg = new CloseableArgument();
         final ParamixelTestArgumentDescriptor argDescriptor = new ParamixelTestArgumentDescriptor(
@@ -99,6 +100,7 @@ public class ParamixelClassRunnerTest {
         final UniqueId rootId = UniqueId.forEngine("paramixel");
         final ParamixelTestClassDescriptor classDescriptor = new ParamixelTestClassDescriptor(
                 rootId.append("class", FailingTest.class.getName()), FailingTest.class, FailingTest.class.getName());
+        classDescriptor.setArgumentParallelism(1);
 
         final ParamixelTestArgumentDescriptor argDescriptor = new ParamixelTestArgumentDescriptor(
                 classDescriptor.getUniqueId().append("argument", "0"), 0, null, "argument:0");
@@ -109,7 +111,7 @@ public class ParamixelClassRunnerTest {
                 argDescriptor.getUniqueId().append("method", "test"), testMethod, "test"));
 
         final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
-        final Map<Class<?>, org.paramixel.api.ClassContext> classContexts = new ConcurrentHashMap<>();
+        final Map<Class<?>, ClassContext> classContexts = new ConcurrentHashMap<>();
         final Map<Class<?>, Object> testInstances = new ConcurrentHashMap<>();
 
         final RecordingListener listener = new RecordingListener();
@@ -137,6 +139,7 @@ public class ParamixelClassRunnerTest {
     }
 
     public static final class CloseableArgument implements AutoCloseable {
+
         final AtomicBoolean closed = new AtomicBoolean(false);
 
         @Override
@@ -146,6 +149,7 @@ public class ParamixelClassRunnerTest {
     }
 
     public static class SuccessfulLifecycleTest implements AutoCloseable {
+
         final List<String> calls = new CopyOnWriteArrayList<>();
         final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -192,6 +196,7 @@ public class ParamixelClassRunnerTest {
     }
 
     public static class FailingTest implements AutoCloseable {
+
         final List<String> calls = new CopyOnWriteArrayList<>();
         final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -233,6 +238,7 @@ public class ParamixelClassRunnerTest {
     }
 
     private static final class RecordingListener implements EngineExecutionListener {
+
         @Override
         public void executionFinished(
                 final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {

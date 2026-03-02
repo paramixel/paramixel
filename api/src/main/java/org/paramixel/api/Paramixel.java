@@ -225,15 +225,6 @@ public class Paramixel {
      *   </li>
      * </ul>
      *
-     * <p><b>Parallelism Control:</b></p>
-     * <p>The {@link #parallelism} attribute controls concurrent execution of test invocations:
-     * </p>
-     * <ul>
-     *   <li>{@code parallelism = 1} - Sequential execution (default)</li>
-     *   <li>{@code parallelism = N} - Up to N concurrent invocations</li>
-     *   <li>{@code parallelism = Integer.MAX_VALUE} - Maximum concurrency</li>
-     * </ul>
-     *
      * <p><b>Constraints:</b></p>
      * <ul>
      *   <li>Only one argument supplier allowed per test class</li>
@@ -247,19 +238,7 @@ public class Paramixel {
     @Documented
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
-    public @interface ArgumentSupplier {
-
-        /**
-         * Specifies the maximum number of concurrent test invocations.
-         *
-         * <p>Controls the degree of parallelism for executing test methods with arguments
-         * provided by this supplier. The default value of {@code 1} ensures sequential
-         * execution.</p>
-         *
-         * @return the maximum number of concurrent invocations; default is 1
-         */
-        int parallelism() default 1;
-    }
+    public @interface ArgumentSupplier {}
 
     /**
      * Marks a method to be invoked once before all test methods within a test class.

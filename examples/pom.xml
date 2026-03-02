@@ -138,6 +138,7 @@
                 <version>${project.version}</version>
                 <executions>
                     <execution>
+                        <phase>test</phase>
                         <goals>
                             <goal>test</goal>
                         </goals>

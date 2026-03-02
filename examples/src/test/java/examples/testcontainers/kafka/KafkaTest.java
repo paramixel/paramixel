@@ -26,7 +26,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Stream;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -38,6 +37,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 import org.testcontainers.containers.Network;
 
@@ -53,20 +53,20 @@ public class KafkaTest {
     private static final String EARLIEST = "earliest";
     private static final String MESSAGE = "message";
 
-    @Paramixel.ArgumentSupplier(parallelism = Integer.MAX_VALUE)
-    public static Stream<KafkaTestEnvironment> arguments() throws IOException {
-        return KafkaTestEnvironment.createTestEnvironments();
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) throws IOException {
+        KafkaTestEnvironment.createTestEnvironments().forEach(argumentSupplierContext::addArgument);
     }
 
     @Paramixel.BeforeAll
-    public void initializeTestEnvironment(final @NonNull ArgumentContext argumentContext) throws Exception {
-        KafkaTestEnvironment testEnvironment = argumentContext.getArgument(KafkaTestEnvironment.class);
+    public void initializeTestEnvironment(final @NonNull ArgumentContext context) throws Exception {
+        KafkaTestEnvironment testEnvironment = context.getArgument(KafkaTestEnvironment.class);
         LOGGER.info("[%s] initialize test environment ...", testEnvironment.getName());
 
         Network network = Network.newNetwork();
         network.getId();
 
-        argumentContext.getClassContext().getStore().put(NETWORK, network);
+        context.getClassContext().getStore().put(NETWORK, network);
         testEnvironment.initialize(network);
 
         assertThat(testEnvironment.isRunning()).isTrue();
@@ -76,13 +76,12 @@ public class KafkaTest {
 
     @Paramixel.Test
     @Paramixel.Order(1)
-    public void testProduce(final @NonNull ArgumentContext argumentContext)
-            throws ExecutionException, InterruptedException {
-        KafkaTestEnvironment testEnvironment = argumentContext.getArgument(KafkaTestEnvironment.class);
+    public void testProduce(final @NonNull ArgumentContext context) throws ExecutionException, InterruptedException {
+        KafkaTestEnvironment testEnvironment = context.getArgument(KafkaTestEnvironment.class);
         LOGGER.info("[%s] testing testProduceConsume() ...", testEnvironment.getName());
 
         String message = RandomUtil.getRandomString(16);
-        argumentContext.getStore().put(MESSAGE, message);
+        context.getStore().put(MESSAGE, message);
 
         LOGGER.info("[%s] producing message [%s] ...", testEnvironment.getName(), message);
 
@@ -96,10 +95,10 @@ public class KafkaTest {
 
     @Paramixel.Test
     @Paramixel.Order(2)
-    public void testConsume(final @NonNull ArgumentContext argumentContext) {
-        KafkaTestEnvironment testEnvironment = argumentContext.getArgument(KafkaTestEnvironment.class);
+    public void testConsume(final @NonNull ArgumentContext context) {
+        KafkaTestEnvironment testEnvironment = context.getArgument(KafkaTestEnvironment.class);
 
-        String message = argumentContext.getStore().get(MESSAGE, String.class);
+        String message = context.getStore().get(MESSAGE, String.class);
         LOGGER.info("[%s] expected message [%s]", testEnvironment.getName(), message);
         boolean messageMatched = false;
 
@@ -121,15 +120,14 @@ public class KafkaTest {
     }
 
     @Paramixel.AfterAll
-    public void destroyTestEnvironment(final @NonNull ArgumentContext argumentContext) throws Throwable {
-        KafkaTestEnvironment testEnvironment = argumentContext.getArgument(KafkaTestEnvironment.class);
+    public void destroyTestEnvironment(final @NonNull ArgumentContext context) throws Throwable {
+        KafkaTestEnvironment testEnvironment = context.getArgument(KafkaTestEnvironment.class);
         LOGGER.info("[%s] destroy test environment ...", testEnvironment.getName());
 
         new CleanupExecutor()
                 .addTask(testEnvironment::destroy)
                 .addTaskIfPresent(
-                        () -> argumentContext.getClassContext().getStore().remove(NETWORK, Network.class),
-                        Network::close)
+                        () -> context.getClassContext().getStore().remove(NETWORK, Network.class), Network::close)
                 .throwIfFailed();
     }
 

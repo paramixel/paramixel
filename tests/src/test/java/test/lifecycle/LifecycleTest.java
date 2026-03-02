@@ -16,10 +16,9 @@
 
 package test.lifecycle;
 
-import java.util.Arrays;
-import java.util.Collection;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -32,56 +31,56 @@ public class LifecycleTest {
     /**
      * Supplies arguments for parameterized lifecycle execution.
      *
-     * @return the argument collection for test invocations
+     * @param argumentSupplierContext the argument supplier context
      */
-    @Paramixel.ArgumentSupplier(parallelism = 1)
-    public static Collection<String> arguments() {
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
         System.out.println("[ARGUMENT_SUPPLIER] Providing arguments for test methods");
-        return Arrays.asList("Argument 1", "Argument 2", "Argument 3");
+        argumentSupplierContext.setParallelism(1);
+        argumentSupplierContext.addArguments("Argument 1", "Argument 2", "Argument 3");
     }
 
     /**
      * Initializes class-level resources.
      *
-     * @param classContext the class context
+     * @param context the class context
      */
     @Paramixel.Initialize
-    public void initialize(final @NonNull ClassContext classContext) {
-        System.out.println(
-                "[INITIALIZE] Test class: " + classContext.getTestClass().getName());
-        System.out.println("[INITIALIZE] Test instance: " + classContext.getTestInstance());
+    public void initialize(final @NonNull ClassContext context) {
+        System.out.println("[INITIALIZE] Test class: " + context.getTestClass().getName());
+        System.out.println("[INITIALIZE] Test instance: " + context.getTestInstance());
     }
 
     /**
      * Executes before all tests for each argument.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.BeforeAll
-    public void beforeAll(final @NonNull ArgumentContext argumentContext) {
+    public void beforeAll(final @NonNull ArgumentContext context) {
         System.out.println("[BEFORE_ALL] Executing before all test methods");
-        System.out.println("[BEFORE_ALL] Argument: " + argumentContext.getArgument());
+        System.out.println("[BEFORE_ALL] Argument: " + context.getArgument());
     }
 
     /**
      * Executes before each test invocation.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.BeforeEach
-    public void beforeEach(final @NonNull ArgumentContext argumentContext) {
+    public void beforeEach(final @NonNull ArgumentContext context) {
         System.out.println("[BEFORE_EACH] Before test execution");
-        System.out.println("[BEFORE_EACH] Argument: " + argumentContext.getArgument());
+        System.out.println("[BEFORE_EACH] Argument: " + context.getArgument());
     }
 
     /**
      * Test method variant 1.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.Test
-    public void testMethod1(final @NonNull ArgumentContext argumentContext) {
-        Object argument = argumentContext.getArgument();
+    public void testMethod1(final @NonNull ArgumentContext context) {
+        Object argument = context.getArgument();
         System.out.println("[TEST_METHOD] Executing test with argument: " + argument);
         if (argument != null) {
             System.out.println(
@@ -92,11 +91,11 @@ public class LifecycleTest {
     /**
      * Test method variant 2.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.Test
-    public void testMethod2(final @NonNull ArgumentContext argumentContext) {
-        Object argument = argumentContext.getArgument();
+    public void testMethod2(final @NonNull ArgumentContext context) {
+        Object argument = context.getArgument();
         System.out.println("[TEST_METHOD] Executing test with argument: " + argument);
         if (argument != null) {
             System.out.println(
@@ -107,11 +106,11 @@ public class LifecycleTest {
     /**
      * Test method variant 3.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.Test
-    public void testMethod3(final @NonNull ArgumentContext argumentContext) {
-        Object argument = argumentContext.getArgument();
+    public void testMethod3(final @NonNull ArgumentContext context) {
+        Object argument = context.getArgument();
         System.out.println("[TEST_METHOD] Executing test with argument: " + argument);
         if (argument != null) {
             System.out.println(
@@ -122,33 +121,33 @@ public class LifecycleTest {
     /**
      * Executes after each test invocation.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.AfterEach
-    public void afterEach(final @NonNull ArgumentContext argumentContext) {
+    public void afterEach(final @NonNull ArgumentContext context) {
         System.out.println("[AFTER_EACH] After test execution");
-        System.out.println("[AFTER_EACH] Argument: " + argumentContext.getArgument());
+        System.out.println("[AFTER_EACH] Argument: " + context.getArgument());
     }
 
     /**
      * Executes after all tests for each argument.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.AfterAll
-    public void afterAll(final @NonNull ArgumentContext argumentContext) {
+    public void afterAll(final @NonNull ArgumentContext context) {
         System.out.println("[AFTER_ALL] Executing after all test methods");
-        System.out.println("[AFTER_ALL] Argument: " + argumentContext.getArgument());
+        System.out.println("[AFTER_ALL] Argument: " + context.getArgument());
     }
 
     /**
      * Finalizes class-level resources after all tests complete.
      *
-     * @param classContext the class context
+     * @param context the class context
      */
     @Paramixel.Finalize
-    public void finalize(final @NonNull ClassContext classContext) {
-        System.out.println("[FINALIZE] Test class completed: "
-                + classContext.getTestClass().getName());
+    public void finalize(final @NonNull ClassContext context) {
+        System.out.println(
+                "[FINALIZE] Test class completed: " + context.getTestClass().getName());
     }
 }

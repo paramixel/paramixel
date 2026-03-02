@@ -24,6 +24,7 @@ import org.paramixel.api.Paramixel;
  */
 @Paramixel.TestClass
 public class SelectorTestClass {
+
     /**
      * Sample test method used by method selectors.
      *

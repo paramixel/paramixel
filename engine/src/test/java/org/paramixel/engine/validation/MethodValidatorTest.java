@@ -18,14 +18,16 @@ package org.paramixel.engine.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.assertj.core.api.ListAssert;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
-class MethodValidatorTest {
+public class MethodValidatorTest {
 
     @Test
     public void constructor_isAccessible_forCoverage() {
@@ -88,8 +90,7 @@ class MethodValidatorTest {
                 .anySatisfy(m -> assertThat(m).contains("AfterAll method").contains("must accept exactly one"))
                 .anySatisfy(m -> assertThat(m).contains("AfterAll method").contains("must return void"));
 
-        final var validateBeforeAll =
-                MethodValidator.class.getDeclaredMethod("validateBeforeAllMethod", java.lang.reflect.Method.class);
+        final var validateBeforeAll = MethodValidator.class.getDeclaredMethod("validateBeforeAllMethod", Method.class);
         validateBeforeAll.setAccessible(true);
         final var privateBeforeAll =
                 BadBeforeAfterAllMethods.class.getDeclaredMethod("privateBeforeAll", ArgumentContext.class);
@@ -100,8 +101,7 @@ class MethodValidatorTest {
                 .anySatisfy(f ->
                         assertThat(f.getMessage()).contains("BeforeAll method").contains("must be public"));
 
-        final var validateAfterAll =
-                MethodValidator.class.getDeclaredMethod("validateAfterAllMethod", java.lang.reflect.Method.class);
+        final var validateAfterAll = MethodValidator.class.getDeclaredMethod("validateAfterAllMethod", Method.class);
         validateAfterAll.setAccessible(true);
         final var privateAfterAll =
                 BadBeforeAfterAllMethods.class.getDeclaredMethod("privateAfterAll", ArgumentContext.class);
@@ -155,9 +155,9 @@ class MethodValidatorTest {
                 .anySatisfy(m -> assertThat(m).contains("must not be static"));
     }
 
-    private static org.assertj.core.api.ListAssert<String> assertValidationFailures(
-            final String methodName, final java.lang.reflect.Method method) throws Exception {
-        final var m = MethodValidator.class.getDeclaredMethod(methodName, java.lang.reflect.Method.class);
+    private static ListAssert<String> assertValidationFailures(final String methodName, final Method method)
+            throws Exception {
+        final var m = MethodValidator.class.getDeclaredMethod(methodName, Method.class);
         m.setAccessible(true);
         @SuppressWarnings("unchecked")
         final List<MethodValidator.ValidationFailure> failures =
@@ -168,7 +168,8 @@ class MethodValidatorTest {
         return assertThat(messages);
     }
 
-    static class BadTestMethods {
+    public static class BadTestMethods {
+
         @Paramixel.Test
         public int badReturn(final ArgumentContext ctx) {
             return 1;
@@ -181,7 +182,8 @@ class MethodValidatorTest {
         public void badParam(final String notAContext) {}
     }
 
-    static class BadLifecycleMethods {
+    public static class BadLifecycleMethods {
+
         @Paramixel.BeforeEach
         public static void beforeEachStatic(final ArgumentContext ctx) {}
 
@@ -195,7 +197,8 @@ class MethodValidatorTest {
         public static void finalizeStatic(final ClassContext ctx) {}
     }
 
-    static class StaticBeforeAfterAllOk {
+    public static class StaticBeforeAfterAllOk {
+
         @Paramixel.BeforeAll
         public static void beforeAll(final ArgumentContext ctx) {}
 
@@ -203,7 +206,8 @@ class MethodValidatorTest {
         public static void afterAll(final ArgumentContext ctx) {}
     }
 
-    static class OrderRules {
+    public static class OrderRules {
+
         @Paramixel.Order(1)
         public void orderOnNonTest(final ArgumentContext ctx) {}
 
@@ -212,7 +216,8 @@ class MethodValidatorTest {
         public void badOrderValue(final ArgumentContext ctx) {}
     }
 
-    static class BadBeforeAfterAllMethods {
+    public static class BadBeforeAfterAllMethods {
+
         @Paramixel.BeforeAll
         public int beforeAll(final ClassContext notAnArgumentContext) {
             return 1;
@@ -230,7 +235,8 @@ class MethodValidatorTest {
         private void privateAfterAll(final ArgumentContext ctx) {}
     }
 
-    static class PrivateInvalidMethods {
+    public static class PrivateInvalidMethods {
+
         @Paramixel.Test
         private static int badTest(final String notAContext) {
             return 1;

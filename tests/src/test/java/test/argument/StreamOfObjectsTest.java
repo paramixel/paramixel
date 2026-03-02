@@ -21,21 +21,35 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.stream.Stream;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that objects supplied from a {@link Stream} are delivered to test invocations.
+ */
 public class StreamOfObjectsTest {
 
+    /**
+     * Supplies a small stream of string arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        return Stream.of("test1", "test2");
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        Stream.of("test1", "test2").forEach(argumentSupplierContext::addArgument);
     }
 
+    /**
+     * Asserts that the argument payload is a {@link String}.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(String.class);
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(String.class);
     }
 }
