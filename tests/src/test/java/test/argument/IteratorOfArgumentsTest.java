@@ -25,7 +25,7 @@ import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
 /**
- * Verifies argument delivery when arguments are supplied via an iterator-like loop.
+ * Verifies that arguments can be collected by iterating over a {@link java.util.Iterator}.
  */
 public class IteratorOfArgumentsTest {
 
@@ -36,7 +36,11 @@ public class IteratorOfArgumentsTest {
      */
     @Paramixel.ArgumentsCollector
     public static void arguments(final @NonNull ArgumentsCollector collector) {
-        collector.addArguments("test1", "test2");
+        java.util.Iterator<String> iterator =
+                java.util.List.of("test1", "test2").iterator();
+        while (iterator.hasNext()) {
+            collector.addArgument(iterator.next());
+        }
     }
 
     /**

@@ -18,6 +18,7 @@ package test.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ArgumentsCollector;
@@ -25,7 +26,7 @@ import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
 /**
- * Verifies delivery of multiple string arguments added as a collection.
+ * Verifies delivery of multiple string arguments added via {@link ArgumentsCollector#addArguments(List)}.
  */
 public class CollectionArgumentsTest {
 
@@ -36,7 +37,7 @@ public class CollectionArgumentsTest {
      */
     @Paramixel.ArgumentsCollector
     public static void arguments(final @NonNull ArgumentsCollector collector) {
-        collector.addArguments("test1", "test2");
+        collector.addArguments(List.of("test1", "test2"));
     }
 
     /**
