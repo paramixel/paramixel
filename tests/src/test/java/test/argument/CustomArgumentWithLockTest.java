@@ -22,7 +22,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
@@ -36,14 +36,14 @@ public class CustomArgumentWithLockTest {
     /**
      * Supplies custom arguments that share a single fair lock and enables high parallelism.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.setParallelism(10);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.setParallelism(10);
         Lock lock = new ReentrantLock(true);
         for (int i = 0; i < 10; i++) {
-            argumentSupplierContext.addArgument(new CustomArgument(lock, "String " + i));
+            collector.addArgument(new CustomArgument(lock, "String " + i));
         }
     }
 

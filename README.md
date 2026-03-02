@@ -83,16 +83,16 @@ paramixel/
 ```java
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 
 @Paramixel.TestClass
 public class ParameterizedTest {
 
-    @Paramixel.ArgumentSupplier
-    public static void arguments(ArgumentSupplierContext context) {
+    @Paramixel.ArgumentsCollector
+    public static void arguments(ArgumentsCollector collector) {
         // Called once to provide arguments for parameterized tests
-        context.setParallelism(4);
-        context.addArguments("arg1", "arg2", "arg3");
+        collector.setParallelism(4);
+        collector.addArguments("arg1", "arg2", "arg3");
     }
 
     @Paramixel.Test
@@ -105,19 +105,20 @@ public class ParameterizedTest {
 
 ### Lifecycle Hooks
 
-```java
-import org.paramixel.api.Paramixel;
-import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ClassContext;
+ ```java
+ import org.paramixel.api.Paramixel;
+ import org.paramixel.api.ArgumentContext;
+ import org.paramixel.api.ArgumentsCollector;
+ import org.paramixel.api.ClassContext;
+ 
+ @Paramixel.TestClass
+ public class LifecycleTest {
 
-@Paramixel.TestClass
-public class LifecycleTest {
-
-    @Paramixel.ArgumentSupplier
-    public static void arguments(ArgumentSupplierContext context) {
+    @Paramixel.ArgumentsCollector
+    public static void arguments(ArgumentsCollector collector) {
         // Called once to provide arguments for parameterized tests
-        context.setParallelism(4);
-        context.addArguments("arg1", "arg2", "arg3");
+        collector.setParallelism(4);
+        collector.addArguments("arg1", "arg2", "arg3");
     }
     
     @Paramixel.Initialize
@@ -195,7 +196,7 @@ public class TestData implements Named {
 
 #### Test Execution
 - `@Paramixel.Test` - Marks a method as a test method
-- `@Paramixel.ArgumentSupplier` - Provides arguments for parameterized tests (parallelism is configured via `ArgumentSupplierContext.setParallelism(N)`)
+- `@Paramixel.ArgumentsCollector` - Provides arguments for parameterized tests (parallelism is configured via `ArgumentsCollector.setParallelism(N)`)
 
 #### Lifecycle Hooks
 - `@Paramixel.Initialize` - Executed once before any other lifecycle method
@@ -255,13 +256,13 @@ public class TestData implements Named {
 
 ### Parallelism
 
-Control parallelism using `ArgumentSupplierContext.setParallelism(...)` inside your `@Paramixel.ArgumentSupplier`:
+Control parallelism using `ArgumentsCollector.setParallelism(...)` inside your `@Paramixel.ArgumentsCollector`:
 
 ```java
-@Paramixel.ArgumentSupplier
-public static void arguments(ArgumentSupplierContext context) {
-    context.setParallelism(4); // Up to 4 concurrent invocations
-    context.addArgument(...)
+@Paramixel.ArgumentsCollector
+public static void arguments(ArgumentsCollector collector) {
+    collector.setParallelism(4); // Up to 4 concurrent invocations
+    collector.addArgument(...)
 }
 ```
 

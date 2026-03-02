@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.stream.Stream;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
@@ -33,11 +33,11 @@ public class StreamOfArgumentsTest {
     /**
      * Supplies a small stream of string arguments.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        Stream.of("test1", "test2").forEach(argumentSupplierContext::addArgument);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        Stream.of("test1", "test2").forEach(collector::addArgument);
     }
 
     /**

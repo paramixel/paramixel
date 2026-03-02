@@ -20,23 +20,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
 /**
- * Verifies delivery of string arguments added via {@link ArgumentSupplierContext#addArguments(Object...)}.
+ * Verifies delivery of string arguments added via {@link ArgumentsCollector#addArguments(Object...)}.
  */
 public class IterableArgumentsTest {
 
     /**
      * Supplies a small set of string arguments.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArguments("test1", "test2");
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArguments("test1", "test2");
     }
 
     /**

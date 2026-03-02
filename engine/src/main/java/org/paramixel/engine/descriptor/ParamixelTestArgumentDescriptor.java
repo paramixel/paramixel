@@ -25,7 +25,7 @@ import org.junit.platform.engine.UniqueId;
  * Test descriptor for a set of arguments from an argument supplier.
  *
  * <p>This descriptor represents a single set of arguments provided by the
- * {@code @Paramixel.ArgumentSupplier} annotation. When an argument supplier is present,
+ * {@code @Paramixel.ArgumentsCollector} annotation. When an argument supplier is present,
  * there will be multiple argument descriptors, one for each set of arguments.</p>
  *
  * <p>Descriptor hierarchy:

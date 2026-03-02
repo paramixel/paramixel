@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -37,7 +37,7 @@ import org.paramixel.api.Paramixel;
  */
 public class BasicTest {
 
-    /** Number of arguments supplied by {@link #arguments(ArgumentSupplierContext)}. */
+    /** Number of arguments supplied by {@link #arguments(ArgumentsCollector)}. */
     private static final int ARGUMENT_COUNT = 5;
 
     /** Number of {@code @Paramixel.Test} methods executed per argument. */
@@ -70,12 +70,12 @@ public class BasicTest {
     /**
      * Supplies a deterministic set of arguments used by all test methods.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
-            argumentSupplierContext.addArgument("String " + i);
+            collector.addArgument("String " + i);
         }
     }
 

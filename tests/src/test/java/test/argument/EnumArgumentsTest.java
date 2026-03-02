@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
@@ -45,11 +45,11 @@ public class EnumArgumentsTest {
     /**
      * Supplies all {@link EnumArgument} values as arguments.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArguments(EnumArgument.ZERO, EnumArgument.ONE, EnumArgument.TWO);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArguments(EnumArgument.ZERO, EnumArgument.ONE, EnumArgument.TWO);
     }
 
     /**

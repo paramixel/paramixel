@@ -27,7 +27,7 @@ import java.net.URI;
 import java.net.URLConnection;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Paramixel;
 import org.testcontainers.containers.Network;
 
@@ -46,12 +46,12 @@ public class NginxTest {
     /**
      * Supplies {@link NginxTestEnvironment} instances as test arguments.
      *
-     * @param argumentSupplierContext the argument supplier context
+     * @param collector the arguments collector
      * @throws IOException if environment creation fails
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) throws IOException {
-        NginxTestEnvironment.createTestEnvironments().forEach(argumentSupplierContext::addArgument);
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) throws IOException {
+        NginxTestEnvironment.createTestEnvironments().forEach(collector::addArgument);
     }
 
     /**

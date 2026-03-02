@@ -50,7 +50,7 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
     /**
      * Parallelism for argument and invocation execution for this class.
      *
-     * <p>Configured by {@code ArgumentSupplierContext#setParallelism(int)} when
+     * <p>Configured by {@code ArgumentsCollector#setParallelism(int)} when
      * the argument supplier uses the context-driven pattern.
      */
     private int argumentParallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
@@ -84,7 +84,7 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
      * Sets the per-class parallelism for arguments and invocations.
      *
      * <p>Discovery typically sets this value based on
-     * {@code ArgumentSupplierContext#setParallelism(int)}.
+     * {@code ArgumentsCollector#setParallelism(int)}.
      *
      * @param argumentParallelism the parallelism value; must be {@code >= 1}
      * @throws IllegalArgumentException if {@code argumentParallelism < 1}

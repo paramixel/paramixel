@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -41,12 +41,12 @@ public class OrderAnnotationTest {
     /**
      * Supplies a single argument and forces sequential execution for deterministic ordering.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.setParallelism(1);
-        argumentSupplierContext.addArgument("single");
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.setParallelism(1);
+        collector.addArgument("single");
     }
 
     /**

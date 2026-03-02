@@ -22,13 +22,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
 /**
- * Verifies delivery of multiple string arguments added via {@link ArgumentSupplierContext#addArguments(Object...)}.
+ * Verifies delivery of multiple string arguments added via {@link ArgumentsCollector#addArguments(Object...)}.
  */
 public class ArrayArgumentsTest {
 
@@ -38,11 +38,11 @@ public class ArrayArgumentsTest {
     /**
      * Supplies a fixed set of string arguments.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArguments("array1", "array2", "array3");
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArguments("array1", "array2", "array3");
     }
 
     /**

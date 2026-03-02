@@ -22,7 +22,7 @@ package org.paramixel.api;
  * <p>This interface represents the leaf node in the context hierarchy, encapsulating
  * all information pertinent to a single test method execution. Each invocation of a
  * test method receives its own {@code ArgumentContext} instance, which may optionally
- * contain a data argument provided by an {@link Paramixel.ArgumentSupplier}.</p>
+ * contain a data argument provided by an {@link Paramixel.ArgumentsCollector}.</p>
  *
  * <p>The context hierarchy follows a parent-child relationship:</p>
  * <pre>
@@ -49,7 +49,7 @@ package org.paramixel.api;
  * @Paramixel.TestClass
  * public class ParameterizedTests {
  *
- *     @Paramixel.ArgumentSupplier
+ *     @Paramixel.ArgumentsCollector
  *     public static List<String> arguments() {
  *         return Arrays.asList("input1", "input2", "input3");
  *     }
@@ -63,7 +63,7 @@ package org.paramixel.api;
  * }
  * }</pre>
  *
- * @see Paramixel.ArgumentSupplier
+ * @see Paramixel.ArgumentsCollector
  * @see ClassContext
  * @see EngineContext
  * @since 0.0.1
@@ -92,7 +92,7 @@ public interface ArgumentContext {
     /**
      * Returns the argument provided for this test invocation.
      *
-     * <p>If an {@link Paramixel.ArgumentSupplier} is defined for the test class, this method
+     * <p>If an {@link Paramixel.ArgumentsCollector} is defined for the test class, this method
      * returns the specific argument value supplied for this invocation. For lifecycle methods
      * such as {@link Paramixel.BeforeAll} and {@link Paramixel.AfterAll}, or when no argument
      * supplier is defined, this method returns {@code null}.</p>
@@ -148,7 +148,7 @@ public interface ArgumentContext {
      * Returns the zero-based index of this invocation within the test class.
      *
      * <p>This index uniquely identifies the argument position when multiple arguments
-     * are supplied by an {@link Paramixel.ArgumentSupplier}. The index begins at 0 for
+     * are supplied by an {@link Paramixel.ArgumentsCollector}. The index begins at 0 for
      * the first argument and increments sequentially for each subsequent argument.</p>
      *
      * <p>For lifecycle methods annotated with {@link Paramixel.BeforeAll} and

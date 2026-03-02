@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
@@ -33,15 +33,15 @@ public class ArrayOfArgumentsWithNullTest {
     /**
      * Supplies a small set of {@link NamedValue} arguments, alternating {@code null} and non-null values.
      *
-     * @param argumentSupplierContext context used to register test arguments
+     * @param collector the arguments collector
      */
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
         for (int i = 0; i < 3; i++) {
             if (i % 2 == 0) {
-                argumentSupplierContext.addArgument(NamedValue.of("test" + i, null));
+                collector.addArgument(NamedValue.of("test" + i, null));
             } else {
-                argumentSupplierContext.addArgument(NamedValue.of("test" + i, "test" + i));
+                collector.addArgument(NamedValue.of("test" + i, "test" + i));
             }
         }
     }

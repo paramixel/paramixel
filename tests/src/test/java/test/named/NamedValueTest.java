@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.Named;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
@@ -31,10 +31,10 @@ import org.paramixel.api.Paramixel;
 @Paramixel.TestClass
 public class NamedValueTest {
 
-    @Paramixel.ArgumentSupplier
-    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
-        argumentSupplierContext.addArgument(NamedValue.of("alpha", "A"));
-        argumentSupplierContext.addArgument(NamedValue.of("beta", "B"));
+    @Paramixel.ArgumentsCollector
+    public static void arguments(final @NonNull ArgumentsCollector collector) {
+        collector.addArgument(NamedValue.of("alpha", "A"));
+        collector.addArgument(NamedValue.of("beta", "B"));
     }
 
     @Paramixel.Test
