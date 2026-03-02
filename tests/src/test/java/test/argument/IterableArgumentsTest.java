@@ -25,7 +25,7 @@ import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
 /**
- * Verifies delivery of string arguments added via {@link ArgumentsCollector#addArguments(Object...)}.
+ * Verifies that arguments can be collected by iterating over an {@link Iterable}.
  */
 public class IterableArgumentsTest {
 
@@ -36,7 +36,10 @@ public class IterableArgumentsTest {
      */
     @Paramixel.ArgumentsCollector
     public static void arguments(final @NonNull ArgumentsCollector collector) {
-        collector.addArguments("test1", "test2");
+        Iterable<String> iterable = java.util.List.of("test1", "test2");
+        for (String item : iterable) {
+            collector.addArgument(item);
+        }
     }
 
     /**
