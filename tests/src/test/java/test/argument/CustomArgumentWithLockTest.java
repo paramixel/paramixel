@@ -18,74 +18,122 @@ package test.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that a custom argument can coordinate lifecycle execution using a shared {@link Lock}.
+ */
 public class CustomArgumentWithLockTest {
 
-    @Paramixel.ArgumentSupplier(parallelism = 10)
-    public static Collection<CustomArgument> arguments() {
+    /**
+     * Supplies custom arguments that share a single fair lock and enables high parallelism.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.setParallelism(10);
         Lock lock = new ReentrantLock(true);
-        Collection<CustomArgument> collection = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            collection.add(new CustomArgument(lock, "String " + i));
+            argumentSupplierContext.addArgument(new CustomArgument(lock, "String " + i));
         }
-        return collection;
     }
 
+    /**
+     * Verifies that the class context and store are available.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Initialize
-    public void initialize(final @NonNull ClassContext classContext) {
-        assertThat(classContext).isNotNull();
-        assertThat(classContext.getStore()).isNotNull();
+    public void initialize(final @NonNull ClassContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Acquires the shared lock once per argument before tests run.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeAll
-    public void beforeAll(final @NonNull ArgumentContext argumentContext) {
-        CustomArgument argument = (CustomArgument) argumentContext.getArgument();
+    public void beforeAll(final @NonNull ArgumentContext context) {
+        CustomArgument argument = (CustomArgument) context.getArgument();
         argument.lock();
-        assertThat(argumentContext.getStore()).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Asserts that the argument is a {@link CustomArgument}.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test1(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(CustomArgument.class);
+    public void test1(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(CustomArgument.class);
     }
 
+    /**
+     * Asserts that the argument is a {@link CustomArgument}.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test2(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(CustomArgument.class);
+    public void test2(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(CustomArgument.class);
     }
 
+    /**
+     * Releases the shared lock once per argument after all tests run.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterAll
-    public void afterAll(final @NonNull ArgumentContext argumentContext) {
-        CustomArgument argument = (CustomArgument) argumentContext.getArgument();
+    public void afterAll(final @NonNull ArgumentContext context) {
+        CustomArgument argument = (CustomArgument) context.getArgument();
         argument.unlock();
-        assertThat(argumentContext.getStore()).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Verifies that the class context and store remain available during finalize.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final @NonNull ClassContext classContext) {
-        assertThat(classContext).isNotNull();
-        assertThat(classContext.getStore()).isNotNull();
+    public void finalize(final @NonNull ClassContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
     }
 
+    /**
+     * Custom argument that exposes lock/unlock operations.
+     */
     public static final class CustomArgument implements Named {
 
+        /** Shared lock used to coordinate lifecycle execution. */
         private final Lock lock;
+
+        /** Value returned as the argument name. */
         private final String value;
 
+        /**
+         * Creates a new argument.
+         *
+         * @param lock shared lock
+         * @param value value returned as the name
+         */
         public CustomArgument(final @NonNull Lock lock, final @NonNull String value) {
             this.lock = lock;
             this.value = value;
@@ -100,6 +148,7 @@ public class CustomArgumentWithLockTest {
             lock.lock();
         }
 
+        /** Releases the shared lock. */
         public void unlock() {
             lock.unlock();
         }

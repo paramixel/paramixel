@@ -26,7 +26,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Stream;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -38,6 +37,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 import org.testcontainers.containers.Network;
 
@@ -53,21 +53,21 @@ public class BufstreamTest {
     private static final String MESSAGE = "message";
     private static final String NETWORK = "network";
 
-    @Paramixel.ArgumentSupplier(parallelism = Integer.MAX_VALUE)
-    public static Stream<BufstreamTestEnvironment> arguments() throws IOException {
-        return BufstreamTestEnvironment.createTestEnvironments();
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) throws IOException {
+        BufstreamTestEnvironment.createTestEnvironments().forEach(argumentSupplierContext::addArgument);
     }
 
     @Paramixel.BeforeAll
-    public void initializeTestEnvironment(final @NonNull ArgumentContext argumentContext) throws IOException {
-        BufstreamTestEnvironment bufstreamTestEnvironment = argumentContext.getArgument(BufstreamTestEnvironment.class);
+    public void initializeTestEnvironment(final @NonNull ArgumentContext context) throws IOException {
+        BufstreamTestEnvironment bufstreamTestEnvironment = context.getArgument(BufstreamTestEnvironment.class);
         LOGGER.info("[%s] initialize test environment ...", bufstreamTestEnvironment.getName());
 
         Network network = Network.newNetwork();
         network.getId();
 
         bufstreamTestEnvironment.initialize(network);
-        argumentContext.getStore().put(NETWORK, network);
+        context.getStore().put(NETWORK, network);
 
         assertThat(bufstreamTestEnvironment.isRunning()).isTrue();
 
@@ -76,13 +76,12 @@ public class BufstreamTest {
 
     @Paramixel.Test
     @Paramixel.Order(1)
-    public void testProduce(final @NonNull ArgumentContext argumentContext)
-            throws ExecutionException, InterruptedException {
-        BufstreamTestEnvironment bufstreamTestEnvironment = argumentContext.getArgument(BufstreamTestEnvironment.class);
+    public void testProduce(final @NonNull ArgumentContext context) throws ExecutionException, InterruptedException {
+        BufstreamTestEnvironment bufstreamTestEnvironment = context.getArgument(BufstreamTestEnvironment.class);
         LOGGER.info("[%s] testing testProduce() ...", bufstreamTestEnvironment.getName());
 
         String message = RandomUtil.getRandomString(16);
-        argumentContext.getStore().put(MESSAGE, message);
+        context.getStore().put(MESSAGE, message);
 
         LOGGER.info("[%s] producing message [%s] ...", bufstreamTestEnvironment.getName(), message);
 
@@ -96,11 +95,11 @@ public class BufstreamTest {
 
     @Paramixel.Test
     @Paramixel.Order(2)
-    public void testConsume(final @NonNull ArgumentContext argumentContext) {
-        BufstreamTestEnvironment bufstreamTestEnvironment = argumentContext.getArgument(BufstreamTestEnvironment.class);
+    public void testConsume(final @NonNull ArgumentContext context) {
+        BufstreamTestEnvironment bufstreamTestEnvironment = context.getArgument(BufstreamTestEnvironment.class);
         LOGGER.info("[%s] testing testConsume() ...", bufstreamTestEnvironment.getName());
 
-        String message = argumentContext.getStore().get(MESSAGE, String.class);
+        String message = context.getStore().get(MESSAGE, String.class);
         LOGGER.info("[%s] expected message [%s]", bufstreamTestEnvironment.getName(), message);
         boolean messageMatched = false;
 
@@ -122,13 +121,13 @@ public class BufstreamTest {
     }
 
     @Paramixel.AfterAll
-    public void destroyTestEnvironment(final @NonNull ArgumentContext argumentContext) throws Throwable {
-        BufstreamTestEnvironment bufstreamTestEnvironment = argumentContext.getArgument(BufstreamTestEnvironment.class);
+    public void destroyTestEnvironment(final @NonNull ArgumentContext context) throws Throwable {
+        BufstreamTestEnvironment bufstreamTestEnvironment = context.getArgument(BufstreamTestEnvironment.class);
         LOGGER.info("[%s] destroy test environment ...", bufstreamTestEnvironment.getName());
 
         new CleanupExecutor()
                 .addTask(bufstreamTestEnvironment::destroy)
-                .addTaskIfPresent(() -> (Network) argumentContext.getStore().remove(NETWORK), Network::close)
+                .addTaskIfPresent(() -> (Network) context.getStore().remove(NETWORK), Network::close)
                 .throwIfFailed();
     }
 

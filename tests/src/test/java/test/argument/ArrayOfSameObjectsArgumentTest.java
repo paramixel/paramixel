@@ -20,25 +20,35 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies delivery of multiple string arguments added in a single call.
+ */
 public class ArrayOfSameObjectsArgumentTest {
 
+    /**
+     * Supplies a small set of string arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object[] arguments() {
-        Object[] objects = new Object[3];
-        for (int i = 0; i < objects.length; i++) {
-            objects[i] = "test" + i;
-        }
-        return objects;
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArguments("test0", "test1", "test2");
     }
 
+    /**
+     * Asserts that the argument payload is a {@link String} with the expected prefix.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(String.class);
-        assertThat((String) argumentContext.getArgument()).startsWith("test");
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(String.class);
+        assertThat((String) context.getArgument()).startsWith("test");
     }
 }

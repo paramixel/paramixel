@@ -18,10 +18,9 @@ package test.named;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Arrays;
-import java.util.Collection;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
 
@@ -37,22 +36,21 @@ public class NamedTest {
      * @return the collection of named arguments
      */
     @Paramixel.ArgumentSupplier
-    public static Collection<NamedString> arguments() {
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
         System.out.println("[ARGUMENT_SUPPLIER] Providing named arguments");
-        return Arrays.asList(
-                new NamedString("First Argument"),
-                new NamedString("Second Argument"),
-                new NamedString("Third Argument"));
+        argumentSupplierContext.addArgument(new NamedString("First Argument"));
+        argumentSupplierContext.addArgument(new NamedString("Second Argument"));
+        argumentSupplierContext.addArgument(new NamedString("Third Argument"));
     }
 
     /**
      * Validates that arguments implement {@link Named}.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.Test
-    public void testWithNamedArgument(final @NonNull ArgumentContext argumentContext) {
-        Object argument = argumentContext.getArgument();
+    public void testWithNamedArgument(final @NonNull ArgumentContext context) {
+        Object argument = context.getArgument();
         System.out.println("[TEST_METHOD] argument class: " + argument.getClass());
         System.out.println("[TEST_METHOD] argument value: " + argument);
         System.out.println("[TEST_METHOD] is NamedString: " + (argument instanceof NamedString));

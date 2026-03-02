@@ -17,10 +17,9 @@
 package examples.simple;
 
 import examples.support.Logger;
-import java.util.ArrayList;
-import java.util.Collection;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
@@ -38,106 +37,102 @@ public class SequentialArgumentTest {
     /**
      * Supplies a collection of string arguments.
      *
-     * @return the argument collection
+     * @param argumentSupplierContext the argument supplier context
      */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        Collection<String> collection = new ArrayList<>();
-
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
         for (int i = 0; i < 10; i++) {
-            collection.add("string-" + i);
+            argumentSupplierContext.addArgument("string-" + i);
         }
-
-        return collection;
     }
 
     /**
      * Initializes class-level resources.
      *
-     * @param classContext the class context
+     * @param context the class context
      */
     @Paramixel.Initialize
-    public void initialize(final @NonNull ClassContext classContext) {
+    public void initialize(final @NonNull ClassContext context) {
         LOGGER.info("initialize()");
     }
 
     /**
      * Executes before all tests for each argument.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.BeforeAll
-    public void beforeAll(final @NonNull ArgumentContext argumentContext) {
-        LOGGER.info("beforeAll() argument [%s]", argumentContext.getArgument());
+    public void beforeAll(final @NonNull ArgumentContext context) {
+        LOGGER.info("beforeAll() argument [%s]", context.getArgument());
     }
 
     /**
      * Executes before each test invocation.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.BeforeEach
-    public void beforeEach(final @NonNull ArgumentContext argumentContext) {
-        LOGGER.info("beforeEach() argument [%s]", argumentContext.getArgument());
+    public void beforeEach(final @NonNull ArgumentContext context) {
+        LOGGER.info("beforeEach() argument [%s]", context.getArgument());
     }
 
     /**
      * Executes the first test method.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.Test
-    public void test1(final @NonNull ArgumentContext argumentContext) {
-        LOGGER.info("test1() argument [%s]", argumentContext.getArgument());
+    public void test1(final @NonNull ArgumentContext context) {
+        LOGGER.info("test1() argument [%s]", context.getArgument());
     }
 
     /**
      * Executes the second test method.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.Test
-    public void test2(final @NonNull ArgumentContext argumentContext) {
-        LOGGER.info("test2() argument [%s]", argumentContext.getArgument());
+    public void test2(final @NonNull ArgumentContext context) {
+        LOGGER.info("test2() argument [%s]", context.getArgument());
     }
 
     /**
      * Executes the third test method.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.Test
-    public void test3(final @NonNull ArgumentContext argumentContext) {
-        LOGGER.info("test3() argument [%s]", argumentContext.getArgument());
+    public void test3(final @NonNull ArgumentContext context) {
+        LOGGER.info("test3() argument [%s]", context.getArgument());
     }
 
     /**
      * Executes after each test invocation.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.AfterEach
-    public void afterEach(final @NonNull ArgumentContext argumentContext) {
-        LOGGER.info("afterEach() argument [%s]", argumentContext.getArgument());
+    public void afterEach(final @NonNull ArgumentContext context) {
+        LOGGER.info("afterEach() argument [%s]", context.getArgument());
     }
 
     /**
      * Executes after all tests for each argument.
      *
-     * @param argumentContext the argument context
+     * @param context the argument context
      */
     @Paramixel.AfterAll
-    public void afterAll(final @NonNull ArgumentContext argumentContext) {
-        LOGGER.info("afterAll() argument [%s]", argumentContext.getArgument());
+    public void afterAll(final @NonNull ArgumentContext context) {
+        LOGGER.info("afterAll() argument [%s]", context.getArgument());
     }
 
     /**
      * Finalizes class-level resources.
      *
-     * @param classContext the class context
+     * @param context the class context
      */
     @Paramixel.Finalize
-    public void finalize(final @NonNull ClassContext classContext) {
+    public void finalize(final @NonNull ClassContext context) {
         LOGGER.info("finalize()");
     }
 }

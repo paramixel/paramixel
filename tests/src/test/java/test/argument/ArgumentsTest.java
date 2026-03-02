@@ -20,39 +20,54 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.stream.Stream;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that Paramixel can surface arbitrary argument payload types.
+ *
+ * <p>This test supplies {@link NamedValue} arguments wrapping a variety of Java types and asserts
+ * that each invocation receives a named, non-null payload matching the supplied value.
+ */
 public class ArgumentsTest {
 
+    /**
+     * Supplies a heterogeneous set of {@link NamedValue} arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        return Stream.of(
-                NamedValue.of("bigDecimal:fromBigDecimal", new BigDecimal("1.0")),
-                NamedValue.of("bigDecimal:fromString", new BigDecimal("1.0")),
-                NamedValue.of("bigInteger:fromBigInteger", new BigInteger("1")),
-                NamedValue.of("bigInteger:fromString", new BigInteger("1")),
-                NamedValue.of("boolean", true),
-                NamedValue.of("byte", (byte) 1),
-                NamedValue.of("char", 'a'),
-                NamedValue.of("double", 1d),
-                NamedValue.of("float", 1.0f),
-                NamedValue.of("int", 1),
-                NamedValue.of("long", 1L),
-                NamedValue.of("short", (short) 1),
-                NamedValue.of("string", "a"));
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument(NamedValue.of("bigDecimal:fromBigDecimal", new BigDecimal("1.0")));
+        argumentSupplierContext.addArgument(NamedValue.of("bigDecimal:fromString", new BigDecimal("1.0")));
+        argumentSupplierContext.addArgument(NamedValue.of("bigInteger:fromBigInteger", new BigInteger("1")));
+        argumentSupplierContext.addArgument(NamedValue.of("bigInteger:fromString", new BigInteger("1")));
+        argumentSupplierContext.addArgument(NamedValue.of("boolean", true));
+        argumentSupplierContext.addArgument(NamedValue.of("byte", (byte) 1));
+        argumentSupplierContext.addArgument(NamedValue.of("char", 'a'));
+        argumentSupplierContext.addArgument(NamedValue.of("double", 1d));
+        argumentSupplierContext.addArgument(NamedValue.of("float", 1.0f));
+        argumentSupplierContext.addArgument(NamedValue.of("int", 1));
+        argumentSupplierContext.addArgument(NamedValue.of("long", 1L));
+        argumentSupplierContext.addArgument(NamedValue.of("short", (short) 1));
+        argumentSupplierContext.addArgument(NamedValue.of("string", "a"));
     }
 
+    /**
+     * Asserts that the argument is a {@link NamedValue} and that its payload matches expectations.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
 
-        Object raw = argumentContext.getArgument();
+        Object raw = context.getArgument();
         assertThat(raw).isInstanceOf(NamedValue.class);
 
         @SuppressWarnings("unchecked")

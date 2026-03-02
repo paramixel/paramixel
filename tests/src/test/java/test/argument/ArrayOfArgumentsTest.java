@@ -20,28 +20,40 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies delivery of {@link NamedValue} arguments supplied in a loop.
+ */
 public class ArrayOfArgumentsTest {
 
+    /**
+     * Supplies a small set of {@link NamedValue} arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object[] arguments() {
-        NamedValue<?>[] arguments = new NamedValue[3];
-        for (int i = 0; i < arguments.length; i++) {
-            arguments[i] = NamedValue.of("test" + i, "test" + i);
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        for (int i = 0; i < 3; i++) {
+            argumentSupplierContext.addArgument(NamedValue.of("test" + i, "test" + i));
         }
-        return arguments;
     }
 
+    /**
+     * Asserts that the argument is a {@link NamedValue} whose name and value follow expectations.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
 
-        Object raw = argumentContext.getArgument();
+        Object raw = context.getArgument();
         assertThat(raw).isInstanceOf(NamedValue.class);
 
         @SuppressWarnings("unchecked")

@@ -18,28 +18,36 @@ package test.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies argument delivery when arguments are supplied via an iterator-like loop.
+ */
 public class IteratorOfArgumentsTest {
 
+    /**
+     * Supplies a small set of string arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        Collection<String> collection = new ArrayList<>();
-        collection.add("test1");
-        collection.add("test2");
-
-        return (Iterable<String>) collection::iterator;
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArguments("test1", "test2");
     }
 
+    /**
+     * Asserts that the argument payload is a {@link String}.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(String.class);
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(String.class);
     }
 }

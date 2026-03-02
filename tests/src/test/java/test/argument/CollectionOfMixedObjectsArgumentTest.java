@@ -20,43 +20,53 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies delivery of mixed-type arguments, including {@code null}.
+ */
 public class CollectionOfMixedObjectsArgumentTest {
 
+    /**
+     * Supplies a heterogeneous set of arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Collection<Object> arguments() {
-        Collection<Object> collection = new ArrayList<>();
-        collection.add(null);
-        collection.add(Boolean.TRUE);
-        collection.add((short) 1);
-        collection.add((byte) 2);
-        collection.add('x');
-        collection.add(4);
-        collection.add(5L);
-        collection.add(6f);
-        collection.add(7d);
-        collection.add(new BigInteger("8"));
-        collection.add(new BigDecimal("9"));
-        collection.add("test");
-        collection.add(new Date());
-        collection.add(NamedValue.of("test", "test"));
-        return collection;
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument(null);
+        argumentSupplierContext.addArgument(Boolean.TRUE);
+        argumentSupplierContext.addArgument((short) 1);
+        argumentSupplierContext.addArgument((byte) 2);
+        argumentSupplierContext.addArgument('x');
+        argumentSupplierContext.addArgument(4);
+        argumentSupplierContext.addArgument(5L);
+        argumentSupplierContext.addArgument(6f);
+        argumentSupplierContext.addArgument(7d);
+        argumentSupplierContext.addArgument(new BigInteger("8"));
+        argumentSupplierContext.addArgument(new BigDecimal("9"));
+        argumentSupplierContext.addArgument("test");
+        argumentSupplierContext.addArgument(new Date());
+        argumentSupplierContext.addArgument(NamedValue.of("test", "test"));
     }
 
+    /**
+     * Asserts that any non-null argument is one of the expected types.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
 
-        Object argument = argumentContext.getArgument();
+        Object argument = context.getArgument();
         if (argument == null) {
             return;
         }

@@ -28,36 +28,74 @@ import org.paramixel.api.Paramixel;
 
 public abstract class LifecycleInheritanceBase {
 
+    /**
+     * Records the sequence of lifecycle and test method invocations.
+     *
+     * <p>This list is shared between the base class and {@link LifecycleInheritanceTest}.
+     */
     protected static final List<String> actual = Collections.synchronizedList(new ArrayList<>());
 
+    /**
+     * Base-class initialize hook.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Initialize
-    public void baseClassInitialize(final ClassContext classContext) {
+    public void baseClassInitialize(final ClassContext context) {
         actual.clear();
         actual.add("baseClassInitialize");
     }
 
+    /**
+     * Base-class before-all hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeAll
-    public void baseClassBeforeAll(final @NonNull ArgumentContext argumentContext) {
+    public void baseClassBeforeAll(final @NonNull ArgumentContext context) {
         actual.add("baseClassBeforeAll");
     }
 
+    /**
+     * Base-class before-each hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeEach
-    public void baseClassBeforeEach(final @NonNull ArgumentContext argumentContext) {
+    public void baseClassBeforeEach(final @NonNull ArgumentContext context) {
         actual.add("baseClassBeforeEach");
     }
 
+    /**
+     * Base-class after-each hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterEach
-    public void baseClassAfterEach(final @NonNull ArgumentContext argumentContext) {
+    public void baseClassAfterEach(final @NonNull ArgumentContext context) {
         actual.add("baseClassAfterEach");
     }
 
+    /**
+     * Base-class after-all hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterAll
-    public void baseClassAfterAll(final @NonNull ArgumentContext argumentContext) {
+    public void baseClassAfterAll(final @NonNull ArgumentContext context) {
         actual.add("baseClassAfterAll");
     }
 
+    /**
+     * Base-class finalize hook.
+     *
+     * <p>This hook asserts that base- and subclass lifecycle methods were invoked in the expected
+     * order.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void baseClassFinalize(final ClassContext classContext) {
+    public void baseClassFinalize(final ClassContext context) {
         actual.add("baseClassFinalize");
 
         List<String> expected = new ArrayList<>();

@@ -20,20 +20,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
 @Paramixel.DisplayName("DisplayNameTest(Changed)")
+/**
+ * Verifies that {@link Paramixel.DisplayName} customizes display names for classes and methods.
+ */
 public class DisplayNameTest {
 
+    /**
+     * Supplies a single argument for a minimal display-name test.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        return "test";
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument("test");
     }
 
+    /**
+     * Verifies that the argument payload is delivered as supplied.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
     @Paramixel.DisplayName("Display Name Test Method")
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext.getArgument()).isEqualTo("test");
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context.getArgument()).isEqualTo("test");
     }
 }

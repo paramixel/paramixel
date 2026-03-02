@@ -56,6 +56,11 @@ public final class FastId {
         }
     }
 
+    /**
+     * Prevents instantiation of this utility class.
+     *
+     * <p>This class exposes only static methods.
+     */
     private FastId() {
         // utility class
     }
@@ -66,6 +71,7 @@ public final class FastId {
      *
      * @param length ID length (must be positive)
      * @return valid random ID
+     * @throws IllegalArgumentException if {@code length <= 0}
      */
     public static String getId(final int length) {
         if (length <= 0) {
@@ -89,8 +95,12 @@ public final class FastId {
     }
 
     /**
-     * Checks buffer for forbidden substrings using
-     * allocation-free case-insensitive matching.
+     * Checks a buffer for forbidden substrings.
+     *
+     * <p>This method performs allocation-free ASCII case-insensitive matching.
+     *
+     * @param buffer the candidate id buffer; never {@code null}
+     * @return {@code true} when any forbidden word occurs as a contiguous substring
      */
     private static boolean containsForbidden(final char[] buffer) {
         final int len = buffer.length;

@@ -32,7 +32,7 @@ import org.junit.platform.engine.support.descriptor.ClassSource;
  * <p>Descriptor hierarchy:
  * <pre>
  * Engine
- *   └── ParamixelTestClassDescriptor (class:com.example.MyTests)
+ *   └── ParamixelTestClassDescriptor (class:MyTests)
  *         └── ParamixelTestMethodDescriptor (method:testSomething)
  *               └── ParamixelInvocationDescriptor (invocation:0)
  * </pre>
@@ -48,6 +48,14 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
     private final Class<?> testClass;
 
     /**
+     * Parallelism for argument and invocation execution for this class.
+     *
+     * <p>Configured by {@code ArgumentSupplierContext#setParallelism(int)} when
+     * the argument supplier uses the context-driven pattern.
+     */
+    private int argumentParallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
+
+    /**
      * Creates a new test class descriptor.
      *
      * @param uniqueId the unique identifier for this descriptor
@@ -58,6 +66,34 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
             final @NonNull UniqueId uniqueId, final @NonNull Class<?> testClass, final @NonNull String displayName) {
         super(uniqueId, displayName, Type.CONTAINER);
         this.testClass = testClass;
+    }
+
+    /**
+     * Returns the configured per-class parallelism for arguments and invocations.
+     *
+     * <p>The engine uses this value to control how many argument buckets and method invocations
+     * may execute concurrently for this test class.
+     *
+     * @return the per-class parallelism; always {@code >= 1}
+     */
+    public int getArgumentParallelism() {
+        return argumentParallelism;
+    }
+
+    /**
+     * Sets the per-class parallelism for arguments and invocations.
+     *
+     * <p>Discovery typically sets this value based on
+     * {@code ArgumentSupplierContext#setParallelism(int)}.
+     *
+     * @param argumentParallelism the parallelism value; must be {@code >= 1}
+     * @throws IllegalArgumentException if {@code argumentParallelism < 1}
+     */
+    public void setArgumentParallelism(final int argumentParallelism) {
+        if (argumentParallelism < 1) {
+            throw new IllegalArgumentException("argumentParallelism must be >= 1");
+        }
+        this.argumentParallelism = argumentParallelism;
     }
 
     /**

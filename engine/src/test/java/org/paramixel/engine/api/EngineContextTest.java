@@ -27,7 +27,7 @@ import org.paramixel.api.EngineContext;
 /**
  * Tests for {@link EngineContext} and {@link ConcreteEngineContext} behavior.
  */
-class EngineContextTest {
+public class EngineContextTest {
 
     /**
      * Verifies successful construction with valid inputs.

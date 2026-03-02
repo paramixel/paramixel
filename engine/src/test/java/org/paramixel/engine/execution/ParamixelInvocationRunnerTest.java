@@ -20,7 +20,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +35,7 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 import org.paramixel.engine.api.ConcreteClassContext;
 import org.paramixel.engine.api.ConcreteEngineContext;
@@ -40,7 +43,7 @@ import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 
-class ParamixelInvocationRunnerTest {
+public class ParamixelInvocationRunnerTest {
 
     @Test
     public void executesInvocationsInParallelWhenParallelismGreaterThanOne_andNoOrderedTests() throws Exception {
@@ -62,6 +65,7 @@ class ParamixelInvocationRunnerTest {
                 rootId.append("class", ParallelInvocationTest.class.getName()),
                 ParallelInvocationTest.class,
                 ParallelInvocationTest.class.getName());
+        classDescriptor.setArgumentParallelism(4);
         final ParamixelTestArgumentDescriptor argDescriptor = new ParamixelTestArgumentDescriptor(
                 classDescriptor.getUniqueId().append("argument", "0"), 0, "arg", "argument:0");
         classDescriptor.addChild(argDescriptor);
@@ -107,6 +111,7 @@ class ParamixelInvocationRunnerTest {
                 rootId.append("class", OrderedInvocationTest.class.getName()),
                 OrderedInvocationTest.class,
                 OrderedInvocationTest.class.getName());
+        classDescriptor.setArgumentParallelism(4);
         final ParamixelTestArgumentDescriptor argDescriptor = new ParamixelTestArgumentDescriptor(
                 classDescriptor.getUniqueId().append("argument", "0"), 0, "arg", "argument:0");
         classDescriptor.addChild(argDescriptor);
@@ -140,6 +145,7 @@ class ParamixelInvocationRunnerTest {
         final UniqueId rootId = UniqueId.forEngine("paramixel");
         final ParamixelTestClassDescriptor classDescriptor = new ParamixelTestClassDescriptor(
                 rootId.append("class", OrderingTest.class.getName()), OrderingTest.class, OrderingTest.class.getName());
+        classDescriptor.setArgumentParallelism(1);
         final ParamixelTestArgumentDescriptor argDescriptor = new ParamixelTestArgumentDescriptor(
                 classDescriptor.getUniqueId().append("argument", "0"), 0, "arg", "argument:0");
         classDescriptor.addChild(argDescriptor);
@@ -172,6 +178,7 @@ class ParamixelInvocationRunnerTest {
     }
 
     public static final class ParallelInvocationTest {
+
         private final CountDownLatch ready;
         private final CountDownLatch start;
         private final Set<String> threads;
@@ -191,9 +198,10 @@ class ParamixelInvocationRunnerTest {
             this.maxConcurrent = maxConcurrent;
         }
 
-        @Paramixel.ArgumentSupplier(parallelism = 4)
-        public static Object[] args() {
-            return new Object[] {"arg"};
+        @Paramixel.ArgumentSupplier
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.setParallelism(4);
+            ctx.addArgument("arg");
         }
 
         @Paramixel.Test
@@ -227,6 +235,7 @@ class ParamixelInvocationRunnerTest {
     }
 
     public static final class OrderedInvocationTest {
+
         private final Set<String> threads;
         private final AtomicInteger concurrent;
         private final AtomicInteger maxConcurrent;
@@ -238,9 +247,10 @@ class ParamixelInvocationRunnerTest {
             this.maxConcurrent = maxConcurrent;
         }
 
-        @Paramixel.ArgumentSupplier(parallelism = 4)
-        public static Object[] args() {
-            return new Object[] {"arg"};
+        @Paramixel.ArgumentSupplier
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.setParallelism(4);
+            ctx.addArgument("arg");
         }
 
         @Paramixel.Test
@@ -263,6 +273,7 @@ class ParamixelInvocationRunnerTest {
     }
 
     public static class OrderingBase {
+
         final List<String> calls = new ArrayList<>();
 
         @Paramixel.BeforeEach
@@ -278,9 +289,10 @@ class ParamixelInvocationRunnerTest {
 
     public static class OrderingTest extends OrderingBase {
 
-        @Paramixel.ArgumentSupplier(parallelism = 1)
-        public static Object[] args() {
-            return new Object[] {"arg"};
+        @Paramixel.ArgumentSupplier
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.setParallelism(1);
+            ctx.addArgument("arg");
         }
 
         @Paramixel.BeforeEach
@@ -306,9 +318,10 @@ class ParamixelInvocationRunnerTest {
     }
 
     private static final class RecordingListener implements EngineExecutionListener {
+
         final List<String> started = new ArrayList<>();
         final List<String> finished = new ArrayList<>();
-        final java.util.Map<String, TestExecutionResult> results = new java.util.HashMap<>();
+        final Map<String, TestExecutionResult> results = new HashMap<>();
 
         @Override
         public void executionStarted(final TestDescriptor testDescriptor) {

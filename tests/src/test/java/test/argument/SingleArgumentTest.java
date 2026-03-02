@@ -20,24 +20,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that a single {@link NamedValue} argument is delivered intact.
+ */
 public class SingleArgumentTest {
 
+    /**
+     * Supplies a single {@link NamedValue} argument.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
-        return NamedValue.of("test", "test");
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument(NamedValue.of("test", "test"));
     }
 
+    /**
+     * Asserts that the argument is a {@link NamedValue} whose value matches the supplied payload.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isNotNull();
 
-        Object raw = argumentContext.getArgument();
+        Object raw = context.getArgument();
         assertThat(raw).isInstanceOf(NamedValue.class);
 
         @SuppressWarnings("unchecked")

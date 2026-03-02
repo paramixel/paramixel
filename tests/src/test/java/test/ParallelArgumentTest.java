@@ -18,68 +18,114 @@ package test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies argument-level parallel execution.
+ *
+ * <p>This test sets a parallelism value on the argument supplier context and uses simple counters
+ * to assert that lifecycle callbacks and test methods execute the expected number of times.
+ */
 public class ParallelArgumentTest {
 
+    /** Number of arguments supplied by {@link #arguments(ArgumentSupplierContext)}. */
     private static final int ARGUMENT_COUNT = 6;
 
+    /** Number of times {@link #beforeAll(ArgumentContext)} is invoked. */
     private static final AtomicInteger beforeAllCount = new AtomicInteger(0);
+
+    /** Number of {@code @Paramixel.Test} invocations across all arguments and methods. */
     private static final AtomicInteger testCount = new AtomicInteger(0);
+
+    /** Number of times {@link #afterAll(ArgumentContext)} is invoked. */
     private static final AtomicInteger afterAllCount = new AtomicInteger(0);
 
-    @Paramixel.ArgumentSupplier(parallelism = 2)
-    public static Collection<String> arguments() {
-        List<String> values = new ArrayList<>();
+    /**
+     * Supplies arguments and configures argument-level parallelism.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
+    @Paramixel.ArgumentSupplier
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.setParallelism(2);
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
-            values.add("String " + i);
+            argumentSupplierContext.addArgument("String " + i);
         }
-        return values;
     }
 
+    /**
+     * Asserts that the class context is provided.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Initialize
-    public void initialize(final ClassContext classContext) {
-        assertThat(classContext).isNotNull();
+    public void initialize(final ClassContext context) {
+        assertThat(context).isNotNull();
     }
 
+    /**
+     * Runs once per argument before tests for that argument.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeAll
-    public void beforeAll(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void beforeAll(final @NonNull ArgumentContext context) {
+        assertThat(context.getArgument()).isNotNull();
         beforeAllCount.incrementAndGet();
     }
 
+    /**
+     * First test method; includes a small random delay to increase scheduling interleavings.
+     *
+     * @param context for the current argument
+     * @throws InterruptedException if the sleep is interrupted
+     */
     @Paramixel.Test
-    public void test1(final @NonNull ArgumentContext argumentContext) throws InterruptedException {
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void test1(final @NonNull ArgumentContext context) throws InterruptedException {
+        assertThat(context.getArgument()).isNotNull();
         Thread.sleep(ThreadLocalRandom.current().nextInt(0, 25));
         testCount.incrementAndGet();
     }
 
+    /**
+     * Second test method; includes a small random delay to increase scheduling interleavings.
+     *
+     * @param context for the current argument
+     * @throws InterruptedException if the sleep is interrupted
+     */
     @Paramixel.Test
-    public void test2(final @NonNull ArgumentContext argumentContext) throws InterruptedException {
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void test2(final @NonNull ArgumentContext context) throws InterruptedException {
+        assertThat(context.getArgument()).isNotNull();
         Thread.sleep(ThreadLocalRandom.current().nextInt(0, 25));
         testCount.incrementAndGet();
     }
 
+    /**
+     * Runs once per argument after tests for that argument.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterAll
-    public void afterAll(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext.getArgument()).isNotNull();
+    public void afterAll(final @NonNull ArgumentContext context) {
+        assertThat(context.getArgument()).isNotNull();
         afterAllCount.incrementAndGet();
     }
 
+    /**
+     * Performs end-of-class assertions on lifecycle callback counts.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void finalize(final ClassContext classContext) {
-        assertThat(classContext).isNotNull();
+    public void finalize(final ClassContext context) {
+        assertThat(context).isNotNull();
         assertThat(beforeAllCount.get()).as("beforeAll count").isEqualTo(ARGUMENT_COUNT);
         assertThat(testCount.get()).as("test count").isEqualTo(ARGUMENT_COUNT * 2);
         assertThat(afterAllCount.get()).as("afterAll count").isEqualTo(ARGUMENT_COUNT);

@@ -28,12 +28,26 @@ import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 
 /**
- * Delegating execution listener that routes events to descriptor-specific listeners.
+ * Delegates execution events to descriptor-specific listeners.
+ *
+ * <p>This listener acts as a router. It inspects the runtime type of a descriptor and forwards
+ * events to a specialized listener for that descriptor type.
+ *
+ * <p><b>Thread safety</b>
+ * <p>This class is thread-safe for concurrent event dispatch. It updates shared counters via
+ * {@link AbstractEngineExecutionListener.ExecutionSummary}.
+ *
+ * @author Douglas Hoard
  */
 public class ParamixelEngineExecutionListener extends AbstractEngineExecutionListener {
 
     /**
      * Mapping of descriptor type to specialized execution listener.
+     */
+    /**
+     * Mapping from descriptor implementation class to the listener that handles it.
+     *
+     * <p>This map is initialized once and not mutated afterward.
      */
     private static final Map<Class<?>, EngineExecutionListener> engineListeners = new HashMap<>();
 
@@ -53,6 +67,15 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
      * @param testDescriptor the descriptor to find parent for
      * @return the parent class name, or null if not found
      */
+    /**
+     * Returns the nearest parent class display name for a descriptor.
+     *
+     * <p>This method walks {@link TestDescriptor#getParent()} until it finds a
+     * {@link ParamixelTestClassDescriptor}.
+     *
+     * @param testDescriptor the descriptor to inspect; may be {@code null}
+     * @return the parent class display name, or {@code null} when not found
+     */
     private String getParentClassName(final TestDescriptor testDescriptor) {
         TestDescriptor current = testDescriptor;
         while (current != null) {
@@ -64,11 +87,7 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
         return null;
     }
 
-    /**
-     * Notifies listeners that execution has started for a descriptor.
-     *
-     * @param testDescriptor the descriptor that started execution
-     */
+    @Override
     public void executionStarted(final @NonNull TestDescriptor testDescriptor) {
         ExecutionSummary summary = getExecutionSummary();
 
@@ -97,12 +116,7 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
         System.out.println(INFO + " " + threadName + " | START | " + testDescriptor.getUniqueId());
     }
 
-    /**
-     * Notifies listeners that a descriptor was skipped.
-     *
-     * @param testDescriptor the descriptor that was skipped
-     * @param reason the skip reason
-     */
+    @Override
     public void executionSkipped(final @NonNull TestDescriptor testDescriptor, @NonNull final String reason) {
         ExecutionSummary summary = getExecutionSummary();
         if (testDescriptor instanceof ParamixelTestClassDescriptor) {
@@ -124,12 +138,7 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
                 "[INFO] " + threadName + " | SKIPPED | " + testDescriptor.getUniqueId() + ", reason: " + reason);
     }
 
-    /**
-     * Notifies listeners that execution has finished for a descriptor.
-     *
-     * @param testDescriptor the descriptor that finished execution
-     * @param testExecutionResult the execution result
-     */
+    @Override
     public void executionFinished(
             final @NonNull TestDescriptor testDescriptor, final @NonNull TestExecutionResult testExecutionResult) {
         ExecutionSummary summary = getExecutionSummary();

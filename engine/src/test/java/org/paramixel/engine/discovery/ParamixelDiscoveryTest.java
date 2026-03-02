@@ -21,14 +21,17 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.File;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
@@ -48,9 +51,14 @@ import org.junit.platform.engine.discovery.PackageNameFilter;
 import org.junit.platform.engine.discovery.PackageSelector;
 import org.junit.platform.engine.discovery.UniqueIdSelector;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
+import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
+import org.paramixel.api.Named;
 import org.paramixel.api.Paramixel;
 import org.paramixel.engine.descriptor.ParamixelEngineDescriptor;
+import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
+import org.paramixel.engine.invalid.InvalidSignatureTestClass;
 
 /**
  * Tests for {@link ParamixelDiscovery} selector handling.
@@ -206,10 +214,7 @@ public class ParamixelDiscoveryTest {
                     .map(d -> d.getDisplayName())
                     .collect(Collectors.toSet());
 
-            assertThat(testClassNames)
-                    .contains(
-                            "org.paramixel.engine.discovery.SelectorTestClass",
-                            "org.paramixel.engine.discovery.AnotherTestClass");
+            assertThat(testClassNames).contains(SelectorTestClass.class.getName(), AnotherTestClass.class.getName());
         }
 
         /**
@@ -396,7 +401,7 @@ public class ParamixelDiscoveryTest {
         @DisplayName("Should discover nested test class from NestedClassSelector")
         public void shouldDiscoverNestedTestClass() {
             final NestedClassSelector selector =
-                    DiscoverySelectors.selectNestedClass(java.util.List.of(Outer.class), Outer.NestedTestClass.class);
+                    DiscoverySelectors.selectNestedClass(List.of(Outer.class), Outer.NestedTestClass.class);
             final EngineDiscoveryRequest request = createRequest(selector);
 
             discovery.discoverTests(request, engineDescriptor);
@@ -437,7 +442,7 @@ public class ParamixelDiscoveryTest {
 
     @Nested
     @DisplayName("DisplayName/Disabled/Arguments tests")
-    class AdditionalDiscoveryBehaviorTests {
+    public class AdditionalDiscoveryBehaviorTests {
 
         @Test
         @DisplayName("Should use @DisplayName when present for classes and methods")
@@ -451,7 +456,7 @@ public class ParamixelDiscoveryTest {
                     engineDescriptor.getChildren().iterator().next();
             assertThat(clazz.getDisplayName()).isEqualTo("My Class");
 
-            final var argument = (org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor)
+            final var argument = (ParamixelTestArgumentDescriptor)
                     clazz.getChildren().iterator().next();
             assertThat(argument.getChildren())
                     .anySatisfy(d -> assertThat(d.getDisplayName()).isEqualTo("My Method"));
@@ -478,7 +483,7 @@ public class ParamixelDiscoveryTest {
 
             final var clazz = (ParamixelTestClassDescriptor)
                     engineDescriptor.getChildren().iterator().next();
-            final var argument = (org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor)
+            final var argument = (ParamixelTestArgumentDescriptor)
                     clazz.getChildren().iterator().next();
 
             assertThat(argument.getChildren()).hasSize(1);
@@ -487,14 +492,15 @@ public class ParamixelDiscoveryTest {
         }
 
         @Test
-        @DisplayName("Should create argument descriptors from various argument supplier return types")
-        public void shouldCreateArgumentsFromSupplierReturnTypes() {
+        @DisplayName("Should create argument descriptors from various argument supplier implementations")
+        public void shouldCreateArgumentsFromSupplierImplementations() {
             assertArgumentCount(SupplierStreamTestClass.class, 2);
             assertArgumentCount(SupplierCollectionTestClass.class, 2);
             assertArgumentCount(SupplierIterableTestClass.class, 2);
             assertArgumentCount(SupplierIterableOnlyTestClass.class, 2);
             assertArgumentCount(SupplierArrayTestClass.class, 2);
             assertArgumentCount(SupplierSingleObjectTestClass.class, 1);
+            assertArgumentCount(SupplierContextTestClass.class, 2);
         }
 
         @Test
@@ -521,8 +527,8 @@ public class ParamixelDiscoveryTest {
         @Test
         @DisplayName("Should fail discovery when MethodValidator reports signature problems")
         public void shouldFailDiscoveryOnValidationFailure() {
-            final EngineDiscoveryRequest request = createRequest(
-                    DiscoverySelectors.selectClass(org.paramixel.engine.invalid.InvalidSignatureTestClass.class));
+            final EngineDiscoveryRequest request =
+                    createRequest(DiscoverySelectors.selectClass(InvalidSignatureTestClass.class));
             assertThatThrownBy(() -> discovery.discoverTests(request, engineDescriptor))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Validation failed");
@@ -532,7 +538,7 @@ public class ParamixelDiscoveryTest {
         @DisplayName("UniqueIdSelector should ignore missing classes")
         public void uniqueIdSelectorShouldIgnoreMissingClasses() {
             final UniqueId missing = UniqueId.forEngine("paramixel")
-                    .append("class", "com.example.DoesNotExist")
+                    .append("class", "DoesNotExist")
                     .append("method", "m");
             final EngineDiscoveryRequest request = createRequest(DiscoverySelectors.selectUniqueId(missing));
 
@@ -544,8 +550,7 @@ public class ParamixelDiscoveryTest {
         @Test
         @DisplayName("extractClassNameFromUniqueId should return null when no class segment exists")
         public void extractClassNameFromUniqueIdReturnsNullWhenNoClassSegment() throws Exception {
-            final java.lang.reflect.Method m =
-                    ParamixelDiscovery.class.getDeclaredMethod("extractClassNameFromUniqueId", UniqueId.class);
+            final Method m = ParamixelDiscovery.class.getDeclaredMethod("extractClassNameFromUniqueId", UniqueId.class);
             m.setAccessible(true);
 
             final UniqueId uniqueId = UniqueId.forEngine("paramixel").append("method", "m");
@@ -555,8 +560,7 @@ public class ParamixelDiscoveryTest {
         @Test
         @DisplayName("extractClassNameFromUniqueId should return null for null UniqueId")
         public void extractClassNameFromUniqueIdReturnsNullForNullUniqueId() throws Exception {
-            final java.lang.reflect.Method m =
-                    ParamixelDiscovery.class.getDeclaredMethod("extractClassNameFromUniqueId", UniqueId.class);
+            final Method m = ParamixelDiscovery.class.getDeclaredMethod("extractClassNameFromUniqueId", UniqueId.class);
             m.setAccessible(true);
             assertThat((String) m.invoke(discovery, new Object[] {null})).isNull();
         }
@@ -564,11 +568,10 @@ public class ParamixelDiscoveryTest {
         @Test
         @DisplayName("getOrderValue should return MAX when no @Order")
         public void getOrderValueReturnsMaxValueWhenNoOrder() throws Exception {
-            final java.lang.reflect.Method m =
-                    ParamixelDiscovery.class.getDeclaredMethod("getOrderValue", java.lang.reflect.Method.class);
+            final Method m = ParamixelDiscovery.class.getDeclaredMethod("getOrderValue", Method.class);
             m.setAccessible(true);
-            final java.lang.reflect.Method testMethod = SupplierSingleObjectTestClass.class.getDeclaredMethod(
-                    "test", org.paramixel.api.ArgumentContext.class);
+            final Method testMethod =
+                    SupplierSingleObjectTestClass.class.getDeclaredMethod("test", ArgumentContext.class);
             assertThat((int) m.invoke(null, testMethod)).isEqualTo(Integer.MAX_VALUE);
         }
 
@@ -578,7 +581,7 @@ public class ParamixelDiscoveryTest {
             final EngineDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
                     .filters(PackageNameFilter.excludePackageNames(""))
                     .build();
-            final java.lang.reflect.Method m =
+            final Method m =
                     ParamixelDiscovery.class.getDeclaredMethod("buildClassFilter", EngineDiscoveryRequest.class);
             m.setAccessible(true);
 
@@ -596,7 +599,7 @@ public class ParamixelDiscoveryTest {
                 final Path pkg = Files.createDirectory(root.resolve("p"));
                 Files.createFile(pkg.resolve("Nope.class"));
 
-                final java.lang.reflect.Method m = ParamixelDiscovery.class.getDeclaredMethod(
+                final Method m = ParamixelDiscovery.class.getDeclaredMethod(
                         "findClassesInDirectory", File.class, String.class, Set.class);
                 m.setAccessible(true);
 
@@ -626,8 +629,7 @@ public class ParamixelDiscoveryTest {
         public void findClassesInClasspathRootReturnsEmptyWhenNotDirectory() throws Exception {
             final Path file = Files.createTempFile("paramixel-root-", ".tmp");
             try {
-                final java.lang.reflect.Method m =
-                        ParamixelDiscovery.class.getDeclaredMethod("findClassesInClasspathRoot", URI.class);
+                final Method m = ParamixelDiscovery.class.getDeclaredMethod("findClassesInClasspathRoot", URI.class);
                 m.setAccessible(true);
 
                 @SuppressWarnings("unchecked")
@@ -651,127 +653,159 @@ public class ParamixelDiscoveryTest {
 
     @Paramixel.TestClass
     @Paramixel.DisplayName(" My Class ")
-    static class DisplayNameTestClass {
+    public static class DisplayNameTestClass {
+
         @Paramixel.Test
         @Paramixel.DisplayName("My Method")
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
     @Paramixel.Disabled("because")
-    static class DisabledTestClass {
+    public static class DisabledTestClass {
+
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class DisabledMethodTestClass {
+    public static class DisabledMethodTestClass {
+
         @Paramixel.Test
-        public void enabled(final org.paramixel.api.ArgumentContext context) {}
+        public void enabled(final ArgumentContext context) {}
 
         @Paramixel.Test
         @Paramixel.Disabled("skip")
-        public void disabled(final org.paramixel.api.ArgumentContext context) {}
+        public void disabled(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierStreamTestClass {
+    public static class SupplierStreamTestClass {
+
         @Paramixel.ArgumentSupplier
-        static java.util.stream.Stream<Object> args() {
-            return java.util.stream.Stream.of("a", new NamedArg("b"));
+        public static void args(final ArgumentSupplierContext ctx) {
+            Stream.of("a", new NamedArg("b")).forEach(ctx::addArgument);
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierCollectionTestClass {
+    public static class SupplierCollectionTestClass {
+
         @Paramixel.ArgumentSupplier
-        static java.util.Collection<Object> args() {
-            return java.util.List.of("a", new NamedArg("b"));
+        public static void args(final ArgumentSupplierContext ctx) {
+            List.of("a", new NamedArg("b")).forEach(ctx::addArgument);
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierIterableTestClass {
+    public static class SupplierIterableTestClass {
+
         @Paramixel.ArgumentSupplier
-        static Iterable<Object> args() {
-            return java.util.List.of("a", new NamedArg("b"));
+        public static void args(final ArgumentSupplierContext ctx) {
+            for (Object o : List.of("a", new NamedArg("b"))) {
+                ctx.addArgument(o);
+            }
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierIterableOnlyTestClass {
+    public static class SupplierIterableOnlyTestClass {
+
         @Paramixel.ArgumentSupplier
-        static Iterable<Object> args() {
-            final java.util.List<Object> list = java.util.List.of("a", new NamedArg("b"));
-            return (Iterable<Object>) () -> list.iterator();
+        public static void args(final ArgumentSupplierContext ctx) {
+            final List<Object> list = List.of("a", new NamedArg("b"));
+            final Iterable<Object> iterable = (Iterable<Object>) () -> list.iterator();
+            for (Object o : iterable) {
+                ctx.addArgument(o);
+            }
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierArrayTestClass {
+    public static class SupplierArrayTestClass {
+
         @Paramixel.ArgumentSupplier
-        static Object[] args() {
-            return new Object[] {"a", new NamedArg("b")};
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.addArgument("a");
+            ctx.addArgument(new NamedArg("b"));
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierSingleObjectTestClass {
+    public static class SupplierSingleObjectTestClass {
+
         @Paramixel.ArgumentSupplier
-        static Object args() {
-            return new NamedArg("only");
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.addArgument(new NamedArg("only"));
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierNullTestClass {
+    public static class SupplierNullTestClass {
+
         @Paramixel.ArgumentSupplier
-        static Object args() {
-            return null;
+        public static void args(final ArgumentSupplierContext ctx) {
+            // Intentionally add no arguments.
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
     @Paramixel.TestClass
-    static class SupplierThrowsTestClass {
+    public static class SupplierThrowsTestClass {
+
         @Paramixel.ArgumentSupplier
-        static Object args() {
+        public static void args(final ArgumentSupplierContext ctx) {
             throw new RuntimeException("boom");
         }
 
         @Paramixel.Test
-        public void test(final org.paramixel.api.ArgumentContext context) {}
+        public void test(final ArgumentContext context) {}
     }
 
-    static final class Outer {
+    @Paramixel.TestClass
+    public static class SupplierContextTestClass {
+
+        @Paramixel.ArgumentSupplier
+        public static void args(final ArgumentSupplierContext ctx) {
+            ctx.addArguments("a", new NamedArg("b"));
+        }
+
+        @Paramixel.Test
+        public void test(final ArgumentContext context) {}
+    }
+
+    public static final class Outer {
+
         @Paramixel.TestClass
-        static class NestedTestClass {
+        public static class NestedTestClass {
+
             @Paramixel.Test
-            public void test(final org.paramixel.api.ArgumentContext context) {}
+            public void test(final ArgumentContext context) {}
         }
     }
 
-    private static final class NamedArg implements org.paramixel.api.Named {
+    private static final class NamedArg implements Named {
+
         private final String name;
 
         private NamedArg(final String name) {

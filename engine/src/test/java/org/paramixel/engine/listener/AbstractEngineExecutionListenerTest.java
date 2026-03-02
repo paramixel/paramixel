@@ -19,13 +19,14 @@ package org.paramixel.engine.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 
-class AbstractEngineExecutionListenerTest {
+public class AbstractEngineExecutionListenerTest {
 
     @Test
     public void getDisplayName_buildsFromHierarchyUpToDepth() throws Exception {
@@ -68,7 +69,8 @@ class AbstractEngineExecutionListenerTest {
     private static void dummy() {}
 
     private static final class TestableListener extends AbstractEngineExecutionListener {
-        String displayName(final int depth, final org.junit.platform.engine.TestDescriptor descriptor) {
+
+        String displayName(final int depth, final TestDescriptor descriptor) {
             return getDisplayName(depth, descriptor);
         }
 

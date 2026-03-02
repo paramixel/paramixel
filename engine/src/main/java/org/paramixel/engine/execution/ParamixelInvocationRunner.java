@@ -38,19 +38,56 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 import org.paramixel.engine.invoker.ParamixelReflectionInvoker;
 import org.paramixel.engine.util.FastId;
 
-/** Executes test method invocations for a single argument. */
+/**
+ * Executes {@link Paramixel.Test} method invocations for one argument bucket.
+ *
+ * <p>This runner executes method-level lifecycle hooks ({@link Paramixel.BeforeEach} and
+ * {@link Paramixel.AfterEach}) and invokes test methods via
+ * {@link ParamixelReflectionInvoker#invokeTestMethod(Method, Object, ArgumentContext)}.
+ *
+ * <p><b>Ordering</b>
+ * <p>When any discovered method has {@link Paramixel.Order}, this runner executes methods
+ * sequentially in descriptor order, even when parallelism is configured.
+ *
+ * <p><b>Thread safety</b>
+ * <p>This class is not thread-safe. It is constructed per argument bucket and is intended for
+ * single-threaded use by {@link ParamixelClassRunner}.
+ *
+ * @author Douglas Hoard
+ */
 public final class ParamixelInvocationRunner {
 
+    /** Logger used for lifecycle and invocation diagnostics. */
     private static final Logger LOGGER = Logger.getLogger(ParamixelInvocationRunner.class.getName());
 
+    /**
+     * Cache of lifecycle methods by (class, annotation, order).
+     *
+     * <p>This cache is static to avoid repeated reflection scanning across invocations.
+     */
     private static final ConcurrentHashMap<LifecycleCacheKey, List<Method>> LIFECYCLE_METHOD_CACHE =
             new ConcurrentHashMap<>();
 
+    /** Shared execution runtime used for task submission and permits. */
     private final ParamixelExecutionRuntime runtime;
+
+    /** Listener notified for method descriptor start/finish events. */
     private final EngineExecutionListener listener;
+
+    /** Owning class context used for metrics and failure aggregation. */
     private final ConcreteClassContext classContext;
+
+    /** Instantiated test instance used to invoke lifecycle and test methods. */
     private final Object testInstance;
 
+    /**
+     * Creates an invocation runner for a single argument bucket.
+     *
+     * @param runtime the shared runtime; never {@code null}
+     * @param listener the listener to notify; never {@code null}
+     * @param classContext the owning class context; never {@code null}
+     * @param testInstance the instantiated test object; never {@code null}
+     */
     public ParamixelInvocationRunner(
             final ParamixelExecutionRuntime runtime,
             final EngineExecutionListener listener,
@@ -62,6 +99,26 @@ public final class ParamixelInvocationRunner {
         this.testInstance = testInstance;
     }
 
+    /**
+     * Executes test method descriptors associated with a single argument index.
+     *
+     * <p>This method identifies {@link ParamixelTestMethodDescriptor} instances under the provided
+     * {@link ParamixelTestClassDescriptor} that correspond to {@code argumentIndex}. It then
+     * executes them either sequentially or concurrently depending on:
+     * <ul>
+     *   <li>configured argument parallelism ({@link ParamixelTestClassDescriptor#getArgumentParallelism()})</li>
+     *   <li>presence of {@link Paramixel.Order}</li>
+     *   <li>number of methods</li>
+     * </ul>
+     *
+     * <p><b>Failure handling</b>
+     * <p>This method returns the first observed failure (if any) as the bucket result.
+     *
+     * @param classDescriptor the class descriptor to execute; never {@code null}
+     * @param argument the argument value; may be {@code null}
+     * @param argumentIndex the argument index
+     * @return the aggregated result for the bucket; never {@code null}
+     */
     public TestExecutionResult runInvocations(
             final ParamixelTestClassDescriptor classDescriptor, final Object argument, final int argumentIndex) {
         final Class<?> testClass = classDescriptor.getTestClass();
@@ -75,7 +132,7 @@ public final class ParamixelInvocationRunner {
                 .map(d -> (ParamixelTestMethodDescriptor) d)
                 .toList();
 
-        final int parallelism = getParallelism(testClass);
+        final int parallelism = classDescriptor.getArgumentParallelism();
         final boolean hasOrderedTests = methodDescriptors.stream()
                 .anyMatch(descriptor -> descriptor.getTestMethod().isAnnotationPresent(Paramixel.Order.class));
 
@@ -149,6 +206,25 @@ public final class ParamixelInvocationRunner {
                 : TestExecutionResult.failed(firstFailure.get());
     }
 
+    /**
+     * Executes a single test method invocation and reports the result.
+     *
+     * <p>This method notifies {@code listener} of execution start/finish, executes
+     * {@link Paramixel.BeforeEach} and {@link Paramixel.AfterEach}, and invokes the test method
+     * when before-each succeeds.
+     *
+     * <p><b>Side effects</b>
+     * <ul>
+     *   <li>Increments invocation/success/failure counters on {@code classContext}.</li>
+     *   <li>Records any throwable on {@code classContext}.</li>
+     * </ul>
+     *
+     * @param methodDescriptor the descriptor to report; never {@code null}
+     * @param testMethod the reflective method to invoke; never {@code null}
+     * @param argument the argument value; may be {@code null}
+     * @param argumentIndex the argument index
+     * @return the invocation result; never {@code null}
+     */
     private TestExecutionResult executeInvocation(
             final ParamixelTestMethodDescriptor methodDescriptor,
             final Method testMethod,
@@ -207,6 +283,15 @@ public final class ParamixelInvocationRunner {
         return result;
     }
 
+    /**
+     * Executes {@link Paramixel.BeforeEach} lifecycle methods.
+     *
+     * <p>This method aborts on the first failure.
+     *
+     * @param testClass the test class; never {@code null}
+     * @param argumentContext the argument context passed to hooks; never {@code null}
+     * @return the first failure, or {@code null} when all hooks succeed
+     */
     private Throwable runBeforeEach(final Class<?> testClass, final ArgumentContext argumentContext) {
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeEach.class, true);
         for (Method method : methods) {
@@ -221,6 +306,15 @@ public final class ParamixelInvocationRunner {
         return null;
     }
 
+    /**
+     * Executes {@link Paramixel.AfterEach} lifecycle methods.
+     *
+     * <p>This method executes all hooks and returns the first failure encountered.
+     *
+     * @param testClass the test class; never {@code null}
+     * @param argumentContext the argument context passed to hooks; never {@code null}
+     * @return the first failure, or {@code null} when all hooks succeed
+     */
     private Throwable runAfterEach(final Class<?> testClass, final ArgumentContext argumentContext) {
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterEach.class, false);
         Throwable firstFailure = null;
@@ -238,6 +332,16 @@ public final class ParamixelInvocationRunner {
         return firstFailure;
     }
 
+    /**
+     * Returns lifecycle methods annotated with the given annotation.
+     *
+     * <p>The returned list is cached and immutable.
+     *
+     * @param testClass the root test class; never {@code null}
+     * @param annotationType the lifecycle annotation type to match; never {@code null}
+     * @param beforeOrder {@code true} to order superclass first; {@code false} for subclass first
+     * @return an immutable list of lifecycle methods; never {@code null}
+     */
     private List<Method> getLifecycleMethods(
             final Class<?> testClass, final Class<? extends Annotation> annotationType, final boolean beforeOrder) {
         final LifecycleCacheKey cacheKey = new LifecycleCacheKey(testClass, annotationType, beforeOrder);
@@ -263,21 +367,29 @@ public final class ParamixelInvocationRunner {
         });
     }
 
-    private int getParallelism(final Class<?> testClass) {
-        for (Method method : testClass.getDeclaredMethods()) {
-            if (method.isAnnotationPresent(Paramixel.ArgumentSupplier.class)) {
-                final Paramixel.ArgumentSupplier supplier = method.getAnnotation(Paramixel.ArgumentSupplier.class);
-                return supplier.parallelism();
-            }
-        }
-        return Math.max(1, Runtime.getRuntime().availableProcessors());
-    }
-
+    /**
+     * Cache key for {@link #LIFECYCLE_METHOD_CACHE}.
+     *
+     * <p>This type is private because it is an internal memoization detail.
+     */
     private static final class LifecycleCacheKey {
+
+        /** Root test class for the lifecycle scan; immutable. */
         private final Class<?> testClass;
+
+        /** Lifecycle annotation type used for matching; immutable. */
         private final Class<? extends Annotation> annotationType;
+
+        /** Ordering flag used for before/after semantics; immutable. */
         private final boolean beforeOrder;
 
+        /**
+         * Creates a cache key.
+         *
+         * @param testClass the test class; never {@code null}
+         * @param annotationType the lifecycle annotation type; never {@code null}
+         * @param beforeOrder ordering flag
+         */
         private LifecycleCacheKey(
                 final Class<?> testClass, final Class<? extends Annotation> annotationType, final boolean beforeOrder) {
             this.testClass = testClass;

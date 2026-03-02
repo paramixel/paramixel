@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.UniqueId;
 
-class ParamixelEngineDescriptorTest {
+public class ParamixelEngineDescriptorTest {
 
     @Test
     public void addChild_removeChild_andFindByUniqueId_work() {

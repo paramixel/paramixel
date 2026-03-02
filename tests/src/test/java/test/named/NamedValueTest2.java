@@ -18,10 +18,9 @@ package test.named;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Collections;
-import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.NamedValue;
 import org.paramixel.api.Paramixel;
 
@@ -32,13 +31,13 @@ import org.paramixel.api.Paramixel;
 public class NamedValueTest2 {
 
     @Paramixel.ArgumentSupplier
-    public static List<NamedValue<Integer>> arguments() {
-        return Collections.singletonList(NamedValue.of("int value", 42));
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument(NamedValue.of("int value", 42));
     }
 
     @Paramixel.Test
-    public void castsToRequestedType(final @NonNull ArgumentContext argumentContext) {
-        NamedValue<?> argument = argumentContext.getArgument(NamedValue.class);
+    public void castsToRequestedType(final @NonNull ArgumentContext context) {
+        NamedValue<?> argument = context.getArgument(NamedValue.class);
         String name = argument.getName();
         Integer value = argument.getValue(Integer.class);
 

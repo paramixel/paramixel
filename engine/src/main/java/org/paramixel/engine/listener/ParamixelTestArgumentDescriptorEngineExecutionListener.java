@@ -21,7 +21,12 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 
 /**
- * Execution listener for argument-level descriptors.
+ * Reports execution events for argument descriptors.
+ *
+ * <p>This listener prints a single line on start and finish using the class and argument display
+ * names.
+ *
+ * @author Douglas Hoard
  */
 public class ParamixelTestArgumentDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 

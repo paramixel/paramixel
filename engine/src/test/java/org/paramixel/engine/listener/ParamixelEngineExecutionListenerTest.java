@@ -30,20 +30,20 @@ import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 
-class ParamixelEngineExecutionListenerTest {
+public class ParamixelEngineExecutionListenerTest {
 
     private PrintStream originalOut;
     private ByteArrayOutputStream out;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() {
         originalOut = System.out;
         out = new ByteArrayOutputStream();
         System.setOut(new PrintStream(out));
     }
 
     @AfterEach
-    void tearDown() {
+    public void tearDown() {
         System.setOut(originalOut);
     }
 
@@ -190,6 +190,7 @@ class ParamixelEngineExecutionListenerTest {
     private static void dummy() {}
 
     private static final class ExposingListener extends ParamixelEngineExecutionListener {
+
         void reset() {
             resetExecutionSummary();
         }
@@ -200,6 +201,7 @@ class ParamixelEngineExecutionListenerTest {
     }
 
     private static final class DummyDescriptor extends AbstractTestDescriptor {
+
         private DummyDescriptor(final UniqueId uniqueId) {
             super(uniqueId, "dummy");
         }

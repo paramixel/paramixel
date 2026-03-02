@@ -41,13 +41,13 @@ paramixel/
 
 ```xml
 <dependency>
-    <groupId>com.paramixel</groupId>
+    <groupId>org.paramixel</groupId>
     <artifactId>paramixel-api</artifactId>
     <version>0.0.1</version>
     <scope>test</scope>
 </dependency>
 <dependency>
-    <groupId>com.paramixel</groupId>
+    <groupId>org.paramixel</groupId>
     <artifactId>paramixel-engine</artifactId>
     <version>0.0.1</version>
     <scope>test</scope>
@@ -60,11 +60,12 @@ paramixel/
 <build>
     <plugins>
         <plugin>
-            <groupId>com.paramixel</groupId>
+            <groupId>org.paramixel</groupId>
             <artifactId>paramixel-maven-plugin</artifactId>
             <version>0.0.1</version>
             <executions>
                 <execution>
+                    <phase>test</phase>
                     <goals>
                         <goal>test</goal>
                     </goals>
@@ -80,38 +81,23 @@ paramixel/
 ### Basic Test Class
 
 ```java
-import com.paramixel.api.Paramixel;
-import com.paramixel.api.ArgumentContext;
-
-@Paramixel.TestClass
-public class MyTest {
-
-    @Paramixel.Test
-    public void testSomething(ArgumentContext context) {
-        // Test implementation
-    }
-}
-```
-
-### Parameterized Tests
-
-```java
-import com.paramixel.api.Paramixel;
-import com.paramixel.api.ArgumentContext;
-import java.util.Arrays;
-import java.util.Collection;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 
 @Paramixel.TestClass
 public class ParameterizedTest {
 
-    @Paramixel.ArgumentSupplier(parallelism = 4)
-    public static Collection<String> provideArguments() {
-        return Arrays.asList("arg1", "arg2", "arg3");
+    @Paramixel.ArgumentSupplier
+    public static void arguments(ArgumentSupplierContext context) {
+        // Called once to provide arguments for parameterized tests
+        context.setParallelism(4);
+        context.addArguments("arg1", "arg2", "arg3");
     }
 
     @Paramixel.Test
-    public void testWithArgument(ArgumentContext context) {
-        String argument = (String) context.getArgument();
+    public void test(ArgumentContext context) {
+        String argument = context.getArgument(String.class);
         // Test with the provided argument
     }
 }
@@ -120,46 +106,53 @@ public class ParameterizedTest {
 ### Lifecycle Hooks
 
 ```java
-import com.paramixel.api.Paramixel;
-import com.paramixel.api.ArgumentContext;
-import com.paramixel.api.ClassContext;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ClassContext;
 
 @Paramixel.TestClass
 public class LifecycleTest {
 
+    @Paramixel.ArgumentSupplier
+    public static void arguments(ArgumentSupplierContext context) {
+        // Called once to provide arguments for parameterized tests
+        context.setParallelism(4);
+        context.addArguments("arg1", "arg2", "arg3");
+    }
+    
     @Paramixel.Initialize
     public void initialize(ClassContext context) {
-        // Called once before any test methods
+        // Called once per class before any test methods
     }
 
     @Paramixel.BeforeAll
-    public void setupAll(ArgumentContext context) {
-        // Called once before all test methods
+    public void beforeAll(ArgumentContext context) {
+        // Called once per argument before all test methods
     }
 
     @Paramixel.BeforeEach
-    public void setupEach(ArgumentContext context) {
-        // Called before each test method
+    public void beforeEach(ArgumentContext context) {
+        // Called once per argument before each test method
     }
 
     @Paramixel.Test
-    public void testMethod(ArgumentContext context) {
-        // Test implementation
+    public void test(ArgumentContext context) {
+        // Test implementation per argument
     }
 
     @Paramixel.AfterEach
-    public void teardownEach(ArgumentContext context) {
-        // Called after each test method
+    public void afterEach(ArgumentContext context) {
+        // Called once per argument after each test method
     }
 
     @Paramixel.AfterAll
-    public void teardownAll(ArgumentContext context) {
-        // Called once after all test methods
+    public void afterAll(ArgumentContext context) {
+        // Called once per argument after all test methods
     }
 
     @Paramixel.Finalize
     public void finalize(ClassContext context) {
-        // Called once after all execution completes
+        // Called once per class after all execution completes
     }
 }
 ```
@@ -167,7 +160,7 @@ public class LifecycleTest {
 ### Named Arguments
 
 ```java
-import com.paramixel.api.argument.Named;
+import org.paramixel.api.Named;
 
 public class TestData implements Named {
     
@@ -202,7 +195,7 @@ public class TestData implements Named {
 
 #### Test Execution
 - `@Paramixel.Test` - Marks a method as a test method
-- `@Paramixel.ArgumentSupplier(parallelism = N)` - Provides arguments for parameterized tests
+- `@Paramixel.ArgumentSupplier` - Provides arguments for parameterized tests (parallelism is configured via `ArgumentSupplierContext.setParallelism(N)`)
 
 #### Lifecycle Hooks
 - `@Paramixel.Initialize` - Executed once before any other lifecycle method
@@ -242,7 +235,7 @@ public class TestData implements Named {
 
 ```xml
 <plugin>
-    <groupId>com.paramixel</groupId>
+    <groupId>org.paramixel</groupId>
     <artifactId>paramixel-maven-plugin</artifactId>
     <version>0.0.1</version>
     <configuration>
@@ -251,6 +244,7 @@ public class TestData implements Named {
     </configuration>
     <executions>
         <execution>
+            <phase>test</phase>
             <goals>
                 <goal>test</goal>
             </goals>
@@ -261,12 +255,13 @@ public class TestData implements Named {
 
 ### Parallelism
 
-Control parallelism using the `@Paramixel.ArgumentSupplier` annotation:
+Control parallelism using `ArgumentSupplierContext.setParallelism(...)` inside your `@Paramixel.ArgumentSupplier`:
 
 ```java
-@Paramixel.ArgumentSupplier(parallelism = 4)  // Up to 4 concurrent invocations
-public static Collection<Arguments> provideArguments() {
-    // ...
+@Paramixel.ArgumentSupplier
+public static void arguments(ArgumentSupplierContext context) {
+    context.setParallelism(4); // Up to 4 concurrent invocations
+    context.addArgument(...)
 }
 ```
 
@@ -323,6 +318,16 @@ For questions and support:
 - Check the tests in the `tests/` module
 - Check the sample examples in the `examples/` module
 - Review the API documentation in the `api/` module
+
+## Sponsorship
+
+![YourKit logo](https://www.yourkit.com/images/yklogo.png)
+
+[YourKit](https://www.yourkit.com/) supports open source projects with innovative and intelligent tools for monitoring and profiling Java and .NET applications.
+
+YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a>,
+<a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a>,
+and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.****
 
 ## License
 

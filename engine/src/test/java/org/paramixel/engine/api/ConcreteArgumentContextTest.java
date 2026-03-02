@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
-class ConcreteArgumentContextTest {
+public class ConcreteArgumentContextTest {
 
     @Test
     public void constructor_rejectsNullClassContext() {

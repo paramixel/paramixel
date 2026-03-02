@@ -23,25 +23,41 @@ import java.util.List;
 import java.util.Vector;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies that arguments can be supplied by iterating over an {@code Enumeration}.
+ */
 public class EnumerationArgumentsTest {
 
+    /**
+     * Builds a {@link Vector} and supplies its elements as arguments.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object arguments() {
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
         Vector<String> vector = new Vector<>();
         vector.add("test1");
         vector.add("test2");
 
         List<String> list = Collections.list(vector.elements());
-        return list;
+        for (String item : list) {
+            argumentSupplierContext.addArgument(item);
+        }
     }
 
+    /**
+     * Asserts that the argument payload is a {@link String}.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
-        assertThat(argumentContext.getArgument()).isInstanceOf(String.class);
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
+        assertThat(context.getArgument()).isInstanceOf(String.class);
     }
 }

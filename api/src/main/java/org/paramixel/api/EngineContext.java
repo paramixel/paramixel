@@ -54,8 +54,8 @@ import java.util.Properties;
  *         EngineContext engineContext = context.getEngineContext();
  *
  *         // Access engine configuration
- *         String customProperty = engineContext.getConfigurationValue("custom.property");
- *         LOGGER.info("Engine ID: " + engineContext.getEngineId());
+ *         String customProperty = context.getConfigurationValue("custom.property");
+ *         LOGGER.info("Engine ID: " + context.getEngineId());
  *     }
  * }
  * }</pre>

@@ -20,30 +20,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies handling of {@code null} objects supplied as arguments.
+ */
 public class ArrayOfObjectsWithNullTest {
 
+    /**
+     * Supplies arguments including {@code null} values.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Object[] arguments() {
-        Object[] arguments = new Object[3];
-        for (int i = 0; i < arguments.length; i++) {
-            if (i % 2 == 0) {
-                arguments[i] = null;
-            } else {
-                arguments[i] = "test" + i;
-            }
-        }
-        return arguments;
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument(null);
+        argumentSupplierContext.addArgument("test1");
+        argumentSupplierContext.addArgument(null);
     }
 
+    /**
+     * Asserts that non-null arguments are strings matching the expected prefix.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test(final @NonNull ArgumentContext argumentContext) {
-        assertThat(argumentContext).isNotNull();
-        assertThat(argumentContext.getStore()).isNotNull();
+    public void test(final @NonNull ArgumentContext context) {
+        assertThat(context).isNotNull();
+        assertThat(context.getStore()).isNotNull();
 
-        Object argument = argumentContext.getArgument();
+        Object argument = context.getArgument();
         if (argument == null) {
             return;
         }

@@ -16,58 +16,107 @@
 
 package test.lifecycle;
 
-import java.util.Collection;
-import java.util.Collections;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ArgumentSupplierContext;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 @Paramixel.TestClass
+/**
+ * Verifies lifecycle hook inheritance between a base class and a subclass.
+ *
+ * <p>The expected ordering is asserted in {@link LifecycleInheritanceBase#baseClassFinalize(ClassContext)}.
+ */
 public class LifecycleInheritanceTest extends LifecycleInheritanceBase {
 
+    /**
+     * Supplies a single argument to drive the lifecycle execution.
+     *
+     * @param argumentSupplierContext context used to register test arguments
+     */
     @Paramixel.ArgumentSupplier
-    public static Collection<String> arguments() {
-        return Collections.singletonList("argument[0]");
+    public static void arguments(final @NonNull ArgumentSupplierContext argumentSupplierContext) {
+        argumentSupplierContext.addArgument("argument[0]");
     }
 
+    /**
+     * Subclass initialize hook.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Initialize
-    public void subClassInitialize(final ClassContext classContext) {
+    public void subClassInitialize(final ClassContext context) {
         actual.add("subClassInitialize");
     }
 
+    /**
+     * Subclass before-all hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeAll
-    public void subClassBeforeAll(final @NonNull ArgumentContext argumentContext) {
+    public void subClassBeforeAll(final @NonNull ArgumentContext context) {
         actual.add("subClassBeforeAll");
     }
 
+    /**
+     * Subclass before-each hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.BeforeEach
-    public void subClassBeforeEach(final @NonNull ArgumentContext argumentContext) {
+    public void subClassBeforeEach(final @NonNull ArgumentContext context) {
         actual.add("subClassBeforeEach");
     }
 
+    /**
+     * First test method used to validate lifecycle ordering.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test1(final @NonNull ArgumentContext argumentContext) {
+    public void test1(final @NonNull ArgumentContext context) {
         actual.add("test1");
     }
 
+    /**
+     * Second test method used to validate lifecycle ordering.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.Test
-    public void test2(final @NonNull ArgumentContext argumentContext) {
+    public void test2(final @NonNull ArgumentContext context) {
         actual.add("test2");
     }
 
+    /**
+     * Subclass after-each hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterEach
-    public void subClassAfterEach(final @NonNull ArgumentContext argumentContext) {
+    public void subClassAfterEach(final @NonNull ArgumentContext context) {
         actual.add("subClassAfterEach");
     }
 
+    /**
+     * Subclass after-all hook.
+     *
+     * @param context for the current argument
+     */
     @Paramixel.AfterAll
-    public void subClassAfterAll(final @NonNull ArgumentContext argumentContext) {
+    public void subClassAfterAll(final @NonNull ArgumentContext context) {
         actual.add("subClassAfterAll");
     }
 
+    /**
+     * Subclass finalize hook.
+     *
+     * @param context for the current class
+     */
     @Paramixel.Finalize
-    public void subClassFinalize(final ClassContext classContext) {
+    public void subClassFinalize(final ClassContext context) {
         actual.add("subClassFinalize");
     }
 }
