@@ -215,14 +215,14 @@ public class ParamixelConcurrencyModelTest {
         static volatile CountDownLatch releaseArg1;
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.setParallelism(2);
-            ctx.addArguments("a0", "a1");
+        public static void args(final ArgumentSupplierContext context) {
+            context.setParallelism(2);
+            context.addArguments("a0", "a1");
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext ctx) throws Exception {
-            if (ctx.getArgumentIndex() == 1) {
+        public void test(final ArgumentContext context) throws Exception {
+            if (context.getArgumentIndex() == 1) {
                 arg1Entered.countDown();
                 releaseArg1.await(5, TimeUnit.SECONDS);
             }
@@ -235,28 +235,28 @@ public class ParamixelConcurrencyModelTest {
         static volatile AtomicInteger max;
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.setParallelism(4);
-            ctx.addArgument("arg");
+        public static void args(final ArgumentSupplierContext context) {
+            context.setParallelism(4);
+            context.addArgument("arg");
         }
 
         @Paramixel.Test
-        public void t1(final ArgumentContext ctx) throws Exception {
+        public void t1(final ArgumentContext context) throws Exception {
             doWork();
         }
 
         @Paramixel.Test
-        public void t2(final ArgumentContext ctx) throws Exception {
+        public void t2(final ArgumentContext context) throws Exception {
             doWork();
         }
 
         @Paramixel.Test
-        public void t3(final ArgumentContext ctx) throws Exception {
+        public void t3(final ArgumentContext context) throws Exception {
             doWork();
         }
 
         @Paramixel.Test
-        public void t4(final ArgumentContext ctx) throws Exception {
+        public void t4(final ArgumentContext context) throws Exception {
             doWork();
         }
 
@@ -274,7 +274,7 @@ public class ParamixelConcurrencyModelTest {
         static volatile CountDownLatch release;
 
         @Paramixel.Test
-        public void test(final ArgumentContext ctx) throws Exception {
+        public void test(final ArgumentContext context) throws Exception {
             entered.countDown();
             release.await(5, TimeUnit.SECONDS);
         }

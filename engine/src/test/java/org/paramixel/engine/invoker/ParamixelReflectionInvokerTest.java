@@ -92,25 +92,25 @@ public class ParamixelReflectionInvokerTest {
         private int initializeCalls;
         private int beforeEachCalls;
 
-        private void initialize(final ClassContext ctx) {
+        private void initialize(final ClassContext context) {
             initializeCalls++;
         }
 
-        private void beforeEach(final ArgumentContext ctx) {
+        private void beforeEach(final ArgumentContext context) {
             beforeEachCalls++;
         }
     }
 
     private static final class ThrowingTarget {
 
-        private void test(final ArgumentContext ctx) {
+        private void test(final ArgumentContext context) {
             throw new Boom("boom");
         }
     }
 
     private static final class InaccessibleTarget {
 
-        private void beforeEach(final ArgumentContext ctx) {}
+        private void beforeEach(final ArgumentContext context) {}
     }
 
     private static final class Boom extends RuntimeException {

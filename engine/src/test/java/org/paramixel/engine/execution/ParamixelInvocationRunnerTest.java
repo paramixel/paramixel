@@ -199,28 +199,28 @@ public class ParamixelInvocationRunnerTest {
         }
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.setParallelism(4);
-            ctx.addArgument("arg");
+        public static void args(final ArgumentSupplierContext context) {
+            context.setParallelism(4);
+            context.addArgument("arg");
         }
 
         @Paramixel.Test
-        public void t1(final ArgumentContext ctx) throws Exception {
+        public void t1(final ArgumentContext context) throws Exception {
             doWork();
         }
 
         @Paramixel.Test
-        public void t2(final ArgumentContext ctx) throws Exception {
+        public void t2(final ArgumentContext context) throws Exception {
             doWork();
         }
 
         @Paramixel.Test
-        public void t3(final ArgumentContext ctx) throws Exception {
+        public void t3(final ArgumentContext context) throws Exception {
             doWork();
         }
 
         @Paramixel.Test
-        public void t4(final ArgumentContext ctx) throws Exception {
+        public void t4(final ArgumentContext context) throws Exception {
             doWork();
         }
 
@@ -248,19 +248,19 @@ public class ParamixelInvocationRunnerTest {
         }
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.setParallelism(4);
-            ctx.addArgument("arg");
+        public static void args(final ArgumentSupplierContext context) {
+            context.setParallelism(4);
+            context.addArgument("arg");
         }
 
         @Paramixel.Test
         @Paramixel.Order(1)
-        public void ordered(final ArgumentContext ctx) {
+        public void ordered(final ArgumentContext context) {
             doWork();
         }
 
         @Paramixel.Test
-        public void plain(final ArgumentContext ctx) {
+        public void plain(final ArgumentContext context) {
             doWork();
         }
 
@@ -277,12 +277,12 @@ public class ParamixelInvocationRunnerTest {
         final List<String> calls = new ArrayList<>();
 
         @Paramixel.BeforeEach
-        public void baseBeforeEach(final ArgumentContext ctx) {
+        public void baseBeforeEach(final ArgumentContext context) {
             calls.add("baseBeforeEach");
         }
 
         @Paramixel.AfterEach
-        public void baseAfterEach(final ArgumentContext ctx) {
+        public void baseAfterEach(final ArgumentContext context) {
             calls.add("baseAfterEach");
         }
     }
@@ -290,28 +290,28 @@ public class ParamixelInvocationRunnerTest {
     public static class OrderingTest extends OrderingBase {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.setParallelism(1);
-            ctx.addArgument("arg");
+        public static void args(final ArgumentSupplierContext context) {
+            context.setParallelism(1);
+            context.addArgument("arg");
         }
 
         @Paramixel.BeforeEach
-        public void subBeforeEach(final ArgumentContext ctx) {
+        public void subBeforeEach(final ArgumentContext context) {
             calls.add("subBeforeEach");
         }
 
         @Paramixel.AfterEach
-        public void subAfterEach(final ArgumentContext ctx) {
+        public void subAfterEach(final ArgumentContext context) {
             calls.add("subAfterEach");
         }
 
         @Paramixel.Test
-        public void ok(final ArgumentContext ctx) {
+        public void ok(final ArgumentContext context) {
             calls.add("ok");
         }
 
         @Paramixel.Test
-        public void fails(final ArgumentContext ctx) {
+        public void fails(final ArgumentContext context) {
             calls.add("fails");
             throw new RuntimeException("boom");
         }

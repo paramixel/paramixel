@@ -683,8 +683,8 @@ public class ParamixelDiscoveryTest {
     public static class SupplierStreamTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            Stream.of("a", new NamedArg("b")).forEach(ctx::addArgument);
+        public static void args(final ArgumentSupplierContext context) {
+            Stream.of("a", new NamedArg("b")).forEach(context::addArgument);
         }
 
         @Paramixel.Test
@@ -695,8 +695,8 @@ public class ParamixelDiscoveryTest {
     public static class SupplierCollectionTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            List.of("a", new NamedArg("b")).forEach(ctx::addArgument);
+        public static void args(final ArgumentSupplierContext context) {
+            List.of("a", new NamedArg("b")).forEach(context::addArgument);
         }
 
         @Paramixel.Test
@@ -707,9 +707,9 @@ public class ParamixelDiscoveryTest {
     public static class SupplierIterableTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
+        public static void args(final ArgumentSupplierContext context) {
             for (Object o : List.of("a", new NamedArg("b"))) {
-                ctx.addArgument(o);
+                context.addArgument(o);
             }
         }
 
@@ -721,11 +721,11 @@ public class ParamixelDiscoveryTest {
     public static class SupplierIterableOnlyTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
+        public static void args(final ArgumentSupplierContext context) {
             final List<Object> list = List.of("a", new NamedArg("b"));
             final Iterable<Object> iterable = (Iterable<Object>) () -> list.iterator();
             for (Object o : iterable) {
-                ctx.addArgument(o);
+                context.addArgument(o);
             }
         }
 
@@ -737,9 +737,9 @@ public class ParamixelDiscoveryTest {
     public static class SupplierArrayTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.addArgument("a");
-            ctx.addArgument(new NamedArg("b"));
+        public static void args(final ArgumentSupplierContext context) {
+            context.addArgument("a");
+            context.addArgument(new NamedArg("b"));
         }
 
         @Paramixel.Test
@@ -750,8 +750,8 @@ public class ParamixelDiscoveryTest {
     public static class SupplierSingleObjectTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.addArgument(new NamedArg("only"));
+        public static void args(final ArgumentSupplierContext context) {
+            context.addArgument(new NamedArg("only"));
         }
 
         @Paramixel.Test
@@ -762,7 +762,7 @@ public class ParamixelDiscoveryTest {
     public static class SupplierNullTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
+        public static void args(final ArgumentSupplierContext context) {
             // Intentionally add no arguments.
         }
 
@@ -774,7 +774,7 @@ public class ParamixelDiscoveryTest {
     public static class SupplierThrowsTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
+        public static void args(final ArgumentSupplierContext context) {
             throw new RuntimeException("boom");
         }
 
@@ -786,8 +786,8 @@ public class ParamixelDiscoveryTest {
     public static class SupplierContextTestClass {
 
         @Paramixel.ArgumentSupplier
-        public static void args(final ArgumentSupplierContext ctx) {
-            ctx.addArguments("a", new NamedArg("b"));
+        public static void args(final ArgumentSupplierContext context) {
+            context.addArguments("a", new NamedArg("b"));
         }
 
         @Paramixel.Test

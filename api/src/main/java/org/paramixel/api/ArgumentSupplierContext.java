@@ -52,7 +52,7 @@ import java.util.List;
  * public final class MyTest {
  *
  *     @Paramixel.ArgumentSupplier
- *     public static void arguments(ArgumentSupplierContext ctx) {
+ *     public static void arguments(ArgumentSupplierContext context) {
  *         context.addArgument(1);
  *         context.addArguments(2, 3, 4);
  *         context.addArguments(List.of(5, 6));
