@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Future;
+import java.util.logging.Logger;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.EngineDiscoveryRequest;
 import org.junit.platform.engine.EngineExecutionListener;
@@ -36,6 +37,7 @@ import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
+import org.paramixel.engine.api.ConcreteClassContext;
 import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.AbstractParamixelDescriptor;
 import org.paramixel.engine.descriptor.ParamixelEngineDescriptor;
@@ -66,9 +68,10 @@ import org.paramixel.engine.util.FastId;
  * <p>This class is stateless and thread-safe. It creates per-execution state inside
  * {@link #execute(ExecutionRequest)}.
  *
- * @author Douglas Hoard
  */
 public class ParamixelTestEngine implements TestEngine {
+
+    private static final Logger LOGGER = Logger.getLogger(ParamixelTestEngine.class.getName());
 
     /**
      * The unique identifier for this engine.
@@ -114,12 +117,17 @@ public class ParamixelTestEngine implements TestEngine {
                 .map(Integer::parseInt)
                 .orElse(DEFAULT_CLASS_PARALLELISM);
 
-        final EngineExecutionListener engineExecutionListener =
-                invokedByMaven ? new ParamixelEngineExecutionListener() : executionRequest.getEngineExecutionListener();
+        final EngineExecutionListener engineExecutionListener = invokedByMaven
+                ? new ParamixelEngineExecutionListener(
+                        System.out::println, executionRequest.getEngineExecutionListener())
+                : executionRequest.getEngineExecutionListener();
 
         engineExecutionListener.executionStarted(executionRequest.getRootTestDescriptor());
 
         Exception exception = null;
+
+        final Map<Class<?>, ClassContext> classContexts = new HashMap<>();
+        final Map<Class<?>, Object> testInstances = new HashMap<>();
 
         try {
             final Properties properties = new Properties();
@@ -135,19 +143,15 @@ public class ParamixelTestEngine implements TestEngine {
             properties.setProperty("parallelism", String.valueOf(classParallelism));
 
             if (invokedByMaven) {
-                System.out.println("Paramixel Engine invoked by Maven");
-                System.out.println("Paramixel Engine Configuration:");
-
-                properties.stringPropertyNames().stream()
-                        .sorted()
-                        .forEach(k -> System.out.println("  " + k + " = " + properties.getProperty(k)));
+                LOGGER.info("Paramixel Engine invoked by Maven");
+                LOGGER.info("Paramixel Engine Configuration:");
+                properties.stringPropertyNames().stream().sorted().forEach(k -> {
+                    LOGGER.info("  " + k + " = " + properties.getProperty(k));
+                });
             }
 
             final ConcreteEngineContext engineContext =
                     new ConcreteEngineContext(ENGINE_ID, properties, classParallelism);
-
-            final Map<Class<?>, ClassContext> classContexts = new HashMap<>();
-            final Map<Class<?>, Object> testInstances = new HashMap<>();
 
             final List<ParamixelTestClassDescriptor> classDescriptors =
                     executionRequest.getRootTestDescriptor().getChildren().stream()
@@ -180,12 +184,26 @@ public class ParamixelTestEngine implements TestEngine {
             exception = e;
         }
 
-        if (exception != null) {
-            engineExecutionListener.executionFinished(
-                    executionRequest.getRootTestDescriptor(), TestExecutionResult.failed(exception));
-        } else {
-            engineExecutionListener.executionFinished(
-                    executionRequest.getRootTestDescriptor(), TestExecutionResult.successful());
+        Throwable firstTestFailure = null;
+        for (ClassContext classContext : classContexts.values()) {
+            if (classContext instanceof ConcreteClassContext) {
+                final Throwable failure = ((ConcreteClassContext) classContext).getFirstFailure();
+                if (failure != null) {
+                    firstTestFailure = failure;
+                    break;
+                }
+            }
         }
+
+        final TestExecutionResult rootResult;
+        if (exception != null) {
+            rootResult = TestExecutionResult.failed(exception);
+        } else if (firstTestFailure != null) {
+            rootResult = TestExecutionResult.failed(firstTestFailure);
+        } else {
+            rootResult = TestExecutionResult.successful();
+        }
+
+        engineExecutionListener.executionFinished(executionRequest.getRootTestDescriptor(), rootResult);
     }
 }

@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p><b>Thread safety</b>
  * <p>This type is thread-safe.
  *
- * @author Douglas Hoard
  */
 public final class ParamixelConcurrencyLimiter {
 

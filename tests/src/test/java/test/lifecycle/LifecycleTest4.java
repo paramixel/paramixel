@@ -16,28 +16,27 @@
 
 package test.lifecycle;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
-import org.paramixel.api.ArgumentsCollector;
 import org.paramixel.api.ClassContext;
 import org.paramixel.api.Paramixel;
 
 /**
- * Demonstrates lifecycle behavior with a longer-running test method.
+ * Verifies lifecycle behavior when no arguments collector is present.
  */
 @Paramixel.TestClass
 public class LifecycleTest4 {
 
-    /**
-     * Supplies arguments for parameterized execution.
-     *
-     * @param collector the arguments collector
-     */
-    @Paramixel.ArgumentsCollector
-    public static void arguments(final @NonNull ArgumentsCollector collector) {
-        System.out.println("[ARGUMENT_SUPPLIER] Providing arguments for test methods");
-        collector.addArguments("Argument 1", "Argument 2", "Argument 3");
-    }
+    private static final AtomicInteger initializeCount = new AtomicInteger(0);
+    private static final AtomicInteger beforeAllCount = new AtomicInteger(0);
+    private static final AtomicInteger beforeEachCount = new AtomicInteger(0);
+    private static final AtomicInteger testCount = new AtomicInteger(0);
+    private static final AtomicInteger afterEachCount = new AtomicInteger(0);
+    private static final AtomicInteger afterAllCount = new AtomicInteger(0);
+    private static final AtomicInteger finalizeCount = new AtomicInteger(0);
 
     /**
      * Initializes class-level resources.
@@ -46,8 +45,14 @@ public class LifecycleTest4 {
      */
     @Paramixel.Initialize
     public void initialize(final @NonNull ClassContext context) {
-        System.out.println("[INITIALIZE] Test class: " + context.getTestClass().getName());
-        System.out.println("[INITIALIZE] Test instance: " + context.getTestInstance());
+        initializeCount.set(0);
+        beforeAllCount.set(0);
+        beforeEachCount.set(0);
+        testCount.set(0);
+        afterEachCount.set(0);
+        afterAllCount.set(0);
+        finalizeCount.set(0);
+        initializeCount.incrementAndGet();
     }
 
     /**
@@ -57,8 +62,9 @@ public class LifecycleTest4 {
      */
     @Paramixel.BeforeAll
     public void beforeAll(final @NonNull ArgumentContext context) {
-        System.out.println("[BEFORE_ALL] Executing before all test methods");
-        System.out.println("[BEFORE_ALL] Argument: " + context.getArgument());
+        beforeAllCount.incrementAndGet();
+        assertThat(context.getArgument()).isNull();
+        assertThat(context.getArgumentIndex()).isZero();
     }
 
     /**
@@ -68,26 +74,19 @@ public class LifecycleTest4 {
      */
     @Paramixel.BeforeEach
     public void beforeEach(final @NonNull ArgumentContext context) {
-        System.out.println("[BEFORE_EACH] Before test execution");
-        System.out.println("[BEFORE_EACH] Argument: " + context.getArgument());
+        beforeEachCount.incrementAndGet();
+        assertThat(context.getArgument()).isNull();
     }
 
     /**
-     * Executes the test method with a simulated delay.
+     * Executes the test method without an arguments collector.
      *
      * @param context the argument context
-     * @throws Exception if the simulated delay is interrupted
      */
     @Paramixel.Test
-    public void testMethod(final ArgumentContext context) throws Exception {
-        Thread.sleep(5000);
-
-        Object argument = context.getArgument();
-        System.out.println("[TEST_METHOD] Executing test with argument: " + argument);
-        if (argument != null) {
-            System.out.println(
-                    "[TEST_METHOD] Argument class: " + argument.getClass().getName());
-        }
+    public void testMethod(final @NonNull ArgumentContext context) {
+        testCount.incrementAndGet();
+        assertThat(context.getArgument()).isNull();
     }
 
     /**
@@ -97,8 +96,8 @@ public class LifecycleTest4 {
      */
     @Paramixel.AfterEach
     public void afterEach(final @NonNull ArgumentContext context) {
-        System.out.println("[AFTER_EACH] After test execution");
-        System.out.println("[AFTER_EACH] Argument: " + context.getArgument());
+        afterEachCount.incrementAndGet();
+        assertThat(context.getArgument()).isNull();
     }
 
     /**
@@ -108,8 +107,8 @@ public class LifecycleTest4 {
      */
     @Paramixel.AfterAll
     public void afterAll(final @NonNull ArgumentContext context) {
-        System.out.println("[AFTER_ALL] Executing after all test methods");
-        System.out.println("[AFTER_ALL] Argument: " + context.getArgument());
+        afterAllCount.incrementAndGet();
+        assertThat(context.getArgument()).isNull();
     }
 
     /**
@@ -119,7 +118,14 @@ public class LifecycleTest4 {
      */
     @Paramixel.Finalize
     public void finalize(final @NonNull ClassContext context) {
-        System.out.println(
-                "[FINALIZE] Test class completed: " + context.getTestClass().getName());
+        finalizeCount.incrementAndGet();
+
+        assertThat(initializeCount.get()).isEqualTo(1);
+        assertThat(beforeAllCount.get()).isEqualTo(1);
+        assertThat(beforeEachCount.get()).isEqualTo(1);
+        assertThat(testCount.get()).isEqualTo(1);
+        assertThat(afterEachCount.get()).isEqualTo(1);
+        assertThat(afterAllCount.get()).isEqualTo(1);
+        assertThat(finalizeCount.get()).isEqualTo(1);
     }
 }

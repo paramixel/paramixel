@@ -16,6 +16,7 @@
 
 package org.paramixel.api;
 
+import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -29,7 +30,7 @@ public final class NamedValue<T> implements Named {
     private final T value;
 
     private NamedValue(final @NonNull String name, final T value) {
-        this.name = name;
+        this.name = Objects.requireNonNull(name, "name must not be null");
         this.value = value;
     }
 

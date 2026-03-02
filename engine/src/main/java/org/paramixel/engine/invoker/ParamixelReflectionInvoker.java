@@ -36,7 +36,6 @@ import org.paramixel.api.ClassContext;
  * <p>This class is thread-safe. It uses a concurrent cache to avoid repeated
  * {@link Method#setAccessible(boolean)} calls.
  *
- * @author Douglas Hoard
  */
 public final class ParamixelReflectionInvoker {
 
@@ -51,6 +50,29 @@ public final class ParamixelReflectionInvoker {
      * Prevents instantiation of this utility class.
      */
     private ParamixelReflectionInvoker() {}
+
+    /**
+     * Invokes a zero-argument static method and returns its result.
+     *
+     * @param method the static method to invoke; never {@code null}
+     * @return the returned value (may be {@code null})
+     * @throws Throwable when the invoked method throws, or when reflection fails
+     */
+    public static Object invokeStatic(final @NonNull Method method) throws Throwable {
+        return invokeStaticMethod(method);
+    }
+
+    /**
+     * Invokes a single-argument static method and returns its result.
+     *
+     * @param method the static method to invoke; never {@code null}
+     * @param parameter the single parameter to pass; never {@code null}
+     * @return the returned value (may be {@code null})
+     * @throws Throwable when the invoked method throws, or when reflection fails
+     */
+    public static Object invokeStatic(final @NonNull Method method, final @NonNull Object parameter) throws Throwable {
+        return invokeStaticMethod(method, parameter);
+    }
 
     /**
      * Invokes an initialize method.
@@ -184,6 +206,21 @@ public final class ParamixelReflectionInvoker {
             throw e.getCause() != null ? e.getCause() : e;
         } catch (IllegalAccessException e) {
             throw new RuntimeException("Failed to invoke method: " + method, e);
+        }
+    }
+
+    private static Object invokeStaticMethod(final @NonNull Method method, final Object... parameters)
+            throws Throwable {
+        try {
+            if (!ACCESSIBLE_CACHE.containsKey(method)) {
+                method.setAccessible(true);
+                ACCESSIBLE_CACHE.put(method, Boolean.TRUE);
+            }
+            return method.invoke(null, parameters);
+        } catch (InvocationTargetException e) {
+            throw e.getCause() != null ? e.getCause() : e;
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Failed to invoke static method: " + method, e);
         }
     }
 }

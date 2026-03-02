@@ -18,7 +18,9 @@ package org.paramixel.engine.listener;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
@@ -33,18 +35,23 @@ import org.junit.platform.engine.TestExecutionResult;
  * <p>This class is not thread-safe for concurrent engine executions because it stores
  * {@code startTimeMillis} as mutable state. The engine constructs a new listener per execution.
  *
- * @author Douglas Hoard
  */
 public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
+    private final Consumer<String> printer;
+
     /** Start time for the current engine execution in epoch milliseconds. */
     private long startTimeMillis;
+
+    public ParamixelEngineDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
+        this.printer = Objects.requireNonNull(printer, "printer must not be null");
+    }
 
     @Override
     public void executionStarted(final @NonNull TestDescriptor testDescriptor) {
         startTimeMillis = System.currentTimeMillis();
         resetExecutionSummary();
-        System.out.println(INFO + " Paramixel starting...");
+        printer.accept(INFO + " Paramixel starting...");
     }
 
     @Override
@@ -57,7 +64,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
 
         // Print header
         printLine(INFO + " ╔════════════════════════════════════════════════════════════════════════╗");
-        printLine(INFO + " ║                    PARAMIXEL TEST EXECUTION REPORT                     ║");
+        printLine(INFO + " ║                    Paramixel Test Execution Report                     ║");
         printLine(INFO + " ╠════════════════════════════════════════════════════════════════════════╣");
         String durationContent = " Duration: " + duration;
         int contentWidth = 72;
@@ -69,9 +76,9 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
             durationLine.append(" ");
         }
         durationLine.append("║");
-        printLine(INFO + " " + durationLine.toString());
+        printLine(INFO + " " + durationLine);
         printLine(INFO + " ╚════════════════════════════════════════════════════════════════════════╝");
-        System.out.println(INFO);
+        printer.accept(INFO);
 
         // Print hierarchical summary
         int totalClasses = summary.getTestClassPassed() + summary.getTestClassFailed() + summary.getTestClassSkipped();
@@ -80,10 +87,10 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         int totalMethods =
                 summary.getTestMethodPassed() + summary.getTestMethodFailed() + summary.getTestMethodSkipped();
 
-        System.out.println(INFO + " " + totalClasses + " Classes tested");
-        System.out.println(INFO + " └── " + totalArguments + " Arguments tested");
-        System.out.println(INFO + "     └── " + totalMethods + " Test methods tested");
-        System.out.println(INFO);
+        printer.accept(INFO + " " + totalClasses + " Classes tested");
+        printer.accept(INFO + " └── " + totalArguments + " Arguments tested");
+        printer.accept(INFO + "     └── " + totalMethods + " Test methods tested");
+        printer.accept(INFO);
 
         // Build class breakdown table
         ConcurrentHashMap<String, ExecutionSummary.ClassStats> classStatsMap = summary.getClassStatsMap();
@@ -97,7 +104,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         int totalFailed = 0;
 
         if (classNames.isEmpty()) {
-            System.out.println(INFO + " No test classes executed.");
+            printer.accept(INFO + " No test classes executed.");
         } else {
             // Calculate column widths
             int maxClassWidth = 40;
@@ -155,17 +162,18 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
             printSeparatorLine(maxClassWidth);
         }
 
-        System.out.println(INFO);
+        printer.accept(INFO);
 
         // Print final result
         int grandTotal = totalPassed + totalFailed;
         if (totalFailed == 0) {
-            System.out.println(
-                    INFO + "\033[1;32m" + " TESTS PASSED (" + grandTotal + "/" + grandTotal + ")" + "\033[0m");
+            printer.accept(INFO + "\033[1;32m" + " TESTS PASSED (" + grandTotal + "/" + grandTotal + ")" + "\033[0m");
         } else {
-            System.out.println(
+            printer.accept(
                     INFO + "\033[1;31m" + " TESTS FAILED (" + totalPassed + "/" + grandTotal + " passed)" + "\033[0m");
         }
+
+        printer.accept(INFO);
     }
 
     /**
@@ -175,7 +183,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      * @param args format arguments; may be empty
      */
     private void printLine(String format, Object... args) {
-        System.out.println(String.format(format, args));
+        printer.accept(String.format(format, args));
     }
 
     /**
@@ -235,7 +243,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
             sep.append("-");
         }
         sep.append("+");
-        printLine(INFO + " " + sep.toString());
+        printLine(INFO + " " + sep);
     }
 
     /**

@@ -41,7 +41,8 @@ public abstract class LifecycleInheritanceBase {
      * @param context for the current class
      */
     @Paramixel.Initialize
-    public void baseClassInitialize(final ClassContext context) {
+    @Paramixel.Order(1)
+    public void baseClassInitialize(final @NonNull ClassContext context) {
         actual.clear();
         actual.add("baseClassInitialize");
     }
@@ -52,6 +53,7 @@ public abstract class LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.BeforeAll
+    @Paramixel.Order(20)
     public void baseClassBeforeAll(final @NonNull ArgumentContext context) {
         actual.add("baseClassBeforeAll");
     }
@@ -62,6 +64,7 @@ public abstract class LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.BeforeEach
+    @Paramixel.Order(10)
     public void baseClassBeforeEach(final @NonNull ArgumentContext context) {
         actual.add("baseClassBeforeEach");
     }
@@ -72,6 +75,7 @@ public abstract class LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.AfterEach
+    @Paramixel.Order(20)
     public void baseClassAfterEach(final @NonNull ArgumentContext context) {
         actual.add("baseClassAfterEach");
     }
@@ -82,6 +86,7 @@ public abstract class LifecycleInheritanceBase {
      * @param context for the current argument
      */
     @Paramixel.AfterAll
+    @Paramixel.Order(20)
     public void baseClassAfterAll(final @NonNull ArgumentContext context) {
         actual.add("baseClassAfterAll");
     }
@@ -95,23 +100,24 @@ public abstract class LifecycleInheritanceBase {
      * @param context for the current class
      */
     @Paramixel.Finalize
-    public void baseClassFinalize(final ClassContext context) {
+    @Paramixel.Order(20)
+    public void baseClassFinalize(final @NonNull ClassContext context) {
         actual.add("baseClassFinalize");
 
         List<String> expected = new ArrayList<>();
 
         expected.add("baseClassInitialize");
         expected.add("subClassInitialize");
-        expected.add("baseClassBeforeAll");
         expected.add("subClassBeforeAll");
+        expected.add("baseClassBeforeAll");
         expected.add("baseClassBeforeEach");
         expected.add("subClassBeforeEach");
-        expected.add("test1");
+        expected.add("test2");
         expected.add("subClassAfterEach");
         expected.add("baseClassAfterEach");
         expected.add("baseClassBeforeEach");
         expected.add("subClassBeforeEach");
-        expected.add("test2");
+        expected.add("test1");
         expected.add("subClassAfterEach");
         expected.add("baseClassAfterEach");
         expected.add("subClassAfterAll");

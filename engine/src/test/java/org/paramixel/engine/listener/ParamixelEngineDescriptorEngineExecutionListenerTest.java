@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,12 +36,16 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
 
     private PrintStream originalOut;
     private ByteArrayOutputStream out;
+    private PrintStream printStream;
+    private Consumer<String> printer;
 
     @BeforeEach
     public void setUp() {
         originalOut = System.out;
         out = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(out));
+        printStream = new PrintStream(out);
+        printer = line -> printStream.println(line);
+        System.setOut(printStream);
     }
 
     @AfterEach
@@ -64,8 +69,8 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         engine.addChild(clazz);
 
         final ParamixelEngineDescriptorEngineExecutionListener engineListener =
-                new ParamixelEngineDescriptorEngineExecutionListener();
-        final ParamixelEngineExecutionListener routingListener = new ParamixelEngineExecutionListener();
+                new ParamixelEngineDescriptorEngineExecutionListener(printer);
+        final ParamixelEngineExecutionListener routingListener = new ParamixelEngineExecutionListener(printer);
 
         engineListener.executionStarted(engine);
         routingListener.executionStarted(clazz);
@@ -77,7 +82,7 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         engineListener.executionFinished(engine, TestExecutionResult.successful());
 
         final String output = out.toString();
-        assertThat(output).contains("PARAMIXEL TEST EXECUTION REPORT");
+        assertThat(output).contains("Paramixel Test Execution Report");
         assertThat(output).contains("Classes tested");
     }
 
@@ -87,7 +92,7 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         final ParamixelEngineDescriptor engine = new ParamixelEngineDescriptor(rootId, "paramixel");
 
         final ParamixelEngineDescriptorEngineExecutionListener engineListener =
-                new ParamixelEngineDescriptorEngineExecutionListener();
+                new ParamixelEngineDescriptorEngineExecutionListener(printer);
 
         engineListener.executionStarted(engine);
         engineListener.executionFinished(engine, TestExecutionResult.successful());
@@ -100,7 +105,7 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         final UniqueId rootId = UniqueId.forEngine("paramixel");
         final ParamixelEngineDescriptor engine = new ParamixelEngineDescriptor(rootId, "paramixel");
         final ParamixelEngineDescriptorEngineExecutionListener engineListener =
-                new ParamixelEngineDescriptorEngineExecutionListener();
+                new ParamixelEngineDescriptorEngineExecutionListener(printer);
 
         engineListener.executionStarted(engine);
         setStartTimeMillis(engineListener, System.currentTimeMillis() - 250);

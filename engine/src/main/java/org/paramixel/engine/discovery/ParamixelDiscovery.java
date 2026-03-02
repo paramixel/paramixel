@@ -19,15 +19,15 @@ package org.paramixel.engine.discovery;
 import java.io.File;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -56,7 +56,9 @@ import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
-import org.paramixel.engine.validation.MethodValidator;
+import org.paramixel.engine.invoker.ParamixelReflectionInvoker;
+import org.paramixel.engine.validation.TestClassValidator;
+import org.paramixel.engine.validation.ValidationFailure;
 
 /**
  * Discovers Paramixel tests from a JUnit Platform discovery request.
@@ -87,7 +89,6 @@ import org.paramixel.engine.validation.MethodValidator;
  * <p>This type is stateless. It uses a JVM logger for diagnostics and does not require external
  * synchronization.
  *
- * @author Douglas Hoard
  */
 public final class ParamixelDiscovery {
 
@@ -412,11 +413,11 @@ public final class ParamixelDiscovery {
             return;
         }
 
-        final List<MethodValidator.ValidationFailure> validationFailures = MethodValidator.validateTestClass(testClass);
+        final List<ValidationFailure> validationFailures = TestClassValidator.validateTestClass(testClass);
 
         if (!validationFailures.isEmpty()) {
             LOGGER.warning("Test class " + testClass.getName() + " has validation failures:");
-            for (MethodValidator.ValidationFailure failure : validationFailures) {
+            for (ValidationFailure failure : validationFailures) {
                 LOGGER.warning("  - " + failure.getMessage());
             }
             throw new IllegalStateException(
@@ -445,13 +446,10 @@ public final class ParamixelDiscovery {
      */
     private void discoverTestMethods(
             final @NonNull Class<?> testClass, final @NonNull ParamixelTestClassDescriptor classDescriptor) {
-        final List<Method> testMethods = new ArrayList<>(Arrays.stream(testClass.getDeclaredMethods())
-                .filter(m -> m.isAnnotationPresent(Paramixel.Test.class))
-                .filter(m -> !isDisabled(m))
-                .toList());
+        final List<Method> testMethods = getFlattenedTestMethods(testClass);
 
-        testMethods.sort(Comparator.comparing(Method::getName));
-        testMethods.sort(Comparator.comparingInt(ParamixelDiscovery::getOrderValue));
+        testMethods.sort(
+                Comparator.comparingInt(ParamixelDiscovery::getOrderValue).thenComparing(Method::getName));
 
         if (testMethods.isEmpty()) {
             LOGGER.fine("No enabled test methods found in class: " + testClass.getName());
@@ -494,6 +492,45 @@ public final class ParamixelDiscovery {
         }
     }
 
+    private List<Method> getFlattenedTestMethods(final @NonNull Class<?> testClass) {
+        final Map<String, Method> bySignature = new LinkedHashMap<>();
+
+        for (Class<?> current = testClass;
+                current != null && current != Object.class;
+                current = current.getSuperclass()) {
+            for (Method method : current.getDeclaredMethods()) {
+                if (!method.isAnnotationPresent(Paramixel.Test.class)) {
+                    continue;
+                }
+                if (isDisabled(method)) {
+                    continue;
+                }
+
+                final String signatureKey = signatureKey(method);
+
+                // Most-specific (subclass) declaration wins.
+                bySignature.putIfAbsent(signatureKey, method);
+            }
+        }
+
+        return new ArrayList<>(bySignature.values());
+    }
+
+    private static String signatureKey(final @NonNull Method method) {
+        final StringBuilder builder = new StringBuilder();
+        builder.append(method.getName());
+        builder.append('(');
+        final Class<?>[] parameterTypes = method.getParameterTypes();
+        for (int i = 0; i < parameterTypes.length; i++) {
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append(parameterTypes[i].getName());
+        }
+        builder.append(')');
+        return builder.toString();
+    }
+
     /**
      * Gets arguments from the argument supplier method, if present.
      *
@@ -501,58 +538,77 @@ public final class ParamixelDiscovery {
      * @return array of arguments, or single null element if no supplier
      */
     private SupplierArguments getSupplierArguments(final @NonNull Class<?> testClass) {
-        for (Method method : testClass.getDeclaredMethods()) {
-            if (method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
-                try {
-                    method.setAccessible(true);
+        Method selected = null;
+        final List<Method> ignored = new ArrayList<>();
 
-                    // Collector-driven: public static void arguments(ArgumentsCollector collector)
-                    if (method.getParameterCount() == 1
-                            && method.getParameterTypes()[0].equals(ArgumentsCollector.class)
-                            && method.getReturnType().equals(void.class)
-                            && Modifier.isStatic(method.getModifiers())) {
-                        final ConcreteArgumentsCollector collector =
-                                new ConcreteArgumentsCollector(DISCOVERY_ENGINE_CONTEXT);
-                        method.invoke(null, collector);
-                        return new SupplierArguments(collector.toArray(), collector.getParallelism());
-                    }
-
-                    // Return-based supplier: public static Object arguments()
-                    if (method.getParameterCount() == 0 && Modifier.isStatic(method.getModifiers())) {
-                        final Object result = method.invoke(null);
-                        if (result == null) {
-                            return SupplierArguments.empty();
-                        }
-                        if (result instanceof Stream) {
-                            return new SupplierArguments(
-                                    ((Stream<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
-                        }
-                        if (result instanceof Collection) {
-                            return new SupplierArguments(
-                                    ((Collection<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
-                        }
-                        if (result instanceof Iterable) {
-                            final List<Object> list = new ArrayList<>();
-                            for (Object item : (Iterable<?>) result) {
-                                list.add(item);
-                            }
-                            return new SupplierArguments(list.toArray(), SupplierArguments.DEFAULT_PARALLELISM);
-                        }
-                        if (result instanceof Object[]) {
-                            return new SupplierArguments((Object[]) result, SupplierArguments.DEFAULT_PARALLELISM);
-                        }
-                        return new SupplierArguments(new Object[] {result}, SupplierArguments.DEFAULT_PARALLELISM);
-                    }
-
-                    LOGGER.warning("Invalid @ArgumentsCollector method signature: " + method);
-                    return SupplierArguments.empty();
-                } catch (Exception e) {
-                    LOGGER.log(Level.WARNING, "Failed to invoke arguments collector: " + method.getName(), e);
-                    return SupplierArguments.empty();
+        for (Class<?> current = testClass;
+                current != null && current != Object.class;
+                current = current.getSuperclass()) {
+            for (Method method : current.getDeclaredMethods()) {
+                if (!method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
+                    continue;
+                }
+                if (selected == null) {
+                    selected = method;
+                } else {
+                    ignored.add(method);
                 }
             }
         }
-        return SupplierArguments.noSupplier();
+
+        if (selected == null) {
+            return SupplierArguments.noSupplier();
+        }
+
+        if (!ignored.isEmpty()) {
+            LOGGER.warning(
+                    "Multiple @Paramixel.ArgumentsCollector methods found in hierarchy for " + testClass.getName()
+                            + "; using " + selected.getDeclaringClass().getName() + "#" + selected.getName()
+                            + " and ignoring " + ignored.size() + " others");
+        }
+
+        try {
+            // Collector-driven: public static void arguments(ArgumentsCollector collector)
+            if (selected.getParameterCount() == 1
+                    && selected.getParameterTypes()[0].equals(ArgumentsCollector.class)
+                    && selected.getReturnType().equals(void.class)) {
+                final ConcreteArgumentsCollector collector = new ConcreteArgumentsCollector(DISCOVERY_ENGINE_CONTEXT);
+                ParamixelReflectionInvoker.invokeStatic(selected, collector);
+                return new SupplierArguments(collector.toArray(), collector.getParallelism());
+            }
+
+            // Return-based supplier: public static <ReturnType> arguments()
+            if (selected.getParameterCount() == 0) {
+                final Object result = ParamixelReflectionInvoker.invokeStatic(selected);
+                if (result == null) {
+                    return SupplierArguments.empty();
+                }
+                if (result instanceof Stream) {
+                    return new SupplierArguments(((Stream<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
+                }
+                if (result instanceof Collection) {
+                    return new SupplierArguments(
+                            ((Collection<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
+                }
+                if (result instanceof Iterable) {
+                    final List<Object> list = new ArrayList<>();
+                    for (Object item : (Iterable<?>) result) {
+                        list.add(item);
+                    }
+                    return new SupplierArguments(list.toArray(), SupplierArguments.DEFAULT_PARALLELISM);
+                }
+                if (result instanceof Object[]) {
+                    return new SupplierArguments((Object[]) result, SupplierArguments.DEFAULT_PARALLELISM);
+                }
+                return new SupplierArguments(new Object[] {result}, SupplierArguments.DEFAULT_PARALLELISM);
+            }
+
+            LOGGER.warning("Invalid @Paramixel.ArgumentsCollector method signature: " + selected);
+            return SupplierArguments.empty();
+        } catch (Throwable t) {
+            LOGGER.log(Level.WARNING, "Failed to invoke arguments collector: " + selected.getName(), t);
+            return SupplierArguments.empty();
+        }
     }
 
     /**

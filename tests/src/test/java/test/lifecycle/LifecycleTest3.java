@@ -16,6 +16,10 @@
 
 package test.lifecycle;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ArgumentsCollector;
@@ -28,6 +32,17 @@ import org.paramixel.api.Paramixel;
 @Paramixel.TestClass
 public class LifecycleTest3 {
 
+    private static final ConcurrentSkipListSet<Integer> seenArgumentIndices = new ConcurrentSkipListSet<>();
+
+    private static final AtomicInteger initializeCount = new AtomicInteger(0);
+    private static final AtomicInteger beforeAllCount = new AtomicInteger(0);
+    private static final AtomicInteger beforeEachCount = new AtomicInteger(0);
+    private static final AtomicInteger testMethod1Count = new AtomicInteger(0);
+    private static final AtomicInteger testMethod2Count = new AtomicInteger(0);
+    private static final AtomicInteger afterEachCount = new AtomicInteger(0);
+    private static final AtomicInteger afterAllCount = new AtomicInteger(0);
+    private static final AtomicInteger finalizeCount = new AtomicInteger(0);
+
     /**
      * Supplies arguments for parameterized execution.
      *
@@ -35,7 +50,7 @@ public class LifecycleTest3 {
      */
     @Paramixel.ArgumentsCollector
     public static void arguments(final @NonNull ArgumentsCollector collector) {
-        System.out.println("[ARGUMENT_SUPPLIER] Providing arguments for test methods");
+        collector.setParallelism(2);
         collector.addArguments("Argument 1", "Argument 2", "Argument 3");
     }
 
@@ -46,8 +61,16 @@ public class LifecycleTest3 {
      */
     @Paramixel.Initialize
     public void initialize(final @NonNull ClassContext context) {
-        System.out.println("[INITIALIZE] Test class: " + context.getTestClass().getName());
-        System.out.println("[INITIALIZE] Test instance: " + context.getTestInstance());
+        seenArgumentIndices.clear();
+        initializeCount.set(0);
+        beforeAllCount.set(0);
+        beforeEachCount.set(0);
+        testMethod1Count.set(0);
+        testMethod2Count.set(0);
+        afterEachCount.set(0);
+        afterAllCount.set(0);
+        finalizeCount.set(0);
+        initializeCount.incrementAndGet();
     }
 
     /**
@@ -57,8 +80,9 @@ public class LifecycleTest3 {
      */
     @Paramixel.BeforeAll
     public void beforeAll(final @NonNull ArgumentContext context) {
-        System.out.println("[BEFORE_ALL] Executing before all test methods");
-        System.out.println("[BEFORE_ALL] Argument: " + context.getArgument());
+        beforeAllCount.incrementAndGet();
+        seenArgumentIndices.add(context.getArgumentIndex());
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
@@ -68,44 +92,30 @@ public class LifecycleTest3 {
      */
     @Paramixel.BeforeEach
     public void beforeEach(final @NonNull ArgumentContext context) {
-        System.out.println("[BEFORE_EACH] Before test execution");
-        System.out.println("[BEFORE_EACH] Argument: " + context.getArgument());
+        beforeEachCount.incrementAndGet();
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
-     * Executes the first test method with a simulated delay.
+     * Executes the first test method.
      *
      * @param context the argument context
-     * @throws Exception if the simulated delay is interrupted
      */
     @Paramixel.Test
-    public void testMethod(final ArgumentContext context) throws Exception {
-        Thread.sleep(2000);
-
-        Object argument = context.getArgument();
-        System.out.println("[TEST_METHOD-1] Executing test with argument: " + argument);
-        if (argument != null) {
-            System.out.println(
-                    "[TEST_METHOD-1] Argument class: " + argument.getClass().getName());
-        }
+    public void testMethod(final @NonNull ArgumentContext context) {
+        testMethod1Count.incrementAndGet();
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
-     * Executes the second test method with a simulated delay.
+     * Executes the second test method.
      *
      * @param context the argument context
-     * @throws Exception if the simulated delay is interrupted
      */
     @Paramixel.Test
-    public void testMethod2(final ArgumentContext context) throws Exception {
-        Thread.sleep(2000);
-
-        Object argument = context.getArgument();
-        System.out.println("[TEST_METHOD-2] Executing test with argument: " + argument);
-        if (argument != null) {
-            System.out.println(
-                    "[TEST_METHOD-2] Argument class: " + argument.getClass().getName());
-        }
+    public void testMethod2(final @NonNull ArgumentContext context) {
+        testMethod2Count.incrementAndGet();
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
@@ -115,8 +125,8 @@ public class LifecycleTest3 {
      */
     @Paramixel.AfterEach
     public void afterEach(final @NonNull ArgumentContext context) {
-        System.out.println("[AFTER_EACH] After test execution");
-        System.out.println("[AFTER_EACH] Argument: " + context.getArgument());
+        afterEachCount.incrementAndGet();
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
@@ -126,8 +136,8 @@ public class LifecycleTest3 {
      */
     @Paramixel.AfterAll
     public void afterAll(final @NonNull ArgumentContext context) {
-        System.out.println("[AFTER_ALL] Executing after all test methods");
-        System.out.println("[AFTER_ALL] Argument: " + context.getArgument());
+        afterAllCount.incrementAndGet();
+        assertThat(context.getArgument(String.class)).startsWith("Argument ");
     }
 
     /**
@@ -137,7 +147,16 @@ public class LifecycleTest3 {
      */
     @Paramixel.Finalize
     public void finalize(final @NonNull ClassContext context) {
-        System.out.println(
-                "[FINALIZE] Test class completed: " + context.getTestClass().getName());
+        finalizeCount.incrementAndGet();
+
+        assertThat(initializeCount.get()).isEqualTo(1);
+        assertThat(beforeAllCount.get()).isEqualTo(3);
+        assertThat(beforeEachCount.get()).isEqualTo(6);
+        assertThat(testMethod1Count.get()).isEqualTo(3);
+        assertThat(testMethod2Count.get()).isEqualTo(3);
+        assertThat(afterEachCount.get()).isEqualTo(6);
+        assertThat(afterAllCount.get()).isEqualTo(3);
+        assertThat(finalizeCount.get()).isEqualTo(1);
+        assertThat(seenArgumentIndices).containsExactly(0, 1, 2);
     }
 }
