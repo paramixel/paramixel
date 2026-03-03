@@ -79,12 +79,12 @@ public class ParamixelTestEngine implements TestEngine {
     public static final String ENGINE_ID = "paramixel";
 
     /**
-     * Default parallelism for test class execution.
+     * Default parallelism for test execution.
      *
-     * <p>This value is used when no explicit {@code parallelism} configuration
+     * <p>This value is used when no explicit {@code paramixel.parallelism} configuration
      * parameter is provided to the engine.</p>
      */
-    private static final int DEFAULT_CLASS_PARALLELISM =
+    private static final int DEFAULT_PARALLELISM =
             Math.max(1, Runtime.getRuntime().availableProcessors());
 
     @Override
@@ -123,7 +123,7 @@ public class ParamixelTestEngine implements TestEngine {
         }
 
         // Determine parallelism: config params override properties file
-        final int classParallelism = executionRequest
+        final int maxParallelism = executionRequest
                 .getConfigurationParameters()
                 .get("paramixel.parallelism")
                 .map(Integer::parseInt)
@@ -136,7 +136,7 @@ public class ParamixelTestEngine implements TestEngine {
                             LOGGER.warning("Invalid paramixel.parallelism value in properties file: " + value);
                         }
                     }
-                    return DEFAULT_CLASS_PARALLELISM;
+                    return DEFAULT_PARALLELISM;
                 });
 
         final EngineExecutionListener engineExecutionListener = invokedByMaven
@@ -153,7 +153,7 @@ public class ParamixelTestEngine implements TestEngine {
 
         try {
             properties.setProperty("invokedBy", invokedByMaven ? "maven" : "junit");
-            properties.setProperty("parallelism", String.valueOf(classParallelism));
+            properties.setProperty("parallelism", String.valueOf(maxParallelism));
 
             if (invokedByMaven) {
                 LOGGER.info("Paramixel Engine invoked by Maven");
@@ -164,7 +164,7 @@ public class ParamixelTestEngine implements TestEngine {
             }
 
             final ConcreteEngineContext engineContext =
-                    new ConcreteEngineContext(ENGINE_ID, properties, classParallelism);
+                    new ConcreteEngineContext(ENGINE_ID, properties, maxParallelism);
 
             final List<ParamixelTestClassDescriptor> classDescriptors =
                     executionRequest.getRootTestDescriptor().getChildren().stream()
@@ -173,7 +173,7 @@ public class ParamixelTestEngine implements TestEngine {
                             .sorted(Comparator.comparing(AbstractParamixelDescriptor::getDisplayName))
                             .toList();
 
-            try (ParamixelExecutionRuntime runtime = ParamixelExecutionRuntime.createDefault()) {
+            try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(maxParallelism)) {
                 final ParamixelClassRunner classRunner = new ParamixelClassRunner(
                         runtime, engineContext, engineExecutionListener, classContexts, testInstances);
 
