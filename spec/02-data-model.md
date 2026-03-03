@@ -125,6 +125,7 @@ All annotations have `@Retention(RetentionPolicy.RUNTIME)` and `@Documented`.
 | `@Paramixel.Disabled` | `TYPE`, `METHOD` | N/A | Skips the annotated class or method; optional `value()` for reason |
 | `@Paramixel.DisplayName` | `TYPE`, `METHOD` | N/A | Overrides display name; required `value()` |
 | `@Paramixel.Order` | `METHOD` (valid on `@Paramixel.Test` and lifecycle hook methods) | N/A | Explicit ordering; `value()` must be > 0; lower = earlier |
+| `@Paramixel.Tags` | `TYPE` | N/A | Categorizes test class with tags; only on `@TestClass` classes; max one per class hierarchy |
 
 ---
 

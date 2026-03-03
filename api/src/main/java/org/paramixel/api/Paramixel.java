@@ -532,4 +532,46 @@ public class Paramixel {
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.TYPE)
     public @interface TestClass {}
+
+    /**
+     * Specifies one or more tags for categorizing a test class.
+     *
+     * <p>This annotation allows developers to attach metadata tags to test classes for
+     * categorization, filtering, and organization purposes. Tags can be used to identify
+     * tests by functionality, priority, environment requirements, or any other criteria.</p>
+     *
+     * <p><b>Constraints:</b></p>
+     * <ul>
+     *   <li>Only one {@code @Tags} annotation is allowed per test class</li>
+     *   <li>Must be applied to a class that is also annotated with {@link TestClass}</li>
+     *   <li>The value array must contain at least one non-empty tag</li>
+     * </ul>
+     *
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * @Paramixel.TestClass
+     * @Paramixel.Tags({"integration", "database", "slow"})
+     * public class DatabaseIntegrationTests {
+     *     // Test methods
+     * }
+     * }</pre>
+     *
+     * @see TestClass
+     * @since 0.0.1
+     */
+    @Documented
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.TYPE)
+    public @interface Tags {
+
+        /**
+         * The tags to associate with the test class.
+         *
+         * <p>Each tag should be a non-empty string that identifies a category,
+         * characteristic, or grouping for the test class.</p>
+         *
+         * @return the array of tag strings
+         */
+        String[] value();
+    }
 }
