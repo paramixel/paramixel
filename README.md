@@ -445,6 +445,6 @@ and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.****
 
 ## License
 
-Copyright 2006-present Douglas Hoard. All Rights Reserved.
+Copyright 2026-present Douglas Hoard. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
