@@ -228,6 +228,13 @@ public class UnitTest {
 }
 ```
 
+**Tag Validation Requirements:**
+- Tags annotation can only be used on classes annotated with `@Paramixel.TestClass`
+- Tags array must contain at least one tag
+- Each tag value must be non-null and non-empty (after trimming)
+- Only one `@Tags` annotation is allowed per class hierarchy
+- Invalid tag usage will cause test discovery to fail with an error
+
 ## Tag-Based Test Filtering
 
 Paramixel supports filtering tests based on their `@Tags` annotations using regular expressions. This allows you to run specific subsets of tests during development or CI/CD pipelines.
@@ -271,9 +278,11 @@ Create a `paramixel.properties` file in your project root:
 
 ```properties
 # Run integration tests except slow ones
-paramixel.tags.include=integration-.*
-paramixel.tags.exclude=.*slow.*,.*flaky.*
+tags.include=integration-.*
+tags.exclude=.*slow.*,.*flaky.*
 ```
+
+**Note:** In the properties file, use `tags.include` and `tags.exclude` (without the `paramixel.` prefix).
 
 ### Regex Pattern Examples
 

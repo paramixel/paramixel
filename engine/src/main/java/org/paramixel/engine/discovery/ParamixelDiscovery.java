@@ -147,22 +147,64 @@ public final class ParamixelDiscovery {
             final @NonNull EngineDiscoveryRequest request, final @NonNull TestDescriptor engineDescriptor) {
         LOGGER.fine("Starting Paramixel test discovery");
 
+        // Step 1: Discover all test classes
         final Set<Class<?>> testClasses = discoverTestClasses(request);
         LOGGER.fine("Discovered " + testClasses.size() + " potential test classes");
 
+        // Step 2: Validate all discovered classes first
+        final Set<Class<?>> validClasses = new LinkedHashSet<>();
+        final List<ValidationFailure> allFailures = new ArrayList<>();
+        for (Class<?> testClass : testClasses) {
+            final List<ValidationFailure> failures = validateTestClass(testClass);
+            if (failures.isEmpty()) {
+                validClasses.add(testClass);
+            } else {
+                allFailures.addAll(failures);
+            }
+        }
+
+        // If any validation failures occurred, throw exception
+        if (!allFailures.isEmpty()) {
+            LOGGER.warning("Validation failed for test classes:");
+            for (ValidationFailure failure : allFailures) {
+                LOGGER.warning("  - " + failure.getMessage());
+            }
+            throw new IllegalStateException("Validation failed for test classes; see logs for details.");
+        }
+
+        LOGGER.fine("Validated " + validClasses.size() + " test classes");
+
+        // Step 3: Apply tag filtering after validation
         final TagFilter tagFilter = TagFilterFactory.fromConfigurationParameters(request.getConfigurationParameters());
 
         if (tagFilter.hasIncludePatterns()) {
             LOGGER.fine("Applying tag filter - include patterns configured");
         }
 
-        testClasses.stream()
+        validClasses.stream()
                 .filter(tagFilter::matches)
                 .sorted(Comparator.comparing((Class<?> clazz) -> getDisplayName(clazz, clazz.getName())))
-                .forEach(testClass -> discoverTestClass(testClass, engineDescriptor));
+                .forEach(testClass -> buildTestClassDescriptor(testClass, engineDescriptor));
 
         LOGGER.fine(
                 "Discovery complete. Found " + engineDescriptor.getChildren().size() + " test classes");
+    }
+
+    /**
+     * Validates a test class and returns any validation failures.
+     *
+     * @param testClass the class to validate
+     * @return list of validation failures; empty if valid
+     */
+    private List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
+        if (isDisabled(testClass)) {
+            final Paramixel.Disabled disabled = testClass.getAnnotation(Paramixel.Disabled.class);
+            LOGGER.fine("Skipping disabled test class: " + testClass.getName()
+                    + (disabled.value().isEmpty() ? "" : " - " + disabled.value()));
+            return List.of();
+        }
+
+        return TestClassValidator.validateTestClass(testClass);
     }
 
     /**
@@ -414,25 +456,8 @@ public final class ParamixelDiscovery {
      * @param engineDescriptor the parent engine descriptor
      * @throws IllegalStateException if {@code testClass} fails validation
      */
-    private void discoverTestClass(final @NonNull Class<?> testClass, final @NonNull TestDescriptor engineDescriptor) {
-        if (isDisabled(testClass)) {
-            final Paramixel.Disabled disabled = testClass.getAnnotation(Paramixel.Disabled.class);
-            LOGGER.fine("Skipping disabled test class: " + testClass.getName()
-                    + (disabled.value().isEmpty() ? "" : " - " + disabled.value()));
-            return;
-        }
-
-        final List<ValidationFailure> validationFailures = TestClassValidator.validateTestClass(testClass);
-
-        if (!validationFailures.isEmpty()) {
-            LOGGER.warning("Test class " + testClass.getName() + " has validation failures:");
-            for (ValidationFailure failure : validationFailures) {
-                LOGGER.warning("  - " + failure.getMessage());
-            }
-            throw new IllegalStateException(
-                    "Validation failed for test class " + testClass.getName() + "; see logs for details.");
-        }
-
+    private void buildTestClassDescriptor(
+            final @NonNull Class<?> testClass, final @NonNull TestDescriptor engineDescriptor) {
         final UniqueId classUniqueId = engineDescriptor.getUniqueId().append(CLASS_SEGMENT, testClass.getName());
 
         final String displayName = getDisplayName(testClass, testClass.getName());

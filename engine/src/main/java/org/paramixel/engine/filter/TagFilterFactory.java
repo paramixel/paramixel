@@ -38,8 +38,10 @@ import org.jspecify.annotations.NonNull;
  */
 public final class TagFilterFactory {
 
-    private static final String TAGS_INCLUDE_KEY = "paramixel.tags.include";
-    private static final String TAGS_EXCLUDE_KEY = "paramixel.tags.exclude";
+    private static final String TAGS_INCLUDE_KEY = "tags.include";
+    private static final String TAGS_EXCLUDE_KEY = "tags.exclude";
+    private static final String TAGS_INCLUDE_KEY_CONFIG = "paramixel.tags.include";
+    private static final String TAGS_EXCLUDE_KEY_CONFIG = "paramixel.tags.exclude";
 
     private TagFilterFactory() {}
 
@@ -58,7 +60,7 @@ public final class TagFilterFactory {
     /**
      * Creates a tag filter from a properties object.
      *
-     * <p>Reads {@code paramixel.tags.include} and {@code paramixel.tags.exclude} from
+     * <p>Reads {@code tags.include} and {@code tags.exclude} from
      * the provided properties. Patterns are comma-separated.</p>
      *
      * @param properties the properties to read from; never {@code null}
@@ -86,8 +88,10 @@ public final class TagFilterFactory {
             final org.junit.platform.engine.ConfigurationParameters configParameters) {
         Objects.requireNonNull(configParameters, "configParameters must not be null");
 
-        final String includeValue = configParameters.get(TAGS_INCLUDE_KEY).orElse("");
-        final String excludeValue = configParameters.get(TAGS_EXCLUDE_KEY).orElse("");
+        final String includeValue =
+                configParameters.get(TAGS_INCLUDE_KEY_CONFIG).orElse("");
+        final String excludeValue =
+                configParameters.get(TAGS_EXCLUDE_KEY_CONFIG).orElse("");
 
         return fromPatterns(parsePatterns(includeValue), parsePatterns(excludeValue));
     }

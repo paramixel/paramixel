@@ -59,7 +59,8 @@ public class AnnotationUsageValidatorTagsTest {
     }
 
     @Test
-    public void validateTestClass_reportsEmptyTagsValue() {
+    public void validateTestClass_rejectsEmptyTagsArray() {
+        // Empty tags array is a validation error
         final List<String> messages = AnnotationUsageValidator.validateTestClass(TestClassWithEmptyTags.class).stream()
                 .map(ValidationFailure::getMessage)
                 .collect(Collectors.toList());
@@ -69,13 +70,26 @@ public class AnnotationUsageValidatorTagsTest {
     }
 
     @Test
-    public void validateTestClass_reportsBlankTagValues() {
+    public void validateTestClass_rejectsBlankTagValues() {
+        // Tags with only blank values are a validation error
         final List<String> messages = AnnotationUsageValidator.validateTestClass(TestClassWithBlankTag.class).stream()
                 .map(ValidationFailure::getMessage)
                 .collect(Collectors.toList());
 
         assertThat(messages)
-                .anySatisfy(m -> assertThat(m).contains("@Paramixel.Tags tag at index 0 must be non-empty"));
+                .anySatisfy(m -> assertThat(m).contains("@Paramixel.Tags tag at index 0 must not be empty"));
+    }
+
+    @Test
+    public void validateTestClass_rejectsEmptyTagValue() {
+        // Empty string in tags array is a validation error
+        final List<String> messages =
+                AnnotationUsageValidator.validateTestClass(TestClassWithEmptyStringTag.class).stream()
+                        .map(ValidationFailure::getMessage)
+                        .collect(Collectors.toList());
+
+        assertThat(messages)
+                .anySatisfy(m -> assertThat(m).contains("@Paramixel.Tags tag at index 1 must not be empty"));
     }
 
     // Test classes for validation
@@ -129,6 +143,14 @@ public class AnnotationUsageValidatorTagsTest {
     @Paramixel.TestClass
     @Paramixel.Tags({"  "})
     static class TestClassWithBlankTag {
+
+        @Paramixel.Test
+        public void test(final ArgumentContext context) {}
+    }
+
+    @Paramixel.TestClass
+    @Paramixel.Tags({"valid", ""})
+    static class TestClassWithEmptyStringTag {
 
         @Paramixel.Test
         public void test(final ArgumentContext context) {}

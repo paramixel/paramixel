@@ -115,16 +115,19 @@ For each annotation type (each lifecycle hook type and `@Paramixel.Test`), the r
 ### `@Paramixel.Tags`
 
 - **Target:** `ElementType.TYPE`
-- **Attribute:** `String[] value()` — required, must contain at least one non-empty tag.
+- **Attribute:** `String[] value()` — required, must contain at least one non-null, non-empty tag.
 - **Effect:** Categorizes a test class with metadata tags for organization, filtering, and reporting purposes.
 - **Constraints:**
   - Can only be applied to classes annotated with `@Paramixel.TestClass`
   - At most one `@Tags` annotation is allowed per class hierarchy
-  - Each tag value must be non-empty (after trimming)
+  - Each tag value must be non-null and non-empty (after trimming)
 - **Validation errors (IllegalStateException at discovery):**
   - `@Tags` on a class not annotated with `@TestClass`
   - Multiple `@Tags` annotations in the same class hierarchy
-  - Empty tags array or array containing only empty/blank strings
+  - Empty tags array
+  - Tags array containing null elements
+  - Tags array containing only empty/blank strings
+  - Any tag value that is null or empty/blank
 
 ---
 
@@ -282,10 +285,12 @@ The engine supports filtering test classes based on `@Paramixel.Tags` annotation
 
 ### Configuration Parameters
 
-| Parameter | Description |
-|---|---|
-| `paramixel.tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included |
-| `paramixel.tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded |
+| Parameter | Description | Usage |
+|---|---|---|
+| `paramixel.tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included | System properties, Maven CLI, JUnit Platform config |
+| `paramixel.tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded | System properties, Maven CLI, JUnit Platform config |
+| `tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included | Properties file (`paramixel.properties`) |
+| `tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded | Properties file (`paramixel.properties`) |
 
 ### Matching Behavior
 
@@ -329,9 +334,11 @@ The engine supports filtering test classes based on `@Paramixel.Tags` annotation
 Create `paramixel.properties` in the project root:
 
 ```properties
-paramixel.tags.include=integration-.*
-paramixel.tags.exclude=.*slow.*,.*flaky.*
+tags.include=integration-.*
+tags.exclude=.*slow.*,.*flaky.*
 ```
+
+**Note:** In the properties file, use `tags.include` and `tags.exclude` (without the `paramixel.` prefix).
 
 ### Error Handling
 
