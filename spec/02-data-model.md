@@ -252,7 +252,15 @@ If the same method signature (name + parameter types) is annotated multiple time
 For each annotation type (each lifecycle hook type and `@Paramixel.Test`), the resulting flattened method list is ordered deterministically:
 - Primary: `@Paramixel.Order` value ascending
 - Secondary: method name ascending
-- Methods without `@Paramixel.Order` execute last (effective value = `Integer.MAX_VALUE`).
+- Methods without `@Paramixel.Order` execute last (effective value = `Integer.MAX_VALUE`)
+
+**Important:** The `@Paramixel.Order` annotation ordering is applied **per annotation type**. This means:
+- All `@BeforeEach` methods are ordered among themselves
+- All `@Test` methods are ordered among themselves
+- All `@AfterEach` methods are ordered among themselves
+- etc.
+
+The ordering of one annotation type does not affect the ordering of another annotation type. For example, a `@BeforeEach` method with `@Order(1)` will still execute before all `@Test` methods, regardless of their `@Order` values.
 
 ---
 
