@@ -171,7 +171,7 @@ All annotations have `@Retention(RetentionPolicy.RUNTIME)` and `@Documented`.
 |---|---|---|
 | `engineContext` | `EngineContext` | Not null |
 | `arguments` | `List<Object>` | Ordered insertion list |
-| `parallelism` | `int` | Defaults to `max(1, availableProcessors)`; settable via `setParallelism()` |
+| `parallelism` | `int` | Defaults to `max(1, availableProcessors)`; settable via `setParallelism()`. Effective value constrained by global `paramixel.parallelism` setting |
 
 #### `ConcreteStore` — `org.paramixel.engine.api`
 
@@ -264,7 +264,27 @@ The engine reads `paramixel.properties` from the current working directory at ru
 |---|---|---|
 | `version` | Filtered at build time in engine's `paramixel.properties` | Engine version |
 | `invokedBy` | Runtime, set by engine | `"maven"` or `"junit"` |
-| `parallelism` | Runtime, from `JUnit Platform configurationParameters` | Class-level parallelism |
+| `paramixel.parallelism` | Properties file or configuration parameters | Global maximum parallelism - the upper bound for concurrent test class execution (default: number of available processors) |
+
+### Configuration Precedence
+
+When a property is defined in multiple places, the following precedence applies (highest to lowest):
+
+1. **JUnit Platform Configuration Parameters** (e.g., `-Dparamixel.parallelism=4`)
+2. **Properties File** (`paramixel.properties`)
+3. **Default Value**
+
+This means configuration parameters override properties file settings.
+
+### Parallelism Hierarchy
+
+The engine supports two levels of parallelism configuration:
+
+1. **Global Parallelism (`paramixel.parallelism`)**: Establishes the overall maximum number of concurrent test classes that may execute simultaneously across the entire test suite. This serves as the upper bound for all parallelism within the engine.
+
+2. **Per-Class Parallelism (`ArgumentsCollector.setParallelism()`)**: Individual test classes may specify their own parallelism limit via `setParallelism()`. This value represents the maximum concurrency permitted for that specific test class. However, the effective parallelism for any class is constrained by the global `paramixel.parallelism` setting—the per-class value cannot exceed the global limit.
+
+For example, if `paramixel.parallelism=4` (global) and a test class calls `setParallelism(8)` (per-class), the effective parallelism for that class will be 4.
 
 The Maven plugin exposes additional parameters:
 

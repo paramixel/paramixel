@@ -201,7 +201,7 @@ Contract:
 | `project` | `project` | (injected) | `MavenProject` | The current Maven project |
 | `skipTests` | `skipTests` | `false` | `boolean` | Skips all test execution when true |
 | `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@TestClass` annotated class found |
-| `classParallelism` | `paramixel.class.parallelism` | `2147483647` | `int` | Maximum concurrent test classes |
+| `classParallelism` | `paramixel.class.parallelism` | `2147483647` | `int` | Maximum concurrent test classes (currently unused - see `paramixel.parallelism` for parallelism control) |
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |
 
 #### Behaviour

@@ -111,11 +111,33 @@ public class ParamixelTestEngine implements TestEngine {
                 .map("maven"::equals)
                 .orElse(false);
 
+        // Load base properties from file
+        final Properties properties = new Properties();
+        final File propertiesFile = new File("paramixel.properties");
+        if (propertiesFile.isFile()) {
+            try (InputStream in = new FileInputStream(propertiesFile)) {
+                properties.load(in);
+            } catch (Exception e) {
+                LOGGER.warning("Failed to load paramixel.properties: " + e.getMessage());
+            }
+        }
+
+        // Determine parallelism: config params override properties file
         final int classParallelism = executionRequest
                 .getConfigurationParameters()
-                .get("parallelism")
+                .get("paramixel.parallelism")
                 .map(Integer::parseInt)
-                .orElse(DEFAULT_CLASS_PARALLELISM);
+                .orElseGet(() -> {
+                    String value = properties.getProperty("paramixel.parallelism");
+                    if (value != null && !value.trim().isEmpty()) {
+                        try {
+                            return Integer.parseInt(value.trim());
+                        } catch (NumberFormatException e) {
+                            LOGGER.warning("Invalid paramixel.parallelism value in properties file: " + value);
+                        }
+                    }
+                    return DEFAULT_CLASS_PARALLELISM;
+                });
 
         final EngineExecutionListener engineExecutionListener = invokedByMaven
                 ? new ParamixelEngineExecutionListener(
@@ -130,15 +152,6 @@ public class ParamixelTestEngine implements TestEngine {
         final Map<Class<?>, Object> testInstances = new HashMap<>();
 
         try {
-            final Properties properties = new Properties();
-
-            final File propertiesFile = new File("paramixel.properties");
-            if (propertiesFile.isFile()) {
-                try (InputStream in = new FileInputStream(propertiesFile)) {
-                    properties.load(in);
-                }
-            }
-
             properties.setProperty("invokedBy", invokedByMaven ? "maven" : "junit");
             properties.setProperty("parallelism", String.valueOf(classParallelism));
 

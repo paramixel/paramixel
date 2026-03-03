@@ -280,7 +280,42 @@ Create a `paramixel.properties` file in your project root:
 # Run integration tests except slow ones
 paramixel.tags.include=integration-.*
 paramixel.tags.exclude=.*slow.*,.*flaky.*
+
+# Control test class parallelism (default: number of available processors)
+paramixel.parallelism=4
 ```
+
+### Configuration Precedence
+
+When a property is defined in multiple places, the following precedence applies (highest to lowest):
+
+1. **Command line system properties** (e.g., `-Dparamixel.parallelism=8`)
+2. **Properties file** (`paramixel.properties`)
+3. **Default value**
+
+### Controlling Parallelism
+
+Paramixel uses virtual threads for concurrent test execution. The degree of parallelism can be controlled at both the global and per-class levels.
+
+**Global Parallelism (`paramixel.parallelism`)**
+
+The `paramixel.parallelism` property establishes the overall maximum number of concurrent test classes that may execute simultaneously across the entire test suite. This serves as the upper bound for all parallelism within the engine.
+
+```bash
+# Run with 4 concurrent test classes
+./mvnw test -Dparamixel.parallelism=4
+```
+
+Or in `paramixel.properties`:
+```properties
+paramixel.parallelism=4
+```
+
+**Per-Class Parallelism (`ArgumentsCollector.setParallelism()`)**
+
+Individual test classes may specify their own parallelism limit via `ArgumentsCollector.setParallelism()`. This value represents the maximum concurrency permitted for that specific test class. However, the effective parallelism for any class is constrained by the global `paramixel.parallelism` setting—the per-class value cannot exceed the global limit.
+
+For example, if `paramixel.parallelism=4` (global) and a test class calls `setParallelism(8)` (per-class), the effective parallelism for that class will be 4.
 
 ### Regex Pattern Examples
 
