@@ -34,8 +34,8 @@ org.paramixel.api
 | Class | Role |
 |---|---|
 | `Paramixel` | Container for all nested annotation types; primary entry point for test authors |
-| `ArgumentContext` | Context injected into `@BeforeAll`, `@BeforeEach`, `@Test`, `@AfterEach`, `@AfterAll` methods |
-| `ClassContext` | Context injected into `@Initialize` and `@Finalize` methods |
+| `ArgumentContext` | Context injected into `@Paramixel.BeforeAll`, `@Paramixel.BeforeEach`, `@Paramixel.Test`, `@Paramixel.AfterEach`, `@Paramixel.AfterAll` methods |
+| `ClassContext` | Context injected into `@Paramixel.Initialize` and `@Paramixel.Finalize` methods |
 | `EngineContext` | Root context; provides configuration properties and engine-scoped store |
 | `ArgumentsCollector` | Passed to collector-driven `@Paramixel.ArgumentsCollector` methods |
 | `Store` | Scoped state-sharing interface used at engine, class, and argument levels |
@@ -61,7 +61,7 @@ None. This module has no runtime configuration of its own.
 
 ### Responsibility
 
-Implements the JUnit Platform `TestEngine` SPI: discovers `@TestClass`-annotated classes, validates method signatures, builds a descriptor tree, and executes tests using virtual threads with a concurrency-limited executor.
+Implements the JUnit Platform `TestEngine` SPI: discovers `@Paramixel.TestClass`-annotated classes, validates method signatures, builds a descriptor tree, and executes tests using virtual threads with a concurrency-limited executor.
 
 ### Internal Package Structure
 
@@ -168,7 +168,7 @@ org.paramixel.engine
 
 ### Responsibility
 
-Bridges the Maven build lifecycle to the Paramixel engine. Provides a single Maven goal (`test`) that discovers `@TestClass` classes in the test output directory and executes them via the JUnit Platform Launcher.
+Bridges the Maven build lifecycle to the Paramixel engine. Provides a single Maven goal (`test`) that discovers `@Paramixel.TestClass` classes in the test output directory and executes them via the JUnit Platform Launcher.
 
 ### Internal Package Structure
 
@@ -224,8 +224,8 @@ test/
 ├── ClassThreadLocalTest1/2.java      ThreadLocal isolation across argument threads
 ├── CollectionArgumentsTest.java      ArgumentsCollector using addArguments
 ├── CollectionMixedArgumentsTest.java Mixed-type collection supplier
-├── DisabledTest.java                 @Disabled class behaviour
-├── DisplayNameTest.java              @DisplayName propagation
+├── DisabledTest.java                 @Paramixel.Disabled class behaviour
+├── DisplayNameTest.java              @Paramixel.DisplayName propagation
 ├── IterableArgumentsTest.java        ArgumentsCollector iterating over an Iterable
 ├── ParallelArgumentTest.java         Parallel argument execution verification
 ├── SingleObjectArgumentsTest.java    ArgumentsCollector using addArgument
@@ -245,7 +245,7 @@ test/
 │   ├── LifecycleInheritanceTest.java
 │   └── ...
 ├── named/                            Named value display name tests
-├── order/                            @Order annotation tests
+├── order/                            @Paramixel.Order annotation tests
 └── store/                            Store scoping and AutoCloseable tests
     ├── StoreTest1-4.java
     └── StoreAutoCloseableTest.java
@@ -262,7 +262,7 @@ All classes are `@Paramixel.TestClass` test classes. No production code resides 
 | `LifecycleInheritanceTest` | Superclass lifecycle method inheritance ordering |
 | `StoreTest1` | Engine/class/argument store scoping |
 | `StoreAutoCloseableTest` | AutoCloseable value auto-close by engine |
-| `OrderAnnotationTest` | `@Order` sequential execution within an argument bucket |
+| `OrderAnnotationTest` | `@Paramixel.Order` sequential execution within an argument bucket |
 | `NamedArgumentTest` | `Named` display name propagation |
 | `NullArgumentTest` | Null argument handling |
 
@@ -306,7 +306,7 @@ examples/
 └── testcontainers/
     ├── kafka/
     │   ├── KafkaTestEnvironment.java   Wraps Kafka Testcontainer
-    │   └── KafkaTest.java             Produce + consume with ordered @Test methods
+    │   └── KafkaTest.java             Produce + consume with ordered @Paramixel.Test methods
     ├── mongodb/
     │   ├── MongoDBTestEnvironment.java
     │   └── MongoDBTest.java
@@ -332,7 +332,7 @@ examples/
 | Class | Role |
 |---|---|
 | `examples.simple.ParallelArgumentTest` | Template for parallel argument usage with context-driven supplier |
-| `examples.testcontainers.kafka.KafkaTest` | Shows `@Order` + `Store` pattern for stateful produce/consume test |
+| `examples.testcontainers.kafka.KafkaTest` | Shows `@Paramixel.Order` + `Store` pattern for stateful produce/consume test |
 | `examples.testcontainers.util.CleanupExecutor` | Utility for ordered cleanup with `addTaskIfPresent()` chaining |
 | `KafkaTestEnvironment` / `MongoDBTestEnvironment` / etc. | `Named`-implementing test environment objects supplied to `@Paramixel.ArgumentsCollector` |
 
@@ -348,3 +348,72 @@ examples/
 - `paramixel-maven-plugin` with `verbose=true`, `skip=false`
 - `slf4j-nop` bound for test scope (suppresses logging noise during example runs)
 - Surefire: `skipTests=true`, JUnit auto-detection disabled
+
+---
+
+## Module: `paramixel-benchmarks`
+
+### Responsibility
+
+Performance benchmarks using JMH (Java Microbenchmark Harness) to measure engine throughput, latency, and compare performance characteristics with JUnit Jupiter. Benchmarks run via a dedicated Maven profile (`-Pbenchmarks`) and are excluded from standard CI builds due to long runtime.
+
+### Internal Package Structure
+
+```
+benchmarks/
+└── src/test/java/org/paramixel/benchmarks/
+    ├── EngineBenchmark.java              Paramixel engine performance benchmarks
+    ├── JUnitComparisonBenchmark.java     Comparison with JUnit Jupiter
+    └── ThroughputBenchmark.java          Throughput measurement benchmarks
+```
+
+### Layer Breakdown
+
+| Layer | Package | Responsibility |
+|---|---|---|
+| Benchmark sources | `org.paramixel.benchmarks` | JMH benchmark classes |
+
+### Key Classes and Roles
+
+| Class | Role |
+|---|---|
+| `EngineBenchmark` | Measures Paramixel engine throughput, latency, and resource utilization |
+| `JUnitComparisonBenchmark` | Comparative benchmarks against JUnit Jupiter for equivalent test scenarios |
+| `ThroughputBenchmark` | Measures maximum test execution throughput under various parallelism configurations |
+
+### What This Module MUST NOT Do
+
+- Must NOT contain functional or integration tests (those go in `paramixel-tests` or `paramixel-examples`).
+- Must NOT depend on `paramixel-maven-plugin`.
+- Must NOT run during standard Maven build phases (must use dedicated profile).
+- Must NOT have production code — all code is test/benchmark scope only.
+- Must NOT be executed in CI builds by default (long runtime).
+
+### Configuration Properties
+
+| Property | Default | Description |
+|---|---|---|
+| `benchmarks.enabled` | `false` | Enable benchmark execution |
+| `benchmarks.forks` | `1` | Number of JMH forks per benchmark |
+| `benchmarks.warmup.iterations` | `5` | Warmup iterations per benchmark |
+| `benchmarks.measurement.iterations` | `10` | Measurement iterations per benchmark |
+| `benchmarks.measurement.time` | `1s` | Measurement time per iteration |
+
+### Execution
+
+Benchmarks are executed via a dedicated Maven profile:
+
+```bash
+# Run all benchmarks
+./mvnw test -pl benchmarks -Pbenchmarks
+
+# Run specific benchmark class
+./mvnw test -pl benchmarks -Pbenchmarks -Dbenchmarks.class=EngineBenchmark
+
+# Run with custom settings
+./mvnw test -pl benchmarks -Pbenchmarks \
+    -Dbenchmarks.forks=3 \
+    -Dbenchmarks.measurement.iterations=20
+```
+
+Benchmark results are written to `benchmarks/target/jmh-results.json` and human-readable reports to `benchmarks/target/jmh-results.txt`.

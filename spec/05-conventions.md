@@ -100,9 +100,9 @@ public ConcreteEngineContext(
 
 | Scope | Policy |
 |---|---|
-| `@Initialize` / `@BeforeAll` / `@BeforeEach` failure | Log + abort the current scope; record on `classContext.recordFailure(t)` |
-| `@Test` failure | Log + count as test failure; `@AfterEach` still executes |
-| `@AfterEach` / `@AfterAll` / `@Finalize` failure | Log + record; execution of remaining hooks continues |
+| `@Paramixel.Initialize` / `@Paramixel.BeforeAll` / `@Paramixel.BeforeEach` failure | Log + abort the current scope; record on `classContext.recordFailure(t)` |
+| `@Paramixel.Test` failure | Log + count as test failure; `@Paramixel.AfterEach` still executes |
+| `@Paramixel.AfterEach` / `@Paramixel.AfterAll` / `@Paramixel.Finalize` failure | Log + record; execution of remaining hooks continues |
 | `AutoCloseable.close()` failure | Log + record; execution continues |
 | Reflection (`InvocationTargetException`) | Always unwrap via `e.getCause() != null ? e.getCause() : e` |
 | Discovery validation failure | Throws `IllegalStateException` from `ParamixelDiscovery.discoverTestClass()` |
@@ -239,13 +239,13 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 15. How To: Add a New `@TestClass` Test (in `paramixel-tests` or `paramixel-examples`)
+## 15. How To: Add a New `@Paramixel.TestClass` Test (in `paramixel-tests` or `paramixel-examples`)
 
 1. Create a new Java class in the appropriate package under `src/test/java/`.
 2. Annotate it `@Paramixel.TestClass`.
 3. Add `@Paramixel.ArgumentsCollector` if parameterized; otherwise the engine provides a single null argument.
 4. Add `@Paramixel.Test` methods with signature `public void name(ArgumentContext context)`.
-5. Add lifecycle methods as needed (`@Initialize`, `@BeforeAll`, etc.) with correct signatures.
+5. Add lifecycle methods as needed (`@Paramixel.Initialize`, `@Paramixel.BeforeAll`, etc.) with correct signatures.
 6. Do NOT annotate the class with JUnit Jupiter annotations.
 7. Run `./mvnw test -pl tests` (or `examples`) and verify the test passes.
 

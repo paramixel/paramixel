@@ -34,7 +34,7 @@ The engine plugs into the JUnit Platform via the standard Java SPI (`META-INF/se
 │  ParamixelTestEngine (JUnit Platform TestEngine SPI)                │
 │    │                                                                │
 │    ├─ discover() → ParamixelDiscovery                               │
-│    │               ├─ scans classpath for @TestClass               │
+│    │               ├─ scans classpath for @Paramixel.TestClass       │
 │    │               ├─ validates method signatures (MethodValidator) │
 │    │               ├─ invokes @Paramixel.ArgumentsCollector to get arguments │
 │    │               └─ builds descriptor tree:                       │
@@ -46,11 +46,11 @@ The engine plugs into the JUnit Platform via the standard Java SPI (`META-INF/se
 │    └─ execute() → ParamixelExecutionRuntime (virtual threads)       │
 │                    ├─ ParamixelConcurrencyLimiter (semaphores)      │
 │                    ├─ ParamixelClassRunner (per class)              │
-│                    │   ├─ @Initialize / @Finalize lifecycle         │
-│                    │   ├─ @BeforeAll / @AfterAll per argument       │
+│                    │   ├─ @Paramixel.Initialize / @Paramixel.Finalize lifecycle         │
+│                    │   ├─ @Paramixel.BeforeAll / @Paramixel.AfterAll per argument       │
 │                    │   └─ ParamixelInvocationRunner (per argument)  │
-│                    │       ├─ @BeforeEach / @AfterEach              │
-│                    │       └─ @Test method invocation               │
+│                    │       ├─ @Paramixel.BeforeEach / @Paramixel.AfterEach              │
+│                    │       └─ @Paramixel.Test method invocation               │
 │                    └─ ParamixelEngineExecutionListener (reporting)  │
 │                                                                     │
 │  ConcreteEngineContext → ConcreteClassContext → ConcreteArgumentContext │
@@ -62,7 +62,7 @@ The engine plugs into the JUnit Platform via the standard Java SPI (`META-INF/se
 ┌─────────────────────────────────────────────────────────────────────┐
 │  paramixel-maven-plugin                                             │
 │  ParamixelMojo (goal: test, phase: test)                            │
-│    ├─ Scans test-classes dir for @TestClass                         │
+│    ├─ Scans test-classes dir for @Paramixel.TestClass               │
 │    ├─ Builds URLClassLoader from test classpath                     │
 │    ├─ Fires JUnit Platform Launcher with EngineFilter=paramixel     │
 │    └─ Fails build on any test failure                               │
@@ -82,10 +82,10 @@ The engine plugs into the JUnit Platform via the standard Java SPI (`META-INF/se
 5. **`ParamixelTestEngine.execute()`** reads the `invokedBy=maven` configuration parameter and installs the custom `ParamixelEngineExecutionListener` for console output. It creates a `ConcreteEngineContext` loading configuration from `paramixel.properties` (project root, if present).
 6. **`ParamixelExecutionRuntime`** provides a `newVirtualThreadPerTaskExecutor()` and a `ParamixelConcurrencyLimiter` backed by three fair semaphores (total=`cores*2`, class=`cores`, argument=`cores`).
 7. For each `ParamixelTestClassDescriptor`, a class-level permit is acquired and the class is submitted to the virtual-thread executor via `ParamixelClassRunner.runTestClass()`.
-8. **`ParamixelClassRunner`** instantiates the test class (no-arg constructor via reflection), runs `@Initialize`, then for each argument:
+8. **`ParamixelClassRunner`** instantiates the test class (no-arg constructor via reflection), runs `@Paramixel.Initialize`, then for each argument:
    - Acquires an optional argument permit.
-   - Calls `@BeforeAll`, delegates to `ParamixelInvocationRunner.runInvocations()`, calls `@AfterAll`, and calls `AutoCloseable.close()` on the argument if applicable.
-9. **`ParamixelInvocationRunner`** iterates method descriptors, running `@BeforeEach → @Test → @AfterEach` per method. Methods with `@Order` are always sequential; otherwise they may execute concurrently up to the configured argument parallelism.
+   - Calls `@Paramixel.BeforeAll`, delegates to `ParamixelInvocationRunner.runInvocations()`, calls `@Paramixel.AfterAll`, and calls `AutoCloseable.close()` on the argument if applicable.
+9. **`ParamixelInvocationRunner`** iterates method descriptors, running `@Paramixel.BeforeEach → @Paramixel.Test → @Paramixel.AfterEach` per method. Methods with `@Paramixel.Order` are always sequential; otherwise they may execute concurrently up to the configured argument parallelism.
 10. All reflective calls go through **`ParamixelReflectionInvoker`**, which unwraps `InvocationTargetException` so user exceptions propagate cleanly.
 11. Results flow back as `TestExecutionResult` to `EngineExecutionListener`. The listener routes each event to a descriptor-type-specific sub-listener for formatted console output.
 12. `ParamixelMojo` checks `TestExecutionSummary.getTotalFailureCount()` and throws `MojoFailureException` if > 0.
@@ -138,6 +138,6 @@ Base/subclass location is irrelevant: methods are flattened across the hierarchy
 | Null safety | `@NonNull` from `org.jspecify` on all public method parameters across api and engine. `Objects.requireNonNull()` guards in constructors. |
 | Thread safety | `ConcurrentHashMap` for all shared mutable maps. `AtomicInteger`/`AtomicReference` for counters and first-failure tracking. `Semaphore` for concurrency permits. All public API implementations are either immutable or thread-safe. |
 | Code style | Spotless + Palantir Java Format enforced at every compile via `spotless:apply`. License header from `assets/license-header.txt` enforced on all Java files. |
-| Exception handling | `InvocationTargetException` is always unwrapped in `ParamixelReflectionInvoker`. Lifecycle exceptions (`@AfterAll`, `@Finalize`, `@AfterEach`) are caught, recorded via `classContext.recordFailure()`, and execution continues (no abort). `@Initialize`/`@BeforeAll`/`@BeforeEach` exceptions abort the current scope. |
+| Exception handling | `InvocationTargetException` is always unwrapped in `ParamixelReflectionInvoker`. Lifecycle exceptions (`@Paramixel.AfterAll`, `@Paramixel.Finalize`, `@Paramixel.AfterEach`) are caught, recorded via `classContext.recordFailure()`, and execution continues (no abort). `@Paramixel.Initialize`/`@Paramixel.BeforeAll`/`@Paramixel.BeforeEach` exceptions abort the current scope. |
 | Validation | `MethodValidator.validateTestClass()` checks all lifecycle method signatures at discovery time. Invalid classes throw `IllegalStateException` and are excluded from the test run. |
 | Resource management | `ParamixelExecutionRuntime` is `AutoCloseable` (shuts down executor on close). Argument/test-instance `AutoCloseable` resources closed by engine post-lifecycle. |

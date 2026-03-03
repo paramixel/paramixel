@@ -182,8 +182,8 @@ Functional tests are authored as `@Paramixel.TestClass` classes and executed ent
 
 1. **Lifecycle counter assertions** — use `static AtomicInteger` counters to count how many times each lifecycle hook is called, then assert in `@Paramixel.Finalize`.
 2. **Argument tracking** — use `ConcurrentSkipListSet<Integer>` to record observed argument indices; assert the full set in `@Paramixel.Finalize`.
-3. **Store scoping** — write a value in `@BeforeAll` to the class store and assert it is visible in `@Test` and gone after `@Finalize` removes it.
-4. **Concurrency verification** — use `ConcurrentHashMap` with argument-indexed entries; assert in `@Finalize` that all arguments were processed.
+3. **Store scoping** — write a value in `@Paramixel.BeforeAll` to the class store and assert it is visible in `@Paramixel.Test` and gone after `@Paramixel.Finalize` removes it.
+4. **Concurrency verification** — use `ConcurrentHashMap` with argument-indexed entries; assert in `@Paramixel.Finalize` that all arguments were processed.
 
 ### Functional Test Template
 
@@ -235,7 +235,7 @@ public class MyFeatureTest {
 | `test.argument` | Per-argument-type tests (null, arrays, collections, enums, etc.) |
 | `test.lifecycle` | Lifecycle ordering and inheritance tests |
 | `test.named` | `Named`/`NamedValue` display name tests |
-| `test.order` | `@Order` annotation tests |
+| `test.order` | `@Paramixel.Order` annotation tests |
 | `test.store` | Store scoping and `AutoCloseable` integration |
 
 ---
@@ -248,9 +248,9 @@ Testcontainers is used exclusively in `paramixel-examples` (test scope only). Do
 
 1. Create a `TestEnvironment` class (e.g., `KafkaTestEnvironment`) that implements `Named` and `AutoCloseable`. It wraps a Testcontainers container.
 2. Return one or more `TestEnvironment` instances from an `@Paramixel.ArgumentsCollector`.
-3. In `@BeforeAll`: call `testEnvironment.initialize(network)` to start containers.
-4. In `@AfterAll`: call `testEnvironment.destroy()` with a `CleanupExecutor` for safe ordered cleanup.
-5. The engine auto-calls `testEnvironment.close()` after `@AfterAll` if it implements `AutoCloseable`.
+3. In `@Paramixel.BeforeAll`: call `testEnvironment.initialize(network)` to start containers.
+4. In `@Paramixel.AfterAll`: call `testEnvironment.destroy()` with a `CleanupExecutor` for safe ordered cleanup.
+5. The engine auto-calls `testEnvironment.close()` after `@Paramixel.AfterAll` if it implements `AutoCloseable`.
 
 ### Available container libraries (test scope in `examples/pom.xml`)
 
@@ -343,5 +343,5 @@ All tests (unit + functional + examples) run in CI. A failing test fails the CI 
 - [ ] Create `<Service>TestEnvironment.java` implementing `Named` + `AutoCloseable`.
 - [ ] Create `<Service>Test.java` annotated `@Paramixel.TestClass`.
 - [ ] Add required Docker image to `src/test/resources/examples/testcontainers/<service>/docker-images.txt`.
-- [ ] Use `CleanupExecutor` in `@AfterAll` for safe cleanup.
+- [ ] Use `CleanupExecutor` in `@Paramixel.AfterAll` for safe cleanup.
 - [ ] Run `./mvnw test -pl examples` to verify (requires Docker).

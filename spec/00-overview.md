@@ -12,9 +12,10 @@ Paramixel is a custom JUnit Platform test engine designed for **parallel, parame
 |---|---|---|---|
 | `paramixel-api` | `jar` | Public annotation and context API consumed by test authors | `junit-platform-commons` |
 | `paramixel-engine` | `jar` | JUnit Platform `TestEngine` implementation: discovery, scheduling, execution | `paramixel-api`, `junit-platform-engine`, `junit-platform-launcher`, `junit-jupiter`, `slf4j-api`, `ascii-table` |
-| `paramixel-maven-plugin` | `maven-plugin` | Maven Mojo that discovers `@TestClass` classes and fires the engine via the JUnit Platform Launcher | `paramixel-api`, `paramixel-engine`, `junit-platform-launcher`, `maven-plugin-api`, `maven-core`, `maven-artifact`, `maven-resolver-impl` |
+| `paramixel-maven-plugin` | `maven-plugin` | Maven Mojo that discovers `@Paramixel.TestClass` classes and fires the engine via the JUnit Platform Launcher | `paramixel-api`, `paramixel-engine`, `junit-platform-launcher`, `maven-plugin-api`, `maven-core`, `maven-artifact`, `maven-resolver-impl` |
 | `paramixel-tests` | `jar` | Functional/integration tests that exercise the engine using the `paramixel-maven-plugin` goal | `paramixel-api` (test), `paramixel-engine` (test) |
 | `paramixel-examples` | `jar` | Demonstrative test classes showing API usage, including Testcontainers-based integration examples | `paramixel-api` (test), `paramixel-engine` (test), `testcontainers`, `kafka-clients`, `mongodb-driver-sync` |
+| `paramixel-benchmarks` | `jar` | Performance benchmarks using JMH to measure engine throughput, latency, and compare with JUnit Jupiter | `paramixel-api` (test), `paramixel-engine` (test), `jmh-core`, `junit-jupiter` (for comparison benchmarks) |
 
 ### Module Dependency Graph
 
@@ -25,8 +26,9 @@ paramixel-engine ──────────────────┐
     ↑                               │
 paramixel-maven-plugin             │
     ↑                               ↓
-paramixel-tests ←── (uses plugin) ──
-paramixel-examples ←── (uses plugin)
+paramixel-tests ←── (uses plugin) ──┤
+paramixel-examples ←── (uses plugin)│
+paramixel-benchmarks ←──────────────┘
 ```
 
 ---

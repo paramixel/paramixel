@@ -52,7 +52,7 @@ public class AnnotationUsageValidatorTest {
                 .map(ValidationFailure::getMessage)
                 .collect(Collectors.toList());
 
-        assertThat(messages).anySatisfy(m -> assertThat(m).contains("@DisplayName value must be non-blank"));
+        assertThat(messages).anySatisfy(m -> assertThat(m).contains("@Paramixel.DisplayName value must be non-blank"));
     }
 
     static class MultipleAnnotations {

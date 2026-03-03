@@ -33,7 +33,7 @@ public class TestClassValidatorTest {
                 .collect(Collectors.toList());
 
         assertThat(messages)
-                .anySatisfy(m -> assertThat(m).contains("@DisplayName value must be non-blank"))
+                .anySatisfy(m -> assertThat(m).contains("@Paramixel.DisplayName value must be non-blank"))
                 .anySatisfy(
                         m -> assertThat(m).contains("@Paramixel.Test method").contains("must return void"));
     }
