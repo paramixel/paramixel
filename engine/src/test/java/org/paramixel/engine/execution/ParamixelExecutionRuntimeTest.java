@@ -43,4 +43,27 @@ public class ParamixelExecutionRuntimeTest {
             assertThat(runtime.limiter()).isNotNull();
         }
     }
+
+    @Test
+    public void constructor_withCustomParallelism_configuresLimiterCorrectly() {
+        // Test with parallelism higher than available processors (oversubscription)
+        final int customParallelism = 100;
+        try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(customParallelism)) {
+            assertThat(runtime.limiter()).isNotNull();
+            assertThat(runtime.limiter().cores()).isEqualTo(customParallelism);
+            assertThat(runtime.limiter().classSlots()).isEqualTo(customParallelism);
+            assertThat(runtime.limiter().totalSlots()).isEqualTo(customParallelism * 2);
+        }
+    }
+
+    @Test
+    public void constructor_withLowParallelism_configuresLimiterCorrectly() {
+        // Test with low parallelism
+        final int lowParallelism = 2;
+        try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(lowParallelism)) {
+            assertThat(runtime.limiter().cores()).isEqualTo(lowParallelism);
+            assertThat(runtime.limiter().classSlots()).isEqualTo(lowParallelism);
+            assertThat(runtime.limiter().totalSlots()).isEqualTo(lowParallelism * 2);
+        }
+    }
 }
