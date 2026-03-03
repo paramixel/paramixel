@@ -285,10 +285,12 @@ The engine supports filtering test classes based on `@Paramixel.Tags` annotation
 
 ### Configuration Parameters
 
-| Parameter | Description |
-|---|---|
-| `paramixel.tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included |
-| `paramixel.tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded |
+| Parameter | Description | Usage |
+|---|---|---|
+| `paramixel.tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included | System properties, Maven CLI, JUnit Platform config |
+| `paramixel.tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded | System properties, Maven CLI, JUnit Platform config |
+| `tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included | Properties file (`paramixel.properties`) |
+| `tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded | Properties file (`paramixel.properties`) |
 
 ### Matching Behavior
 
@@ -332,9 +334,11 @@ The engine supports filtering test classes based on `@Paramixel.Tags` annotation
 Create `paramixel.properties` in the project root:
 
 ```properties
-paramixel.tags.include=integration-.*
-paramixel.tags.exclude=.*slow.*,.*flaky.*
+tags.include=integration-.*
+tags.exclude=.*slow.*,.*flaky.*
 ```
+
+**Note:** In the properties file, use `tags.include` and `tags.exclude` (without the `paramixel.` prefix).
 
 ### Error Handling
 
