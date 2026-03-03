@@ -49,8 +49,11 @@ The ordering of one annotation type does not affect the ordering of another anno
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public static void methodName(ArgumentsCollector collector)` — static.
-- **Effect:** Declares a test method. Discovered by the engine; executed once per argument supplied by `@Paramixel.ArgumentsCollector` (or once with a null argument if no collector exists).
-- **Constraint:** Only one method per class hierarchy may be annotated with `@Paramixel.ArgumentsCollector`. If multiple are present, the one in the most specific subclass is used (invoked); others are ignored with a warning.
+- **Effect:** Supplies test arguments. Discovered by the engine; executed once per test class (before instantiation) to provide arguments for all test methods.
+- **Constraint:** **Only ONE method per class hierarchy** may be annotated with `@Paramixel.ArgumentsCollector`. When inheritance is used:
+  - The method in the **outermost (most specific) subclass** is invoked
+  - Methods in parent classes are **ignored** (not invoked)
+- **Example:** If `BaseTest` and `ChildTest extends BaseTest` both have @ArgumentsCollector, only ChildTest's method is invoked.
 - **Validation errors (IllegalStateException at discovery):**
   - Not public
   - Not void return
@@ -61,43 +64,43 @@ The ordering of one annotation type does not affect the ordering of another anno
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ClassContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per class, before `@BeforeAll`, ordered using the rules described in "Inheritance (Flattened)".
-- **Failure:** Causes class execution to abort; no tests run.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per class, before `@BeforeAll`, ordered using the rules described in "Inheritance (Flattened)". Paired with `@Finalize` — if `@Initialize` executes, `@Finalize` is guaranteed to run.
+- **Failure:** Causes class execution to abort; no tests run; `@Finalize` still runs.
 
 ### `@Paramixel.BeforeAll`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — may be static or instance.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, before any `@Test` methods for that argument, ordered using the rules described in "Inheritance (Flattened)".
-- **Failure:** Aborts that argument bucket; tests for that argument are skipped. Failure recorded on class context.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, before any `@Test` methods for that argument, ordered using the rules described in "Inheritance (Flattened)". Paired with `@AfterAll` — if `@BeforeAll` executes, `@AfterAll` is guaranteed to run.
+- **Failure:** Aborts that argument bucket; tests for that argument are skipped; paired `@AfterAll` still runs. Failure recorded on class context.
 
 ### `@Paramixel.BeforeEach`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute before every individual `@Test` method invocation, ordered using the rules described in "Inheritance (Flattened)".
-- **Failure:** Aborts that specific test invocation; `@AfterEach` still runs. Failure counted.
+- **Execution:** One or more methods may be declared. All discovered methods execute before every individual `@Test` method invocation, ordered using the rules described in "Inheritance (Flattened)". Paired with `@AfterEach` — if `@BeforeEach` executes, `@AfterEach` is guaranteed to run.
+- **Failure:** Aborts that specific test invocation; paired `@AfterEach` still runs. Failure counted.
 
 ### `@Paramixel.AfterEach`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute after every `@Test` method invocation (even on test failure), ordered using the rules described in "Inheritance (Flattened)".
-- **Failure:** Recorded; execution continues with next method. Does not suppress test failure.
+- **Execution:** One or more methods may be declared. All discovered methods execute after every `@Test` method invocation (even on test failure), ordered using the rules described in "Inheritance (Flattened)". Only executes if `@BeforeEach` was executed for that test method.
+- **Failure:** Exception printed to console; remaining tests for THIS argument are aborted; the test class is marked FAILED. Does not suppress execution of paired `@AfterAll` or `@Finalize`.
 
 ### `@Paramixel.AfterAll`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, after all `@Test` methods, ordered using the rules described in "Inheritance (Flattened)".
-- **Failure:** Recorded; remaining `@AfterAll` methods still execute.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, after all `@Test` methods, ordered using the rules described in "Inheritance (Flattened)". Only executes if `@BeforeAll` was executed for that argument.
+- **Failure:** Exception printed to console; remaining `@AfterAll` methods still execute; paired `@Finalize` still runs; the test class is marked FAILED.
 
 ### `@Paramixel.Finalize`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ClassContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per class, after `@AfterAll`, ordered using the rules described in "Inheritance (Flattened)". Guaranteed to run if the class was instantiated.
-- **Failure:** Recorded; remaining `@Finalize` methods still execute.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per class, after `@AfterAll`, ordered using the rules described in "Inheritance (Flattened)". Only executes if `@Initialize` was executed for the class.
+- **Failure:** Exception printed to console; remaining `@Finalize` methods still execute; the test class is marked FAILED.
 
 ### `@Paramixel.Disabled`
 
@@ -254,27 +257,40 @@ All error messages that mention a Paramixel annotation MUST use the qualified fo
 
 ### Discovery-time errors
 
-| Condition | Thrown | Where |
-|---|---|---|
-| `@TestClass` method fails signature validation | `IllegalStateException` in `ParamixelDiscovery.discoverTestClass()` | Discovery phase |
-| `@Order(value <= 0)` or `@Order` on unsupported method type | `IllegalStateException` (via validation failure list) | Discovery phase |
-| `@Paramixel.ArgumentsCollector` invocation throws | Warning logged; class gets 0 arguments (empty result) | Discovery phase |
-| Class cannot be loaded (`ClassNotFoundException`) | Warning logged; class skipped | Discovery phase |
-
-### Execution-time errors
+**Fail-Fast Behavior:** The engine fails immediately on the first validation error. Exceptions are printed to console output and the test run aborts.
 
 | Condition | Result |
 |---|---|
-| `@Initialize` throws | Class execution aborts; `@Finalize` still runs; class marked failed |
-| `@BeforeAll` throws | Argument bucket skipped; `@AfterAll` still runs; failure recorded |
-| `@BeforeEach` throws | Test invocation marked failed; `@AfterEach` still runs |
-| `@Test` throws | Test invocation marked failed; `@AfterEach` still runs |
-| `@AfterEach` throws | Recorded; execution continues |
-| `@AfterAll` throws | Recorded; execution continues |
-| `@Finalize` throws | Recorded; execution continues |
-| `AutoCloseable.close()` throws | Recorded on class context |
+| `@TestClass` method fails signature validation | `IllegalStateException` printed to console; test execution aborts |
+| `@Order(value <= 0)` or `@Order` on unsupported method type | `IllegalStateException` printed to console; test execution aborts |
+| `@Paramixel.ArgumentsCollector` invocation throws | Exception printed to console; test execution aborts |
+| Class cannot be loaded (`ClassNotFoundException`) | Exception printed to console; test execution aborts |
 
-All exceptions are unwrapped from `InvocationTargetException` by `ParamixelReflectionInvoker`.
+**Error Message Format:** All validation errors include the class name, validation failure details, and use qualified annotation names (e.g., `@Paramixel.BeforeAll`).
+
+### Execution-time errors
+
+All exceptions from test engine annotations are **printed to console output** for visibility.
+
+| Condition | Result |
+|---|---|
+| Test class instantiation fails (no-arg constructor) | All test methods marked FAILED; lifecycle hooks (`@Initialize`, `@BeforeAll`, etc.) not executed; exception printed |
+| `@Initialize` throws | Class execution aborts; `@Finalize` runs (if @Initialize executed); class marked FAILED |
+| `@BeforeAll` throws | Argument bucket skipped; `@AfterAll` runs (if @BeforeAll executed); failure recorded |
+| `@BeforeEach` throws | Test invocation marked FAILED; `@AfterEach` runs (if @BeforeEach executed) |
+| `@Test` throws | Test invocation marked FAILED; `@AfterEach` runs (if @BeforeEach executed) |
+| `@AfterEach` throws | Exception printed; remaining tests for THIS argument aborted; `@AfterAll` runs (if @BeforeAll executed); class marked FAILED |
+| `@AfterAll` throws | Exception printed; `@Finalize` runs (if @Initialize executed); class marked FAILED |
+| `@Finalize` throws | Exception printed; class marked FAILED |
+| `AutoCloseable.close()` throws | Exception printed; class marked FAILED |
+
+**Key Principles:**
+1. **Console Visibility**: All exceptions are printed to console output
+2. **Lifecycle Pairing**: "After" hooks only run if their paired "before" hook executed (@AfterEach↔@BeforeEach, @AfterAll↔@BeforeAll, @Finalize↔@Initialize)
+3. **Fail Fast**: `@AfterEach` failure stops further testing of the current argument
+4. **Guaranteed Cleanup**: Paired "after" hooks always execute despite failures
+5. **First Failure Wins**: The first recorded exception determines the test class result
+6. **Exception Unwrapping**: All exceptions are unwrapped from `InvocationTargetException` by `ParamixelReflectionInvoker`
 
 ### Maven plugin errors
 
@@ -354,6 +370,8 @@ paramixel.tags.exclude=.*slow.*,.*flaky.*
 
 | Condition | Result |
 |---|---|
-| Invalid regex pattern | Warning logged; pattern skipped; other patterns still applied |
+| Invalid regex pattern | Exception printed; test execution fails before discovery |
 | Empty pattern string | Ignored |
 | No matching classes | Discovery completes with 0 test classes |
+
+**Strict Validation:** Invalid regex patterns in `paramixel.tags.include` or `paramixel.tags.exclude` cause immediate test execution failure. The engine validates all patterns during initialization, before test discovery begins. This ensures configuration errors are caught early and prevents partial test runs with unintended filtering.
