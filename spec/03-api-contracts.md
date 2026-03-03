@@ -115,16 +115,19 @@ For each annotation type (each lifecycle hook type and `@Paramixel.Test`), the r
 ### `@Paramixel.Tags`
 
 - **Target:** `ElementType.TYPE`
-- **Attribute:** `String[] value()` — required, must contain at least one non-empty tag.
+- **Attribute:** `String[] value()` — required, must contain at least one non-null, non-empty tag.
 - **Effect:** Categorizes a test class with metadata tags for organization, filtering, and reporting purposes.
 - **Constraints:**
   - Can only be applied to classes annotated with `@Paramixel.TestClass`
   - At most one `@Tags` annotation is allowed per class hierarchy
-  - Each tag value must be non-empty (after trimming)
+  - Each tag value must be non-null and non-empty (after trimming)
 - **Validation errors (IllegalStateException at discovery):**
   - `@Tags` on a class not annotated with `@TestClass`
   - Multiple `@Tags` annotations in the same class hierarchy
-  - Empty tags array or array containing only empty/blank strings
+  - Empty tags array
+  - Tags array containing null elements
+  - Tags array containing only empty/blank strings
+  - Any tag value that is null or empty/blank
 
 ---
 

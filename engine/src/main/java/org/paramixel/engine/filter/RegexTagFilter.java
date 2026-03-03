@@ -107,13 +107,7 @@ public final class RegexTagFilter implements TagFilter {
         Objects.requireNonNull(testClass, "testClass must not be null");
 
         final Paramixel.Tags tags = testClass.getAnnotation(Paramixel.Tags.class);
-        final Set<String> classTags;
-
-        if (tags == null || tags.value() == null) {
-            classTags = Collections.emptySet();
-        } else {
-            classTags = Set.of(tags.value());
-        }
+        final Set<String> classTags = extractValidTags(tags);
 
         // Check exclude patterns first (highest priority)
         if (!excludePatterns.isEmpty()) {
@@ -141,6 +135,27 @@ public final class RegexTagFilter implements TagFilter {
 
         // No include patterns - class passes (assuming it passed excludes)
         return true;
+    }
+
+    /**
+     * Extracts valid (non-null, non-empty) tags from the annotation.
+     * Tags with null or empty values are ignored.
+     *
+     * @param tags the Tags annotation
+     * @return set of valid tag strings; empty set if no valid tags
+     */
+    private Set<String> extractValidTags(final Paramixel.Tags tags) {
+        if (tags == null || tags.value() == null || tags.value().length == 0) {
+            return Collections.emptySet();
+        }
+
+        final Set<String> validTags = new java.util.HashSet<>();
+        for (String tag : tags.value()) {
+            if (tag != null && !tag.trim().isEmpty()) {
+                validTags.add(tag);
+            }
+        }
+        return Collections.unmodifiableSet(validTags);
     }
 
     @Override

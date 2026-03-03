@@ -80,36 +80,37 @@ public final class AnnotationUsageValidator {
                                 + testClass.getName()));
             }
 
-            // Validate that tags value is not empty
+            // Validate tags value array
             if (tags.value() == null || tags.value().length == 0) {
                 failures.add(new ValidationFailure(
                         "@Paramixel.Tags must have at least one tag value on class " + testClass.getName()));
             } else {
-                // Validate that each tag is non-empty
+                // Validate each tag is non-null and non-empty
                 for (int i = 0; i < tags.value().length; i++) {
-                    if (tags.value()[i] == null || tags.value()[i].trim().isEmpty()) {
+                    if (tags.value()[i] == null) {
                         failures.add(new ValidationFailure("@Paramixel.Tags tag at index " + i
-                                + " must be non-empty on class " + testClass.getName()));
+                                + " must not be null on class " + testClass.getName()));
+                    } else if (tags.value()[i].trim().isEmpty()) {
+                        failures.add(new ValidationFailure("@Paramixel.Tags tag at index " + i
+                                + " must not be empty on class " + testClass.getName()));
                     }
                 }
             }
-        }
 
-        // Check for multiple @Tags annotations (only one allowed per class hierarchy)
-        // This is actually enforced by the compiler - you can't declare the same annotation twice
-        // But we check the class hierarchy to ensure only one exists across the hierarchy
-        int tagsCount = 0;
-        for (Class<?> current = testClass;
-                current != null && current != Object.class;
-                current = current.getSuperclass()) {
-            if (current.isAnnotationPresent(Paramixel.Tags.class)) {
-                tagsCount++;
+            // Check for multiple @Tags annotations (only one allowed per class hierarchy)
+            int tagsCount = 0;
+            for (Class<?> current = testClass;
+                    current != null && current != Object.class;
+                    current = current.getSuperclass()) {
+                if (current.isAnnotationPresent(Paramixel.Tags.class)) {
+                    tagsCount++;
+                }
             }
-        }
-        if (tagsCount > 1) {
-            failures.add(new ValidationFailure(
-                    "At most one @Paramixel.Tags annotation is allowed per class hierarchy; found " + tagsCount + " on "
-                            + testClass.getName()));
+            if (tagsCount > 1) {
+                failures.add(new ValidationFailure(
+                        "At most one @Paramixel.Tags annotation is allowed per class hierarchy; found " + tagsCount
+                                + " on " + testClass.getName()));
+            }
         }
     }
 

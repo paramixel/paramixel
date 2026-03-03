@@ -228,6 +228,13 @@ public class UnitTest {
 }
 ```
 
+**Tag Validation Requirements:**
+- Tags annotation can only be used on classes annotated with `@Paramixel.TestClass`
+- Tags array must contain at least one tag
+- Each tag value must be non-null and non-empty (after trimming)
+- Only one `@Tags` annotation is allowed per class hierarchy
+- Invalid tag usage will cause test discovery to fail with an error
+
 ## Tag-Based Test Filtering
 
 Paramixel supports filtering tests based on their `@Tags` annotations using regular expressions. This allows you to run specific subsets of tests during development or CI/CD pipelines.
