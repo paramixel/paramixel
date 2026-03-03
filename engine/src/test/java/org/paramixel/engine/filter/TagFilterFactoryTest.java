@@ -37,7 +37,7 @@ public class TagFilterFactoryTest {
     @Test
     public void fromProperties_withIncludePattern() {
         Properties props = new Properties();
-        props.setProperty("tags.include", "integration.*");
+        props.setProperty("paramixel.tags.include", "integration.*");
         TagFilter filter = TagFilterFactory.fromProperties(props);
 
         assertThat(filter.hasIncludePatterns()).isTrue();
@@ -48,7 +48,7 @@ public class TagFilterFactoryTest {
     @Test
     public void fromProperties_withExcludePattern() {
         Properties props = new Properties();
-        props.setProperty("tags.exclude", ".*slow.*");
+        props.setProperty("paramixel.tags.exclude", ".*slow.*");
         TagFilter filter = TagFilterFactory.fromProperties(props);
 
         assertThat(filter.hasIncludePatterns()).isFalse();
@@ -59,8 +59,8 @@ public class TagFilterFactoryTest {
     @Test
     public void fromProperties_withBothPatterns() {
         Properties props = new Properties();
-        props.setProperty("tags.include", "integration.*");
-        props.setProperty("tags.exclude", ".*slow.*");
+        props.setProperty("paramixel.tags.include", "integration.*");
+        props.setProperty("paramixel.tags.exclude", ".*slow.*");
         TagFilter filter = TagFilterFactory.fromProperties(props);
 
         assertThat(filter.matches(IntegrationSlowTest.class)).isFalse();
@@ -71,7 +71,7 @@ public class TagFilterFactoryTest {
     @Test
     public void fromProperties_commaSeparatedPatterns() {
         Properties props = new Properties();
-        props.setProperty("tags.include", "^unit$,^fast$");
+        props.setProperty("paramixel.tags.include", "^unit$,^fast$");
         TagFilter filter = TagFilterFactory.fromProperties(props);
 
         assertThat(filter.matches(UnitTest.class)).isTrue();
