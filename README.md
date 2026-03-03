@@ -278,11 +278,9 @@ Create a `paramixel.properties` file in your project root:
 
 ```properties
 # Run integration tests except slow ones
-tags.include=integration-.*
-tags.exclude=.*slow.*,.*flaky.*
+paramixel.tags.include=integration-.*
+paramixel.tags.exclude=.*slow.*,.*flaky.*
 ```
-
-**Note:** In the properties file, use `tags.include` and `tags.exclude` (without the `paramixel.` prefix).
 
 ### Regex Pattern Examples
 
