@@ -1,0 +1,168 @@
+/*
+ * Copyright 2006-present Douglas Hoard. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.paramixel.engine.filter;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+import org.jspecify.annotations.NonNull;
+import org.paramixel.api.Paramixel;
+
+/**
+ * Filters test classes using regex patterns against {@code @Paramixel.Tags} values.
+ *
+ * <p>This filter supports include and exclude patterns using standard Java regular expressions.
+ * Include patterns are applied first to select candidate classes, then exclude patterns remove
+ * matching classes from the result set.</p>
+ *
+ * <p><b>Matching Behavior:</b></p>
+ * <ul>
+ *   <li>A class matches an include pattern if <strong>any</strong> of its tags matches the pattern</li>
+ *   <li>A class is excluded if <strong>any</strong> of its tags matches an exclude pattern</li>
+ *   <li>Multiple patterns are combined with OR logic (match any pattern)</li>
+ *   <li>Classes without {@code @Tags} are only included when no include patterns are specified</li>
+ * </ul>
+ *
+ * <p><b>Regex Examples:</b></p>
+ * <pre>
+ * "integration-.*"     - Matches tags starting with "integration-"
+ * "^unit$"             - Matches exactly "unit"
+ * ".*slow.*"           - Matches tags containing "slow"
+ * "api-v2\\..*"        - Matches tags starting with "api-v2." (dot escaped)
+ * </pre>
+ *
+ * @since 0.0.1
+ */
+public final class RegexTagFilter implements TagFilter {
+
+    private static final Logger LOGGER = Logger.getLogger(RegexTagFilter.class.getName());
+
+    private final List<Pattern> includePatterns;
+    private final List<Pattern> excludePatterns;
+
+    /**
+     * Creates a tag filter with the specified regex patterns.
+     *
+     * <p>Patterns are compiled during construction. Invalid patterns are logged as warnings
+     * and skipped.</p>
+     *
+     * @param includePatterns regex patterns for tags to include; may be empty but not {@code null}
+     * @param excludePatterns regex patterns for tags to exclude; may be empty but not {@code null}
+     */
+    public RegexTagFilter(final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
+        this.includePatterns = compilePatterns(includePatterns, "include");
+        this.excludePatterns = compilePatterns(excludePatterns, "exclude");
+    }
+
+    /**
+     * Compiles a list of regex patterns, logging warnings for invalid patterns.
+     *
+     * @param patterns the pattern strings to compile
+     * @param patternType the type of patterns (for logging)
+     * @return list of compiled patterns; never {@code null}
+     */
+    private List<Pattern> compilePatterns(final @NonNull List<String> patterns, final @NonNull String patternType) {
+        final List<Pattern> compiled = new ArrayList<>();
+
+        for (String pattern : patterns) {
+            if (pattern == null || pattern.trim().isEmpty()) {
+                continue;
+            }
+
+            try {
+                compiled.add(Pattern.compile(pattern.trim()));
+            } catch (PatternSyntaxException e) {
+                LOGGER.log(
+                        Level.WARNING,
+                        "Invalid regex pattern in paramixel.tags." + patternType + ": \"" + pattern + "\"");
+                LOGGER.log(Level.WARNING, "Skipping pattern. Error: " + e.getMessage());
+            }
+        }
+
+        return Collections.unmodifiableList(compiled);
+    }
+
+    @Override
+    public boolean matches(final @NonNull Class<?> testClass) {
+        Objects.requireNonNull(testClass, "testClass must not be null");
+
+        final Paramixel.Tags tags = testClass.getAnnotation(Paramixel.Tags.class);
+        final Set<String> classTags;
+
+        if (tags == null || tags.value() == null) {
+            classTags = Collections.emptySet();
+        } else {
+            classTags = Set.of(tags.value());
+        }
+
+        // Check exclude patterns first (highest priority)
+        if (!excludePatterns.isEmpty()) {
+            for (Pattern excludePattern : excludePatterns) {
+                for (String tag : classTags) {
+                    if (excludePattern.matcher(tag).matches()) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // Check include patterns
+        if (!includePatterns.isEmpty()) {
+            for (Pattern includePattern : includePatterns) {
+                for (String tag : classTags) {
+                    if (includePattern.matcher(tag).matches()) {
+                        return true;
+                    }
+                }
+            }
+            // Had include patterns but no match
+            return false;
+        }
+
+        // No include patterns - class passes (assuming it passed excludes)
+        return true;
+    }
+
+    @Override
+    public boolean hasIncludePatterns() {
+        return !includePatterns.isEmpty();
+    }
+
+    /**
+     * Returns the number of compiled include patterns.
+     *
+     * @return count of include patterns
+     */
+    public int getIncludePatternCount() {
+        return includePatterns.size();
+    }
+
+    /**
+     * Returns the number of compiled exclude patterns.
+     *
+     * @return count of exclude patterns
+     */
+    public int getExcludePatternCount() {
+        return excludePatterns.size();
+    }
+}

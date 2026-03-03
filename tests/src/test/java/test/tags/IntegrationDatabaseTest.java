@@ -1,0 +1,49 @@
+/*
+ * Copyright 2006-present Douglas Hoard. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package test.tags;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.jspecify.annotations.NonNull;
+import org.paramixel.api.ArgumentContext;
+import org.paramixel.api.ClassContext;
+import org.paramixel.api.Paramixel;
+
+@Paramixel.TestClass
+@Paramixel.Tags({"integration", "database", "slow"})
+/**
+ * Test class with integration and database tags.
+ * Should be included when filtering by "integration.*" or ".*database.*".
+ * Should be excluded when filtering by ".*slow.*".
+ */
+public class IntegrationDatabaseTest {
+
+    public static final AtomicBoolean executed = new AtomicBoolean(false);
+
+    @Paramixel.Test
+    public void test(final @NonNull ArgumentContext context) {
+        executed.set(true);
+        assertThat(context.getArgument()).isNull();
+    }
+
+    @Paramixel.Finalize
+    public void finalize(final ClassContext context) {
+        // Verify the test was executed
+        assertThat(executed.get()).isTrue();
+    }
+}

@@ -112,6 +112,20 @@ For each annotation type (each lifecycle hook type and `@Paramixel.Test`), the r
 - **Side effect:** When **any** test method in a class has `@Order`, ALL methods for that argument are executed sequentially (even if argument parallelism > 1).
 - **Validation error:** `@Order` on an unsupported method type; `@Order(value <= 0)`.
 
+### `@Paramixel.Tags`
+
+- **Target:** `ElementType.TYPE`
+- **Attribute:** `String[] value()` — required, must contain at least one non-empty tag.
+- **Effect:** Categorizes a test class with metadata tags for organization, filtering, and reporting purposes.
+- **Constraints:**
+  - Can only be applied to classes annotated with `@Paramixel.TestClass`
+  - At most one `@Tags` annotation is allowed per class hierarchy
+  - Each tag value must be non-empty (after trimming)
+- **Validation errors (IllegalStateException at discovery):**
+  - `@Tags` on a class not annotated with `@TestClass`
+  - Multiple `@Tags` annotations in the same class hierarchy
+  - Empty tags array or array containing only empty/blank strings
+
 ---
 
 ## 2. Context API — Method Contracts
@@ -259,3 +273,70 @@ All exceptions are unwrapped from `InvocationTargetException` by `ParamixelRefle
 | Classpath construction fails | `MojoExecutionException("Failed to execute Paramixel tests", cause)` |
 | `skipTests=true` | No exception; logs info |
 | No `@TestClass` found + `failIfNoTests=true` | `MojoFailureException("No @Paramixel.TestClass annotated classes found")` |
+
+---
+
+## 7. Tag-Based Test Filtering
+
+The engine supports filtering test classes based on `@Paramixel.Tags` annotations using regular expressions.
+
+### Configuration Parameters
+
+| Parameter | Description |
+|---|---|
+| `paramixel.tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included |
+| `paramixel.tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded |
+
+### Matching Behavior
+
+1. **Include Patterns Applied First**: A class matches if ANY of its tags matches ANY include pattern
+2. **Exclude Patterns Applied Second**: Matching classes are removed if ANY of their tags matches ANY exclude pattern
+3. **Default Behavior**: Without include patterns, all classes pass (except excluded ones)
+4. **Untagged Classes**: Only included when no include patterns are configured
+5. **Case Sensitive**: Regex matching uses Java's default case-sensitive behavior
+
+### Examples
+
+```bash
+# Include only integration tests
+./mvnw test -Dparamixel.tags.include="integration-.*"
+
+# Exclude slow tests
+./mvnw test -Dparamixel.tags.exclude=".*slow.*"
+
+# Include integration tests except slow ones
+./mvnw test -Dparamixel.tags.include="integration-.*" -Dparamixel.tags.exclude=".*slow.*"
+
+# Include multiple patterns
+./mvnw test -Dparamixel.tags.include="^unit$,^fast$"
+```
+
+### Maven Plugin Configuration
+
+```xml
+<plugin>
+    <groupId>org.paramixel</groupId>
+    <artifactId>paramixel-maven-plugin</artifactId>
+    <configuration>
+        <includeTags>integration-.*</includeTags>
+        <excludeTags>.*-slow</excludeTags>
+    </configuration>
+</plugin>
+```
+
+### Properties File Configuration
+
+Create `paramixel.properties` in the project root:
+
+```properties
+paramixel.tags.include=integration-.*
+paramixel.tags.exclude=.*slow.*,.*flaky.*
+```
+
+### Error Handling
+
+| Condition | Result |
+|---|---|
+| Invalid regex pattern | Warning logged; pattern skipped; other patterns still applied |
+| Empty pattern string | Ignored |
+| No matching classes | Discovery completes with 0 test classes |

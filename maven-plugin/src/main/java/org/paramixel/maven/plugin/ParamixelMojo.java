@@ -122,6 +122,20 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(property = "paramixel.verbose", defaultValue = "false")
     private boolean verbose;
 
+    /**
+     * Include tags for test filtering.
+     * Comma-separated list of regex patterns.
+     */
+    @Parameter(property = "paramixel.tags.include")
+    private String includeTags;
+
+    /**
+     * Exclude tags for test filtering.
+     * Comma-separated list of regex patterns.
+     */
+    @Parameter(property = "paramixel.tags.exclude")
+    private String excludeTags;
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (skipTests) {
@@ -267,6 +281,16 @@ public class ParamixelMojo extends AbstractMojo {
         requestBuilder.filters(EngineFilter.includeEngines("paramixel"));
 
         requestBuilder.configurationParameter("invokedBy", "maven");
+
+        if (includeTags != null && !includeTags.trim().isEmpty()) {
+            requestBuilder.configurationParameter("paramixel.tags.include", includeTags.trim());
+            getLog().info("Including tests with tags matching: " + includeTags.trim());
+        }
+
+        if (excludeTags != null && !excludeTags.trim().isEmpty()) {
+            requestBuilder.configurationParameter("paramixel.tags.exclude", excludeTags.trim());
+            getLog().info("Excluding tests with tags matching: " + excludeTags.trim());
+        }
 
         final LauncherDiscoveryRequest request = requestBuilder.build();
 

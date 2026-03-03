@@ -56,6 +56,8 @@ import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
+import org.paramixel.engine.filter.TagFilter;
+import org.paramixel.engine.filter.TagFilterFactory;
 import org.paramixel.engine.invoker.ParamixelReflectionInvoker;
 import org.paramixel.engine.validation.TestClassValidator;
 import org.paramixel.engine.validation.ValidationFailure;
@@ -148,7 +150,14 @@ public final class ParamixelDiscovery {
         final Set<Class<?>> testClasses = discoverTestClasses(request);
         LOGGER.fine("Discovered " + testClasses.size() + " potential test classes");
 
+        final TagFilter tagFilter = TagFilterFactory.fromConfigurationParameters(request.getConfigurationParameters());
+
+        if (tagFilter.hasIncludePatterns()) {
+            LOGGER.fine("Applying tag filter - include patterns configured");
+        }
+
         testClasses.stream()
+                .filter(tagFilter::matches)
                 .sorted(Comparator.comparing((Class<?> clazz) -> getDisplayName(clazz, clazz.getName())))
                 .forEach(testClass -> discoverTestClass(testClass, engineDescriptor));
 

@@ -210,6 +210,119 @@ public class TestData implements Named {
 - `@Paramixel.Disabled("reason")` - Disables individual test methods
 - `@Paramixel.DisplayName("name")` - Custom display name for test methods
 
+### Tags
+
+The `@Paramixel.Tags` annotation allows you to categorize test classes for selective execution:
+
+```java
+@Paramixel.TestClass
+@Paramixel.Tags({"integration", "database", "slow"})
+public class DatabaseIntegrationTest {
+    // This test is tagged with "integration", "database", and "slow"
+}
+
+@Paramixel.TestClass
+@Paramixel.Tags({"unit", "fast"})
+public class UnitTest {
+    // This test is tagged with "unit" and "fast"
+}
+```
+
+## Tag-Based Test Filtering
+
+Paramixel supports filtering tests based on their `@Tags` annotations using regular expressions. This allows you to run specific subsets of tests during development or CI/CD pipelines.
+
+### Using System Properties
+
+```bash
+# Run only integration tests
+./mvnw test -Dparamixel.tags.include="integration-.*"
+
+# Exclude slow tests
+./mvnw test -Dparamixel.tags.exclude=".*slow.*"
+
+# Include integration tests but exclude slow ones
+./mvnw test -Dparamixel.tags.include="integration-.*" -Dparamixel.tags.exclude=".*slow.*"
+
+# Include multiple patterns (OR logic)
+./mvnw test -Dparamixel.tags.include="^unit$,^fast$"
+
+# Match tags with special characters (escape regex metacharacters)
+./mvnw test -Dparamixel.tags.include="v1\\.0"
+```
+
+### Using Maven Plugin Configuration
+
+```xml
+<plugin>
+    <groupId>org.paramixel</groupId>
+    <artifactId>paramixel-maven-plugin</artifactId>
+    <version>0.0.1</version>
+    <configuration>
+        <includeTags>integration-.*</includeTags>
+        <excludeTags>.*-slow,.*-flaky</excludeTags>
+    </configuration>
+</plugin>
+```
+
+### Using Properties File
+
+Create a `paramixel.properties` file in your project root:
+
+```properties
+# Run integration tests except slow ones
+paramixel.tags.include=integration-.*
+paramixel.tags.exclude=.*slow.*,.*flaky.*
+```
+
+### Regex Pattern Examples
+
+| Pattern | Matches |
+|---------|---------|
+| `integration-.*` | Tags starting with "integration-" |
+| `^unit$` | Exactly "unit" |
+| `.*slow.*` | Tags containing "slow" |
+| `^fast$\|^api$` | Either "fast" or "api" |
+| `v1\\.0` | Literally "v1.0" (dot escaped) |
+
+### Filtering Behavior
+
+1. **Include filters** select classes where ANY tag matches ANY include pattern
+2. **Exclude filters** remove classes where ANY tag matches ANY exclude pattern
+3. **Untagged classes** are only included when no include filter is specified
+4. **Case sensitivity**: Patterns are case-sensitive (Java regex default)
+
+### CI/CD Example
+
+```yaml
+# GitHub Actions workflow
+jobs:
+  fast-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run fast unit tests
+        run: ./mvnw test -Dparamixel.tags.include="unit,fast"
+        
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: fast-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integration tests (excluding slow)
+        run: ./mvnw test -Dparamixel.tags.include="integration" -Dparamixel.tags.exclude="slow"
+        
+  database-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run database tests
+        run: ./mvnw test -Dparamixel.tags.include="database"
+```
+
 ## Building from Source
 
 **Requirements:**
