@@ -10,6 +10,8 @@ Paramixel is a test framework, not a data-persistence application. There are no 
 
 Represents context for a single argument invocation (one argument value × one test class instantiation). Injected into `@BeforeAll`, `@BeforeEach`, `@Test`, `@AfterEach`, `@AfterAll` methods.
 
+**Context Hierarchy Access:** From an ArgumentContext, access the parent ClassContext via `getClassContext()`, and the root EngineContext via `getClassContext().getEngineContext()`. This allows access to all methods and stores in the context tree.
+
 | Member | Type | Nullable | Description |
 |---|---|---|---|
 | `getClassContext()` | `ClassContext` | no | Parent class-level context |
@@ -37,6 +39,8 @@ Collector passed to a context-driven `@Paramixel.ArgumentsCollector` method (sig
 ### `ClassContext` — `org.paramixel.api`
 
 Represents context for one test class. Injected into `@Initialize` and `@Finalize` methods. Available via `ArgumentContext.getClassContext()`.
+
+**Context Hierarchy Access:** From a ClassContext, access the root EngineContext via `getEngineContext()`. This allows access to all methods and stores in the context tree.
 
 | Member | Type | Nullable | Description |
 |---|---|---|---|
@@ -229,21 +233,32 @@ Base class implementing `org.junit.platform.engine.TestDescriptor`.
 
 ```
 [Per class]
+  @Paramixel.ArgumentsCollector (static method - no instance required)
+  TestClass.newInstance()          ← no-arg constructor invocation
   @Initialize(ClassContext)
   [Per argument]
     @BeforeAll(ArgumentContext)
     [Per test method]
       @BeforeEach(ArgumentContext)
       @Test(ArgumentContext)
-      @AfterEach(ArgumentContext)
+      @AfterEach(ArgumentContext)   ← only if @BeforeEach executed
     [End per test method]
-    @AfterAll(ArgumentContext)
-    argument.close()        ← if argument implements AutoCloseable
+    @AfterAll(ArgumentContext)      ← only if @BeforeAll executed
+    argument.close()                ← if argument implements AutoCloseable
   [End per argument]
-  @Finalize(ClassContext)
-  testInstance.close()     ← if test instance implements AutoCloseable
+  @Finalize(ClassContext)           ← only if @Initialize executed
+  testInstance.close()              ← if test instance implements AutoCloseable
 [End per class]
 ```
+
+**Important:** The `@Paramixel.ArgumentsCollector` method is static and executes before test class instantiation. If the test class cannot be instantiated (e.g., no-arg constructor fails), all test methods are marked FAILED and lifecycle hooks (`@Initialize`, `@BeforeAll`, etc.) are not executed.
+
+**Lifecycle Pairing:** "After" hooks are paired with their corresponding "before" hooks:
+- `@AfterEach` only executes if `@BeforeEach` was executed for that test method
+- `@AfterAll` only executes if `@BeforeAll` was executed for that argument
+- `@Finalize` only executes if `@Initialize` was executed for the class
+
+This ensures cleanup only runs when setup has occurred.
 
 Lifecycle hooks and `@Paramixel.Test` methods are discovered across the full class hierarchy and treated as a single flattened set per `@Paramixel.TestClass` (base/subclass location is irrelevant).
 
