@@ -37,13 +37,10 @@ public class AnnotationUsageValidatorTagsTest {
     }
 
     @Test
-    public void validateTestClass_reportsMultipleTagsAnnotations() {
-        final List<String> messages = AnnotationUsageValidator.validateTestClass(ChildWithTags.class).stream()
-                .map(ValidationFailure::getMessage)
-                .collect(Collectors.toList());
-
-        assertThat(messages).anySatisfy(m -> assertThat(m)
-                .contains("At most one @Paramixel.Tags annotation is allowed per class hierarchy"));
+    public void validateTestClass_acceptsTagsOnBothParentAndChild() {
+        // Tags can be declared on both parent and child classes - each class can have one @Tags
+        assertThat(AnnotationUsageValidator.validateTestClass(ChildWithTags.class))
+                .isEmpty();
     }
 
     @Test
@@ -109,6 +106,7 @@ public class AnnotationUsageValidatorTagsTest {
         public void test(final ArgumentContext context) {}
     }
 
+    @Paramixel.TestClass
     @Paramixel.Tags({"child"})
     static class ChildWithTags extends ParentWithTags {
 

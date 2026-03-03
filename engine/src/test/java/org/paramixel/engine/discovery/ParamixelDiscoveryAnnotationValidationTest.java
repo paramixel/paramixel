@@ -40,7 +40,7 @@ public class ParamixelDiscoveryAnnotationValidationTest {
 
         assertThatThrownBy(() -> discovery.discoverTests(request, engine))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Validation failed");
+                .hasMessageContaining("@Paramixel.ArgumentsCollector");
     }
 
     @Paramixel.TestClass

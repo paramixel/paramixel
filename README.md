@@ -232,8 +232,29 @@ public class UnitTest {
 - Tags annotation can only be used on classes annotated with `@Paramixel.TestClass`
 - Tags array must contain at least one tag
 - Each tag value must be non-null and non-empty (after trimming)
-- Only one `@Tags` annotation is allowed per class hierarchy
+- At most one `@Tags` annotation is allowed per class (each class in a hierarchy can have its own `@Tags`)
+- Tags are inherited from parent classes and combined when filtering
 - Invalid tag usage will cause test discovery to fail with an error
+
+**Tag Inheritance:**
+When a test class extends another test class, tags from both classes are combined:
+
+```java
+@Paramixel.TestClass
+@Paramixel.Tags({"integration"})
+public class BaseIntegrationTest {
+    // Base class with "integration" tag
+}
+
+@Paramixel.TestClass
+@Paramixel.Tags({"database", "slow"})
+public class DatabaseIntegrationTest extends BaseIntegrationTest {
+    // Inherits "integration" tag, has its own "database" and "slow" tags
+    // Combined tags: ["integration", "database", "slow"]
+}
+```
+
+When filtering with `-Dparamixel.tags.include="integration"`, the `DatabaseIntegrationTest` will match because it inherits the "integration" tag from its parent class.
 
 ## Tag-Based Test Filtering
 

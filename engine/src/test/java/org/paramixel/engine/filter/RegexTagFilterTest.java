@@ -150,6 +150,46 @@ public class RegexTagFilterTest {
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isTrue();
     }
 
+    @Test
+    public void matches_inheritedTags_fromParentClass() {
+        // Child class inherits tags from parent class
+        // Parent has: "integration", "database"
+        // Child has: "fast"
+        // Combined: ["integration", "database", "fast"]
+        RegexTagFilter filter = new RegexTagFilter(List.of("integration"), List.of());
+
+        // Should match because parent has "integration" tag
+        assertThat(filter.matches(ChildTestWithInheritedTags.class)).isTrue();
+    }
+
+    @Test
+    public void matches_inheritedTags_matchesChildTag() {
+        // Child class inherits tags from parent class
+        // Parent has: "integration", "database"
+        // Child has: "fast"
+        // Combined: ["integration", "database", "fast"]
+        RegexTagFilter filter = new RegexTagFilter(List.of("fast"), List.of());
+
+        // Should match because child has "fast" tag
+        assertThat(filter.matches(ChildTestWithInheritedTags.class)).isTrue();
+    }
+
+    @Test
+    public void matches_inheritedTags_excludedByParentTag() {
+        // Child class inherits tags from parent class
+        // Parent has: "integration", "database"
+        // Child has: "fast"
+        // Combined: ["integration", "database", "fast"]
+        RegexTagFilter filter = new RegexTagFilter(List.of(), List.of("slow"));
+
+        // Should match because neither parent nor child has "slow" tag
+        assertThat(filter.matches(ChildTestWithInheritedTags.class)).isTrue();
+
+        // Create filter that excludes "database" - should exclude because parent has it
+        RegexTagFilter excludeFilter = new RegexTagFilter(List.of(), List.of("database"));
+        assertThat(excludeFilter.matches(ChildTestWithInheritedTags.class)).isFalse();
+    }
+
     // Test classes
 
     @Paramixel.TestClass
@@ -189,5 +229,21 @@ public class RegexTagFilterTest {
 
         @Paramixel.Test
         public void test(final @NonNull ArgumentContext context) {}
+    }
+
+    @Paramixel.TestClass
+    @Paramixel.Tags({"integration", "database"})
+    static class ParentTestWithTags {
+
+        @Paramixel.Test
+        public void test(final @NonNull ArgumentContext context) {}
+    }
+
+    @Paramixel.TestClass
+    @Paramixel.Tags({"fast"})
+    static class ChildTestWithInheritedTags extends ParentTestWithTags {
+
+        @Paramixel.Test
+        public void test2(final @NonNull ArgumentContext context) {}
     }
 }

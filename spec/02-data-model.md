@@ -8,7 +8,7 @@ Paramixel is a test framework, not a data-persistence application. There are no 
 
 ### `ArgumentContext` — `org.paramixel.api`
 
-Represents context for a single argument invocation (one argument value × one test class instantiation). Injected into `@BeforeAll`, `@BeforeEach`, `@Test`, `@AfterEach`, `@AfterAll` methods.
+Represents context for a single argument invocation (one argument value × one test class instantiation). Injected into `@Paramixel.BeforeAll`, `@Paramixel.BeforeEach`, `@Paramixel.Test`, `@Paramixel.AfterEach`, `@Paramixel.AfterAll` methods.
 
 **Context Hierarchy Access:** From an ArgumentContext, access the parent ClassContext via `getClassContext()`, and the root EngineContext via `getClassContext().getEngineContext()`. This allows access to all methods and stores in the context tree.
 
@@ -38,7 +38,7 @@ Collector passed to a context-driven `@Paramixel.ArgumentsCollector` method (sig
 
 ### `ClassContext` — `org.paramixel.api`
 
-Represents context for one test class. Injected into `@Initialize` and `@Finalize` methods. Available via `ArgumentContext.getClassContext()`.
+Represents context for one test class. Injected into `@Paramixel.Initialize` and `@Paramixel.Finalize` methods. Available via `ArgumentContext.getClassContext()`.
 
 **Context Hierarchy Access:** From a ClassContext, access the root EngineContext via `getEngineContext()`. This allows access to all methods and stores in the context tree.
 
@@ -129,7 +129,7 @@ All annotations have `@Retention(RetentionPolicy.RUNTIME)` and `@Documented`.
 | `@Paramixel.Disabled` | `TYPE`, `METHOD` | N/A | Skips the annotated class or method; optional `value()` for reason |
 | `@Paramixel.DisplayName` | `TYPE`, `METHOD` | N/A | Overrides display name; required `value()` |
 | `@Paramixel.Order` | `METHOD` (valid on `@Paramixel.Test` and lifecycle hook methods) | N/A | Explicit ordering; `value()` must be > 0; lower = earlier |
-| `@Paramixel.Tags` | `TYPE` | N/A | Categorizes test class with tags; only on `@TestClass` classes; max one per class hierarchy |
+| `@Paramixel.Tags` | `TYPE` | N/A | Categorizes test class with tags; only on `@Paramixel.TestClass` classes; max one per class |
 
 ---
 
@@ -158,7 +158,7 @@ All annotations have `@Retention(RetentionPolicy.RUNTIME)` and `@Documented`.
 | `failureCount` | `AtomicInteger` | Failed invocations |
 | `firstFailure` | `AtomicReference<Throwable>` | Records first failure only |
 | `store` | `Store` | Class-scoped `ConcreteStore` |
-| `argumentContexts` | `ConcurrentHashMap<Integer, ConcreteArgumentContext>` | Cached per-argument contexts; removed after `@AfterAll` |
+| `argumentContexts` | `ConcurrentHashMap<Integer, ConcreteArgumentContext>` | Cached per-argument contexts; removed after `@Paramixel.AfterAll` |
 
 #### `ConcreteArgumentContext` — `org.paramixel.engine.api`
 
@@ -201,7 +201,7 @@ Base class implementing `org.junit.platform.engine.TestDescriptor`.
 | Field | Type | Notes |
 |---|---|---|
 | `uniqueId` | `UniqueId` | Segment format: `[engine:paramixel]/[class:<fqcn>]/[argument:<idx>]/[method:<name>]` |
-| `displayName` | `String` | From `@DisplayName` value or defaults to class/method name |
+| `displayName` | `String` | From `@Paramixel.DisplayName` value or defaults to class/method name |
 | `type` | `Type` | `CONTAINER` or `TEST` |
 | `parent` | `TestDescriptor` | Nullable |
 | `children` | `List<TestDescriptor>` | Ordered |
@@ -210,7 +210,7 @@ Base class implementing `org.junit.platform.engine.TestDescriptor`.
 
 | Additional field | Type | Notes |
 |---|---|---|
-| `testClass` | `Class<?>` | The `@TestClass`-annotated class |
+| `testClass` | `Class<?>` | The `@Paramixel.TestClass`-annotated class |
 | `argumentParallelism` | `int` | Set during discovery from collector; controls concurrent argument execution |
 
 #### `ParamixelTestArgumentDescriptor` — extends `AbstractParamixelDescriptor`
@@ -225,7 +225,7 @@ Base class implementing `org.junit.platform.engine.TestDescriptor`.
 
 | Additional field | Type | Notes |
 |---|---|---|
-| `testMethod` | `java.lang.reflect.Method` | The `@Test`-annotated method |
+| `testMethod` | `java.lang.reflect.Method` | The `@Paramixel.Test`-annotated method |
 
 ---
 
@@ -235,28 +235,28 @@ Base class implementing `org.junit.platform.engine.TestDescriptor`.
 [Per class]
   @Paramixel.ArgumentsCollector (static method - no instance required)
   TestClass.newInstance()          ← no-arg constructor invocation
-  @Initialize(ClassContext)
+  @Paramixel.Initialize(ClassContext)
   [Per argument]
-    @BeforeAll(ArgumentContext)
+    @Paramixel.BeforeAll(ArgumentContext)
     [Per test method]
-      @BeforeEach(ArgumentContext)
-      @Test(ArgumentContext)
-      @AfterEach(ArgumentContext)   ← only if @BeforeEach executed
+      @Paramixel.BeforeEach(ArgumentContext)
+      @Paramixel.Test(ArgumentContext)
+      @Paramixel.AfterEach(ArgumentContext)   ← only if @Paramixel.BeforeEach executed
     [End per test method]
-    @AfterAll(ArgumentContext)      ← only if @BeforeAll executed
+    @Paramixel.AfterAll(ArgumentContext)      ← only if @Paramixel.BeforeAll executed
     argument.close()                ← if argument implements AutoCloseable
   [End per argument]
-  @Finalize(ClassContext)           ← only if @Initialize executed
+  @Paramixel.Finalize(ClassContext)           ← only if @Paramixel.Initialize executed
   testInstance.close()              ← if test instance implements AutoCloseable
 [End per class]
 ```
 
-**Important:** The `@Paramixel.ArgumentsCollector` method is static and executes before test class instantiation. If the test class cannot be instantiated (e.g., no-arg constructor fails), all test methods are marked FAILED and lifecycle hooks (`@Initialize`, `@BeforeAll`, etc.) are not executed.
+**Important:** The `@Paramixel.ArgumentsCollector` method is static and executes before test class instantiation. If the test class cannot be instantiated (e.g., no-arg constructor fails), all test methods are marked FAILED and lifecycle hooks (`@Paramixel.Initialize`, `@Paramixel.BeforeAll`, etc.) are not executed.
 
 **Lifecycle Pairing:** "After" hooks are paired with their corresponding "before" hooks:
-- `@AfterEach` only executes if `@BeforeEach` was executed for that test method
-- `@AfterAll` only executes if `@BeforeAll` was executed for that argument
-- `@Finalize` only executes if `@Initialize` was executed for the class
+- `@Paramixel.AfterEach` only executes if `@Paramixel.BeforeEach` was executed for that test method
+- `@Paramixel.AfterAll` only executes if `@Paramixel.BeforeAll` was executed for that argument
+- `@Paramixel.Finalize` only executes if `@Paramixel.Initialize` was executed for the class
 
 This ensures cleanup only runs when setup has occurred.
 
@@ -270,12 +270,12 @@ For each annotation type (each lifecycle hook type and `@Paramixel.Test`), the r
 - Methods without `@Paramixel.Order` execute last (effective value = `Integer.MAX_VALUE`)
 
 **Important:** The `@Paramixel.Order` annotation ordering is applied **per annotation type**. This means:
-- All `@BeforeEach` methods are ordered among themselves
-- All `@Test` methods are ordered among themselves
-- All `@AfterEach` methods are ordered among themselves
+- All `@Paramixel.BeforeEach` methods are ordered among themselves
+- All `@Paramixel.Test` methods are ordered among themselves
+- All `@Paramixel.AfterEach` methods are ordered among themselves
 - etc.
 
-The ordering of one annotation type does not affect the ordering of another annotation type. For example, a `@BeforeEach` method with `@Order(1)` will still execute before all `@Test` methods, regardless of their `@Order` values.
+The ordering of one annotation type does not affect the ordering of another annotation type. For example, a `@Paramixel.BeforeEach` method with `@Paramixel.Order(1)` will still execute before all `@Paramixel.Test` methods, regardless of their `@Paramixel.Order` values.
 
 ---
 
@@ -314,6 +314,6 @@ The Maven plugin exposes additional parameters:
 | Maven property | Default | Description |
 |---|---|---|
 | `skipTests` | `false` | Skip all test execution |
-| `paramixel.failIfNoTests` | `true` | Fail build if no `@TestClass` found |
+| `paramixel.failIfNoTests` | `true` | Fail build if no `@Paramixel.TestClass` found |
 | `paramixel.class.parallelism` | `2147483647` | Max concurrent test classes (effectively unlimited) |
 | `paramixel.verbose` | `false` | Verbose logging (currently partially implemented) |

@@ -106,8 +106,7 @@ public final class RegexTagFilter implements TagFilter {
     public boolean matches(final @NonNull Class<?> testClass) {
         Objects.requireNonNull(testClass, "testClass must not be null");
 
-        final Paramixel.Tags tags = testClass.getAnnotation(Paramixel.Tags.class);
-        final Set<String> classTags = extractValidTags(tags);
+        final Set<String> classTags = extractAllTagsFromHierarchy(testClass);
 
         // Check exclude patterns first (highest priority)
         if (!excludePatterns.isEmpty()) {
@@ -138,23 +137,29 @@ public final class RegexTagFilter implements TagFilter {
     }
 
     /**
-     * Extracts valid (non-null, non-empty) tags from the annotation.
+     * Extracts all valid tags from the class hierarchy.
+     * Tags are collected from the test class and all its superclasses.
      * Tags with null or empty values are ignored.
      *
-     * @param tags the Tags annotation
-     * @return set of valid tag strings; empty set if no valid tags
+     * @param testClass the test class to extract tags from
+     * @return set of valid tag strings from the entire hierarchy; empty set if no valid tags
      */
-    private Set<String> extractValidTags(final Paramixel.Tags tags) {
-        if (tags == null || tags.value() == null || tags.value().length == 0) {
-            return Collections.emptySet();
-        }
-
+    private Set<String> extractAllTagsFromHierarchy(final Class<?> testClass) {
         final Set<String> validTags = new java.util.HashSet<>();
-        for (String tag : tags.value()) {
-            if (tag != null && !tag.trim().isEmpty()) {
-                validTags.add(tag);
+
+        for (Class<?> current = testClass;
+                current != null && current != Object.class;
+                current = current.getSuperclass()) {
+            final Paramixel.Tags tags = current.getAnnotation(Paramixel.Tags.class);
+            if (tags != null && tags.value() != null) {
+                for (String tag : tags.value()) {
+                    if (tag != null && !tag.trim().isEmpty()) {
+                        validTags.add(tag);
+                    }
+                }
             }
         }
+
         return Collections.unmodifiableSet(validTags);
     }
 

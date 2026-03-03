@@ -73,7 +73,7 @@ public final class AnnotationUsageValidator {
         // Check if class has @Tags annotation
         final Paramixel.Tags tags = testClass.getAnnotation(Paramixel.Tags.class);
         if (tags != null) {
-            // Validate that the class is annotated with @TestClass
+            // Validate that the class is annotated with @Paramixel.TestClass
             if (!testClass.isAnnotationPresent(Paramixel.TestClass.class)) {
                 failures.add(new ValidationFailure(
                         "@Paramixel.Tags can only be used on classes annotated with @Paramixel.TestClass: "
@@ -96,28 +96,14 @@ public final class AnnotationUsageValidator {
                     }
                 }
             }
-
-            // Check for multiple @Tags annotations (only one allowed per class hierarchy)
-            int tagsCount = 0;
-            for (Class<?> current = testClass;
-                    current != null && current != Object.class;
-                    current = current.getSuperclass()) {
-                if (current.isAnnotationPresent(Paramixel.Tags.class)) {
-                    tagsCount++;
-                }
-            }
-            if (tagsCount > 1) {
-                failures.add(new ValidationFailure(
-                        "At most one @Paramixel.Tags annotation is allowed per class hierarchy; found " + tagsCount
-                                + " on " + testClass.getName()));
-            }
         }
     }
 
     private static void validateDisplayName(final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
         final Paramixel.DisplayName classDisplayName = testClass.getAnnotation(Paramixel.DisplayName.class);
         if (classDisplayName != null && classDisplayName.value().trim().isEmpty()) {
-            failures.add(new ValidationFailure("@DisplayName value must be non-blank on class " + testClass.getName()));
+            failures.add(new ValidationFailure(
+                    "@Paramixel.DisplayName value must be non-blank on class " + testClass.getName()));
         }
 
         for (Class<?> current = testClass;
@@ -127,7 +113,7 @@ public final class AnnotationUsageValidator {
                 final Paramixel.DisplayName methodDisplayName = method.getAnnotation(Paramixel.DisplayName.class);
                 if (methodDisplayName != null
                         && methodDisplayName.value().trim().isEmpty()) {
-                    failures.add(new ValidationFailure("@DisplayName value must be non-blank on method "
+                    failures.add(new ValidationFailure("@Paramixel.DisplayName value must be non-blank on method "
                             + current.getName() + "#" + method.getName()));
                 }
             }
@@ -174,7 +160,9 @@ public final class AnnotationUsageValidator {
             return;
         }
 
-        final String presentNames = present.stream().map(Class::getSimpleName).collect(Collectors.joining(", "));
+        final String presentNames = present.stream()
+                .map(annotationType -> "@Paramixel." + annotationType.getSimpleName())
+                .collect(Collectors.joining(", "));
         failures.add(new ValidationFailure("Method " + declaringClass.getName() + "#" + method.getName()
                 + " declares multiple Paramixel annotations: " + presentNames));
     }

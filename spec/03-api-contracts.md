@@ -20,12 +20,12 @@ For each annotation type (each lifecycle hook type and `@Paramixel.Test`), the r
 - Methods without `@Paramixel.Order` execute last (effective value = `Integer.MAX_VALUE`).
 
 **Important:** The `@Paramixel.Order` annotation ordering is applied **per annotation type**. This means:
-- All `@BeforeEach` methods are ordered among themselves
-- All `@Test` methods are ordered among themselves  
-- All `@AfterEach` methods are ordered among themselves
+- All `@Paramixel.BeforeEach` methods are ordered among themselves
+- All `@Paramixel.Test` methods are ordered among themselves  
+- All `@Paramixel.AfterEach` methods are ordered among themselves
 - etc.
 
-The ordering of one annotation type does not affect the ordering of another annotation type. For example, a `@BeforeEach` method with `@Order(1)` will still execute before all `@Test` methods, regardless of their `@Order` values.
+The ordering of one annotation type does not affect the ordering of another annotation type. For example, a `@Paramixel.BeforeEach` method with `@Paramixel.Order(1)` will still execute before all `@Paramixel.Test` methods, regardless of their `@Paramixel.Order` values.
 
 ### `@Paramixel.TestClass`
 
@@ -64,43 +64,43 @@ The ordering of one annotation type does not affect the ordering of another anno
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ClassContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per class, before `@BeforeAll`, ordered using the rules described in "Inheritance (Flattened)". Paired with `@Finalize` — if `@Initialize` executes, `@Finalize` is guaranteed to run.
-- **Failure:** Causes class execution to abort; no tests run; `@Finalize` still runs.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per class, before `@Paramixel.BeforeAll`, ordered using the rules described in "Inheritance (Flattened)". Paired with `@Paramixel.Finalize` — if `@Paramixel.Initialize` executes, `@Paramixel.Finalize` is guaranteed to run.
+- **Failure:** Causes class execution to abort; no tests run; `@Paramixel.Finalize` still runs.
 
 ### `@Paramixel.BeforeAll`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — may be static or instance.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, before any `@Test` methods for that argument, ordered using the rules described in "Inheritance (Flattened)". Paired with `@AfterAll` — if `@BeforeAll` executes, `@AfterAll` is guaranteed to run.
-- **Failure:** Aborts that argument bucket; tests for that argument are skipped; paired `@AfterAll` still runs. Failure recorded on class context.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, before any `@Paramixel.Test` methods for that argument, ordered using the rules described in "Inheritance (Flattened)". Paired with `@Paramixel.AfterAll` — if `@Paramixel.BeforeAll` executes, `@Paramixel.AfterAll` is guaranteed to run.
+- **Failure:** Aborts that argument bucket; tests for that argument are skipped; paired `@Paramixel.AfterAll` still runs. Failure recorded on class context.
 
 ### `@Paramixel.BeforeEach`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute before every individual `@Test` method invocation, ordered using the rules described in "Inheritance (Flattened)". Paired with `@AfterEach` — if `@BeforeEach` executes, `@AfterEach` is guaranteed to run.
-- **Failure:** Aborts that specific test invocation; paired `@AfterEach` still runs. Failure counted.
+- **Execution:** One or more methods may be declared. All discovered methods execute before every individual `@Paramixel.Test` method invocation, ordered using the rules described in "Inheritance (Flattened)". Paired with `@Paramixel.AfterEach` — if `@Paramixel.BeforeEach` executes, `@Paramixel.AfterEach` is guaranteed to run.
+- **Failure:** Aborts that specific test invocation; paired `@Paramixel.AfterEach` still runs. Failure counted.
 
 ### `@Paramixel.AfterEach`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute after every `@Test` method invocation (even on test failure), ordered using the rules described in "Inheritance (Flattened)". Only executes if `@BeforeEach` was executed for that test method.
-- **Failure:** Exception printed to console; remaining tests for THIS argument are aborted; the test class is marked FAILED. Does not suppress execution of paired `@AfterAll` or `@Finalize`.
+- **Execution:** One or more methods may be declared. All discovered methods execute after every `@Paramixel.Test` method invocation (even on test failure), ordered using the rules described in "Inheritance (Flattened)". Only executes if `@Paramixel.BeforeEach` was executed for that test method.
+- **Failure:** Exception printed to console; remaining tests for THIS argument are aborted; the test class is marked FAILED. Does not suppress execution of paired `@Paramixel.AfterAll` or `@Paramixel.Finalize`.
 
 ### `@Paramixel.AfterAll`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ArgumentContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, after all `@Test` methods, ordered using the rules described in "Inheritance (Flattened)". Only executes if `@BeforeAll` was executed for that argument.
-- **Failure:** Exception printed to console; remaining `@AfterAll` methods still execute; paired `@Finalize` still runs; the test class is marked FAILED.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per argument bucket, after all `@Paramixel.Test` methods, ordered using the rules described in "Inheritance (Flattened)". Only executes if `@Paramixel.BeforeAll` was executed for that argument.
+- **Failure:** Exception printed to console; remaining `@Paramixel.AfterAll` methods still execute; paired `@Paramixel.Finalize` still runs; the test class is marked FAILED.
 
 ### `@Paramixel.Finalize`
 
 - **Target:** `ElementType.METHOD`
 - **Validated signature:** `public void methodName(ClassContext context)` — instance method, not static.
-- **Execution:** One or more methods may be declared. All discovered methods execute once per class, after `@AfterAll`, ordered using the rules described in "Inheritance (Flattened)". Only executes if `@Initialize` was executed for the class.
-- **Failure:** Exception printed to console; remaining `@Finalize` methods still execute; the test class is marked FAILED.
+- **Execution:** One or more methods may be declared. All discovered methods execute once per class, after `@Paramixel.AfterAll`, ordered using the rules described in "Inheritance (Flattened)". Only executes if `@Paramixel.Initialize` was executed for the class.
+- **Failure:** Exception printed to console; remaining `@Paramixel.Finalize` methods still execute; the test class is marked FAILED.
 
 ### `@Paramixel.Disabled`
 
@@ -119,9 +119,9 @@ The ordering of one annotation type does not affect the ordering of another anno
 
 - **Target:** `ElementType.METHOD` (valid on `@Paramixel.Test` and on lifecycle hook methods)
 - **Attribute:** `int value()` — must be > 0.
-- **Effect:** Establishes deterministic execution order. Lower values execute first. Methods without `@Order` sort last (effective value = `Integer.MAX_VALUE`).
-- **Side effect:** When **any** test method in a class has `@Order`, ALL methods for that argument are executed sequentially (even if argument parallelism > 1).
-- **Validation error:** `@Order` on an unsupported method type; `@Order(value <= 0)`.
+- **Effect:** Establishes deterministic execution order. Lower values execute first. Methods without `@Paramixel.Order` sort last (effective value = `Integer.MAX_VALUE`).
+- **Side effect:** When **any** test method in a class has `@Paramixel.Order`, ALL methods for that argument are executed sequentially (even if argument parallelism > 1).
+- **Validation error:** `@Paramixel.Order` on an unsupported method type; `@Paramixel.Order(value <= 0)`.
 
 ### `@Paramixel.Tags`
 
@@ -130,11 +130,15 @@ The ordering of one annotation type does not affect the ordering of another anno
 - **Effect:** Categorizes a test class with metadata tags for organization, filtering, and reporting purposes.
 - **Constraints:**
   - Can only be applied to classes annotated with `@Paramixel.TestClass`
-  - At most one `@Tags` annotation is allowed per class hierarchy
+  - At most one `@Paramixel.Tags` annotation is allowed per class (each class in a hierarchy can have its own `@Paramixel.Tags`)
   - Each tag value must be non-null and non-empty (after trimming)
+- **Inheritance Behavior:**
+  - Tags are inherited from parent classes and combined with the current class's tags
+  - When filtering, a class matches if ANY of its tags (inherited or declared) match the pattern
+  - Example: If `BaseTest` has `@Paramixel.Tags("integration")` and `ChildTest extends BaseTest` has `@Paramixel.Tags("fast")`, then `ChildTest` has both tags: `["integration", "fast"]`
 - **Validation errors (IllegalStateException at discovery):**
-  - `@Tags` on a class not annotated with `@TestClass`
-  - Multiple `@Tags` annotations in the same class hierarchy
+  - `@Paramixel.Tags` on a class not annotated with `@Paramixel.TestClass`
+  - Multiple `@Paramixel.Tags` annotations on the same class
   - Empty tags array
   - Tags array containing null elements
   - Tags array containing only empty/blank strings
@@ -192,7 +196,7 @@ Contract:
 | Method | Contract |
 |---|---|
 | `getId()` | Returns `"paramixel"` — never null, never changes. |
-| `discover(EngineDiscoveryRequest, UniqueId)` | Returns a `ParamixelEngineDescriptor` populated with class/argument/method descriptors. Throws `IllegalStateException` if a `@TestClass` fails method validation. Never returns null. |
+| `discover(EngineDiscoveryRequest, UniqueId)` | Returns a `ParamixelEngineDescriptor` populated with class/argument/method descriptors. Throws `IllegalStateException` if a `@Paramixel.TestClass` fails method validation. Never returns null. |
 | `execute(ExecutionRequest)` | Runs all discovered tests. Reports start/finish on the engine descriptor. Never throws. If any test fails, the engine descriptor MUST be finished with `TestExecutionResult.failed(...)` so build tools (including Maven) observe an overall failure. |
 
 ---
@@ -211,7 +215,7 @@ Contract:
 |---|---|---|---|---|
 | `project` | `project` | (injected) | `MavenProject` | The current Maven project |
 | `skipTests` | `skipTests` | `false` | `boolean` | Skips all test execution when true |
-| `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@TestClass` annotated class found |
+| `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@Paramixel.TestClass` annotated class found |
 | `classParallelism` | `paramixel.class.parallelism` | `2147483647` | `int` | Maximum concurrent test classes (currently unused - see `paramixel.parallelism` for parallelism control) |
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |
 
@@ -261,8 +265,8 @@ All error messages that mention a Paramixel annotation MUST use the qualified fo
 
 | Condition | Result |
 |---|---|
-| `@TestClass` method fails signature validation | `IllegalStateException` printed to console; test execution aborts |
-| `@Order(value <= 0)` or `@Order` on unsupported method type | `IllegalStateException` printed to console; test execution aborts |
+| `@Paramixel.TestClass` method fails signature validation | `IllegalStateException` printed to console; test execution aborts |
+| `@Paramixel.Order(value <= 0)` or `@Paramixel.Order` on unsupported method type | `IllegalStateException` printed to console; test execution aborts |
 | `@Paramixel.ArgumentsCollector` invocation throws | Exception printed to console; test execution aborts |
 | Class cannot be loaded (`ClassNotFoundException`) | Exception printed to console; test execution aborts |
 
@@ -274,20 +278,20 @@ All exceptions from test engine annotations are **printed to console output** fo
 
 | Condition | Result |
 |---|---|
-| Test class instantiation fails (no-arg constructor) | All test methods marked FAILED; lifecycle hooks (`@Initialize`, `@BeforeAll`, etc.) not executed; exception printed |
-| `@Initialize` throws | Class execution aborts; `@Finalize` runs (if @Initialize executed); class marked FAILED |
-| `@BeforeAll` throws | Argument bucket skipped; `@AfterAll` runs (if @BeforeAll executed); failure recorded |
-| `@BeforeEach` throws | Test invocation marked FAILED; `@AfterEach` runs (if @BeforeEach executed) |
-| `@Test` throws | Test invocation marked FAILED; `@AfterEach` runs (if @BeforeEach executed) |
-| `@AfterEach` throws | Exception printed; remaining tests for THIS argument aborted; `@AfterAll` runs (if @BeforeAll executed); class marked FAILED |
-| `@AfterAll` throws | Exception printed; `@Finalize` runs (if @Initialize executed); class marked FAILED |
-| `@Finalize` throws | Exception printed; class marked FAILED |
+| Test class instantiation fails (no-arg constructor) | All test methods marked FAILED; lifecycle hooks (`@Paramixel.Initialize`, `@Paramixel.BeforeAll`, etc.) not executed; exception printed |
+| `@Paramixel.Initialize` throws | Class execution aborts; `@Paramixel.Finalize` runs (if @Paramixel.Initialize executed); class marked FAILED |
+| `@Paramixel.BeforeAll` throws | Argument bucket skipped; `@Paramixel.AfterAll` runs (if @Paramixel.BeforeAll executed); failure recorded |
+| `@Paramixel.BeforeEach` throws | Test invocation marked FAILED; `@Paramixel.AfterEach` runs (if @Paramixel.BeforeEach executed) |
+| `@Paramixel.Test` throws | Test invocation marked FAILED; `@Paramixel.AfterEach` runs (if @Paramixel.BeforeEach executed) |
+| `@Paramixel.AfterEach` throws | Exception printed; remaining tests for THIS argument aborted; `@Paramixel.AfterAll` runs (if @Paramixel.BeforeAll executed); class marked FAILED |
+| `@Paramixel.AfterAll` throws | Exception printed; `@Paramixel.Finalize` runs (if @Paramixel.Initialize executed); class marked FAILED |
+| `@Paramixel.Finalize` throws | Exception printed; class marked FAILED |
 | `AutoCloseable.close()` throws | Exception printed; class marked FAILED |
 
 **Key Principles:**
 1. **Console Visibility**: All exceptions are printed to console output
-2. **Lifecycle Pairing**: "After" hooks only run if their paired "before" hook executed (@AfterEach↔@BeforeEach, @AfterAll↔@BeforeAll, @Finalize↔@Initialize)
-3. **Fail Fast**: `@AfterEach` failure stops further testing of the current argument
+2. **Lifecycle Pairing**: "After" hooks only run if their paired "before" hook executed (@Paramixel.AfterEach↔@Paramixel.BeforeEach, @Paramixel.AfterAll↔@Paramixel.BeforeAll, @Paramixel.Finalize↔@Paramixel.Initialize)
+3. **Fail Fast**: `@Paramixel.AfterEach` failure stops further testing of the current argument
 4. **Guaranteed Cleanup**: Paired "after" hooks always execute despite failures
 5. **First Failure Wins**: The first recorded exception determines the test class result
 6. **Exception Unwrapping**: All exceptions are unwrapped from `InvocationTargetException` by `ParamixelReflectionInvoker`
@@ -299,7 +303,7 @@ All exceptions from test engine annotations are **printed to console output** fo
 | Test execution fails (`N > 0` failures) | `MojoFailureException("Tests failed: N of M tests")` |
 | Classpath construction fails | `MojoExecutionException("Failed to execute Paramixel tests", cause)` |
 | `skipTests=true` | No exception; logs info |
-| No `@TestClass` found + `failIfNoTests=true` | `MojoFailureException("No @Paramixel.TestClass annotated classes found")` |
+| No `@Paramixel.TestClass` found + `failIfNoTests=true` | `MojoFailureException("No @Paramixel.TestClass annotated classes found")` |
 
 ---
 

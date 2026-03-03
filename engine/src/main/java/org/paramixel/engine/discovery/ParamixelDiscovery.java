@@ -151,25 +151,19 @@ public final class ParamixelDiscovery {
         final Set<Class<?>> testClasses = discoverTestClasses(request);
         LOGGER.fine("Discovered " + testClasses.size() + " potential test classes");
 
-        // Step 2: Validate all discovered classes first
+        // Step 2: Validate all discovered classes first (fail-fast on first error)
         final Set<Class<?>> validClasses = new LinkedHashSet<>();
-        final List<ValidationFailure> allFailures = new ArrayList<>();
         for (Class<?> testClass : testClasses) {
             final List<ValidationFailure> failures = validateTestClass(testClass);
             if (failures.isEmpty()) {
                 validClasses.add(testClass);
             } else {
-                allFailures.addAll(failures);
+                // Fail-fast: report first error immediately
+                final ValidationFailure firstFailure = failures.get(0);
+                LOGGER.warning("Validation failed for test class: " + testClass.getName());
+                LOGGER.warning("  - " + firstFailure.getMessage());
+                throw new IllegalStateException(firstFailure.getMessage());
             }
-        }
-
-        // If any validation failures occurred, throw exception
-        if (!allFailures.isEmpty()) {
-            LOGGER.warning("Validation failed for test classes:");
-            for (ValidationFailure failure : allFailures) {
-                LOGGER.warning("  - " + failure.getMessage());
-            }
-            throw new IllegalStateException("Validation failed for test classes; see logs for details.");
         }
 
         LOGGER.fine("Validated " + validClasses.size() + " test classes");
