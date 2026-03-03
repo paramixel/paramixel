@@ -110,6 +110,35 @@ public class MethodValidatorTest {
                 .anySatisfy(m -> assertThat(m).contains("@Paramixel.Order value must be greater than 0"));
     }
 
+    @Test
+    public void validateTestClass_reportsPrimitiveReturnTypeForArgumentsCollector() {
+        final List<String> messages = MethodValidator.validateTestClass(PrimitiveReturnCollector.class).stream()
+                .map(ValidationFailure::getMessage)
+                .collect(Collectors.toList());
+
+        assertThat(messages).anySatisfy(m -> assertThat(m)
+                .contains("Invalid @Paramixel.ArgumentsCollector return type (primitive)"));
+    }
+
+    @Test
+    public void validateTestClass_reportsPrimitiveArrayReturnTypeForArgumentsCollector() {
+        final List<String> messages = MethodValidator.validateTestClass(PrimitiveArrayReturnCollector.class).stream()
+                .map(ValidationFailure::getMessage)
+                .collect(Collectors.toList());
+
+        assertThat(messages).anySatisfy(m -> assertThat(m)
+                .contains("Invalid @Paramixel.ArgumentsCollector return type (primitive array)"));
+    }
+
+    @Test
+    public void validateTestClass_acceptsObjectArrayReturnTypeForArgumentsCollector() {
+        final List<String> messages = MethodValidator.validateTestClass(ObjectArrayReturnCollector.class).stream()
+                .map(ValidationFailure::getMessage)
+                .collect(Collectors.toList());
+
+        assertThat(messages).isEmpty();
+    }
+
     static class BadTestMethods {
 
         @Paramixel.Test
@@ -192,5 +221,29 @@ public class MethodValidatorTest {
 
         @Paramixel.Order(1)
         public void notAllowedWithoutHook(final ArgumentContext context) {}
+    }
+
+    static class PrimitiveReturnCollector {
+
+        @Paramixel.ArgumentsCollector
+        public static int arguments() {
+            return 42;
+        }
+    }
+
+    static class PrimitiveArrayReturnCollector {
+
+        @Paramixel.ArgumentsCollector
+        public static int[] arguments() {
+            return new int[0];
+        }
+    }
+
+    static class ObjectArrayReturnCollector {
+
+        @Paramixel.ArgumentsCollector
+        public static Object[] arguments() {
+            return new Object[0];
+        }
     }
 }

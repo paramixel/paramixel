@@ -55,4 +55,38 @@ public class ConcreteEngineContextTest {
         assertThatThrownBy(() -> new ConcreteEngineContext("paramixel", new Properties(), 0))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    public void equalsAndHashCode_considerAllFields() {
+        final Properties props1 = new Properties();
+        props1.setProperty("k", "v");
+        final Properties props2 = new Properties();
+        props2.setProperty("k", "v");
+        final Properties props3 = new Properties();
+        props3.setProperty("k", "different");
+
+        final ConcreteEngineContext ctx1 = new ConcreteEngineContext("paramixel", props1, 4);
+        final ConcreteEngineContext ctx2 = new ConcreteEngineContext("paramixel", props2, 4);
+        final ConcreteEngineContext ctx3 = new ConcreteEngineContext("paramixel", props3, 4);
+        final ConcreteEngineContext ctx4 = new ConcreteEngineContext("other", props1, 4);
+        final ConcreteEngineContext ctx5 = new ConcreteEngineContext("paramixel", props1, 8);
+
+        assertThat(ctx1).isEqualTo(ctx2);
+        assertThat(ctx1.hashCode()).isEqualTo(ctx2.hashCode());
+
+        assertThat(ctx1).isNotEqualTo(ctx3);
+        assertThat(ctx1).isNotEqualTo(ctx4);
+        assertThat(ctx1).isNotEqualTo(ctx5);
+        assertThat(ctx1).isNotEqualTo(null);
+        assertThat(ctx1).isNotEqualTo("not-a-context");
+        assertThat(ctx1).isEqualTo(ctx1);
+    }
+
+    @Test
+    public void toString_includesEngineIdAndParallelism() {
+        final ConcreteEngineContext ctx = new ConcreteEngineContext("paramixel", new Properties(), 4);
+
+        assertThat(ctx.toString()).contains("engineId='paramixel'");
+        assertThat(ctx.toString()).contains("classParallelism=4");
+    }
 }

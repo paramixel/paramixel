@@ -157,7 +157,7 @@ public class ParamixelDiscoveryTest {
      */
     @Nested
     @DisplayName("MethodSelector tests")
-    class MethodSelectorTests {
+    public class MethodSelectorTests {
 
         /**
          * Ensures a method selector discovers a test class.
@@ -196,7 +196,7 @@ public class ParamixelDiscoveryTest {
      */
     @Nested
     @DisplayName("PackageSelector tests")
-    class PackageSelectorTests {
+    public class PackageSelectorTests {
 
         /**
          * Ensures package selectors discover classes in the package.
@@ -256,7 +256,7 @@ public class ParamixelDiscoveryTest {
      */
     @Nested
     @DisplayName("Combined selector tests")
-    class CombinedSelectorTests {
+    public class CombinedSelectorTests {
 
         /**
          * Ensures multiple selector types are handled.
@@ -298,7 +298,7 @@ public class ParamixelDiscoveryTest {
      */
     @Nested
     @DisplayName("Empty request tests")
-    class EmptyRequestTests {
+    public class EmptyRequestTests {
 
         /**
          * Ensures empty requests return no classes.
@@ -319,7 +319,7 @@ public class ParamixelDiscoveryTest {
      */
     @Nested
     @DisplayName("Selector filtering tests")
-    class SelectorFilteringTests {
+    public class SelectorFilteringTests {
 
         /**
          * Ensures only @TestClass-annotated classes are discovered.
@@ -343,7 +343,7 @@ public class ParamixelDiscoveryTest {
 
     @Nested
     @DisplayName("UniqueIdSelector tests")
-    class UniqueIdSelectorTests {
+    public class UniqueIdSelectorTests {
 
         @Test
         @DisplayName("Should discover test class from UniqueIdSelector")
@@ -363,7 +363,7 @@ public class ParamixelDiscoveryTest {
 
     @Nested
     @DisplayName("Discovery filters tests")
-    class FiltersTests {
+    public class FiltersTests {
 
         @Test
         @DisplayName("ClassNameFilter should exclude non-matching classes")
@@ -395,7 +395,7 @@ public class ParamixelDiscoveryTest {
 
     @Nested
     @DisplayName("NestedClassSelector tests")
-    class NestedClassSelectorTests {
+    public class NestedClassSelectorTests {
 
         @Test
         @DisplayName("Should discover nested test class from NestedClassSelector")
@@ -414,7 +414,7 @@ public class ParamixelDiscoveryTest {
 
     @Nested
     @DisplayName("ClasspathRootSelector tests")
-    class ClasspathRootSelectorTests {
+    public class ClasspathRootSelectorTests {
 
         @Test
         @DisplayName("Should discover test classes from ClasspathRootSelector with filters")

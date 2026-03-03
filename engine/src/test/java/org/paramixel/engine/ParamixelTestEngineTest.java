@@ -18,8 +18,13 @@ package org.paramixel.engine;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.platform.engine.EngineExecutionListener;
+import org.junit.platform.engine.ExecutionRequest;
 import org.junit.platform.engine.TestDescriptor;
+import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
@@ -46,4 +51,56 @@ public class ParamixelTestEngineTest {
     }
 
     static class NotATestClass {}
+
+    @Test
+    public void execute_withNoTests_doesNotFail() {
+        final ParamixelTestEngine engine = new ParamixelTestEngine();
+        final var request = LauncherDiscoveryRequestBuilder.request()
+                .selectors(DiscoverySelectors.selectClass(NotATestClass.class))
+                .build();
+
+        final UniqueId uniqueId = UniqueId.forEngine("paramixel");
+        final TestDescriptor descriptor = engine.discover(request, uniqueId);
+
+        final AtomicBoolean started = new AtomicBoolean(false);
+        final AtomicBoolean finished = new AtomicBoolean(false);
+
+        final EngineExecutionListener listener = new EngineExecutionListener() {
+            @Override
+            public void executionStarted(final TestDescriptor testDescriptor) {
+                started.set(true);
+            }
+
+            @Override
+            public void executionFinished(
+                    final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {
+                finished.set(true);
+                assertThat(testExecutionResult.getStatus()).isEqualTo(TestExecutionResult.Status.SUCCESSFUL);
+            }
+        };
+
+        final ExecutionRequest execRequest =
+                new ExecutionRequest(descriptor, listener, new org.junit.platform.engine.ConfigurationParameters() {
+                    public Optional<String> get(final String key) {
+                        return Optional.empty();
+                    }
+
+                    public Optional<Boolean> getBoolean(final String key) {
+                        return Optional.empty();
+                    }
+
+                    public int size() {
+                        return 0;
+                    }
+
+                    public java.util.Set<String> keySet() {
+                        return java.util.Collections.emptySet();
+                    }
+                });
+
+        engine.execute(execRequest);
+
+        assertThat(started.get()).isTrue();
+        assertThat(finished.get()).isTrue();
+    }
 }

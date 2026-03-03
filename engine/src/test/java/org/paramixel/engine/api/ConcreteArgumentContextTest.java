@@ -67,4 +67,41 @@ public class ConcreteArgumentContextTest {
         assertThat(argumentContext.toString()).contains("testClass=");
         assertThat(argumentContext.toString()).contains("invocationIndex=7");
     }
+
+    @Test
+    public void getArgumentTyped_returnsNullWhenArgumentNull() {
+        final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
+        final ConcreteClassContext classContext = new ConcreteClassContext(String.class, engineContext, null);
+        final ConcreteArgumentContext argumentContext = new ConcreteArgumentContext(classContext, null, 0);
+
+        assertThat(argumentContext.getArgument(String.class)).isNull();
+    }
+
+    @Test
+    public void getArgumentTyped_returnsCastValueWhenTypeMatches() {
+        final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
+        final ConcreteClassContext classContext = new ConcreteClassContext(String.class, engineContext, null);
+        final ConcreteArgumentContext argumentContext = new ConcreteArgumentContext(classContext, "value", 0);
+
+        assertThat(argumentContext.getArgument(String.class)).isEqualTo("value");
+        assertThat(argumentContext.getArgument(Object.class)).isEqualTo("value");
+    }
+
+    @Test
+    public void getArgumentTyped_throwsClassCastExceptionWhenTypeMismatch() {
+        final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
+        final ConcreteClassContext classContext = new ConcreteClassContext(String.class, engineContext, null);
+        final ConcreteArgumentContext argumentContext = new ConcreteArgumentContext(classContext, "value", 0);
+
+        assertThatThrownBy(() -> argumentContext.getArgument(Integer.class)).isInstanceOf(ClassCastException.class);
+    }
+
+    @Test
+    public void getArgumentTyped_throwsNullPointerExceptionWhenTypeNull() {
+        final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
+        final ConcreteClassContext classContext = new ConcreteClassContext(String.class, engineContext, null);
+        final ConcreteArgumentContext argumentContext = new ConcreteArgumentContext(classContext, "value", 0);
+
+        assertThatThrownBy(() -> argumentContext.getArgument(null)).isInstanceOf(NullPointerException.class);
+    }
 }
