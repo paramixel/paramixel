@@ -59,7 +59,8 @@ public class BufstreamTest {
     }
 
     @Paramixel.BeforeAll
-    public void initializeTestEnvironment(final @NonNull ArgumentContext context) throws IOException {
+    public void initializeTestEnvironment(final @NonNull ArgumentContext context)
+            throws IOException, ExecutionException, InterruptedException {
         BufstreamTestEnvironment bufstreamTestEnvironment = context.getArgument(BufstreamTestEnvironment.class);
         LOGGER.info("[%s] initialize test environment ...", bufstreamTestEnvironment.getName());
 
@@ -72,6 +73,8 @@ public class BufstreamTest {
         assertThat(bufstreamTestEnvironment.isRunning()).isTrue();
 
         LOGGER.info("bootstrap servers: %s", bufstreamTestEnvironment.getBootstrapServers());
+
+        bufstreamTestEnvironment.createTopic(TOPIC);
     }
 
     @Paramixel.Test

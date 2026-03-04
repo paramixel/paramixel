@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
@@ -35,6 +36,7 @@ import java.util.stream.Stream;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.errors.TopicExistsException;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.Named;
 import org.testcontainers.containers.GenericContainer;
@@ -151,14 +153,18 @@ public class TansuTestEnvironment implements Named {
         p.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
 
         try (AdminClient admin = AdminClient.create(p)) {
-            List<NewTopic> topics = new ArrayList<>();
-            topics.add(new NewTopic(topic, 1, (short) 1));
-            admin.createTopics(topics).all().get();
+            admin.createTopics(Collections.singletonList(new NewTopic(topic, 1, (short) 1)))
+                    .all()
+                    .get();
         } catch (ExecutionException e) {
-            // ignore “already exists”
-            if (e.getCause() == null || !e.getCause().getClass().getName().contains("TopicExists")) {
-                throw e;
+            // ignore "already exists"
+            Throwable cause = e.getCause();
+            if (cause instanceof TopicExistsException
+                    || (cause != null && cause.getCause() instanceof TopicExistsException)) {
+                return;
             }
+
+            throw e;
         }
     }
 

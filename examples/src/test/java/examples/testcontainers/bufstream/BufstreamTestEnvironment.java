@@ -26,10 +26,17 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Stream;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.errors.TopicExistsException;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.Named;
 import org.testcontainers.containers.GenericContainer;
@@ -141,6 +148,33 @@ public class BufstreamTestEnvironment implements Named {
         }
 
         // info("test environment [%s] destroyed", dockerImageName);
+    }
+
+    /**
+     * Method to create a topic in the BufstreamTestEnvironment
+     *
+     * @param topic the topic name
+     * @throws ExecutionException if an error occurs
+     * @throws InterruptedException if an error occurs
+     */
+    public void createTopic(final @NonNull String topic) throws ExecutionException, InterruptedException {
+        Properties p = new Properties();
+        p.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
+
+        try (AdminClient admin = AdminClient.create(p)) {
+            admin.createTopics(Collections.singletonList(new NewTopic(topic, 1, (short) 1)))
+                    .all()
+                    .get();
+        } catch (ExecutionException e) {
+            // ignore "already exists"
+            Throwable cause = e.getCause();
+            if (cause instanceof TopicExistsException
+                    || (cause != null && cause.getCause() instanceof TopicExistsException)) {
+                return;
+            }
+
+            throw e;
+        }
     }
 
     /**
