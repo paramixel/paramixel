@@ -142,7 +142,7 @@ All annotations have `@Retention(RetentionPolicy.RUNTIME)` and `@Documented`.
 | Field | Type | Notes |
 |---|---|---|
 | `engineId` | `String` | Always `"paramixel"` |
-| `configuration` | `Properties` | Defensive copy; loaded from `paramixel.properties` + runtime overrides (`invokedBy`, `parallelism`) |
+| `configuration` | `Properties` | Defensive copy; loaded from `paramixel.properties` + runtime overrides (`invokedBy`, `paramixel.parallelism`) |
 | `classParallelism` | `int` | Max concurrent test classes; defaults to `availableProcessors` |
 | `store` | `Store` | `ConcreteStore` instance |
 
@@ -234,7 +234,7 @@ Base class implementing `org.junit.platform.engine.TestDescriptor`.
 ```
 [Per class]
   @Paramixel.ArgumentsCollector (static method - no instance required)
-  TestClass.newInstance()          ← no-arg constructor invocation
+  TestClass.newInstance()          ← no-arg constructor invocation (engine may make constructor accessible)
   @Paramixel.Initialize(ClassContext)
   [Per argument]
     @Paramixel.BeforeAll(ArgumentContext)
@@ -315,5 +315,5 @@ The Maven plugin exposes additional parameters:
 |---|---|---|
 | `skipTests` | `false` | Skip all test execution |
 | `paramixel.failIfNoTests` | `true` | Fail build if no `@Paramixel.TestClass` found |
-| `paramixel.class.parallelism` | `2147483647` | Max concurrent test classes (effectively unlimited) |
+| `paramixel.parallelism` | (engine default) | Global maximum parallelism (max concurrent test classes) |
 | `paramixel.verbose` | `false` | Verbose logging (currently partially implemented) |

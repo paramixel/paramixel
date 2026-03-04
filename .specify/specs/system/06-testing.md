@@ -104,6 +104,15 @@ Note: examples include Testcontainers-based tests that require Docker. Ensure Do
 # Report written to: engine/target/site/jacoco/index.html
 ```
 
+### Benchmarks (JMH)
+
+Benchmarks live in the `benchmarks` module under `benchmarks/src/main/java` and are executed only when the benchmarks
+profile is enabled.
+
+```bash
+./mvnw test -pl benchmarks -Pbenchmarks
+```
+
 ---
 
 ## 3. Unit Test Structure (`engine` module)
@@ -121,6 +130,11 @@ Unit tests live in `engine/src/test/java/` mirroring the production package stru
 - **JUnit Jupiter** (`org.junit.jupiter:junit-jupiter`)
 - **AssertJ** (`org.assertj:assertj-core`) for fluent assertions
 - No Mockito (not in any `pom.xml`); tests use real collaborators or minimal hand-rolled stubs.
+
+### Reflection in Tests
+
+JUnit unit tests MAY use reflection helpers such as `setAccessible(true)` and `@SuppressWarnings` when needed to
+validate internal behavior.
 
 ### Test Class Template (engine unit test)
 

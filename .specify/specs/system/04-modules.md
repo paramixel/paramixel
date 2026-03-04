@@ -158,7 +158,7 @@ org.paramixel.engine
 | Source | Key | Consumed by |
 |---|---|---|
 | JUnit Platform config | `invokedBy` | `ParamixelTestEngine.execute()` — selects listener mode |
-| JUnit Platform config | `parallelism` | `ParamixelTestEngine.execute()` — sets class parallelism |
+| JUnit Platform config | `paramixel.parallelism` | `ParamixelTestEngine.execute()` — sets class parallelism |
 | `paramixel.properties` (file) | Any key | Available via `EngineContext.getConfigurationValue()` |
 | `paramixel.properties` (built-in resource) | `version` | Engine version string |
 
@@ -205,8 +205,8 @@ org.paramixel.maven.plugin
 
 ### Configuration Properties
 
-Exposed as Maven Mojo parameters (see spec/03-api-contracts.md §4):
-- `skipTests` / `paramixel.failIfNoTests` / `paramixel.class.parallelism` / `paramixel.verbose`
+Exposed as Maven Mojo parameters (see `.specify/specs/system/03-api-contracts.md` §4):
+- `skipTests` / `paramixel.failIfNoTests` / `paramixel.parallelism` / `paramixel.verbose`
 
 ---
 
@@ -355,39 +355,47 @@ examples/
 
 ### Responsibility
 
-Performance benchmarks using JMH (Java Microbenchmark Harness) to measure engine throughput, latency, and compare performance characteristics with JUnit Jupiter. Benchmarks run via a dedicated Maven profile (`-Pbenchmarks`) and are excluded from standard CI builds due to long runtime.
+Performance benchmarks using JMH (Java Microbenchmark Harness) to measure engine throughput, latency, and compare performance characteristics with JUnit Jupiter.
+
+Benchmarks are implemented as regular Java sources under this module so that JMH can discover and execute them reliably.
+They are run via a dedicated Maven profile (`-Pbenchmarks`) and are excluded from standard CI builds due to long runtime.
 
 ### Internal Package Structure
 
 ```
 benchmarks/
-└── src/test/java/org/paramixel/benchmarks/
-    ├── EngineBenchmark.java              Paramixel engine performance benchmarks
-    ├── JUnitComparisonBenchmark.java     Comparison with JUnit Jupiter
-    └── ThroughputBenchmark.java          Throughput measurement benchmarks
+└── src/main/java/
+    └── org/paramixel/engine/
+        ├── api/                          Benchmarks for api-layer implementations
+        ├── filter/                       Benchmarks for tag filtering
+        └── util/                         Benchmarks for utility classes
 ```
 
 ### Layer Breakdown
 
 | Layer | Package | Responsibility |
 |---|---|---|
-| Benchmark sources | `org.paramixel.benchmarks` | JMH benchmark classes |
+| Benchmark sources | `org.paramixel.engine.*` | JMH benchmark classes (benchmarks-only module) |
 
 ### Key Classes and Roles
 
 | Class | Role |
 |---|---|
-| `EngineBenchmark` | Measures Paramixel engine throughput, latency, and resource utilization |
-| `JUnitComparisonBenchmark` | Comparative benchmarks against JUnit Jupiter for equivalent test scenarios |
-| `ThroughputBenchmark` | Measures maximum test execution throughput under various parallelism configurations |
+| `ConcreteStoreBenchmark` | Microbenchmarks for `ConcreteStore` operations |
+| `FastIdBenchmark` | Microbenchmarks for `FastId` ID generation |
+| `RegexTagFilterBenchmark` | Microbenchmarks for tag filter regex matching |
 
 ### What This Module MUST NOT Do
 
 - Must NOT contain functional or integration tests (those go in `paramixel-tests` or `paramixel-examples`).
 - Must NOT depend on `paramixel-maven-plugin`.
 - Must NOT run during standard Maven build phases (must use dedicated profile).
-- Must NOT have production code — all code is test/benchmark scope only.
 - Must NOT be executed in CI builds by default (long runtime).
+
+Notes:
+- This module intentionally places benchmark code in `benchmarks/src/main/java` for JMH functionality.
+- It may declare synthetic `@Paramixel.TestClass` types inside benchmarks as benchmark inputs (these are not part of the
+  engine module and are not discovered during normal builds).
 
 ### Configuration Properties
 
@@ -408,7 +416,7 @@ Benchmarks are executed via a dedicated Maven profile:
 ./mvnw test -pl benchmarks -Pbenchmarks
 
 # Run specific benchmark class
-./mvnw test -pl benchmarks -Pbenchmarks -Dbenchmarks.class=EngineBenchmark
+./mvnw test -pl benchmarks -Pbenchmarks -Dbenchmarks.class=FastIdBenchmark
 
 # Run with custom settings
 ./mvnw test -pl benchmarks -Pbenchmarks \

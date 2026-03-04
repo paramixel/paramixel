@@ -7,12 +7,16 @@
 | Module | Root package | Sub-packages |
 |---|---|---|
 | `paramixel-api` | `org.paramixel.api` | None (flat) |
-| `paramixel-engine` | `org.paramixel.engine` | `api`, `descriptor`, `discovery`, `execution`, `invoker`, `listener`, `util`, `validation` |
+| `paramixel-engine` | `org.paramixel.engine` | `api`, `descriptor`, `discovery`, `execution`, `filter`, `invoker`, `listener`, `util`, `validation` |
 | `paramixel-maven-plugin` | `org.paramixel.maven.plugin` | None |
-| `paramixel-tests` | `test` (or `test.<subpackage>`) | `argument`, `lifecycle`, `named`, `order`, `store` |
+| `paramixel-tests` | `test` (or `test.<subpackage>`) | `argument`, `lifecycle`, `named`, `order`, `store`, `tags` |
 | `paramixel-examples` | `examples` | `simple`, `complex`, `support`, `testcontainers.*`, `testcontainers.util` |
+| `paramixel-benchmarks` | `org.paramixel.engine` | `api`, `filter`, `util` |
 
 **Rule:** New engine classes go into the sub-package that matches their layer (e.g., a new runner class → `org.paramixel.engine.execution`). New API types go into `org.paramixel.api`.
+
+**Benchmarks note:** The `paramixel-benchmarks` module intentionally uses the `org.paramixel.engine.*` package namespace
+and places sources under `benchmarks/src/main/java` to support JMH discovery/execution.
 
 ---
 
@@ -174,7 +178,8 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 4. **Every new production class in `paramixel-engine` MUST have a corresponding unit test** in `engine/src/test/java/`.
 5. **Constructor injection MUST be used** for all dependencies. No field-level DI annotations.
 6. **`final` MUST be used** on all fields set in constructors and on all utility classes.
-7. **`@SuppressWarnings` MUST NOT be used** to suppress compiler or static analysis warnings.
+7. **`@SuppressWarnings` MUST NOT be used in production code** to suppress compiler or static analysis warnings.
+   It MAY be used in test sources (`*/src/test/java/**`) when necessary (e.g., unavoidable generic casts in assertions).
 8. **New public API types (interfaces, annotations, value objects) MUST live in `org.paramixel.api`** and only in `paramixel-api`.
 9. **Engine-internal types MUST live in the appropriate `org.paramixel.engine.<layer>` sub-package**.
 10. **Lifecycle exceptions MUST be recorded via `classContext.recordFailure(t)`** and must NOT propagate silently.
@@ -192,9 +197,17 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 6. Never reference `paramixel-maven-plugin` or `paramixel-engine` from `paramixel-api`.
 7. Never add `@Paramixel.TestClass`-annotated classes to `paramixel-engine` or `paramixel-maven-plugin` source.
 8. Never use JUnit Jupiter annotations (`@org.junit.jupiter.api.Test`, `@BeforeEach`, etc.) in any module — use Paramixel annotations in test classes and standard `org.junit.jupiter.api.*` only in engine unit tests.
-9. Never call `method.setAccessible(true)` outside `ParamixelReflectionInvoker`.
+9. Never call `method.setAccessible(true)` outside `ParamixelReflectionInvoker` in production code.
+
+   Exceptions:
+   - `constructor.setAccessible(true)` is permitted in
+     `engine/src/main/java/org/paramixel/engine/execution/ParamixelClassRunner.java` when instantiating the test class
+     via its no-arg constructor. This supports test classes that do not declare an explicit constructor (so the compiler
+     provides a default no-arg constructor whose access may be package-private).
+   - Test sources (`*/src/test/java/**`) MAY use `setAccessible(true)` when required to validate behavior (e.g., to
+     inspect or manipulate private state in JUnit unit tests).
 10. Never bypass the `ParamixelConcurrencyLimiter` when submitting class or argument tasks.
-11. Never modify a `paramixel-api` interface without updating `spec/02-data-model.md` and `spec/03-api-contracts.md`.
+11. Never modify a `paramixel-api` interface without updating `.specify/specs/system/02-data-model.md` and `.specify/specs/system/03-api-contracts.md`.
 12. Never add a new Maven dependency to a module without explicit user approval and updating this spec.
 
 ---
@@ -207,8 +220,8 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 4. Add `@NonNull` to all non-null method parameters.
 5. Create a concrete implementation in `engine/src/main/java/org/paramixel/engine/api/ConcreteMyNew.java`.
 6. Write a unit test in `engine/src/test/java/org/paramixel/engine/api/ConcreteMyNewTest.java`.
-7. Update `spec/02-data-model.md` with the new interface fields/methods.
-8. Update `spec/03-api-contracts.md` with method-level contracts.
+7. Update `.specify/specs/system/02-data-model.md` with the new interface fields/methods.
+8. Update `.specify/specs/system/03-api-contracts.md` with method-level contracts.
 9. Run `./mvnw verify -pl api,engine` and fix all errors.
 
 ---
@@ -221,7 +234,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 4. If the annotation applies to test methods, add validation logic to `MethodValidator.validateTestClass()`.
 5. Add a corresponding lifecycle hook in `ParamixelClassRunner` or `ParamixelInvocationRunner` if execution behaviour is needed.
 6. Add a test class in `paramixel-tests/src/test/java/test/` to verify the new annotation.
-7. Update `spec/02-data-model.md` annotation table and `spec/03-api-contracts.md`.
+7. Update `.specify/specs/system/02-data-model.md` annotation table and `.specify/specs/system/03-api-contracts.md`.
 8. Run `./mvnw verify` and fix all errors.
 
 ---
@@ -258,8 +271,8 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 3. Add Spotless plugin configuration with the license header file path.
 4. Add maven-enforcer-plugin if this module needs enforcer rules.
 5. Declare only dependencies that the module directly uses.
-6. Update `spec/00-overview.md` module inventory table.
-7. Update `spec/04-modules.md` with a new module section.
+6. Update `.specify/specs/system/00-overview.md` module inventory table.
+7. Update `.specify/specs/system/04-modules.md` with a new module section.
 8. Run `./mvnw verify` from root and fix all errors.
 
 ---

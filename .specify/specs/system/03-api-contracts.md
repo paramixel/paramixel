@@ -31,7 +31,9 @@ The ordering of one annotation type does not affect the ordering of another anno
 
 - **Target:** `ElementType.TYPE`
 - **Effect:** Marks a class as a Paramixel test class. Required for discovery.
-- **Constraint:** None on the class itself. The class must have a public or accessible no-arg constructor.
+- **Constraint:** None on the class itself. The class must have a no-arg constructor that the engine can instantiate.
+  If the test class does not declare an explicit constructor, the compiler provides a default no-arg constructor whose
+  access may be package-private; the engine may use reflection to make that constructor accessible.
 
 ### `@Paramixel.Test`
 
@@ -216,7 +218,7 @@ Contract:
 | `project` | `project` | (injected) | `MavenProject` | The current Maven project |
 | `skipTests` | `skipTests` | `false` | `boolean` | Skips all test execution when true |
 | `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@Paramixel.TestClass` annotated class found |
-| `classParallelism` | `paramixel.class.parallelism` | `2147483647` | `int` | Maximum concurrent test classes (currently unused - see `paramixel.parallelism` for parallelism control) |
+| `parallelism` | `paramixel.parallelism` | (engine default) | `Integer` | Global maximum parallelism (max concurrent test classes); when unset, engine default applies |
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |
 
 #### Behaviour
@@ -247,7 +249,7 @@ String getName();
 
 ### `org.paramixel.api.Store`
 
-Full contract documented in spec/02-data-model.md. Key behavioral notes:
+Full contract documented in `.specify/specs/system/02-data-model.md`. Key behavioral notes:
 - `null` values are NOT stored; `put(key, null)` == `remove(key)`.
 - `ClassCastException` thrown for type mismatches on typed get/put/remove methods.
 - `computeIfAbsent` supplier may be invoked multiple times under contention.
