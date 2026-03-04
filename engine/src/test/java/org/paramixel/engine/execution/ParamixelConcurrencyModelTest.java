@@ -40,7 +40,7 @@ import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
-import org.paramixel.engine.util.FastId;
+import org.paramixel.engine.util.FastIdUtil;
 
 public class ParamixelConcurrencyModelTest {
 
@@ -84,7 +84,7 @@ public class ParamixelConcurrencyModelTest {
                     new ParamixelClassRunner(runtime, engineContext, listener, classContexts, testInstances);
             final ParamixelConcurrencyLimiter.ClassPermit classPermit =
                     runtime.limiter().acquireClassExecution();
-            final Future<?> future = runtime.submitNamed(FastId.getId(6), () -> {
+            final Future<?> future = runtime.submitNamed(FastIdUtil.getId(6), () -> {
                 try (classPermit) {
                     runner.runTestClass(classDescriptor);
                 }
@@ -138,7 +138,7 @@ public class ParamixelConcurrencyModelTest {
 
             final ParamixelConcurrencyLimiter.ClassPermit permit =
                     runtime.limiter().acquireClassExecution();
-            runtime.submitNamed(FastId.getId(6), () -> {
+            runtime.submitNamed(FastIdUtil.getId(6), () -> {
                         try (permit) {
                             runner.runTestClass(classDescriptor);
                         }
@@ -190,12 +190,12 @@ public class ParamixelConcurrencyModelTest {
             final ParamixelConcurrencyLimiter.ClassPermit p1 = runtime.limiter().acquireClassExecution();
             final ParamixelConcurrencyLimiter.ClassPermit p2 = runtime.limiter().acquireClassExecution();
 
-            final Future<?> f1 = runtime.submitNamed(FastId.getId(6), () -> {
+            final Future<?> f1 = runtime.submitNamed(FastIdUtil.getId(6), () -> {
                 try (p1) {
                     runner.runTestClass(d1);
                 }
             });
-            final Future<?> f2 = runtime.submitNamed(FastId.getId(6), () -> {
+            final Future<?> f2 = runtime.submitNamed(FastIdUtil.getId(6), () -> {
                 try (p2) {
                     runner.runTestClass(d2);
                 }

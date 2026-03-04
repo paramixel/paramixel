@@ -39,7 +39,7 @@ import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 import org.paramixel.engine.invoker.ParamixelReflectionInvoker;
-import org.paramixel.engine.util.FastId;
+import org.paramixel.engine.util.FastIdUtil;
 
 /**
  * Executes {@link Paramixel.Test} method invocations for one argument bucket.
@@ -168,7 +168,7 @@ public final class ParamixelInvocationRunner {
                 if (permitOpt.isPresent()) {
                     asyncStarted++;
                     final ParamixelConcurrencyLimiter.ArgumentPermit permit = permitOpt.get();
-                    futures.add(runtime.submitNamed(FastId.getId(6), () -> {
+                    futures.add(runtime.submitNamed(FastIdUtil.getId(6), () -> {
                         try (permit) {
                             return executeInvocation(methodDescriptor, testMethod, argument, argumentIndex);
                         }

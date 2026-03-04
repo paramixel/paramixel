@@ -38,7 +38,7 @@ import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
-import org.paramixel.engine.util.FastId;
+import org.paramixel.engine.util.FastIdUtil;
 
 public class ParamixelClassRunnerTest {
 
@@ -71,7 +71,7 @@ public class ParamixelClassRunnerTest {
 
             final ParamixelConcurrencyLimiter.ClassPermit permit =
                     runtime.limiter().acquireClassExecution();
-            runtime.submitNamed(FastId.getId(6), () -> {
+            runtime.submitNamed(FastIdUtil.getId(6), () -> {
                         try (permit) {
                             runner.runTestClass(classDescriptor);
                         }
@@ -121,7 +121,7 @@ public class ParamixelClassRunnerTest {
                     new ParamixelClassRunner(runtime, engineContext, listener, classContexts, testInstances);
             final ParamixelConcurrencyLimiter.ClassPermit permit =
                     runtime.limiter().acquireClassExecution();
-            runtime.submitNamed(FastId.getId(6), () -> {
+            runtime.submitNamed(FastIdUtil.getId(6), () -> {
                         try (permit) {
                             runner.runTestClass(classDescriptor);
                         }

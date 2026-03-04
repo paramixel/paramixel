@@ -22,18 +22,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
-public class FastIdTest {
+public class FastIdUtilTest {
 
     @Test
     public void getId_throwsWhenLengthNonPositive() {
-        assertThatThrownBy(() -> FastId.getId(0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> FastId.getId(-1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> FastIdUtil.getId(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> FastIdUtil.getId(-1)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     public void getId_generatesAlphanumeric_andAvoidsForbiddenWords() {
         for (int i = 0; i < 5_000; i++) {
-            final String id = FastId.getId(16);
+            final String id = FastIdUtil.getId(16);
             assertThat(id).hasSize(16);
             assertThat(id).matches("[0-9A-Za-z]+$");
 
@@ -47,7 +47,7 @@ public class FastIdTest {
 
     @Test
     public void containsForbidden_detectsForbiddenSubstrings() throws Exception {
-        final var m = FastId.class.getDeclaredMethod("containsForbidden", char[].class);
+        final var m = FastIdUtil.class.getDeclaredMethod("containsForbidden", char[].class);
         m.setAccessible(true);
 
         assertThat((boolean) m.invoke(null, (Object) "XPASSY".toCharArray())).isTrue();
