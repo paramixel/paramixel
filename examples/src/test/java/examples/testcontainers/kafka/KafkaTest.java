@@ -72,6 +72,8 @@ public class KafkaTest {
         assertThat(testEnvironment.isRunning()).isTrue();
 
         LOGGER.info("bootstrap servers: %s", testEnvironment.getBootstrapServers());
+
+        testEnvironment.createTopic(TOPIC);
     }
 
     @Paramixel.Test
