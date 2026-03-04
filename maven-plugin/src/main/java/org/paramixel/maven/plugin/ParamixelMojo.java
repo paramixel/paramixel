@@ -111,10 +111,10 @@ public class ParamixelMojo extends AbstractMojo {
     private boolean failIfNoTests;
 
     /**
-     * The parallelism setting for test class execution.
+     * The global parallelism setting for test class execution.
      */
-    @Parameter(property = "paramixel.class.parallelism", defaultValue = "2147483647")
-    private int classParallelism;
+    @Parameter(property = "paramixel.parallelism")
+    private Integer parallelism;
 
     /**
      * Whether to print verbose output.
@@ -146,7 +146,7 @@ public class ParamixelMojo extends AbstractMojo {
         /*
         if (verbose) {
             getLog().info("Starting Paramixel test execution");
-            getLog().info("Class parallelism: " + classParallelism);
+            getLog().info("Parallelism: " + parallelism);
             getLog().info("Fail if no tests: " + failIfNoTests);
         }
         */
@@ -281,6 +281,11 @@ public class ParamixelMojo extends AbstractMojo {
         requestBuilder.filters(EngineFilter.includeEngines("paramixel"));
 
         requestBuilder.configurationParameter("invokedBy", "maven");
+
+        if (parallelism != null) {
+            requestBuilder.configurationParameter("paramixel.parallelism", String.valueOf(parallelism));
+            getLog().info("Paramixel parallelism: " + parallelism);
+        }
 
         if (includeTags != null && !includeTags.trim().isEmpty()) {
             requestBuilder.configurationParameter("paramixel.tags.include", includeTags.trim());

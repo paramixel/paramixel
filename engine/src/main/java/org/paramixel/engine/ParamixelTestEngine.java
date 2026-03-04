@@ -153,7 +153,7 @@ public class ParamixelTestEngine implements TestEngine {
 
         try {
             properties.setProperty("invokedBy", invokedByMaven ? "maven" : "junit");
-            properties.setProperty("parallelism", String.valueOf(maxParallelism));
+            properties.setProperty("paramixel.parallelism", String.valueOf(maxParallelism));
 
             if (invokedByMaven) {
                 LOGGER.info("Paramixel Engine invoked by Maven");

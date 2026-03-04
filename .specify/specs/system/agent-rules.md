@@ -1,8 +1,18 @@
-# Paramixel — Agent Rules
+# Paramixel - Agent Rules
+
+This file mirrors `AGENTS.md` to keep all workflow guardrails alongside the system specification.
+
+TODO: Decide whether `AGENTS.md` should remain at repo root or be replaced by this file.
+
+---
+
+# Paramixel - Agent Rules
 
 ## Specification
 
 This project uses specification-oriented development. The authoritative system specification lives under `.specify/specs/system/`. Before implementing any feature, you MUST read the relevant spec files.
+
+TODO: If any tooling relied on `opencode.json` instruction loading, replace it with Spec-Kit templates/commands conventions.
 
 ## Critical Rules
 
@@ -50,14 +60,14 @@ This project uses specification-oriented development. The authoritative system s
 | Run a single unit test class | `./mvnw test -pl engine -Dtest=MyTest` |
 | Run a single unit test method | `./mvnw test -pl engine -Dtest=MyTest#myMethod` |
 | Apply code formatting only | `./mvnw spotless:apply` |
-| Code coverage report (engine) | `./mvnw verify -pl engine` → `engine/target/site/jacoco/index.html` |
+| Code coverage report (engine) | `./mvnw verify -pl engine` -> `engine/target/site/jacoco/index.html` |
 
 ## Key Design Decisions to Respect
 
 1. **Virtual threads**: All parallel execution uses `Executors.newVirtualThreadPerTaskExecutor()`. Do not introduce platform thread pools.
 2. **Fair semaphores for concurrency**: `ParamixelConcurrencyLimiter` uses three fair `Semaphore` instances (total=`cores*2`, class=`cores`, argument=`cores`). Do not bypass this.
 3. **Arguments collector invoked at discovery time**: `@Paramixel.ArgumentsCollector` is called during `discover()`, not `execute()`. This is intentional.
-4. **Context hierarchy**: `EngineContext → ClassContext → ArgumentContext`. Each level has its own `Store`. Do not mix them.
+4. **Context hierarchy**: `EngineContext -> ClassContext -> ArgumentContext`. Each level has its own `Store`. Do not mix them.
 5. **No IoC container**: All dependencies are wired manually via constructors. Never use `@Autowired`, `@Inject`, or `@Component`.
 6. **Lifecycle exception handling**: "after" hooks (`@AfterEach`, `@AfterAll`, `@Finalize`) MUST run even after failures. "before" hooks (`@Initialize`, `@BeforeAll`, `@BeforeEach`) abort on first failure.
 7. **InvocationTargetException unwrapping**: All reflection invocations go through `ParamixelReflectionInvoker.invokeMethod()` which unwraps `InvocationTargetException`.
@@ -66,9 +76,9 @@ This project uses specification-oriented development. The authoritative system s
 
 - Do not refactor code outside the scope of the requested task.
 - Do not rename existing public APIs (`org.paramixel.api.*`) without explicit instruction.
-- Do not change the engine ID (`"paramixel"`) — it is a stable SPI identifier.
+- Do not change the engine ID (`"paramixel"`) - it is a stable SPI identifier.
 - Do not add `@SuppressWarnings` to hide compiler or static analysis warnings.
-- Do not use field injection (`@Autowired` on fields) — constructor injection only.
+- Do not use field injection (`@Autowired` on fields)  constructor injection only.
 - Do not commit or push changes; only make edits.
 - Do not add `System.out.println` to engine or API production code outside `ParamixelEngineExecutionListener`.
 - Do not reference `org.paramixel.engine.*` internal packages from `paramixel-api`.
