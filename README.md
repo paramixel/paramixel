@@ -5,7 +5,7 @@
 
 # Paramixel Test Engine
 
-A powerful and flexible JUnit platform-based Java test engine designed for parallel test execution with lifecycle management.
+A powerful and flexible JUnit Platform-based Java test engine designed for parallel test execution with lifecycle management.
 
 ## Overview
 
