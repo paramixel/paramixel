@@ -29,16 +29,23 @@ import java.util.concurrent.ThreadLocalRandom;
  *   <li>FAIL</li>
  *   <li>SKIP</li>
  * </ul>
+ *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class FastIdUtil {
 
     /**
      * Character set containing all valid ID characters.
+     *
+     * @since 0.0.1
      */
     private static final char[] CHARS = new char[62];
 
     /**
      * Forbidden words (uppercase).
+     *
+     * @since 0.0.1
      */
     private static final String[] FORBIDDEN = {"PASS", "TEST", "FAIL", "SKIP"};
 
@@ -60,9 +67,11 @@ public final class FastIdUtil {
      * Prevents instantiation of this utility class.
      *
      * <p>This class exposes only static methods.
+     *
+     * @since 0.0.1
      */
     private FastIdUtil() {
-        // utility class
+        // INTENTIONALLY EMPTY
     }
 
     /**
@@ -72,6 +81,7 @@ public final class FastIdUtil {
      * @param length ID length (must be positive)
      * @return valid random ID
      * @throws IllegalArgumentException if {@code length <= 0}
+     * @since 0.0.1
      */
     public static String getId(final int length) {
         if (length <= 0) {
@@ -101,6 +111,7 @@ public final class FastIdUtil {
      *
      * @param buffer the candidate id buffer; never {@code null}
      * @return {@code true} when any forbidden word occurs as a contiguous substring
+     * @since 0.0.1
      */
     private static boolean containsForbidden(final char[] buffer) {
         final int len = buffer.length;

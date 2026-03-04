@@ -29,16 +29,26 @@ import org.jspecify.annotations.NonNull;
  *   <li>method signature contracts</li>
  * </ul>
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class TestClassValidator {
 
-    private TestClassValidator() {}
+    /**
+     * Creates a new instance.
+     *
+     * @since 0.0.1
+     */
+    private TestClassValidator() {
+        // INTENTIONALLY EMPTY
+    }
 
     /**
      * Validates a test class for Paramixel contract compliance.
      *
      * @param testClass the class to validate
      * @return validation failures; empty when valid
+     * @since 0.0.1
      */
     public static List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
         final List<ValidationFailure> failures = new ArrayList<>();

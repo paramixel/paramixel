@@ -40,10 +40,19 @@ import org.paramixel.api.Paramixel;
  * Callers are expected to decide whether to skip or fail test discovery based on
  * the returned failures.</p>
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class MethodValidator {
 
-    private MethodValidator() {}
+    /**
+     * Creates a new instance.
+     *
+     * @since 0.0.1
+     */
+    private MethodValidator() {
+        // INTENTIONALLY EMPTY
+    }
 
     /**
      * Validates a test class and its annotated methods.
@@ -53,6 +62,7 @@ public final class MethodValidator {
      *
      * @param testClass the test class to validate
      * @return a list of validation failures; empty when the class is valid
+     * @since 0.0.1
      */
     public static List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
         final List<ValidationFailure> failures = new ArrayList<>();
@@ -60,38 +70,134 @@ public final class MethodValidator {
 
         for (Class<?> current : classHierarchy) {
             for (Method method : current.getDeclaredMethods()) {
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 final boolean isTestMethod = method.isAnnotationPresent(Paramixel.Test.class);
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 final boolean isLifecycleMethod = method.isAnnotationPresent(Paramixel.Initialize.class)
+                        /**
+                         * Provides this type.
+                         *
+                         * @author Douglas Hoard <doug.hoard@gmail.com>
+                         * @since 0.0.1
+                         */
                         || method.isAnnotationPresent(Paramixel.BeforeAll.class)
+                        /**
+                         * Provides this type.
+                         *
+                         * @author Douglas Hoard <doug.hoard@gmail.com>
+                         * @since 0.0.1
+                         */
                         || method.isAnnotationPresent(Paramixel.BeforeEach.class)
+                        /**
+                         * Provides this type.
+                         *
+                         * @author Douglas Hoard <doug.hoard@gmail.com>
+                         * @since 0.0.1
+                         */
                         || method.isAnnotationPresent(Paramixel.AfterEach.class)
+                        /**
+                         * Provides this type.
+                         *
+                         * @author Douglas Hoard <doug.hoard@gmail.com>
+                         * @since 0.0.1
+                         */
                         || method.isAnnotationPresent(Paramixel.AfterAll.class)
+                        /**
+                         * Provides this type.
+                         *
+                         * @author Douglas Hoard <doug.hoard@gmail.com>
+                         * @since 0.0.1
+                         */
                         || method.isAnnotationPresent(Paramixel.Finalize.class);
 
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.Test.class)) {
                     failures.addAll(validateTestMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
                     failures.addAll(validateArgumentsCollectorMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.BeforeEach.class)) {
                     failures.addAll(validateBeforeEachMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.AfterEach.class)) {
                     failures.addAll(validateAfterEachMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.BeforeAll.class)) {
                     failures.addAll(validateBeforeAllMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.AfterAll.class)) {
                     failures.addAll(validateAfterAllMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.Initialize.class)) {
                     failures.addAll(validateInitializeMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.Finalize.class)) {
                     failures.addAll(validateFinalizeMethod(method));
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (method.isAnnotationPresent(Paramixel.Order.class)) {
                     failures.addAll(validateOrderAnnotationUsage(method, isTestMethod, isLifecycleMethod));
                 }
@@ -101,9 +207,22 @@ public final class MethodValidator {
         return failures;
     }
 
+    /**
+     * Performs buildClassHierarchy.
+     *
+     * @param testClass the testClass
+     * @return the result
+     * @since 0.0.1
+     */
     private static List<Class<?>> buildClassHierarchy(final @NonNull Class<?> testClass) {
         final List<Class<?>> result = new ArrayList<>();
         for (Class<?> current = testClass;
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             result.add(current);
@@ -111,10 +230,24 @@ public final class MethodValidator {
         return result;
     }
 
+    /**
+     * Performs validateArgumentsCollectorMethod.
+     *
+     * @param method the method
+     * @return the result
+     * @since 0.0.1
+     */
     private static List<ValidationFailure> validateArgumentsCollectorMethod(final @NonNull Method method) {
         final List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param method.getName()) the method.getName())
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.ArgumentsCollector method must be public: "
                     + method.getDeclaringClass().getName() + "#" + method.getName()));
         }
@@ -125,13 +258,31 @@ public final class MethodValidator {
         }
 
         final boolean isCollectorDriven = method.getParameterCount() == 1
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 && method.getParameterTypes()[0].equals(ArgumentsCollector.class)
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 && method.getReturnType().equals(void.class);
         if (isCollectorDriven) {
             return failures;
         }
 
         final boolean isReturnBased =
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 method.getParameterCount() == 0 && !method.getReturnType().equals(void.class);
         if (!isReturnBased) {
             failures.add(new ValidationFailure("Invalid @Paramixel.ArgumentsCollector method signature: "
@@ -153,9 +304,24 @@ public final class MethodValidator {
         return failures;
     }
 
+    /**
+     * Performs validateOrderAnnotationUsage.
+     *
+     * @param method the method
+     * @param isTestMethod the isTestMethod
+     * @param isLifecycleMethod the isLifecycleMethod
+     * @return the result
+     * @since 0.0.1
+     */
     private static List<ValidationFailure> validateOrderAnnotationUsage(
             final @NonNull Method method, final boolean isTestMethod, final boolean isLifecycleMethod) {
         final List<ValidationFailure> failures = new ArrayList<>();
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {
             return failures;
@@ -180,19 +346,39 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
+     * @since 0.0.1
      */
     private static List<ValidationFailure> validateTestMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param public") the public")
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.Test method " + method.getName() + " must be public"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
             failures.add(new ValidationFailure("@Paramixel.Test method " + method.getName()
                     + " must accept exactly one ArgumentContext parameter"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (!method.getReturnType().equals(void.class)) {
             failures.add(new ValidationFailure("@Paramixel.Test method " + method.getName() + " must return void"));
         }
@@ -209,19 +395,39 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
+     * @since 0.0.1
      */
     private static List<ValidationFailure> validateBeforeEachMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param public") the public")
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.BeforeEach method " + method.getName() + " must be public"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
             failures.add(new ValidationFailure("@Paramixel.BeforeEach method " + method.getName()
                     + " must accept exactly one ArgumentContext parameter"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (!method.getReturnType().equals(void.class)) {
             failures.add(
                     new ValidationFailure("@Paramixel.BeforeEach method " + method.getName() + " must return void"));
@@ -240,19 +446,39 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
+     * @since 0.0.1
      */
     private static List<ValidationFailure> validateAfterEachMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param public") the public")
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.AfterEach method " + method.getName() + " must be public"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
             failures.add(new ValidationFailure("@Paramixel.AfterEach method " + method.getName()
                     + " must accept exactly one ArgumentContext parameter"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (!method.getReturnType().equals(void.class)) {
             failures.add(
                     new ValidationFailure("@Paramixel.AfterEach method " + method.getName() + " must return void"));
@@ -271,19 +497,39 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
+     * @since 0.0.1
      */
     private static List<ValidationFailure> validateBeforeAllMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param public") the public")
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.BeforeAll method " + method.getName() + " must be public"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
             failures.add(new ValidationFailure("@Paramixel.BeforeAll method " + method.getName()
                     + " must accept exactly one ArgumentContext parameter"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (!method.getReturnType().equals(void.class)) {
             failures.add(
                     new ValidationFailure("@Paramixel.BeforeAll method " + method.getName() + " must return void"));
@@ -297,19 +543,39 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
+     * @since 0.0.1
      */
     private static List<ValidationFailure> validateAfterAllMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param public") the public")
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.AfterAll method " + method.getName() + " must be public"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
             failures.add(new ValidationFailure("@Paramixel.AfterAll method " + method.getName()
                     + " must accept exactly one ArgumentContext parameter"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (!method.getReturnType().equals(void.class)) {
             failures.add(new ValidationFailure("@Paramixel.AfterAll method " + method.getName() + " must return void"));
         }
@@ -322,19 +588,39 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
+     * @since 0.0.1
      */
     private static List<ValidationFailure> validateInitializeMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param public") the public")
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.Initialize method " + method.getName() + " must be public"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ClassContext.class)) {
             failures.add(new ValidationFailure("@Paramixel.Initialize method " + method.getName()
                     + " must accept exactly one ClassContext parameter"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (!method.getReturnType().equals(void.class)) {
             failures.add(
                     new ValidationFailure("@Paramixel.Initialize method " + method.getName() + " must return void"));
@@ -353,19 +639,39 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
+     * @since 0.0.1
      */
     private static List<ValidationFailure> validateFinalizeMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
 
         if (!Modifier.isPublic(method.getModifiers())) {
+            /**
+             * Performs failures.add.
+             *
+             * @param public") the public")
+             * @return the result
+             * @since 0.0.1
+             */
             failures.add(new ValidationFailure("@Paramixel.Finalize method " + method.getName() + " must be public"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ClassContext.class)) {
             failures.add(new ValidationFailure("@Paramixel.Finalize method " + method.getName()
                     + " must accept exactly one ClassContext parameter"));
         }
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         if (!method.getReturnType().equals(void.class)) {
             failures.add(new ValidationFailure("@Paramixel.Finalize method " + method.getName() + " must return void"));
         }

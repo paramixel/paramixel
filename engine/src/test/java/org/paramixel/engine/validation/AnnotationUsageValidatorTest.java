@@ -59,16 +59,22 @@ public class AnnotationUsageValidatorTest {
 
         @Paramixel.Test
         @Paramixel.BeforeEach
-        public void bad(final ArgumentContext context) {}
+        public void bad(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     static class MultipleCollectors {
 
         @Paramixel.ArgumentsCollector
-        public static void c1(final ArgumentsCollector collector) {}
+        public static void c1(final ArgumentsCollector collector) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.ArgumentsCollector
-        public static void c2(final ArgumentsCollector collector) {}
+        public static void c2(final ArgumentsCollector collector) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.DisplayName("   ")
@@ -76,6 +82,8 @@ public class AnnotationUsageValidatorTest {
 
         @Paramixel.Test
         @Paramixel.DisplayName("\t")
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 }

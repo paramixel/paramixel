@@ -197,7 +197,9 @@ public class RegexTagFilterTest {
     static class IntegrationDatabaseTest {
 
         @Paramixel.Test
-        public void test(final @NonNull ArgumentContext context) {}
+        public void test(final @NonNull ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -205,7 +207,9 @@ public class RegexTagFilterTest {
     static class UnitFastTest {
 
         @Paramixel.Test
-        public void test(final @NonNull ArgumentContext context) {}
+        public void test(final @NonNull ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -213,14 +217,18 @@ public class RegexTagFilterTest {
     static class IntegrationApiTest {
 
         @Paramixel.Test
-        public void test(final @NonNull ArgumentContext context) {}
+        public void test(final @NonNull ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
     static class UntaggedTest {
 
         @Paramixel.Test
-        public void test(final @NonNull ArgumentContext context) {}
+        public void test(final @NonNull ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -228,7 +236,9 @@ public class RegexTagFilterTest {
     static class VersionTest {
 
         @Paramixel.Test
-        public void test(final @NonNull ArgumentContext context) {}
+        public void test(final @NonNull ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -236,7 +246,9 @@ public class RegexTagFilterTest {
     static class ParentTestWithTags {
 
         @Paramixel.Test
-        public void test(final @NonNull ArgumentContext context) {}
+        public void test(final @NonNull ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -244,6 +256,8 @@ public class RegexTagFilterTest {
     static class ChildTestWithInheritedTags extends ParentTestWithTags {
 
         @Paramixel.Test
-        public void test2(final @NonNull ArgumentContext context) {}
+        public void test2(final @NonNull ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 }

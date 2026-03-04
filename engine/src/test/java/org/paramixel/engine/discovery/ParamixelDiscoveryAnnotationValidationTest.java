@@ -47,9 +47,13 @@ public class ParamixelDiscoveryAnnotationValidationTest {
     static class InvalidArgumentsCollectorSignatureTestClass {
 
         @Paramixel.ArgumentsCollector
-        public void arguments() {}
+        public void arguments() {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 }

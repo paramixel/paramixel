@@ -27,8 +27,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.EngineExecutionListener;
-import org.junit.platform.engine.TestDescriptor;
-import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ClassContext;
@@ -64,7 +62,7 @@ public class ParamixelClassRunnerTest {
         final Map<Class<?>, ClassContext> classContexts = new ConcurrentHashMap<>();
         final Map<Class<?>, Object> testInstances = new ConcurrentHashMap<>();
 
-        final RecordingListener listener = new RecordingListener();
+        final EngineExecutionListener listener = EngineExecutionListener.NOOP;
         try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(1)) {
             final ParamixelClassRunner runner =
                     new ParamixelClassRunner(runtime, engineContext, listener, classContexts, testInstances);
@@ -115,7 +113,7 @@ public class ParamixelClassRunnerTest {
         final Map<Class<?>, ClassContext> classContexts = new ConcurrentHashMap<>();
         final Map<Class<?>, Object> testInstances = new ConcurrentHashMap<>();
 
-        final RecordingListener listener = new RecordingListener();
+        final EngineExecutionListener listener = EngineExecutionListener.NOOP;
         try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(1)) {
             final ParamixelClassRunner runner =
                     new ParamixelClassRunner(runtime, engineContext, listener, classContexts, testInstances);
@@ -235,15 +233,6 @@ public class ParamixelClassRunnerTest {
         @Override
         public void close() {
             closed.set(true);
-        }
-    }
-
-    private static final class RecordingListener implements EngineExecutionListener {
-
-        @Override
-        public void executionFinished(
-                final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {
-            // no-op; we validate side effects on contexts/instances
         }
     }
 }

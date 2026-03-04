@@ -37,6 +37,7 @@ import org.openjdk.jmh.infra.Blackhole;
  * put, get, contains, remove, and computeIfAbsent under various conditions.</p>
  *
  * @since 0.0.1
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.Throughput)
@@ -46,13 +47,44 @@ import org.openjdk.jmh.infra.Blackhole;
 @Fork(0)
 public class ConcreteStoreBenchmark {
 
+    /**
+     * Creates a new benchmark instance.
+     *
+     * @since 0.0.1
+     */
+    public ConcreteStoreBenchmark() {
+        // INTENTIONALLY EMPTY
+    }
+
+    /**
+     * Stores the store.
+     *
+     * @since 0.0.1
+     */
     private ConcreteStore store;
+    /**
+     * Stores the TEST_KEY.
+     *
+     * @since 0.0.1
+     */
     private static final String TEST_KEY = "test-key";
+    /**
+     * Stores the TEST_VALUE.
+     *
+     * @since 0.0.1
+     */
     private static final String TEST_VALUE = "test-value";
+    /**
+     * Stores the PREPOPULATE_SIZE.
+     *
+     * @since 0.0.1
+     */
     private static final int PREPOPULATE_SIZE = 1000;
 
     /**
      * Sets up the store before each benchmark iteration.
+     *
+     * @since 0.0.1
      */
     @Setup
     public void setup() {
@@ -61,6 +93,8 @@ public class ConcreteStoreBenchmark {
 
     /**
      * Cleans up the store after each benchmark iteration.
+     *
+     * @since 0.0.1
      */
     @TearDown
     public void tearDown() {
@@ -71,6 +105,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks simple put operation.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void putOperation(final Blackhole blackhole) {
@@ -82,9 +117,16 @@ public class ConcreteStoreBenchmark {
      * Benchmarks put with type checking.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void putTypedOperation(final Blackhole blackhole) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final String previous = store.put(TEST_KEY, String.class, TEST_VALUE);
         blackhole.consume(previous);
     }
@@ -93,6 +135,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks get operation on existing key.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void getExistingKey(final Blackhole blackhole) {
@@ -105,10 +148,17 @@ public class ConcreteStoreBenchmark {
      * Benchmarks get with type checking on existing key.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void getTypedExistingKey(final Blackhole blackhole) {
         store.put(TEST_KEY, TEST_VALUE);
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final String value = store.get(TEST_KEY, String.class);
         blackhole.consume(value);
     }
@@ -117,6 +167,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks contains operation on existing key.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void containsExistingKey(final Blackhole blackhole) {
@@ -129,6 +180,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks remove operation.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void removeOperation(final Blackhole blackhole) {
@@ -141,10 +193,17 @@ public class ConcreteStoreBenchmark {
      * Benchmarks remove with type checking.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void removeTypedOperation(final Blackhole blackhole) {
         store.put(TEST_KEY, TEST_VALUE);
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final String removed = store.remove(TEST_KEY, String.class);
         blackhole.consume(removed);
     }
@@ -153,6 +212,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks computeIfAbsent when key is absent.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void computeIfAbsentKeyAbsent(final Blackhole blackhole) {
@@ -164,6 +224,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks computeIfAbsent when key already exists.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void computeIfAbsentKeyExists(final Blackhole blackhole) {
@@ -176,6 +237,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks size operation.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void sizeOperation(final Blackhole blackhole) {
@@ -187,6 +249,7 @@ public class ConcreteStoreBenchmark {
      * Benchmarks mixed workload simulating realistic usage.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void mixedWorkload(final Blackhole blackhole) {

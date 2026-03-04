@@ -35,6 +35,7 @@ import org.openjdk.jmh.infra.Blackhole;
  * under various ID length configurations.</p>
  *
  * @since 0.0.1
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.Throughput)
@@ -45,9 +46,19 @@ import org.openjdk.jmh.infra.Blackhole;
 public class FastIdBenchmark {
 
     /**
+     * Creates a new benchmark instance.
+     *
+     * @since 0.0.1
+     */
+    public FastIdBenchmark() {
+        // INTENTIONALLY EMPTY
+    }
+
+    /**
      * Benchmarks generation of 6-character IDs (typical thread name suffix).
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void generateId6Characters(final Blackhole blackhole) {
@@ -59,6 +70,7 @@ public class FastIdBenchmark {
      * Benchmarks generation of 8-character IDs.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void generateId8Characters(final Blackhole blackhole) {
@@ -70,6 +82,7 @@ public class FastIdBenchmark {
      * Benchmarks generation of 12-character IDs.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void generateId12Characters(final Blackhole blackhole) {
@@ -81,6 +94,7 @@ public class FastIdBenchmark {
      * Benchmarks generation of 16-character IDs.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void generateId16Characters(final Blackhole blackhole) {
@@ -92,6 +106,7 @@ public class FastIdBenchmark {
      * Benchmarks generation of 32-character IDs (long IDs).
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
+     * @since 0.0.1
      */
     @Benchmark
     public void generateId32Characters(final Blackhole blackhole) {

@@ -27,11 +27,25 @@ import org.junit.platform.engine.TestExecutionResult;
  *
  * <p>This listener prints a single line on start and finish using the class-level display name.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public class ParamixelTestClassDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
+    /**
+     * Printer used for reporting class-level execution status.
+     *
+     * @since 0.0.1
+     */
     private final Consumer<String> printer;
 
+    /**
+     * Creates a listener for class descriptors.
+     *
+     * @param printer the printer to receive output lines; never {@code null}
+     * @return the result
+     * @since 0.0.1
+     */
     public ParamixelTestClassDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
         this.printer = Objects.requireNonNull(printer, "printer must not be null");
     }

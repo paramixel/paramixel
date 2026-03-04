@@ -288,7 +288,7 @@ public class KafkaTestEnvironment implements Named {
             System.err.printf(
                     "Kafka container logs (cause: %s):%n%s%n", originalCause.getMessage(), kafkaContainer.getLogs());
         } catch (Exception ignored) {
-            // Log retrieval must never suppress the original failure.
+            // INTENTIONALLY EMPTY
         }
     }
 
@@ -301,7 +301,7 @@ public class KafkaTestEnvironment implements Named {
             try {
                 kafkaContainer.stop();
             } catch (Exception ignored) {
-                // Best-effort cleanup.
+                // INTENTIONALLY EMPTY
             } finally {
                 kafkaContainer = null;
             }

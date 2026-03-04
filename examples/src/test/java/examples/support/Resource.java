@@ -34,7 +34,7 @@ public final class Resource {
      * Prevents instantiation of utility class.
      */
     private Resource() {
-        // utility class
+        // INTENTIONALLY EMPTY
     }
 
     /**

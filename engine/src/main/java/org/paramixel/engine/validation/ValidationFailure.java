@@ -22,16 +22,23 @@ import org.jspecify.annotations.NonNull;
 /**
  * Represents a validation failure with a descriptive message.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ValidationFailure {
 
-    /** Human-readable validation failure message; immutable. */
+    /**
+     * Human-readable validation failure message; immutable.
+     *
+     * @since 0.0.1
+     */
     private final String message;
 
     /**
      * Creates a new validation failure.
      *
      * @param message the failure description
+     * @since 0.0.1
      */
     public ValidationFailure(final @NonNull String message) {
         this.message = Objects.requireNonNull(message, "message must not be null");
@@ -41,6 +48,7 @@ public final class ValidationFailure {
      * Returns the failure description.
      *
      * @return the failure message
+     * @since 0.0.1
      */
     public String getMessage() {
         return message;

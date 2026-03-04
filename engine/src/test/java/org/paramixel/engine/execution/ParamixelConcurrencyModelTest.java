@@ -29,8 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.EngineExecutionListener;
-import org.junit.platform.engine.TestDescriptor;
-import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ArgumentsCollector;
@@ -74,7 +72,7 @@ public class ParamixelConcurrencyModelTest {
         SaturationTest.arg1Entered = arg1Entered;
         SaturationTest.releaseArg1 = releaseArg1;
 
-        final RecordingListener listener = new RecordingListener();
+        final EngineExecutionListener listener = EngineExecutionListener.NOOP;
         try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(1)) {
             // Saturate the only argument slot + the remaining total slot.
             final ParamixelConcurrencyLimiter.ArgumentPermit saturationPermit =
@@ -131,7 +129,7 @@ public class ParamixelConcurrencyModelTest {
         MaxConcurrencyTest.running = running;
         MaxConcurrencyTest.max = max;
 
-        final RecordingListener listener = new RecordingListener();
+        final EngineExecutionListener listener = EngineExecutionListener.NOOP;
         try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(cores)) {
             final ParamixelClassRunner runner =
                     new ParamixelClassRunner(runtime, engineContext, listener, classContexts, testInstances);
@@ -182,7 +180,7 @@ public class ParamixelConcurrencyModelTest {
         BlockingClassTest.entered = entered;
         BlockingClassTest.release = release;
 
-        final RecordingListener listener = new RecordingListener();
+        final EngineExecutionListener listener = EngineExecutionListener.NOOP;
         try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(cores)) {
             final ParamixelClassRunner runner =
                     new ParamixelClassRunner(runtime, engineContext, listener, classContexts, testInstances);
@@ -280,12 +278,5 @@ public class ParamixelConcurrencyModelTest {
         }
     }
 
-    private static final class RecordingListener implements EngineExecutionListener {
-
-        @Override
-        public void executionFinished(
-                final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {
-            // no-op
-        }
-    }
+    // No hand-rolled EngineExecutionListener is required here; use EngineExecutionListener.NOOP.
 }

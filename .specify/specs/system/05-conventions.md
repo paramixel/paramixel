@@ -113,11 +113,62 @@ public ConcreteEngineContext(
 
 **All exceptions must be unchecked at module boundaries.** `throws Throwable` is acceptable in internal invoker signatures to propagate user exceptions cleanly.
 
-**`@SuppressWarnings` is prohibited** to hide compiler or static analysis warnings.
+**`@SuppressWarnings` MUST NOT be used in production code** to hide compiler or static analysis warnings.
+It MAY be used in test sources (`*/src/test/java/**`) when necessary.
 
 ---
 
-## 6. Logging Convention
+## 6. Javadoc Standards
+
+Javadoc requirements apply to production sources (`*/src/main/java/**`).
+In test sources (`*/src/test/java/**`), Javadoc is optional.
+
+- **Coverage:**
+  - All `class`, `interface`, `enum`, and `record` types MUST have Javadoc, regardless of scope (public, protected, package-private, private).
+  - All member variables (fields) MUST have Javadoc, regardless of scope (public, protected, package-private, private).
+  - Public and private methods and constructors MUST have Javadoc.
+  - **Exception:** Do not add Javadoc to methods annotated with `@Override`.
+- **Completeness:** Every Javadoc block MUST document:
+  - `@param` for every parameter
+  - `@return` for every non-void method
+  - `@throws` for every exception the method/constructor explicitly throws (checked or unchecked)
+- **Tags:**
+  - `@author` MUST appear only on type-level Javadoc for a `class`, `interface`, or `enum`.
+    It MUST NOT be used on record or annotation Javadoc, and it MUST NOT be used on field, method, or constructor Javadoc.
+  - `@author` MUST include the git user's name and email address in the form:
+    `@author Full Name <email@domain>`
+  - `@since` MUST be included on every Javadoc block (types, fields, methods, and constructors).
+- **Tone:** Use a consistent, professional tone. Use complete sentences; avoid conversational phrasing.
+- **Format:** Javadoc MUST use block (multi-line) format. Inline (single-line) Javadoc such as `/** ... */` on one line MUST NOT be used.
+- **Spacing:** In any Javadoc block that contains both prose content and `@` tags, there MUST be a blank `*` line between the prose content and the first `@`-tagged line.
+
+Example:
+
+```java
+/**
+ * Utility for formatting durations.
+ *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
+ */
+public final class DurationFormatter {
+    /**
+     * Formats a duration in milliseconds for human-readable output.
+     *
+     * @param millis duration in milliseconds; must be {@code >= 0}
+     * @return formatted duration string; never {@code null}
+     * @throws IllegalArgumentException if {@code millis < 0}
+     * @since 0.0.1
+     */
+    public static String formatMillis(final long millis) {
+        ...
+    }
+}
+```
+
+---
+
+## 7. Logging Convention
 
 | Module | Logger type | Usage |
 |---|---|---|
@@ -138,7 +189,7 @@ LOGGER.log(Level.SEVERE, "Fatal: could not instantiate " + className, e);
 
 ---
 
-## 7. DTO / Mapping Strategy
+## 8. DTO / Mapping Strategy
 
 There are no DTOs or mapping frameworks (no MapStruct, no ModelMapper). The project uses:
 - Direct field access via constructors.
@@ -147,7 +198,7 @@ There are no DTOs or mapping frameworks (no MapStruct, no ModelMapper). The proj
 
 ---
 
-## 8. Code Style and Formatting
+## 9. Code Style and Formatting
 
 - **Formatter:** Palantir Java Format (PALANTIR style), version 2.87.0.
 - **Applied at:** Every `compile` phase via `spotless-maven-plugin:apply`.
@@ -161,7 +212,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 9. `final` Usage
+## 10. `final` Usage
 
 - All fields that are set in the constructor and never mutated are declared `final`.
 - All utility classes (static methods only) are declared `final` with a private no-arg constructor.
@@ -170,7 +221,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 10. Mandatory Rules (MUST always do)
+## 11. Mandatory Rules (MUST always do)
 
 1. **Every public method parameter that must be non-null MUST be annotated `@NonNull`** and validated with `Objects.requireNonNull()` in constructors.
 2. **All new Java source files MUST start with the Apache 2.0 license header** from `assets/license-header.txt`.
@@ -184,10 +235,12 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 9. **Engine-internal types MUST live in the appropriate `org.paramixel.engine.<layer>` sub-package**.
 10. **Lifecycle exceptions MUST be recorded via `classContext.recordFailure(t)`** and must NOT propagate silently.
 11. **Any error message that mentions a Paramixel annotation MUST qualify it as `@Paramixel.<AnnotationName>`** (e.g., `@Paramixel.BeforeAll`, not `@BeforeAll`).
+12. **Any empty method or constructor MUST contain the comment `// INTENTIONALLY EMPTY`** (inside the body) to make the emptiness explicit.
+13. **All classes in production sources (`*/src/main/java/**`) MUST explicitly declare at least one constructor** (do not rely on the implicit default constructor).
 
 ---
 
-## 11. Prohibited Patterns (MUST NEVER do)
+## 12. Prohibited Patterns (MUST NEVER do)
 
 1. Never use `@Autowired`, `@Inject`, `@Component`, `@Service`, or any Spring/CDI annotation.
 2. Never use field injection (injecting dependencies via annotated fields).
@@ -212,11 +265,11 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 12. How To: Add a New API Interface
+## 13. How To: Add a New API Interface
 
 1. Create `org.paramixel.api.MyNewInterface.java` in `api/src/main/java/org/paramixel/api/`.
 2. Add Apache license header.
-3. Add full Javadoc with `@since 0.0.1` (or current version).
+3. Add full Javadoc with `@author` and `@since 0.0.1` (or current version).
 4. Add `@NonNull` to all non-null method parameters.
 5. Create a concrete implementation in `engine/src/main/java/org/paramixel/engine/api/ConcreteMyNew.java`.
 6. Write a unit test in `engine/src/test/java/org/paramixel/engine/api/ConcreteMyNewTest.java`.
@@ -226,11 +279,12 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 13. How To: Add a New Annotation
+## 14. How To: Add a New Annotation
 
 1. Add nested `@interface` inside `org.paramixel.api.Paramixel` following the existing pattern.
 2. Set `@Retention(RetentionPolicy.RUNTIME)`, `@Documented`, and appropriate `@Target`.
-3. Add full Javadoc describing: method signature requirements, execution guarantees, lifecycle ordering.
+3. Add full Javadoc describing: method signature requirements, execution guarantees, lifecycle ordering; include
+   `@author` and `@since`.
 4. If the annotation applies to test methods, add validation logic to `MethodValidator.validateTestClass()`.
 5. Add a corresponding lifecycle hook in `ParamixelClassRunner` or `ParamixelInvocationRunner` if execution behaviour is needed.
 6. Add a test class in `paramixel-tests/src/test/java/test/` to verify the new annotation.
@@ -239,7 +293,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 14. How To: Add a New Engine Execution Feature
+## 15. How To: Add a New Engine Execution Feature
 
 1. Identify the correct sub-package (execution, invoker, listener, etc.).
 2. Create the class with `final` modifier if it is not designed for extension.
@@ -252,7 +306,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 15. How To: Add a New `@Paramixel.TestClass` Test (in `paramixel-tests` or `paramixel-examples`)
+## 16. How To: Add a New `@Paramixel.TestClass` Test (in `paramixel-tests` or `paramixel-examples`)
 
 1. Create a new Java class in the appropriate package under `src/test/java/`.
 2. Annotate it `@Paramixel.TestClass`.
@@ -264,7 +318,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 16. How To: Add a New Maven Module
+## 17. How To: Add a New Maven Module
 
 1. Create `<moduleName>/pom.xml` with `<parent>` pointing to `paramixel-parent`.
 2. Add `<module>moduleName</module>` to the root `pom.xml`.
@@ -277,7 +331,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ---
 
-## 17. Testing Requirements Per Change Type
+## 18. Testing Requirements Per Change Type
 
 | Change type | Required tests |
 |---|---|

@@ -91,57 +91,75 @@ import org.paramixel.engine.validation.ValidationFailure;
  * <p>This type is stateless. It uses a JVM logger for diagnostics and does not require external
  * synchronization.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ParamixelDiscovery {
 
     /**
+     * Creates a new discovery instance.
+     *
+     * @since 0.0.1
+     */
+    public ParamixelDiscovery() {
+        // INTENTIONALLY EMPTY
+    }
+
+    /**
      * Logger for discovery events and validation warnings.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelDiscovery.class.getName());
 
     /**
      * Unique ID segment for the engine root.
+     *
+     * @since 0.0.1
      */
     private static final String ENGINE_ID_SEGMENT = "paramixel";
 
     /**
      * Unique ID segment name for class descriptors.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     private static final String CLASS_SEGMENT = "class";
 
     /**
      * Unique ID segment name for argument descriptors.
+     *
+     * @since 0.0.1
      */
     private static final String ARGUMENT_SEGMENT = "argument";
 
     /**
      * Unique ID segment name for method descriptors.
+     *
+     * @since 0.0.1
      */
     private static final String METHOD_SEGMENT = "method";
 
     /**
-     * Engine context used during discovery-time argument supplier invocation.
+     * Performs ConcreteEngineContext.
      *
-     * <p>Discovery occurs before engine execution, so full runtime configuration is not available.
-     * This context is provided to satisfy {@link ArgumentsCollector#getEngineContext()}.
+     * @param ENGINE_ID_SEGMENT the ENGINE_ID_SEGMENT
+     * @param Properties() the Properties()
+     * @param 1 the 1
+     * @return the result
+     * @since 0.0.1
      */
     private static final EngineContext DISCOVERY_ENGINE_CONTEXT =
             new ConcreteEngineContext(ENGINE_ID_SEGMENT, new Properties(), 1);
 
     /**
-     * Discovers test classes from the given discovery request and populates the engine descriptor.
+     * Performs discoverTests.
      *
-     * <p>This method:
-     * <ol>
-     *   <li>Extracts all selectors from the request</li>
-     *   <li>Filters to only classes annotated with {@code @Paramixel.TestClass}</li>
-     *   <li>Validates each class's annotated methods</li>
-     *   <li>Creates test descriptors for valid classes</li>
-     *   <li>Handles invalid classes by logging and skipping</li>
-     * </ol>
-     *
-     * @param request the JUnit Platform discovery request
-     * @param engineDescriptor the engine descriptor to populate
+     * @param request the request
+     * @param engineDescriptor the engineDescriptor
+     * @since 0.0.1
      */
     public void discoverTests(
             final @NonNull EngineDiscoveryRequest request, final @NonNull TestDescriptor engineDescriptor) {
@@ -160,6 +178,12 @@ public final class ParamixelDiscovery {
             } else {
                 // Fail-fast: report first error immediately
                 final ValidationFailure firstFailure = failures.get(0);
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 LOGGER.warning("Validation failed for test class: " + testClass.getName());
                 LOGGER.warning("  - " + firstFailure.getMessage());
                 throw new IllegalStateException(firstFailure.getMessage());
@@ -189,10 +213,23 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the class to validate
      * @return list of validation failures; empty if valid
+     * @since 0.0.1
      */
     private List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
         if (isDisabled(testClass)) {
+            /**
+             * Provides this type.
+             *
+             * @author Douglas Hoard <doug.hoard@gmail.com>
+             * @since 0.0.1
+             */
             final Paramixel.Disabled disabled = testClass.getAnnotation(Paramixel.Disabled.class);
+            /**
+             * Provides this type.
+             *
+             * @author Douglas Hoard <doug.hoard@gmail.com>
+             * @since 0.0.1
+             */
             LOGGER.fine("Skipping disabled test class: " + testClass.getName()
                     + (disabled.value().isEmpty() ? "" : " - " + disabled.value()));
             return List.of();
@@ -215,63 +252,130 @@ public final class ParamixelDiscovery {
      *
      * @param request the discovery request
      * @return set of discovered test classes
+     * @since 0.0.1
      */
     private Set<Class<?>> discoverTestClasses(final @NonNull EngineDiscoveryRequest request) {
         final Predicate<String> classFilter = buildClassFilter(request);
         final Set<Class<?>> testClasses = new LinkedHashSet<>();
 
         // Handle ClassSelector - direct class selection
+        /**
+         * Provides type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         for (ClassSelector selector : request.getSelectorsByType(ClassSelector.class)) {
             final Class<?> clazz = selector.getJavaClass();
             if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                 testClasses.add(clazz);
+                /**
+                 * Provides from.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 LOGGER.fine("Added class from ClassSelector: " + clazz.getName());
             }
         }
 
         // Handle MethodSelector - select class containing the method
+        /**
+         * Provides type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         for (MethodSelector selector : request.getSelectorsByType(MethodSelector.class)) {
             final Class<?> clazz = selector.getJavaClass();
             if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                 testClasses.add(clazz);
+                /**
+                 * Provides from.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 LOGGER.fine("Added class from MethodSelector: " + clazz.getName());
             }
         }
 
         // Handle PackageSelector - all classes in a package
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         for (PackageSelector selector : request.getSelectorsByType(PackageSelector.class)) {
             final String packageName = selector.getPackageName();
             final Set<Class<?>> classesInPackage = findClassesInPackage(packageName);
             for (Class<?> clazz : classesInPackage) {
                 if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                     testClasses.add(clazz);
+                    /**
+                     * Provides from.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     LOGGER.fine("Added class from PackageSelector: " + clazz.getName());
                 }
             }
         }
 
         // Handle ClasspathRootSelector - all classes in a classpath root
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         for (ClasspathRootSelector selector : request.getSelectorsByType(ClasspathRootSelector.class)) {
             final URI classpathRoot = selector.getClasspathRoot();
             final Set<Class<?>> classesInRoot = findClassesInClasspathRoot(classpathRoot);
             for (Class<?> clazz : classesInRoot) {
                 if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                     testClasses.add(clazz);
+                    /**
+                     * Provides from.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     LOGGER.fine("Added class from ClasspathRootSelector: " + clazz.getName());
                 }
             }
         }
 
         // Handle NestedClassSelector - nested classes
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         for (NestedClassSelector selector : request.getSelectorsByType(NestedClassSelector.class)) {
             final Class<?> clazz = selector.getNestedClass();
             if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                 testClasses.add(clazz);
+                /**
+                 * Provides from.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 LOGGER.fine("Added class from NestedClassSelector: " + clazz.getName());
             }
         }
 
         // Handle UniqueIdSelector - select tests by unique ID
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         for (UniqueIdSelector selector : request.getSelectorsByType(UniqueIdSelector.class)) {
             final UniqueId uniqueId = selector.getUniqueId();
             final String className = extractClassNameFromUniqueId(uniqueId);
@@ -281,11 +385,29 @@ public final class ParamixelDiscovery {
                     final Class<?> clazz = classLoader.loadClass(className);
                     if (isParamixelTestClass(clazz)) {
                         testClasses.add(clazz);
+                        /**
+                         * Provides from.
+                         *
+                         * @author Douglas Hoard <doug.hoard@gmail.com>
+                         * @since 0.0.1
+                         */
                         LOGGER.fine("Added class from UniqueIdSelector: " + className);
                     }
                 } catch (ClassNotFoundException e) {
+                    /**
+                     * Provides from.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     LOGGER.log(Level.WARNING, "Could not load class from UniqueIdSelector: " + className);
                 } catch (Exception e) {
+                    /**
+                     * Provides from.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     LOGGER.log(Level.WARNING, "Error loading class from UniqueIdSelector: " + className, e);
                 }
             }
@@ -299,11 +421,18 @@ public final class ParamixelDiscovery {
      *
      * @param request the discovery request
      * @return a predicate that tests if a class name passes all filters
+     * @since 0.0.1
      */
     private Predicate<String> buildClassFilter(final @NonNull EngineDiscoveryRequest request) {
         final List<Predicate<String>> filters = new ArrayList<>();
 
         // Class name filter
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<ClassNameFilter> classNameFilters = request.getFiltersByType(ClassNameFilter.class);
         if (!classNameFilters.isEmpty()) {
             filters.add(className -> {
@@ -317,6 +446,12 @@ public final class ParamixelDiscovery {
         }
 
         // Package name filter
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<PackageNameFilter> packageNameFilters = request.getFiltersByType(PackageNameFilter.class);
         if (!packageNameFilters.isEmpty()) {
             filters.add(className -> {
@@ -349,8 +484,15 @@ public final class ParamixelDiscovery {
      *
      * @param clazz the class to check
      * @return true if the class has @Paramixel.TestClass annotation
+     * @since 0.0.1
      */
     private boolean isParamixelTestClass(final @NonNull Class<?> clazz) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         return clazz.isAnnotationPresent(Paramixel.TestClass.class);
     }
 
@@ -359,6 +501,7 @@ public final class ParamixelDiscovery {
      *
      * @param packageName the package name
      * @return set of classes in the package
+     * @since 0.0.1
      */
     private Set<Class<?>> findClassesInPackage(final @NonNull String packageName) {
         final Set<Class<?>> classes = new LinkedHashSet<>();
@@ -380,11 +523,12 @@ public final class ParamixelDiscovery {
     }
 
     /**
-     * Recursively finds classes in a directory.
+     * Performs findClassesInDirectory.
      *
-     * @param directory the directory to scan
-     * @param packageName the package name
-     * @param classes the set to add found classes to
+     * @param directory the directory
+     * @param packageName the packageName
+     * @param classes the classes
+     * @since 0.0.1
      */
     private void findClassesInDirectory(
             final @NonNull File directory, final @NonNull String packageName, final @NonNull Set<Class<?>> classes) {
@@ -400,6 +544,12 @@ public final class ParamixelDiscovery {
                 } else {
                     findClassesInDirectory(file, packageName + "." + file.getName(), classes);
                 }
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
             } else if (file.getName().endsWith(".class")) {
                 final String className = packageName + "."
                         + file.getName().substring(0, file.getName().length() - 6);
@@ -408,8 +558,20 @@ public final class ParamixelDiscovery {
                     final Class<?> clazz = classLoader.loadClass(className);
                     classes.add(clazz);
                 } catch (ClassNotFoundException e) {
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     LOGGER.log(Level.WARNING, "Could not load class: " + className);
                 } catch (Exception e) {
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     LOGGER.log(Level.WARNING, "Error loading class: " + className, e);
                 }
             }
@@ -421,6 +583,7 @@ public final class ParamixelDiscovery {
      *
      * @param classpathRoot the classpath root URI
      * @return set of classes in the classpath root
+     * @since 0.0.1
      */
     private Set<Class<?>> findClassesInClasspathRoot(final @NonNull URI classpathRoot) {
         final Set<Class<?>> classes = new LinkedHashSet<>();
@@ -436,19 +599,11 @@ public final class ParamixelDiscovery {
     }
 
     /**
-     * Discovers a single test class and adds its descriptor to the engine.
+     * Performs buildTestClassDescriptor.
      *
-     * <p>This method:
-     * <ol>
-     *   <li>Validates all annotated methods in the class</li>
-     *   <li>Creates a ClassDescriptor</li>
-     *   <li>Creates MethodDescriptors for each @Paramixel.Test</li>
-     *   <li>Creates InvocationDescriptors based on argument supplier</li>
-     * </ol>
-     *
-     * @param testClass the test class to discover
-     * @param engineDescriptor the parent engine descriptor
-     * @throws IllegalStateException if {@code testClass} fails validation
+     * @param testClass the testClass
+     * @param engineDescriptor the engineDescriptor
+     * @since 0.0.1
      */
     private void buildTestClassDescriptor(
             final @NonNull Class<?> testClass, final @NonNull TestDescriptor engineDescriptor) {
@@ -463,14 +618,21 @@ public final class ParamixelDiscovery {
 
         discoverTestMethods(testClass, classDescriptor);
 
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         LOGGER.fine("Discovered test class: " + testClass.getName());
     }
 
     /**
-     * Discovers all test methods in a test class.
+     * Performs discoverTestMethods.
      *
-     * @param testClass the test class
-     * @param classDescriptor the class descriptor to populate
+     * @param testClass the testClass
+     * @param classDescriptor the classDescriptor
+     * @since 0.0.1
      */
     private void discoverTestMethods(
             final @NonNull Class<?> testClass, final @NonNull ParamixelTestClassDescriptor classDescriptor) {
@@ -480,6 +642,12 @@ public final class ParamixelDiscovery {
                 Comparator.comparingInt(ParamixelDiscovery::getOrderValue).thenComparing(Method::getName));
 
         if (testMethods.isEmpty()) {
+            /**
+             * Provides this type.
+             *
+             * @author Douglas Hoard <doug.hoard@gmail.com>
+             * @since 0.0.1
+             */
             LOGGER.fine("No enabled test methods found in class: " + testClass.getName());
             return;
         }
@@ -520,13 +688,32 @@ public final class ParamixelDiscovery {
         }
     }
 
+    /**
+     * Performs getFlattenedTestMethods.
+     *
+     * @param testClass the testClass
+     * @return the result
+     * @since 0.0.1
+     */
     private List<Method> getFlattenedTestMethods(final @NonNull Class<?> testClass) {
         final Map<String, Method> bySignature = new LinkedHashMap<>();
 
         for (Class<?> current = testClass;
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             for (Method method : current.getDeclaredMethods()) {
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (!method.isAnnotationPresent(Paramixel.Test.class)) {
                     continue;
                 }
@@ -544,6 +731,13 @@ public final class ParamixelDiscovery {
         return new ArrayList<>(bySignature.values());
     }
 
+    /**
+     * Performs signatureKey.
+     *
+     * @param method the method
+     * @return the result
+     * @since 0.0.1
+     */
     private static String signatureKey(final @NonNull Method method) {
         final StringBuilder builder = new StringBuilder();
         builder.append(method.getName());
@@ -564,15 +758,28 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the test class
      * @return array of arguments, or single null element if no supplier
+     * @since 0.0.1
      */
     private SupplierArguments getSupplierArguments(final @NonNull Class<?> testClass) {
         Method selected = null;
         final List<Method> ignored = new ArrayList<>();
 
         for (Class<?> current = testClass;
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             for (Method method : current.getDeclaredMethods()) {
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (!method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
                     continue;
                 }
@@ -596,15 +803,41 @@ public final class ParamixelDiscovery {
         }
 
         try {
+            /**
+             * Performs if.
+             *
+             * @param selected.getReturnType().equals(void.class) the selected.getReturnType().equals(void.class)
+             * @return the result
+             * @since 0.0.1
+             */
             // Collector-driven: public static void arguments(ArgumentsCollector collector)
             if (selected.getParameterCount() == 1
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     && selected.getParameterTypes()[0].equals(ArgumentsCollector.class)
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     && selected.getReturnType().equals(void.class)) {
                 final ConcreteArgumentsCollector collector = new ConcreteArgumentsCollector(DISCOVERY_ENGINE_CONTEXT);
                 ParamixelReflectionInvoker.invokeStatic(selected, collector);
                 return new SupplierArguments(collector.toArray(), collector.getParallelism());
             }
 
+            /**
+             * Performs if.
+             *
+             * @param 0 the 0
+             * @return the result
+             * @since 0.0.1
+             */
             // Return-based supplier: public static <ReturnType> arguments()
             if (selected.getParameterCount() == 0) {
                 final Object result = ParamixelReflectionInvoker.invokeStatic(selected);
@@ -644,24 +877,36 @@ public final class ParamixelDiscovery {
      *
      * <p>This type is private because it is an internal transport between supplier invocation and
      * descriptor construction.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     private static final class SupplierArguments {
 
         /**
-         * Default parallelism used when no supplier overrides it.
+         * Performs Math.max.
          *
-         * <p>The value is initialized to {@code max(1, availableProcessors)}.
+         * @param 1 the 1
+         * @param Runtime.getRuntime().availableProcessors() the Runtime.getRuntime().availableProcessors()
+         * @return the result
+         * @since 0.0.1
          */
         private static final int DEFAULT_PARALLELISM =
                 Math.max(1, Runtime.getRuntime().availableProcessors());
 
-        /** Collected argument values in iteration order; never {@code null}. */
+        /**
+         * Collected argument values in iteration order; never {@code null}.
+         *
+         * @since 0.0.1
+         */
         private final Object[] arguments;
 
         /**
          * Resolved parallelism for the test class.
          *
          * <p>The value is always {@code >= 1}.
+         *
+         * @since 0.0.1
          */
         private final int parallelism;
 
@@ -670,6 +915,8 @@ public final class ParamixelDiscovery {
          *
          * @param arguments the collected arguments; never {@code null}
          * @param parallelism the resolved parallelism; must be {@code >= 1}
+         * @return the result
+         * @since 0.0.1
          */
         private SupplierArguments(final Object[] arguments, final int parallelism) {
             this.arguments = arguments;
@@ -682,6 +929,7 @@ public final class ParamixelDiscovery {
          * <p>This result indicates that a supplier exists but does not provide any arguments.
          *
          * @return an empty supplier result; never {@code null}
+         * @since 0.0.1
          */
         private static SupplierArguments empty() {
             return new SupplierArguments(new Object[0], DEFAULT_PARALLELISM);
@@ -694,6 +942,7 @@ public final class ParamixelDiscovery {
          * {@code null} so that non-parameterized test classes still execute.
          *
          * @return a sentinel supplier result; never {@code null}
+         * @since 0.0.1
          */
         private static SupplierArguments noSupplier() {
             return new SupplierArguments(new Object[] {null}, DEFAULT_PARALLELISM);
@@ -706,8 +955,15 @@ public final class ParamixelDiscovery {
      * @param annotated the annotated element (Class or Method)
      * @param defaultName the default name to use if no annotation or empty
      * @return the display name
+     * @since 0.0.1
      */
     private String getDisplayName(final @NonNull AnnotatedElement annotated, final @NonNull String defaultName) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final Paramixel.DisplayName displayNameAnnotation = annotated.getAnnotation(Paramixel.DisplayName.class);
         if (displayNameAnnotation != null) {
             final String name = displayNameAnnotation.value();
@@ -723,8 +979,15 @@ public final class ParamixelDiscovery {
      *
      * @param annotated the annotated element (Class or Method)
      * @return true if the element is disabled
+     * @since 0.0.1
      */
     private boolean isDisabled(final @NonNull AnnotatedElement annotated) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         return annotated.isAnnotationPresent(Paramixel.Disabled.class);
     }
 
@@ -735,6 +998,7 @@ public final class ParamixelDiscovery {
      *
      * @param uniqueId the unique ID to parse
      * @return the class name, or null if not found
+     * @since 0.0.1
      */
     private String extractClassNameFromUniqueId(final @NonNull UniqueId uniqueId) {
         if (uniqueId == null) {
@@ -758,8 +1022,15 @@ public final class ParamixelDiscovery {
      *
      * @param method the method to inspect; never {@code null}
      * @return the configured order value, or {@link Integer#MAX_VALUE} when unordered
+     * @since 0.0.1
      */
     private static int getOrderValue(final Method method) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {
             return Integer.MAX_VALUE;

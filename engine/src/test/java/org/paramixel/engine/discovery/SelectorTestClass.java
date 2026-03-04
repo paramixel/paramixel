@@ -31,5 +31,7 @@ public class SelectorTestClass {
      * @param context the argument context
      */
     @Paramixel.Test
-    public void testMethod(final ArgumentContext context) {}
+    public void testMethod(final ArgumentContext context) {
+        // INTENTIONALLY EMPTY
+    }
 }

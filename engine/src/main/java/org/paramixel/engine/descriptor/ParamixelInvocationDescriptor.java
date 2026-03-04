@@ -46,25 +46,32 @@ import org.junit.platform.engine.UniqueId;
  *
  * @see ParamixelTestClassDescriptor
  * @see ParamixelTestMethodDescriptor
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Zero-based index of this invocation.
+     *
+     * @since 0.0.1
      */
     private final int invocationIndex;
 
     /**
      * Argument value bound to this invocation.
+     *
+     * @since 0.0.1
      */
     private final Object argument;
 
     /**
-     * Creates a new invocation descriptor.
+     * Creates a new instance.
      *
-     * @param uniqueId the unique identifier for this descriptor
-     * @param invocationIndex the zero-based index of this invocation
-     * @param argument the argument for this invocation (may be null)
+     * @param uniqueId the uniqueId
+     * @param invocationIndex the invocationIndex
+     * @param argument the argument
+     * @since 0.0.1
      */
     public ParamixelInvocationDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull int invocationIndex, final @NonNull Object argument) {
@@ -81,6 +88,7 @@ public class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
      * lifecycle methods, this returns null.</p>
      *
      * @return the invocation argument, or null
+     * @since 0.0.1
      */
     public Object getArgument() {
         return argument;

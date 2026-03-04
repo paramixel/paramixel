@@ -121,7 +121,9 @@ public class ParamixelReflectionInvokerTest {
 
     private static final class InaccessibleTarget {
 
-        private void beforeEach(final ArgumentContext context) {}
+        private void beforeEach(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     private static final class Boom extends RuntimeException {

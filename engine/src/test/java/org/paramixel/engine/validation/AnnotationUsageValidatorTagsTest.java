@@ -95,7 +95,9 @@ public class AnnotationUsageValidatorTagsTest {
     static class TagsOnNonTestClass {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -103,7 +105,9 @@ public class AnnotationUsageValidatorTagsTest {
     static class ParentWithTags {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -111,7 +115,9 @@ public class AnnotationUsageValidatorTagsTest {
     static class ChildWithTags extends ParentWithTags {
 
         @Paramixel.Test
-        public void test2(final ArgumentContext context) {}
+        public void test2(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -119,7 +125,9 @@ public class AnnotationUsageValidatorTagsTest {
     static class SingleTagsOnTestClass {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -127,7 +135,9 @@ public class AnnotationUsageValidatorTagsTest {
     static class TestClassWithTags {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -135,7 +145,9 @@ public class AnnotationUsageValidatorTagsTest {
     static class TestClassWithEmptyTags {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -143,7 +155,9 @@ public class AnnotationUsageValidatorTagsTest {
     static class TestClassWithBlankTag {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -151,6 +165,8 @@ public class AnnotationUsageValidatorTagsTest {
     static class TestClassWithEmptyStringTag {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 }

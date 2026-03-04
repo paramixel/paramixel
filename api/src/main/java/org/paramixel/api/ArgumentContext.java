@@ -46,6 +46,7 @@ package org.paramixel.api;
  *
  * <p><b>Usage Example:</b></p>
  * <pre>{@code
+ *
  * @Paramixel.TestClass
  * public class ParameterizedTests {
  *
@@ -66,6 +67,7 @@ package org.paramixel.api;
  * @see Paramixel.ArgumentsCollector
  * @see ClassContext
  * @see EngineContext
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
 public interface ArgumentContext {
@@ -77,6 +79,7 @@ public interface ArgumentContext {
      * the test class metadata and execution state. This context is never null.</p>
      *
      * @return the parent class context; never {@code null}
+     * @since 0.0.1
      */
     ClassContext getClassContext();
 
@@ -86,6 +89,7 @@ public interface ArgumentContext {
      * <p>The returned store is scoped to the current argument invocation.
      *
      * @return the argument-scoped store; never {@code null}
+     * @since 0.0.1
      */
     Store getStore();
 
@@ -102,6 +106,7 @@ public interface ArgumentContext {
      *
      * @return the argument object for this invocation, or {@code null} if no argument
      *         was provided
+     * @since 0.0.1
      */
     Object getArgument();
 
@@ -118,6 +123,7 @@ public interface ArgumentContext {
      *
      * <p><b>Usage Example:</b></p>
      * <pre>{@code
+     *
      * @Paramixel.Test
      * public void testWithTypedArgument(ArgumentContext context) {
      *     // Type-safe access without manual casting
@@ -135,6 +141,7 @@ public interface ArgumentContext {
      *         was provided
      * @throws NullPointerException if {@code type} is {@code null}
      * @throws ClassCastException if the argument is not assignable to the specified type
+     * @since 0.0.1
      */
     default <T> T getArgument(final Class<T> type) {
         Object argument = getArgument();
@@ -156,6 +163,7 @@ public interface ArgumentContext {
      * returns the index of the current argument being processed.</p>
      *
      * @return the zero-based index of this invocation; always non-negative
+     * @since 0.0.1
      */
     int getArgumentIndex();
 }

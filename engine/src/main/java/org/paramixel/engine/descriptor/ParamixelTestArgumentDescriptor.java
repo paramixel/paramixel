@@ -48,26 +48,33 @@ import org.junit.platform.engine.UniqueId;
  *
  * @see ParamixelTestClassDescriptor
  * @see ParamixelTestMethodDescriptor
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Zero-based index of this argument in the supplier output.
+     *
+     * @since 0.0.1
      */
     private final int argumentIndex;
 
     /**
      * Argument value associated with this descriptor.
+     *
+     * @since 0.0.1
      */
     private final Object argument;
 
     /**
-     * Creates a new argument descriptor.
+     * Creates a new instance.
      *
-     * @param uniqueId the unique identifier for this descriptor
-     * @param argumentIndex the zero-based index of this argument set
-     * @param argument the argument for this descriptor (may be null)
-     * @param displayName the display name for this descriptor
+     * @param uniqueId the uniqueId
+     * @param argumentIndex the argumentIndex
+     * @param argument the argument
+     * @param displayName the displayName
+     * @since 0.0.1
      */
     public ParamixelTestArgumentDescriptor(
             final @NonNull UniqueId uniqueId,
@@ -87,6 +94,7 @@ public class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor
      * argument supplier, this is always 0.</p>
      *
      * @return the argument index
+     * @since 0.0.1
      */
     public int getArgumentIndex() {
         return argumentIndex;
@@ -99,6 +107,7 @@ public class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor
      * argument for this descriptor. When no supplier is present, this returns null.</p>
      *
      * @return the argument, or null
+     * @since 0.0.1
      */
     public Object getArgument() {
         return argument;

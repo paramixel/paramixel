@@ -29,39 +29,46 @@ import org.paramixel.api.Store;
  * information used during test method invocations.</p>
  *
  * @see ArgumentContext
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ConcreteArgumentContext implements ArgumentContext {
 
     /**
      * Parent class context for this invocation.
+     *
+     * @since 0.0.1
      */
     private final ConcreteClassContext classContext;
 
     /**
      * Argument value for this invocation.
+     *
+     * @since 0.0.1
      */
     private final Object argument;
 
     /**
      * Zero-based index of this argument within the supplier output.
+     *
+     * @since 0.0.1
      */
     private final int argumentIndex;
 
     /**
      * Argument-scoped store.
+     *
+     * @since 0.0.1
      */
     private final Store store;
 
     /**
-     * Creates a new ConcreteArgumentContext for the specified invocation.
+     * Creates a new instance.
      *
-     * <p>This constructor initializes the context with the parent class context,
-     * the argument for this invocation, and the invocation index.</p>
-     *
-     * @param classContext the parent class context; must not be null
-     * @param argument the argument for this invocation; may be null
-     * @param argumentIndex the zero-based index of this invocation in the test class
-     * @throws NullPointerException if classContext is null
+     * @param classContext the classContext
+     * @param argument the argument
+     * @param argumentIndex the argumentIndex
+     * @since 0.0.1
      */
     public ConcreteArgumentContext(
             final @NonNull ConcreteClassContext classContext, final Object argument, final int argumentIndex) {

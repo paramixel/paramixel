@@ -103,7 +103,9 @@ public class TagFilterFactoryTest {
     static class TestClassWithTags {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -111,7 +113,9 @@ public class TagFilterFactoryTest {
     static class IntegrationTest {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -119,7 +123,9 @@ public class TagFilterFactoryTest {
     static class UnitTest {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -127,7 +133,9 @@ public class TagFilterFactoryTest {
     static class SlowTest {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -135,7 +143,9 @@ public class TagFilterFactoryTest {
     static class FastTest {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -143,7 +153,9 @@ public class TagFilterFactoryTest {
     static class IntegrationSlowTest {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -151,6 +163,8 @@ public class TagFilterFactoryTest {
     static class IntegrationFastTest {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 }

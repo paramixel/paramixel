@@ -39,11 +39,15 @@ import org.junit.platform.engine.support.descriptor.ClassSource;
  *
  * @see ParamixelTestMethodDescriptor
  * @see ParamixelInvocationDescriptor
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Test class represented by this descriptor.
+     *
+     * @since 0.0.1
      */
     private final Class<?> testClass;
 
@@ -52,15 +56,18 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
      *
      * <p>Configured by {@code ArgumentsCollector#setParallelism(int)} when
      * the argument supplier uses the context-driven pattern.
+     *
+     * @since 0.0.1
      */
     private int argumentParallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
 
     /**
-     * Creates a new test class descriptor.
+     * Creates a new instance.
      *
-     * @param uniqueId the unique identifier for this descriptor
-     * @param testClass the test class this descriptor represents
-     * @param displayName the display name for the test class
+     * @param uniqueId the uniqueId
+     * @param testClass the testClass
+     * @param displayName the displayName
+     * @since 0.0.1
      */
     public ParamixelTestClassDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull Class<?> testClass, final @NonNull String displayName) {
@@ -75,6 +82,7 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
      * may execute concurrently for this test class.
      *
      * @return the per-class parallelism; always {@code >= 1}
+     * @since 0.0.1
      */
     public int getArgumentParallelism() {
         return argumentParallelism;
@@ -88,6 +96,7 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
      *
      * @param argumentParallelism the parallelism value; must be {@code >= 1}
      * @throws IllegalArgumentException if {@code argumentParallelism < 1}
+     * @since 0.0.1
      */
     public void setArgumentParallelism(final int argumentParallelism) {
         if (argumentParallelism < 1) {
@@ -100,6 +109,7 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
      * Returns the test class this descriptor represents.
      *
      * @return the test class
+     * @since 0.0.1
      */
     public Class<?> getTestClass() {
         return testClass;

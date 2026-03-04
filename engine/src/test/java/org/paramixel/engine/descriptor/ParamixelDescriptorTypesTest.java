@@ -64,5 +64,7 @@ public class ParamixelDescriptorTypesTest {
         assertThat(invocation.toString()).contains("invocationIndex=7").contains("uniqueId=");
     }
 
-    private static void dummy() {}
+    private static void dummy() {
+        // INTENTIONALLY EMPTY
+    }
 }

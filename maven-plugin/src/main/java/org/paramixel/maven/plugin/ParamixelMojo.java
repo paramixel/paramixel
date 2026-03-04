@@ -43,56 +43,23 @@ import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import org.paramixel.api.Paramixel;
 
-/**
- * Maven plugin goal for executing Paramixel tests.
- *
- * <p>This mojo discovers and executes all test classes annotated with
- * {@link Paramixel.TestClass} within the current Maven project.
- * It uses the JUnit Platform to launch the Paramixel test engine.</p>
- *
- * <p><b>Goal:</b></p>
- * <p>The goal name is {@code x:test}.</p>
- *
- * <p><b>Phase:</b></p>
- * <p>This goal is bound to the {@code test} lifecycle phase by default.</p>
- *
- * <p><b>Execution Flow:</b></p>
- * <ol>
- *   <li>Discover all classes in the test source directory</li>
- *   <li>Filter to only classes annotated with {@code @Paramixel.TestClass}</li>
- *   <li>Build a JUnit Platform discovery request</li>
- *   <li>Launch the Paramixel test engine</li>
- *   <li>Execute all discovered tests</li>
- *   <li>Report results and fail build if tests fail</li>
- * </ol>
- *
- * <p><b>Example Usage:</b></p>
- * <pre>{@code
- * <plugin>
- *   <groupId>org.paramixel</groupId>
- *   <artifactId>paramixel-maven-plugin</artifactId>
- *   <version>1.0.0</version>
- *   <executions>
- *     <execution>
- *       <goals>
- *         <goal>x:test</goal>
- *       </goals>
- *     </execution>
- *   </executions>
- * </plugin>
- * }</pre>
- *
- * @see Paramixel.TestClass
- */
 @Mojo(
         name = "test",
         defaultPhase = LifecyclePhase.TEST,
         requiresProject = true,
         requiresDependencyResolution = ResolutionScope.TEST)
+/**
+ * Provides ParamixelMojo.
+ *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
+ */
 public class ParamixelMojo extends AbstractMojo {
 
     /**
      * The Maven project.
+     *
+     * @since 0.0.1
      */
     @Parameter(property = "project", required = true, readonly = true)
     private MavenProject project;
@@ -100,24 +67,32 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Whether to skip test execution.
      * Supports the standard Maven -DskipTests flag.
+     *
+     * @since 0.0.1
      */
     @Parameter(property = "skipTests", defaultValue = "false")
     private boolean skipTests;
 
     /**
      * Whether to fail the build if tests fail.
+     *
+     * @since 0.0.1
      */
     @Parameter(property = "paramixel.failIfNoTests", defaultValue = "true")
     private boolean failIfNoTests;
 
     /**
      * The global parallelism setting for test class execution.
+     *
+     * @since 0.0.1
      */
     @Parameter(property = "paramixel.parallelism")
     private Integer parallelism;
 
     /**
      * Whether to print verbose output.
+     *
+     * @since 0.0.1
      */
     @Parameter(property = "paramixel.verbose", defaultValue = "false")
     private boolean verbose;
@@ -125,6 +100,8 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Include tags for test filtering.
      * Comma-separated list of regex patterns.
+     *
+     * @since 0.0.1
      */
     @Parameter(property = "paramixel.tags.include")
     private String includeTags;
@@ -132,9 +109,20 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Exclude tags for test filtering.
      * Comma-separated list of regex patterns.
+     *
+     * @since 0.0.1
      */
     @Parameter(property = "paramixel.tags.exclude")
     private String excludeTags;
+
+    /**
+     * Creates a new Mojo instance.
+     *
+     * @since 0.0.1
+     */
+    public ParamixelMojo() {
+        // INTENTIONALLY EMPTY
+    }
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -191,7 +179,9 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Discovers all test classes annotated with @Paramixel.TestClass.
      *
+     * @param classLoader the classLoader
      * @return a list of test classes to execute
+     * @since 0.0.1
      */
     private List<Class<?>> discoverTestClasses(final @NonNull ClassLoader classLoader) {
         final File testClassesDir = new File(project.getBuild().getTestOutputDirectory());
@@ -208,12 +198,30 @@ public class ParamixelMojo extends AbstractMojo {
         for (String className : classNames) {
             try {
                 final Class<?> clazz = classLoader.loadClass(className);
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 if (clazz.isAnnotationPresent(Paramixel.TestClass.class)) {
                     testClasses.add(clazz);
                 }
             } catch (ClassNotFoundException e) {
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 getLog().warn("Could not load class: " + className);
             } catch (NoClassDefFoundError e) {
+                /**
+                 * Provides definition.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 getLog().warn("Could not load class definition: " + className);
             }
         }
@@ -226,6 +234,7 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @param directory the directory to scan
      * @return a set of fully qualified class names
+     * @since 0.0.1
      */
     private Set<String> scanForTestClasses(final @NonNull File directory) {
         if (!directory.exists() || !directory.isDirectory()) {
@@ -238,11 +247,12 @@ public class ParamixelMojo extends AbstractMojo {
     }
 
     /**
-     * Recursively scans a directory tree for class files.
+     * Performs scanDirectoryRecursive.
      *
-     * @param directory the directory to scan
-     * @param basePath the base path used to compute relative class names
-     * @param classNames the mutable set to collect class names
+     * @param directory the directory
+     * @param basePath the basePath
+     * @param classNames the classNames
+     * @since 0.0.1
      */
     private void scanDirectoryRecursive(
             final @NonNull File directory, final @NonNull String basePath, final @NonNull Set<String> classNames) {
@@ -254,9 +264,21 @@ public class ParamixelMojo extends AbstractMojo {
         for (File file : files) {
             if (file.isDirectory()) {
                 scanDirectoryRecursive(file, basePath, classNames);
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
             } else if (file.getName().endsWith(".class") && !file.getName().contains("$")) {
                 final String relativePath = file.getPath().substring(basePath.length());
                 final String className =
+                        /**
+                         * Provides this type.
+                         *
+                         * @author Douglas Hoard <doug.hoard@gmail.com>
+                         * @since 0.0.1
+                         */
                         relativePath.replace(File.separatorChar, '.').replace(".class", "");
                 classNames.add(className.startsWith(".") ? className.substring(1) : className);
             }
@@ -268,6 +290,7 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @param testClasses the classes to execute
      * @throws Exception if execution fails
+     * @since 0.0.1
      */
     private void executeTests(final @NonNull List<Class<?>> testClasses) throws Exception {
         getLog().info("Executing " + testClasses.size() + " test classes");
@@ -321,6 +344,7 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @return a class loader for executing tests
      * @throws Exception if classpath URLs cannot be built
+     * @since 0.0.1
      */
     private URLClassLoader buildTestClassLoader() throws Exception {
         final List<URL> classpathUrls = buildTestClasspathUrls();
@@ -333,6 +357,7 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @return the ordered list of classpath URLs
      * @throws Exception if classpath elements cannot be resolved
+     * @since 0.0.1
      */
     private List<URL> buildTestClasspathUrls() throws Exception {
         final File testClassesDir = new File(project.getBuild().getTestOutputDirectory());

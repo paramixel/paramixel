@@ -52,12 +52,29 @@ import org.paramixel.api.Paramixel;
  * </pre>
  *
  * @since 0.0.1
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  */
 public final class RegexTagFilter implements TagFilter {
 
+    /**
+     * Provides this type.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
+     */
     private static final Logger LOGGER = Logger.getLogger(RegexTagFilter.class.getName());
 
+    /**
+     * Stores the includePatterns.
+     *
+     * @since 0.0.1
+     */
     private final List<Pattern> includePatterns;
+    /**
+     * Stores the excludePatterns.
+     *
+     * @since 0.0.1
+     */
     private final List<Pattern> excludePatterns;
 
     /**
@@ -68,6 +85,8 @@ public final class RegexTagFilter implements TagFilter {
      *
      * @param includePatterns regex patterns for tags to include; may be empty but not {@code null}
      * @param excludePatterns regex patterns for tags to exclude; may be empty but not {@code null}
+     * @return the result
+     * @since 0.0.1
      */
     public RegexTagFilter(final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
         this.includePatterns = compilePatterns(includePatterns, "include");
@@ -80,6 +99,7 @@ public final class RegexTagFilter implements TagFilter {
      * @param patterns the pattern strings to compile
      * @param patternType the type of patterns (for logging)
      * @return list of compiled patterns; never {@code null}
+     * @since 0.0.1
      */
     private List<Pattern> compilePatterns(final @NonNull List<String> patterns, final @NonNull String patternType) {
         final List<Pattern> compiled = new ArrayList<>();
@@ -132,6 +152,11 @@ public final class RegexTagFilter implements TagFilter {
             return false;
         }
 
+        /**
+         * Stores the true.
+         *
+         * @since 0.0.1
+         */
         // No include patterns - class passes (assuming it passed excludes)
         return true;
     }
@@ -143,13 +168,26 @@ public final class RegexTagFilter implements TagFilter {
      *
      * @param testClass the test class to extract tags from
      * @return set of valid tag strings from the entire hierarchy; empty set if no valid tags
+     * @since 0.0.1
      */
     private Set<String> extractAllTagsFromHierarchy(final Class<?> testClass) {
         final Set<String> validTags = new java.util.HashSet<>();
 
         for (Class<?> current = testClass;
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
+            /**
+             * Provides this type.
+             *
+             * @author Douglas Hoard <doug.hoard@gmail.com>
+             * @since 0.0.1
+             */
             final Paramixel.Tags tags = current.getAnnotation(Paramixel.Tags.class);
             if (tags != null && tags.value() != null) {
                 for (String tag : tags.value()) {
@@ -172,6 +210,7 @@ public final class RegexTagFilter implements TagFilter {
      * Returns the number of compiled include patterns.
      *
      * @return count of include patterns
+     * @since 0.0.1
      */
     public int getIncludePatternCount() {
         return includePatterns.size();
@@ -181,6 +220,7 @@ public final class RegexTagFilter implements TagFilter {
      * Returns the number of compiled exclude patterns.
      *
      * @return count of exclude patterns
+     * @since 0.0.1
      */
     public int getExcludePatternCount() {
         return excludePatterns.size();

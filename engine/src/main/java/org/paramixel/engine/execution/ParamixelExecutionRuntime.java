@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
  * <p>This class is thread-safe. The underlying executor is thread-safe and the limiter uses
  * thread-safe primitives.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ParamixelExecutionRuntime implements AutoCloseable {
 
@@ -44,19 +46,30 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * Default timeout for graceful executor shutdown.
      *
      * <p>The value is {@code 30 seconds}.
+     *
+     * @since 0.0.1
      */
     private static final Duration DEFAULT_SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
 
-    /** Owned executor used for task submission; immutable reference. */
+    /**
+     * Owned executor used for task submission; immutable reference.
+     *
+     * @since 0.0.1
+     */
     private final ExecutorService executor;
 
-    /** Owned concurrency limiter used for permit acquisition; immutable reference. */
+    /**
+     * Owned concurrency limiter used for permit acquisition; immutable reference.
+     *
+     * @since 0.0.1
+     */
     private final ParamixelConcurrencyLimiter limiter;
 
     /**
      * Creates a runtime sized to the current machine.
      *
      * @return a new runtime sized to {@code availableProcessors}; never {@code null}
+     * @since 0.0.1
      */
     public static ParamixelExecutionRuntime createDefault() {
         return new ParamixelExecutionRuntime(Runtime.getRuntime().availableProcessors());
@@ -68,7 +81,9 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * <p>The {@code cores} value configures the concurrency limiter.
      *
      * @param cores the core count used to size permits; must be {@code >= 1}
+     * @return the result
      * @throws IllegalArgumentException if {@code cores < 1}
+     * @since 0.0.1
      */
     public ParamixelExecutionRuntime(final int cores) {
         this.executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -82,6 +97,7 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * it down directly.
      *
      * @return the executor; never {@code null}
+     * @since 0.0.1
      */
     public ExecutorService executor() {
         return executor;
@@ -91,6 +107,7 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * Returns the global concurrency limiter.
      *
      * @return the limiter; never {@code null}
+     * @since 0.0.1
      */
     public ParamixelConcurrencyLimiter limiter() {
         return limiter;
@@ -105,6 +122,7 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * @param runnable the task to execute; never {@code null}
      * @return a future representing task completion; never {@code null}
      * @throws NullPointerException if any argument is {@code null}
+     * @since 0.0.1
      */
     public Future<?> submitNamed(final String threadName, final Runnable runnable) {
         Objects.requireNonNull(threadName, "threadName");
@@ -122,6 +140,7 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * @param <T> the callable result type
      * @return a future representing task completion and result; never {@code null}
      * @throws NullPointerException if any argument is {@code null}
+     * @since 0.0.1
      */
     public <T> Future<T> submitNamed(final String threadName, final Callable<T> callable) {
         Objects.requireNonNull(threadName, "threadName");
@@ -136,6 +155,7 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      *
      * @param threadName the thread name to set; may be {@code null} (delegated behavior of {@link Thread#setName(String)})
      * @param runnable the runnable to execute; may be {@code null} (throws {@link NullPointerException})
+     * @since 0.0.1
      */
     public static void runWithThreadName(final String threadName, final Runnable runnable) {
         final Thread current = Thread.currentThread();
@@ -158,6 +178,7 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * @param <T> the callable result type
      * @return the callable result
      * @throws Exception when {@code callable.call()} throws
+     * @since 0.0.1
      */
     public static <T> T callWithThreadName(final String threadName, final Callable<T> callable) throws Exception {
         final Thread current = Thread.currentThread();

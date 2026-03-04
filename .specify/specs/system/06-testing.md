@@ -316,6 +316,8 @@ No mocking framework is declared. The test approach uses:
 - **Minimal stub implementations:** Where a `TestEngine` or `EngineExecutionListener` is needed, simple anonymous classes or minimal concrete implementations are used.
 - **Functional test classes:** The integration layer is tested end-to-end by the `paramixel-tests` module.
 
+**Guideline:** For JUnit unit tests, never mock what you can use for real. Prefer real collaborators over stubs; use minimal hand-rolled stubs only when a real collaborator is impractical to construct or would make the test significantly slower or more brittle.
+
 If Mockito is needed in the future, it must be added explicitly to the relevant module's `pom.xml` and this spec must be updated.
 
 ---

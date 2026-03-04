@@ -31,7 +31,9 @@ public class AnotherTestClass {
      * @param context the argument context
      */
     @Paramixel.Test
-    public void anotherTest(final ArgumentContext context) {}
+    public void anotherTest(final ArgumentContext context) {
+        // INTENTIONALLY EMPTY
+    }
 
     /**
      * Sample test method used for method selector coverage.
@@ -39,5 +41,7 @@ public class AnotherTestClass {
      * @param context the argument context
      */
     @Paramixel.Test
-    public void testWithAnnotation(final ArgumentContext context) {}
+    public void testWithAnnotation(final ArgumentContext context) {
+        // INTENTIONALLY EMPTY
+    }
 }

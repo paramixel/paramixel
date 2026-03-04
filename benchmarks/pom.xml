@@ -112,10 +112,12 @@
                                 </goals>
                                 <configuration>
                                     <finalName>benchmarks</finalName>
+                                    <createDependencyReducedPom>false</createDependencyReducedPom>
                                     <transformers>
                                         <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                             <mainClass>org.openjdk.jmh.Main</mainClass>
                                         </transformer>
+                                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                                     </transformers>
                                     <filters>
                                         <filter>
@@ -124,6 +126,19 @@
                                                 <exclude>META-INF/*.SF</exclude>
                                                 <exclude>META-INF/*.DSA</exclude>
                                                 <exclude>META-INF/*.RSA</exclude>
+                                                <exclude>module-info.class</exclude>
+                                                <exclude>META-INF/versions/**/module-info.class</exclude>
+                                                <exclude>META-INF/MANIFEST.MF</exclude>
+                                                <exclude>META-INF/LICENSE</exclude>
+                                                <exclude>META-INF/LICENSE.*</exclude>
+                                                <exclude>META-INF/NOTICE</exclude>
+                                                <exclude>META-INF/NOTICE.*</exclude>
+                                                <exclude>META-INF/*LICENSE*</exclude>
+                                                <exclude>META-INF/*NOTICE*</exclude>
+                                                <exclude>LICENSE</exclude>
+                                                <exclude>LICENSE.*</exclude>
+                                                <exclude>NOTICE</exclude>
+                                                <exclude>NOTICE.*</exclude>
                                             </excludes>
                                         </filter>
                                     </filters>

@@ -19,6 +19,7 @@ package org.paramixel.engine.util;
 /**
  * Duration-related utilities.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
 public final class DurationUtils {
@@ -27,9 +28,11 @@ public final class DurationUtils {
      * Prevents instantiation of this utility class.
      *
      * <p>This class exposes only static methods.
+     *
+     * @since 0.0.1
      */
     private DurationUtils() {
-        // utility class
+        // INTENTIONALLY EMPTY
     }
 
     /**
@@ -45,6 +48,7 @@ public final class DurationUtils {
      * @param millis duration in milliseconds; must be {@code >= 0}
      * @return formatted duration string; never {@code null}
      * @throws IllegalArgumentException if {@code millis < 0}
+     * @since 0.0.1
      */
     public static String formatMillis(final long millis) {
         if (millis < 0) {
