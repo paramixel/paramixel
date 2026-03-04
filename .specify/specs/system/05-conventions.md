@@ -81,7 +81,8 @@ There is no IoC container. Object graphs are wired manually in `ParamixelTestEng
 ## 4. Null Safety
 
 - All public method parameters that must not be null are annotated `@NonNull` from `org.jspecify.annotations`.
-- Constructors use `Objects.requireNonNull(param, "param must not be null")` for each non-null parameter.
+  This applies only to reference types. `@NonNull` MUST NOT be used on primitive parameters.
+- Constructors use `Objects.requireNonNull(param, "param must not be null")` for each non-null reference-type parameter.
 - Return values that may be null are documented explicitly in Javadoc (`or {@code null} if...`).
 - Nullable parameters are documented but not annotated `@Nullable` in the current codebase (only `@NonNull` is used).
 
@@ -223,7 +224,7 @@ Avoid redundant `toString()` calls in string concatenation. For example, prefer
 
 ## 11. Mandatory Rules (MUST always do)
 
-1. **Every public method parameter that must be non-null MUST be annotated `@NonNull`** and validated with `Objects.requireNonNull()` in constructors.
+1. **Every public method parameter that must be non-null MUST be annotated `@NonNull`** (reference types only; never primitives) and validated with `Objects.requireNonNull()` in constructors (reference-type parameters only).
 2. **All new Java source files MUST start with the Apache 2.0 license header** from `assets/license-header.txt`.
 3. **All new classes MUST be formatted with Palantir Java Format** — commit only after `./mvnw compile` succeeds (Spotless applies automatically).
 4. **Every new production class in `paramixel-engine` MUST have a corresponding unit test** in `engine/src/test/java/`.
