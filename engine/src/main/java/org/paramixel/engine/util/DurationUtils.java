@@ -1,0 +1,67 @@
+/*
+ * Copyright 2026-present Douglas Hoard. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.paramixel.engine.util;
+
+/**
+ * Duration-related utilities.
+ *
+ * @since 0.0.1
+ */
+public final class DurationUtils {
+
+    /**
+     * Prevents instantiation of this utility class.
+     *
+     * <p>This class exposes only static methods.
+     */
+    private DurationUtils() {
+        // utility class
+    }
+
+    /**
+     * Formats a duration in milliseconds for human-readable output.
+     *
+     * <p>Rules:
+     * <ul>
+     *   <li>{@code < 1000}: {@code "{millis}ms"}
+     *   <li>{@code < 60000}: seconds with 3 decimals (e.g. {@code "1.500s"})
+     *   <li>{@code >= 60000}: {@code "{m}m {s}s {ms}ms"}
+     * </ul>
+     *
+     * @param millis duration in milliseconds; must be {@code >= 0}
+     * @return formatted duration string; never {@code null}
+     * @throws IllegalArgumentException if {@code millis < 0}
+     */
+    public static String formatMillis(final long millis) {
+        if (millis < 0) {
+            throw new IllegalArgumentException("millis must be >= 0, got: " + millis);
+        }
+
+        if (millis < 1000) {
+            return millis + "ms";
+        }
+
+        if (millis < 60000) {
+            return String.format("%.3fs", millis / 1000.0);
+        }
+
+        final long minutes = millis / 60000;
+        final long seconds = (millis % 60000) / 1000;
+        final long remainingMillis = millis % 1000;
+        return String.format("%dm %ds %dms", minutes, seconds, remainingMillis);
+    }
+}

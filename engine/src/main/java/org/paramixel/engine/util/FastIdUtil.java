@@ -30,7 +30,7 @@ import java.util.concurrent.ThreadLocalRandom;
  *   <li>SKIP</li>
  * </ul>
  */
-public final class FastId {
+public final class FastIdUtil {
 
     /**
      * Character set containing all valid ID characters.
@@ -61,7 +61,7 @@ public final class FastId {
      *
      * <p>This class exposes only static methods.
      */
-    private FastId() {
+    private FastIdUtil() {
         // utility class
     }
 

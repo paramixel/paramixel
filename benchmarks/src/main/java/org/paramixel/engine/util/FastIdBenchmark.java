@@ -29,9 +29,9 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
 /**
- * JMH benchmarks for {@link FastId} ID generation utility.
+ * JMH benchmarks for {@link FastIdUtil} ID generation utility.
  *
- * <p>Benchmarks measure the throughput and latency of FastId.getId()
+ * <p>Benchmarks measure the throughput and latency of FastIdUtil.getId()
  * under various ID length configurations.</p>
  *
  * @since 0.0.1
@@ -51,7 +51,7 @@ public class FastIdBenchmark {
      */
     @Benchmark
     public void generateId6Characters(final Blackhole blackhole) {
-        final String id = FastId.getId(6);
+        final String id = FastIdUtil.getId(6);
         blackhole.consume(id);
     }
 
@@ -62,7 +62,7 @@ public class FastIdBenchmark {
      */
     @Benchmark
     public void generateId8Characters(final Blackhole blackhole) {
-        final String id = FastId.getId(8);
+        final String id = FastIdUtil.getId(8);
         blackhole.consume(id);
     }
 
@@ -73,7 +73,7 @@ public class FastIdBenchmark {
      */
     @Benchmark
     public void generateId12Characters(final Blackhole blackhole) {
-        final String id = FastId.getId(12);
+        final String id = FastIdUtil.getId(12);
         blackhole.consume(id);
     }
 
@@ -84,7 +84,7 @@ public class FastIdBenchmark {
      */
     @Benchmark
     public void generateId16Characters(final Blackhole blackhole) {
-        final String id = FastId.getId(16);
+        final String id = FastIdUtil.getId(16);
         blackhole.consume(id);
     }
 
@@ -95,7 +95,7 @@ public class FastIdBenchmark {
      */
     @Benchmark
     public void generateId32Characters(final Blackhole blackhole) {
-        final String id = FastId.getId(32);
+        final String id = FastIdUtil.getId(32);
         blackhole.consume(id);
     }
 }

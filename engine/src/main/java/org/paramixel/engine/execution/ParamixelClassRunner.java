@@ -40,7 +40,7 @@ import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.invoker.ParamixelReflectionInvoker;
-import org.paramixel.engine.util.FastId;
+import org.paramixel.engine.util.FastIdUtil;
 
 /**
  * Executes one {@link ParamixelTestClassDescriptor} using a shared runtime.
@@ -240,7 +240,7 @@ public final class ParamixelClassRunner {
 
         // Always execute arg0 inline to guarantee progress.
         startArgumentDescriptor(argumentDescriptors, 0);
-        final String arg0ThreadName = classThreadName + "/" + FastId.getId(6);
+        final String arg0ThreadName = classThreadName + "/" + FastIdUtil.getId(6);
         final TestExecutionResult arg0Result = executeArgumentBody(
                 classDescriptor, testClass, classContext, testInstance, arguments[0], 0, arg0ThreadName);
         finishArgumentDescriptor(argumentDescriptors, 0, arg0Result);
@@ -250,7 +250,7 @@ public final class ParamixelClassRunner {
 
             final int argumentIndexCopy = argumentIndex;
             final Object argument = arguments[argumentIndexCopy];
-            final String argumentThreadName = classThreadName + "/" + FastId.getId(6);
+            final String argumentThreadName = classThreadName + "/" + FastIdUtil.getId(6);
 
             if (argumentParallelism <= 1 || asyncStarted >= maxAsyncArguments) {
                 final TestExecutionResult result = executeArgumentBody(

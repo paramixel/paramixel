@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
+import org.paramixel.engine.util.DurationUtils;
 
 /**
  * Reports a summarized execution report for the engine root descriptor.
@@ -58,7 +59,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
     public void executionFinished(
             final @NonNull TestDescriptor testDescriptor, final @NonNull TestExecutionResult testExecutionResult) {
         long durationMillis = System.currentTimeMillis() - startTimeMillis;
-        String duration = formatDuration(durationMillis);
+        String duration = DurationUtils.formatMillis(durationMillis);
 
         ExecutionSummary summary = getExecutionSummary();
 
@@ -182,25 +183,6 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      */
     private void printLine(String format, Object... args) {
         printer.accept(String.format(format, args));
-    }
-
-    /**
-     * Formats a duration in milliseconds for human-readable output.
-     *
-     * @param millis duration in milliseconds; must be {@code >= 0}
-     * @return formatted duration string; never {@code null}
-     */
-    private String formatDuration(long millis) {
-        if (millis < 1000) {
-            return millis + "ms";
-        } else if (millis < 60000) {
-            return String.format("%.3fs", millis / 1000.0);
-        } else {
-            long minutes = millis / 60000;
-            long seconds = (millis % 60000) / 1000;
-            long remainingMillis = millis % 1000;
-            return String.format("%dm %ds %dms", minutes, seconds, remainingMillis);
-        }
     }
 
     /**

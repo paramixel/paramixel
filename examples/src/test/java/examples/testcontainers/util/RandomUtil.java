@@ -43,7 +43,7 @@ import org.jspecify.annotations.NonNull;
  *
  * <p><b>Example Usage:</b></p>
  * <pre>{@code
- * String id = FastId.getId(16);  // Generates 16-character ID
+ * String id = RandomUtil.getRandomString(16);  // Generates 16-character ID
  * }</pre>
  *
  * @see ThreadLocalRandom

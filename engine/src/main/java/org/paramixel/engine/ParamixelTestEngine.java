@@ -47,7 +47,7 @@ import org.paramixel.engine.execution.ParamixelClassRunner;
 import org.paramixel.engine.execution.ParamixelConcurrencyLimiter;
 import org.paramixel.engine.execution.ParamixelExecutionRuntime;
 import org.paramixel.engine.listener.ParamixelEngineExecutionListener;
-import org.paramixel.engine.util.FastId;
+import org.paramixel.engine.util.FastIdUtil;
 
 /**
  * Provides the Paramixel JUnit Platform {@link TestEngine} implementation.
@@ -181,7 +181,7 @@ public class ParamixelTestEngine implements TestEngine {
                 for (ParamixelTestClassDescriptor classDescriptor : classDescriptors) {
                     final ParamixelConcurrencyLimiter.ClassPermit permit =
                             runtime.limiter().acquireClassExecution();
-                    futures.add(runtime.submitNamed(FastId.getId(6), () -> {
+                    futures.add(runtime.submitNamed(FastIdUtil.getId(6), () -> {
                         try (permit) {
                             classRunner.runTestClass(classDescriptor);
                         }
