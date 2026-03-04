@@ -56,7 +56,7 @@ TODO: If any tooling relied on `opencode.json` instruction loading, replace it w
 | Single module tests (unit) | `./mvnw test -pl <module>` |
 | Functional tests (tests module) | `./mvnw test -pl tests` |
 | Functional tests (examples module) | `./mvnw test -pl examples` |
-| Skip all tests | `./mvnw package -DskipTests` |
+| Skip all tests | `./mvnw package -DskipTests -Dparamixel.skipTests=true` |
 | Run a single unit test class | `./mvnw test -pl engine -Dtest=MyTest` |
 | Run a single unit test method | `./mvnw test -pl engine -Dtest=MyTest#myMethod` |
 | Apply code formatting only | `./mvnw spotless:apply` |

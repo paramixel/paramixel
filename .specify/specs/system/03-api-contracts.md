@@ -215,8 +215,8 @@ Contract:
 
 | Parameter | Property | Default | Type | Description |
 |---|---|---|---|---|
-| `project` | `project` | (injected) | `MavenProject` | The current Maven project |
-| `skipTests` | `skipTests` | `false` | `boolean` | Skips all test execution when true |
+| `project` | (injected) | (injected) | `MavenProject` | The current Maven project |
+| `skipTests` | `paramixel.skipTests` | `false` | `boolean` | Skips all test execution when true |
 | `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@Paramixel.TestClass` annotated class found |
 | `parallelism` | `paramixel.parallelism` | (engine default) | `Integer` | Global maximum parallelism (max concurrent test classes); when unset, engine default applies |
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |

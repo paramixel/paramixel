@@ -112,7 +112,6 @@
                 </executions>
                 <configuration>
                     <verbose>true</verbose>
-                    <skip>false</skip>
                 </configuration>
             </plugin>
         </plugins>

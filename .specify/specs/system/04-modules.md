@@ -206,7 +206,7 @@ org.paramixel.maven.plugin
 ### Configuration Properties
 
 Exposed as Maven Mojo parameters (see `.specify/specs/system/03-api-contracts.md` §4):
-- `skipTests` / `paramixel.failIfNoTests` / `paramixel.parallelism` / `paramixel.verbose`
+- `paramixel.skipTests` / `paramixel.failIfNoTests` / `paramixel.parallelism` / `paramixel.verbose`
 
 ---
 
