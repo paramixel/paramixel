@@ -61,16 +61,17 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @since 0.0.1
      */
-    @Parameter(property = "project", required = true, readonly = true)
+    @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
 
     /**
      * Whether to skip test execution.
-     * Supports the standard Maven -DskipTests flag.
+     *
+     * System property: -Dparamixel.skipTests=true
      *
      * @since 0.0.1
      */
-    @Parameter(property = "skipTests", defaultValue = "false")
+    @Parameter(property = "paramixel.skipTests", defaultValue = "false")
     private boolean skipTests;
 
     /**

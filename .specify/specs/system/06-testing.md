@@ -76,7 +76,7 @@ Note: examples include Testcontainers-based tests that require Docker. Ensure Do
 ### Skip all tests
 
 ```bash
-./mvnw package -DskipTests
+./mvnw package -DskipTests -Dparamixel.skipTests=true
 ```
 
 ### Run a single unit test class (engine)

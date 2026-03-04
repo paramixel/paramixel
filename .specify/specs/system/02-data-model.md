@@ -313,7 +313,7 @@ The Maven plugin exposes additional parameters:
 
 | Maven property | Default | Description |
 |---|---|---|
-| `skipTests` | `false` | Skip all test execution |
+| `paramixel.skipTests` | `false` | Skip all test execution |
 | `paramixel.failIfNoTests` | `true` | Fail build if no `@Paramixel.TestClass` found |
 | `paramixel.parallelism` | (engine default) | Global maximum parallelism (max concurrent test classes) |
 | `paramixel.verbose` | `false` | Verbose logging (currently partially implemented) |
