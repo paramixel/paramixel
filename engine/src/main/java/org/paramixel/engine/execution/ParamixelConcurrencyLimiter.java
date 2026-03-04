@@ -36,6 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p><b>Thread safety</b>
  * <p>This type is thread-safe.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ParamixelConcurrencyLimiter {
 
@@ -43,16 +45,30 @@ public final class ParamixelConcurrencyLimiter {
      * Core count used to size permit pools.
      *
      * <p>This value is immutable and is always {@code >= 1}.
+     *
+     * @since 0.0.1
      */
     private final int cores;
 
-    /** Total permit pool that caps all parallel work. */
+    /**
+     * Total permit pool that caps all parallel work.
+     *
+     * @since 0.0.1
+     */
     private final Semaphore totalSlots;
 
-    /** Permit pool that caps concurrently active test classes. */
+    /**
+     * Permit pool that caps concurrently active test classes.
+     *
+     * @since 0.0.1
+     */
     private final Semaphore classSlots;
 
-    /** Permit pool that caps extra parallel work within a class. */
+    /**
+     * Permit pool that caps extra parallel work within a class.
+     *
+     * @since 0.0.1
+     */
     private final Semaphore argumentSlots;
 
     /**
@@ -60,6 +76,7 @@ public final class ParamixelConcurrencyLimiter {
      *
      * @param cores the core count; must be {@code >= 1}
      * @throws IllegalArgumentException if {@code cores < 1}
+     * @since 0.0.1
      */
     public ParamixelConcurrencyLimiter(final int cores) {
         if (cores < 1) {
@@ -75,6 +92,7 @@ public final class ParamixelConcurrencyLimiter {
      * Returns the configured core count.
      *
      * @return the core count; always {@code >= 1}
+     * @since 0.0.1
      */
     public int cores() {
         return cores;
@@ -84,6 +102,7 @@ public final class ParamixelConcurrencyLimiter {
      * Returns the configured total slot capacity.
      *
      * @return the total slot capacity
+     * @since 0.0.1
      */
     public int totalSlots() {
         return cores * 2;
@@ -93,6 +112,7 @@ public final class ParamixelConcurrencyLimiter {
      * Returns the configured class slot capacity.
      *
      * @return the class slot capacity
+     * @since 0.0.1
      */
     public int classSlots() {
         return cores;
@@ -102,6 +122,7 @@ public final class ParamixelConcurrencyLimiter {
      * Returns the configured argument slot capacity.
      *
      * @return the argument slot capacity
+     * @since 0.0.1
      */
     public int argumentSlots() {
         return cores;
@@ -111,6 +132,7 @@ public final class ParamixelConcurrencyLimiter {
      * Returns the number of total slots currently in use.
      *
      * @return the number of total slots acquired
+     * @since 0.0.1
      */
     public int totalSlotsInUse() {
         return totalSlots() - totalSlots.availablePermits();
@@ -120,6 +142,7 @@ public final class ParamixelConcurrencyLimiter {
      * Returns the number of class slots currently in use.
      *
      * @return the number of class slots acquired
+     * @since 0.0.1
      */
     public int classSlotsInUse() {
         return classSlots() - classSlots.availablePermits();
@@ -129,6 +152,7 @@ public final class ParamixelConcurrencyLimiter {
      * Returns the number of argument slots currently in use.
      *
      * @return the number of argument slots acquired
+     * @since 0.0.1
      */
     public int argumentSlotsInUse() {
         return argumentSlots() - argumentSlots.availablePermits();
@@ -141,6 +165,7 @@ public final class ParamixelConcurrencyLimiter {
      *
      * @return a permit that releases the acquired capacity on {@link ClassPermit#close()}; never {@code null}
      * @throws InterruptedException if the current thread is interrupted while acquiring permits
+     * @since 0.0.1
      */
     public ClassPermit acquireClassExecution() throws InterruptedException {
         classSlots.acquire();
@@ -151,7 +176,7 @@ public final class ParamixelConcurrencyLimiter {
             return new ClassPermit(this);
         } catch (InterruptedException e) {
             if (!totalAcquired) {
-                // no-op
+                // INTENTIONALLY EMPTY
             }
             classSlots.release();
             throw e;
@@ -168,6 +193,7 @@ public final class ParamixelConcurrencyLimiter {
      * execute inline to preserve progress.
      *
      * @return an acquired permit, or {@link Optional#empty()} when capacity is unavailable
+     * @since 0.0.1
      */
     public Optional<ArgumentPermit> tryAcquireArgumentExecution() {
         if (!totalSlots.tryAcquire()) {
@@ -184,6 +210,8 @@ public final class ParamixelConcurrencyLimiter {
      * Releases permits associated with a class execution.
      *
      * <p>This method is private because only {@link ClassPermit} should release permits.
+     *
+     * @since 0.0.1
      */
     private void releaseClassExecution() {
         totalSlots.release();
@@ -194,6 +222,8 @@ public final class ParamixelConcurrencyLimiter {
      * Releases permits associated with an argument execution.
      *
      * <p>This method is private because only {@link ArgumentPermit} should release permits.
+     *
+     * @since 0.0.1
      */
     private void releaseArgumentExecution() {
         argumentSlots.release();
@@ -207,19 +237,32 @@ public final class ParamixelConcurrencyLimiter {
      *
      * <p><b>Thread safety</b>
      * <p>This permit is thread-safe and idempotent.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     public static final class ClassPermit implements AutoCloseable {
 
-        /** Owning limiter used to release permits; immutable. */
+        /**
+         * Owning limiter used to release permits; immutable.
+         *
+         * @since 0.0.1
+         */
         private final ParamixelConcurrencyLimiter limiter;
 
-        /** Guard that prevents double-release; mutable and thread-safe. */
+        /**
+         * Guard that prevents double-release; mutable and thread-safe.
+         *
+         * @since 0.0.1
+         */
         private final AtomicBoolean closed = new AtomicBoolean(false);
 
         /**
          * Creates a permit for the given limiter.
          *
          * @param limiter the owning limiter; never {@code null}
+         * @return the result
+         * @since 0.0.1
          */
         private ClassPermit(final ParamixelConcurrencyLimiter limiter) {
             this.limiter = limiter;
@@ -240,19 +283,32 @@ public final class ParamixelConcurrencyLimiter {
      *
      * <p><b>Thread safety</b>
      * <p>This permit is thread-safe and idempotent.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     public static final class ArgumentPermit implements AutoCloseable {
 
-        /** Owning limiter used to release permits; immutable. */
+        /**
+         * Owning limiter used to release permits; immutable.
+         *
+         * @since 0.0.1
+         */
         private final ParamixelConcurrencyLimiter limiter;
 
-        /** Guard that prevents double-release; mutable and thread-safe. */
+        /**
+         * Guard that prevents double-release; mutable and thread-safe.
+         *
+         * @since 0.0.1
+         */
         private final AtomicBoolean closed = new AtomicBoolean(false);
 
         /**
          * Creates a permit for the given limiter.
          *
          * @param limiter the owning limiter; never {@code null}
+         * @return the result
+         * @since 0.0.1
          */
         private ArgumentPermit(final ParamixelConcurrencyLimiter limiter) {
             this.limiter = limiter;

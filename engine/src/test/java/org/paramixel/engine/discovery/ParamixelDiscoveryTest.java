@@ -615,11 +615,11 @@ public class ParamixelDiscoveryTest {
                                 try {
                                     Files.deleteIfExists(p);
                                 } catch (Exception ignored) {
-                                    // ignore
+                                    // INTENTIONALLY EMPTY
                                 }
                             });
                 } catch (Exception ignored) {
-                    // ignore
+                    // INTENTIONALLY EMPTY
                 }
             }
         }
@@ -657,7 +657,9 @@ public class ParamixelDiscoveryTest {
 
         @Paramixel.Test
         @Paramixel.DisplayName("My Method")
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -665,18 +667,24 @@ public class ParamixelDiscoveryTest {
     public static class DisabledTestClass {
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
     public static class DisabledMethodTestClass {
 
         @Paramixel.Test
-        public void enabled(final ArgumentContext context) {}
+        public void enabled(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.Test
         @Paramixel.Disabled("skip")
-        public void disabled(final ArgumentContext context) {}
+        public void disabled(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -688,7 +696,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -700,7 +710,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -714,7 +726,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -730,7 +744,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -743,7 +759,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -755,7 +773,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -763,11 +783,13 @@ public class ParamixelDiscoveryTest {
 
         @Paramixel.ArgumentsCollector
         public static void arguments(final ArgumentsCollector collector) {
-            // Intentionally add no arguments.
+            // INTENTIONALLY EMPTY
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -779,7 +801,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     @Paramixel.TestClass
@@ -791,7 +815,9 @@ public class ParamixelDiscoveryTest {
         }
 
         @Paramixel.Test
-        public void test(final ArgumentContext context) {}
+        public void test(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     public static final class Outer {
@@ -800,7 +826,9 @@ public class ParamixelDiscoveryTest {
         public static class NestedTestClass {
 
             @Paramixel.Test
-            public void test(final ArgumentContext context) {}
+            public void test(final ArgumentContext context) {
+                // INTENTIONALLY EMPTY
+            }
         }
     }
 

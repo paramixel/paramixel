@@ -134,5 +134,7 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         field.setLong(listener, startTimeMillis);
     }
 
-    private static void dummy() {}
+    private static void dummy() {
+        // INTENTIONALLY EMPTY
+    }
 }

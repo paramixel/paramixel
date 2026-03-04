@@ -35,13 +35,31 @@ import org.jspecify.annotations.NonNull;
  * </ul>
  *
  * @since 0.0.1
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  */
 public final class TagFilterFactory {
 
+    /**
+     * Stores the TAGS_INCLUDE_KEY.
+     *
+     * @since 0.0.1
+     */
     private static final String TAGS_INCLUDE_KEY = "paramixel.tags.include";
+    /**
+     * Stores the TAGS_EXCLUDE_KEY.
+     *
+     * @since 0.0.1
+     */
     private static final String TAGS_EXCLUDE_KEY = "paramixel.tags.exclude";
 
-    private TagFilterFactory() {}
+    /**
+     * Creates a new instance.
+     *
+     * @since 0.0.1
+     */
+    private TagFilterFactory() {
+        // INTENTIONALLY EMPTY
+    }
 
     /**
      * Creates a tag filter from system properties.
@@ -50,6 +68,7 @@ public final class TagFilterFactory {
      * system properties. Patterns are comma-separated.</p>
      *
      * @return a configured {@link TagFilter}; never {@code null}
+     * @since 0.0.1
      */
     public static TagFilter fromSystemProperties() {
         return fromProperties(System.getProperties());
@@ -63,6 +82,7 @@ public final class TagFilterFactory {
      *
      * @param properties the properties to read from; never {@code null}
      * @return a configured {@link TagFilter}; never {@code null}
+     * @since 0.0.1
      */
     public static TagFilter fromProperties(final @NonNull Properties properties) {
         Objects.requireNonNull(properties, "properties must not be null");
@@ -74,13 +94,11 @@ public final class TagFilterFactory {
     }
 
     /**
-     * Creates a tag filter from JUnit Platform configuration parameters.
+     * Performs fromConfigurationParameters.
      *
-     * <p>Reads {@code paramixel.tags.include} and {@code paramixel.tags.exclude} from
-     * the provided configuration parameters.</p>
-     *
-     * @param configParameters the configuration parameters to read from; never {@code null}
-     * @return a configured {@link TagFilter}; never {@code null}
+     * @param configParameters the configParameters
+     * @return the result
+     * @since 0.0.1
      */
     public static TagFilter fromConfigurationParameters(
             final org.junit.platform.engine.ConfigurationParameters configParameters) {
@@ -98,17 +116,19 @@ public final class TagFilterFactory {
      * @param includePatterns comma-separated include patterns; may be empty or {@code null}
      * @param excludePatterns comma-separated exclude patterns; may be empty or {@code null}
      * @return a configured {@link TagFilter}; never {@code null}
+     * @since 0.0.1
      */
     public static TagFilter fromPatternStrings(final String includePatterns, final String excludePatterns) {
         return fromPatterns(parsePatterns(includePatterns), parsePatterns(excludePatterns));
     }
 
     /**
-     * Creates a tag filter from lists of patterns.
+     * Performs fromPatterns.
      *
-     * @param includePatterns list of include patterns; never {@code null}
-     * @param excludePatterns list of exclude patterns; never {@code null}
-     * @return a configured {@link TagFilter}; never {@code null}
+     * @param includePatterns the includePatterns
+     * @param excludePatterns the excludePatterns
+     * @return the result
+     * @since 0.0.1
      */
     public static TagFilter fromPatterns(
             final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
@@ -125,6 +145,7 @@ public final class TagFilterFactory {
      *
      * @param value the comma-separated pattern string; may be {@code null} or empty
      * @return list of non-empty patterns; never {@code null}
+     * @since 0.0.1
      */
     private static List<String> parsePatterns(final String value) {
         if (value == null || value.trim().isEmpty()) {

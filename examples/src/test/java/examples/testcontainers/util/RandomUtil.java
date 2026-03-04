@@ -76,7 +76,7 @@ public final class RandomUtil {
      * Private constructor to prevent instantiation.
      */
     private RandomUtil() {
-        // Utility class
+        // INTENTIONALLY EMPTY
     }
 
     /**

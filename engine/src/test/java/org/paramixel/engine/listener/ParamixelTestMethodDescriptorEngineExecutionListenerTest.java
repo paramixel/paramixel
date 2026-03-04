@@ -54,5 +54,7 @@ public class ParamixelTestMethodDescriptorEngineExecutionListenerTest {
         assertThat(out.toString()).contains("M").contains("ABORTED");
     }
 
-    private static void dummy() {}
+    private static void dummy() {
+        // INTENTIONALLY EMPTY
+    }
 }

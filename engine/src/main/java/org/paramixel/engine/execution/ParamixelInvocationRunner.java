@@ -56,39 +56,64 @@ import org.paramixel.engine.util.FastIdUtil;
  * <p>This class is not thread-safe. It is constructed per argument bucket and is intended for
  * single-threaded use by {@link ParamixelClassRunner}.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ParamixelInvocationRunner {
 
-    /** Logger used for lifecycle and invocation diagnostics. */
+    /**
+     * Logger used for lifecycle and invocation diagnostics.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
+     */
     private static final Logger LOGGER = Logger.getLogger(ParamixelInvocationRunner.class.getName());
 
     /**
-     * Cache of lifecycle methods by (class, annotation, order).
+     * Performs ConcurrentHashMap<>.
      *
-     * <p>This cache is static to avoid repeated reflection scanning across invocations.
+     * @return the result
+     * @since 0.0.1
      */
     private static final ConcurrentHashMap<LifecycleCacheKey, List<Method>> LIFECYCLE_METHOD_CACHE =
             new ConcurrentHashMap<>();
 
-    /** Shared execution runtime used for task submission and permits. */
+    /**
+     * Shared execution runtime used for task submission and permits.
+     *
+     * @since 0.0.1
+     */
     private final ParamixelExecutionRuntime runtime;
 
-    /** Listener notified for method descriptor start/finish events. */
+    /**
+     * Listener notified for method descriptor start/finish events.
+     *
+     * @since 0.0.1
+     */
     private final EngineExecutionListener listener;
 
-    /** Owning class context used for metrics and failure aggregation. */
+    /**
+     * Owning class context used for metrics and failure aggregation.
+     *
+     * @since 0.0.1
+     */
     private final ConcreteClassContext classContext;
 
-    /** Instantiated test instance used to invoke lifecycle and test methods. */
+    /**
+     * Instantiated test instance used to invoke lifecycle and test methods.
+     *
+     * @since 0.0.1
+     */
     private final Object testInstance;
 
     /**
-     * Creates an invocation runner for a single argument bucket.
+     * Creates a new instance.
      *
-     * @param runtime the shared runtime; never {@code null}
-     * @param listener the listener to notify; never {@code null}
-     * @param classContext the owning class context; never {@code null}
-     * @param testInstance the instantiated test object; never {@code null}
+     * @param runtime the runtime
+     * @param listener the listener
+     * @param classContext the classContext
+     * @param testInstance the testInstance
+     * @since 0.0.1
      */
     public ParamixelInvocationRunner(
             final ParamixelExecutionRuntime runtime,
@@ -102,24 +127,13 @@ public final class ParamixelInvocationRunner {
     }
 
     /**
-     * Executes test method descriptors associated with a single argument index.
+     * Performs runInvocations.
      *
-     * <p>This method identifies {@link ParamixelTestMethodDescriptor} instances under the provided
-     * {@link ParamixelTestClassDescriptor} that correspond to {@code argumentIndex}. It then
-     * executes them either sequentially or concurrently depending on:
-     * <ul>
-     *   <li>configured argument parallelism ({@link ParamixelTestClassDescriptor#getArgumentParallelism()})</li>
-     *   <li>presence of {@link Paramixel.Order}</li>
-     *   <li>number of methods</li>
-     * </ul>
-     *
-     * <p><b>Failure handling</b>
-     * <p>This method returns the first observed failure (if any) as the bucket result.
-     *
-     * @param classDescriptor the class descriptor to execute; never {@code null}
-     * @param argument the argument value; may be {@code null}
-     * @param argumentIndex the argument index
-     * @return the aggregated result for the bucket; never {@code null}
+     * @param classDescriptor the classDescriptor
+     * @param argument the argument
+     * @param argumentIndex the argumentIndex
+     * @return the result
+     * @since 0.0.1
      */
     public TestExecutionResult runInvocations(
             final ParamixelTestClassDescriptor classDescriptor, final Object argument, final int argumentIndex) {
@@ -136,6 +150,12 @@ public final class ParamixelInvocationRunner {
 
         final int parallelism = classDescriptor.getArgumentParallelism();
         final boolean hasOrderedTests = methodDescriptors.stream()
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 .anyMatch(descriptor -> descriptor.getTestMethod().isAnnotationPresent(Paramixel.Order.class));
 
         if (parallelism <= 1 || hasOrderedTests || methodDescriptors.size() <= 1) {
@@ -209,23 +229,14 @@ public final class ParamixelInvocationRunner {
     }
 
     /**
-     * Executes a single test method invocation and reports the result.
+     * Performs executeInvocation.
      *
-     * <p>This method notifies {@code listener} of execution start/finish, executes
-     * {@link Paramixel.BeforeEach} and {@link Paramixel.AfterEach}, and invokes the test method
-     * when before-each succeeds.
-     *
-     * <p><b>Side effects</b>
-     * <ul>
-     *   <li>Increments invocation/success/failure counters on {@code classContext}.</li>
-     *   <li>Records any throwable on {@code classContext}.</li>
-     * </ul>
-     *
-     * @param methodDescriptor the descriptor to report; never {@code null}
-     * @param testMethod the reflective method to invoke; never {@code null}
-     * @param argument the argument value; may be {@code null}
-     * @param argumentIndex the argument index
-     * @return the invocation result; never {@code null}
+     * @param methodDescriptor the methodDescriptor
+     * @param testMethod the testMethod
+     * @param argument the argument
+     * @param argumentIndex the argumentIndex
+     * @return the result
+     * @since 0.0.1
      */
     private TestExecutionResult executeInvocation(
             final ParamixelTestMethodDescriptor methodDescriptor,
@@ -293,8 +304,15 @@ public final class ParamixelInvocationRunner {
      * @param testClass the test class; never {@code null}
      * @param argumentContext the argument context passed to hooks; never {@code null}
      * @return the first failure, or {@code null} when all hooks succeed
+     * @since 0.0.1
      */
     private Throwable runBeforeEach(final Class<?> testClass, final ArgumentContext argumentContext) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeEach.class);
         for (Method method : methods) {
             try {
@@ -316,8 +334,15 @@ public final class ParamixelInvocationRunner {
      * @param testClass the test class; never {@code null}
      * @param argumentContext the argument context passed to hooks; never {@code null}
      * @return the first failure, or {@code null} when all hooks succeed
+     * @since 0.0.1
      */
     private Throwable runAfterEach(final Class<?> testClass, final ArgumentContext argumentContext) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterEach.class);
         Throwable firstFailure = null;
         for (Method method : methods) {
@@ -335,13 +360,12 @@ public final class ParamixelInvocationRunner {
     }
 
     /**
-     * Returns lifecycle methods annotated with the given annotation.
+     * Performs getLifecycleMethods.
      *
-     * <p>The returned list is cached and immutable.
-     *
-     * @param testClass the root test class; never {@code null}
-     * @param annotationType the lifecycle annotation type to match; never {@code null}
-     * @return an immutable list of lifecycle methods; never {@code null}
+     * @param testClass the testClass
+     * @param annotationType the annotationType
+     * @return the result
+     * @since 0.0.1
      */
     private List<Method> getLifecycleMethods(
             final Class<?> testClass, final Class<? extends Annotation> annotationType) {
@@ -349,12 +373,24 @@ public final class ParamixelInvocationRunner {
         return LIFECYCLE_METHOD_CACHE.computeIfAbsent(cacheKey, key -> {
             final Map<String, Method> bySignature = new ConcurrentHashMap<>();
             for (Class<?> current = testClass;
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     current != null && current != Object.class;
                     current = current.getSuperclass()) {
                 for (Method method : current.getDeclaredMethods()) {
                     if (!method.isAnnotationPresent(annotationType)) {
                         continue;
                     }
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
                         continue;
                     }
@@ -371,7 +407,20 @@ public final class ParamixelInvocationRunner {
         });
     }
 
+    /**
+     * Performs getOrderValue.
+     *
+     * @param method the method
+     * @return the result
+     * @since 0.0.1
+     */
     private static int getOrderValue(final @NonNull Method method) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {
             return Integer.MAX_VALUE;
@@ -379,6 +428,13 @@ public final class ParamixelInvocationRunner {
         return order.value();
     }
 
+    /**
+     * Performs signatureKey.
+     *
+     * @param method the method
+     * @return the result
+     * @since 0.0.1
+     */
     private static String signatureKey(final @NonNull Method method) {
         final StringBuilder builder = new StringBuilder();
         builder.append(method.getName());
@@ -398,13 +454,24 @@ public final class ParamixelInvocationRunner {
      * Cache key for {@link #LIFECYCLE_METHOD_CACHE}.
      *
      * <p>This type is private because it is an internal memoization detail.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     private static final class LifecycleCacheKey {
 
-        /** Root test class for the lifecycle scan; immutable. */
+        /**
+         * Root test class for the lifecycle scan; immutable.
+         *
+         * @since 0.0.1
+         */
         private final Class<?> testClass;
 
-        /** Lifecycle annotation type used for matching; immutable. */
+        /**
+         * Lifecycle annotation type used for matching; immutable.
+         *
+         * @since 0.0.1
+         */
         private final Class<? extends Annotation> annotationType;
 
         /**
@@ -412,6 +479,8 @@ public final class ParamixelInvocationRunner {
          *
          * @param testClass the test class; never {@code null}
          * @param annotationType the lifecycle annotation type; never {@code null}
+         * @return the result
+         * @since 0.0.1
          */
         private LifecycleCacheKey(final Class<?> testClass, final Class<? extends Annotation> annotationType) {
             this.testClass = testClass;

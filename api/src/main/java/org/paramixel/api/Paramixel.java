@@ -69,6 +69,7 @@ import java.lang.annotation.Target;
  *
  * <p><b>Usage Example:</b></p>
  * <pre>{@code
+ *
  * @Paramixel.TestClass
  * @Paramixel.DisplayName("User Authentication Tests")
  * public class AuthenticationTests {
@@ -116,9 +117,19 @@ import java.lang.annotation.Target;
  * @see ArgumentContext
  * @see ClassContext
  * @see EngineContext
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
 public class Paramixel {
+
+    /**
+     * Creates a new {@code Paramixel} instance.
+     *
+     * @since 0.0.1
+     */
+    public Paramixel() {
+        // INTENTIONALLY EMPTY
+    }
 
     /**
      * Marks a method to be invoked once after all test methods within a test class have completed.
@@ -336,6 +347,7 @@ public class Paramixel {
          * why the test is disabled (e.g., "Pending bug fix", "Requires database").</p>
          *
          * @return the reason for disabling, or empty string if not specified
+         * @since 0.0.1
          */
         String value() default "";
     }
@@ -363,6 +375,7 @@ public class Paramixel {
          * The custom display name.
          *
          * @return the display name to use in test reports
+         * @since 0.0.1
          */
         String value();
     }
@@ -420,6 +433,7 @@ public class Paramixel {
      *
      * <p><b>Example:</b></p>
      * <pre>{@code
+     *
      * @Paramixel.Test
      * @Paramixel.Order(1)
      * public void shouldCreateEntity(ArgumentContext context) { ... }
@@ -440,6 +454,7 @@ public class Paramixel {
          * The order value used to sort test methods.
          *
          * @return the order value
+         * @since 0.0.1
          */
         int value();
     }
@@ -549,6 +564,7 @@ public class Paramixel {
      *
      * <p><b>Usage Example:</b></p>
      * <pre>{@code
+     *
      * @Paramixel.TestClass
      * @Paramixel.Tags({"integration", "database", "slow"})
      * public class DatabaseIntegrationTests {
@@ -571,6 +587,7 @@ public class Paramixel {
          * characteristic, or grouping for the test class.</p>
          *
          * @return the array of tag strings
+         * @since 0.0.1
          */
         String[] value();
     }

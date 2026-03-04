@@ -38,40 +38,53 @@ import org.junit.platform.engine.UniqueId;
  * @see ParamixelTestClassDescriptor
  * @see ParamixelTestMethodDescriptor
  * @see ParamixelInvocationDescriptor
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public abstract class AbstractParamixelDescriptor implements TestDescriptor {
 
     /**
      * Unique identifier for this descriptor.
+     *
+     * @since 0.0.1
      */
     private final UniqueId uniqueId;
 
     /**
      * Human-readable display name used in reports.
+     *
+     * @since 0.0.1
      */
     private final String displayName;
 
     /**
      * Descriptor type indicating container or test.
+     *
+     * @since 0.0.1
      */
     private final Type type;
 
     /**
      * Parent descriptor in the hierarchy, if any.
+     *
+     * @since 0.0.1
      */
     private TestDescriptor parent;
 
     /**
      * Mutable list of child descriptors.
+     *
+     * @since 0.0.1
      */
     private final List<TestDescriptor> children = new ArrayList<>(10);
 
     /**
-     * Creates a new abstract test descriptor.
+     * Creates a new instance.
      *
-     * @param uniqueId the unique identifier for this descriptor
-     * @param displayName the display name for this descriptor
-     * @param type the type of this descriptor (CONTAINER or TEST)
+     * @param uniqueId the uniqueId
+     * @param displayName the displayName
+     * @param type the type
+     * @since 0.0.1
      */
     protected AbstractParamixelDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull String displayName, final @NonNull Type type) {

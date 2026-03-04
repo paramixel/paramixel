@@ -35,16 +35,24 @@ import org.paramixel.api.EngineContext;
  * <p>This implementation is not thread-safe. The engine invokes an argument supplier on a single
  * thread during discovery.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ConcreteArgumentsCollector implements ArgumentsCollector {
 
-    /** Parent engine context associated with the supplier; immutable. */
+    /**
+     * Parent engine context associated with the supplier; immutable.
+     *
+     * @since 0.0.1
+     */
     private final EngineContext engineContext;
 
     /**
      * Collected argument values.
      *
      * <p>This list is mutable and preserves insertion order.
+     *
+     * @since 0.0.1
      */
     private final List<Object> arguments = new ArrayList<>();
 
@@ -52,6 +60,8 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * Configured per-class parallelism.
      *
      * <p>The value is mutable and is initialized to {@code max(1, availableProcessors)}.
+     *
+     * @since 0.0.1
      */
     private int parallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
 
@@ -59,6 +69,8 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * Creates a new supplier context.
      *
      * @param engineContext the engine context associated with the class; never {@code null}
+     * @return the result
+     * @since 0.0.1
      */
     public ConcreteArgumentsCollector(final @NonNull EngineContext engineContext) {
         this.engineContext = Objects.requireNonNull(engineContext, "engineContext must not be null");
@@ -105,6 +117,7 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * <p>The returned array preserves insertion order.
      *
      * @return collected argument values; never {@code null}
+     * @since 0.0.1
      */
     public Object[] toArray() {
         return arguments.toArray();
@@ -117,6 +130,7 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * {@link #setParallelism(int)}.
      *
      * @return the configured parallelism; always {@code >= 1}
+     * @since 0.0.1
      */
     public int getParallelism() {
         return parallelism;

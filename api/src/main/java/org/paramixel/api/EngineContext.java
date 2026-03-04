@@ -46,6 +46,7 @@ import java.util.Properties;
  *
  * <p><b>Usage Example:</b></p>
  * <pre>{@code
+ *
  * @Paramixel.TestClass
  * public class ConfigurationAwareTests {
  *
@@ -62,6 +63,7 @@ import java.util.Properties;
  *
  * @see ClassContext
  * @see ArgumentContext
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
 public interface EngineContext {
@@ -74,6 +76,7 @@ public interface EngineContext {
      * test engines in the system.</p>
      *
      * @return the engine identifier; never {@code null} or empty
+     * @since 0.0.1
      */
     String getEngineId();
 
@@ -86,6 +89,7 @@ public interface EngineContext {
      *
      * @return a copy of the configuration properties; never {@code null};
      *         may be empty
+     * @since 0.0.1
      */
     Properties getConfiguration();
 
@@ -100,6 +104,7 @@ public interface EngineContext {
      * @return the configuration value associated with the key, or {@code null}
      *         if the key is not found
      * @throws NullPointerException if {@code key} is {@code null}
+     * @since 0.0.1
      */
     String getConfigurationValue(final String key);
 
@@ -117,6 +122,7 @@ public interface EngineContext {
      * @return the configuration value associated with the key, or
      *         {@code defaultValue} if the key is not found
      * @throws NullPointerException if {@code key} is {@code null}
+     * @since 0.0.1
      */
     String getConfigurationValue(final String key, final String defaultValue);
 
@@ -127,6 +133,7 @@ public interface EngineContext {
      * the current engine execution.
      *
      * @return the engine-scoped store; never {@code null}
+     * @since 0.0.1
      */
     Store getStore();
 }

@@ -48,6 +48,7 @@ import java.util.List;
  *
  * <h2>Example</h2>
  * <pre>{@code
+ *
  * @Paramixel.TestClass
  * public final class MyTest {
  *
@@ -68,6 +69,9 @@ import java.util.List;
  * <p><b>Compatibility note:</b> The signature shown in the example ({@code arguments(ArgumentsCollector)})
  * depends on whether/where the collector-driven pattern is supported by the calling integration.
  * This interface defines the contract for the collector itself.
+ *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public interface ArgumentsCollector {
 
@@ -79,6 +83,7 @@ public interface ArgumentsCollector {
      * properties. This context is never null.</p>
      *
      * @return the parent engine context; never {@code null}
+     * @since 0.0.1
      */
     EngineContext getEngineContext();
 
@@ -92,6 +97,7 @@ public interface ArgumentsCollector {
      * @param argument the argument value to register; may be {@code null} if supported by the
      *     implementation
      * @return this argument supplier context
+     * @since 0.0.1
      */
     ArgumentsCollector addArgument(Object argument);
 
@@ -104,6 +110,7 @@ public interface ArgumentsCollector {
      * @param arguments the argument values to register; may be empty; may contain {@code null}
      *     values if supported by the implementation
      * @return this argument supplier context
+     * @since 0.0.1
      */
     ArgumentsCollector addArguments(Object... arguments);
 
@@ -117,6 +124,7 @@ public interface ArgumentsCollector {
      *     values if supported by the implementation
      * @return this argument supplier context
      * @throws NullPointerException if {@code arguments} is {@code null}
+     * @since 0.0.1
      */
     ArgumentsCollector addArguments(List<?> arguments);
 
@@ -130,6 +138,7 @@ public interface ArgumentsCollector {
      * @param parallelism the desired parallelism level; must be a positive integer ({@code >= 1})
      * @return this argument supplier context
      * @throws IllegalArgumentException if {@code parallelism} is not a positive integer
+     * @since 0.0.1
      */
     ArgumentsCollector setParallelism(int parallelism);
 }

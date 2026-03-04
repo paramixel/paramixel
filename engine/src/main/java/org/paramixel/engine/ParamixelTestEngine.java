@@ -36,7 +36,6 @@ import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ClassContext;
-import org.paramixel.api.Paramixel;
 import org.paramixel.engine.api.ConcreteClassContext;
 import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.descriptor.AbstractParamixelDescriptor;
@@ -68,24 +67,45 @@ import org.paramixel.engine.util.FastIdUtil;
  * <p>This class is stateless and thread-safe. It creates per-execution state inside
  * {@link #execute(ExecutionRequest)}.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public class ParamixelTestEngine implements TestEngine {
 
+    /**
+     * Provides this type.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
+     */
     private static final Logger LOGGER = Logger.getLogger(ParamixelTestEngine.class.getName());
 
     /**
      * The unique identifier for this engine.
+     *
+     * @since 0.0.1
      */
     public static final String ENGINE_ID = "paramixel";
 
     /**
-     * Default parallelism for test execution.
+     * Performs Math.max.
      *
-     * <p>This value is used when no explicit {@code paramixel.parallelism} configuration
-     * parameter is provided to the engine.</p>
+     * @param 1 the 1
+     * @param Runtime.getRuntime().availableProcessors() the Runtime.getRuntime().availableProcessors()
+     * @return the result
+     * @since 0.0.1
      */
     private static final int DEFAULT_PARALLELISM =
             Math.max(1, Runtime.getRuntime().availableProcessors());
+
+    /**
+     * Creates a new test engine instance.
+     *
+     * @since 0.0.1
+     */
+    public ParamixelTestEngine() {
+        // INTENTIONALLY EMPTY
+    }
 
     @Override
     public @NonNull String getId() {

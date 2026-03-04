@@ -44,6 +44,7 @@ package org.paramixel.api;
  *
  * <p><b>Usage Example:</b></p>
  * <pre>{@code
+ *
  * @Paramixel.TestClass
  * public class MyTests {
  *
@@ -70,6 +71,7 @@ package org.paramixel.api;
  * @see ArgumentContext
  * @see Paramixel.Initialize
  * @see Paramixel.Finalize
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
 public interface ClassContext {
@@ -82,6 +84,7 @@ public interface ClassContext {
      * properties. This context is never null.</p>
      *
      * @return the parent engine context; never {@code null}
+     * @since 0.0.1
      */
     EngineContext getEngineContext();
 
@@ -92,6 +95,7 @@ public interface ClassContext {
      * argument invocations for the class.
      *
      * @return the class-scoped store; never {@code null}
+     * @since 0.0.1
      */
     Store getStore();
 
@@ -103,6 +107,7 @@ public interface ClassContext {
      * The returned class object is never null.</p>
      *
      * @return the test class {@code Class} object; never {@code null}
+     * @since 0.0.1
      */
     Class<?> getTestClass();
 
@@ -119,6 +124,7 @@ public interface ClassContext {
      *
      * @return the test class instance, or {@code null} if the test class
      *         has not yet been instantiated
+     * @since 0.0.1
      */
     Object getTestInstance();
 }

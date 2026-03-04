@@ -103,7 +103,9 @@ public class ParamixelTestEngineTest {
 
         final EngineExecutionListener listener = new EngineExecutionListener() {
             @Override
-            public void executionStarted(final TestDescriptor testDescriptor) {}
+            public void executionStarted(final TestDescriptor testDescriptor) {
+                // INTENTIONALLY EMPTY
+            }
 
             @Override
             public void executionFinished(
@@ -157,7 +159,9 @@ public class ParamixelTestEngineTest {
 
             final EngineExecutionListener listener = new EngineExecutionListener() {
                 @Override
-                public void executionStarted(final TestDescriptor testDescriptor) {}
+                public void executionStarted(final TestDescriptor testDescriptor) {
+                    // INTENTIONALLY EMPTY
+                }
 
                 @Override
                 public void executionFinished(

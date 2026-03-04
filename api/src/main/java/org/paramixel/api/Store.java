@@ -52,6 +52,7 @@ import org.jspecify.annotations.NonNull;
  * In particular, callers should assume suppliers may be invoked more than once under
  * contention.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
 public interface Store {
@@ -67,6 +68,7 @@ public interface Store {
      * @param value the value to store; may be {@code null} (implementation-defined)
      * @return the previous value, or {@code null} if none
      * @throws NullPointerException if {@code key} is {@code null}
+     * @since 0.0.1
      */
     Object put(final @NonNull String key, final Object value);
 
@@ -86,6 +88,7 @@ public interface Store {
      * @return the previous value cast to {@code type}, or {@code null} if none
      * @throws ClassCastException if a non-null previous value is not assignable to {@code type}
      * @throws NullPointerException if {@code key} or {@code type} is {@code null}
+     * @since 0.0.1
      */
     <T> T put(final @NonNull String key, final @NonNull Class<T> type, final T value);
 
@@ -97,6 +100,7 @@ public interface Store {
      * @param key the key whose associated value is to be returned; must not be {@code null}
      * @return the value stored under {@code key}, or {@code null} if none
      * @throws NullPointerException if {@code key} is {@code null}
+     * @since 0.0.1
      */
     Object get(final @NonNull String key);
 
@@ -108,6 +112,7 @@ public interface Store {
      * @return the value cast to {@code type}, or {@code null} if none
      * @throws ClassCastException if a non-null value is present but not assignable to {@code type}
      * @throws NullPointerException if {@code key} or {@code type} is {@code null}
+     * @since 0.0.1
      */
     <T> T get(final @NonNull String key, final @NonNull Class<T> type);
 
@@ -117,6 +122,7 @@ public interface Store {
      * @param key the key to test; must not be {@code null}
      * @return {@code true} if a value is present for {@code key}, {@code false} otherwise
      * @throws NullPointerException if {@code key} is {@code null}
+     * @since 0.0.1
      */
     boolean contains(final @NonNull String key);
 
@@ -126,6 +132,7 @@ public interface Store {
      * @param key the key to remove; must not be {@code null}
      * @return the removed value, or {@code null} if none
      * @throws NullPointerException if {@code key} is {@code null}
+     * @since 0.0.1
      */
     Object remove(final @NonNull String key);
 
@@ -140,6 +147,7 @@ public interface Store {
      * @return the removed value cast to {@code type}, or {@code null} if none
      * @throws ClassCastException if a non-null value was removed but is not assignable to {@code type}
      * @throws NullPointerException if {@code key} or {@code type} is {@code null}
+     * @since 0.0.1
      */
     <T> T remove(final @NonNull String key, final @NonNull Class<T> type);
 
@@ -148,6 +156,7 @@ public interface Store {
      *
      * @implNote Implementations should document whether this operation is atomic with respect to
      *     concurrent access.
+     * @since 0.0.1
      */
     void clear();
 
@@ -155,6 +164,7 @@ public interface Store {
      * Returns the number of entries in this store.
      *
      * @return the current number of mappings
+     * @since 0.0.1
      */
     int size();
 
@@ -171,6 +181,7 @@ public interface Store {
      * @return the current (existing or newly computed) value for {@code key}, or {@code null} if the
      *     supplier returns {@code null} and the implementation chooses to leave the key unmapped
      * @throws NullPointerException if {@code key} or {@code supplier} is {@code null}
+     * @since 0.0.1
      */
     Object computeIfAbsent(final @NonNull String key, final @NonNull Supplier<?> supplier);
 
@@ -182,28 +193,10 @@ public interface Store {
      * @return an {@link Optional} describing the stored value (when present), otherwise {@link Optional#empty()}
      * @throws ClassCastException if a non-null value is present but not assignable to {@code type}
      * @throws NullPointerException if {@code key} or {@code type} is {@code null}
+     * @since 0.0.1
      */
     <T> Optional<T> find(final @NonNull String key, final @NonNull Class<T> type);
 
-    /**
-     * Typed variant of {@link #computeIfAbsent(String, Supplier)}.
-     *
-     * <p>If a value already exists under {@code key}, it must be assignable to {@code type}.
-     * If absent, the value produced by {@code supplier} must be assignable to {@code type}.
-     *
-     * <p>Concurrency note: under contention, {@code supplier} may be invoked more than once.
-     * Implementations should ensure that only one value becomes associated with {@code key}.
-     *
-     * @param key the key whose value should be computed; must not be {@code null}
-     * @param type the expected type of the stored/computed value; must not be {@code null}
-     * @param supplier the supplier used to create a value when absent; must not be {@code null}
-     * @return the existing or newly computed value cast to {@code type}, or {@code null} if the supplier returns
-     *     {@code null} and the implementation chooses to leave the key unmapped
-     *
-     * @throws ClassCastException if an existing value is not assignable to {@code type} or if the supplier produces a
-     *         value that is not assignable to {@code type}
-     * @throws NullPointerException if {@code key}, {@code type}, or {@code supplier} is {@code null}
-     */
     <T> T computeIfAbsent(
             final @NonNull String key, final @NonNull Class<T> type, final @NonNull Supplier<? extends T> supplier);
 
@@ -212,6 +205,7 @@ public interface Store {
      * specified and may vary between implementations.
      *
      * @return an iterator over the keys in this store
+     * @since 0.0.1
      */
     Iterator<String> keyIterator();
 }

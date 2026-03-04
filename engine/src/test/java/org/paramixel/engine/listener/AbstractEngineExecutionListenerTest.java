@@ -66,7 +66,9 @@ public class AbstractEngineExecutionListenerTest {
                 .contains("ABORTED");
     }
 
-    private static void dummy() {}
+    private static void dummy() {
+        // INTENTIONALLY EMPTY
+    }
 
     private static final class TestableListener extends AbstractEngineExecutionListener {
 

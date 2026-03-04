@@ -36,5 +36,7 @@ public class ParamixelTestMethodDescriptorTest {
         assertThat(descriptor.getSource()).isPresent();
     }
 
-    private static void dummy() {}
+    private static void dummy() {
+        // INTENTIONALLY EMPTY
+    }
 }

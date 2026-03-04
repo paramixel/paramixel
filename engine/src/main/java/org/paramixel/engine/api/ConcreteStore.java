@@ -32,16 +32,23 @@ import org.paramixel.api.Store;
  * {@link ConcurrentHashMap}. Keys are {@link String}s and values are {@link Object}s.
  *
  * <p>Null values are not stored. A {@code put(key, null)} behaves like {@link #remove(String)}.
+ *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ConcreteStore implements Store {
 
     /**
      * The underlying concurrent map storing the key-value pairs. Keys are non-null strings, and values are objects.
+     *
+     * @since 0.0.1
      */
     private final ConcurrentMap<String, Object> map;
 
     /**
      * Creates an empty store.
+     *
+     * @since 0.0.1
      */
     public ConcreteStore() {
         this(10);
@@ -51,6 +58,7 @@ public final class ConcreteStore implements Store {
      * Creates an empty store with an expected capacity.
      *
      * @param initialCapacity the expected number of entries in the store; used to optimize internal data structures
+     * @since 0.0.1
      */
     public ConcreteStore(final int initialCapacity) {
         this.map = new ConcurrentHashMap<>(Math.max(0, initialCapacity));

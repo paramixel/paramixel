@@ -36,6 +36,8 @@ import org.paramixel.api.ClassContext;
  * <p>This class is thread-safe. It uses a concurrent cache to avoid repeated
  * {@link Method#setAccessible(boolean)} calls.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ParamixelReflectionInvoker {
 
@@ -43,13 +45,19 @@ public final class ParamixelReflectionInvoker {
      * Cache tracking which methods have been made accessible.
      *
      * <p>The values are unused and exist only to indicate presence.
+     *
+     * @since 0.0.1
      */
     private static final ConcurrentHashMap<Method, Boolean> ACCESSIBLE_CACHE = new ConcurrentHashMap<>();
 
     /**
-     * Prevents instantiation of this utility class.
+     * Creates a new instance.
+     *
+     * @since 0.0.1
      */
-    private ParamixelReflectionInvoker() {}
+    private ParamixelReflectionInvoker() {
+        // INTENTIONALLY EMPTY
+    }
 
     /**
      * Invokes a zero-argument static method and returns its result.
@@ -57,6 +65,7 @@ public final class ParamixelReflectionInvoker {
      * @param method the static method to invoke; never {@code null}
      * @return the returned value (may be {@code null})
      * @throws Throwable when the invoked method throws, or when reflection fails
+     * @since 0.0.1
      */
     public static Object invokeStatic(final @NonNull Method method) throws Throwable {
         return invokeStaticMethod(method);
@@ -69,18 +78,20 @@ public final class ParamixelReflectionInvoker {
      * @param parameter the single parameter to pass; never {@code null}
      * @return the returned value (may be {@code null})
      * @throws Throwable when the invoked method throws, or when reflection fails
+     * @since 0.0.1
      */
     public static Object invokeStatic(final @NonNull Method method, final @NonNull Object parameter) throws Throwable {
         return invokeStaticMethod(method, parameter);
     }
 
     /**
-     * Invokes an initialize method.
+     * Performs invokeInitialize.
      *
-     * @param method the method to invoke
-     * @param instance the target instance
-     * @param classContext the class context argument
-     * @throws Throwable if invocation fails
+     * @param method the method
+     * @param instance the instance
+     * @param classContext the classContext
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     public static void invokeInitialize(
             final @NonNull Method method, final @NonNull Object instance, final @NonNull ClassContext classContext)
@@ -89,12 +100,13 @@ public final class ParamixelReflectionInvoker {
     }
 
     /**
-     * Invokes a before-all method.
+     * Performs invokeBeforeAll.
      *
-     * @param method the method to invoke
-     * @param instance the target instance
-     * @param argumentContext the argument context argument
-     * @throws Throwable if invocation fails
+     * @param method the method
+     * @param instance the instance
+     * @param argumentContext the argumentContext
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     public static void invokeBeforeAll(
             final @NonNull Method method,
@@ -105,12 +117,13 @@ public final class ParamixelReflectionInvoker {
     }
 
     /**
-     * Invokes a before-each method.
+     * Performs invokeBeforeEach.
      *
-     * @param method the method to invoke
-     * @param instance the target instance
-     * @param argumentContext the argument context argument
-     * @throws Throwable if invocation fails
+     * @param method the method
+     * @param instance the instance
+     * @param argumentContext the argumentContext
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     public static void invokeBeforeEach(
             final @NonNull Method method,
@@ -121,12 +134,13 @@ public final class ParamixelReflectionInvoker {
     }
 
     /**
-     * Invokes a test method.
+     * Performs invokeTestMethod.
      *
-     * @param method the method to invoke
-     * @param instance the target instance
-     * @param argumentContext the argument context argument
-     * @throws Throwable if invocation fails
+     * @param method the method
+     * @param instance the instance
+     * @param argumentContext the argumentContext
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     public static void invokeTestMethod(
             final @NonNull Method method,
@@ -137,12 +151,13 @@ public final class ParamixelReflectionInvoker {
     }
 
     /**
-     * Invokes an after-each method.
+     * Performs invokeAfterEach.
      *
-     * @param method the method to invoke
-     * @param instance the target instance
-     * @param argumentContext the argument context argument
-     * @throws Throwable if invocation fails
+     * @param method the method
+     * @param instance the instance
+     * @param argumentContext the argumentContext
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     public static void invokeAfterEach(
             final @NonNull Method method,
@@ -153,12 +168,13 @@ public final class ParamixelReflectionInvoker {
     }
 
     /**
-     * Invokes an after-all method.
+     * Performs invokeAfterAll.
      *
-     * @param method the method to invoke
-     * @param instance the target instance
-     * @param argumentContext the argument context argument
-     * @throws Throwable if invocation fails
+     * @param method the method
+     * @param instance the instance
+     * @param argumentContext the argumentContext
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     public static void invokeAfterAll(
             final @NonNull Method method,
@@ -169,12 +185,13 @@ public final class ParamixelReflectionInvoker {
     }
 
     /**
-     * Invokes a finalize method.
+     * Performs invokeFinalize.
      *
-     * @param method the method to invoke
-     * @param instance the target instance
-     * @param classContext the class context argument
-     * @throws Throwable if invocation fails
+     * @param method the method
+     * @param instance the instance
+     * @param classContext the classContext
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     public static void invokeFinalize(
             final @NonNull Method method, final @NonNull Object instance, final @NonNull ClassContext classContext)
@@ -183,15 +200,13 @@ public final class ParamixelReflectionInvoker {
     }
 
     /**
-     * Invokes a single-argument method and unwraps the target exception.
+     * Performs invokeMethod.
      *
-     * <p>This method sets the target method accessible once and memoizes that state in
-     * {@link #ACCESSIBLE_CACHE}.
-     *
-     * @param method the reflective method to invoke; never {@code null}
-     * @param instance the target instance; never {@code null}
-     * @param parameter the single parameter to pass; never {@code null}
-     * @throws Throwable when the invoked method throws, or when reflection fails
+     * @param method the method
+     * @param instance the instance
+     * @param parameter the parameter
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
      */
     private static void invokeMethod(
             final @NonNull Method method, final @NonNull Object instance, final @NonNull Object parameter)
@@ -209,6 +224,15 @@ public final class ParamixelReflectionInvoker {
         }
     }
 
+    /**
+     * Performs invokeStaticMethod.
+     *
+     * @param method the method
+     * @param parameters the parameters
+     * @return the result
+     * @throws Throwable if an error occurs
+     * @since 0.0.1
+     */
     private static Object invokeStaticMethod(final @NonNull Method method, final Object... parameters)
             throws Throwable {
         try {

@@ -60,10 +60,17 @@ import org.paramixel.engine.util.FastIdUtil;
  * {@code classContexts} and {@code testInstances} maps. When the engine executes multiple test
  * classes concurrently, the caller must provide thread-safe map implementations.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ParamixelClassRunner {
 
-    /** Logger used for lifecycle and execution diagnostics. */
+    /**
+     * Logger used for lifecycle and execution diagnostics.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
+     */
     private static final Logger LOGGER = Logger.getLogger(ParamixelClassRunner.class.getName());
 
     /**
@@ -71,22 +78,38 @@ public final class ParamixelClassRunner {
      *
      * <p>This cache is static to avoid repeated reflection scanning across executions.
      * It is thread-safe via {@link ConcurrentHashMap}.
+     *
+     * @since 0.0.1
      */
     private static final Map<LifecycleCacheKey, List<Method>> LIFECYCLE_METHOD_CACHE = new ConcurrentHashMap<>();
 
-    /** Shared execution runtime used for thread submission and permits. */
+    /**
+     * Shared execution runtime used for thread submission and permits.
+     *
+     * @since 0.0.1
+     */
     private final ParamixelExecutionRuntime runtime;
 
-    /** Immutable engine context shared across all executed classes. */
+    /**
+     * Immutable engine context shared across all executed classes.
+     *
+     * @since 0.0.1
+     */
     private final ConcreteEngineContext engineContext;
 
-    /** Listener notified for descriptor start/finish events. */
+    /**
+     * Listener notified for descriptor start/finish events.
+     *
+     * @since 0.0.1
+     */
     private final EngineExecutionListener listener;
 
     /**
      * Map of test class to class context.
      *
      * <p>This map is mutable and is populated during execution.
+     *
+     * @since 0.0.1
      */
     private final Map<Class<?>, ClassContext> classContexts;
 
@@ -94,17 +117,20 @@ public final class ParamixelClassRunner {
      * Map of test class to instantiated test object.
      *
      * <p>This map is mutable and is populated during execution.
+     *
+     * @since 0.0.1
      */
     private final Map<Class<?>, Object> testInstances;
 
     /**
-     * Creates a runner for executing a single test class at a time.
+     * Creates a new instance.
      *
-     * @param runtime the shared runtime used for task submission; never {@code null}
-     * @param engineContext the engine context shared by all classes; never {@code null}
-     * @param listener the execution listener to notify; never {@code null}
-     * @param classContexts a mutable map used to publish class contexts; never {@code null}
-     * @param testInstances a mutable map used to publish instantiated test objects; never {@code null}
+     * @param runtime the runtime
+     * @param engineContext the engineContext
+     * @param listener the listener
+     * @param classContexts the classContexts
+     * @param testInstances the testInstances
+     * @since 0.0.1
      */
     public ParamixelClassRunner(
             final ParamixelExecutionRuntime runtime,
@@ -134,10 +160,16 @@ public final class ParamixelClassRunner {
      * </ul>
      *
      * @param classDescriptor the class descriptor to execute; never {@code null}
+     * @since 0.0.1
      */
     public void runTestClass(final ParamixelTestClassDescriptor classDescriptor) {
         final Class<?> testClass = classDescriptor.getTestClass();
 
+        /**
+         * Performs listener.executionStarted.
+         *
+         * @since 0.0.1
+         */
         // Notify started on the class thread so the thread ID is correct in output
         listener.executionStarted(classDescriptor);
 
@@ -174,6 +206,12 @@ public final class ParamixelClassRunner {
                         argumentParallelism);
             }
         } catch (Throwable t) {
+            /**
+             * Provides this type.
+             *
+             * @author Douglas Hoard <doug.hoard@gmail.com>
+             * @since 0.0.1
+             */
             LOGGER.log(Level.WARNING, "Error executing test class: " + testClass.getName(), t);
             final ConcreteClassContext contextToUse =
                     classContextWithInstance != null ? classContextWithInstance : classContext;
@@ -190,6 +228,12 @@ public final class ParamixelClassRunner {
 
             final Throwable firstFailure = contextToUse.getFirstFailure();
             if (firstFailure != null) {
+                /**
+                 * Provides failed.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 LOGGER.log(Level.WARNING, "Test class failed: " + testClass.getName(), firstFailure);
                 result = TestExecutionResult.failed(firstFailure);
             }
@@ -199,26 +243,16 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Executes argument buckets, running the first argument inline.
+     * Performs executeArgumentsInlineFirst.
      *
-     * <p>This method executes argument index {@code 0} on the calling thread to guarantee
-     * progress even when asynchronous execution is saturated. It then schedules additional
-     * arguments up to {@code argumentParallelism - 1} concurrently, subject to the shared
-     * {@link ParamixelConcurrencyLimiter}.
-     *
-     * <p><b>Preconditions</b>
-     * <ul>
-     *   <li>{@code argumentDescriptors} and {@code arguments} refer to the same ordering.</li>
-     *   <li>{@code argumentParallelism} is {@code >= 1}.</li>
-     * </ul>
-     *
-     * @param classDescriptor the class descriptor that owns the arguments; never {@code null}
-     * @param testClass the concrete test class; never {@code null}
-     * @param classContext the class context bound to {@code testInstance}; never {@code null}
-     * @param testInstance the instantiated test object; never {@code null}
-     * @param argumentDescriptors descriptors for reporting argument start/finish; never {@code null}
-     * @param arguments argument values in index order; never {@code null}
-     * @param argumentParallelism maximum concurrent argument executions; must be {@code >= 1}
+     * @param classDescriptor the classDescriptor
+     * @param testClass the testClass
+     * @param classContext the classContext
+     * @param testInstance the testInstance
+     * @param argumentDescriptors the argumentDescriptors
+     * @param arguments the arguments
+     * @param argumentParallelism the argumentParallelism
+     * @since 0.0.1
      */
     private void executeArgumentsInlineFirst(
             final ParamixelTestClassDescriptor classDescriptor,
@@ -313,6 +347,7 @@ public final class ParamixelClassRunner {
      *
      * @param argumentDescriptors the argument descriptors in index order; never {@code null}
      * @param i the argument index into {@code argumentDescriptors}
+     * @since 0.0.1
      */
     private void startArgumentDescriptor(final List<ParamixelTestArgumentDescriptor> argumentDescriptors, final int i) {
         if (argumentDescriptors.isEmpty()) {
@@ -323,13 +358,12 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Reports {@code executionFinished} for an argument descriptor.
+     * Performs finishArgumentDescriptor.
      *
-     * <p>This method is a no-op when the class has no argument descriptors.
-     *
-     * @param argumentDescriptors the argument descriptors in index order; never {@code null}
-     * @param i the argument index into {@code argumentDescriptors}
-     * @param result the argument execution result to report; never {@code null}
+     * @param argumentDescriptors the argumentDescriptors
+     * @param i the i
+     * @param result the result
+     * @since 0.0.1
      */
     private void finishArgumentDescriptor(
             final List<ParamixelTestArgumentDescriptor> argumentDescriptors,
@@ -343,27 +377,17 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Executes the argument-level lifecycle and method invocations.
+     * Performs executeArgumentBody.
      *
-     * <p>This method runs {@link Paramixel.BeforeAll} and {@link Paramixel.AfterAll} hooks for the
-     * given argument index, delegates method invocation to {@link ParamixelInvocationRunner}, and
-     * attempts to close the argument when it implements {@link AutoCloseable}.
-     *
-     * <p><b>Side effects</b>
-     * <ul>
-     *   <li>Creates or reuses an {@link ArgumentContext} for the given argument.</li>
-     *   <li>Records failures on {@code classContext}.</li>
-     *   <li>Removes the per-argument context after {@link Paramixel.AfterAll}.</li>
-     * </ul>
-     *
-     * @param classDescriptor the class descriptor that owns the argument; never {@code null}
-     * @param testClass the concrete test class; never {@code null}
-     * @param classContext the class context used for failure aggregation; never {@code null}
-     * @param testInstance the instantiated test object; never {@code null}
-     * @param argument the argument value for this bucket; may be {@code null}
-     * @param argumentIndex the argument index
-     * @param argumentThreadName the thread name used during execution; never {@code null}
-     * @return the aggregated result for this argument bucket; never {@code null}
+     * @param classDescriptor the classDescriptor
+     * @param testClass the testClass
+     * @param classContext the classContext
+     * @param testInstance the testInstance
+     * @param argument the argument
+     * @param argumentIndex the argumentIndex
+     * @param argumentThreadName the argumentThreadName
+     * @return the result
+     * @since 0.0.1
      */
     private TestExecutionResult executeArgumentBody(
             final ParamixelTestClassDescriptor classDescriptor,
@@ -424,6 +448,7 @@ public final class ParamixelClassRunner {
      * @param testClass the class to instantiate; never {@code null}
      * @return a new test instance; never {@code null}
      * @throws Throwable if instantiation fails for any reason
+     * @since 0.0.1
      */
     private Object instantiateTestClass(final Class<?> testClass) throws Throwable {
         try {
@@ -431,25 +456,34 @@ public final class ParamixelClassRunner {
             constructor.setAccessible(true);
             return constructor.newInstance();
         } catch (Exception e) {
+            /**
+             * Provides this type.
+             *
+             * @author Douglas Hoard <doug.hoard@gmail.com>
+             * @since 0.0.1
+             */
             LOGGER.log(Level.SEVERE, "Failed to instantiate test class: " + testClass.getName(), e);
             throw e;
         }
     }
 
     /**
-     * Executes {@link Paramixel.Initialize} methods for the class hierarchy.
+     * Performs runInitialize.
      *
-     * <p>This method executes initialize hooks in deterministic order (flattened across the class
-     * hierarchy; ordered by {@link Paramixel.Order} value and then method name). When any
-     * initialize method fails, it records the failure and aborts further initialization.
-     *
-     * @param testClass the test class; never {@code null}
-     * @param classContext the class context to pass to hooks; never {@code null}
-     * @param testInstance the test instance to invoke on; never {@code null}
-     * @return {@code true} when all initialize methods succeed; {@code false} otherwise
+     * @param testClass the testClass
+     * @param classContext the classContext
+     * @param testInstance the testInstance
+     * @return the result
+     * @since 0.0.1
      */
     private boolean runInitialize(
             final Class<?> testClass, final ConcreteClassContext classContext, final Object testInstance) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Initialize.class);
         for (Method method : methods) {
             try {
@@ -464,20 +498,23 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Executes {@link Paramixel.Finalize} methods for the class hierarchy.
+     * Performs runFinalize.
      *
-     * <p>This method executes finalize hooks in deterministic order (flattened across the class
-     * hierarchy; ordered by {@link Paramixel.Order} value and then method name). It records any
-     * thrown exception and continues executing remaining finalize hooks.
-     *
-     * @param testClass the test class; never {@code null}
-     * @param classContext the class context to pass to hooks; never {@code null}
-     * @param testInstance the test instance to invoke on; never {@code null}
+     * @param testClass the testClass
+     * @param classContext the classContext
+     * @param testInstance the testInstance
+     * @since 0.0.1
      */
     private void runFinalize(
             final @NonNull Class<?> testClass,
             final @NonNull ConcreteClassContext classContext,
             final @NonNull Object testInstance) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Finalize.class);
         for (Method method : methods) {
             try {
@@ -490,18 +527,15 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Executes {@link Paramixel.BeforeAll} methods for a specific argument.
+     * Performs runBeforeAll.
      *
-     * <p>This method executes before-all hooks in deterministic order (flattened across the class
-     * hierarchy; ordered by {@link Paramixel.Order} value and then method name) and aborts on the
-     * first failure.
-     *
-     * @param testClass the test class; never {@code null}
-     * @param classContext the class context used for context lookup and failure recording; never {@code null}
-     * @param testInstance the test instance to invoke on; never {@code null}
-     * @param argument the argument value for this bucket; may be {@code null}
-     * @param argumentIndex the argument index
-     * @return the first thrown failure, or {@code null} when all hooks succeed
+     * @param testClass the testClass
+     * @param classContext the classContext
+     * @param testInstance the testInstance
+     * @param argument the argument
+     * @param argumentIndex the argumentIndex
+     * @return the result
+     * @since 0.0.1
      */
     private Throwable runBeforeAll(
             final @NonNull Class<?> testClass,
@@ -510,6 +544,12 @@ public final class ParamixelClassRunner {
             final @NonNull Object argument,
             final int argumentIndex) {
         final ArgumentContext argumentContext = classContext.getOrCreateArgumentContext(argument, argumentIndex);
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeAll.class);
 
         for (Method method : methods) {
@@ -526,21 +566,15 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Executes {@link Paramixel.AfterAll} methods for a specific argument.
+     * Performs runAfterAll.
      *
-     * <p>This method executes after-all hooks in deterministic order (flattened across the class
-     * hierarchy; ordered by {@link Paramixel.Order} value and then method name). It records all
-     * failures and returns the first encountered exception.
-     *
-     * <p>After hook execution, this method removes the per-argument context via
-     * {@link ConcreteClassContext#removeArgumentContext(int)}.
-     *
-     * @param testClass the test class; never {@code null}
-     * @param classContext the class context used for context lookup and failure recording; never {@code null}
-     * @param testInstance the test instance to invoke on; never {@code null}
-     * @param argument the argument value for this bucket; may be {@code null}
-     * @param argumentIndex the argument index
-     * @return the first thrown failure, or {@code null} when all hooks succeed
+     * @param testClass the testClass
+     * @param classContext the classContext
+     * @param testInstance the testInstance
+     * @param argument the argument
+     * @param argumentIndex the argumentIndex
+     * @return the result
+     * @since 0.0.1
      */
     private Throwable runAfterAll(
             final @NonNull Class<?> testClass,
@@ -549,6 +583,12 @@ public final class ParamixelClassRunner {
             final @NonNull Object argument,
             final int argumentIndex) {
         final ArgumentContext argumentContext = classContext.getOrCreateArgumentContext(argument, argumentIndex);
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterAll.class);
         Throwable firstFailure = null;
 
@@ -569,16 +609,12 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Returns lifecycle methods annotated with the given annotation.
+     * Performs getLifecycleMethods.
      *
-     * <p>The method list includes declared methods from the class hierarchy, flattened and de-duped
-     * by signature (most specific declaration wins), and ordered deterministically by
-     * {@link Paramixel.Order} value (unordered last) and then by method name. The returned list is
-     * immutable.
-     *
-     * @param testClass the root test class; never {@code null}
-     * @param annotationType the lifecycle annotation type to match; never {@code null}
-     * @return an immutable list of lifecycle methods; never {@code null}
+     * @param testClass the testClass
+     * @param annotationType the annotationType
+     * @return the result
+     * @since 0.0.1
      */
     private List<Method> getLifecycleMethods(
             final Class<?> testClass, final Class<? extends Annotation> annotationType) {
@@ -586,12 +622,24 @@ public final class ParamixelClassRunner {
         return LIFECYCLE_METHOD_CACHE.computeIfAbsent(cacheKey, key -> {
             final Map<String, Method> bySignature = new ConcurrentHashMap<>();
             for (Class<?> current = testClass;
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     current != null && current != Object.class;
                     current = current.getSuperclass()) {
                 for (Method method : current.getDeclaredMethods()) {
                     if (!method.isAnnotationPresent(annotationType)) {
                         continue;
                     }
+                    /**
+                     * Provides this type.
+                     *
+                     * @author Douglas Hoard <doug.hoard@gmail.com>
+                     * @since 0.0.1
+                     */
                     if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
                         continue;
                     }
@@ -610,7 +658,20 @@ public final class ParamixelClassRunner {
         });
     }
 
+    /**
+     * Performs getOrderValue.
+     *
+     * @param method the method
+     * @return the result
+     * @since 0.0.1
+     */
     private static int getOrderValue(final @NonNull Method method) {
+        /**
+         * Provides this type.
+         *
+         * @author Douglas Hoard <doug.hoard@gmail.com>
+         * @since 0.0.1
+         */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {
             return Integer.MAX_VALUE;
@@ -618,6 +679,13 @@ public final class ParamixelClassRunner {
         return order.value();
     }
 
+    /**
+     * Performs signatureKey.
+     *
+     * @param method the method
+     * @return the result
+     * @since 0.0.1
+     */
     private static String signatureKey(final @NonNull Method method) {
         final StringBuilder builder = new StringBuilder();
         builder.append(method.getName());
@@ -634,16 +702,14 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Closes a resource when it implements {@link AutoCloseable}.
+     * Performs closeAutoCloseable.
      *
-     * <p>This method records any close failure on {@code classContext} and returns the thrown
-     * exception to the caller.
-     *
-     * @param resource the resource to close; may be {@code null}
-     * @param resourceName a human-readable resource name used in logs; never {@code null}
-     * @param testClassName the owning test class name used in logs; never {@code null}
-     * @param classContext the class context used to record failures; never {@code null}
-     * @return the thrown failure, or {@code null} when the resource closes successfully or is not closeable
+     * @param resource the resource
+     * @param resourceName the resourceName
+     * @param testClassName the testClassName
+     * @param classContext the classContext
+     * @return the result
+     * @since 0.0.1
      */
     private Throwable closeAutoCloseable(
             final Object resource,
@@ -658,6 +724,12 @@ public final class ParamixelClassRunner {
             ((AutoCloseable) resource).close();
             return null;
         } catch (Throwable t) {
+            /**
+             * Provides this type.
+             *
+             * @author Douglas Hoard <doug.hoard@gmail.com>
+             * @since 0.0.1
+             */
             LOGGER.log(Level.WARNING, "Failed to close " + resourceName + " for class " + testClassName, t);
             classContext.recordFailure(t);
             return t;
@@ -665,10 +737,11 @@ public final class ParamixelClassRunner {
     }
 
     /**
-     * Returns argument descriptors sorted by argument index.
+     * Performs getSortedArgumentDescriptors.
      *
-     * @param classDescriptor the class descriptor to scan; never {@code null}
-     * @return argument descriptors sorted by index; never {@code null}
+     * @param classDescriptor the classDescriptor
+     * @return the result
+     * @since 0.0.1
      */
     private List<ParamixelTestArgumentDescriptor> getSortedArgumentDescriptors(
             final ParamixelTestClassDescriptor classDescriptor) {
@@ -690,6 +763,7 @@ public final class ParamixelClassRunner {
      *
      * @param argumentDescriptors argument descriptors in index order; never {@code null}
      * @return an argument array; never {@code null}
+     * @since 0.0.1
      */
     private Object[] argumentsFromDescriptors(final List<ParamixelTestArgumentDescriptor> argumentDescriptors) {
         if (argumentDescriptors.isEmpty()) {
@@ -706,13 +780,24 @@ public final class ParamixelClassRunner {
      * Cache key for {@link #LIFECYCLE_METHOD_CACHE}.
      *
      * <p>This type is private because it is an internal memoization detail.
+     *
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     private static final class LifecycleCacheKey {
 
-        /** Root test class for the lifecycle scan; immutable. */
+        /**
+         * Root test class for the lifecycle scan; immutable.
+         *
+         * @since 0.0.1
+         */
         private final Class<?> testClass;
 
-        /** Lifecycle annotation type used for matching; immutable. */
+        /**
+         * Lifecycle annotation type used for matching; immutable.
+         *
+         * @since 0.0.1
+         */
         private final Class<? extends Annotation> annotationType;
 
         /**
@@ -720,6 +805,8 @@ public final class ParamixelClassRunner {
          *
          * @param testClass the test class; never {@code null}
          * @param annotationType the lifecycle annotation type; never {@code null}
+         * @return the result
+         * @since 0.0.1
          */
         private LifecycleCacheKey(final Class<?> testClass, final Class<? extends Annotation> annotationType) {
             this.testClass = testClass;
@@ -753,16 +840,24 @@ public final class ParamixelClassRunner {
      * {@link #executeArgumentBody(ParamixelTestClassDescriptor, Class, ConcreteClassContext, Object, Object, int, String)}.
      *
      * @param <T> the held value type
+     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @since 0.0.1
      */
     private static final class AtomicReferenceHolder<T> {
 
-        /** The held value; mutable and published via {@code volatile}. */
+        /**
+         * The held value; mutable and published via {@code volatile}.
+         *
+         * @since 0.0.1
+         */
         private volatile T value;
 
         /**
          * Creates a holder with an initial value.
          *
          * @param initial the initial value
+         * @return the result
+         * @since 0.0.1
          */
         private AtomicReferenceHolder(final T initial) {
             this.value = initial;
@@ -772,6 +867,7 @@ public final class ParamixelClassRunner {
          * Sets the held value.
          *
          * @param value the new value
+         * @since 0.0.1
          */
         private void set(final T value) {
             this.value = value;
@@ -781,6 +877,7 @@ public final class ParamixelClassRunner {
          * Returns the current held value.
          *
          * @return the current value
+         * @since 0.0.1
          */
         private T get() {
             return value;

@@ -147,34 +147,50 @@ public class MethodValidatorTest {
         }
 
         @Paramixel.Test
-        public static void staticTest(final ArgumentContext context) {}
+        public static void staticTest(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.Test
-        public void badParam(final String notAContext) {}
+        public void badParam(final String notAContext) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     static class BadLifecycleMethods {
 
         @Paramixel.BeforeEach
-        public static void beforeEachStatic(final ArgumentContext context) {}
+        public static void beforeEachStatic(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.AfterEach
-        public void afterEachWrongParam(final ClassContext context) {}
+        public void afterEachWrongParam(final ClassContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.Initialize
-        public void initializeWrongParam(final ArgumentContext context) {}
+        public void initializeWrongParam(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.Finalize
-        public static void finalizeStatic(final ClassContext context) {}
+        public static void finalizeStatic(final ClassContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     static class StaticBeforeAfterAllOk {
 
         @Paramixel.BeforeAll
-        public static void beforeAll(final ArgumentContext context) {}
+        public static void beforeAll(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.AfterAll
-        public static void afterAll(final ArgumentContext context) {}
+        public static void afterAll(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     static class BadBeforeAfterAllMethods {
@@ -190,10 +206,14 @@ public class MethodValidatorTest {
         }
 
         @Paramixel.BeforeAll
-        private void privateBeforeAll(final ArgumentContext context) {}
+        private void privateBeforeAll(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.AfterAll
-        private void privateAfterAll(final ArgumentContext context) {}
+        private void privateAfterAll(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     static class BadCollectorSignature {
@@ -213,14 +233,20 @@ public class MethodValidatorTest {
 
         @Paramixel.Test
         @Paramixel.Order(0)
-        public void badOrderValue(final ArgumentContext context) {}
+        public void badOrderValue(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.BeforeEach
         @Paramixel.Order(1)
-        public void allowedOnLifecycle(final ArgumentContext context) {}
+        public void allowedOnLifecycle(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
 
         @Paramixel.Order(1)
-        public void notAllowedWithoutHook(final ArgumentContext context) {}
+        public void notAllowedWithoutHook(final ArgumentContext context) {
+            // INTENTIONALLY EMPTY
+        }
     }
 
     static class PrimitiveReturnCollector {

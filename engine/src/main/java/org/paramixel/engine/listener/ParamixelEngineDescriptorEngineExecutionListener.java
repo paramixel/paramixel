@@ -36,14 +36,32 @@ import org.paramixel.engine.util.DurationUtils;
  * <p>This class is not thread-safe for concurrent engine executions because it stores
  * {@code startTimeMillis} as mutable state. The engine constructs a new listener per execution.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
+    /**
+     * Printer used for emitting the execution report.
+     *
+     * @since 0.0.1
+     */
     private final Consumer<String> printer;
 
-    /** Start time for the current engine execution in epoch milliseconds. */
+    /**
+     * Start time for the current engine execution in epoch milliseconds.
+     *
+     * @since 0.0.1
+     */
     private long startTimeMillis;
 
+    /**
+     * Creates a listener that writes the report to the provided printer.
+     *
+     * @param printer the printer to receive report lines; never {@code null}
+     * @return the result
+     * @since 0.0.1
+     */
     public ParamixelEngineDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
         this.printer = Objects.requireNonNull(printer, "printer must not be null");
     }
@@ -93,6 +111,11 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         printer.accept(INFO + "     └── " + totalMethods + " Test methods tested");
         printer.accept(INFO);
 
+        /**
+         * Performs summary.getClassStatsMap.
+         *
+         * @since 0.0.1
+         */
         // Build class breakdown table
         ConcurrentHashMap<String, ExecutionSummary.ClassStats> classStatsMap = summary.getClassStatsMap();
         List<String> classNames = new ArrayList<>(classStatsMap.keySet());
@@ -129,6 +152,11 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
                 int failed = stats != null ? stats.failed.get() : 0;
                 String status = failed > 0 ? "X" : "OK";
 
+                /**
+                 * Stores the displayName.
+                 *
+                 * @since 0.0.1
+                 */
                 // Truncate class name if too long
                 String displayName = className;
                 if (displayName.length() > maxClassWidth) {
@@ -180,6 +208,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      *
      * @param format the format string; never {@code null}
      * @param args format arguments; may be empty
+     * @since 0.0.1
      */
     private void printLine(String format, Object... args) {
         printer.accept(String.format(format, args));
@@ -189,6 +218,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      * Prints a table separator line sized for the class-name column width.
      *
      * @param classWidth the class column width in characters; must be {@code >= 0}
+     * @since 0.0.1
      */
     private void printSeparatorLine(int classWidth) {
         StringBuilder sep = new StringBuilder();
@@ -227,15 +257,16 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
     }
 
     /**
-     * Prints a single table row.
+     * Performs printTableRow.
      *
-     * @param classWidth the class-name column width
-     * @param className the class display name to print
-     * @param args argument bucket count
-     * @param methods method count
-     * @param passed passed count
-     * @param failed failed count
-     * @param status status marker
+     * @param classWidth the classWidth
+     * @param className the className
+     * @param args the args
+     * @param methods the methods
+     * @param passed the passed
+     * @param failed the failed
+     * @param status the status
+     * @since 0.0.1
      */
     private void printTableRow(
             int classWidth,

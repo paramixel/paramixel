@@ -204,7 +204,7 @@ public class TansuTestEnvironment implements Named {
         try {
             container.stop();
         } catch (Exception ignored) {
-            // ignore
+            // INTENTIONALLY EMPTY
         }
     }
 

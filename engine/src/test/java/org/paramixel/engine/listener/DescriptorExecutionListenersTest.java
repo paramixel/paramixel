@@ -65,5 +65,7 @@ public class DescriptorExecutionListenersTest {
         assertThat(output).contains("ABORTED");
     }
 
-    private static void dummy() {}
+    private static void dummy() {
+        // INTENTIONALLY EMPTY
+    }
 }

@@ -44,7 +44,7 @@ public class NullArgumentTest {
      */
     @Paramixel.ArgumentsCollector
     public static void arguments(final @NonNull ArgumentsCollector collector) {
-        // Intentionally add no arguments.
+        // INTENTIONALLY EMPTY
     }
 
     /**

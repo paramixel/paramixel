@@ -35,46 +35,45 @@ import org.paramixel.api.Store;
  *
  * @see EngineContext
  * @since 0.0.1
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  */
 public final class ConcreteEngineContext implements EngineContext {
 
     /**
      * Immutable engine identifier.
+     *
+     * @since 0.0.1
      */
     private final String engineId;
 
     /**
      * Defensive copy of engine configuration properties.
+     *
+     * @since 0.0.1
      */
     private final Properties configuration;
 
     /**
      * Maximum number of test classes to execute concurrently.
+     *
+     * @since 0.0.1
      */
     private final int classParallelism;
 
     /**
      * Engine-scoped store.
+     *
+     * @since 0.0.1
      */
     private final Store store;
 
     /**
-     * Constructs a new {@code ConcreteEngineContext} with the specified configuration.
+     * Creates a new instance.
      *
-     * <p>This constructor creates an immutable engine context with the given
-     * identifier, configuration properties, and parallelism settings. The
-     * configuration properties are defensively copied to ensure immutability.</p>
-     *
-     * @param engineId the unique identifier for this engine instance;
-     *                 must not be {@code null} or empty
-     * @param configuration the engine configuration properties;
-     *                      must not be {@code null}; may be empty
-     * @param classParallelism the maximum number of test classes to execute
-     *                         concurrently; must be a positive integer ({@code >= 1})
-     * @throws NullPointerException if {@code engineId} or {@code configuration}
-     *                              is {@code null}
-     * @throws IllegalArgumentException if {@code engineId} is empty or
-     *                                  {@code classParallelism} is not positive
+     * @param engineId the engineId
+     * @param configuration the configuration
+     * @param classParallelism the classParallelism
+     * @since 0.0.1
      */
     public ConcreteEngineContext(
             final @NonNull String engineId, final @NonNull Properties configuration, final int classParallelism) {
@@ -126,6 +125,7 @@ public final class ConcreteEngineContext implements EngineContext {
      * A value of {@code 1} indicates sequential execution of test classes.</p>
      *
      * @return the maximum number of concurrent test classes; always positive
+     * @since 0.0.1
      */
     public int getClassParallelism() {
         return classParallelism;

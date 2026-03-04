@@ -34,63 +34,81 @@ import org.paramixel.api.Store;
  * invocations, successes, failures, and errors.</p>
  *
  * @see ClassContext
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class ConcreteClassContext implements ClassContext {
 
     /**
      * The test class associated with this context.
+     *
+     * @since 0.0.1
      */
     private final Class<?> testClass;
 
     /**
      * The parent engine context.
+     *
+     * @since 0.0.1
      */
     private final EngineContext engineContext;
 
     /**
      * The instantiated test object, if available.
+     *
+     * @since 0.0.1
      */
     private final Object testInstance;
 
     /**
      * Counter for total test invocations executed.
+     *
+     * @since 0.0.1
      */
     private final AtomicInteger invocationCount;
 
     /**
      * Counter for successful test invocations.
+     *
+     * @since 0.0.1
      */
     private final AtomicInteger successCount;
 
     /**
      * Counter for failed test invocations.
+     *
+     * @since 0.0.1
      */
     private final AtomicInteger failureCount;
 
     /**
      * First failure recorded during execution, if any.
+     *
+     * @since 0.0.1
      */
     private final AtomicReference<Throwable> firstFailure;
 
     /**
      * Class-scoped store.
+     *
+     * @since 0.0.1
      */
     private final Store store;
 
     /**
      * Thread-safe cache of argument contexts keyed by argument index.
+     *
+     * @since 0.0.1
      */
     private final Map<Integer, ConcreteArgumentContext> argumentContexts;
 
     /**
-     * Creates a new ConcreteClassContext for the specified test class and engine context.
+     * Creates a new instance.
      *
-     * <p>This constructor initializes all state tracking fields and validates the parameters.</p>
-     *
-     * @param testClass the test class being executed; must not be null
-     * @param engineContext the parent engine context; must not be null
-     * @param testInstance the instantiated test object; may be null if not yet instantiated
-     * @throws NullPointerException if testClass or engineContext is null
+     * @param testClass the testClass
+     * @param engineContext the engineContext
+     * @param testInstance the testInstance
+     * @since 0.0.1
      */
     public ConcreteClassContext(
             final @NonNull Class<?> testClass, final @NonNull EngineContext engineContext, final Object testInstance) {
@@ -131,6 +149,7 @@ public final class ConcreteClassContext implements ClassContext {
      * @param argument the argument for this invocation; may be null
      * @param argumentIndex the zero-based index of this invocation in the test class
      * @return the argument context for this index
+     * @since 0.0.1
      */
     public ConcreteArgumentContext getOrCreateArgumentContext(final Object argument, final int argumentIndex) {
         return argumentContexts.computeIfAbsent(
@@ -142,6 +161,7 @@ public final class ConcreteClassContext implements ClassContext {
      *
      * @param argumentIndex the zero-based index of this invocation in the test class
      * @return the removed argument context, or null if none existed
+     * @since 0.0.1
      */
     public ConcreteArgumentContext removeArgumentContext(final int argumentIndex) {
         return argumentContexts.remove(argumentIndex);
@@ -151,6 +171,7 @@ public final class ConcreteClassContext implements ClassContext {
      * Returns the fully qualified name of the test class.
      *
      * @return the fully qualified class name; never null
+     * @since 0.0.1
      */
     public String getTestClassName() {
         return testClass.getName();
@@ -162,6 +183,7 @@ public final class ConcreteClassContext implements ClassContext {
      * <p>This method atomically increments the invocation counter and returns the new value.</p>
      *
      * @return the new invocation count after incrementing
+     * @since 0.0.1
      */
     public int incrementInvocationCount() {
         return invocationCount.incrementAndGet();
@@ -173,6 +195,7 @@ public final class ConcreteClassContext implements ClassContext {
      * <p>This method atomically increments the success counter and returns the new value.</p>
      *
      * @return the new success count after incrementing
+     * @since 0.0.1
      */
     public int incrementSuccessCount() {
         return successCount.incrementAndGet();
@@ -184,6 +207,7 @@ public final class ConcreteClassContext implements ClassContext {
      * <p>This method atomically increments the failure counter and returns the new value.</p>
      *
      * @return the new failure count after incrementing
+     * @since 0.0.1
      */
     public int incrementFailureCount() {
         return failureCount.incrementAndGet();
@@ -196,6 +220,7 @@ public final class ConcreteClassContext implements ClassContext {
      * Subsequent failures do not overwrite the first failure.</p>
      *
      * @param failure the Throwable that caused the test failure; must not be null
+     * @since 0.0.1
      */
     public void recordFailure(final @NonNull Throwable failure) {
         Objects.requireNonNull(failure, "failure must not be null");
@@ -206,6 +231,7 @@ public final class ConcreteClassContext implements ClassContext {
      * Returns the first failure that was recorded during test execution.
      *
      * @return the first failure, or null if no failures occurred
+     * @since 0.0.1
      */
     public Throwable getFirstFailure() {
         return firstFailure.get();

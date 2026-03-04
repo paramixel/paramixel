@@ -39,53 +39,102 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
  * <p>This class is thread-safe for concurrent event dispatch. It updates shared counters via
  * {@link AbstractEngineExecutionListener.ExecutionSummary}.
  *
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public class ParamixelEngineExecutionListener extends AbstractEngineExecutionListener {
 
     /**
-     * Mapping of descriptor type to specialized execution listener.
-     */
-    /**
-     * Mapping from descriptor implementation class to the listener that handles it.
+     * Printer used for emitting execution events.
      *
-     * <p>This map is initialized once and not mutated afterward.
+     * @since 0.0.1
      */
     private final Consumer<String> printer;
 
+    /**
+     * Delegate listener invoked in addition to Paramixel-specific reporting.
+     *
+     * @since 0.0.1
+     */
     private final EngineExecutionListener delegate;
 
+    /**
+     * Mapping from descriptor implementation type to its specialized listener.
+     *
+     * <p>This map is initialized once and not mutated afterward.
+     *
+     * @since 0.0.1
+     */
     private final Map<Class<?>, EngineExecutionListener> engineListeners;
 
+    /**
+     * Creates a listener that prints to standard output with a no-op delegate.
+     *
+     * @return the result
+     * @since 0.0.1
+     */
     public ParamixelEngineExecutionListener() {
         this(System.out::println, new EngineExecutionListener() {});
     }
 
+    /**
+     * Creates a listener that prints to the provided printer with a no-op delegate.
+     *
+     * @param printer the printer to receive output lines; never {@code null}
+     * @return the result
+     * @since 0.0.1
+     */
     public ParamixelEngineExecutionListener(final @NonNull Consumer<String> printer) {
         this(printer, new EngineExecutionListener() {});
     }
 
+    /**
+     * Creates a new instance.
+     *
+     * @param printer the printer
+     * @param delegate the delegate
+     * @since 0.0.1
+     */
     public ParamixelEngineExecutionListener(
             final @NonNull Consumer<String> printer, final @NonNull EngineExecutionListener delegate) {
         this.printer = Objects.requireNonNull(printer, "printer must not be null");
         this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
         this.engineListeners = new HashMap<>();
         engineListeners.put(
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 ParamixelEngineDescriptor.class, new ParamixelEngineDescriptorEngineExecutionListener(printer));
         engineListeners.put(
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 ParamixelTestClassDescriptor.class, new ParamixelTestClassDescriptorEngineExecutionListener(printer));
         engineListeners.put(
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 ParamixelTestArgumentDescriptor.class,
                 new ParamixelTestArgumentDescriptorEngineExecutionListener(printer));
         engineListeners.put(
+                /**
+                 * Provides this type.
+                 *
+                 * @author Douglas Hoard <doug.hoard@gmail.com>
+                 * @since 0.0.1
+                 */
                 ParamixelTestMethodDescriptor.class, new ParamixelTestMethodDescriptorEngineExecutionListener(printer));
     }
 
-    /**
-     * Gets the parent class name from the descriptor hierarchy.
-     *
-     * @param testDescriptor the descriptor to find parent for
-     * @return the parent class name, or null if not found
-     */
     /**
      * Returns the nearest parent class display name for a descriptor.
      *
@@ -94,6 +143,7 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
      *
      * @param testDescriptor the descriptor to inspect; may be {@code null}
      * @return the parent class display name, or {@code null} when not found
+     * @since 0.0.1
      */
     private String getParentClassName(final TestDescriptor testDescriptor) {
         TestDescriptor current = testDescriptor;

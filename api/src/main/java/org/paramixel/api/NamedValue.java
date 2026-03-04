@@ -23,12 +23,31 @@ import org.jspecify.annotations.NonNull;
  * Simple {@link Named} implementation that pairs a display name with a value.
  *
  * @param <T> type of the wrapped value
+ * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @since 0.0.1
  */
 public final class NamedValue<T> implements Named {
 
+    /**
+     * Stores the name.
+     *
+     * @since 0.0.1
+     */
     private final String name;
+    /**
+     * Stores the value.
+     *
+     * @since 0.0.1
+     */
     private final T value;
 
+    /**
+     * Creates a new instance.
+     *
+     * @param name the name
+     * @param value the value
+     * @since 0.0.1
+     */
     private NamedValue(final @NonNull String name, final T value) {
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.value = value;
@@ -41,6 +60,7 @@ public final class NamedValue<T> implements Named {
      * @param value value to wrap
      * @param <T>   type of the wrapped value
      * @return a new {@code NamedValue}
+     * @since 0.0.1
      */
     public static <T> NamedValue<T> of(final @NonNull String name, final T value) {
         return new NamedValue<>(name, value);
@@ -55,6 +75,7 @@ public final class NamedValue<T> implements Named {
      * Returns the wrapped value.
      *
      * @return the wrapped value (may be {@code null})
+     * @since 0.0.1
      */
     public T getValue() {
         return value;
@@ -67,6 +88,7 @@ public final class NamedValue<T> implements Named {
      * @return the wrapped value cast to {@code type}
      * @throws NullPointerException     if {@code type} is {@code null}
      * @throws ClassCastException       if the value cannot be cast to {@code type}
+     * @since 0.0.1
      */
     public <V> V getValue(final @NonNull Class<V> type) {
         return value == null ? null : type.cast(value);

@@ -24,5 +24,7 @@ public class NonTestClass {
     /**
      * Placeholder method that should not be treated as a test.
      */
-    public void notATest() {}
+    public void notATest() {
+        // INTENTIONALLY EMPTY
+    }
 }

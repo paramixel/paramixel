@@ -25,7 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
-import org.junit.platform.engine.support.descriptor.AbstractTestDescriptor;
+import org.junit.platform.engine.support.descriptor.EngineDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestArgumentDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
@@ -138,8 +138,8 @@ public class ParamixelEngineExecutionListenerTest {
         final ExposingListener listener = new ExposingListener();
         listener.reset();
 
-        final DummyDescriptor dummy =
-                new DummyDescriptor(UniqueId.forEngine("paramixel").append("dummy", "1"));
+        final EngineDescriptor dummy =
+                new EngineDescriptor(UniqueId.forEngine("dummy").append("dummy", "1"), "dummy");
         listener.executionStarted(dummy);
         listener.executionSkipped(dummy, "because");
         listener.executionFinished(dummy, TestExecutionResult.successful());
@@ -187,7 +187,9 @@ public class ParamixelEngineExecutionListenerTest {
         assertThat(listener.summary().getClassStatsMap().get("C").getTotal()).isEqualTo(1);
     }
 
-    private static void dummy() {}
+    private static void dummy() {
+        // INTENTIONALLY EMPTY
+    }
 
     private static final class ExposingListener extends ParamixelEngineExecutionListener {
 
@@ -197,18 +199,6 @@ public class ParamixelEngineExecutionListenerTest {
 
         ExecutionSummary summary() {
             return getExecutionSummary();
-        }
-    }
-
-    private static final class DummyDescriptor extends AbstractTestDescriptor {
-
-        private DummyDescriptor(final UniqueId uniqueId) {
-            super(uniqueId, "dummy");
-        }
-
-        @Override
-        public Type getType() {
-            return Type.TEST;
         }
     }
 }

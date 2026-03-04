@@ -86,6 +86,7 @@ package org.paramixel.api;
  *
  * @see Paramixel.ArgumentsCollector
  * @see ArgumentContext
+ * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
 public interface Named {
@@ -98,6 +99,7 @@ public interface Named {
      * unique within the set of arguments.</p>
      *
      * @return the display name for this argument; never {@code null}
+     * @since 0.0.1
      */
     String getName();
 }
