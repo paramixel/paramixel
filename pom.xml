@@ -16,7 +16,6 @@
         <module>api</module>
         <module>engine</module>
         <module>maven-plugin</module>
-        <module>gradle-plugin</module>
         <module>tests</module>
         <module>examples</module>
         <module>benchmarks</module>
