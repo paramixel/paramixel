@@ -4,13 +4,7 @@
 # Log file
 *.log
 
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.nar
@@ -33,11 +27,12 @@ pom.xml.releaseBackup
 
 .files.tmp
 
-test.sh
-test.log
+# Gradle
+.gradle/
 
-junit-platform-console-standalone.sh
-build.sh
-.aider*
-.orchestrator
+# Gradle Plugin build files
+gradle-plugin/build/
+gradle-plugin/*.bak
+gradle-plugin/gradle-app.setting
+gradle-plugin/local.properties
 

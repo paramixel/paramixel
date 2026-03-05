@@ -92,6 +92,35 @@ org.paramixel.maven.plugin
 
 ---
 
+## `paramixel-gradle-plugin` (EXPERIMENTAL)
+
+**Responsibility:** Experimental Gradle plugin providing `paramixelTest` task for
+Gradle build integration. Bridges Gradle build lifecycle to the Paramixel engine.
+
+> **Status**: This module is experimental and not yet stabilized.
+
+### Package Structure
+
+```
+org.paramixel.gradle
++-- ParamixelPlugin.java          Plugin entry point
++-- ParamixelExtension.java       Configuration DSL
++-- ParamixelTestTask.java        Task implementation
++-- TestClassScanner.java         Test class discovery
+```
+
+### Constraints
+
+- MUST NOT implement test execution logic (that belongs in `paramixel-engine`).
+- MUST NOT bypass the JUnit Platform Launcher.
+- MUST NOT contain `@Paramixel.TestClass` annotated classes.
+- MUST NOT depend on engine-internal packages (`org.paramixel.engine.*`), only on
+  `paramixel-api` and `paramixel-engine` as opaque dependencies.
+- MUST NOT introduce HTTP, persistence, or messaging dependencies.
+- MUST be documented as experimental in all user-facing documentation.
+
+---
+
 ## `paramixel-tests`
 
 **Responsibility:** Functional/integration test suite validating the engine's lifecycle,

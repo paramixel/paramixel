@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.paramixel</groupId>
+        <artifactId>paramixel-parent</artifactId>
+        <version>0.0.1</version>
+    </parent>
+
+    <artifactId>paramixel-gradle-plugin</artifactId>
+    <packaging>pom</packaging>
+
+    <name>Paramixel Gradle Plugin</name>
+    <description>Gradle plugin for Paramixel test framework</description>
+
+    <build>
+        <plugins>
+            <!-- Invoke Gradle build -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>gradle-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>./gradlew</executable>
+                            <arguments>
+                                <argument>compileJava</argument>
+                                <argument>-x</argument>
+                                <argument>test</argument>
+                            </arguments>
+                            <environmentVariables>
+                                <JAVA_HOME>/opt/amazon-corretto-21.0.8.9.1-linux-x64</JAVA_HOME>
+                            </environmentVariables>
+                        </configuration>
+                    </execution>
+                    <!-- Test execution skipped - run manually with ./gradlew test -->
+                    <execution>
+                        <id>gradle-package</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>./gradlew</executable>
+                            <arguments>
+                                <argument>assemble</argument>
+                                <argument>-x</argument>
+                                <argument>test</argument>
+                            </arguments>
+                            <environmentVariables>
+                                <JAVA_HOME>/opt/amazon-corretto-21.0.8.9.1-linux-x64</JAVA_HOME>
+                            </environmentVariables>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
