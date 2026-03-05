@@ -104,7 +104,6 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 ParamixelEngineDescriptor.class, new ParamixelEngineDescriptorEngineExecutionListener(printer));
@@ -112,7 +111,6 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 ParamixelTestClassDescriptor.class, new ParamixelTestClassDescriptorEngineExecutionListener(printer));
@@ -120,7 +118,6 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 ParamixelTestArgumentDescriptor.class,
@@ -129,7 +126,6 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 ParamixelTestMethodDescriptor.class, new ParamixelTestMethodDescriptorEngineExecutionListener(printer));

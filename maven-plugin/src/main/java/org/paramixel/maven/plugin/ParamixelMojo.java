@@ -202,7 +202,6 @@ public class ParamixelMojo extends AbstractMojo {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (clazz.isAnnotationPresent(Paramixel.TestClass.class)) {
@@ -212,7 +211,6 @@ public class ParamixelMojo extends AbstractMojo {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 getLog().warn("Could not load class: " + className);
@@ -220,7 +218,6 @@ public class ParamixelMojo extends AbstractMojo {
                 /**
                  * Provides definition.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 getLog().warn("Could not load class definition: " + className);
@@ -268,7 +265,6 @@ public class ParamixelMojo extends AbstractMojo {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
             } else if (file.getName().endsWith(".class") && !file.getName().contains("$")) {
@@ -277,7 +273,6 @@ public class ParamixelMojo extends AbstractMojo {
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         relativePath.replace(File.separatorChar, '.').replace(".class", "");

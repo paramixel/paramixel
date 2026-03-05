@@ -68,7 +68,6 @@ public final class ParamixelClassRunner {
     /**
      * Logger used for lifecycle and execution diagnostics.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
      * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelClassRunner.class.getName());
@@ -209,7 +208,6 @@ public final class ParamixelClassRunner {
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             LOGGER.log(Level.WARNING, "Error executing test class: " + testClass.getName(), t);
@@ -231,7 +229,6 @@ public final class ParamixelClassRunner {
                 /**
                  * Provides failed.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 LOGGER.log(Level.WARNING, "Test class failed: " + testClass.getName(), firstFailure);
@@ -459,7 +456,6 @@ public final class ParamixelClassRunner {
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             LOGGER.log(Level.SEVERE, "Failed to instantiate test class: " + testClass.getName(), e);
@@ -481,7 +477,6 @@ public final class ParamixelClassRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Initialize.class);
@@ -512,7 +507,6 @@ public final class ParamixelClassRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Finalize.class);
@@ -547,7 +541,6 @@ public final class ParamixelClassRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeAll.class);
@@ -586,7 +579,6 @@ public final class ParamixelClassRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterAll.class);
@@ -625,7 +617,6 @@ public final class ParamixelClassRunner {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     current != null && current != Object.class;
@@ -637,7 +628,6 @@ public final class ParamixelClassRunner {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
@@ -669,7 +659,6 @@ public final class ParamixelClassRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
@@ -727,7 +716,6 @@ public final class ParamixelClassRunner {
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             LOGGER.log(Level.WARNING, "Failed to close " + resourceName + " for class " + testClassName, t);

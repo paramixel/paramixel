@@ -73,49 +73,42 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 final boolean isTestMethod = method.isAnnotationPresent(Paramixel.Test.class);
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 final boolean isLifecycleMethod = method.isAnnotationPresent(Paramixel.Initialize.class)
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         || method.isAnnotationPresent(Paramixel.BeforeAll.class)
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         || method.isAnnotationPresent(Paramixel.BeforeEach.class)
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         || method.isAnnotationPresent(Paramixel.AfterEach.class)
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         || method.isAnnotationPresent(Paramixel.AfterAll.class)
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         || method.isAnnotationPresent(Paramixel.Finalize.class);
@@ -123,7 +116,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.Test.class)) {
@@ -132,7 +124,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
@@ -141,7 +132,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.BeforeEach.class)) {
@@ -150,7 +140,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.AfterEach.class)) {
@@ -159,7 +148,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.BeforeAll.class)) {
@@ -168,7 +156,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.AfterAll.class)) {
@@ -177,7 +164,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.Initialize.class)) {
@@ -186,7 +172,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.Finalize.class)) {
@@ -195,7 +180,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (method.isAnnotationPresent(Paramixel.Order.class)) {
@@ -220,7 +204,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 current != null && current != Object.class;
@@ -261,14 +244,12 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 && method.getParameterTypes()[0].equals(ArgumentsCollector.class)
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 && method.getReturnType().equals(void.class);
@@ -280,7 +261,6 @@ public final class MethodValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 method.getParameterCount() == 0 && !method.getReturnType().equals(void.class);
@@ -319,7 +299,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
@@ -365,7 +344,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
@@ -376,7 +354,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (!method.getReturnType().equals(void.class)) {
@@ -414,7 +391,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
@@ -425,7 +401,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (!method.getReturnType().equals(void.class)) {
@@ -465,7 +440,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
@@ -476,7 +450,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (!method.getReturnType().equals(void.class)) {
@@ -516,7 +489,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
@@ -527,7 +499,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (!method.getReturnType().equals(void.class)) {
@@ -562,7 +533,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ArgumentContext.class)) {
@@ -573,7 +543,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (!method.getReturnType().equals(void.class)) {
@@ -607,7 +576,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ClassContext.class)) {
@@ -618,7 +586,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (!method.getReturnType().equals(void.class)) {
@@ -658,7 +625,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (method.getParameterCount() != 1 || !method.getParameterTypes()[0].equals(ClassContext.class)) {
@@ -669,7 +635,6 @@ public final class MethodValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         if (!method.getReturnType().equals(void.class)) {

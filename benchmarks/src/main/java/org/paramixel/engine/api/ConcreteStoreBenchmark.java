@@ -124,7 +124,6 @@ public class ConcreteStoreBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final String previous = store.put(TEST_KEY, String.class, TEST_VALUE);
@@ -156,7 +155,6 @@ public class ConcreteStoreBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final String value = store.get(TEST_KEY, String.class);
@@ -201,7 +199,6 @@ public class ConcreteStoreBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final String removed = store.remove(TEST_KEY, String.class);

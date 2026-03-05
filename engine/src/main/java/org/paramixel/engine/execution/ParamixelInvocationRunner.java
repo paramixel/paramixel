@@ -64,7 +64,6 @@ public final class ParamixelInvocationRunner {
     /**
      * Logger used for lifecycle and invocation diagnostics.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
      * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelInvocationRunner.class.getName());
@@ -153,7 +152,6 @@ public final class ParamixelInvocationRunner {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 .anyMatch(descriptor -> descriptor.getTestMethod().isAnnotationPresent(Paramixel.Order.class));
@@ -310,7 +308,6 @@ public final class ParamixelInvocationRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeEach.class);
@@ -340,7 +337,6 @@ public final class ParamixelInvocationRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterEach.class);
@@ -376,7 +372,6 @@ public final class ParamixelInvocationRunner {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     current != null && current != Object.class;
@@ -388,7 +383,6 @@ public final class ParamixelInvocationRunner {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
@@ -418,7 +412,6 @@ public final class ParamixelInvocationRunner {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);

@@ -75,7 +75,6 @@ public class ParamixelTestEngine implements TestEngine {
     /**
      * Provides this type.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
      * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelTestEngine.class.getName());

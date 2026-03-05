@@ -305,7 +305,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = includeOnlyFilter.matches(IntegrationDatabaseTest.class);
@@ -323,7 +322,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = includeOnlyFilter.matches(UntaggedTest.class);
@@ -341,7 +339,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = excludeOnlyFilter.matches(SlowIntegrationTest.class);
@@ -359,7 +356,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = excludeOnlyFilter.matches(UnitTest.class);
@@ -377,7 +373,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = includeExcludeFilter.matches(IntegrationApiTest.class);
@@ -395,7 +390,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = complexPatternsFilter.matches(VersionedApiTest.class);
@@ -413,7 +407,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = includeOnlyFilter.matches(ChildTest.class);
@@ -431,7 +424,6 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final boolean matches = noPatternsFilter.matches(UnitTest.class);
@@ -449,35 +441,30 @@ public class RegexTagFilterBenchmark {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         blackhole.consume(includeExcludeFilter.matches(UnitTest.class));
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         blackhole.consume(includeExcludeFilter.matches(IntegrationDatabaseTest.class));
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         blackhole.consume(includeExcludeFilter.matches(IntegrationApiTest.class));
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         blackhole.consume(includeExcludeFilter.matches(SlowIntegrationTest.class));
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         blackhole.consume(includeExcludeFilter.matches(VersionedApiTest.class));

@@ -52,56 +52,48 @@ public final class AnnotationUsageValidator {
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.Test.class,
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.ArgumentsCollector.class,
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.Initialize.class,
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.Finalize.class,
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.BeforeAll.class,
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.AfterAll.class,
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.BeforeEach.class,
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             Paramixel.AfterEach.class);
@@ -145,7 +137,6 @@ public final class AnnotationUsageValidator {
         /**
          * Provides type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final Paramixel.Tags tags = testClass.getAnnotation(Paramixel.Tags.class);
@@ -154,7 +145,6 @@ public final class AnnotationUsageValidator {
             /**
              * Provides type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             if (!testClass.isAnnotationPresent(Paramixel.TestClass.class)) {
@@ -169,7 +159,6 @@ public final class AnnotationUsageValidator {
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         "@Paramixel.Tags must have at least one tag value on class " + testClass.getName()));
@@ -181,7 +170,6 @@ public final class AnnotationUsageValidator {
                                 /**
                                  * Provides this type.
                                  *
-                                 * @author Douglas Hoard <doug.hoard@gmail.com>
                                  * @since 0.0.1
                                  */
                                 + " must not be null on class " + testClass.getName()));
@@ -190,7 +178,6 @@ public final class AnnotationUsageValidator {
                                 /**
                                  * Provides this type.
                                  *
-                                 * @author Douglas Hoard <doug.hoard@gmail.com>
                                  * @since 0.0.1
                                  */
                                 + " must not be empty on class " + testClass.getName()));
@@ -211,7 +198,6 @@ public final class AnnotationUsageValidator {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final Paramixel.DisplayName classDisplayName = testClass.getAnnotation(Paramixel.DisplayName.class);
@@ -220,7 +206,6 @@ public final class AnnotationUsageValidator {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     "@Paramixel.DisplayName value must be non-blank on class " + testClass.getName()));
@@ -230,7 +215,6 @@ public final class AnnotationUsageValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 current != null && current != Object.class;
@@ -239,7 +223,6 @@ public final class AnnotationUsageValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 final Paramixel.DisplayName methodDisplayName = method.getAnnotation(Paramixel.DisplayName.class);
@@ -265,7 +248,6 @@ public final class AnnotationUsageValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 current != null && current != Object.class;
@@ -274,7 +256,6 @@ public final class AnnotationUsageValidator {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     .filter(m -> m.isAnnotationPresent(Paramixel.ArgumentsCollector.class))
@@ -284,7 +265,6 @@ public final class AnnotationUsageValidator {
                         /**
                          * Provides this type.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         "At most one @Paramixel.ArgumentsCollector method is allowed per class; found " + declaredCount
@@ -306,7 +286,6 @@ public final class AnnotationUsageValidator {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 current != null && current != Object.class;
