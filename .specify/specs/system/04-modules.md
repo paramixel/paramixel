@@ -105,7 +105,7 @@ org.paramixel.engine
 │   └── ParamixelTestMethodDescriptorEngineExecutionListener.java  Method-level reporting
 │
 ├── util/
-│   └── FastId.java                      Random alphanumeric ID generator (thread-local random)
+│   └── FastIdUtil.java                  Random alphanumeric ID generator (thread-local random)
 │
 └── validation/
     └── MethodValidator.java             Static validation of all lifecycle method signatures
@@ -122,7 +122,7 @@ org.paramixel.engine
 | Execution | `org.paramixel.engine.execution` | Runtime, limiter, class runner, invocation runner |
 | Invocation | `org.paramixel.engine.invoker` | Reflective method invocation with error unwrapping |
 | Reporting | `org.paramixel.engine.listener` | Console output + execution counters |
-| Utilities | `org.paramixel.engine.util` | `FastId` (thread-name suffix generation) |
+| Utilities | `org.paramixel.engine.util` | `FastIdUtil` (thread-name suffix generation) |
 | Validation | `org.paramixel.engine.validation` | Method signature rules enforced at discovery |
 
 ### Key Classes and Roles
@@ -142,7 +142,7 @@ org.paramixel.engine
 | `ParamixelInvocationRunner` | Per-argument method execution; supports ordered sequential or parallel modes |
 | `ParamixelReflectionInvoker` | Static utility; caches `setAccessible(true)` calls |
 | `ParamixelEngineExecutionListener` | Maven-mode listener; dispatches to type-specific sub-listeners; updates `ExecutionSummary` |
-| `FastId` | Generates 6-char alphanumeric thread-name suffixes; avoids forbidden words |
+| `FastIdUtil` | Generates 6-char alphanumeric thread-name suffixes; avoids forbidden words |
 
 ### What This Module MUST NOT Do
 
@@ -382,7 +382,7 @@ benchmarks/
 | Class | Role |
 |---|---|
 | `ConcreteStoreBenchmark` | Microbenchmarks for `ConcreteStore` operations |
-| `FastIdBenchmark` | Microbenchmarks for `FastId` ID generation |
+| `FastIdBenchmark` | Microbenchmarks for `FastIdUtil` ID generation |
 | `RegexTagFilterBenchmark` | Microbenchmarks for tag filter regex matching |
 
 ### What This Module MUST NOT Do

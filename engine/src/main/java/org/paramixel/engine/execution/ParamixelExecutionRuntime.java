@@ -46,22 +46,16 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * Default timeout for graceful executor shutdown.
      *
      * <p>The value is {@code 30 seconds}.
-     *
-     * @since 0.0.1
      */
     private static final Duration DEFAULT_SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
 
     /**
      * Owned executor used for task submission; immutable reference.
-     *
-     * @since 0.0.1
      */
     private final ExecutorService executor;
 
     /**
      * Owned concurrency limiter used for permit acquisition; immutable reference.
-     *
-     * @since 0.0.1
      */
     private final ParamixelConcurrencyLimiter limiter;
 
@@ -81,7 +75,6 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * <p>The {@code cores} value configures the concurrency limiter.
      *
      * @param cores the core count used to size permits; must be {@code >= 1}
-     * @return the result
      * @throws IllegalArgumentException if {@code cores < 1}
      * @since 0.0.1
      */

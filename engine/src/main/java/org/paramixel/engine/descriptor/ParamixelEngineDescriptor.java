@@ -39,22 +39,16 @@ public class ParamixelEngineDescriptor implements TestDescriptor {
 
     /**
      * Unique identifier for the engine descriptor.
-     *
-     * @since 0.0.1
      */
     private final UniqueId uniqueId;
 
     /**
      * Display name used in reports and IDEs.
-     *
-     * @since 0.0.1
      */
     private final String displayName;
 
     /**
      * Child descriptors discovered for this engine.
-     *
-     * @since 0.0.1
      */
     private final Set<TestDescriptor> children = new LinkedHashSet<>();
 
@@ -63,7 +57,6 @@ public class ParamixelEngineDescriptor implements TestDescriptor {
      *
      * @param uniqueId the unique ID for the engine descriptor
      * @param displayName the display name for the engine
-     * @return the result
      * @since 0.0.1
      */
     public ParamixelEngineDescriptor(final @NonNull UniqueId uniqueId, final @NonNull String displayName) {

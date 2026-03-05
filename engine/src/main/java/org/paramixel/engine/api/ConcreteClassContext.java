@@ -41,64 +41,46 @@ public final class ConcreteClassContext implements ClassContext {
 
     /**
      * The test class associated with this context.
-     *
-     * @since 0.0.1
      */
     private final Class<?> testClass;
 
     /**
      * The parent engine context.
-     *
-     * @since 0.0.1
      */
     private final EngineContext engineContext;
 
     /**
      * The instantiated test object, if available.
-     *
-     * @since 0.0.1
      */
     private final Object testInstance;
 
     /**
      * Counter for total test invocations executed.
-     *
-     * @since 0.0.1
      */
     private final AtomicInteger invocationCount;
 
     /**
      * Counter for successful test invocations.
-     *
-     * @since 0.0.1
      */
     private final AtomicInteger successCount;
 
     /**
      * Counter for failed test invocations.
-     *
-     * @since 0.0.1
      */
     private final AtomicInteger failureCount;
 
     /**
      * First failure recorded during execution, if any.
-     *
-     * @since 0.0.1
      */
     private final AtomicReference<Throwable> firstFailure;
 
     /**
      * Class-scoped store.
-     *
-     * @since 0.0.1
      */
     private final Store store;
 
     /**
      * Thread-safe cache of argument contexts keyed by argument index.
-     *
-     * @since 0.0.1
      */
     private final Map<Integer, ConcreteArgumentContext> argumentContexts;
 

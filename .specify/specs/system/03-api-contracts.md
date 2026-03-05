@@ -220,6 +220,8 @@ Contract:
 | `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@Paramixel.TestClass` annotated class found |
 | `parallelism` | `paramixel.parallelism` | (engine default) | `Integer` | Global maximum parallelism (max concurrent test classes); when unset, engine default applies |
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |
+| `includeTags` | `paramixel.tags.include` | (none) | `String` | Comma-separated list of regex patterns; includes matching tags |
+| `excludeTags` | `paramixel.tags.exclude` | (none) | `String` | Comma-separated list of regex patterns; excludes matching tags |
 
 #### Behaviour
 

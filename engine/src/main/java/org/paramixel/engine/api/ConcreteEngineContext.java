@@ -41,29 +41,21 @@ public final class ConcreteEngineContext implements EngineContext {
 
     /**
      * Immutable engine identifier.
-     *
-     * @since 0.0.1
      */
     private final String engineId;
 
     /**
      * Defensive copy of engine configuration properties.
-     *
-     * @since 0.0.1
      */
     private final Properties configuration;
 
     /**
      * Maximum number of test classes to execute concurrently.
-     *
-     * @since 0.0.1
      */
     private final int classParallelism;
 
     /**
      * Engine-scoped store.
-     *
-     * @since 0.0.1
      */
     private final Store store;
 

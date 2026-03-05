@@ -53,15 +53,11 @@ public class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Zero-based index of this invocation.
-     *
-     * @since 0.0.1
      */
     private final int invocationIndex;
 
     /**
      * Argument value bound to this invocation.
-     *
-     * @since 0.0.1
      */
     private final Object argument;
 

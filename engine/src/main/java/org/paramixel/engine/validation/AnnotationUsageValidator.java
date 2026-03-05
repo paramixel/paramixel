@@ -44,58 +44,15 @@ public final class AnnotationUsageValidator {
 
     /**
      * Performs List.of.
-     *
-     * @return the result
-     * @since 0.0.1
      */
     private static final List<Class<? extends Annotation>> MUTUALLY_EXCLUSIVE_METHOD_ANNOTATIONS = List.of(
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.Test.class,
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.ArgumentsCollector.class,
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.Initialize.class,
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.Finalize.class,
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.BeforeAll.class,
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.AfterAll.class,
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.BeforeEach.class,
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             Paramixel.AfterEach.class);
 
     /**
@@ -134,19 +91,9 @@ public final class AnnotationUsageValidator {
      */
     private static void validateTagsUsage(final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
         // Check if class has @Tags annotation
-        /**
-         * Provides type.
-         *
-         * @since 0.0.1
-         */
         final Paramixel.Tags tags = testClass.getAnnotation(Paramixel.Tags.class);
         if (tags != null) {
             // Validate that the class is annotated with @Paramixel.TestClass
-            /**
-             * Provides type.
-             *
-             * @since 0.0.1
-             */
             if (!testClass.isAnnotationPresent(Paramixel.TestClass.class)) {
                 failures.add(new ValidationFailure(
                         "@Paramixel.Tags can only be used on classes annotated with @Paramixel.TestClass: "
@@ -156,30 +103,15 @@ public final class AnnotationUsageValidator {
             // Validate tags value array
             if (tags.value() == null || tags.value().length == 0) {
                 failures.add(new ValidationFailure(
-                        /**
-                         * Provides this type.
-                         *
-                         * @since 0.0.1
-                         */
                         "@Paramixel.Tags must have at least one tag value on class " + testClass.getName()));
             } else {
                 // Validate each tag is non-null and non-empty
                 for (int i = 0; i < tags.value().length; i++) {
                     if (tags.value()[i] == null) {
                         failures.add(new ValidationFailure("@Paramixel.Tags tag at index " + i
-                                /**
-                                 * Provides this type.
-                                 *
-                                 * @since 0.0.1
-                                 */
                                 + " must not be null on class " + testClass.getName()));
                     } else if (tags.value()[i].trim().isEmpty()) {
                         failures.add(new ValidationFailure("@Paramixel.Tags tag at index " + i
-                                /**
-                                 * Provides this type.
-                                 *
-                                 * @since 0.0.1
-                                 */
                                 + " must not be empty on class " + testClass.getName()));
                     }
                 }
@@ -195,36 +127,16 @@ public final class AnnotationUsageValidator {
      * @since 0.0.1
      */
     private static void validateDisplayName(final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final Paramixel.DisplayName classDisplayName = testClass.getAnnotation(Paramixel.DisplayName.class);
         if (classDisplayName != null && classDisplayName.value().trim().isEmpty()) {
             failures.add(new ValidationFailure(
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     "@Paramixel.DisplayName value must be non-blank on class " + testClass.getName()));
         }
 
         for (Class<?> current = testClass;
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             for (Method method : current.getDeclaredMethods()) {
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 final Paramixel.DisplayName methodDisplayName = method.getAnnotation(Paramixel.DisplayName.class);
                 if (methodDisplayName != null
                         && methodDisplayName.value().trim().isEmpty()) {
@@ -245,28 +157,13 @@ public final class AnnotationUsageValidator {
     private static void validateArgumentsCollectorUsage(
             final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
         for (Class<?> current = testClass;
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             final long declaredCount = Arrays.stream(current.getDeclaredMethods())
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     .filter(m -> m.isAnnotationPresent(Paramixel.ArgumentsCollector.class))
                     .count();
             if (declaredCount > 1) {
                 failures.add(new ValidationFailure(
-                        /**
-                         * Provides this type.
-                         *
-                         * @since 0.0.1
-                         */
                         "At most one @Paramixel.ArgumentsCollector method is allowed per class; found " + declaredCount
                                 + " on " + current.getName()));
             }
@@ -283,11 +180,6 @@ public final class AnnotationUsageValidator {
     private static void validateMethodAnnotationUsage(
             final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
         for (Class<?> current = testClass;
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             for (Method method : current.getDeclaredMethods()) {

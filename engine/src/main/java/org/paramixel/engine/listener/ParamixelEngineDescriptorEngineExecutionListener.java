@@ -43,15 +43,11 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
 
     /**
      * Printer used for emitting the execution report.
-     *
-     * @since 0.0.1
      */
     private final Consumer<String> printer;
 
     /**
      * Start time for the current engine execution in epoch milliseconds.
-     *
-     * @since 0.0.1
      */
     private long startTimeMillis;
 
@@ -59,7 +55,6 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      * Creates a listener that writes the report to the provided printer.
      *
      * @param printer the printer to receive report lines; never {@code null}
-     * @return the result
      * @since 0.0.1
      */
     public ParamixelEngineDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
@@ -82,21 +77,19 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         ExecutionSummary summary = getExecutionSummary();
 
         // Print header
-        printLine(INFO + " ╔════════════════════════════════════════════════════════════════════════╗");
-        printLine(INFO + " ║                    Paramixel Test Execution Report                     ║");
-        printLine(INFO + " ╠════════════════════════════════════════════════════════════════════════╣");
+        printLine(INFO + " ╔══════════════════════════════════════════════════════════════╗");
+        printLine(INFO + " ║                    Paramixel Test Summary                    ║");
+        printLine(INFO + " ╠══════════════════════════════════════════════════════════════╣");
         String durationContent = " Duration: " + duration;
-        int contentWidth = 72;
+        int contentWidth = 62;
         int padding = contentWidth - durationContent.length();
         StringBuilder durationLine = new StringBuilder();
         durationLine.append("║");
         durationLine.append(durationContent);
-        for (int i = 0; i < padding; i++) {
-            durationLine.append(" ");
-        }
+        durationLine.append(" ".repeat(Math.max(0, padding)));
         durationLine.append("║");
         printLine(INFO + " " + durationLine);
-        printLine(INFO + " ╚════════════════════════════════════════════════════════════════════════╝");
+        printLine(INFO + " ╚══════════════════════════════════════════════════════════════╝");
         printer.accept(INFO);
 
         // Print hierarchical summary
@@ -111,11 +104,6 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
         printer.accept(INFO + "     └── " + totalMethods + " Test methods tested");
         printer.accept(INFO);
 
-        /**
-         * Performs summary.getClassStatsMap.
-         *
-         * @since 0.0.1
-         */
         // Build class breakdown table
         ConcurrentHashMap<String, ExecutionSummary.ClassStats> classStatsMap = summary.getClassStatsMap();
         List<String> classNames = new ArrayList<>(classStatsMap.keySet());
@@ -152,11 +140,6 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
                 int failed = stats != null ? stats.failed.get() : 0;
                 String status = failed > 0 ? "X" : "OK";
 
-                /**
-                 * Stores the displayName.
-                 *
-                 * @since 0.0.1
-                 */
                 // Truncate class name if too long
                 String displayName = className;
                 if (displayName.length() > maxClassWidth) {
@@ -210,7 +193,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      * @param args format arguments; may be empty
      * @since 0.0.1
      */
-    private void printLine(String format, Object... args) {
+    private void printLine(final @NonNull String format, Object... args) {
         printer.accept(String.format(format, args));
     }
 

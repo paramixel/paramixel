@@ -224,21 +224,8 @@ public class Paramixel {
      * <p><b>Method Signature Requirements:</b></p>
      * <ul>
      *   <li>Must be declared {@code public static}</li>
-     *   <li>Must be either:
-     *     <ul>
-     *       <li>Collector-driven: accept exactly one parameter of type {@link org.paramixel.api.ArgumentsCollector} and
-     *           return {@code void}</li>
-     *       <li>Return-based: accept zero parameters and return one of:
-     *         <ul>
-     *           <li>{@link java.util.stream.Stream}</li>
-     *           <li>{@link java.util.Collection}</li>
-     *           <li>{@link java.lang.Iterable}</li>
-     *           <li>Array ({@code Object[]})</li>
-     *           <li>Single {@code Object} (treated as a single-element collection)</li>
-     *         </ul>
-     *       </li>
-     *     </ul>
-     *   </li>
+     *   <li>Must accept exactly one parameter of type {@link org.paramixel.api.ArgumentsCollector}</li>
+     *   <li>Return type must be {@code void}</li>
      * </ul>
      *
      * <p><b>Constraints:</b></p>

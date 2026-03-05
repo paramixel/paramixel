@@ -37,15 +37,11 @@ public final class FastIdUtil {
 
     /**
      * Character set containing all valid ID characters.
-     *
-     * @since 0.0.1
      */
     private static final char[] CHARS = new char[62];
 
     /**
      * Forbidden words (uppercase).
-     *
-     * @since 0.0.1
      */
     private static final String[] FORBIDDEN = {"PASS", "TEST", "FAIL", "SKIP"};
 

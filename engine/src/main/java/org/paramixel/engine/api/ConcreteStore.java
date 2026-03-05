@@ -40,8 +40,6 @@ public final class ConcreteStore implements Store {
 
     /**
      * The underlying concurrent map storing the key-value pairs. Keys are non-null strings, and values are objects.
-     *
-     * @since 0.0.1
      */
     private final ConcurrentMap<String, Object> map;
 

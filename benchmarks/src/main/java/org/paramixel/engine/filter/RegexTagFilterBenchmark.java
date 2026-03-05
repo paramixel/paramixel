@@ -61,62 +61,42 @@ public class RegexTagFilterBenchmark {
 
     /**
      * Stores the includeOnlyFilter.
-     *
-     * @since 0.0.1
      */
     private RegexTagFilter includeOnlyFilter;
     /**
      * Stores the excludeOnlyFilter.
-     *
-     * @since 0.0.1
      */
     private RegexTagFilter excludeOnlyFilter;
     /**
      * Stores the includeExcludeFilter.
-     *
-     * @since 0.0.1
      */
     private RegexTagFilter includeExcludeFilter;
     /**
      * Stores the complexPatternsFilter.
-     *
-     * @since 0.0.1
      */
     private RegexTagFilter complexPatternsFilter;
     /**
      * Stores the noPatternsFilter.
-     *
-     * @since 0.0.1
      */
     private RegexTagFilter noPatternsFilter;
 
     /**
-     * Performs Arrays.asList.
+     * Include patterns used for benchmark scenarios.
      *
-     * @param "integration-.*" the "integration-.*"
-     * @param "^unit$" the "^unit$"
-     * @return the result
-     * @since 0.0.1
+     * <p>Values: {@code integration-.*}, {@code ^unit$}.
      */
     private static final List<String> INCLUDE_PATTERNS = Arrays.asList("integration-.*", "^unit$");
     /**
-     * Performs Arrays.asList.
+     * Exclude patterns used for benchmark scenarios.
      *
-     * @param ".*slow.*" the ".*slow.*"
-     * @param ".*flaky.*" the ".*flaky.*"
-     * @return the result
-     * @since 0.0.1
+     * <p>Values: {@code .*slow.*}, {@code .*flaky.*}.
      */
     private static final List<String> EXCLUDE_PATTERNS = Arrays.asList(".*slow.*", ".*flaky.*");
 
     /**
-     * Performs Arrays.asList.
+     * More complex include patterns used for benchmark scenarios.
      *
-     * @param "^api-v\\d+\\..*" the "^api-v\\d+\\..*"
-     * @param "integration-(kafka|mongo).*" the "integration-(kafka|mongo).*"
-     * @param ".*\\-v\\d+$" the ".*\\-v\\d+$"
-     * @return the result
-     * @since 0.0.1
+     * <p>Values: {@code ^api-v\d+\..*}, {@code integration-(kafka|mongo).*}, {@code .*\-v\d+$}.
      */
     private static final List<String> COMPLEX_PATTERNS =
             Arrays.asList("^api-v\\d+\\..*", "integration-(kafka|mongo).*", ".*\\-v\\d+$");
@@ -302,11 +282,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void includeOnlyMatch(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = includeOnlyFilter.matches(IntegrationDatabaseTest.class);
         blackhole.consume(matches);
     }
@@ -319,11 +294,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void includeOnlyNoMatch(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = includeOnlyFilter.matches(UntaggedTest.class);
         blackhole.consume(matches);
     }
@@ -336,11 +306,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void excludeOnlyMatch(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = excludeOnlyFilter.matches(SlowIntegrationTest.class);
         blackhole.consume(matches);
     }
@@ -353,11 +318,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void excludeOnlyNoMatch(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = excludeOnlyFilter.matches(UnitTest.class);
         blackhole.consume(matches);
     }
@@ -370,11 +330,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void includeExcludeFilter(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = includeExcludeFilter.matches(IntegrationApiTest.class);
         blackhole.consume(matches);
     }
@@ -387,11 +342,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void complexPatternsMatch(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = complexPatternsFilter.matches(VersionedApiTest.class);
         blackhole.consume(matches);
     }
@@ -404,11 +354,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void inheritedTagsMatch(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = includeOnlyFilter.matches(ChildTest.class);
         blackhole.consume(matches);
     }
@@ -421,11 +366,6 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void noPatternsFilter(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final boolean matches = noPatternsFilter.matches(UnitTest.class);
         blackhole.consume(matches);
     }
@@ -438,35 +378,10 @@ public class RegexTagFilterBenchmark {
      */
     @Benchmark
     public void filterMultipleClasses(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         blackhole.consume(includeExcludeFilter.matches(UnitTest.class));
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         blackhole.consume(includeExcludeFilter.matches(IntegrationDatabaseTest.class));
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         blackhole.consume(includeExcludeFilter.matches(IntegrationApiTest.class));
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         blackhole.consume(includeExcludeFilter.matches(SlowIntegrationTest.class));
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         blackhole.consume(includeExcludeFilter.matches(VersionedApiTest.class));
     }
 }

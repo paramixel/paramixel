@@ -30,14 +30,10 @@ public final class NamedValue<T> implements Named {
 
     /**
      * Stores the name.
-     *
-     * @since 0.0.1
      */
     private final String name;
     /**
      * Stores the value.
-     *
-     * @since 0.0.1
      */
     private final T value;
 

@@ -35,8 +35,6 @@ public class ParamixelTestArgumentDescriptorEngineExecutionListener extends Abst
 
     /**
      * Printer used for reporting argument-level execution status.
-     *
-     * @since 0.0.1
      */
     private final Consumer<String> printer;
 
@@ -44,7 +42,6 @@ public class ParamixelTestArgumentDescriptorEngineExecutionListener extends Abst
      * Creates a listener for argument descriptors.
      *
      * @param printer the printer to receive output lines; never {@code null}
-     * @return the result
      * @since 0.0.1
      */
     public ParamixelTestArgumentDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {

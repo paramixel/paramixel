@@ -131,6 +131,8 @@ Unit tests live in `engine/src/test/java/` mirroring the production package stru
 - **AssertJ** (`org.assertj:assertj-core`) for fluent assertions
 - No Mockito (not in any `pom.xml`); tests use real collaborators or minimal hand-rolled stubs.
 
+JUnit Jupiter is a unit-test-only dependency (declared with Maven `test` scope in modules that use it).
+
 ### Reflection in Tests
 
 JUnit unit tests MAY use reflection helpers such as `setAccessible(true)` and `@SuppressWarnings` when needed to

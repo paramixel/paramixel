@@ -45,29 +45,21 @@ public final class ParamixelConcurrencyLimiter {
      * Core count used to size permit pools.
      *
      * <p>This value is immutable and is always {@code >= 1}.
-     *
-     * @since 0.0.1
      */
     private final int cores;
 
     /**
      * Total permit pool that caps all parallel work.
-     *
-     * @since 0.0.1
      */
     private final Semaphore totalSlots;
 
     /**
      * Permit pool that caps concurrently active test classes.
-     *
-     * @since 0.0.1
      */
     private final Semaphore classSlots;
 
     /**
      * Permit pool that caps extra parallel work within a class.
-     *
-     * @since 0.0.1
      */
     private final Semaphore argumentSlots;
 
@@ -245,15 +237,11 @@ public final class ParamixelConcurrencyLimiter {
 
         /**
          * Owning limiter used to release permits; immutable.
-         *
-         * @since 0.0.1
          */
         private final ParamixelConcurrencyLimiter limiter;
 
         /**
          * Guard that prevents double-release; mutable and thread-safe.
-         *
-         * @since 0.0.1
          */
         private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -261,7 +249,6 @@ public final class ParamixelConcurrencyLimiter {
          * Creates a permit for the given limiter.
          *
          * @param limiter the owning limiter; never {@code null}
-         * @return the result
          * @since 0.0.1
          */
         private ClassPermit(final ParamixelConcurrencyLimiter limiter) {
@@ -291,15 +278,11 @@ public final class ParamixelConcurrencyLimiter {
 
         /**
          * Owning limiter used to release permits; immutable.
-         *
-         * @since 0.0.1
          */
         private final ParamixelConcurrencyLimiter limiter;
 
         /**
          * Guard that prevents double-release; mutable and thread-safe.
-         *
-         * @since 0.0.1
          */
         private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -307,7 +290,6 @@ public final class ParamixelConcurrencyLimiter {
          * Creates a permit for the given limiter.
          *
          * @param limiter the owning limiter; never {@code null}
-         * @return the result
          * @since 0.0.1
          */
         private ArgumentPermit(final ParamixelConcurrencyLimiter limiter) {

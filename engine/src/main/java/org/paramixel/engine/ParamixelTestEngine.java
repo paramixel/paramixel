@@ -73,26 +73,19 @@ import org.paramixel.engine.util.FastIdUtil;
 public class ParamixelTestEngine implements TestEngine {
 
     /**
-     * Provides this type.
-     *
-     * @since 0.0.1
+     * Logger for engine-level diagnostics.
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelTestEngine.class.getName());
 
     /**
      * The unique identifier for this engine.
-     *
-     * @since 0.0.1
      */
     public static final String ENGINE_ID = "paramixel";
 
     /**
-     * Performs Math.max.
+     * Default class-level parallelism when not configured.
      *
-     * @param 1 the 1
-     * @param Runtime.getRuntime().availableProcessors() the Runtime.getRuntime().availableProcessors()
-     * @return the result
-     * @since 0.0.1
+     * <p>The value is always {@code >= 1}.
      */
     private static final int DEFAULT_PARALLELISM =
             Math.max(1, Runtime.getRuntime().availableProcessors());
