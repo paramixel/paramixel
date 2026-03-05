@@ -22,7 +22,7 @@ import org.jspecify.annotations.NonNull;
 /**
  * Represents a validation failure with a descriptive message.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ValidationFailure {

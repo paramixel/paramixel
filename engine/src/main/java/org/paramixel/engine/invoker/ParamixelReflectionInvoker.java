@@ -36,7 +36,7 @@ import org.paramixel.api.ClassContext;
  * <p>This class is thread-safe. It uses a concurrent cache to avoid repeated
  * {@link Method#setAccessible(boolean)} calls.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ParamixelReflectionInvoker {

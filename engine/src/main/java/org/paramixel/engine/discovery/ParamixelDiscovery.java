@@ -65,7 +65,8 @@ import org.paramixel.engine.validation.ValidationFailure;
  *
  * <p>This class parses JUnit Platform selectors and filters to identify Paramixel test classes
  * annotated with {@link Paramixel.TestClass}. It then validates annotated methods using
- * {@link MethodValidator} and builds a descriptor hierarchy rooted under the engine descriptor.
+ * {@link org.paramixel.engine.validation.TestClassValidator} and builds a descriptor hierarchy rooted
+ * under the engine descriptor.
  *
  * <p><b>Selectors</b>
  * <ul>
@@ -89,7 +90,7 @@ import org.paramixel.engine.validation.ValidationFailure;
  * <p>This type is stateless. It uses a JVM logger for diagnostics and does not require external
  * synchronization.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ParamixelDiscovery {
@@ -636,7 +637,7 @@ public final class ParamixelDiscovery {
      * <p>This type is private because it is an internal transport between supplier invocation and
      * descriptor construction.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     private static final class SupplierArguments {

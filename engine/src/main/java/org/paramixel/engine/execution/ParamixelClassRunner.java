@@ -60,7 +60,7 @@ import org.paramixel.engine.util.FastIdUtil;
  * {@code classContexts} and {@code testInstances} maps. When the engine executes multiple test
  * classes concurrently, the caller must provide thread-safe map implementations.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ParamixelClassRunner {
@@ -694,7 +694,7 @@ public final class ParamixelClassRunner {
      *
      * <p>This type is private because it is an internal memoization detail.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     private static final class LifecycleCacheKey {
@@ -748,7 +748,7 @@ public final class ParamixelClassRunner {
      * {@link #executeArgumentBody(ParamixelTestClassDescriptor, Class, ConcreteClassContext, Object, Object, int, String)}.
      *
      * @param <T> the held value type
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     private static final class AtomicReferenceHolder<T> {

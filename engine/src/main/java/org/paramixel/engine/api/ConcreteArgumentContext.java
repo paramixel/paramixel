@@ -29,7 +29,7 @@ import org.paramixel.api.Store;
  * information used during test method invocations.</p>
  *
  * @see ArgumentContext
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ConcreteArgumentContext implements ArgumentContext {

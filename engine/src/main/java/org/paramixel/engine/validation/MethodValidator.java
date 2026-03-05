@@ -40,7 +40,7 @@ import org.paramixel.api.Paramixel;
  * Callers are expected to decide whether to skip or fail test discovery based on
  * the returned failures.</p>
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class MethodValidator {

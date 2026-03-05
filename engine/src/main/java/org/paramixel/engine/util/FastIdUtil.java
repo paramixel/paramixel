@@ -30,7 +30,7 @@ import java.util.concurrent.ThreadLocalRandom;
  *   <li>SKIP</li>
  * </ul>
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class FastIdUtil {

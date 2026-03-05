@@ -52,7 +52,7 @@ import org.paramixel.api.Paramixel;
  * </pre>
  *
  * @since 0.0.1
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public final class RegexTagFilter implements TagFilter {
 

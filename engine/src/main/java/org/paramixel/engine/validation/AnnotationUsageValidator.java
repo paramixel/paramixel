@@ -37,7 +37,7 @@ import org.paramixel.api.Paramixel;
  *   <li>no method may declare multiple Paramixel lifecycle/test annotations</li>
  * </ul>
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class AnnotationUsageValidator {

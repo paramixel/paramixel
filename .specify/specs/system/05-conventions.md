@@ -139,13 +139,16 @@ In test sources (`*/src/test/java/**`), Javadoc is optional.
   - `@author` MUST appear only on type-level Javadoc for a `class`, `interface`, or `enum`.
     It MUST NOT be used on record or annotation Javadoc, and it MUST NOT be used on field, method, or constructor Javadoc.
   - `@author` MUST include the git user's name and email address in the form:
-    `@author Full Name <email@domain>`
+    `@author Full Name (email@domain)`
   - `@since` MUST be included on every type, method, and constructor Javadoc block.
   - `@since` MUST NOT appear on field (member variable) Javadoc blocks.
+  - Optional standard note tags `@apiNote`, `@implSpec`, and `@implNote` MAY be used when appropriate.
 - **Tone:** Use a consistent, professional tone. Use complete sentences; avoid conversational phrasing.
 - **Format:** Javadoc MUST use block (multi-line) format. Inline (single-line) Javadoc such as `/** ... */` on one line MUST NOT be used.
 - **Trailing lines:** Javadoc blocks MUST NOT contain an effective empty line immediately before the closing `*/`.
   The final `*` line in a Javadoc block MUST contain non-whitespace content (prose or an `@` tag).
+- **Links:** All inline links (for example `{@link SomeType}`) MUST resolve when Javadocs are generated.
+  Use fully-qualified names in `{@link ...}` when necessary.
 - **Placement:** Javadoc MUST appear only immediately preceding a type, field, method, or constructor declaration.
   It MUST NOT appear inside method bodies, inside argument lists, or between tokens in an expression.
 - **Spacing:** In any Javadoc block that contains both prose content and `@` tags, there MUST be a blank `*` line between the prose content and the first `@`-tagged line.
@@ -156,7 +159,7 @@ Example:
 /**
  * Utility for formatting durations.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class DurationFormatter {

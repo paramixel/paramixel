@@ -25,7 +25,7 @@ import org.jspecify.annotations.NonNull;
  * based on the tags applied to it via {@code @Paramixel.Tags}.</p>
  *
  * @since 0.0.1
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public interface TagFilter {
 

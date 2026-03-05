@@ -33,7 +33,7 @@ import org.paramixel.api.Store;
  *
  * <p>Null values are not stored. A {@code put(key, null)} behaves like {@link #remove(String)}.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ConcreteStore implements Store {

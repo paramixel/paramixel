@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p><b>Thread safety</b>
  * <p>This type is thread-safe.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ParamixelConcurrencyLimiter {
@@ -230,7 +230,7 @@ public final class ParamixelConcurrencyLimiter {
      * <p><b>Thread safety</b>
      * <p>This permit is thread-safe and idempotent.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     public static final class ClassPermit implements AutoCloseable {
@@ -271,7 +271,7 @@ public final class ParamixelConcurrencyLimiter {
      * <p><b>Thread safety</b>
      * <p>This permit is thread-safe and idempotent.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     public static final class ArgumentPermit implements AutoCloseable {

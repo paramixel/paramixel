@@ -71,7 +71,7 @@ package org.paramixel.api;
  * @see ArgumentContext
  * @see Paramixel.Initialize
  * @see Paramixel.Finalize
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public interface ClassContext {

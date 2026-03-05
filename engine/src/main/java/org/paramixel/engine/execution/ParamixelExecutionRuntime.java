@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  * <p>This class is thread-safe. The underlying executor is thread-safe and the limiter uses
  * thread-safe primitives.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ParamixelExecutionRuntime implements AutoCloseable {

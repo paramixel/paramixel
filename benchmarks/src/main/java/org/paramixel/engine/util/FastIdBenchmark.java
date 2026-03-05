@@ -29,13 +29,13 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 
 /**
- * JMH benchmarks for {@link FastIdUtil} ID generation utility.
+ * JMH benchmarks for FastIdUtil ID generation utility.
  *
  * <p>Benchmarks measure the throughput and latency of FastIdUtil.getId()
  * under various ID length configurations.</p>
  *
  * @since 0.0.1
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.Throughput)
