@@ -34,7 +34,7 @@ paramixel/
 
 ### Prerequisites
 
-- Java 21 (Java 25+ recommended)
+- Java 21
 - Maven 3.9+
 
 ### Add Dependency
