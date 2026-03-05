@@ -6,12 +6,12 @@ This project uses specification-oriented development. The authoritative system s
 
 ## Critical Rules
 
-- Always follow the conventions in `.specify/specs/system/05-conventions.md`.
+- Always follow the conventions in `.specify/specs/system/09-conventions.md`.
 - Never introduce a dependency not already present in a module's `pom.xml` without explicit user approval.
-- New classes must follow the naming and packaging conventions in `.specify/specs/system/05-conventions.md`.
-- All new code must have tests as described in `.specify/specs/system/06-testing.md`.
-- If a feature requires a change to the API model, update `.specify/specs/system/02-data-model.md` after implementing it.
-- If a feature adds or changes an API, update `.specify/specs/system/03-api-contracts.md` after implementing it.
+- New classes must follow the naming and packaging conventions in `.specify/specs/system/09-conventions.md`.
+- All new code must have tests as described in `.specify/specs/system/10-testing.md`.
+- If a feature requires a change to the API model, update `.specify/specs/system/03-domain-model.md` after implementing it.
+- If a feature adds or changes an API, update `.specify/specs/system/04-lifecycle.md` after implementing it.
 - Build the project with `./mvnw verify` after every significant change and fix all errors before declaring the task complete.
 - Every Java file MUST begin with the Apache 2.0 license header from `assets/license-header.txt`.
 - Code is auto-formatted by Spotless (Palantir Java Format) during `./mvnw compile`. Never manually adjust formatting.
@@ -19,10 +19,11 @@ This project uses specification-oriented development. The authoritative system s
 ## Module Boundaries
 
 - **paramixel-api**: Public annotations + context interfaces only. No engine, plugin, or persistence code. No dependency on `paramixel-engine`.
-- **paramixel-engine**: Engine implementation only. No Maven plugin APIs. No `@TestClass`-annotated test classes in production source. Must not reference `paramixel-maven-plugin`.
+- **paramixel-engine**: Engine implementation only. No Maven plugin APIs. No `@Paramixel.TestClass`-annotated test classes in production source. Must not reference `paramixel-maven-plugin`.
 - **paramixel-maven-plugin**: Maven Mojo only. No engine-internal package imports. No test author code.
 - **paramixel-tests**: Functional tests via `@Paramixel.TestClass`. No JUnit Jupiter `@Test`. No Testcontainers. Imports only `paramixel-api` and `paramixel-engine`.
 - **paramixel-examples**: Demonstrative tests. No engine unit tests. All Testcontainers dependencies are `test` scope only.
+- **paramixel-benchmarks**: JMH benchmarks only. Must not run in standard builds or CI. Requires `-Pbenchmarks` profile.
 
 ## How to Navigate This Codebase
 
@@ -59,7 +60,7 @@ This project uses specification-oriented development. The authoritative system s
 3. **Arguments collector invoked at discovery time**: `@Paramixel.ArgumentsCollector` is called during `discover()`, not `execute()`. This is intentional.
 4. **Context hierarchy**: `EngineContext → ClassContext → ArgumentContext`. Each level has its own `Store`. Do not mix them.
 5. **No IoC container**: All dependencies are wired manually via constructors. Never use `@Autowired`, `@Inject`, or `@Component`.
-6. **Lifecycle exception handling**: "after" hooks (`@AfterEach`, `@AfterAll`, `@Finalize`) MUST run even after failures. "before" hooks (`@Initialize`, `@BeforeAll`, `@BeforeEach`) abort on first failure.
+6. **Lifecycle exception handling**: "after" hooks (`@Paramixel.AfterEach`, `@Paramixel.AfterAll`, `@Paramixel.Finalize`) MUST run even after failures. "before" hooks (`@Paramixel.Initialize`, `@Paramixel.BeforeAll`, `@Paramixel.BeforeEach`) abort on first failure.
 7. **InvocationTargetException unwrapping**: All reflection invocations go through `ParamixelReflectionInvoker.invokeMethod()` which unwraps `InvocationTargetException`.
 
 ## What OpenCode Should NOT Do
