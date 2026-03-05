@@ -59,7 +59,6 @@ public final class RegexTagFilter implements TagFilter {
     /**
      * Provides this type.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
      * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(RegexTagFilter.class.getName());
@@ -177,7 +176,6 @@ public final class RegexTagFilter implements TagFilter {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 current != null && current != Object.class;
@@ -185,7 +183,6 @@ public final class RegexTagFilter implements TagFilter {
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             final Paramixel.Tags tags = current.getAnnotation(Paramixel.Tags.class);

@@ -108,7 +108,6 @@ public final class ParamixelDiscovery {
     /**
      * Logger for discovery events and validation warnings.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
      * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelDiscovery.class.getName());
@@ -123,7 +122,6 @@ public final class ParamixelDiscovery {
     /**
      * Unique ID segment name for class descriptors.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
      * @since 0.0.1
      */
     private static final String CLASS_SEGMENT = "class";
@@ -181,7 +179,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 LOGGER.warning("Validation failed for test class: " + testClass.getName());
@@ -220,14 +217,12 @@ public final class ParamixelDiscovery {
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             final Paramixel.Disabled disabled = testClass.getAnnotation(Paramixel.Disabled.class);
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             LOGGER.fine("Skipping disabled test class: " + testClass.getName()
@@ -262,7 +257,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         for (ClassSelector selector : request.getSelectorsByType(ClassSelector.class)) {
@@ -272,7 +266,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides from.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 LOGGER.fine("Added class from ClassSelector: " + clazz.getName());
@@ -283,7 +276,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         for (MethodSelector selector : request.getSelectorsByType(MethodSelector.class)) {
@@ -293,7 +285,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides from.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 LOGGER.fine("Added class from MethodSelector: " + clazz.getName());
@@ -304,7 +295,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         for (PackageSelector selector : request.getSelectorsByType(PackageSelector.class)) {
@@ -316,7 +306,6 @@ public final class ParamixelDiscovery {
                     /**
                      * Provides from.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     LOGGER.fine("Added class from PackageSelector: " + clazz.getName());
@@ -328,7 +317,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         for (ClasspathRootSelector selector : request.getSelectorsByType(ClasspathRootSelector.class)) {
@@ -340,7 +328,6 @@ public final class ParamixelDiscovery {
                     /**
                      * Provides from.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     LOGGER.fine("Added class from ClasspathRootSelector: " + clazz.getName());
@@ -352,7 +339,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         for (NestedClassSelector selector : request.getSelectorsByType(NestedClassSelector.class)) {
@@ -362,7 +348,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides from.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 LOGGER.fine("Added class from NestedClassSelector: " + clazz.getName());
@@ -373,7 +358,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         for (UniqueIdSelector selector : request.getSelectorsByType(UniqueIdSelector.class)) {
@@ -388,7 +372,6 @@ public final class ParamixelDiscovery {
                         /**
                          * Provides from.
                          *
-                         * @author Douglas Hoard <doug.hoard@gmail.com>
                          * @since 0.0.1
                          */
                         LOGGER.fine("Added class from UniqueIdSelector: " + className);
@@ -397,7 +380,6 @@ public final class ParamixelDiscovery {
                     /**
                      * Provides from.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     LOGGER.log(Level.WARNING, "Could not load class from UniqueIdSelector: " + className);
@@ -405,7 +387,6 @@ public final class ParamixelDiscovery {
                     /**
                      * Provides from.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     LOGGER.log(Level.WARNING, "Error loading class from UniqueIdSelector: " + className, e);
@@ -430,7 +411,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<ClassNameFilter> classNameFilters = request.getFiltersByType(ClassNameFilter.class);
@@ -449,7 +429,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final List<PackageNameFilter> packageNameFilters = request.getFiltersByType(PackageNameFilter.class);
@@ -490,7 +469,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         return clazz.isAnnotationPresent(Paramixel.TestClass.class);
@@ -547,7 +525,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
             } else if (file.getName().endsWith(".class")) {
@@ -561,7 +538,6 @@ public final class ParamixelDiscovery {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     LOGGER.log(Level.WARNING, "Could not load class: " + className);
@@ -569,7 +545,6 @@ public final class ParamixelDiscovery {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     LOGGER.log(Level.WARNING, "Error loading class: " + className, e);
@@ -621,7 +596,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         LOGGER.fine("Discovered test class: " + testClass.getName());
@@ -645,7 +619,6 @@ public final class ParamixelDiscovery {
             /**
              * Provides this type.
              *
-             * @author Douglas Hoard <doug.hoard@gmail.com>
              * @since 0.0.1
              */
             LOGGER.fine("No enabled test methods found in class: " + testClass.getName());
@@ -702,7 +675,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 current != null && current != Object.class;
@@ -711,7 +683,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (!method.isAnnotationPresent(Paramixel.Test.class)) {
@@ -768,7 +739,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 current != null && current != Object.class;
@@ -777,7 +747,6 @@ public final class ParamixelDiscovery {
                 /**
                  * Provides this type.
                  *
-                 * @author Douglas Hoard <doug.hoard@gmail.com>
                  * @since 0.0.1
                  */
                 if (!method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
@@ -815,14 +784,12 @@ public final class ParamixelDiscovery {
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     && selected.getParameterTypes()[0].equals(ArgumentsCollector.class)
                     /**
                      * Provides this type.
                      *
-                     * @author Douglas Hoard <doug.hoard@gmail.com>
                      * @since 0.0.1
                      */
                     && selected.getReturnType().equals(void.class)) {
@@ -961,7 +928,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final Paramixel.DisplayName displayNameAnnotation = annotated.getAnnotation(Paramixel.DisplayName.class);
@@ -985,7 +951,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         return annotated.isAnnotationPresent(Paramixel.Disabled.class);
@@ -1028,7 +993,6 @@ public final class ParamixelDiscovery {
         /**
          * Provides this type.
          *
-         * @author Douglas Hoard <doug.hoard@gmail.com>
          * @since 0.0.1
          */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
