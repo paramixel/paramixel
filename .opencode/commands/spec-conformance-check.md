@@ -6,8 +6,6 @@ description: Verify the codebase conforms to the system specification
 
 Purpose: verify the codebase conforms to the system specification under `.specify/specs/system/`.
 
-This command replaces the former OpenCode command `.opencode/commands/spec-check.md`.
-
 ## Checks
 
 - Conventions: `.specify/specs/system/05-conventions.md`
@@ -34,6 +32,7 @@ This command replaces the former OpenCode command `.opencode/commands/spec-check
 
 ## Output
 
-- If violations are found: list them with file path and line number where applicable.
+- If violations are found: create an ISSUES.md. The file should have the list of them with file path and line number where applicable.
+- If a violation in ISSUES.md is resolved, remove it from ISSUES.md
 - If no violations are found: output `Specification conformance check passed.`
 
