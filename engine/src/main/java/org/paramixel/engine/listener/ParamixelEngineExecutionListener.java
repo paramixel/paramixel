@@ -77,7 +77,7 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
      * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(final @NonNull Consumer<String> printer) {
-        this(printer, new EngineExecutionListener() {});
+        this(Objects.requireNonNull(printer, "printer must not be null"), new EngineExecutionListener() {});
     }
 
     /**

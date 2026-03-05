@@ -189,8 +189,7 @@ public class TansuTestEnvironment implements Named {
      * @param createContainerCmd the create container command
      * @param HOST_KAFKA_PORT the kafka port
      */
-    private static void bindHostPorts(
-            final @NonNull CreateContainerCmd createContainerCmd, final @NonNull int HOST_KAFKA_PORT) {
+    private static void bindHostPorts(final @NonNull CreateContainerCmd createContainerCmd, final int HOST_KAFKA_PORT) {
         Ports bindings = new Ports();
         bindings.bind(ExposedPort.tcp(9092), Ports.Binding.bindPort(HOST_KAFKA_PORT));
 

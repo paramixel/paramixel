@@ -16,6 +16,9 @@
 
 package org.paramixel.api;
 
+import java.util.Objects;
+import org.jspecify.annotations.NonNull;
+
 /**
  * Provides contextual information for individual test method invocations.
  *
@@ -143,7 +146,8 @@ public interface ArgumentContext {
      * @throws ClassCastException if the argument is not assignable to the specified type
      * @since 0.0.1
      */
-    default <T> T getArgument(final Class<T> type) {
+    default <T> T getArgument(final @NonNull Class<T> type) {
+        Objects.requireNonNull(type, "type must not be null");
         Object argument = getArgument();
         if (argument == null) {
             return null;

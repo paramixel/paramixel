@@ -81,6 +81,8 @@ public final class RegexTagFilter implements TagFilter {
      * @since 0.0.1
      */
     public RegexTagFilter(final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
+        Objects.requireNonNull(includePatterns, "includePatterns must not be null");
+        Objects.requireNonNull(excludePatterns, "excludePatterns must not be null");
         this.includePatterns = compilePatterns(includePatterns, "include");
         this.excludePatterns = compilePatterns(excludePatterns, "exclude");
     }

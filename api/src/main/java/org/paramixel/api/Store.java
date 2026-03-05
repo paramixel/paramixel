@@ -39,8 +39,7 @@ import org.jspecify.annotations.NonNull;
  * <ul>
  *   <li>Absent mappings are represented by {@code null} return values from
  *       {@link #get(String)} and {@link #remove(String)}.</li>
- *   <li>Whether {@code null} values can be stored is implementation-defined. Some
- *       implementations may treat {@code put(key, null)} as removal or may reject it.</li>
+ *   <li>{@code put(key, null)} behaves like {@link #remove(String)}.</li>
  *   <li>Suppliers passed to {@code computeIfAbsent} may return {@code null}; in that
  *       case, implementations may leave the key unmapped.</li>
  * </ul>
@@ -60,12 +59,10 @@ public interface Store {
     /**
      * Stores {@code value} under {@code key}.
      *
-     * <p>The exact behavior for {@code value == null} is implementation-defined.
-     * Implementations may remove the key, store a {@code null} sentinel, or throw an
-     * exception.
+     * <p>If {@code value} is {@code null}, this method behaves like {@link #remove(String)}.
      *
      * @param key the key under which to store the value; must not be {@code null}
-     * @param value the value to store; may be {@code null} (implementation-defined)
+     * @param value the value to store; may be {@code null}
      * @return the previous value, or {@code null} if none
      * @throws NullPointerException if {@code key} is {@code null}
      * @since 0.0.1
@@ -197,6 +194,27 @@ public interface Store {
      */
     <T> Optional<T> find(final @NonNull String key, final @NonNull Class<T> type);
 
+    /**
+     * Returns the existing typed value for {@code key}, or stores and returns the value
+     * produced by {@code supplier} when absent.
+     *
+     * <p>If a value is present and is not assignable to {@code type}, this method throws
+     * {@link ClassCastException}.
+     *
+     * <p>Concurrency note: under contention, implementations may invoke {@code supplier} more than
+     * once; callers should ensure the supplier is side-effect free or otherwise safe to call
+     * multiple times.
+     *
+     * @param key the key whose value should be computed; must not be {@code null}
+     * @param type the expected type of the stored value; must not be {@code null}
+     * @param supplier the supplier used to create a value when absent; must not be {@code null}
+     * @return the current (existing or newly computed) typed value for {@code key}, or {@code null} if the
+     *     supplier returns {@code null} and the implementation chooses to leave the key unmapped
+     * @throws ClassCastException if a non-null existing value is present but not assignable to {@code type}
+     * @throws ClassCastException if the supplier produces a non-null value that is not assignable to {@code type}
+     * @throws NullPointerException if {@code key}, {@code type}, or {@code supplier} is {@code null}
+     * @since 0.0.1
+     */
     <T> T computeIfAbsent(
             final @NonNull String key, final @NonNull Class<T> type, final @NonNull Supplier<? extends T> supplier);
 

@@ -101,7 +101,9 @@ public class ConcreteArgumentContextTest {
         final ConcreteEngineContext engineContext = new ConcreteEngineContext("paramixel", new Properties(), 1);
         final ConcreteClassContext classContext = new ConcreteClassContext(String.class, engineContext, null);
         final ConcreteArgumentContext argumentContext = new ConcreteArgumentContext(classContext, "value", 0);
+        final ConcreteArgumentContext nullArgumentContext = new ConcreteArgumentContext(classContext, null, 0);
 
         assertThatThrownBy(() -> argumentContext.getArgument(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> nullArgumentContext.getArgument(null)).isInstanceOf(NullPointerException.class);
     }
 }

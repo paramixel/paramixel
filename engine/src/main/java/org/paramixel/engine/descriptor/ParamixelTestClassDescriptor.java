@@ -16,6 +16,7 @@
 
 package org.paramixel.engine.descriptor;
 
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.TestSource;
@@ -67,8 +68,11 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
      */
     public ParamixelTestClassDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull Class<?> testClass, final @NonNull String displayName) {
-        super(uniqueId, displayName, Type.CONTAINER);
-        this.testClass = testClass;
+        super(
+                Objects.requireNonNull(uniqueId, "uniqueId must not be null"),
+                Objects.requireNonNull(displayName, "displayName must not be null"),
+                Type.CONTAINER);
+        this.testClass = Objects.requireNonNull(testClass, "testClass must not be null");
     }
 
     /**

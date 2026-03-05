@@ -17,6 +17,7 @@
 package org.paramixel.api;
 
 import java.util.List;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Collector-style context for building argument sets for Paramixel test execution.
@@ -126,7 +127,7 @@ public interface ArgumentsCollector {
      * @throws NullPointerException if {@code arguments} is {@code null}
      * @since 0.0.1
      */
-    ArgumentsCollector addArguments(List<?> arguments);
+    ArgumentsCollector addArguments(@NonNull List<?> arguments);
 
     /**
      * Sets the parallelism level for test execution based on the arguments supplied by this

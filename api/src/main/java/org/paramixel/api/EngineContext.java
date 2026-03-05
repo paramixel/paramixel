@@ -17,6 +17,7 @@
 package org.paramixel.api;
 
 import java.util.Properties;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Provides engine-level context and configuration for test execution.
@@ -106,7 +107,7 @@ public interface EngineContext {
      * @throws NullPointerException if {@code key} is {@code null}
      * @since 0.0.1
      */
-    String getConfigurationValue(final String key);
+    String getConfigurationValue(final @NonNull String key);
 
     /**
      * Returns the configuration value associated with the specified key,
@@ -124,7 +125,7 @@ public interface EngineContext {
      * @throws NullPointerException if {@code key} is {@code null}
      * @since 0.0.1
      */
-    String getConfigurationValue(final String key, final String defaultValue);
+    String getConfigurationValue(final @NonNull String key, final String defaultValue);
 
     /**
      * Returns an engine-scoped {@link Store} for sharing state.
