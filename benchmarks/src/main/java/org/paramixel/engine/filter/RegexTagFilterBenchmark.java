@@ -40,7 +40,7 @@ import org.paramixel.api.Paramixel;
  * configurations including include/exclude patterns and class hierarchies.</p>
  *
  * @since 0.0.1
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.Throughput)
@@ -104,7 +104,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Test class with single tag.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass
@@ -124,7 +124,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Test class with integration tag.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass
@@ -144,7 +144,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Test class with multiple tags.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass
@@ -164,7 +164,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Test class with slow tag.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass
@@ -184,7 +184,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Test class with complex versioned tag.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass
@@ -204,7 +204,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Base class with tags.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass
@@ -224,7 +224,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Child class that inherits tags.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass
@@ -244,7 +244,7 @@ public class RegexTagFilterBenchmark {
     /**
      * Test class with no tags.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     @Paramixel.TestClass

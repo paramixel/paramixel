@@ -35,7 +35,7 @@ import org.paramixel.api.EngineContext;
  * <p>This implementation is not thread-safe. The engine invokes an argument supplier on a single
  * thread during discovery.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ConcreteArgumentsCollector implements ArgumentsCollector {

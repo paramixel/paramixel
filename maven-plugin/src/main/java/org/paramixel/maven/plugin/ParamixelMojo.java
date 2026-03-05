@@ -46,7 +46,7 @@ import org.paramixel.api.Paramixel;
 /**
  * Provides ParamixelMojo.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 @Mojo(

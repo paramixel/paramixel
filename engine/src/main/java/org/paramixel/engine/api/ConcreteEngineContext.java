@@ -35,7 +35,7 @@ import org.paramixel.api.Store;
  *
  * @see EngineContext
  * @since 0.0.1
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public final class ConcreteEngineContext implements EngineContext {
 

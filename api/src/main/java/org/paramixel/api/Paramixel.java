@@ -117,7 +117,7 @@ import java.lang.annotation.Target;
  * @see ArgumentContext
  * @see ClassContext
  * @see EngineContext
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public class Paramixel {

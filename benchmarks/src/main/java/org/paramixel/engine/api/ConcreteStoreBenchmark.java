@@ -37,7 +37,7 @@ import org.openjdk.jmh.infra.Blackhole;
  * put, get, contains, remove, and computeIfAbsent under various conditions.</p>
  *
  * @since 0.0.1
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.Throughput)

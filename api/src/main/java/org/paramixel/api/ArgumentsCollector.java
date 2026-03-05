@@ -70,7 +70,7 @@ import java.util.List;
  * depends on whether/where the collector-driven pattern is supported by the calling integration.
  * This interface defines the contract for the collector itself.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public interface ArgumentsCollector {

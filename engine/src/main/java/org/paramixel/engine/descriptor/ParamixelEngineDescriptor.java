@@ -32,7 +32,7 @@ import org.junit.platform.engine.UniqueId;
  * <p>This descriptor represents the root of the Paramixel test hierarchy and owns
  * all discovered test class descriptors.</p>
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public class ParamixelEngineDescriptor implements TestDescriptor {

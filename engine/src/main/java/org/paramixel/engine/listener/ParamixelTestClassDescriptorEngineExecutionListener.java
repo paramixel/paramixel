@@ -27,7 +27,7 @@ import org.junit.platform.engine.TestExecutionResult;
  *
  * <p>This listener prints a single line on start and finish using the class-level display name.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public class ParamixelTestClassDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {

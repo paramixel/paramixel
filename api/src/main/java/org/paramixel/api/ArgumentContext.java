@@ -67,7 +67,7 @@ package org.paramixel.api;
  * @see Paramixel.ArgumentsCollector
  * @see ClassContext
  * @see EngineContext
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public interface ArgumentContext {

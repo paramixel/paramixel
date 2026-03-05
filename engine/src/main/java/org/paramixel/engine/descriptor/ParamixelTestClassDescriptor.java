@@ -39,7 +39,7 @@ import org.junit.platform.engine.support.descriptor.ClassSource;
  *
  * @see ParamixelTestMethodDescriptor
  * @see ParamixelInvocationDescriptor
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {

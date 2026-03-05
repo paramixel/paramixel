@@ -36,7 +36,7 @@ import org.paramixel.engine.util.DurationUtils;
  * <p>This class is not thread-safe for concurrent engine executions because it stores
  * {@code startTimeMillis} as mutable state. The engine constructs a new listener per execution.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {

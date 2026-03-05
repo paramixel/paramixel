@@ -52,7 +52,7 @@ import org.jspecify.annotations.NonNull;
  * In particular, callers should assume suppliers may be invoked more than once under
  * contention.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public interface Store {

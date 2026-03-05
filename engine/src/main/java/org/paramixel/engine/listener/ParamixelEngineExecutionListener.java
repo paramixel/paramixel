@@ -39,7 +39,7 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
  * <p>This class is thread-safe for concurrent event dispatch. It updates shared counters via
  * {@link AbstractEngineExecutionListener.ExecutionSummary}.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public class ParamixelEngineExecutionListener extends AbstractEngineExecutionListener {

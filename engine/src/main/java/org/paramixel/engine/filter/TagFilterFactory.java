@@ -35,7 +35,7 @@ import org.jspecify.annotations.NonNull;
  * </ul>
  *
  * @since 0.0.1
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public final class TagFilterFactory {
 

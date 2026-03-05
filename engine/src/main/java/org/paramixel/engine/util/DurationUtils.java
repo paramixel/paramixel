@@ -19,7 +19,7 @@ package org.paramixel.engine.util;
 /**
  * Duration-related utilities.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class DurationUtils {

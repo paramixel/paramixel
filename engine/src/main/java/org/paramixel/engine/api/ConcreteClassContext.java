@@ -34,7 +34,7 @@ import org.paramixel.api.Store;
  * invocations, successes, failures, and errors.</p>
  *
  * @see ClassContext
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ConcreteClassContext implements ClassContext {

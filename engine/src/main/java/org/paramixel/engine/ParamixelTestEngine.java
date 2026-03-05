@@ -51,7 +51,7 @@ import org.paramixel.engine.util.FastIdUtil;
 /**
  * Provides the Paramixel JUnit Platform {@link TestEngine} implementation.
  *
- * <p>This engine discovers tests annotated with {@link Paramixel.TestClass} and executes them
+ * <p>This engine discovers tests annotated with {@link org.paramixel.api.Paramixel.TestClass} and executes them
  * through the Paramixel engine runtime. It builds a descriptor tree during
  * {@link #discover(EngineDiscoveryRequest, UniqueId)} and schedules class-level execution during
  * {@link #execute(ExecutionRequest)}.
@@ -67,7 +67,7 @@ import org.paramixel.engine.util.FastIdUtil;
  * <p>This class is stateless and thread-safe. It creates per-execution state inside
  * {@link #execute(ExecutionRequest)}.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public class ParamixelTestEngine implements TestEngine {

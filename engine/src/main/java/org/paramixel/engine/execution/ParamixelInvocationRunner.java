@@ -56,7 +56,7 @@ import org.paramixel.engine.util.FastIdUtil;
  * <p>This class is not thread-safe. It is constructed per argument bucket and is intended for
  * single-threaded use by {@link ParamixelClassRunner}.
  *
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class ParamixelInvocationRunner {
@@ -405,7 +405,7 @@ public final class ParamixelInvocationRunner {
      *
      * <p>This type is private because it is an internal memoization detail.
      *
-     * @author Douglas Hoard <doug.hoard@gmail.com>
+     * @author Douglas Hoard (doug.hoard@gmail.com)
      * @since 0.0.1
      */
     private static final class LifecycleCacheKey {

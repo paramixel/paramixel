@@ -23,7 +23,7 @@ import org.jspecify.annotations.NonNull;
  * Simple {@link Named} implementation that pairs a display name with a value.
  *
  * @param <T> type of the wrapped value
- * @author Douglas Hoard <doug.hoard@gmail.com>
+ * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
 public final class NamedValue<T> implements Named {
