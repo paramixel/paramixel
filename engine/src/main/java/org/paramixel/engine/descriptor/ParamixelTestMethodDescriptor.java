@@ -52,8 +52,6 @@ public class ParamixelTestMethodDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Reflected test method represented by this descriptor.
-     *
-     * @since 0.0.1
      */
     private final Method testMethod;
 

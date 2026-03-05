@@ -55,15 +55,11 @@ public class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor
 
     /**
      * Zero-based index of this argument in the supplier output.
-     *
-     * @since 0.0.1
      */
     private final int argumentIndex;
 
     /**
      * Argument value associated with this descriptor.
-     *
-     * @since 0.0.1
      */
     private final Object argument;
 

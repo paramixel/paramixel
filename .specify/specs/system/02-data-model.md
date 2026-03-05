@@ -119,7 +119,7 @@ All annotations have `@Retention(RetentionPolicy.RUNTIME)` and `@Documented`.
 |---|---|---|---|
 | `@Paramixel.TestClass` | `TYPE` | N/A (class-level) | Marks a class for discovery |
 | `@Paramixel.Test` | `METHOD` | `public void name(ArgumentContext)` — instance, not static | Marks a test method |
-| `@Paramixel.ArgumentsCollector` | `METHOD` | Either: `public static void name(ArgumentsCollector)` (collector-driven) or `public static <ReturnType> name()` where return is `Stream`, `Collection`, `Iterable`, `Object[]`, or a single `Object` (return-based) | Supplies test arguments |
+| `@Paramixel.ArgumentsCollector` | `METHOD` | `public static void name(ArgumentsCollector)` | Supplies test arguments |
 | `@Paramixel.Initialize` | `METHOD` | `public void name(ClassContext)` — instance, not static | Once per class, before all lifecycle |
 | `@Paramixel.BeforeAll` | `METHOD` | `public void name(ArgumentContext)` — may be static | Once per argument, before all tests |
 | `@Paramixel.BeforeEach` | `METHOD` | `public void name(ArgumentContext)` — instance, not static | Before each test method invocation |

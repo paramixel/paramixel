@@ -39,6 +39,7 @@ package org.paramixel.api;
  * <p><b>Usage Example:</b></p>
  * <pre>{@code
  * public class TestScenario implements Named {
+ *
  *     private final String name;
  *     private final String input;
  *     private final String expectedOutput;
@@ -67,12 +68,11 @@ package org.paramixel.api;
  * public class ParameterizedTests {
  *
  *     @Paramixel.ArgumentsCollector
- *     public static List<TestScenario> provideScenarios() {
- *         return Arrays.asList(
- *             new TestScenario("empty string", "", ""),
- *             new TestScenario("single character", "a", "A"),
- *             new TestScenario("multiple words", "hello world", "HELLO WORLD")
- *         );
+ *     public static void provideScenarios(final ArgumentsCollector collector) {
+ *         collector.addArguments(
+ *                 new TestScenario("empty string", "", ""),
+ *                 new TestScenario("single character", "a", "A"),
+ *                 new TestScenario("multiple words", "hello world", "HELLO WORLD"));
  *     }
  *
  *     @Paramixel.Test

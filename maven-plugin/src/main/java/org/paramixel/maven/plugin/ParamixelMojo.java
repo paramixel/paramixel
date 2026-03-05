@@ -43,23 +43,21 @@ import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import org.paramixel.api.Paramixel;
 
-@Mojo(
-        name = "test",
-        defaultPhase = LifecyclePhase.TEST,
-        requiresProject = true,
-        requiresDependencyResolution = ResolutionScope.TEST)
 /**
  * Provides ParamixelMojo.
  *
  * @author Douglas Hoard <doug.hoard@gmail.com>
  * @since 0.0.1
  */
+@Mojo(
+        name = "test",
+        defaultPhase = LifecyclePhase.TEST,
+        requiresProject = true,
+        requiresDependencyResolution = ResolutionScope.TEST)
 public class ParamixelMojo extends AbstractMojo {
 
     /**
      * The Maven project.
-     *
-     * @since 0.0.1
      */
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
@@ -67,33 +65,25 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Whether to skip test execution.
      *
-     * System property: -Dparamixel.skipTests=true
-     *
-     * @since 0.0.1
+     * <p>System property: -Dparamixel.skipTests=true</p>
      */
     @Parameter(property = "paramixel.skipTests", defaultValue = "false")
     private boolean skipTests;
 
     /**
      * Whether to fail the build if tests fail.
-     *
-     * @since 0.0.1
      */
     @Parameter(property = "paramixel.failIfNoTests", defaultValue = "true")
     private boolean failIfNoTests;
 
     /**
      * The global parallelism setting for test class execution.
-     *
-     * @since 0.0.1
      */
     @Parameter(property = "paramixel.parallelism")
     private Integer parallelism;
 
     /**
      * Whether to print verbose output.
-     *
-     * @since 0.0.1
      */
     @Parameter(property = "paramixel.verbose", defaultValue = "false")
     private boolean verbose;
@@ -101,8 +91,6 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Include tags for test filtering.
      * Comma-separated list of regex patterns.
-     *
-     * @since 0.0.1
      */
     @Parameter(property = "paramixel.tags.include")
     private String includeTags;
@@ -110,8 +98,6 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Exclude tags for test filtering.
      * Comma-separated list of regex patterns.
-     *
-     * @since 0.0.1
      */
     @Parameter(property = "paramixel.tags.exclude")
     private String excludeTags;
@@ -199,27 +185,12 @@ public class ParamixelMojo extends AbstractMojo {
         for (String className : classNames) {
             try {
                 final Class<?> clazz = classLoader.loadClass(className);
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 if (clazz.isAnnotationPresent(Paramixel.TestClass.class)) {
                     testClasses.add(clazz);
                 }
             } catch (ClassNotFoundException e) {
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 getLog().warn("Could not load class: " + className);
             } catch (NoClassDefFoundError e) {
-                /**
-                 * Provides definition.
-                 *
-                 * @since 0.0.1
-                 */
                 getLog().warn("Could not load class definition: " + className);
             }
         }
@@ -262,19 +233,9 @@ public class ParamixelMojo extends AbstractMojo {
         for (File file : files) {
             if (file.isDirectory()) {
                 scanDirectoryRecursive(file, basePath, classNames);
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
             } else if (file.getName().endsWith(".class") && !file.getName().contains("$")) {
                 final String relativePath = file.getPath().substring(basePath.length());
                 final String className =
-                        /**
-                         * Provides this type.
-                         *
-                         * @since 0.0.1
-                         */
                         relativePath.replace(File.separatorChar, '.').replace(".class", "");
                 classNames.add(className.startsWith(".") ? className.substring(1) : className);
             }

@@ -57,22 +57,16 @@ import org.paramixel.api.Paramixel;
 public final class RegexTagFilter implements TagFilter {
 
     /**
-     * Provides this type.
-     *
-     * @since 0.0.1
+     * Logger for tag filter diagnostics.
      */
     private static final Logger LOGGER = Logger.getLogger(RegexTagFilter.class.getName());
 
     /**
      * Stores the includePatterns.
-     *
-     * @since 0.0.1
      */
     private final List<Pattern> includePatterns;
     /**
      * Stores the excludePatterns.
-     *
-     * @since 0.0.1
      */
     private final List<Pattern> excludePatterns;
 
@@ -84,7 +78,6 @@ public final class RegexTagFilter implements TagFilter {
      *
      * @param includePatterns regex patterns for tags to include; may be empty but not {@code null}
      * @param excludePatterns regex patterns for tags to exclude; may be empty but not {@code null}
-     * @return the result
      * @since 0.0.1
      */
     public RegexTagFilter(final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
@@ -173,18 +166,8 @@ public final class RegexTagFilter implements TagFilter {
         final Set<String> validTags = new java.util.HashSet<>();
 
         for (Class<?> current = testClass;
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             final Paramixel.Tags tags = current.getAnnotation(Paramixel.Tags.class);
             if (tags != null && tags.value() != null) {
                 for (String tag : tags.value()) {

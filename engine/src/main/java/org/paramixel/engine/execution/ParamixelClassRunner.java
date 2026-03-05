@@ -67,8 +67,6 @@ public final class ParamixelClassRunner {
 
     /**
      * Logger used for lifecycle and execution diagnostics.
-     *
-     * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelClassRunner.class.getName());
 
@@ -77,29 +75,21 @@ public final class ParamixelClassRunner {
      *
      * <p>This cache is static to avoid repeated reflection scanning across executions.
      * It is thread-safe via {@link ConcurrentHashMap}.
-     *
-     * @since 0.0.1
      */
     private static final Map<LifecycleCacheKey, List<Method>> LIFECYCLE_METHOD_CACHE = new ConcurrentHashMap<>();
 
     /**
      * Shared execution runtime used for thread submission and permits.
-     *
-     * @since 0.0.1
      */
     private final ParamixelExecutionRuntime runtime;
 
     /**
      * Immutable engine context shared across all executed classes.
-     *
-     * @since 0.0.1
      */
     private final ConcreteEngineContext engineContext;
 
     /**
      * Listener notified for descriptor start/finish events.
-     *
-     * @since 0.0.1
      */
     private final EngineExecutionListener listener;
 
@@ -107,8 +97,6 @@ public final class ParamixelClassRunner {
      * Map of test class to class context.
      *
      * <p>This map is mutable and is populated during execution.
-     *
-     * @since 0.0.1
      */
     private final Map<Class<?>, ClassContext> classContexts;
 
@@ -116,8 +104,6 @@ public final class ParamixelClassRunner {
      * Map of test class to instantiated test object.
      *
      * <p>This map is mutable and is populated during execution.
-     *
-     * @since 0.0.1
      */
     private final Map<Class<?>, Object> testInstances;
 
@@ -163,12 +149,6 @@ public final class ParamixelClassRunner {
      */
     public void runTestClass(final ParamixelTestClassDescriptor classDescriptor) {
         final Class<?> testClass = classDescriptor.getTestClass();
-
-        /**
-         * Performs listener.executionStarted.
-         *
-         * @since 0.0.1
-         */
         // Notify started on the class thread so the thread ID is correct in output
         listener.executionStarted(classDescriptor);
 
@@ -205,11 +185,6 @@ public final class ParamixelClassRunner {
                         argumentParallelism);
             }
         } catch (Throwable t) {
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             LOGGER.log(Level.WARNING, "Error executing test class: " + testClass.getName(), t);
             final ConcreteClassContext contextToUse =
                     classContextWithInstance != null ? classContextWithInstance : classContext;
@@ -226,11 +201,6 @@ public final class ParamixelClassRunner {
 
             final Throwable firstFailure = contextToUse.getFirstFailure();
             if (firstFailure != null) {
-                /**
-                 * Provides failed.
-                 *
-                 * @since 0.0.1
-                 */
                 LOGGER.log(Level.WARNING, "Test class failed: " + testClass.getName(), firstFailure);
                 result = TestExecutionResult.failed(firstFailure);
             }
@@ -453,11 +423,6 @@ public final class ParamixelClassRunner {
             constructor.setAccessible(true);
             return constructor.newInstance();
         } catch (Exception e) {
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             LOGGER.log(Level.SEVERE, "Failed to instantiate test class: " + testClass.getName(), e);
             throw e;
         }
@@ -474,11 +439,6 @@ public final class ParamixelClassRunner {
      */
     private boolean runInitialize(
             final Class<?> testClass, final ConcreteClassContext classContext, final Object testInstance) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Initialize.class);
         for (Method method : methods) {
             try {
@@ -504,11 +464,6 @@ public final class ParamixelClassRunner {
             final @NonNull Class<?> testClass,
             final @NonNull ConcreteClassContext classContext,
             final @NonNull Object testInstance) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.Finalize.class);
         for (Method method : methods) {
             try {
@@ -538,11 +493,6 @@ public final class ParamixelClassRunner {
             final @NonNull Object argument,
             final int argumentIndex) {
         final ArgumentContext argumentContext = classContext.getOrCreateArgumentContext(argument, argumentIndex);
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeAll.class);
 
         for (Method method : methods) {
@@ -576,11 +526,6 @@ public final class ParamixelClassRunner {
             final @NonNull Object argument,
             final int argumentIndex) {
         final ArgumentContext argumentContext = classContext.getOrCreateArgumentContext(argument, argumentIndex);
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterAll.class);
         Throwable firstFailure = null;
 
@@ -614,22 +559,12 @@ public final class ParamixelClassRunner {
         return LIFECYCLE_METHOD_CACHE.computeIfAbsent(cacheKey, key -> {
             final Map<String, Method> bySignature = new ConcurrentHashMap<>();
             for (Class<?> current = testClass;
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     current != null && current != Object.class;
                     current = current.getSuperclass()) {
                 for (Method method : current.getDeclaredMethods()) {
                     if (!method.isAnnotationPresent(annotationType)) {
                         continue;
                     }
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
                         continue;
                     }
@@ -656,11 +591,6 @@ public final class ParamixelClassRunner {
      * @since 0.0.1
      */
     private static int getOrderValue(final @NonNull Method method) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {
             return Integer.MAX_VALUE;
@@ -713,11 +643,6 @@ public final class ParamixelClassRunner {
             ((AutoCloseable) resource).close();
             return null;
         } catch (Throwable t) {
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             LOGGER.log(Level.WARNING, "Failed to close " + resourceName + " for class " + testClassName, t);
             classContext.recordFailure(t);
             return t;
@@ -776,15 +701,11 @@ public final class ParamixelClassRunner {
 
         /**
          * Root test class for the lifecycle scan; immutable.
-         *
-         * @since 0.0.1
          */
         private final Class<?> testClass;
 
         /**
          * Lifecycle annotation type used for matching; immutable.
-         *
-         * @since 0.0.1
          */
         private final Class<? extends Annotation> annotationType;
 
@@ -793,7 +714,6 @@ public final class ParamixelClassRunner {
          *
          * @param testClass the test class; never {@code null}
          * @param annotationType the lifecycle annotation type; never {@code null}
-         * @return the result
          * @since 0.0.1
          */
         private LifecycleCacheKey(final Class<?> testClass, final Class<? extends Annotation> annotationType) {
@@ -835,8 +755,6 @@ public final class ParamixelClassRunner {
 
         /**
          * The held value; mutable and published via {@code volatile}.
-         *
-         * @since 0.0.1
          */
         private volatile T value;
 
@@ -844,7 +762,6 @@ public final class ParamixelClassRunner {
          * Creates a holder with an initial value.
          *
          * @param initial the initial value
-         * @return the result
          * @since 0.0.1
          */
         private AtomicReferenceHolder(final T initial) {

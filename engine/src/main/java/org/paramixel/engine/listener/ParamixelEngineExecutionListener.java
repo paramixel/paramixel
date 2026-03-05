@@ -46,15 +46,11 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
 
     /**
      * Printer used for emitting execution events.
-     *
-     * @since 0.0.1
      */
     private final Consumer<String> printer;
 
     /**
      * Delegate listener invoked in addition to Paramixel-specific reporting.
-     *
-     * @since 0.0.1
      */
     private final EngineExecutionListener delegate;
 
@@ -62,15 +58,12 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
      * Mapping from descriptor implementation type to its specialized listener.
      *
      * <p>This map is initialized once and not mutated afterward.
-     *
-     * @since 0.0.1
      */
     private final Map<Class<?>, EngineExecutionListener> engineListeners;
 
     /**
      * Creates a listener that prints to standard output with a no-op delegate.
      *
-     * @return the result
      * @since 0.0.1
      */
     public ParamixelEngineExecutionListener() {
@@ -81,7 +74,6 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
      * Creates a listener that prints to the provided printer with a no-op delegate.
      *
      * @param printer the printer to receive output lines; never {@code null}
-     * @return the result
      * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(final @NonNull Consumer<String> printer) {
@@ -101,33 +93,13 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
         this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
         this.engineListeners = new HashMap<>();
         engineListeners.put(
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 ParamixelEngineDescriptor.class, new ParamixelEngineDescriptorEngineExecutionListener(printer));
         engineListeners.put(
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 ParamixelTestClassDescriptor.class, new ParamixelTestClassDescriptorEngineExecutionListener(printer));
         engineListeners.put(
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 ParamixelTestArgumentDescriptor.class,
                 new ParamixelTestArgumentDescriptorEngineExecutionListener(printer));
         engineListeners.put(
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 ParamixelTestMethodDescriptor.class, new ParamixelTestMethodDescriptorEngineExecutionListener(printer));
     }
 
@@ -141,7 +113,7 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
      * @return the parent class display name, or {@code null} when not found
      * @since 0.0.1
      */
-    private String getParentClassName(final TestDescriptor testDescriptor) {
+    private String getParentClassName(final @NonNull TestDescriptor testDescriptor) {
         TestDescriptor current = testDescriptor;
         while (current != null) {
             if (current instanceof ParamixelTestClassDescriptor) {

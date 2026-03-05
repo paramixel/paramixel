@@ -45,36 +45,26 @@ public abstract class AbstractParamixelDescriptor implements TestDescriptor {
 
     /**
      * Unique identifier for this descriptor.
-     *
-     * @since 0.0.1
      */
     private final UniqueId uniqueId;
 
     /**
      * Human-readable display name used in reports.
-     *
-     * @since 0.0.1
      */
     private final String displayName;
 
     /**
      * Descriptor type indicating container or test.
-     *
-     * @since 0.0.1
      */
     private final Type type;
 
     /**
      * Parent descriptor in the hierarchy, if any.
-     *
-     * @since 0.0.1
      */
     private TestDescriptor parent;
 
     /**
      * Mutable list of child descriptors.
-     *
-     * @since 0.0.1
      */
     private final List<TestDescriptor> children = new ArrayList<>(10);
 

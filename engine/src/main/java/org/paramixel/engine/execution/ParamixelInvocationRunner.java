@@ -63,45 +63,32 @@ public final class ParamixelInvocationRunner {
 
     /**
      * Logger used for lifecycle and invocation diagnostics.
-     *
-     * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelInvocationRunner.class.getName());
 
     /**
-     * Performs ConcurrentHashMap<>.
-     *
-     * @return the result
-     * @since 0.0.1
+     * Cache of discovered lifecycle methods.
      */
     private static final ConcurrentHashMap<LifecycleCacheKey, List<Method>> LIFECYCLE_METHOD_CACHE =
             new ConcurrentHashMap<>();
 
     /**
      * Shared execution runtime used for task submission and permits.
-     *
-     * @since 0.0.1
      */
     private final ParamixelExecutionRuntime runtime;
 
     /**
      * Listener notified for method descriptor start/finish events.
-     *
-     * @since 0.0.1
      */
     private final EngineExecutionListener listener;
 
     /**
      * Owning class context used for metrics and failure aggregation.
-     *
-     * @since 0.0.1
      */
     private final ConcreteClassContext classContext;
 
     /**
      * Instantiated test instance used to invoke lifecycle and test methods.
-     *
-     * @since 0.0.1
      */
     private final Object testInstance;
 
@@ -149,11 +136,6 @@ public final class ParamixelInvocationRunner {
 
         final int parallelism = classDescriptor.getArgumentParallelism();
         final boolean hasOrderedTests = methodDescriptors.stream()
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 .anyMatch(descriptor -> descriptor.getTestMethod().isAnnotationPresent(Paramixel.Order.class));
 
         if (parallelism <= 1 || hasOrderedTests || methodDescriptors.size() <= 1) {
@@ -305,11 +287,6 @@ public final class ParamixelInvocationRunner {
      * @since 0.0.1
      */
     private Throwable runBeforeEach(final Class<?> testClass, final ArgumentContext argumentContext) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeEach.class);
         for (Method method : methods) {
             try {
@@ -334,11 +311,6 @@ public final class ParamixelInvocationRunner {
      * @since 0.0.1
      */
     private Throwable runAfterEach(final Class<?> testClass, final ArgumentContext argumentContext) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterEach.class);
         Throwable firstFailure = null;
         for (Method method : methods) {
@@ -369,22 +341,12 @@ public final class ParamixelInvocationRunner {
         return LIFECYCLE_METHOD_CACHE.computeIfAbsent(cacheKey, key -> {
             final Map<String, Method> bySignature = new ConcurrentHashMap<>();
             for (Class<?> current = testClass;
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     current != null && current != Object.class;
                     current = current.getSuperclass()) {
                 for (Method method : current.getDeclaredMethods()) {
                     if (!method.isAnnotationPresent(annotationType)) {
                         continue;
                     }
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
                         continue;
                     }
@@ -409,11 +371,6 @@ public final class ParamixelInvocationRunner {
      * @since 0.0.1
      */
     private static int getOrderValue(final @NonNull Method method) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {
             return Integer.MAX_VALUE;
@@ -455,15 +412,11 @@ public final class ParamixelInvocationRunner {
 
         /**
          * Root test class for the lifecycle scan; immutable.
-         *
-         * @since 0.0.1
          */
         private final Class<?> testClass;
 
         /**
          * Lifecycle annotation type used for matching; immutable.
-         *
-         * @since 0.0.1
          */
         private final Class<? extends Annotation> annotationType;
 
@@ -472,7 +425,6 @@ public final class ParamixelInvocationRunner {
          *
          * @param testClass the test class; never {@code null}
          * @param annotationType the lifecycle annotation type; never {@code null}
-         * @return the result
          * @since 0.0.1
          */
         private LifecycleCacheKey(final Class<?> testClass, final Class<? extends Annotation> annotationType) {

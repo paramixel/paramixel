@@ -41,14 +41,10 @@ public final class TagFilterFactory {
 
     /**
      * Stores the TAGS_INCLUDE_KEY.
-     *
-     * @since 0.0.1
      */
     private static final String TAGS_INCLUDE_KEY = "paramixel.tags.include";
     /**
      * Stores the TAGS_EXCLUDE_KEY.
-     *
-     * @since 0.0.1
      */
     private static final String TAGS_EXCLUDE_KEY = "paramixel.tags.exclude";
 

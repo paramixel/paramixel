@@ -36,29 +36,21 @@ public final class ConcreteArgumentContext implements ArgumentContext {
 
     /**
      * Parent class context for this invocation.
-     *
-     * @since 0.0.1
      */
     private final ConcreteClassContext classContext;
 
     /**
      * Argument value for this invocation.
-     *
-     * @since 0.0.1
      */
     private final Object argument;
 
     /**
      * Zero-based index of this argument within the supplier output.
-     *
-     * @since 0.0.1
      */
     private final int argumentIndex;
 
     /**
      * Argument-scoped store.
-     *
-     * @since 0.0.1
      */
     private final Store store;
 

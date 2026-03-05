@@ -52,43 +52,31 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
     /**
      * ANSI escape sequence that resets terminal formatting.
-     *
-     * @since 0.0.1
      */
     private static final String RESET_ESCAPE_SEQUENCE = "\033[0m";
 
     /**
      * ANSI-formatted {@code [INFO]} label used for reporting.
-     *
-     * @since 0.0.1
      */
     protected final String INFO = "[" + "\033[1;34m" + "INFO" + "\033[0m" + "]";
 
     /**
      * ANSI-formatted {@code TEST} label.
-     *
-     * @since 0.0.1
      */
     protected final String TEST = "\033[1;37m" + "TEST" + RESET_ESCAPE_SEQUENCE;
 
     /**
      * ANSI-formatted {@code PASS} label.
-     *
-     * @since 0.0.1
      */
     protected final String PASS = "\033[1;32m" + "PASS" + RESET_ESCAPE_SEQUENCE;
 
     /**
      * ANSI-formatted {@code FAIL} label.
-     *
-     * @since 0.0.1
      */
     protected final String FAIL = "\033[1;31m" + "FAIL" + RESET_ESCAPE_SEQUENCE;
 
     /**
      * Global execution summary for the current engine run.
-     *
-     * @since 0.0.1
      */
     protected static final ExecutionSummary EXECUTION_SUMMARY = new ExecutionSummary();
 
@@ -201,71 +189,51 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Number of test classes that pass.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testClassPassed = new AtomicInteger(0);
 
         /**
          * Number of test classes that fail.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testClassFailed = new AtomicInteger(0);
 
         /**
          * Number of test classes that are skipped or aborted.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testClassSkipped = new AtomicInteger(0);
 
         /**
          * Number of argument buckets that pass.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testArgumentPassed = new AtomicInteger(0);
 
         /**
          * Number of argument buckets that fail.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testArgumentFailed = new AtomicInteger(0);
 
         /**
          * Number of argument buckets that are skipped or aborted.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testArgumentSkipped = new AtomicInteger(0);
 
         /**
          * Number of test method invocations that pass.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testMethodPassed = new AtomicInteger(0);
 
         /**
          * Number of test method invocations that fail.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testMethodFailed = new AtomicInteger(0);
 
         /**
          * Number of test method invocations that are skipped or aborted.
-         *
-         * @since 0.0.1
          */
         private final AtomicInteger testMethodSkipped = new AtomicInteger(0);
 
         /**
          * Per-class pass and fail counters keyed by class display name.
-         *
-         * @since 0.0.1
          */
         private final ConcurrentHashMap<String, ClassStats> classStatsMap = new ConcurrentHashMap<>();
 
@@ -273,22 +241,16 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Most recently started class display name.
          *
          * <p>This value is {@code volatile} for safe publication across threads.
-         *
-         * @since 0.0.1
          */
         private volatile String currentClassName;
 
         /**
          * Per-class argument bucket count keyed by class display name.
-         *
-         * @since 0.0.1
          */
         private final ConcurrentHashMap<String, AtomicInteger> classArgumentCounts = new ConcurrentHashMap<>();
 
         /**
          * Per-class method count keyed by class display name.
-         *
-         * @since 0.0.1
          */
         private final ConcurrentHashMap<String, AtomicInteger> classMethodCounts = new ConcurrentHashMap<>();
 
@@ -597,22 +559,16 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
             /**
              * Class display name; immutable.
-             *
-             * @since 0.0.1
              */
             final String className;
 
             /**
              * Passed method count for this class; mutable and thread-safe.
-             *
-             * @since 0.0.1
              */
             final AtomicInteger passed = new AtomicInteger(0);
 
             /**
              * Failed method count for this class; mutable and thread-safe.
-             *
-             * @since 0.0.1
              */
             final AtomicInteger failed = new AtomicInteger(0);
 

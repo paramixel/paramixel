@@ -82,7 +82,7 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         engineListener.executionFinished(engine, TestExecutionResult.successful());
 
         final String output = out.toString();
-        assertThat(output).contains("Paramixel Test Execution Report");
+        assertThat(output).contains("Paramixel Test Summary");
         assertThat(output).contains("Classes tested");
     }
 

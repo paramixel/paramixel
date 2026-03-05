@@ -46,8 +46,6 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Test class represented by this descriptor.
-     *
-     * @since 0.0.1
      */
     private final Class<?> testClass;
 
@@ -56,8 +54,6 @@ public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
      *
      * <p>Configured by {@code ArgumentsCollector#setParallelism(int)} when
      * the argument supplier uses the context-driven pattern.
-     *
-     * @since 0.0.1
      */
     private int argumentParallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
 

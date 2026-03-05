@@ -37,7 +37,7 @@ and places sources under `benchmarks/src/main/java` to support JMH discovery/exe
 | Listeners | `Paramixel` prefix + subject + `Listener` | `ParamixelEngineExecutionListener` |
 | Abstract listener base | `Abstract` prefix + noun | `AbstractEngineExecutionListener` |
 | Validators | Subject + `Validator` | `MethodValidator` |
-| Utilities | Subject + utility purpose | `FastId` |
+| Utilities | Subject + utility purpose | `FastIdUtil` |
 | Maven Mojo | Subject + `Mojo` | `ParamixelMojo` |
 | Test engine entry point | `Paramixel` + `TestEngine` | `ParamixelTestEngine` |
 | Example test classes | `<Scenario>Test` | `ParallelArgumentTest`, `KafkaTest` |
@@ -133,14 +133,21 @@ In test sources (`*/src/test/java/**`), Javadoc is optional.
   - `@param` for every parameter
   - `@return` for every non-void method
   - `@throws` for every exception the method/constructor explicitly throws (checked or unchecked)
+  - Field Javadoc MUST NOT use `@param` or `@return`.
+  - Constructor Javadoc MUST NOT use `@return`.
 - **Tags:**
   - `@author` MUST appear only on type-level Javadoc for a `class`, `interface`, or `enum`.
     It MUST NOT be used on record or annotation Javadoc, and it MUST NOT be used on field, method, or constructor Javadoc.
   - `@author` MUST include the git user's name and email address in the form:
     `@author Full Name <email@domain>`
-  - `@since` MUST be included on every Javadoc block (types, fields, methods, and constructors).
+  - `@since` MUST be included on every type, method, and constructor Javadoc block.
+  - `@since` MUST NOT appear on field (member variable) Javadoc blocks.
 - **Tone:** Use a consistent, professional tone. Use complete sentences; avoid conversational phrasing.
 - **Format:** Javadoc MUST use block (multi-line) format. Inline (single-line) Javadoc such as `/** ... */` on one line MUST NOT be used.
+- **Trailing lines:** Javadoc blocks MUST NOT contain an effective empty line immediately before the closing `*/`.
+  The final `*` line in a Javadoc block MUST contain non-whitespace content (prose or an `@` tag).
+- **Placement:** Javadoc MUST appear only immediately preceding a type, field, method, or constructor declaration.
+  It MUST NOT appear inside method bodies, inside argument lists, or between tokens in an expression.
 - **Spacing:** In any Javadoc block that contains both prose content and `@` tags, there MUST be a blank `*` line between the prose content and the first `@`-tagged line.
 
 Example:

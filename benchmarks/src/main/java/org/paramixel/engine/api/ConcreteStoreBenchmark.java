@@ -58,26 +58,18 @@ public class ConcreteStoreBenchmark {
 
     /**
      * Stores the store.
-     *
-     * @since 0.0.1
      */
     private ConcreteStore store;
     /**
      * Stores the TEST_KEY.
-     *
-     * @since 0.0.1
      */
     private static final String TEST_KEY = "test-key";
     /**
      * Stores the TEST_VALUE.
-     *
-     * @since 0.0.1
      */
     private static final String TEST_VALUE = "test-value";
     /**
      * Stores the PREPOPULATE_SIZE.
-     *
-     * @since 0.0.1
      */
     private static final int PREPOPULATE_SIZE = 1000;
 
@@ -121,11 +113,6 @@ public class ConcreteStoreBenchmark {
      */
     @Benchmark
     public void putTypedOperation(final Blackhole blackhole) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final String previous = store.put(TEST_KEY, String.class, TEST_VALUE);
         blackhole.consume(previous);
     }
@@ -152,11 +139,6 @@ public class ConcreteStoreBenchmark {
     @Benchmark
     public void getTypedExistingKey(final Blackhole blackhole) {
         store.put(TEST_KEY, TEST_VALUE);
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final String value = store.get(TEST_KEY, String.class);
         blackhole.consume(value);
     }
@@ -196,11 +178,6 @@ public class ConcreteStoreBenchmark {
     @Benchmark
     public void removeTypedOperation(final Blackhole blackhole) {
         store.put(TEST_KEY, TEST_VALUE);
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final String removed = store.remove(TEST_KEY, String.class);
         blackhole.consume(removed);
     }

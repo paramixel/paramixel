@@ -35,8 +35,6 @@ public class ParamixelTestMethodDescriptorEngineExecutionListener extends Abstra
 
     /**
      * Printer used for reporting method-level execution status.
-     *
-     * @since 0.0.1
      */
     private final Consumer<String> printer;
 

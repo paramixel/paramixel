@@ -51,8 +51,8 @@ package org.paramixel.api;
  * public class ParameterizedTests {
  *
  *     @Paramixel.ArgumentsCollector
- *     public static List<String> arguments() {
- *         return Arrays.asList("input1", "input2", "input3");
+ *     public static void arguments(final ArgumentsCollector collector) {
+ *         collector.addArguments("input1", "input2", "input3");
  *     }
  *
  *     @Paramixel.Test

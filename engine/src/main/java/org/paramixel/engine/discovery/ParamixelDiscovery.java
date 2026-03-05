@@ -22,7 +22,6 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,7 +32,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.commons.util.ClassLoaderUtils;
 import org.junit.platform.engine.EngineDiscoveryRequest;
@@ -107,47 +105,31 @@ public final class ParamixelDiscovery {
 
     /**
      * Logger for discovery events and validation warnings.
-     *
-     * @since 0.0.1
      */
     private static final Logger LOGGER = Logger.getLogger(ParamixelDiscovery.class.getName());
 
     /**
      * Unique ID segment for the engine root.
-     *
-     * @since 0.0.1
      */
     private static final String ENGINE_ID_SEGMENT = "paramixel";
 
     /**
      * Unique ID segment name for class descriptors.
-     *
-     * @since 0.0.1
      */
     private static final String CLASS_SEGMENT = "class";
 
     /**
      * Unique ID segment name for argument descriptors.
-     *
-     * @since 0.0.1
      */
     private static final String ARGUMENT_SEGMENT = "argument";
 
     /**
      * Unique ID segment name for method descriptors.
-     *
-     * @since 0.0.1
      */
     private static final String METHOD_SEGMENT = "method";
 
     /**
-     * Performs ConcreteEngineContext.
-     *
-     * @param ENGINE_ID_SEGMENT the ENGINE_ID_SEGMENT
-     * @param Properties() the Properties()
-     * @param 1 the 1
-     * @return the result
-     * @since 0.0.1
+     * Minimal engine context used during discovery-time operations.
      */
     private static final EngineContext DISCOVERY_ENGINE_CONTEXT =
             new ConcreteEngineContext(ENGINE_ID_SEGMENT, new Properties(), 1);
@@ -176,11 +158,6 @@ public final class ParamixelDiscovery {
             } else {
                 // Fail-fast: report first error immediately
                 final ValidationFailure firstFailure = failures.get(0);
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 LOGGER.warning("Validation failed for test class: " + testClass.getName());
                 LOGGER.warning("  - " + firstFailure.getMessage());
                 throw new IllegalStateException(firstFailure.getMessage());
@@ -214,17 +191,7 @@ public final class ParamixelDiscovery {
      */
     private List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
         if (isDisabled(testClass)) {
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             final Paramixel.Disabled disabled = testClass.getAnnotation(Paramixel.Disabled.class);
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             LOGGER.fine("Skipping disabled test class: " + testClass.getName()
                     + (disabled.value().isEmpty() ? "" : " - " + disabled.value()));
             return List.of();
@@ -254,112 +221,57 @@ public final class ParamixelDiscovery {
         final Set<Class<?>> testClasses = new LinkedHashSet<>();
 
         // Handle ClassSelector - direct class selection
-        /**
-         * Provides type.
-         *
-         * @since 0.0.1
-         */
         for (ClassSelector selector : request.getSelectorsByType(ClassSelector.class)) {
             final Class<?> clazz = selector.getJavaClass();
             if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                 testClasses.add(clazz);
-                /**
-                 * Provides from.
-                 *
-                 * @since 0.0.1
-                 */
                 LOGGER.fine("Added class from ClassSelector: " + clazz.getName());
             }
         }
 
         // Handle MethodSelector - select class containing the method
-        /**
-         * Provides type.
-         *
-         * @since 0.0.1
-         */
         for (MethodSelector selector : request.getSelectorsByType(MethodSelector.class)) {
             final Class<?> clazz = selector.getJavaClass();
             if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                 testClasses.add(clazz);
-                /**
-                 * Provides from.
-                 *
-                 * @since 0.0.1
-                 */
                 LOGGER.fine("Added class from MethodSelector: " + clazz.getName());
             }
         }
 
         // Handle PackageSelector - all classes in a package
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         for (PackageSelector selector : request.getSelectorsByType(PackageSelector.class)) {
             final String packageName = selector.getPackageName();
             final Set<Class<?>> classesInPackage = findClassesInPackage(packageName);
             for (Class<?> clazz : classesInPackage) {
                 if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                     testClasses.add(clazz);
-                    /**
-                     * Provides from.
-                     *
-                     * @since 0.0.1
-                     */
                     LOGGER.fine("Added class from PackageSelector: " + clazz.getName());
                 }
             }
         }
 
         // Handle ClasspathRootSelector - all classes in a classpath root
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         for (ClasspathRootSelector selector : request.getSelectorsByType(ClasspathRootSelector.class)) {
             final URI classpathRoot = selector.getClasspathRoot();
             final Set<Class<?>> classesInRoot = findClassesInClasspathRoot(classpathRoot);
             for (Class<?> clazz : classesInRoot) {
                 if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                     testClasses.add(clazz);
-                    /**
-                     * Provides from.
-                     *
-                     * @since 0.0.1
-                     */
                     LOGGER.fine("Added class from ClasspathRootSelector: " + clazz.getName());
                 }
             }
         }
 
         // Handle NestedClassSelector - nested classes
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         for (NestedClassSelector selector : request.getSelectorsByType(NestedClassSelector.class)) {
             final Class<?> clazz = selector.getNestedClass();
             if (isParamixelTestClass(clazz) && classFilter.test(clazz.getName())) {
                 testClasses.add(clazz);
-                /**
-                 * Provides from.
-                 *
-                 * @since 0.0.1
-                 */
                 LOGGER.fine("Added class from NestedClassSelector: " + clazz.getName());
             }
         }
 
         // Handle UniqueIdSelector - select tests by unique ID
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         for (UniqueIdSelector selector : request.getSelectorsByType(UniqueIdSelector.class)) {
             final UniqueId uniqueId = selector.getUniqueId();
             final String className = extractClassNameFromUniqueId(uniqueId);
@@ -369,26 +281,11 @@ public final class ParamixelDiscovery {
                     final Class<?> clazz = classLoader.loadClass(className);
                     if (isParamixelTestClass(clazz)) {
                         testClasses.add(clazz);
-                        /**
-                         * Provides from.
-                         *
-                         * @since 0.0.1
-                         */
                         LOGGER.fine("Added class from UniqueIdSelector: " + className);
                     }
                 } catch (ClassNotFoundException e) {
-                    /**
-                     * Provides from.
-                     *
-                     * @since 0.0.1
-                     */
                     LOGGER.log(Level.WARNING, "Could not load class from UniqueIdSelector: " + className);
                 } catch (Exception e) {
-                    /**
-                     * Provides from.
-                     *
-                     * @since 0.0.1
-                     */
                     LOGGER.log(Level.WARNING, "Error loading class from UniqueIdSelector: " + className, e);
                 }
             }
@@ -408,11 +305,6 @@ public final class ParamixelDiscovery {
         final List<Predicate<String>> filters = new ArrayList<>();
 
         // Class name filter
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<ClassNameFilter> classNameFilters = request.getFiltersByType(ClassNameFilter.class);
         if (!classNameFilters.isEmpty()) {
             filters.add(className -> {
@@ -426,11 +318,6 @@ public final class ParamixelDiscovery {
         }
 
         // Package name filter
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final List<PackageNameFilter> packageNameFilters = request.getFiltersByType(PackageNameFilter.class);
         if (!packageNameFilters.isEmpty()) {
             filters.add(className -> {
@@ -466,11 +353,6 @@ public final class ParamixelDiscovery {
      * @since 0.0.1
      */
     private boolean isParamixelTestClass(final @NonNull Class<?> clazz) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         return clazz.isAnnotationPresent(Paramixel.TestClass.class);
     }
 
@@ -522,11 +404,6 @@ public final class ParamixelDiscovery {
                 } else {
                     findClassesInDirectory(file, packageName + "." + file.getName(), classes);
                 }
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
             } else if (file.getName().endsWith(".class")) {
                 final String className = packageName + "."
                         + file.getName().substring(0, file.getName().length() - 6);
@@ -535,18 +412,8 @@ public final class ParamixelDiscovery {
                     final Class<?> clazz = classLoader.loadClass(className);
                     classes.add(clazz);
                 } catch (ClassNotFoundException e) {
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     LOGGER.log(Level.WARNING, "Could not load class: " + className);
                 } catch (Exception e) {
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     LOGGER.log(Level.WARNING, "Error loading class: " + className, e);
                 }
             }
@@ -592,12 +459,6 @@ public final class ParamixelDiscovery {
         engineDescriptor.addChild(classDescriptor);
 
         discoverTestMethods(testClass, classDescriptor);
-
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         LOGGER.fine("Discovered test class: " + testClass.getName());
     }
 
@@ -616,11 +477,6 @@ public final class ParamixelDiscovery {
                 Comparator.comparingInt(ParamixelDiscovery::getOrderValue).thenComparing(Method::getName));
 
         if (testMethods.isEmpty()) {
-            /**
-             * Provides this type.
-             *
-             * @since 0.0.1
-             */
             LOGGER.fine("No enabled test methods found in class: " + testClass.getName());
             return;
         }
@@ -672,19 +528,9 @@ public final class ParamixelDiscovery {
         final Map<String, Method> bySignature = new LinkedHashMap<>();
 
         for (Class<?> current = testClass;
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             for (Method method : current.getDeclaredMethods()) {
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 if (!method.isAnnotationPresent(Paramixel.Test.class)) {
                     continue;
                 }
@@ -736,19 +582,9 @@ public final class ParamixelDiscovery {
         final List<Method> ignored = new ArrayList<>();
 
         for (Class<?> current = testClass;
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 current != null && current != Object.class;
                 current = current.getSuperclass()) {
             for (Method method : current.getDeclaredMethods()) {
-                /**
-                 * Provides this type.
-                 *
-                 * @since 0.0.1
-                 */
                 if (!method.isAnnotationPresent(Paramixel.ArgumentsCollector.class)) {
                     continue;
                 }
@@ -772,70 +608,25 @@ public final class ParamixelDiscovery {
         }
 
         try {
-            /**
-             * Performs if.
-             *
-             * @param selected.getReturnType().equals(void.class) the selected.getReturnType().equals(void.class)
-             * @return the result
-             * @since 0.0.1
-             */
             // Collector-driven: public static void arguments(ArgumentsCollector collector)
             if (selected.getParameterCount() == 1
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     && selected.getParameterTypes()[0].equals(ArgumentsCollector.class)
-                    /**
-                     * Provides this type.
-                     *
-                     * @since 0.0.1
-                     */
                     && selected.getReturnType().equals(void.class)) {
                 final ConcreteArgumentsCollector collector = new ConcreteArgumentsCollector(DISCOVERY_ENGINE_CONTEXT);
                 ParamixelReflectionInvoker.invokeStatic(selected, collector);
                 return new SupplierArguments(collector.toArray(), collector.getParallelism());
             }
 
-            /**
-             * Performs if.
-             *
-             * @param 0 the 0
-             * @return the result
-             * @since 0.0.1
-             */
-            // Return-based supplier: public static <ReturnType> arguments()
-            if (selected.getParameterCount() == 0) {
-                final Object result = ParamixelReflectionInvoker.invokeStatic(selected);
-                if (result == null) {
-                    return SupplierArguments.empty();
-                }
-                if (result instanceof Stream) {
-                    return new SupplierArguments(((Stream<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
-                }
-                if (result instanceof Collection) {
-                    return new SupplierArguments(
-                            ((Collection<?>) result).toArray(), SupplierArguments.DEFAULT_PARALLELISM);
-                }
-                if (result instanceof Iterable) {
-                    final List<Object> list = new ArrayList<>();
-                    for (Object item : (Iterable<?>) result) {
-                        list.add(item);
-                    }
-                    return new SupplierArguments(list.toArray(), SupplierArguments.DEFAULT_PARALLELISM);
-                }
-                if (result instanceof Object[]) {
-                    return new SupplierArguments((Object[]) result, SupplierArguments.DEFAULT_PARALLELISM);
-                }
-                return new SupplierArguments(new Object[] {result}, SupplierArguments.DEFAULT_PARALLELISM);
-            }
-
-            LOGGER.warning("Invalid @Paramixel.ArgumentsCollector method signature: " + selected);
-            return SupplierArguments.empty();
+            throw new IllegalStateException("Invalid @Paramixel.ArgumentsCollector method signature: "
+                    + selected.getDeclaringClass().getName() + "#" + selected.getName()
+                    + " (expected: public static void methodName(ArgumentsCollector))");
         } catch (Throwable t) {
-            LOGGER.log(Level.WARNING, "Failed to invoke arguments collector: " + selected.getName(), t);
-            return SupplierArguments.empty();
+            LOGGER.log(
+                    Level.WARNING, "Failed to invoke @Paramixel.ArgumentsCollector method: " + selected.getName(), t);
+            throw new IllegalStateException(
+                    "Failed to invoke @Paramixel.ArgumentsCollector method: "
+                            + selected.getDeclaringClass().getName() + "#" + selected.getName(),
+                    t);
         }
     }
 
@@ -851,20 +642,15 @@ public final class ParamixelDiscovery {
     private static final class SupplierArguments {
 
         /**
-         * Performs Math.max.
+         * Default parallelism when argument supplier does not specify one.
          *
-         * @param 1 the 1
-         * @param Runtime.getRuntime().availableProcessors() the Runtime.getRuntime().availableProcessors()
-         * @return the result
-         * @since 0.0.1
+         * <p>The value is always {@code >= 1}.
          */
         private static final int DEFAULT_PARALLELISM =
                 Math.max(1, Runtime.getRuntime().availableProcessors());
 
         /**
          * Collected argument values in iteration order; never {@code null}.
-         *
-         * @since 0.0.1
          */
         private final Object[] arguments;
 
@@ -872,8 +658,6 @@ public final class ParamixelDiscovery {
          * Resolved parallelism for the test class.
          *
          * <p>The value is always {@code >= 1}.
-         *
-         * @since 0.0.1
          */
         private final int parallelism;
 
@@ -882,7 +666,6 @@ public final class ParamixelDiscovery {
          *
          * @param arguments the collected arguments; never {@code null}
          * @param parallelism the resolved parallelism; must be {@code >= 1}
-         * @return the result
          * @since 0.0.1
          */
         private SupplierArguments(final Object[] arguments, final int parallelism) {
@@ -925,11 +708,6 @@ public final class ParamixelDiscovery {
      * @since 0.0.1
      */
     private String getDisplayName(final @NonNull AnnotatedElement annotated, final @NonNull String defaultName) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final Paramixel.DisplayName displayNameAnnotation = annotated.getAnnotation(Paramixel.DisplayName.class);
         if (displayNameAnnotation != null) {
             final String name = displayNameAnnotation.value();
@@ -948,11 +726,6 @@ public final class ParamixelDiscovery {
      * @since 0.0.1
      */
     private boolean isDisabled(final @NonNull AnnotatedElement annotated) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         return annotated.isAnnotationPresent(Paramixel.Disabled.class);
     }
 
@@ -990,11 +763,6 @@ public final class ParamixelDiscovery {
      * @since 0.0.1
      */
     private static int getOrderValue(final Method method) {
-        /**
-         * Provides this type.
-         *
-         * @since 0.0.1
-         */
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
         if (order == null) {
             return Integer.MAX_VALUE;

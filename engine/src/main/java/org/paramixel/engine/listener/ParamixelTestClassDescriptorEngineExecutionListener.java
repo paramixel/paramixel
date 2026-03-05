@@ -34,8 +34,6 @@ public class ParamixelTestClassDescriptorEngineExecutionListener extends Abstrac
 
     /**
      * Printer used for reporting class-level execution status.
-     *
-     * @since 0.0.1
      */
     private final Consumer<String> printer;
 
@@ -43,7 +41,6 @@ public class ParamixelTestClassDescriptorEngineExecutionListener extends Abstrac
      * Creates a listener for class descriptors.
      *
      * @param printer the printer to receive output lines; never {@code null}
-     * @return the result
      * @since 0.0.1
      */
     public ParamixelTestClassDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {

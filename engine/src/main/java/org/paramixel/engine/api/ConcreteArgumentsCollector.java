@@ -42,8 +42,6 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
 
     /**
      * Parent engine context associated with the supplier; immutable.
-     *
-     * @since 0.0.1
      */
     private final EngineContext engineContext;
 
@@ -51,8 +49,6 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * Collected argument values.
      *
      * <p>This list is mutable and preserves insertion order.
-     *
-     * @since 0.0.1
      */
     private final List<Object> arguments = new ArrayList<>();
 
@@ -60,8 +56,6 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * Configured per-class parallelism.
      *
      * <p>The value is mutable and is initialized to {@code max(1, availableProcessors)}.
-     *
-     * @since 0.0.1
      */
     private int parallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
 
@@ -69,7 +63,6 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * Creates a new supplier context.
      *
      * @param engineContext the engine context associated with the class; never {@code null}
-     * @return the result
      * @since 0.0.1
      */
     public ConcreteArgumentsCollector(final @NonNull EngineContext engineContext) {

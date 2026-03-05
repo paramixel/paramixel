@@ -11,7 +11,7 @@ Paramixel is a custom JUnit Platform test engine designed for **parallel, parame
 | Module name (artifactId) | Packaging | Responsibility | Depends on |
 |---|---|---|---|
 | `paramixel-api` | `jar` | Public annotation and context API consumed by test authors | `junit-platform-commons` |
-| `paramixel-engine` | `jar` | JUnit Platform `TestEngine` implementation: discovery, scheduling, execution | `paramixel-api`, `junit-platform-engine`, `junit-platform-launcher`, `junit-jupiter`, `slf4j-api`, `ascii-table` |
+| `paramixel-engine` | `jar` | JUnit Platform `TestEngine` implementation: discovery, scheduling, execution | `paramixel-api`, `junit-platform-engine`, `junit-platform-launcher`, `junit-jupiter` (test), `slf4j-api`, `ascii-table` |
 | `paramixel-maven-plugin` | `maven-plugin` | Maven Mojo that discovers `@Paramixel.TestClass` classes and fires the engine via the JUnit Platform Launcher | `paramixel-api`, `paramixel-engine`, `junit-platform-launcher`, `maven-plugin-api`, `maven-core`, `maven-artifact`, `maven-resolver-impl` |
 | `paramixel-tests` | `jar` | Functional/integration tests that exercise the engine using the `paramixel-maven-plugin` goal | `paramixel-api` (test), `paramixel-engine` (test) |
 | `paramixel-examples` | `jar` | Demonstrative test classes showing API usage, including Testcontainers-based integration examples | `paramixel-api` (test), `paramixel-engine` (test), `testcontainers`, `kafka-clients`, `mongodb-driver-sync` |
@@ -67,7 +67,7 @@ paramixel/
 │   │   ├── execution/      Runners + concurrency primitives
 │   │   ├── invoker/        Reflective method invoker
 │   │   ├── listener/       Execution event listeners / reporters
-│   │   ├── util/           FastId generator
+│   │   ├── util/           FastIdUtil generator
 │   │   └── validation/     Method signature validator
 │   └── src/main/resources/
 │       ├── META-INF/services/org.junit.platform.engine.TestEngine  (SPI registration)

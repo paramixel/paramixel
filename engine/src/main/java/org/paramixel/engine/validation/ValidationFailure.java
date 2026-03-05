@@ -29,8 +29,6 @@ public final class ValidationFailure {
 
     /**
      * Human-readable validation failure message; immutable.
-     *
-     * @since 0.0.1
      */
     private final String message;
 

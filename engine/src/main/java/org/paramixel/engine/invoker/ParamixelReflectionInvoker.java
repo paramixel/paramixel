@@ -45,8 +45,6 @@ public final class ParamixelReflectionInvoker {
      * Cache tracking which methods have been made accessible.
      *
      * <p>The values are unused and exist only to indicate presence.
-     *
-     * @since 0.0.1
      */
     private static final ConcurrentHashMap<Method, Boolean> ACCESSIBLE_CACHE = new ConcurrentHashMap<>();
 

@@ -111,32 +111,13 @@ public class MethodValidatorTest {
     }
 
     @Test
-    public void validateTestClass_reportsPrimitiveReturnTypeForArgumentsCollector() {
-        final List<String> messages = MethodValidator.validateTestClass(PrimitiveReturnCollector.class).stream()
+    public void validateTestClass_rejectsReturnBasedArgumentsCollector() {
+        final List<String> messages = MethodValidator.validateTestClass(ReturnBasedCollector.class).stream()
                 .map(ValidationFailure::getMessage)
                 .collect(Collectors.toList());
 
-        assertThat(messages).anySatisfy(m -> assertThat(m)
-                .contains("Invalid @Paramixel.ArgumentsCollector return type (primitive)"));
-    }
-
-    @Test
-    public void validateTestClass_reportsPrimitiveArrayReturnTypeForArgumentsCollector() {
-        final List<String> messages = MethodValidator.validateTestClass(PrimitiveArrayReturnCollector.class).stream()
-                .map(ValidationFailure::getMessage)
-                .collect(Collectors.toList());
-
-        assertThat(messages).anySatisfy(m -> assertThat(m)
-                .contains("Invalid @Paramixel.ArgumentsCollector return type (primitive array)"));
-    }
-
-    @Test
-    public void validateTestClass_acceptsObjectArrayReturnTypeForArgumentsCollector() {
-        final List<String> messages = MethodValidator.validateTestClass(ObjectArrayReturnCollector.class).stream()
-                .map(ValidationFailure::getMessage)
-                .collect(Collectors.toList());
-
-        assertThat(messages).isEmpty();
+        assertThat(messages)
+                .anySatisfy(m -> assertThat(m).contains("Invalid @Paramixel.ArgumentsCollector method signature"));
     }
 
     static class BadTestMethods {
@@ -249,23 +230,7 @@ public class MethodValidatorTest {
         }
     }
 
-    static class PrimitiveReturnCollector {
-
-        @Paramixel.ArgumentsCollector
-        public static int arguments() {
-            return 42;
-        }
-    }
-
-    static class PrimitiveArrayReturnCollector {
-
-        @Paramixel.ArgumentsCollector
-        public static int[] arguments() {
-            return new int[0];
-        }
-    }
-
-    static class ObjectArrayReturnCollector {
+    static class ReturnBasedCollector {
 
         @Paramixel.ArgumentsCollector
         public static Object[] arguments() {
