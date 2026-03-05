@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
@@ -78,9 +79,9 @@ public abstract class AbstractParamixelDescriptor implements TestDescriptor {
      */
     protected AbstractParamixelDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull String displayName, final @NonNull Type type) {
-        this.uniqueId = uniqueId;
-        this.displayName = displayName;
-        this.type = type;
+        this.uniqueId = Objects.requireNonNull(uniqueId, "uniqueId must not be null");
+        this.displayName = Objects.requireNonNull(displayName, "displayName must not be null");
+        this.type = Objects.requireNonNull(type, "type must not be null");
     }
 
     @Override

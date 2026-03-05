@@ -198,7 +198,7 @@ public class BufstreamTestEnvironment implements Named {
      * @param HOST_KAFKA_PORT the kafka port
      * @return the configuration
      */
-    private String buildConfiguration(final @NonNull int HOST_KAFKA_PORT) {
+    private String buildConfiguration(final int HOST_KAFKA_PORT) {
         if (dockerImageName.contains("0.3.")) {
             return new TextBlock()
                     .line("kafka:")
@@ -233,8 +233,8 @@ public class BufstreamTestEnvironment implements Named {
      */
     private static void bindHostPorts(
             final @NonNull CreateContainerCmd createContainerCmd,
-            final @NonNull int HOST_KAFKA_PORT,
-            final @NonNull int HOST_ADMIN_PORT) {
+            final int HOST_KAFKA_PORT,
+            final int HOST_ADMIN_PORT) {
         Ports bindings = new Ports();
         bindings.bind(ExposedPort.tcp(9092), Ports.Binding.bindPort(HOST_KAFKA_PORT));
         bindings.bind(ExposedPort.tcp(9089), Ports.Binding.bindPort(HOST_ADMIN_PORT));

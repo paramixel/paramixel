@@ -17,6 +17,7 @@
 package org.paramixel.engine.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
@@ -94,6 +95,26 @@ public class TagFilterFactoryTest {
 
         assertThat(filter.hasIncludePatterns()).isFalse();
         assertThat(filter.matches(TestClassWithTags.class)).isTrue();
+    }
+
+    @Test
+    public void fromProperties_invalidIncludePattern_throws() {
+        Properties props = new Properties();
+        props.setProperty("paramixel.tags.include", "integration[");
+
+        assertThatThrownBy(() -> TagFilterFactory.fromProperties(props))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("paramixel.tags.include");
+    }
+
+    @Test
+    public void fromProperties_invalidExcludePattern_throws() {
+        Properties props = new Properties();
+        props.setProperty("paramixel.tags.exclude", "slow(");
+
+        assertThatThrownBy(() -> TagFilterFactory.fromProperties(props))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("paramixel.tags.exclude");
     }
 
     // Test classes

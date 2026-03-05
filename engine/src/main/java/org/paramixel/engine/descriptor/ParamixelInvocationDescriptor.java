@@ -17,6 +17,7 @@
 package org.paramixel.engine.descriptor;
 
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.TestDescriptor;
@@ -49,7 +50,7 @@ import org.junit.platform.engine.UniqueId;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
+public final class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Zero-based index of this invocation.
@@ -70,8 +71,11 @@ public class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
      * @since 0.0.1
      */
     public ParamixelInvocationDescriptor(
-            final @NonNull UniqueId uniqueId, final @NonNull int invocationIndex, final @NonNull Object argument) {
-        super(uniqueId, "invocation:" + invocationIndex, Type.TEST);
+            final @NonNull UniqueId uniqueId, final int invocationIndex, final Object argument) {
+        super(
+                Objects.requireNonNull(uniqueId, "uniqueId must not be null"),
+                "invocation:" + invocationIndex,
+                Type.TEST);
         this.invocationIndex = invocationIndex;
         this.argument = argument;
     }

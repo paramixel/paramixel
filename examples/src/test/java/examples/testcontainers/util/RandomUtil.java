@@ -17,7 +17,6 @@
 package examples.testcontainers.util;
 
 import java.util.concurrent.ThreadLocalRandom;
-import org.jspecify.annotations.NonNull;
 
 /**
  * Fast ID generator for alphanumeric strings.
@@ -95,7 +94,7 @@ public final class RandomUtil {
      * @return a random alphanumeric ID of the specified length
      * @throws IllegalArgumentException if length is not positive
      */
-    public static String getRandomString(final @NonNull int length) {
+    public static String getRandomString(final int length) {
         if (length <= 0) {
             throw new IllegalArgumentException("Length must be positive, got: " + length);
         }

@@ -18,6 +18,7 @@ package org.paramixel.engine.descriptor;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
@@ -35,7 +36,7 @@ import org.junit.platform.engine.UniqueId;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelEngineDescriptor implements TestDescriptor {
+public final class ParamixelEngineDescriptor implements TestDescriptor {
 
     /**
      * Unique identifier for the engine descriptor.
@@ -60,8 +61,8 @@ public class ParamixelEngineDescriptor implements TestDescriptor {
      * @since 0.0.1
      */
     public ParamixelEngineDescriptor(final @NonNull UniqueId uniqueId, final @NonNull String displayName) {
-        this.uniqueId = uniqueId;
-        this.displayName = displayName;
+        this.uniqueId = Objects.requireNonNull(uniqueId, "uniqueId must not be null");
+        this.displayName = Objects.requireNonNull(displayName, "displayName must not be null");
     }
 
     @Override

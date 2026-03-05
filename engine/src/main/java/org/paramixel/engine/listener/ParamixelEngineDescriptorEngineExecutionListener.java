@@ -39,7 +39,7 @@ import org.paramixel.engine.util.DurationUtils;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
+public final class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
     /**
      * Printer used for emitting the execution report.
@@ -193,7 +193,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      * @param args format arguments; may be empty
      * @since 0.0.1
      */
-    private void printLine(final @NonNull String format, Object... args) {
+    private void printLine(final @NonNull String format, final Object... args) {
         printer.accept(String.format(format, args));
     }
 
@@ -203,7 +203,7 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      * @param classWidth the class column width in characters; must be {@code >= 0}
      * @since 0.0.1
      */
-    private void printSeparatorLine(int classWidth) {
+    private void printSeparatorLine(final int classWidth) {
         StringBuilder sep = new StringBuilder();
         sep.append("+");
         // Class column: width + 2 (for spaces)
@@ -252,13 +252,13 @@ public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEn
      * @since 0.0.1
      */
     private void printTableRow(
-            int classWidth,
-            String className,
-            String args,
-            String methods,
-            String passed,
-            String failed,
-            String status) {
+            final int classWidth,
+            final String className,
+            final String args,
+            final String methods,
+            final String passed,
+            final String failed,
+            final String status) {
         StringBuilder row = new StringBuilder();
         row.append("| ");
 

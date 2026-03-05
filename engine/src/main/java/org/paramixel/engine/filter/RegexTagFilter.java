@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -81,6 +80,8 @@ public final class RegexTagFilter implements TagFilter {
      * @since 0.0.1
      */
     public RegexTagFilter(final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
+        Objects.requireNonNull(includePatterns, "includePatterns must not be null");
+        Objects.requireNonNull(excludePatterns, "excludePatterns must not be null");
         this.includePatterns = compilePatterns(includePatterns, "include");
         this.excludePatterns = compilePatterns(excludePatterns, "exclude");
     }
@@ -104,10 +105,8 @@ public final class RegexTagFilter implements TagFilter {
             try {
                 compiled.add(Pattern.compile(pattern.trim()));
             } catch (PatternSyntaxException e) {
-                LOGGER.log(
-                        Level.WARNING,
-                        "Invalid regex pattern in paramixel.tags." + patternType + ": \"" + pattern + "\"");
-                LOGGER.log(Level.WARNING, "Skipping pattern. Error: " + e.getMessage());
+                throw new IllegalStateException(
+                        "Invalid regex pattern in paramixel.tags." + patternType + ": \"" + pattern + "\"", e);
             }
         }
 
@@ -144,11 +143,6 @@ public final class RegexTagFilter implements TagFilter {
             return false;
         }
 
-        /**
-         * Stores the true.
-         *
-         * @since 0.0.1
-         */
         // No include patterns - class passes (assuming it passed excludes)
         return true;
     }

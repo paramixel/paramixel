@@ -60,8 +60,8 @@ public class ParamixelEngineExecutionListenerTest {
         clazz.addChild(arg);
         arg.addChild(method);
 
-        final ExposingListener listener = new ExposingListener();
-        listener.reset();
+        final ParamixelEngineExecutionListener listener = new ParamixelEngineExecutionListener();
+        listener.resetExecutionSummary();
 
         listener.executionStarted(clazz);
         listener.executionStarted(arg);
@@ -70,7 +70,7 @@ public class ParamixelEngineExecutionListenerTest {
         listener.executionFinished(arg, TestExecutionResult.successful());
         listener.executionFinished(clazz, TestExecutionResult.failed(new RuntimeException("boom")));
 
-        final var summary = listener.summary();
+        final var summary = listener.getExecutionSummary();
         assertThat(summary.getTestClassFailed()).isEqualTo(1);
         assertThat(summary.getTestArgumentPassed()).isEqualTo(1);
         assertThat(summary.getTestMethodPassed()).isEqualTo(1);
@@ -91,15 +91,15 @@ public class ParamixelEngineExecutionListenerTest {
         clazz.addChild(arg);
         arg.addChild(method);
 
-        final ExposingListener listener = new ExposingListener();
-        listener.reset();
+        final ParamixelEngineExecutionListener listener = new ParamixelEngineExecutionListener();
+        listener.resetExecutionSummary();
 
         listener.executionSkipped(method, "reason");
         listener.executionFinished(method, TestExecutionResult.aborted(new RuntimeException("abort")));
         listener.executionSkipped(arg, "reason");
         listener.executionSkipped(clazz, "reason");
 
-        final var summary = listener.summary();
+        final var summary = listener.getExecutionSummary();
         assertThat(summary.getTestMethodSkipped()).isEqualTo(2);
         assertThat(summary.getTestArgumentSkipped()).isEqualTo(1);
         assertThat(summary.getTestClassSkipped()).isEqualTo(1);
@@ -118,14 +118,14 @@ public class ParamixelEngineExecutionListenerTest {
         clazz.addChild(arg);
         arg.addChild(method);
 
-        final ExposingListener listener = new ExposingListener();
-        listener.reset();
+        final ParamixelEngineExecutionListener listener = new ParamixelEngineExecutionListener();
+        listener.resetExecutionSummary();
 
         listener.executionFinished(method, TestExecutionResult.failed(new RuntimeException("method fail")));
         listener.executionFinished(arg, TestExecutionResult.failed(new RuntimeException("arg fail")));
         listener.executionFinished(clazz, TestExecutionResult.successful());
 
-        final var summary = listener.summary();
+        final var summary = listener.getExecutionSummary();
         assertThat(summary.getTestClassPassed()).isEqualTo(1);
         assertThat(summary.getTestArgumentFailed()).isEqualTo(1);
         assertThat(summary.getTestMethodFailed()).isEqualTo(1);
@@ -135,8 +135,8 @@ public class ParamixelEngineExecutionListenerTest {
 
     @Test
     public void unknownDescriptorType_fallsBackToConsoleOutput() {
-        final ExposingListener listener = new ExposingListener();
-        listener.reset();
+        final ParamixelEngineExecutionListener listener = new ParamixelEngineExecutionListener();
+        listener.resetExecutionSummary();
 
         final EngineDescriptor dummy =
                 new EngineDescriptor(UniqueId.forEngine("dummy").append("dummy", "1"), "dummy");
@@ -157,14 +157,14 @@ public class ParamixelEngineExecutionListenerTest {
                 new ParamixelTestMethodDescriptor(arg.getUniqueId().append("method", "m"), m, "M");
         arg.addChild(method);
 
-        final ExposingListener listener = new ExposingListener();
-        listener.reset();
+        final ParamixelEngineExecutionListener listener = new ParamixelEngineExecutionListener();
+        listener.resetExecutionSummary();
 
         listener.executionStarted(arg);
         listener.executionStarted(method);
 
-        assertThat(listener.summary().getClassArgumentCount("C")).isZero();
-        assertThat(listener.summary().getClassMethodCount("C")).isZero();
+        assertThat(listener.getExecutionSummary().getClassArgumentCount("C")).isZero();
+        assertThat(listener.getExecutionSummary().getClassMethodCount("C")).isZero();
     }
 
     @Test
@@ -173,32 +173,25 @@ public class ParamixelEngineExecutionListenerTest {
         final ParamixelTestClassDescriptor clazz =
                 new ParamixelTestClassDescriptor(rootId.append("class", "c"), String.class, "C");
 
-        final ExposingListener listener = new ExposingListener();
-        listener.reset();
+        final ParamixelEngineExecutionListener listener = new ParamixelEngineExecutionListener();
+        listener.resetExecutionSummary();
 
         listener.executionStarted(clazz);
-        assertThat(listener.summary().getCurrentClassName()).isEqualTo("C");
+        assertThat(listener.getExecutionSummary().getCurrentClassName()).isEqualTo("C");
 
         listener.executionFinished(clazz, TestExecutionResult.successful());
-        assertThat(listener.summary().getClassStatsMap().get("C").getTotal()).isEqualTo(1);
+        assertThat(listener.getExecutionSummary().getClassStatsMap().get("C").getTotal())
+                .isEqualTo(1);
 
-        listener.reset();
+        listener.resetExecutionSummary();
         listener.executionFinished(clazz, TestExecutionResult.failed(new RuntimeException("boom")));
-        assertThat(listener.summary().getClassStatsMap().get("C").getTotal()).isEqualTo(1);
+        assertThat(listener.getExecutionSummary().getClassStatsMap().get("C").getTotal())
+                .isEqualTo(1);
     }
 
     private static void dummy() {
         // INTENTIONALLY EMPTY
     }
 
-    private static final class ExposingListener extends ParamixelEngineExecutionListener {
-
-        void reset() {
-            resetExecutionSummary();
-        }
-
-        ExecutionSummary summary() {
-            return getExecutionSummary();
-        }
-    }
+    // No test helper subclass required: protected members are package-accessible here.
 }

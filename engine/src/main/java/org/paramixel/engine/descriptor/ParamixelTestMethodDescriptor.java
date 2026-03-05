@@ -18,6 +18,7 @@ package org.paramixel.engine.descriptor;
 
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
@@ -48,7 +49,7 @@ import org.junit.platform.engine.support.descriptor.MethodSource;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelTestMethodDescriptor extends AbstractParamixelDescriptor {
+public final class ParamixelTestMethodDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Reflected test method represented by this descriptor.
@@ -65,8 +66,11 @@ public class ParamixelTestMethodDescriptor extends AbstractParamixelDescriptor {
      */
     public ParamixelTestMethodDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull Method testMethod, final @NonNull String displayName) {
-        super(uniqueId, displayName, Type.TEST);
-        this.testMethod = testMethod;
+        super(
+                Objects.requireNonNull(uniqueId, "uniqueId must not be null"),
+                Objects.requireNonNull(displayName, "displayName must not be null"),
+                Type.TEST);
+        this.testMethod = Objects.requireNonNull(testMethod, "testMethod must not be null");
     }
 
     /**

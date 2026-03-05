@@ -254,7 +254,7 @@ public class KafkaTestEnvironment implements Named {
      * @return a configured {@link Properties} instance
      */
     private static Properties buildAdminClientProperties(
-            final @NonNull String bootstrapServers, final @NonNull long probeTimeoutMs) {
+            final @NonNull String bootstrapServers, final long probeTimeoutMs) {
         Properties props = new Properties();
         props.put("bootstrap.servers", bootstrapServers);
 

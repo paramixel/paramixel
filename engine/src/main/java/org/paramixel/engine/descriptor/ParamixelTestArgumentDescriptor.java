@@ -16,6 +16,7 @@
 
 package org.paramixel.engine.descriptor;
 
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.TestSource;
@@ -51,7 +52,7 @@ import org.junit.platform.engine.UniqueId;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor {
+public final class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Zero-based index of this argument in the supplier output.
@@ -77,7 +78,10 @@ public class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor
             final int argumentIndex,
             final Object argument,
             final @NonNull String displayName) {
-        super(uniqueId, displayName, Type.CONTAINER);
+        super(
+                Objects.requireNonNull(uniqueId, "uniqueId must not be null"),
+                Objects.requireNonNull(displayName, "displayName must not be null"),
+                Type.CONTAINER);
         this.argumentIndex = argumentIndex;
         this.argument = argument;
     }

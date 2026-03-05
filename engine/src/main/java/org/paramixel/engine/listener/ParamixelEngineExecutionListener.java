@@ -42,7 +42,7 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelEngineExecutionListener extends AbstractEngineExecutionListener {
+public final class ParamixelEngineExecutionListener extends AbstractEngineExecutionListener {
 
     /**
      * Printer used for emitting execution events.
@@ -71,13 +71,23 @@ public class ParamixelEngineExecutionListener extends AbstractEngineExecutionLis
     }
 
     /**
+     * Creates a listener that prints to standard output and delegates to {@code delegate}.
+     *
+     * @param delegate the delegate listener; never {@code null}
+     * @since 0.0.1
+     */
+    public ParamixelEngineExecutionListener(final @NonNull EngineExecutionListener delegate) {
+        this(System.out::println, delegate);
+    }
+
+    /**
      * Creates a listener that prints to the provided printer with a no-op delegate.
      *
      * @param printer the printer to receive output lines; never {@code null}
      * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(final @NonNull Consumer<String> printer) {
-        this(printer, new EngineExecutionListener() {});
+        this(Objects.requireNonNull(printer, "printer must not be null"), new EngineExecutionListener() {});
     }
 
     /**
