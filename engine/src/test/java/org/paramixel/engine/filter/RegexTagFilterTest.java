@@ -17,6 +17,7 @@
 package org.paramixel.engine.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -124,13 +125,10 @@ public class RegexTagFilterTest {
     }
 
     @Test
-    public void invalidRegexPattern_skippedWithWarning() {
-        // Invalid pattern "integration[" should be skipped
-        RegexTagFilter filter = new RegexTagFilter(List.of("integration[", "unit"), List.of());
-
-        // Should still work with the valid pattern
-        assertThat(filter.matches(UnitFastTest.class)).isTrue();
-        assertThat(filter.getIncludePatternCount()).isEqualTo(1);
+    public void invalidRegexPattern_throws() {
+        assertThatThrownBy(() -> new RegexTagFilter(List.of("integration[", "unit"), List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("paramixel.tags.include");
     }
 
     @Test

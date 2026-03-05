@@ -52,7 +52,7 @@ import org.junit.platform.engine.UniqueId;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor {
+public final class ParamixelTestArgumentDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Zero-based index of this argument in the supplier output.

@@ -43,7 +43,7 @@ import org.junit.platform.engine.support.descriptor.ClassSource;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
+public final class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Test class represented by this descriptor.

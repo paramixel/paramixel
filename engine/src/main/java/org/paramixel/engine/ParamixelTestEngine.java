@@ -70,7 +70,7 @@ import org.paramixel.engine.util.FastIdUtil;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelTestEngine implements TestEngine {
+public final class ParamixelTestEngine implements TestEngine {
 
     /**
      * Logger for engine-level diagnostics.
@@ -152,8 +152,7 @@ public class ParamixelTestEngine implements TestEngine {
                 });
 
         final EngineExecutionListener engineExecutionListener = invokedByMaven
-                ? new ParamixelEngineExecutionListener(
-                        System.out::println, executionRequest.getEngineExecutionListener())
+                ? new ParamixelEngineExecutionListener(executionRequest.getEngineExecutionListener())
                 : executionRequest.getEngineExecutionListener();
 
         engineExecutionListener.executionStarted(executionRequest.getRootTestDescriptor());

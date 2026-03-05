@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import org.jspecify.annotations.NonNull;
+import org.junit.platform.engine.ConfigurationParameters;
 
 /**
  * Factory for creating {@link TagFilter} instances from various configuration sources.
@@ -96,8 +97,7 @@ public final class TagFilterFactory {
      * @return the result
      * @since 0.0.1
      */
-    public static TagFilter fromConfigurationParameters(
-            final org.junit.platform.engine.ConfigurationParameters configParameters) {
+    public static TagFilter fromConfigurationParameters(final @NonNull ConfigurationParameters configParameters) {
         Objects.requireNonNull(configParameters, "configParameters must not be null");
 
         final String includeValue = configParameters.get(TAGS_INCLUDE_KEY).orElse("");

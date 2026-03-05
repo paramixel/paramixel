@@ -49,7 +49,7 @@ import org.junit.platform.engine.support.descriptor.MethodSource;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelTestMethodDescriptor extends AbstractParamixelDescriptor {
+public final class ParamixelTestMethodDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Reflected test method represented by this descriptor.

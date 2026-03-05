@@ -39,7 +39,7 @@ import org.paramixel.engine.util.DurationUtils;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
+public final class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
     /**
      * Printer used for emitting the execution report.

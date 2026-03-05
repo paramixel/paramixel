@@ -146,6 +146,9 @@ public final class ParamixelDiscovery {
             final @NonNull EngineDiscoveryRequest request, final @NonNull TestDescriptor engineDescriptor) {
         LOGGER.fine("Starting Paramixel test discovery");
 
+        // Validate tag filter configuration up-front (invalid regex patterns must fail discovery).
+        final TagFilter tagFilter = TagFilterFactory.fromConfigurationParameters(request.getConfigurationParameters());
+
         // Step 1: Discover all test classes
         final Set<Class<?>> testClasses = discoverTestClasses(request);
         LOGGER.fine("Discovered " + testClasses.size() + " potential test classes");
@@ -168,7 +171,6 @@ public final class ParamixelDiscovery {
         LOGGER.fine("Validated " + validClasses.size() + " test classes");
 
         // Step 3: Apply tag filtering after validation
-        final TagFilter tagFilter = TagFilterFactory.fromConfigurationParameters(request.getConfigurationParameters());
 
         if (tagFilter.hasIncludePatterns()) {
             LOGGER.fine("Applying tag filter - include patterns configured");

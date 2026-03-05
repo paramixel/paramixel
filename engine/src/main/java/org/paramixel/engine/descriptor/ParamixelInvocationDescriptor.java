@@ -50,7 +50,7 @@ import org.junit.platform.engine.UniqueId;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
+public final class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
 
     /**
      * Zero-based index of this invocation.

@@ -36,7 +36,7 @@ import org.junit.platform.engine.UniqueId;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelEngineDescriptor implements TestDescriptor {
+public final class ParamixelEngineDescriptor implements TestDescriptor {
 
     /**
      * Unique identifier for the engine descriptor.

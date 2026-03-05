@@ -31,7 +31,7 @@ import org.junit.platform.engine.TestExecutionResult;
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */
-public class ParamixelTestArgumentDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
+public final class ParamixelTestArgumentDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
     /**
      * Printer used for reporting argument-level execution status.
