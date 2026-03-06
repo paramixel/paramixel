@@ -193,6 +193,54 @@ and failure behavior, see `04-lifecycle.md` and `08-error-handling.md`.
 
 ---
 
+## Execution Timing
+
+The engine captures execution duration at three levels: test class, argument bucket,
+and test method. Timing is measured from the start of `executionStarted` to the
+completion of `executionFinished` for each descriptor.
+
+### Duration Storage
+
+Durations are stored internally in the engine's `ExecutionSummary` and are
+accessible to listeners for reporting purposes. All durations are stored in
+milliseconds as `long` values.
+
+| Level | Key Type | Storage Location |
+|---|---|---|
+| Class | Class display name | `ExecutionSummary.classDurations` |
+| Argument | Descriptor unique ID | `ExecutionSummary.argumentDurations` |
+| Method | Descriptor unique ID | `ExecutionSummary.methodDurations` |
+
+### ClassStats Duration
+
+The `ExecutionSummary.ClassStats` inner class includes total duration tracking:
+
+| Field | Type | Description |
+|---|---|---|
+| `totalDurationMillis` | `AtomicLong` | Total execution time for all test methods in this class |
+
+### Duration Display
+
+The `ParamixelEngineDescriptorEngineExecutionListener` displays durations in the
+final summary table as the rightmost column. Durations are formatted using
+`DurationUtils.formatMillis()` for human-readable output.
+
+#### Duration Format
+
+Durations are displayed with a space between the value and unit:
+
+| Range | Format | Example |
+|---|---|---|
+| `< 1000 ms` | `{millis} ms` | `500 ms` |
+| `< 60000 ms` | `{seconds} s` | `1.500 s` |
+| `>= 60000 ms` | `{minutes} m {seconds} s {millis} ms` | `1 m 30 s 500 ms` |
+
+In the summary table, the unit labels are left-aligned at a consistent position
+across all rows, with the numeric values right-aligned to ensure visual clarity
+when durations have different units (e.g., some in `ms` and others in `s`).
+
+---
+
 ## Context Hierarchy
 
 The context hierarchy mirrors the test execution hierarchy. Each level has its own `Store`.

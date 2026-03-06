@@ -114,6 +114,7 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
         int totalMethodsAll = 0;
         int totalPassed = 0;
         int totalFailed = 0;
+        long totalDuration = 0;
 
         if (classNames.isEmpty()) {
             printer.accept(INFO + " No test classes executed.");
@@ -128,7 +129,7 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
 
             // Print table header with proper separator
             printSeparatorLine(maxClassWidth);
-            printTableRow(maxClassWidth, "Class", "Args", "Methods", "Passed", "Failed", "Status");
+            printTableRow(maxClassWidth, "Class", "Args", "Methods", "Passed", "Failed", "Status", "Duration");
             printSeparatorLine(maxClassWidth);
 
             // Print data rows
@@ -139,6 +140,7 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
                 int passed = stats != null ? stats.passed.get() : 0;
                 int failed = stats != null ? stats.failed.get() : 0;
                 String status = failed > 0 ? "X" : "OK";
+                long classDuration = summary.getClassDuration(className);
 
                 // Truncate class name if too long
                 String displayName = className;
@@ -153,12 +155,14 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
                         String.valueOf(methodCount),
                         String.valueOf(passed),
                         String.valueOf(failed),
-                        status);
+                        status,
+                        DurationUtils.formatMillis(classDuration));
 
                 totalArgs += argCount;
                 totalMethodsAll += methodCount;
                 totalPassed += passed;
                 totalFailed += failed;
+                totalDuration += classDuration;
             }
 
             // Print total row
@@ -170,7 +174,8 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
                     String.valueOf(totalMethodsAll),
                     String.valueOf(totalPassed),
                     String.valueOf(totalFailed),
-                    totalFailed > 0 ? "X" : "OK");
+                    totalFailed > 0 ? "X" : "OK",
+                    DurationUtils.formatMillis(totalDuration));
             printSeparatorLine(maxClassWidth);
         }
 
@@ -236,6 +241,11 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
             sep.append("-");
         }
         sep.append("+");
+        // Duration column: 10 + 2 = 12 (value + space + unit)
+        for (int i = 0; i < 12; i++) {
+            sep.append("-");
+        }
+        sep.append("+");
         printLine(INFO + " " + sep);
     }
 
@@ -249,6 +259,7 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      * @param passed the passed
      * @param failed the failed
      * @param status the status
+     * @param duration the duration
      * @since 0.0.1
      */
     private void printTableRow(
@@ -258,7 +269,8 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
             final String methods,
             final String passed,
             final String failed,
-            final String status) {
+            final String status,
+            final String duration) {
         StringBuilder row = new StringBuilder();
         row.append("| ");
 
@@ -279,7 +291,24 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
         row.append(" | ").append(String.format("%6s", failed));
         // Status: 6 chars + 2 spaces = 8 total
         row.append(" | ").append(String.format("%6s", status));
-        row.append(" |");
+        // Duration: 10 chars total (right-aligned value, left-aligned unit)
+        // Split duration into value and unit parts
+        String durationValue;
+        String durationUnit;
+        int spaceIndex = duration.lastIndexOf(' ');
+        if (spaceIndex > 0) {
+            durationValue = duration.substring(0, spaceIndex);
+            durationUnit = duration.substring(spaceIndex + 1);
+        } else {
+            durationValue = duration;
+            durationUnit = "";
+        }
+        // Format: " | " + 7 chars right-aligned value + " " + 2 chars left-aligned unit
+        row.append(" | ")
+                .append(String.format("%7s", durationValue))
+                .append(" ")
+                .append(String.format("%-2s", durationUnit));
+        row.append("|");
 
         printLine(INFO + " " + row);
     }
