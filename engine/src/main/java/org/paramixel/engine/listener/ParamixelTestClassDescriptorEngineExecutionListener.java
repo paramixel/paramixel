@@ -69,7 +69,7 @@ public final class ParamixelTestClassDescriptorEngineExecutionListener extends A
         stats.totalDurationMillis.addAndGet(duration);
         String threadName = Thread.currentThread().getName();
         String displayName = getDisplayName(1, testDescriptor);
-        String message = getStatusMessage(testExecutionResult, threadName, displayName);
+        String message = getStatusMessage(testExecutionResult, threadName, displayName, duration);
         printer.accept(message);
     }
 }
