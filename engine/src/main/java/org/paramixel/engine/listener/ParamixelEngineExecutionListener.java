@@ -67,7 +67,11 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      * @since 0.0.1
      */
     public ParamixelEngineExecutionListener() {
-        this(System.out::println, new EngineExecutionListener() {});
+        this(
+                System.out::println,
+                new EngineExecutionListener() {
+                    // INTENTIONALLY EMPTY
+                });
     }
 
     /**
@@ -87,7 +91,11 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(final @NonNull Consumer<String> printer) {
-        this(Objects.requireNonNull(printer, "printer must not be null"), new EngineExecutionListener() {});
+        this(
+                Objects.requireNonNull(printer, "printer must not be null"),
+                new EngineExecutionListener() {
+                    // INTENTIONALLY EMPTY
+                });
     }
 
     /**

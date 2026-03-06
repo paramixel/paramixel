@@ -246,3 +246,67 @@ Ordering is applied **per annotation type** independently:
 
 Only ONE `@Paramixel.ArgumentsCollector` method is allowed per class hierarchy. If multiple
 exist, the method in the most specific subclass is invoked and parent methods are ignored.
+
+---
+
+## Execution Timing
+
+The engine measures execution duration for each test descriptor independently.
+
+### Timing Measurement Points
+
+Timing starts at `executionStarted` and ends at `executionFinished` for each descriptor:
+
+| Descriptor Level | Start Event | End Event | Stored In |
+|---|---|---|---|
+| Test Class | `ParamixelTestClassDescriptor` started | `ParamixelTestClassDescriptor` finished | `ExecutionSummary.classDurations` |
+| Argument | `ParamixelTestArgumentDescriptor` started | `ParamixelTestArgumentDescriptor` finished | `ExecutionSummary.argumentDurations` |
+| Test Method | `ParamixelTestMethodDescriptor` started | `ParamixelTestMethodDescriptor` finished | `ExecutionSummary.methodDurations` |
+
+### Duration Semantics
+
+- **Class duration**: Total time from class execution start to finish, including all
+  lifecycle hooks (`@Paramixel.Initialize`, `@Paramixel.BeforeAll`, etc.) and all
+  argument/test method executions.
+- **Argument duration**: Time for one argument bucket execution, including
+  `@Paramixel.BeforeAll`, all test method invocations for that argument, and
+  `@Paramixel.AfterAll`.
+- **Method duration**: Time for a single test method invocation, including
+  `@Paramixel.BeforeEach`, the test method itself, and `@Paramixel.AfterEach`.
+
+### Thread Safety
+
+Duration tracking uses thread-safe concurrent maps keyed by descriptor unique IDs.
+All timing operations are atomic and safe under parallel execution.
+
+---
+
+## Execution Timing
+
+The engine measures execution duration for each test descriptor independently.
+
+### Timing Measurement Points
+
+Timing starts at `executionStarted` and ends at `executionFinished` for each descriptor:
+
+| Descriptor Level | Start Event | End Event | Stored In |
+|---|---|---|---|
+| Test Class | `ParamixelTestClassDescriptor` started | `ParamixelTestClassDescriptor` finished | `ExecutionSummary.classDurations` |
+| Argument | `ParamixelTestArgumentDescriptor` started | `ParamixelTestArgumentDescriptor` finished | `ExecutionSummary.argumentDurations` |
+| Test Method | `ParamixelTestMethodDescriptor` started | `ParamixelTestMethodDescriptor` finished | `ExecutionSummary.methodDurations` |
+
+### Duration Semantics
+
+- **Class duration**: Total time from class execution start to finish, including all
+  lifecycle hooks (`@Paramixel.Initialize`, `@Paramixel.BeforeAll`, etc.) and all
+  argument/test method executions.
+- **Argument duration**: Time for one argument bucket execution, including
+  `@Paramixel.BeforeAll`, all test method invocations for that argument, and
+  `@Paramixel.AfterAll`.
+- **Method duration**: Time for a single test method invocation, including
+  `@Paramixel.BeforeEach`, the test method itself, and `@Paramixel.AfterEach`.
+
+### Thread Safety
+
+Duration tracking uses thread-safe concurrent maps keyed by descriptor unique IDs.
+All timing operations are atomic and safe under parallel execution.

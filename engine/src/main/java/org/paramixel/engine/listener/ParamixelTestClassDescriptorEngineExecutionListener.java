@@ -49,6 +49,8 @@ public final class ParamixelTestClassDescriptorEngineExecutionListener extends A
 
     @Override
     public void executionStarted(final @NonNull TestDescriptor testDescriptor) {
+        String descriptorId = testDescriptor.getUniqueId().toString();
+        getExecutionSummary().recordStart(descriptorId);
         String threadName = Thread.currentThread().getName();
         String displayName = getDisplayName(1, testDescriptor);
         printer.accept(INFO + " " + TEST + " | " + threadName + " | " + displayName);
@@ -57,6 +59,14 @@ public final class ParamixelTestClassDescriptorEngineExecutionListener extends A
     @Override
     public void executionFinished(
             final @NonNull TestDescriptor testDescriptor, final @NonNull TestExecutionResult testExecutionResult) {
+        String descriptorId = testDescriptor.getUniqueId().toString();
+        String className = testDescriptor.getDisplayName();
+        long duration = getExecutionSummary()
+                .recordEnd(descriptorId, getExecutionSummary().getClassDurations());
+        ExecutionSummary.ClassStats stats = getExecutionSummary()
+                .getClassStatsMap()
+                .computeIfAbsent(className, k -> new ExecutionSummary.ClassStats(className));
+        stats.totalDurationMillis.addAndGet(duration);
         String threadName = Thread.currentThread().getName();
         String displayName = getDisplayName(1, testDescriptor);
         String message = getStatusMessage(testExecutionResult, threadName, displayName);

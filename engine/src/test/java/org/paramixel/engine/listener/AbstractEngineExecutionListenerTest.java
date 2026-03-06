@@ -70,6 +70,62 @@ public class AbstractEngineExecutionListenerTest {
         // INTENTIONALLY EMPTY
     }
 
+    @Test
+    public void recordStart_capturesStartTime() {
+        final TestableListener listener = new TestableListener();
+        final AbstractEngineExecutionListener.ExecutionSummary summary = listener.getExecutionSummary();
+        summary.reset();
+
+        summary.recordStart("test-descriptor");
+
+        assertThat(summary.getClassDuration("test-descriptor")).isEqualTo(0L);
+    }
+
+    @Test
+    public void recordEnd_calculatesDuration() throws InterruptedException {
+        final TestableListener listener = new TestableListener();
+        final AbstractEngineExecutionListener.ExecutionSummary summary = listener.getExecutionSummary();
+        summary.reset();
+
+        summary.recordStart("test-descriptor");
+        Thread.sleep(10L);
+        summary.recordEnd("test-descriptor", summary.getClassDurations());
+
+        assertThat(summary.getClassDuration("test-descriptor")).isGreaterThanOrEqualTo(10L);
+    }
+
+    @Test
+    public void getClassDuration_returnsZeroWhenNoData() {
+        final TestableListener listener = new TestableListener();
+        final AbstractEngineExecutionListener.ExecutionSummary summary = listener.getExecutionSummary();
+        summary.reset();
+
+        assertThat(summary.getClassDuration("non-existent")).isEqualTo(0L);
+    }
+
+    @Test
+    public void classStats_tracksTotalDurationMillis() {
+        final AbstractEngineExecutionListener.ExecutionSummary.ClassStats stats =
+                new AbstractEngineExecutionListener.ExecutionSummary.ClassStats("TestClass");
+
+        stats.totalDurationMillis.addAndGet(100L);
+        stats.totalDurationMillis.addAndGet(200L);
+
+        assertThat(stats.getTotalDurationMillis()).isEqualTo(300L);
+    }
+
+    @Test
+    public void reset_clearsTimingData() {
+        final TestableListener listener = new TestableListener();
+        final AbstractEngineExecutionListener.ExecutionSummary summary = listener.getExecutionSummary();
+
+        summary.recordStart("test-descriptor");
+        summary.recordEnd("test-descriptor", summary.getClassDurations());
+        summary.reset();
+
+        assertThat(summary.getClassDuration("test-descriptor")).isEqualTo(0L);
+    }
+
     private static final class TestableListener extends AbstractEngineExecutionListener {
 
         String displayName(final int depth, final TestDescriptor descriptor) {

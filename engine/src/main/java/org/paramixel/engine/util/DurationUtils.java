@@ -40,9 +40,9 @@ public final class DurationUtils {
      *
      * <p>Rules:
      * <ul>
-     *   <li>{@code < 1000}: {@code "{millis}ms"}
-     *   <li>{@code < 60000}: seconds with 3 decimals (e.g. {@code "1.500s"})
-     *   <li>{@code >= 60000}: {@code "{m}m {s}s {ms}ms"}
+     *   <li>{@code < 1000}: {@code "{millis} ms"}
+     *   <li>{@code < 60000}: seconds with 3 decimals (e.g. {@code "1.500 s"})
+     *   <li>{@code >= 60000}: {@code "{m} m {s} s {ms} ms"}
      * </ul>
      *
      * @param millis duration in milliseconds; must be {@code >= 0}
@@ -56,16 +56,16 @@ public final class DurationUtils {
         }
 
         if (millis < 1000) {
-            return millis + "ms";
+            return millis + " ms";
         }
 
         if (millis < 60000) {
-            return String.format("%.3fs", millis / 1000.0);
+            return String.format("%.3f s", millis / 1000.0);
         }
 
         final long minutes = millis / 60000;
         final long seconds = (millis % 60000) / 1000;
         final long remainingMillis = millis % 1000;
-        return String.format("%dm %ds %dms", minutes, seconds, remainingMillis);
+        return String.format("%d m %d s %d ms", minutes, seconds, remainingMillis);
     }
 }

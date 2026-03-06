@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
@@ -255,6 +256,26 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
         private final ConcurrentHashMap<String, AtomicInteger> classMethodCounts = new ConcurrentHashMap<>();
 
         /**
+         * Start times for descriptors keyed by unique ID.
+         */
+        private final ConcurrentHashMap<String, Long> startTimes = new ConcurrentHashMap<>();
+
+        /**
+         * Class durations in milliseconds keyed by class display name.
+         */
+        private final ConcurrentHashMap<String, Long> classDurations = new ConcurrentHashMap<>();
+
+        /**
+         * Argument durations in milliseconds keyed by descriptor unique ID.
+         */
+        private final ConcurrentHashMap<String, Long> argumentDurations = new ConcurrentHashMap<>();
+
+        /**
+         * Method durations in milliseconds keyed by descriptor unique ID.
+         */
+        private final ConcurrentHashMap<String, Long> methodDurations = new ConcurrentHashMap<>();
+
+        /**
          * Resets all counters and tracked class state.
          *
          * <p>This method clears concurrent maps and sets counters to zero.
@@ -275,6 +296,10 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
             classArgumentCounts.clear();
             classMethodCounts.clear();
             currentClassName = null;
+            startTimes.clear();
+            classDurations.clear();
+            argumentDurations.clear();
+            methodDurations.clear();
         }
 
         /**
@@ -550,6 +575,100 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
         }
 
         /**
+         * Records the start time for a descriptor.
+         *
+         * @param descriptorId the descriptor unique ID; never {@code null}
+         * @since 0.0.1
+         */
+        protected void recordStart(final String descriptorId) {
+            startTimes.put(descriptorId, System.currentTimeMillis());
+        }
+
+        /**
+         * Records the end time for a descriptor and stores its duration.
+         *
+         * @param descriptorId the descriptor unique ID; never {@code null}
+         * @param durationMap the map to store the duration in; never {@code null}
+         * @return the duration in milliseconds
+         * @since 0.0.1
+         */
+        protected long recordEnd(final String descriptorId, final ConcurrentHashMap<String, Long> durationMap) {
+            Long startTime = startTimes.remove(descriptorId);
+            if (startTime == null) {
+                startTime = System.currentTimeMillis();
+            }
+            long duration = System.currentTimeMillis() - startTime;
+            durationMap.put(descriptorId, duration);
+            return duration;
+        }
+
+        /**
+         * Returns the duration for a class.
+         *
+         * @param className the class display name; never {@code null}
+         * @return the duration in milliseconds, or {@code 0} when no data exists
+         * @since 0.0.1
+         */
+        protected long getClassDuration(final String className) {
+            Long duration = classDurations.get(className);
+            return duration != null ? duration : 0L;
+        }
+
+        /**
+         * Returns the duration for an argument.
+         *
+         * @param descriptorId the descriptor unique ID; never {@code null}
+         * @return the duration in milliseconds, or {@code 0} when no data exists
+         * @since 0.0.1
+         */
+        protected long getArgumentDuration(final String descriptorId) {
+            Long duration = argumentDurations.get(descriptorId);
+            return duration != null ? duration : 0L;
+        }
+
+        /**
+         * Returns the duration for a method.
+         *
+         * @param descriptorId the descriptor unique ID; never {@code null}
+         * @return the duration in milliseconds, or {@code 0} when no data exists
+         * @since 0.0.1
+         */
+        protected long getMethodDuration(final String descriptorId) {
+            Long duration = methodDurations.get(descriptorId);
+            return duration != null ? duration : 0L;
+        }
+
+        /**
+         * Returns the class durations map.
+         *
+         * @return the class durations map; never {@code null}
+         * @since 0.0.1
+         */
+        protected ConcurrentHashMap<String, Long> getClassDurations() {
+            return classDurations;
+        }
+
+        /**
+         * Returns the argument durations map.
+         *
+         * @return the argument durations map; never {@code null}
+         * @since 0.0.1
+         */
+        protected ConcurrentHashMap<String, Long> getArgumentDurations() {
+            return argumentDurations;
+        }
+
+        /**
+         * Returns the method durations map.
+         *
+         * @return the method durations map; never {@code null}
+         * @since 0.0.1
+         */
+        protected ConcurrentHashMap<String, Long> getMethodDurations() {
+            return methodDurations;
+        }
+
+        /**
          * Statistics for a single test class.
          *
          * @author Douglas Hoard (doug.hoard@gmail.com)
@@ -573,6 +692,11 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
             final AtomicInteger failed = new AtomicInteger(0);
 
             /**
+             * Total duration for this class in milliseconds; mutable and thread-safe.
+             */
+            final AtomicLong totalDurationMillis = new AtomicLong(0);
+
+            /**
              * Creates statistics for a class.
              *
              * @param className the class display name; never {@code null}
@@ -590,6 +714,16 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
              */
             int getTotal() {
                 return passed.get() + failed.get();
+            }
+
+            /**
+             * Returns the total duration for this class.
+             *
+             * @return total duration in milliseconds
+             * @since 0.0.1
+             */
+            long getTotalDurationMillis() {
+                return totalDurationMillis.get();
             }
         }
     }

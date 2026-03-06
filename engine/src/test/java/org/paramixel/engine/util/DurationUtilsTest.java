@@ -30,20 +30,20 @@ public class DurationUtilsTest {
 
     @Test
     public void formatMillis_formatsSubSecondAsMilliseconds() {
-        assertThat(DurationUtils.formatMillis(0)).isEqualTo("0ms");
-        assertThat(DurationUtils.formatMillis(999)).isEqualTo("999ms");
+        assertThat(DurationUtils.formatMillis(0)).isEqualTo("0 ms");
+        assertThat(DurationUtils.formatMillis(999)).isEqualTo("999 ms");
     }
 
     @Test
     public void formatMillis_formatsSubMinuteAsSecondsWithThreeDecimals() {
-        assertThat(DurationUtils.formatMillis(1000)).isEqualTo("1.000s");
-        assertThat(DurationUtils.formatMillis(1500)).isEqualTo("1.500s");
-        assertThat(DurationUtils.formatMillis(59999)).isEqualTo("59.999s");
+        assertThat(DurationUtils.formatMillis(1000)).isEqualTo("1.000 s");
+        assertThat(DurationUtils.formatMillis(1500)).isEqualTo("1.500 s");
+        assertThat(DurationUtils.formatMillis(59999)).isEqualTo("59.999 s");
     }
 
     @Test
     public void formatMillis_formatsMinuteAndAboveAsMinutesSecondsMillis() {
-        assertThat(DurationUtils.formatMillis(60000)).isEqualTo("1m 0s 0ms");
-        assertThat(DurationUtils.formatMillis(61001)).isEqualTo("1m 1s 1ms");
+        assertThat(DurationUtils.formatMillis(60000)).isEqualTo("1 m 0 s 0 ms");
+        assertThat(DurationUtils.formatMillis(61001)).isEqualTo("1 m 1 s 1 ms");
     }
 }
