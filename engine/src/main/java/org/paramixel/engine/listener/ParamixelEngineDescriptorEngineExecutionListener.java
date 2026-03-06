@@ -303,12 +303,12 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
             durationValue = duration;
             durationUnit = "";
         }
-        // Format: " | " + 7 chars right-aligned value + " " + 2 chars left-aligned unit
+        // Format: " | " + 7 chars right-aligned value + " " + 2 chars left-aligned unit + " |"
         row.append(" | ")
                 .append(String.format("%7s", durationValue))
                 .append(" ")
-                .append(String.format("%-2s", durationUnit));
-        row.append("|");
+                .append(String.format("%-2s", durationUnit))
+                .append(" |");
 
         printLine(INFO + " " + row);
     }
