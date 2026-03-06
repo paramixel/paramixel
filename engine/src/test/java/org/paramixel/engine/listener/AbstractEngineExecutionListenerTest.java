@@ -66,6 +66,22 @@ public class AbstractEngineExecutionListenerTest {
                 .contains("ABORTED");
     }
 
+    @Test
+    public void getStatusMessage_includesDuration() {
+        final TestableListener listener = new TestableListener();
+        assertThat(listener.statusMessage(TestExecutionResult.successful(), "t", "d", 1500L))
+                .contains("t")
+                .contains("d")
+                .contains("PASS")
+                .contains("1.500 s");
+
+        assertThat(listener.statusMessage(TestExecutionResult.successful(), "t", "d", 500L))
+                .contains("t")
+                .contains("d")
+                .contains("PASS")
+                .contains("500 ms");
+    }
+
     private static void dummy() {
         // INTENTIONALLY EMPTY
     }
@@ -133,7 +149,15 @@ public class AbstractEngineExecutionListenerTest {
         }
 
         String statusMessage(final TestExecutionResult result, final String thread, final String displayName) {
-            return getStatusMessage(result, thread, displayName);
+            return getStatusMessage(result, thread, displayName, 0L);
+        }
+
+        String statusMessage(
+                final TestExecutionResult result,
+                final String thread,
+                final String displayName,
+                final long durationMillis) {
+            return getStatusMessage(result, thread, displayName, durationMillis);
         }
     }
 }

@@ -61,10 +61,11 @@ public final class ParamixelTestMethodDescriptorEngineExecutionListener extends 
     public void executionFinished(
             final @NonNull TestDescriptor testDescriptor, final @NonNull TestExecutionResult testExecutionResult) {
         String descriptorId = testDescriptor.getUniqueId().toString();
-        getExecutionSummary().recordEnd(descriptorId, getExecutionSummary().getMethodDurations());
+        long duration = getExecutionSummary()
+                .recordEnd(descriptorId, getExecutionSummary().getMethodDurations());
         String threadName = Thread.currentThread().getName();
         String displayName = getDisplayName(3, testDescriptor);
-        String message = getStatusMessage(testExecutionResult, threadName, displayName);
+        String message = getStatusMessage(testExecutionResult, threadName, displayName, duration);
         printer.accept(message);
     }
 }

@@ -26,6 +26,7 @@ import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
+import org.paramixel.engine.util.DurationUtils;
 
 /**
  * Provides common formatting and summary tracking for engine listeners.
@@ -141,30 +142,33 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
      * @param testExecutionResult the testExecutionResult
      * @param threadName the threadName
      * @param displayName the displayName
+     * @param durationMillis the duration in milliseconds
      * @return the result
      * @since 0.0.1
      */
     protected String getStatusMessage(
             final @NonNull TestExecutionResult testExecutionResult,
             final @NonNull String threadName,
-            final @NonNull String displayName) {
+            final @NonNull String displayName,
+            final long durationMillis) {
         String message;
+        String duration = DurationUtils.formatMillis(durationMillis);
 
         switch (testExecutionResult.getStatus()) {
             case SUCCESSFUL: {
-                message = INFO + " " + PASS + " | " + threadName + " | " + displayName;
+                message = INFO + " " + PASS + " | " + threadName + " | " + displayName + " | " + duration;
                 break;
             }
             case ABORTED: {
-                message = INFO + " " + threadName + " | ABORTED | " + displayName;
+                message = INFO + " " + threadName + " | ABORTED | " + displayName + " | " + duration;
                 break;
             }
             case FAILED: {
-                message = INFO + " " + threadName + " | FAIL | " + displayName;
+                message = INFO + " " + threadName + " | FAIL | " + displayName + " | " + duration;
                 break;
             }
             default: {
-                message = INFO + " " + threadName + " | UNKNOWN | " + displayName;
+                message = INFO + " " + threadName + " | UNKNOWN | " + displayName + " | " + duration;
             }
         }
 

@@ -225,6 +225,21 @@ The `ParamixelEngineDescriptorEngineExecutionListener` displays durations in the
 final summary table as the rightmost column. Durations are formatted using
 `DurationUtils.formatMillis()` for human-readable output.
 
+#### Duration in Test Output
+
+In addition to the summary table, durations are displayed in individual test completion
+messages. When a test class, argument, or method completes, the listener prints the
+duration as the last column:
+
+**Format:** `[INFO] PASS | {thread} | {displayName} | {duration}`
+
+**Examples:**
+```
+[INFO] PASS | RpMWbr | test.BasicTest | 0 ms
+[INFO] PASS | q7Bckd | test.MyTest | argument-1 | testMethod | 1.250 s
+[INFO] FAIL | xYz9Ab | test.FailingTest | 0 ms
+```
+
 #### Duration Format
 
 Durations are displayed with a space between the value and unit:
