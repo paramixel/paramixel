@@ -287,8 +287,8 @@ Paramixel supports filtering tests based on their `@Tags` annotations using regu
     <artifactId>paramixel-maven-plugin</artifactId>
     <version>0.0.1</version>
     <configuration>
-        <includeTags>integration-.*</includeTags>
-        <excludeTags>.*-slow,.*-flaky</excludeTags>
+        <tagsInclude>integration-.*</tagsInclude>
+        <tagsExclude>.*-slow,.*-flaky</tagsExclude>
     </configuration>
 </plugin>
 ```

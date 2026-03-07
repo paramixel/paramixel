@@ -93,14 +93,14 @@ public class ParamixelMojo extends AbstractMojo {
      * Comma-separated list of regex patterns.
      */
     @Parameter(property = "paramixel.tags.include")
-    private String includeTags;
+    private String tagsInclude;
 
     /**
      * Exclude tags for test filtering.
      * Comma-separated list of regex patterns.
      */
     @Parameter(property = "paramixel.tags.exclude")
-    private String excludeTags;
+    private String tagsExclude;
 
     /**
      * Creates a new Mojo instance.
@@ -267,14 +267,14 @@ public class ParamixelMojo extends AbstractMojo {
             getLog().info("Paramixel parallelism: " + parallelism);
         }
 
-        if (includeTags != null && !includeTags.trim().isEmpty()) {
-            requestBuilder.configurationParameter("paramixel.tags.include", includeTags.trim());
-            getLog().info("Including tests with tags matching: " + includeTags.trim());
+        if (tagsInclude != null && !tagsInclude.trim().isEmpty()) {
+            requestBuilder.configurationParameter("paramixel.tags.include", tagsInclude.trim());
+            getLog().info("Including tests with tags matching: " + tagsInclude.trim());
         }
 
-        if (excludeTags != null && !excludeTags.trim().isEmpty()) {
-            requestBuilder.configurationParameter("paramixel.tags.exclude", excludeTags.trim());
-            getLog().info("Excluding tests with tags matching: " + excludeTags.trim());
+        if (tagsExclude != null && !tagsExclude.trim().isEmpty()) {
+            requestBuilder.configurationParameter("paramixel.tags.exclude", tagsExclude.trim());
+            getLog().info("Excluding tests with tags matching: " + tagsExclude.trim());
         }
 
         final LauncherDiscoveryRequest request = requestBuilder.build();
