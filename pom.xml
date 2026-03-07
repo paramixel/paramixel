@@ -27,8 +27,9 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.platform.version>6.0.3</junit.platform.version>
-        <maven.plugin.api.version>3.15.2</maven.plugin.api.version>
-        <maven.core.version>3.9.12</maven.core.version>
+        <maven.plugin.api.version>3.9.13</maven.plugin.api.version>
+        <maven.plugin.annotations.version>3.15.2</maven.plugin.annotations.version>
+        <maven.core.version>3.9.13</maven.core.version>
         <maven.artifact.version>3.9.13</maven.artifact.version>
         <maven.resolver.version>2.0.16</maven.resolver.version>
         <slf4j.version>2.0.17</slf4j.version>
@@ -65,7 +66,7 @@
             <dependency>
                 <groupId>org.apache.maven.plugin-tools</groupId>
                 <artifactId>maven-plugin-annotations</artifactId>
-                <version>${maven.plugin.api.version}</version>
+                <version>${maven.plugin.annotations.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven</groupId>
