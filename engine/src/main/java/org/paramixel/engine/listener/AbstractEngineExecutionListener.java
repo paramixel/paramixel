@@ -265,21 +265,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
         private final ConcurrentHashMap<String, Long> startTimes = new ConcurrentHashMap<>();
 
         /**
-         * Class durations in milliseconds keyed by class display name.
-         */
-        private final ConcurrentHashMap<String, Long> classDurations = new ConcurrentHashMap<>();
-
-        /**
-         * Argument durations in milliseconds keyed by descriptor unique ID.
-         */
-        private final ConcurrentHashMap<String, Long> argumentDurations = new ConcurrentHashMap<>();
-
-        /**
-         * Method durations in milliseconds keyed by descriptor unique ID.
-         */
-        private final ConcurrentHashMap<String, Long> methodDurations = new ConcurrentHashMap<>();
-
-        /**
          * Resets all counters and tracked class state.
          *
          * <p>This method clears concurrent maps and sets counters to zero.
@@ -301,9 +286,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
             classMethodCounts.clear();
             currentClassName = null;
             startTimes.clear();
-            classDurations.clear();
-            argumentDurations.clear();
-            methodDurations.clear();
         }
 
         /**
@@ -589,20 +571,18 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
         }
 
         /**
-         * Records the end time for a descriptor and stores its duration.
+         * Records the end time for a descriptor.
          *
          * @param descriptorId the descriptor unique ID; never {@code null}
-         * @param durationMap the map to store the duration in; never {@code null}
          * @return the duration in milliseconds
          * @since 0.0.1
          */
-        protected long recordEnd(final String descriptorId, final ConcurrentHashMap<String, Long> durationMap) {
+        protected long recordEnd(final String descriptorId) {
             Long startTime = startTimes.remove(descriptorId);
             if (startTime == null) {
                 startTime = System.currentTimeMillis();
             }
             long duration = System.currentTimeMillis() - startTime;
-            durationMap.put(descriptorId, duration);
             return duration;
         }
 
@@ -614,62 +594,8 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * @since 0.0.1
          */
         protected long getClassDuration(final String className) {
-            Long duration = classDurations.get(className);
-            return duration != null ? duration : 0L;
-        }
-
-        /**
-         * Returns the duration for an argument.
-         *
-         * @param descriptorId the descriptor unique ID; never {@code null}
-         * @return the duration in milliseconds, or {@code 0} when no data exists
-         * @since 0.0.1
-         */
-        protected long getArgumentDuration(final String descriptorId) {
-            Long duration = argumentDurations.get(descriptorId);
-            return duration != null ? duration : 0L;
-        }
-
-        /**
-         * Returns the duration for a method.
-         *
-         * @param descriptorId the descriptor unique ID; never {@code null}
-         * @return the duration in milliseconds, or {@code 0} when no data exists
-         * @since 0.0.1
-         */
-        protected long getMethodDuration(final String descriptorId) {
-            Long duration = methodDurations.get(descriptorId);
-            return duration != null ? duration : 0L;
-        }
-
-        /**
-         * Returns the class durations map.
-         *
-         * @return the class durations map; never {@code null}
-         * @since 0.0.1
-         */
-        protected ConcurrentHashMap<String, Long> getClassDurations() {
-            return classDurations;
-        }
-
-        /**
-         * Returns the argument durations map.
-         *
-         * @return the argument durations map; never {@code null}
-         * @since 0.0.1
-         */
-        protected ConcurrentHashMap<String, Long> getArgumentDurations() {
-            return argumentDurations;
-        }
-
-        /**
-         * Returns the method durations map.
-         *
-         * @return the method durations map; never {@code null}
-         * @since 0.0.1
-         */
-        protected ConcurrentHashMap<String, Long> getMethodDurations() {
-            return methodDurations;
+            ClassStats stats = classStatsMap.get(className);
+            return stats != null ? stats.getTotalDurationMillis() : 0L;
         }
 
         /**

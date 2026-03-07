@@ -27,16 +27,16 @@ inheritance rules, annotation contracts, and lifecycle pairing behavior.
 
 ## Lifecycle Pairing Rules
 
-"After" hooks MUST only execute when their paired "before" hook has executed:
+"After" hooks MUST execute when their paired "before" hook execution was attempted, regardless of whether any before hook methods completed successfully:
 
 | Before Hook | After Hook | Condition |
 |---|---|---|
-| `@Paramixel.Initialize` | `@Paramixel.Finalize` | `@Paramixel.Finalize` runs only if `@Paramixel.Initialize` was invoked |
-| `@Paramixel.BeforeAll` | `@Paramixel.AfterAll` | `@Paramixel.AfterAll` runs only if `@Paramixel.BeforeAll` was invoked for that argument |
-| `@Paramixel.BeforeEach` | `@Paramixel.AfterEach` | `@Paramixel.AfterEach` runs only if `@Paramixel.BeforeEach` was invoked for that test method |
+| `@Paramixel.Initialize` | `@Paramixel.Finalize` | `@Paramixel.Finalize` runs if `@Paramixel.Initialize` execution was attempted |
+| `@Paramixel.BeforeAll` | `@Paramixel.AfterAll` | `@Paramixel.AfterAll` runs if `@Paramixel.BeforeAll` execution was attempted for that argument |
+| `@Paramixel.BeforeEach` | `@Paramixel.AfterEach` | `@Paramixel.AfterEach` runs if `@Paramixel.BeforeEach` execution was attempted for that test method |
 
-When a paired "before" hook has executed, the corresponding "after" hook MUST execute
-regardless of whether intervening steps failed. This guarantees cleanup.
+When a paired "before" hook execution is attempted, the corresponding "after" hook MUST execute
+regardless of whether intervening steps failed. This guarantees cleanup even when before hooks fail partially or completely.
 
 ## AutoCloseable Integration
 

@@ -61,8 +61,7 @@ public final class ParamixelTestArgumentDescriptorEngineExecutionListener extend
     public void executionFinished(
             final @NonNull TestDescriptor testDescriptor, final @NonNull TestExecutionResult testExecutionResult) {
         String descriptorId = testDescriptor.getUniqueId().toString();
-        long duration = getExecutionSummary()
-                .recordEnd(descriptorId, getExecutionSummary().getArgumentDurations());
+        long duration = getExecutionSummary().recordEnd(descriptorId);
         String threadName = Thread.currentThread().getName();
         String displayName = getDisplayName(2, testDescriptor);
         String message = getStatusMessage(testExecutionResult, threadName, displayName, duration);

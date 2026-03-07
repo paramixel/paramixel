@@ -79,7 +79,7 @@ public class AbstractEngineExecutionListenerTest {
                 .contains("t")
                 .contains("d")
                 .contains("PASS")
-                .contains("500 ms");
+                .contains("500.000 ms");
     }
 
     private static void dummy() {
@@ -105,9 +105,9 @@ public class AbstractEngineExecutionListenerTest {
 
         summary.recordStart("test-descriptor");
         Thread.sleep(10L);
-        summary.recordEnd("test-descriptor", summary.getClassDurations());
+        long duration = summary.recordEnd("test-descriptor");
 
-        assertThat(summary.getClassDuration("test-descriptor")).isGreaterThanOrEqualTo(10L);
+        assertThat(duration).isGreaterThanOrEqualTo(10L);
     }
 
     @Test
@@ -135,11 +135,21 @@ public class AbstractEngineExecutionListenerTest {
         final TestableListener listener = new TestableListener();
         final AbstractEngineExecutionListener.ExecutionSummary summary = listener.getExecutionSummary();
 
+        summary.reset();
+
+        summary.getClassStatsMap()
+                .computeIfAbsent("C", k -> new AbstractEngineExecutionListener.ExecutionSummary.ClassStats("C"))
+                .totalDurationMillis
+                .addAndGet(1L);
+
+        assertThat(summary.getClassDuration("C")).isEqualTo(1L);
+
         summary.recordStart("test-descriptor");
-        summary.recordEnd("test-descriptor", summary.getClassDurations());
+        summary.recordEnd("test-descriptor");
         summary.reset();
 
         assertThat(summary.getClassDuration("test-descriptor")).isEqualTo(0L);
+        assertThat(summary.getClassDuration("C")).isEqualTo(0L);
     }
 
     private static final class TestableListener extends AbstractEngineExecutionListener {

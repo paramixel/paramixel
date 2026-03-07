@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -123,11 +124,11 @@ public final class ParamixelClassRunner {
             final EngineExecutionListener listener,
             final Map<Class<?>, ClassContext> classContexts,
             final Map<Class<?>, Object> testInstances) {
-        this.runtime = runtime;
-        this.engineContext = engineContext;
-        this.listener = listener;
-        this.classContexts = classContexts;
-        this.testInstances = testInstances;
+        this.runtime = Objects.requireNonNull(runtime, "runtime must not be null");
+        this.engineContext = Objects.requireNonNull(engineContext, "engineContext must not be null");
+        this.listener = Objects.requireNonNull(listener, "listener must not be null");
+        this.classContexts = Objects.requireNonNull(classContexts, "classContexts must not be null");
+        this.testInstances = Objects.requireNonNull(testInstances, "testInstances must not be null");
     }
 
     /**

@@ -229,5 +229,13 @@ public final class ParamixelTestEngine implements TestEngine {
         }
 
         engineExecutionListener.executionFinished(executionRequest.getRootTestDescriptor(), rootResult);
+
+        if (invokedByMaven) {
+            if (rootResult.getStatus() == TestExecutionResult.Status.SUCCESSFUL) {
+                LOGGER.info("TESTS PASSED");
+            } else {
+                LOGGER.info("TESTS FAILED");
+            }
+        }
     }
 }
