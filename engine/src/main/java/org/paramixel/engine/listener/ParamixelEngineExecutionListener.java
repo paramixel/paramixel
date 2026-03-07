@@ -71,7 +71,8 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
                 System.out::println,
                 new EngineExecutionListener() {
                     // INTENTIONALLY EMPTY
-                });
+                },
+                Integer.MAX_VALUE);
     }
 
     /**
@@ -81,7 +82,19 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(final @NonNull EngineExecutionListener delegate) {
-        this(System.out::println, delegate);
+        this(System.out::println, delegate, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Creates a listener that prints to standard output and delegates to {@code delegate}.
+     *
+     * @param delegate the delegate listener; never {@code null}
+     * @param summaryClassNameMaxLength the maximum rendered class-name length
+     * @since 0.0.1
+     */
+    public ParamixelEngineExecutionListener(
+            final @NonNull EngineExecutionListener delegate, final int summaryClassNameMaxLength) {
+        this(System.out::println, delegate, summaryClassNameMaxLength);
     }
 
     /**
@@ -95,7 +108,8 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
                 Objects.requireNonNull(printer, "printer must not be null"),
                 new EngineExecutionListener() {
                     // INTENTIONALLY EMPTY
-                });
+                },
+                Integer.MAX_VALUE);
     }
 
     /**
@@ -107,11 +121,27 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      */
     public ParamixelEngineExecutionListener(
             final @NonNull Consumer<String> printer, final @NonNull EngineExecutionListener delegate) {
+        this(printer, delegate, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Creates a new instance.
+     *
+     * @param printer the printer
+     * @param delegate the delegate
+     * @param summaryClassNameMaxLength the maximum rendered class-name length
+     * @since 0.0.1
+     */
+    public ParamixelEngineExecutionListener(
+            final @NonNull Consumer<String> printer,
+            final @NonNull EngineExecutionListener delegate,
+            final int summaryClassNameMaxLength) {
         this.printer = Objects.requireNonNull(printer, "printer must not be null");
         this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
         this.engineListeners = new HashMap<>();
         engineListeners.put(
-                ParamixelEngineDescriptor.class, new ParamixelEngineDescriptorEngineExecutionListener(printer));
+                ParamixelEngineDescriptor.class,
+                new ParamixelEngineDescriptorEngineExecutionListener(printer, summaryClassNameMaxLength));
         engineListeners.put(
                 ParamixelTestClassDescriptor.class, new ParamixelTestClassDescriptorEngineExecutionListener(printer));
         engineListeners.put(

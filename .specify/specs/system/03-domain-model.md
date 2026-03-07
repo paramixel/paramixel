@@ -239,6 +239,39 @@ output.
 +------------+------+---------+--------+--------+--------+---------+
 ```
 
+#### Summary Class Name Abbreviation
+
+In Maven invocation mode, the engine may abbreviate the class name shown in the summary table
+to improve readability.
+
+Configuration key: `paramixel.summary.classNameMaxLength`
+
+If the configured maximum is smaller than the full class name, the engine abbreviates the name
+by shortening package segments while keeping the final segment intact:
+
+1. Split the class name on `.` into segments.
+2. The final segment is always kept intact.
+3. Each other segment is either the full segment or its first character.
+4. Start with all non-final segments abbreviated to 1 character, then attempt to expand segments
+   from right to left to their full names while the overall rendered value remains within the
+   maximum. If a segment cannot be expanded without exceeding the maximum, the engine stops
+   expanding and all remaining segments to the left remain abbreviated.
+
+If the final segment alone exceeds the configured maximum, it is still kept intact and the
+rendered class name may exceed the configured maximum.
+
+Example: `foo.bar.Class`
+
+- With `paramixel.summary.classNameMaxLength=11`: `f.bar.Class`
+- With `paramixel.summary.classNameMaxLength=10`: `f.b.Class`
+
+Example: `test.argument.ArgumentsTest`
+
+- With `paramixel.summary.classNameMaxLength=20`: `t.a.ArgumentsTest`
+
+This is display-only and may cause ambiguous/colliding rendered names. Increase the maximum
+length when you need unambiguous output.
+
 #### Duration in Test Output
 
 In addition to the summary table, durations are displayed in individual test completion

@@ -289,9 +289,27 @@ Paramixel supports filtering tests based on their `@Tags` annotations using regu
     <configuration>
         <tagsInclude>integration-.*</tagsInclude>
         <tagsExclude>.*-slow,.*-flaky</tagsExclude>
+        <summaryClassNameMaxLength>60</summaryClassNameMaxLength>
     </configuration>
 </plugin>
 ```
+
+`summaryClassNameMaxLength` abbreviates class names in the Maven-only `Paramixel Test Summary`
+table by shortening package segments while keeping the final segment intact. This is display-only
+and may cause ambiguous/colliding rendered names; increase the maximum length when you need
+unambiguous output.
+
+If the final segment alone exceeds the configured maximum, it is still kept intact and the
+rendered class name may exceed the configured maximum.
+
+Example: `foo.bar.Class`
+
+- With `paramixel.summary.classNameMaxLength=11`: `f.bar.Class`
+- With `paramixel.summary.classNameMaxLength=10`: `f.b.Class`
+
+Example: `test.argument.ArgumentsTest`
+
+- With `paramixel.summary.classNameMaxLength=20`: `t.a.ArgumentsTest`
 
 ### Using Properties File
 
@@ -304,6 +322,9 @@ paramixel.tags.exclude=.*slow.*,.*flaky.*
 
 # Control test class parallelism (default: number of available processors)
 paramixel.parallelism=4
+
+# Limit class name width in the Maven-only summary table
+paramixel.summary.classNameMaxLength=60
 ```
 
 ### Configuration Precedence

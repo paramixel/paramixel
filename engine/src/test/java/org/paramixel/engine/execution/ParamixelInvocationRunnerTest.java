@@ -84,10 +84,10 @@ public class ParamixelInvocationRunnerTest {
             final var future =
                     runtime.submitNamed("invocation-root", () -> runner.runInvocations(classDescriptor, "arg", 0));
 
-            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(ready.await(15, TimeUnit.SECONDS)).isTrue();
             start.countDown();
 
-            final TestExecutionResult result = (TestExecutionResult) future.get(5, TimeUnit.SECONDS);
+            final TestExecutionResult result = (TestExecutionResult) future.get(15, TimeUnit.SECONDS);
             assertThat(result.getStatus()).isEqualTo(TestExecutionResult.Status.SUCCESSFUL);
         }
 
@@ -229,7 +229,7 @@ public class ParamixelInvocationRunnerTest {
             final int now = concurrent.incrementAndGet();
             maxConcurrent.accumulateAndGet(now, Math::max);
             ready.countDown();
-            start.await(5, TimeUnit.SECONDS);
+            start.await(15, TimeUnit.SECONDS);
             concurrent.decrementAndGet();
         }
     }

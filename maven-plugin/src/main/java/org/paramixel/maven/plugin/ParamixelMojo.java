@@ -103,6 +103,15 @@ public class ParamixelMojo extends AbstractMojo {
     private String tagsExclude;
 
     /**
+     * Maximum rendered class-name length in the Maven-only summary table.
+     *
+     * <p>When set, class names in the {@code Paramixel Test Summary} table are abbreviated by
+     * shortening package segments while keeping the final segment intact.
+     */
+    @Parameter(property = "paramixel.summary.classNameMaxLength")
+    private Integer summaryClassNameMaxLength;
+
+    /**
      * Creates a new Mojo instance.
      *
      * @since 0.0.1
@@ -116,6 +125,14 @@ public class ParamixelMojo extends AbstractMojo {
         if (skipTests) {
             getLog().info("Tests are skipped.");
             return;
+        }
+
+        if (summaryClassNameMaxLength != null && summaryClassNameMaxLength < 1) {
+            final String raw = String.valueOf(summaryClassNameMaxLength);
+            throw new MojoFailureException(
+                    "Invalid paramixel.summary.classNameMaxLength: value must be an integer in range [1, 2147483647] (raw='"
+                            + raw
+                            + "')");
         }
 
         /*
@@ -265,6 +282,12 @@ public class ParamixelMojo extends AbstractMojo {
         if (parallelism != null) {
             requestBuilder.configurationParameter("paramixel.parallelism", String.valueOf(parallelism));
             getLog().info("Paramixel parallelism: " + parallelism);
+        }
+
+        if (summaryClassNameMaxLength != null) {
+            requestBuilder.configurationParameter(
+                    "paramixel.summary.classNameMaxLength", String.valueOf(summaryClassNameMaxLength));
+            getLog().info("Paramixel summary class name max length: " + summaryClassNameMaxLength);
         }
 
         if (tagsInclude != null && !tagsInclude.trim().isEmpty()) {

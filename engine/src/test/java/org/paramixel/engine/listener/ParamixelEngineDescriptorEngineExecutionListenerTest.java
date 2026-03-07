@@ -228,6 +228,36 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         }
     }
 
+    @Test
+    public void tableClassNamesAreAbbreviatedWhenSummaryClassNameMaxLengthIsConfigured() throws Exception {
+        final UniqueId rootId = UniqueId.forEngine("paramixel");
+        final ParamixelEngineDescriptor engine = new ParamixelEngineDescriptor(rootId, "paramixel");
+
+        final String fullClassName = "com.example.deep.pkg.ClassName";
+        final String expectedRendered = "c.e.d.pkg.ClassName";
+
+        final ParamixelEngineDescriptorEngineExecutionListener engineListener =
+                new ParamixelEngineDescriptorEngineExecutionListener(printer, 19);
+
+        engineListener.executionStarted(engine);
+
+        AbstractEngineExecutionListener.ExecutionSummary summary = AbstractEngineExecutionListener.EXECUTION_SUMMARY;
+        AbstractEngineExecutionListener.ExecutionSummary.ClassStats stats =
+                new AbstractEngineExecutionListener.ExecutionSummary.ClassStats(fullClassName);
+        summary.getClassStatsMap().put(fullClassName, stats);
+        stats.passed.set(1);
+        stats.failed.set(0);
+        stats.totalDurationMillis.set(10L);
+        setClassArgumentCount(summary, fullClassName, 1);
+        setClassMethodCount(summary, fullClassName, 1);
+
+        engineListener.executionFinished(engine, TestExecutionResult.successful());
+
+        final String normalizedOutput = stripAnsi(out.toString());
+        assertThat(normalizedOutput).contains(expectedRendered);
+        assertThat(normalizedOutput).doesNotContain(fullClassName);
+    }
+
     private static List<Integer> getTableLineLengths(final String output) {
         String[] lines = output.split("\n");
         List<Integer> lengths = new ArrayList<>();
