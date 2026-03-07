@@ -48,6 +48,7 @@ threads with a concurrency-limited executor.
 org.paramixel.engine
 +-- ParamixelTestEngine.java
 +-- api/            Concrete context/store implementations
++-- configuration/  Engine configuration resolution
 +-- descriptor/     JUnit Platform TestDescriptor hierarchy
 +-- discovery/      Test class scanner
 +-- execution/      Runners + concurrency primitives

@@ -48,7 +48,6 @@ import org.junit.platform.engine.UniqueId;
  * @see ParamixelTestClassDescriptor
  * @see ParamixelTestMethodDescriptor
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelInvocationDescriptor extends AbstractParamixelDescriptor {
 
@@ -68,7 +67,6 @@ public final class ParamixelInvocationDescriptor extends AbstractParamixelDescri
      * @param uniqueId the uniqueId
      * @param invocationIndex the invocationIndex
      * @param argument the argument
-     * @since 0.0.1
      */
     public ParamixelInvocationDescriptor(
             final @NonNull UniqueId uniqueId, final int invocationIndex, final Object argument) {
@@ -88,7 +86,6 @@ public final class ParamixelInvocationDescriptor extends AbstractParamixelDescri
      * lifecycle methods, this returns null.</p>
      *
      * @return the invocation argument, or null
-     * @since 0.0.1
      */
     public Object getArgument() {
         return argument;

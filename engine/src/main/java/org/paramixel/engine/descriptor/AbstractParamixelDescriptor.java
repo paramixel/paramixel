@@ -40,7 +40,6 @@ import org.junit.platform.engine.UniqueId;
  * @see ParamixelTestMethodDescriptor
  * @see ParamixelInvocationDescriptor
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public abstract class AbstractParamixelDescriptor implements TestDescriptor {
 
@@ -75,7 +74,6 @@ public abstract class AbstractParamixelDescriptor implements TestDescriptor {
      * @param uniqueId the uniqueId
      * @param displayName the displayName
      * @param type the type
-     * @since 0.0.1
      */
     protected AbstractParamixelDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull String displayName, final @NonNull Type type) {

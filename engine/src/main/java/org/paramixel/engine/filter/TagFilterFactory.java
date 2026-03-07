@@ -16,13 +16,13 @@
 
 package org.paramixel.engine.filter;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.ConfigurationParameters;
+import org.paramixel.engine.util.EngineConfigurationUtil;
 
 /**
  * Factory for creating {@link TagFilter} instances from various configuration sources.
@@ -35,7 +35,6 @@ import org.junit.platform.engine.ConfigurationParameters;
  *   <li>Programmatic list of patterns</li>
  * </ul>
  *
- * @since 0.0.1
  * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public final class TagFilterFactory {
@@ -51,8 +50,6 @@ public final class TagFilterFactory {
 
     /**
      * Creates a new instance.
-     *
-     * @since 0.0.1
      */
     private TagFilterFactory() {
         // INTENTIONALLY EMPTY
@@ -62,32 +59,38 @@ public final class TagFilterFactory {
      * Creates a tag filter from system properties.
      *
      * <p>Reads {@code paramixel.tags.include} and {@code paramixel.tags.exclude} from
-     * system properties. Patterns are comma-separated.</p>
+     * system properties. Each value represents a single regex pattern.</p>
      *
      * @return a configured {@link TagFilter}; never {@code null}
-     * @since 0.0.1
      */
     public static TagFilter fromSystemProperties() {
-        return fromProperties(System.getProperties());
+        return fromProperties(System.getProperties(), EngineConfigurationUtil.Source.SYSTEM_PROPERTIES);
     }
 
     /**
      * Creates a tag filter from a properties object.
      *
      * <p>Reads {@code paramixel.tags.include} and {@code paramixel.tags.exclude} from
-     * the provided properties. Patterns are comma-separated.</p>
+     * the provided properties. Each value represents a single regex pattern.</p>
      *
      * @param properties the properties to read from; never {@code null}
      * @return a configured {@link TagFilter}; never {@code null}
-     * @since 0.0.1
      */
     public static TagFilter fromProperties(final @NonNull Properties properties) {
+        return fromProperties(properties, EngineConfigurationUtil.Source.PROPERTIES_FILE);
+    }
+
+    public static TagFilter fromProperties(
+            final @NonNull Properties properties, final EngineConfigurationUtil.Source source) {
         Objects.requireNonNull(properties, "properties must not be null");
 
-        final String includeValue = properties.getProperty(TAGS_INCLUDE_KEY, "");
-        final String excludeValue = properties.getProperty(TAGS_EXCLUDE_KEY, "");
+        final boolean includePresent = properties.containsKey(TAGS_INCLUDE_KEY);
+        final boolean excludePresent = properties.containsKey(TAGS_EXCLUDE_KEY);
 
-        return fromPatterns(parsePatterns(includeValue), parsePatterns(excludeValue));
+        final String includeValue = includePresent ? properties.getProperty(TAGS_INCLUDE_KEY, "") : null;
+        final String excludeValue = excludePresent ? properties.getProperty(TAGS_EXCLUDE_KEY, "") : null;
+
+        return fromOptionalPatterns(includeValue, includePresent, excludeValue, excludePresent, source, source);
     }
 
     /**
@@ -95,27 +98,71 @@ public final class TagFilterFactory {
      *
      * @param configParameters the configParameters
      * @return the result
-     * @since 0.0.1
      */
     public static TagFilter fromConfigurationParameters(final @NonNull ConfigurationParameters configParameters) {
         Objects.requireNonNull(configParameters, "configParameters must not be null");
 
-        final String includeValue = configParameters.get(TAGS_INCLUDE_KEY).orElse("");
-        final String excludeValue = configParameters.get(TAGS_EXCLUDE_KEY).orElse("");
+        return fromConfigurationParametersAndProperties(configParameters, new Properties());
+    }
 
-        return fromPatterns(parsePatterns(includeValue), parsePatterns(excludeValue));
+    public static TagFilter fromConfigurationParametersAndProperties(
+            final @NonNull ConfigurationParameters configParameters, final @NonNull Properties properties) {
+        Objects.requireNonNull(configParameters, "configParameters must not be null");
+        Objects.requireNonNull(properties, "properties must not be null");
+
+        final boolean includeFromConfig = configParameters.get(TAGS_INCLUDE_KEY).isPresent();
+        final boolean excludeFromConfig = configParameters.get(TAGS_EXCLUDE_KEY).isPresent();
+
+        final boolean includePresent = includeFromConfig || properties.containsKey(TAGS_INCLUDE_KEY);
+        final boolean excludePresent = excludeFromConfig || properties.containsKey(TAGS_EXCLUDE_KEY);
+
+        final String includeValue = includeFromConfig
+                ? configParameters.get(TAGS_INCLUDE_KEY).orElse("")
+                : properties.getProperty(TAGS_INCLUDE_KEY);
+        final String excludeValue = excludeFromConfig
+                ? configParameters.get(TAGS_EXCLUDE_KEY).orElse("")
+                : properties.getProperty(TAGS_EXCLUDE_KEY);
+
+        final EngineConfigurationUtil.Source includeSource = includeFromConfig
+                ? EngineConfigurationUtil.Source.JUNIT_CONFIG
+                : EngineConfigurationUtil.Source.PROPERTIES_FILE;
+        final EngineConfigurationUtil.Source excludeSource = excludeFromConfig
+                ? EngineConfigurationUtil.Source.JUNIT_CONFIG
+                : EngineConfigurationUtil.Source.PROPERTIES_FILE;
+
+        return fromOptionalPatterns(
+                includeValue, includePresent, excludeValue, excludePresent, includeSource, excludeSource);
     }
 
     /**
      * Creates a tag filter from explicit pattern strings.
      *
-     * @param includePatterns comma-separated include patterns; may be empty or {@code null}
-     * @param excludePatterns comma-separated exclude patterns; may be empty or {@code null}
+     * @param includePattern include pattern; may be {@code null} to indicate no include filtering
+     * @param excludePattern exclude pattern; may be {@code null} to indicate no exclude filtering
      * @return a configured {@link TagFilter}; never {@code null}
-     * @since 0.0.1
      */
-    public static TagFilter fromPatternStrings(final String includePatterns, final String excludePatterns) {
-        return fromPatterns(parsePatterns(includePatterns), parsePatterns(excludePatterns));
+    public static TagFilter fromPatternStrings(final String includePattern, final String excludePattern) {
+        return fromOptionalPatterns(
+                includePattern,
+                includePattern != null,
+                excludePattern,
+                excludePattern != null,
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
+    }
+
+    private static TagFilter fromOptionalPatterns(
+            final String includeValue,
+            final boolean includePresent,
+            final String excludeValue,
+            final boolean excludePresent,
+            final EngineConfigurationUtil.Source includeSource,
+            final EngineConfigurationUtil.Source excludeSource) {
+        return fromPatterns(
+                parseOptionalPattern(includeValue, includePresent, TAGS_INCLUDE_KEY, includeSource),
+                parseOptionalPattern(excludeValue, excludePresent, TAGS_EXCLUDE_KEY, excludeSource),
+                includeSource,
+                excludeSource);
     }
 
     /**
@@ -124,40 +171,38 @@ public final class TagFilterFactory {
      * @param includePatterns the includePatterns
      * @param excludePatterns the excludePatterns
      * @return the result
-     * @since 0.0.1
      */
     public static TagFilter fromPatterns(
             final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
+        return fromPatterns(
+                includePatterns,
+                excludePatterns,
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
+    }
+
+    public static TagFilter fromPatterns(
+            final @NonNull List<String> includePatterns,
+            final @NonNull List<String> excludePatterns,
+            final EngineConfigurationUtil.Source includeSource,
+            final EngineConfigurationUtil.Source excludeSource) {
         Objects.requireNonNull(includePatterns, "includePatterns must not be null");
         Objects.requireNonNull(excludePatterns, "excludePatterns must not be null");
 
-        return new RegexTagFilter(includePatterns, excludePatterns);
+        return new RegexTagFilter(includePatterns, excludePatterns, includeSource, excludeSource);
     }
 
-    /**
-     * Parses a comma-separated string of patterns into a list.
-     *
-     * <p>Empty strings and whitespace-only patterns are filtered out.</p>
-     *
-     * @param value the comma-separated pattern string; may be {@code null} or empty
-     * @return list of non-empty patterns; never {@code null}
-     * @since 0.0.1
-     */
-    private static List<String> parsePatterns(final String value) {
-        if (value == null || value.trim().isEmpty()) {
+    private static List<String> parseOptionalPattern(
+            final String rawValue,
+            final boolean present,
+            final String key,
+            final EngineConfigurationUtil.Source source) {
+        if (!present) {
             return Collections.emptyList();
         }
 
-        final List<String> patterns = new ArrayList<>();
-        final String[] parts = value.split(",");
-
-        for (String part : parts) {
-            final String trimmed = part.trim();
-            if (!trimmed.isEmpty()) {
-                patterns.add(trimmed);
-            }
-        }
-
-        return Collections.unmodifiableList(patterns);
+        final String normalized =
+                EngineConfigurationUtil.normalizeProvided(key, rawValue == null ? "" : rawValue, source);
+        return List.of(normalized);
     }
 }

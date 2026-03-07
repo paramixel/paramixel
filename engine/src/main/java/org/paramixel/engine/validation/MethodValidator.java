@@ -41,14 +41,11 @@ import org.paramixel.api.Paramixel;
  * the returned failures.</p>
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class MethodValidator {
 
     /**
      * Creates a new instance.
-     *
-     * @since 0.0.1
      */
     private MethodValidator() {
         // INTENTIONALLY EMPTY
@@ -62,7 +59,6 @@ public final class MethodValidator {
      *
      * @param testClass the test class to validate
      * @return a list of validation failures; empty when the class is valid
-     * @since 0.0.1
      */
     public static List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
         final List<ValidationFailure> failures = new ArrayList<>();
@@ -116,7 +112,6 @@ public final class MethodValidator {
      *
      * @param testClass the testClass
      * @return the result
-     * @since 0.0.1
      */
     private static List<Class<?>> buildClassHierarchy(final @NonNull Class<?> testClass) {
         final List<Class<?>> result = new ArrayList<>();
@@ -133,7 +128,6 @@ public final class MethodValidator {
      *
      * @param method the method
      * @return the result
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateArgumentsCollectorMethod(final @NonNull Method method) {
         final List<ValidationFailure> failures = new ArrayList<>();
@@ -167,7 +161,6 @@ public final class MethodValidator {
      * @param isTestMethod the isTestMethod
      * @param isLifecycleMethod the isLifecycleMethod
      * @return the result
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateOrderAnnotationUsage(
             final @NonNull Method method, final boolean isTestMethod, final boolean isLifecycleMethod) {
@@ -196,7 +189,6 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateTestMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
@@ -226,7 +218,6 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateBeforeEachMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
@@ -258,7 +249,6 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateAfterEachMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
@@ -290,7 +280,6 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateBeforeAllMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
@@ -317,7 +306,6 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateAfterAllMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
@@ -343,7 +331,6 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateInitializeMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();
@@ -375,7 +362,6 @@ public final class MethodValidator {
      *
      * @param method the method to validate
      * @return validation failures for the method
-     * @since 0.0.1
      */
     private static List<ValidationFailure> validateFinalizeMethod(final @NonNull Method method) {
         List<ValidationFailure> failures = new ArrayList<>();

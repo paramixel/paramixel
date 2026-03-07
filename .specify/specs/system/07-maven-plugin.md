@@ -21,8 +21,8 @@ classes in the test output directory and executes them via the JUnit Platform La
 | `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@Paramixel.TestClass` found |
 | `parallelism` | `paramixel.parallelism` | (engine default) | `Integer` | Global max parallelism; when unset, engine default applies |
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |
-| `tagsInclude` | `paramixel.tags.include` | (none) | `String` | Comma-separated regex patterns; includes matching tags |
-| `tagsExclude` | `paramixel.tags.exclude` | (none) | `String` | Comma-separated regex patterns; excludes matching tags |
+| `tagsInclude` | `paramixel.tags.include` | (none) | `String` | Regex pattern; includes matching tags |
+| `tagsExclude` | `paramixel.tags.exclude` | (none) | `String` | Regex pattern; excludes matching tags |
 | `summaryClassNameMaxLength` | `paramixel.summary.classNameMaxLength` | `2147483647` | `Integer` | Maximum rendered class-name length in the Maven-only summary table |
 
 ## Execution Behavior
@@ -34,12 +34,10 @@ classes in the test output directory and executes them via the JUnit Platform La
 5. If no classes found and `failIfNoTests=true`: throw `MojoFailureException`.
    If no classes found and `failIfNoTests=false`: log warning and return.
 6. Create `LauncherDiscoveryRequest` with one `ClassSelector` per test class, filtered to
-   engine `"paramixel"`, with `configurationParameter("invokedBy", "maven")`.
+   engine `"paramixel"`, with:
+   - `configurationParameter("paramixel.internal.invoker", "paramixe-maven-plugin")`
 7. Execute via `Launcher.execute()`.
 8. If `summary.getTotalFailureCount() > 0`: throw `MojoFailureException("Tests failed: N of M tests")`.
-
-In Maven invocation mode (`invokedBy=maven`), the engine MUST print a final line containing
-either `TESTS PASSED` or `TESTS FAILED`.
 
 ## Error Handling
 
@@ -62,19 +60,25 @@ regular expressions.
 
 | Parameter | Description |
 |---|---|
-| `paramixel.tags.include` | Comma-separated regex patterns; classes matching ANY pattern are included |
-| `paramixel.tags.exclude` | Comma-separated regex patterns; classes matching ANY pattern are excluded |
+| `paramixel.tags.include` | Regex pattern; classes matching the pattern are included |
+| `paramixel.tags.exclude` | Regex pattern; classes matching the pattern are excluded |
 
 **Configuration sources (same precedence as other properties):**
-- System properties: `-Dparamixel.tags.include=pattern`
-- Maven CLI: `-Dparamixel.tags.include=pattern`
-- JUnit Platform configuration parameters
-- Properties file (`paramixel.properties`): `paramixel.tags.include=pattern`
+- JUnit Platform configuration parameters (e.g., Maven `-Dparamixel.tags.include=pattern`)
+- Properties file (`paramixel.properties`, optional)
+
+### Normalization
+
+When `paramixel.tags.include` or `paramixel.tags.exclude` is provided, the engine MUST apply
+standard configuration normalization (trim, then decode Unicode escapes; do not trim again).
+
+If the key is present in configuration parameters, system properties, or `paramixel.properties`,
+the normalized value MUST be non-blank. A blank string is invalid.
 
 ### Matching Behavior
 
-1. **Include patterns applied first:** A class matches if ANY of its tags matches ANY include pattern.
-2. **Exclude patterns applied second:** Matching classes are removed if ANY of their tags matches ANY exclude pattern.
+1. **Include pattern applied first:** A class matches if ANY of its tags matches the include pattern.
+2. **Exclude pattern applied second:** Matching classes are removed if ANY of their tags matches the exclude pattern.
 3. **Default behavior:** Without include patterns, all classes pass (except excluded ones).
 4. **Untagged classes:** Only included when no include patterns are configured.
 5. **Case sensitive:** Regex matching uses Java's default case-sensitive behavior.
@@ -91,8 +95,8 @@ regular expressions.
 # Include integration tests except slow ones
 ./mvnw test -Dparamixel.tags.include="integration-.*" -Dparamixel.tags.exclude=".*slow.*"
 
-# Include multiple patterns
-./mvnw test -Dparamixel.tags.include="^unit$,^fast$"
+# Include multiple tags (single regex via alternation)
+./mvnw test -Dparamixel.tags.include="^(unit|fast)$"
 ```
 
 ### Maven Plugin Tag Configuration
@@ -113,7 +117,7 @@ regular expressions.
 
 ```properties
 paramixel.tags.include=integration-.*
-paramixel.tags.exclude=.*slow.*,.*flaky.*
+paramixel.tags.exclude=.*(slow|flaky).*
 ```
 
 ### Tag Filtering Error Handling
@@ -121,7 +125,7 @@ paramixel.tags.exclude=.*slow.*,.*flaky.*
 | Condition | Result |
 |---|---|
 | Invalid regex pattern | Exception printed; test execution fails before discovery |
-| Empty pattern string | Ignored |
+| Empty pattern string when key is present | Invalid configuration; fail fast |
 | No matching classes after filtering | Discovery completes with 0 test classes |
 
 **Strict Validation:** Invalid regex patterns in `paramixel.tags.include` or
@@ -132,7 +136,7 @@ MUST validate all patterns during initialization, before test discovery begins.
 
 ## Maven Summary Table Class Name Rendering
 
-When invoked by Maven (`invokedBy=maven`), Paramixel emits a `Paramixel Test Summary` table.
+When invoked by Maven (`paramixel.internal.invoker=paramixe-maven-plugin`), Paramixel emits a `Paramixel Test Summary` table.
 The class name column can be abbreviated to improve readability.
 
 ### Configuration Parameter

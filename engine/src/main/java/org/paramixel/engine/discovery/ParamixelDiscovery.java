@@ -57,6 +57,7 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
 import org.paramixel.engine.filter.TagFilter;
 import org.paramixel.engine.filter.TagFilterFactory;
 import org.paramixel.engine.invoker.ParamixelReflectionInvoker;
+import org.paramixel.engine.util.PropertiesLoaderUtil;
 import org.paramixel.engine.validation.TestClassValidator;
 import org.paramixel.engine.validation.ValidationFailure;
 
@@ -91,14 +92,11 @@ import org.paramixel.engine.validation.ValidationFailure;
  * synchronization.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelDiscovery {
 
     /**
      * Creates a new discovery instance.
-     *
-     * @since 0.0.1
      */
     public ParamixelDiscovery() {
         // INTENTIONALLY EMPTY
@@ -140,14 +138,16 @@ public final class ParamixelDiscovery {
      *
      * @param request the request
      * @param engineDescriptor the engineDescriptor
-     * @since 0.0.1
      */
     public void discoverTests(
             final @NonNull EngineDiscoveryRequest request, final @NonNull TestDescriptor engineDescriptor) {
         LOGGER.fine("Starting Paramixel test discovery");
 
         // Validate tag filter configuration up-front (invalid regex patterns must fail discovery).
-        final TagFilter tagFilter = TagFilterFactory.fromConfigurationParameters(request.getConfigurationParameters());
+        final var rawProperties =
+                PropertiesLoaderUtil.loadProjectRootPropertiesOrFail("paramixel.properties", "paramixel.properties");
+        final TagFilter tagFilter = TagFilterFactory.fromConfigurationParametersAndProperties(
+                request.getConfigurationParameters(), rawProperties);
 
         // Step 1: Discover all test classes
         final Set<Class<?>> testClasses = discoverTestClasses(request);
@@ -190,7 +190,6 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the class to validate
      * @return list of validation failures; empty if valid
-     * @since 0.0.1
      */
     private List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
         if (isDisabled(testClass)) {
@@ -217,7 +216,6 @@ public final class ParamixelDiscovery {
      *
      * @param request the discovery request
      * @return set of discovered test classes
-     * @since 0.0.1
      */
     private Set<Class<?>> discoverTestClasses(final @NonNull EngineDiscoveryRequest request) {
         final Predicate<String> classFilter = buildClassFilter(request);
@@ -302,7 +300,6 @@ public final class ParamixelDiscovery {
      *
      * @param request the discovery request
      * @return a predicate that tests if a class name passes all filters
-     * @since 0.0.1
      */
     private Predicate<String> buildClassFilter(final @NonNull EngineDiscoveryRequest request) {
         final List<Predicate<String>> filters = new ArrayList<>();
@@ -353,7 +350,6 @@ public final class ParamixelDiscovery {
      *
      * @param clazz the class to check
      * @return true if the class has @Paramixel.TestClass annotation
-     * @since 0.0.1
      */
     private boolean isParamixelTestClass(final @NonNull Class<?> clazz) {
         return clazz.isAnnotationPresent(Paramixel.TestClass.class);
@@ -364,7 +360,6 @@ public final class ParamixelDiscovery {
      *
      * @param packageName the package name
      * @return set of classes in the package
-     * @since 0.0.1
      */
     private Set<Class<?>> findClassesInPackage(final @NonNull String packageName) {
         final Set<Class<?>> classes = new LinkedHashSet<>();
@@ -391,7 +386,6 @@ public final class ParamixelDiscovery {
      * @param directory the directory
      * @param packageName the packageName
      * @param classes the classes
-     * @since 0.0.1
      */
     private void findClassesInDirectory(
             final @NonNull File directory, final @NonNull String packageName, final @NonNull Set<Class<?>> classes) {
@@ -428,7 +422,6 @@ public final class ParamixelDiscovery {
      *
      * @param classpathRoot the classpath root URI
      * @return set of classes in the classpath root
-     * @since 0.0.1
      */
     private Set<Class<?>> findClassesInClasspathRoot(final @NonNull URI classpathRoot) {
         final Set<Class<?>> classes = new LinkedHashSet<>();
@@ -448,7 +441,6 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the testClass
      * @param engineDescriptor the engineDescriptor
-     * @since 0.0.1
      */
     private void buildTestClassDescriptor(
             final @NonNull Class<?> testClass, final @NonNull TestDescriptor engineDescriptor) {
@@ -470,7 +462,6 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the testClass
      * @param classDescriptor the classDescriptor
-     * @since 0.0.1
      */
     private void discoverTestMethods(
             final @NonNull Class<?> testClass, final @NonNull ParamixelTestClassDescriptor classDescriptor) {
@@ -525,7 +516,6 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the testClass
      * @return the result
-     * @since 0.0.1
      */
     private List<Method> getFlattenedTestMethods(final @NonNull Class<?> testClass) {
         final Map<String, Method> bySignature = new LinkedHashMap<>();
@@ -556,7 +546,6 @@ public final class ParamixelDiscovery {
      *
      * @param method the method
      * @return the result
-     * @since 0.0.1
      */
     private static String signatureKey(final @NonNull Method method) {
         final StringBuilder builder = new StringBuilder();
@@ -578,7 +567,6 @@ public final class ParamixelDiscovery {
      *
      * @param testClass the test class
      * @return array of arguments, or single null element if no supplier
-     * @since 0.0.1
      */
     private SupplierArguments getSupplierArguments(final @NonNull Class<?> testClass) {
         Method selected = null;
@@ -640,7 +628,6 @@ public final class ParamixelDiscovery {
      * descriptor construction.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     private static final class SupplierArguments {
 
@@ -669,7 +656,6 @@ public final class ParamixelDiscovery {
          *
          * @param arguments the collected arguments; never {@code null}
          * @param parallelism the resolved parallelism; must be {@code >= 1}
-         * @since 0.0.1
          */
         private SupplierArguments(final Object[] arguments, final int parallelism) {
             this.arguments = arguments;
@@ -682,7 +668,6 @@ public final class ParamixelDiscovery {
          * <p>This result indicates that a supplier exists but does not provide any arguments.
          *
          * @return an empty supplier result; never {@code null}
-         * @since 0.0.1
          */
         private static SupplierArguments empty() {
             return new SupplierArguments(new Object[0], DEFAULT_PARALLELISM);
@@ -695,7 +680,6 @@ public final class ParamixelDiscovery {
          * {@code null} so that non-parameterized test classes still execute.
          *
          * @return a sentinel supplier result; never {@code null}
-         * @since 0.0.1
          */
         private static SupplierArguments noSupplier() {
             return new SupplierArguments(new Object[] {null}, DEFAULT_PARALLELISM);
@@ -708,7 +692,6 @@ public final class ParamixelDiscovery {
      * @param annotated the annotated element (Class or Method)
      * @param defaultName the default name to use if no annotation or empty
      * @return the display name
-     * @since 0.0.1
      */
     private String getDisplayName(final @NonNull AnnotatedElement annotated, final @NonNull String defaultName) {
         final Paramixel.DisplayName displayNameAnnotation = annotated.getAnnotation(Paramixel.DisplayName.class);
@@ -726,7 +709,6 @@ public final class ParamixelDiscovery {
      *
      * @param annotated the annotated element (Class or Method)
      * @return true if the element is disabled
-     * @since 0.0.1
      */
     private boolean isDisabled(final @NonNull AnnotatedElement annotated) {
         return annotated.isAnnotationPresent(Paramixel.Disabled.class);
@@ -739,7 +721,6 @@ public final class ParamixelDiscovery {
      *
      * @param uniqueId the unique ID to parse
      * @return the class name, or null if not found
-     * @since 0.0.1
      */
     private String extractClassNameFromUniqueId(final @NonNull UniqueId uniqueId) {
         if (uniqueId == null) {
@@ -763,7 +744,6 @@ public final class ParamixelDiscovery {
      *
      * @param method the method to inspect; never {@code null}
      * @return the configured order value, or {@link Integer#MAX_VALUE} when unordered
-     * @since 0.0.1
      */
     private static int getOrderValue(final Method method) {
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);

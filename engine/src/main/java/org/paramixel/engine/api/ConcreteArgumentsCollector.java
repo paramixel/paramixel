@@ -36,7 +36,6 @@ import org.paramixel.api.EngineContext;
  * thread during discovery.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ConcreteArgumentsCollector implements ArgumentsCollector {
 
@@ -63,7 +62,6 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * Creates a new supplier context.
      *
      * @param engineContext the engine context associated with the class; never {@code null}
-     * @since 0.0.1
      */
     public ConcreteArgumentsCollector(final @NonNull EngineContext engineContext) {
         this.engineContext = Objects.requireNonNull(engineContext, "engineContext must not be null");
@@ -110,7 +108,6 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * <p>The returned array preserves insertion order.
      *
      * @return collected argument values; never {@code null}
-     * @since 0.0.1
      */
     public Object[] toArray() {
         return arguments.toArray();
@@ -123,7 +120,6 @@ public final class ConcreteArgumentsCollector implements ArgumentsCollector {
      * {@link #setParallelism(int)}.
      *
      * @return the configured parallelism; always {@code >= 1}
-     * @since 0.0.1
      */
     public int getParallelism() {
         return parallelism;

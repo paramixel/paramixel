@@ -9,7 +9,8 @@ the relevant specs (referenced inline).
 
 1. Create `org.paramixel.api.MyNewInterface.java` in `api/src/main/java/org/paramixel/api/`.
 2. Add Apache license header from `assets/license-header.txt`.
-3. Add full Javadoc with `@author` and `@since` (see `09-conventions.md` section 6).
+3. Add full Javadoc. Use `@since` on every public type/method/constructor/field.
+   Do not use `@since` on non-public declarations (see `09-conventions.md` section 6).
 4. Add `@NonNull` to all non-null reference-type parameters.
 5. Create a concrete implementation in
    `engine/src/main/java/org/paramixel/engine/api/ConcreteMyNew.java`.
@@ -25,8 +26,8 @@ the relevant specs (referenced inline).
 
 1. Add nested `@interface` inside `org.paramixel.api.Paramixel` following existing patterns.
 2. Set `@Retention(RetentionPolicy.RUNTIME)`, `@Documented`, and appropriate `@Target`.
-3. Add full Javadoc including signature requirements and lifecycle ordering. Include `@author`
-   and `@since`.
+3. Add full Javadoc including signature requirements and lifecycle ordering. Include `@author`.
+   Use `@since` on every public type/method/constructor/field and never on non-public declarations.
 4. If the annotation applies to methods, add validation logic to
    `MethodValidator.validateTestClass()`.
 5. Add corresponding lifecycle hook in `ParamixelClassRunner` or `ParamixelInvocationRunner`.

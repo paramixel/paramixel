@@ -47,7 +47,6 @@ import org.paramixel.api.Paramixel;
  * Provides ParamixelMojo.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 @Mojo(
         name = "test",
@@ -90,14 +89,14 @@ public class ParamixelMojo extends AbstractMojo {
 
     /**
      * Include tags for test filtering.
-     * Comma-separated list of regex patterns.
+     * Regex pattern.
      */
     @Parameter(property = "paramixel.tags.include")
     private String tagsInclude;
 
     /**
      * Exclude tags for test filtering.
-     * Comma-separated list of regex patterns.
+     * Regex pattern.
      */
     @Parameter(property = "paramixel.tags.exclude")
     private String tagsExclude;
@@ -113,8 +112,6 @@ public class ParamixelMojo extends AbstractMojo {
 
     /**
      * Creates a new Mojo instance.
-     *
-     * @since 0.0.1
      */
     public ParamixelMojo() {
         // INTENTIONALLY EMPTY
@@ -127,10 +124,22 @@ public class ParamixelMojo extends AbstractMojo {
             return;
         }
 
+        if (parallelism != null && parallelism < 1) {
+            final String raw = String.valueOf(parallelism);
+            throw new MojoFailureException(
+                    "Invalid configuration: paramixel.parallelism: must be an integer in range [1, 2147483647] (source=maven-plugin raw='"
+                            + raw
+                            + "' normalized='"
+                            + raw
+                            + "')");
+        }
+
         if (summaryClassNameMaxLength != null && summaryClassNameMaxLength < 1) {
             final String raw = String.valueOf(summaryClassNameMaxLength);
             throw new MojoFailureException(
-                    "Invalid paramixel.summary.classNameMaxLength: value must be an integer in range [1, 2147483647] (raw='"
+                    "Invalid configuration: paramixel.summary.classNameMaxLength: must be an integer in range [1, 2147483647] (source=maven-plugin raw='"
+                            + raw
+                            + "' normalized='"
                             + raw
                             + "')");
         }
@@ -185,7 +194,6 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @param classLoader the classLoader
      * @return a list of test classes to execute
-     * @since 0.0.1
      */
     private List<Class<?>> discoverTestClasses(final @NonNull ClassLoader classLoader) {
         final File testClassesDir = new File(project.getBuild().getTestOutputDirectory());
@@ -220,7 +228,6 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @param directory the directory to scan
      * @return a set of fully qualified class names
-     * @since 0.0.1
      */
     private Set<String> scanForTestClasses(final @NonNull File directory) {
         if (!directory.exists() || !directory.isDirectory()) {
@@ -238,7 +245,6 @@ public class ParamixelMojo extends AbstractMojo {
      * @param directory the directory
      * @param basePath the basePath
      * @param classNames the classNames
-     * @since 0.0.1
      */
     private void scanDirectoryRecursive(
             final @NonNull File directory, final @NonNull String basePath, final @NonNull Set<String> classNames) {
@@ -264,7 +270,6 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @param testClasses the classes to execute
      * @throws Exception if execution fails
-     * @since 0.0.1
      */
     private void executeTests(final @NonNull List<Class<?>> testClasses) throws Exception {
         getLog().info("Executing " + testClasses.size() + " test classes");
@@ -277,7 +282,7 @@ public class ParamixelMojo extends AbstractMojo {
 
         requestBuilder.filters(EngineFilter.includeEngines("paramixel"));
 
-        requestBuilder.configurationParameter("invokedBy", "maven");
+        requestBuilder.configurationParameter("paramixel.internal.invoker", "paramixe-maven-plugin");
 
         if (parallelism != null) {
             requestBuilder.configurationParameter("paramixel.parallelism", String.valueOf(parallelism));
@@ -290,14 +295,32 @@ public class ParamixelMojo extends AbstractMojo {
             getLog().info("Paramixel summary class name max length: " + summaryClassNameMaxLength);
         }
 
-        if (tagsInclude != null && !tagsInclude.trim().isEmpty()) {
-            requestBuilder.configurationParameter("paramixel.tags.include", tagsInclude.trim());
-            getLog().info("Including tests with tags matching: " + tagsInclude.trim());
+        if (tagsInclude != null) {
+            final String normalized = tagsInclude.trim();
+            if (normalized.isEmpty()) {
+                throw new MojoFailureException(
+                        "Invalid configuration: paramixel.tags.include: must not be blank (source=maven-plugin raw='"
+                                + tagsInclude
+                                + "' normalized='"
+                                + normalized
+                                + "')");
+            }
+            requestBuilder.configurationParameter("paramixel.tags.include", normalized);
+            getLog().info("Including tests with tags matching: " + normalized);
         }
 
-        if (tagsExclude != null && !tagsExclude.trim().isEmpty()) {
-            requestBuilder.configurationParameter("paramixel.tags.exclude", tagsExclude.trim());
-            getLog().info("Excluding tests with tags matching: " + tagsExclude.trim());
+        if (tagsExclude != null) {
+            final String normalized = tagsExclude.trim();
+            if (normalized.isEmpty()) {
+                throw new MojoFailureException(
+                        "Invalid configuration: paramixel.tags.exclude: must not be blank (source=maven-plugin raw='"
+                                + tagsExclude
+                                + "' normalized='"
+                                + normalized
+                                + "')");
+            }
+            requestBuilder.configurationParameter("paramixel.tags.exclude", normalized);
+            getLog().info("Excluding tests with tags matching: " + normalized);
         }
 
         final LauncherDiscoveryRequest request = requestBuilder.build();
@@ -324,7 +347,6 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @return a class loader for executing tests
      * @throws Exception if classpath URLs cannot be built
-     * @since 0.0.1
      */
     private URLClassLoader buildTestClassLoader() throws Exception {
         final List<URL> classpathUrls = buildTestClasspathUrls();
@@ -337,7 +359,6 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @return the ordered list of classpath URLs
      * @throws Exception if classpath elements cannot be resolved
-     * @since 0.0.1
      */
     private List<URL> buildTestClasspathUrls() throws Exception {
         final File testClassesDir = new File(project.getBuild().getTestOutputDirectory());

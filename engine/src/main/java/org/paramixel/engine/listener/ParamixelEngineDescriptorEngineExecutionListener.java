@@ -38,7 +38,6 @@ import org.paramixel.engine.util.SummaryClassNameUtil;
  * {@code startTimeMillis} as mutable state. The engine constructs a new listener per execution.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelEngineDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
@@ -67,7 +66,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      * Creates a listener that writes the report to the provided printer.
      *
      * @param printer the printer to receive report lines; never {@code null}
-     * @since 0.0.1
      */
     public ParamixelEngineDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
         this(printer, Integer.MAX_VALUE);
@@ -78,7 +76,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      *
      * @param printer the printer to receive report lines; never {@code null}
      * @param summaryClassNameMaxLength the maximum rendered class-name length
-     * @since 0.0.1
      */
     public ParamixelEngineDescriptorEngineExecutionListener(
             final @NonNull Consumer<String> printer, final int summaryClassNameMaxLength) {
@@ -190,10 +187,9 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
         // Print final result
         int grandTotal = totalPassed + totalFailed;
         if (totalFailed == 0) {
-            printer.accept(INFO + "\033[1;32m" + " TESTS PASSED (" + grandTotal + "/" + grandTotal + ")" + "\033[0m");
+            printer.accept(INFO + "\033[1;32m" + " TESTS PASSED " + "\033[0m");
         } else {
-            printer.accept(
-                    INFO + "\033[1;31m" + " TESTS FAILED (" + totalPassed + "/" + grandTotal + " passed)" + "\033[0m");
+            printer.accept(INFO + "\033[1;31m" + " TESTS FAILED " + "\033[0m");
         }
     }
 
@@ -203,7 +199,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      * @param tableWidth the width of the full table line in characters
      * @param title the title text
      * @param duration the duration string
-     * @since 0.0.1
      */
     private void printTableTitleRow(final int tableWidth, final @NonNull String title, final @NonNull String duration) {
         String content = title + " | " + duration;
@@ -220,8 +215,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
 
     /**
      * Column width accumulator for the summary table.
-     *
-     * @since 0.0.1
      */
     private static final class ColumnWidths {
 
@@ -264,7 +257,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
          * Creates a new column-width accumulator initialized from headers.
          *
          * @param headers the table headers
-         * @since 0.0.1
          */
         private ColumnWidths(final @NonNull String[] headers) {
             Objects.requireNonNull(headers, "headers must not be null");
@@ -281,7 +273,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
          * Observes a row and updates all tracked column widths.
          *
          * @param row the row to observe
-         * @since 0.0.1
          */
         private void observeRow(final @NonNull TableRow row) {
             Objects.requireNonNull(row, "row must not be null");
@@ -297,8 +288,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
 
     /**
      * A single row of data for the summary table.
-     *
-     * @since 0.0.1
      */
     private static final class TableRow {
 
@@ -347,7 +336,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
          * @param failed the failed count
          * @param status the status
          * @param time the time
-         * @since 0.0.1
          */
         private TableRow(
                 final @NonNull String className,
@@ -369,8 +357,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
 
     /**
      * Column configuration for table rendering.
-     *
-     * @since 0.0.1
      */
     private static final class ColumnConfig {
 
@@ -395,7 +381,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
          * @param header the header
          * @param width the width
          * @param rightAligned true for right alignment
-         * @since 0.0.1
          */
         private ColumnConfig(final @NonNull String header, final int width, final boolean rightAligned) {
             this.header = Objects.requireNonNull(header, "header must not be null");
@@ -409,7 +394,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      *
      * @param columns the column configurations
      * @return the separator line
-     * @since 0.0.1
      */
     private String buildSeparatorLine(final @NonNull ColumnConfig[] columns) {
         Objects.requireNonNull(columns, "columns must not be null");
@@ -427,7 +411,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      *
      * @param columns the column configurations
      * @return the header row
-     * @since 0.0.1
      */
     private String buildHeaderRow(final @NonNull ColumnConfig[] columns) {
         Objects.requireNonNull(columns, "columns must not be null");
@@ -448,7 +431,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      * @param columns the column configurations
      * @param row the row values
      * @return the rendered data row
-     * @since 0.0.1
      */
     private String buildDataRow(final @NonNull ColumnConfig[] columns, final @NonNull TableRow row) {
         Objects.requireNonNull(columns, "columns must not be null");
@@ -476,7 +458,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      * @param width the target width
      * @param rightAligned true to right-align, false to left-align
      * @return the padded value
-     * @since 0.0.1
      */
     private String pad(final @NonNull String value, final int width, final boolean rightAligned) {
         Objects.requireNonNull(value, "value must not be null");

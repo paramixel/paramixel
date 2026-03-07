@@ -17,43 +17,10 @@
 package org.paramixel.engine.util;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
 public class SummaryClassNameUtilTest {
-
-    @Test
-    public void parseProvidedMaxLength_rejectsBlank() {
-        assertThatThrownBy(
-                        () -> SummaryClassNameUtil.parseProvidedMaxLength("paramixel.summary.classNameMaxLength", ""))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Invalid paramixel.summary.classNameMaxLength: value must not be blank (raw='')");
-    }
-
-    @Test
-    public void parseProvidedMaxLength_rejectsLeadingTrailingWhitespace() {
-        assertThatThrownBy(() ->
-                        SummaryClassNameUtil.parseProvidedMaxLength("paramixel.summary.classNameMaxLength", " 60 "))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                        "Invalid paramixel.summary.classNameMaxLength: value must not have leading/trailing whitespace (raw=' 60 ' trimmed='60')");
-    }
-
-    @Test
-    public void parseProvidedMaxLength_rejectsNonInteger() {
-        assertThatThrownBy(() ->
-                        SummaryClassNameUtil.parseProvidedMaxLength("paramixel.summary.classNameMaxLength", "abc"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                        "Invalid paramixel.summary.classNameMaxLength: value must be an integer in range [1, 2147483647] (raw='abc')");
-    }
-
-    @Test
-    public void parseProvidedMaxLength_acceptsValidInteger() {
-        assertThat(SummaryClassNameUtil.parseProvidedMaxLength("paramixel.summary.classNameMaxLength", "60"))
-                .isEqualTo(60);
-    }
 
     @Test
     public void abbreviateClassName_returnsFullWhenMaxIsUnlimited() {

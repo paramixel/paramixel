@@ -39,14 +39,11 @@ import org.paramixel.engine.util.DurationUtils;
  * concurrent maps inside {@link ExecutionSummary}.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public class AbstractEngineExecutionListener implements EngineExecutionListener {
 
     /**
      * Creates a new listener instance.
-     *
-     * @since 0.0.1
      */
     protected AbstractEngineExecutionListener() {
         // INTENTIONALLY EMPTY
@@ -86,8 +83,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
      * Resets the global execution summary counters.
      *
      * <p>Call this method at the start of an engine execution.
-     *
-     * @since 0.0.1
      */
     protected void resetExecutionSummary() {
         EXECUTION_SUMMARY.reset();
@@ -97,7 +92,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
      * Returns the global execution summary.
      *
      * @return the global execution summary; never {@code null}
-     * @since 0.0.1
      */
     protected ExecutionSummary getExecutionSummary() {
         return EXECUTION_SUMMARY;
@@ -112,7 +106,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
      * @param depth the maximum number of hierarchy elements to include; must be {@code >= 1}
      * @param testDescriptor the descriptor to render; never {@code null}
      * @return a formatted display name path; never {@code null}
-     * @since 0.0.1
      */
     protected String getDisplayName(final int depth, final @NonNull TestDescriptor testDescriptor) {
         List<String> names = new ArrayList<>();
@@ -144,7 +137,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
      * @param displayName the displayName
      * @param durationMillis the duration in milliseconds
      * @return the result
-     * @since 0.0.1
      */
     protected String getStatusMessage(
             final @NonNull TestExecutionResult testExecutionResult,
@@ -179,14 +171,11 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
      * Execution summary counters.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     protected static final class ExecutionSummary {
 
         /**
          * Creates a new execution summary instance.
-         *
-         * @since 0.0.1
          */
         protected ExecutionSummary() {
             // INTENTIONALLY EMPTY
@@ -268,8 +257,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Resets all counters and tracked class state.
          *
          * <p>This method clears concurrent maps and sets counters to zero.
-         *
-         * @since 0.0.1
          */
         protected void reset() {
             testClassPassed.set(0);
@@ -292,7 +279,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Sets the current class name and ensures per-class state exists.
          *
          * @param className the class display name; may be {@code null}
-         * @since 0.0.1
          */
         protected void setCurrentClassName(final String className) {
             this.currentClassName = className;
@@ -303,7 +289,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the current class name.
          *
          * @return the current class display name, or {@code null} when unset
-         * @since 0.0.1
          */
         protected String getCurrentClassName() {
             return currentClassName;
@@ -313,7 +298,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Increments the argument bucket count for a class.
          *
          * @param className the class display name; never {@code null}
-         * @since 0.0.1
          */
         protected void incrementClassArgumentCount(final String className) {
             classArgumentCounts
@@ -325,7 +309,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Increments the method count for a class.
          *
          * @param className the class display name; never {@code null}
-         * @since 0.0.1
          */
         protected void incrementClassMethodCount(final String className) {
             classMethodCounts
@@ -337,7 +320,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Increments the per-class passed count.
          *
          * @param className the class display name; never {@code null}
-         * @since 0.0.1
          */
         protected void incrementClassPassed(final String className) {
             ClassStats stats = classStatsMap.computeIfAbsent(className, k -> new ClassStats(className));
@@ -348,7 +330,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Increments the per-class failed count.
          *
          * @param className the class display name; never {@code null}
-         * @since 0.0.1
          */
         protected void incrementClassFailed(final String className) {
             ClassStats stats = classStatsMap.computeIfAbsent(className, k -> new ClassStats(className));
@@ -357,8 +338,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of passed test classes.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestClassPassed() {
             testClassPassed.incrementAndGet();
@@ -366,8 +345,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of failed test classes.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestClassFailed() {
             testClassFailed.incrementAndGet();
@@ -375,8 +352,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of skipped/aborted test classes.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestClassSkipped() {
             testClassSkipped.incrementAndGet();
@@ -384,8 +359,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of passed argument buckets.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestArgumentPassed() {
             testArgumentPassed.incrementAndGet();
@@ -393,8 +366,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of failed argument buckets.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestArgumentFailed() {
             testArgumentFailed.incrementAndGet();
@@ -402,8 +373,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of skipped/aborted argument buckets.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestArgumentSkipped() {
             testArgumentSkipped.incrementAndGet();
@@ -411,8 +380,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of passed test methods.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestMethodPassed() {
             testMethodPassed.incrementAndGet();
@@ -420,8 +387,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of failed test methods.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestMethodFailed() {
             testMethodFailed.incrementAndGet();
@@ -429,8 +394,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
 
         /**
          * Increments the global count of skipped/aborted test methods.
-         *
-         * @since 0.0.1
          */
         protected void incrementTestMethodSkipped() {
             testMethodSkipped.incrementAndGet();
@@ -440,7 +403,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of passed test classes.
          *
          * @return passed class count
-         * @since 0.0.1
          */
         protected int getTestClassPassed() {
             return testClassPassed.get();
@@ -450,7 +412,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of failed test classes.
          *
          * @return failed class count
-         * @since 0.0.1
          */
         protected int getTestClassFailed() {
             return testClassFailed.get();
@@ -460,7 +421,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of skipped/aborted test classes.
          *
          * @return skipped class count
-         * @since 0.0.1
          */
         protected int getTestClassSkipped() {
             return testClassSkipped.get();
@@ -470,7 +430,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of passed argument buckets.
          *
          * @return passed argument count
-         * @since 0.0.1
          */
         protected int getTestArgumentPassed() {
             return testArgumentPassed.get();
@@ -480,7 +439,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of failed argument buckets.
          *
          * @return failed argument count
-         * @since 0.0.1
          */
         protected int getTestArgumentFailed() {
             return testArgumentFailed.get();
@@ -490,7 +448,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of skipped/aborted argument buckets.
          *
          * @return skipped argument count
-         * @since 0.0.1
          */
         protected int getTestArgumentSkipped() {
             return testArgumentSkipped.get();
@@ -500,7 +457,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of passed test methods.
          *
          * @return passed method count
-         * @since 0.0.1
          */
         protected int getTestMethodPassed() {
             return testMethodPassed.get();
@@ -510,7 +466,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of failed test methods.
          *
          * @return failed method count
-         * @since 0.0.1
          */
         protected int getTestMethodFailed() {
             return testMethodFailed.get();
@@ -520,7 +475,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the number of skipped/aborted test methods.
          *
          * @return skipped method count
-         * @since 0.0.1
          */
         protected int getTestMethodSkipped() {
             return testMethodSkipped.get();
@@ -530,7 +484,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Returns the per-class statistics map.
          *
          * @return the per-class statistics map; never {@code null}
-         * @since 0.0.1
          */
         protected ConcurrentHashMap<String, ClassStats> getClassStatsMap() {
             return classStatsMap;
@@ -541,7 +494,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          *
          * @param className the class display name; never {@code null}
          * @return the argument count, or {@code 0} when no data exists
-         * @since 0.0.1
          */
         protected int getClassArgumentCount(final String className) {
             AtomicInteger count = classArgumentCounts.get(className);
@@ -553,7 +505,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          *
          * @param className the class display name; never {@code null}
          * @return the method count, or {@code 0} when no data exists
-         * @since 0.0.1
          */
         protected int getClassMethodCount(final String className) {
             AtomicInteger count = classMethodCounts.get(className);
@@ -564,7 +515,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Records the start time for a descriptor.
          *
          * @param descriptorId the descriptor unique ID; never {@code null}
-         * @since 0.0.1
          */
         protected void recordStart(final String descriptorId) {
             startTimes.put(descriptorId, System.currentTimeMillis());
@@ -575,7 +525,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          *
          * @param descriptorId the descriptor unique ID; never {@code null}
          * @return the duration in milliseconds
-         * @since 0.0.1
          */
         protected long recordEnd(final String descriptorId) {
             Long startTime = startTimes.remove(descriptorId);
@@ -591,7 +540,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          *
          * @param className the class display name; never {@code null}
          * @return the duration in milliseconds, or {@code 0} when no data exists
-         * @since 0.0.1
          */
         protected long getClassDuration(final String className) {
             ClassStats stats = classStatsMap.get(className);
@@ -602,7 +550,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
          * Statistics for a single test class.
          *
          * @author Douglas Hoard (doug.hoard@gmail.com)
-         * @since 0.0.1
          */
         protected static final class ClassStats {
 
@@ -630,7 +577,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
              * Creates statistics for a class.
              *
              * @param className the class display name; never {@code null}
-             * @since 0.0.1
              */
             ClassStats(final String className) {
                 this.className = className;
@@ -640,7 +586,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
              * Returns the total number of completed methods.
              *
              * @return passed + failed
-             * @since 0.0.1
              */
             int getTotal() {
                 return passed.get() + failed.get();
@@ -650,7 +595,6 @@ public class AbstractEngineExecutionListener implements EngineExecutionListener 
              * Returns the total duration for this class.
              *
              * @return total duration in milliseconds
-             * @since 0.0.1
              */
             long getTotalDurationMillis() {
                 return totalDurationMillis.get();

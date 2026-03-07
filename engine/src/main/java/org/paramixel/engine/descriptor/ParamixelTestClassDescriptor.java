@@ -41,7 +41,6 @@ import org.junit.platform.engine.support.descriptor.ClassSource;
  * @see ParamixelTestMethodDescriptor
  * @see ParamixelInvocationDescriptor
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelTestClassDescriptor extends AbstractParamixelDescriptor {
 
@@ -64,7 +63,6 @@ public final class ParamixelTestClassDescriptor extends AbstractParamixelDescrip
      * @param uniqueId the uniqueId
      * @param testClass the testClass
      * @param displayName the displayName
-     * @since 0.0.1
      */
     public ParamixelTestClassDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull Class<?> testClass, final @NonNull String displayName) {
@@ -82,7 +80,6 @@ public final class ParamixelTestClassDescriptor extends AbstractParamixelDescrip
      * may execute concurrently for this test class.
      *
      * @return the per-class parallelism; always {@code >= 1}
-     * @since 0.0.1
      */
     public int getArgumentParallelism() {
         return argumentParallelism;
@@ -96,7 +93,6 @@ public final class ParamixelTestClassDescriptor extends AbstractParamixelDescrip
      *
      * @param argumentParallelism the parallelism value; must be {@code >= 1}
      * @throws IllegalArgumentException if {@code argumentParallelism < 1}
-     * @since 0.0.1
      */
     public void setArgumentParallelism(final int argumentParallelism) {
         if (argumentParallelism < 1) {
@@ -109,7 +105,6 @@ public final class ParamixelTestClassDescriptor extends AbstractParamixelDescrip
      * Returns the test class this descriptor represents.
      *
      * @return the test class
-     * @since 0.0.1
      */
     public Class<?> getTestClass() {
         return testClass;

@@ -26,6 +26,21 @@
 Discovery errors are fail-fast. The engine MUST fail immediately on the first validation
 error.
 
+## Configuration Errors
+
+Configuration errors are fail-fast.
+
+| Condition | Result |
+|---|---|
+| `paramixel.properties` exists but cannot be loaded | `ConfigurationException`; test execution aborts |
+| Provided configuration value is invalid after normalization | `ConfigurationException`; test execution aborts |
+
+**Standardized message:** All configuration failures MUST use a single-line standardized error
+message starting with `Invalid configuration:` and MUST include the key name.
+
+**Normalization:** Values MUST be normalized as defined in `06-engine-internals.md` (trim, then
+Unicode unescape, no re-trim).
+
 | Condition | Result |
 |---|---|
 | Method fails signature validation | `IllegalStateException`; test execution aborts |
@@ -33,7 +48,7 @@ error.
 | `@Paramixel.Order` on unsupported method type | `IllegalStateException`; test execution aborts |
 | `@Paramixel.ArgumentsCollector` invocation throws | Exception printed; test execution aborts |
 | Class cannot be loaded (`ClassNotFoundException`) | Exception printed; test execution aborts |
-| Invalid tag filter regex pattern | Exception printed; test execution fails before discovery |
+| Invalid tag filter regex pattern | `ConfigurationException`; test execution fails before discovery |
 
 **Error Message Format:** All validation errors MUST include the class name, validation
 failure details, and qualified annotation names.

@@ -42,6 +42,11 @@ This guarantees progress even when all semaphore slots are saturated.
 Controls the maximum number of concurrent test classes. Defaults to
 `Runtime.getRuntime().availableProcessors()`.
 
+**Validation (fail-fast):** If `paramixel.parallelism` is provided from either JUnit Platform
+configuration parameters or `paramixel.properties`, the engine MUST normalize the value (see
+`06-engine-internals.md`) and then parse it as a base-10 integer `>= 1`. Invalid values MUST
+cause immediate test execution failure.
+
 **Configuration precedence** (highest to lowest):
 1. JUnit Platform Configuration Parameters (e.g., `-Dparamixel.parallelism=4`)
 2. Properties file (`paramixel.properties` in project root)

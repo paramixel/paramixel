@@ -30,7 +30,6 @@ import org.paramixel.api.Paramixel;
  * at the class level. The duration is displayed in the test summary table.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 @Paramixel.TestClass
 public class DurationTimingTest {

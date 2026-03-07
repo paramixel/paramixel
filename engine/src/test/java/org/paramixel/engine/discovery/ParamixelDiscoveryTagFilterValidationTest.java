@@ -27,6 +27,7 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.Paramixel;
 import org.paramixel.engine.descriptor.ParamixelEngineDescriptor;
+import org.paramixel.engine.util.ConfigurationException;
 
 public class ParamixelDiscoveryTagFilterValidationTest {
 
@@ -40,8 +41,23 @@ public class ParamixelDiscoveryTagFilterValidationTest {
                 .build();
 
         assertThatThrownBy(() -> discovery.discoverTests(request, engine))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("paramixel.tags.include");
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("Invalid configuration: paramixel.tags.include");
+    }
+
+    @Test
+    public void discoverTests_blankIncludePattern_failsDiscovery() {
+        final ParamixelDiscovery discovery = new ParamixelDiscovery();
+        final TestDescriptor engine = new ParamixelEngineDescriptor(UniqueId.forEngine("paramixel"), "Paramixel");
+        final EngineDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
+                .selectors(DiscoverySelectors.selectClass(TaggedTestClass.class))
+                .configurationParameter("paramixel.tags.include", "\t")
+                .build();
+
+        assertThatThrownBy(() -> discovery.discoverTests(request, engine))
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("Invalid configuration: paramixel.tags.include")
+                .hasMessageContaining("must not be blank");
     }
 
     @Paramixel.TestClass

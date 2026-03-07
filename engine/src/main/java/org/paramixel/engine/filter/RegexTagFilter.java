@@ -21,11 +21,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.jspecify.annotations.NonNull;
 import org.paramixel.api.Paramixel;
+import org.paramixel.engine.util.ConfigurationException;
+import org.paramixel.engine.util.EngineConfigurationUtil;
 
 /**
  * Filters test classes using regex patterns against {@code @Paramixel.Tags} values.
@@ -50,15 +51,9 @@ import org.paramixel.api.Paramixel;
  * "api-v2\\..*"        - Matches tags starting with "api-v2." (dot escaped)
  * </pre>
  *
- * @since 0.0.1
  * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public final class RegexTagFilter implements TagFilter {
-
-    /**
-     * Logger for tag filter diagnostics.
-     */
-    private static final Logger LOGGER = Logger.getLogger(RegexTagFilter.class.getName());
 
     /**
      * Stores the includePatterns.
@@ -72,41 +67,52 @@ public final class RegexTagFilter implements TagFilter {
     /**
      * Creates a tag filter with the specified regex patterns.
      *
-     * <p>Patterns are compiled during construction. Invalid patterns are logged as warnings
-     * and skipped.</p>
+     * <p>Patterns are compiled during construction. Invalid patterns cause immediate failure.</p>
      *
      * @param includePatterns regex patterns for tags to include; may be empty but not {@code null}
      * @param excludePatterns regex patterns for tags to exclude; may be empty but not {@code null}
-     * @since 0.0.1
      */
-    public RegexTagFilter(final @NonNull List<String> includePatterns, final @NonNull List<String> excludePatterns) {
+    public RegexTagFilter(
+            final @NonNull List<String> includePatterns,
+            final @NonNull List<String> excludePatterns,
+            final EngineConfigurationUtil.Source includeSource,
+            final EngineConfigurationUtil.Source excludeSource) {
         Objects.requireNonNull(includePatterns, "includePatterns must not be null");
         Objects.requireNonNull(excludePatterns, "excludePatterns must not be null");
-        this.includePatterns = compilePatterns(includePatterns, "include");
-        this.excludePatterns = compilePatterns(excludePatterns, "exclude");
+
+        this.includePatterns = compilePatterns(
+                includePatterns,
+                "paramixel.tags.include",
+                Objects.requireNonNull(includeSource, "includeSource must not be null"));
+        this.excludePatterns = compilePatterns(
+                excludePatterns,
+                "paramixel.tags.exclude",
+                Objects.requireNonNull(excludeSource, "excludeSource must not be null"));
     }
 
     /**
-     * Compiles a list of regex patterns, logging warnings for invalid patterns.
+     * Compiles a list of regex patterns.
      *
      * @param patterns the pattern strings to compile
-     * @param patternType the type of patterns (for logging)
+     * @param key the configuration key used for error reporting
+     * @param source the configuration source used for error reporting
      * @return list of compiled patterns; never {@code null}
-     * @since 0.0.1
      */
-    private List<Pattern> compilePatterns(final @NonNull List<String> patterns, final @NonNull String patternType) {
+    private List<Pattern> compilePatterns(
+            final @NonNull List<String> patterns,
+            final @NonNull String key,
+            final EngineConfigurationUtil.Source source) {
         final List<Pattern> compiled = new ArrayList<>();
 
         for (String pattern : patterns) {
-            if (pattern == null || pattern.trim().isEmpty()) {
+            if (pattern == null || pattern.isBlank()) {
                 continue;
             }
 
             try {
-                compiled.add(Pattern.compile(pattern.trim()));
+                compiled.add(Pattern.compile(pattern));
             } catch (PatternSyntaxException e) {
-                throw new IllegalStateException(
-                        "Invalid regex pattern in paramixel.tags." + patternType + ": \"" + pattern + "\"", e);
+                throw new ConfigurationException(key, "invalid regex pattern", source.id(), pattern, pattern, e);
             }
         }
 
@@ -154,7 +160,6 @@ public final class RegexTagFilter implements TagFilter {
      *
      * @param testClass the test class to extract tags from
      * @return set of valid tag strings from the entire hierarchy; empty set if no valid tags
-     * @since 0.0.1
      */
     private Set<String> extractAllTagsFromHierarchy(final Class<?> testClass) {
         final Set<String> validTags = new java.util.HashSet<>();
@@ -184,7 +189,6 @@ public final class RegexTagFilter implements TagFilter {
      * Returns the number of compiled include patterns.
      *
      * @return count of include patterns
-     * @since 0.0.1
      */
     public int getIncludePatternCount() {
         return includePatterns.size();
@@ -194,7 +198,6 @@ public final class RegexTagFilter implements TagFilter {
      * Returns the number of compiled exclude patterns.
      *
      * @return count of exclude patterns
-     * @since 0.0.1
      */
     public int getExcludePatternCount() {
         return excludePatterns.size();

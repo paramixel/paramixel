@@ -134,7 +134,7 @@ Base class implementing `org.junit.platform.engine.TestDescriptor`.
 
 | Source | Key | Consumed By |
 |---|---|---|
-| JUnit Platform config | `invokedBy` | `ParamixelTestEngine.execute()` -- selects listener mode (`"maven"` or `"junit"`) |
+| JUnit Platform config | `paramixel.internal.invoker` | `ParamixelTestEngine.execute()` -- gates Maven invocation mode |
 | JUnit Platform config | `paramixel.parallelism` | `ParamixelTestEngine.execute()` -- sets class parallelism |
 | `paramixel.properties` (file) | Any key | Available via `EngineContext.getConfigurationValue()` |
 | `paramixel.properties` (built-in resource) | `version` | Engine version string |
@@ -146,3 +146,37 @@ When a property is defined in multiple places:
 1. **JUnit Platform Configuration Parameters** (highest priority)
 2. **Properties File** (`paramixel.properties` in project root)
 3. **Default Value** (lowest priority)
+
+### Configuration Normalization
+
+For configuration values read from either JUnit Platform configuration parameters or
+`paramixel.properties`, the engine MUST normalize values before use:
+
+1. Trim leading and trailing whitespace (treat as extraneous formatting).
+2. Decode Unicode escapes (`\uXXXX`) in the trimmed string.
+3. Do not trim again after decoding.
+
+`paramixel.tags.include` and `paramixel.tags.exclude` (when provided) each represent a single
+regular expression pattern. Commas have no special meaning and are treated as literal characters
+within the regex.
+
+If leading or trailing whitespace is semantically required, it MUST be expressed using Unicode
+escapes (e.g., `\u0020`) so that it survives the initial trim.
+
+Note: `java.util.Properties` performs its own escape processing when loading `paramixel.properties`.
+To ensure `\uXXXX` sequences survive loading and are decoded by the engine after trimming, users
+should write `\\uXXXX` in `paramixel.properties`.
+
+### Internal Invocation Keys
+
+`paramixel.internal.invoker` is an internal key used only to determine Maven invocation behavior.
+It MUST be provided via JUnit Platform configuration parameters and MUST NOT be configurable via
+`paramixel.properties`.
+
+Maven invocation mode is enabled only when the following is present via JUnit Platform
+configuration parameters (after normalization):
+
+- `paramixel.internal.invoker=paramixe-maven-plugin`
+
+When Maven invocation mode is enabled, the engine installs its Maven-specific console listener and
+prints a final line containing either `TESTS PASSED` or `TESTS FAILED`.

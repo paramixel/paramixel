@@ -24,7 +24,6 @@ import org.jspecify.annotations.NonNull;
  * <p>Implementations determine whether a test class should be included in the test run
  * based on the tags applied to it via {@code @Paramixel.Tags}.</p>
  *
- * @since 0.0.1
  * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public interface TagFilter {
@@ -37,7 +36,6 @@ public interface TagFilter {
      *
      * @param testClass the test class to filter; never {@code null}
      * @return {@code true} if the class should be included, {@code false} to exclude it
-     * @since 0.0.1
      */
     boolean matches(final @NonNull Class<?> testClass);
 
@@ -45,7 +43,6 @@ public interface TagFilter {
      * Determines if this filter has any include patterns configured.
      *
      * @return {@code true} if include patterns are configured, {@code false} otherwise
-     * @since 0.0.1
      */
     boolean hasIncludePatterns();
 }

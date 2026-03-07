@@ -34,7 +34,6 @@ import org.paramixel.api.Store;
  * consistent behavior throughout the test execution lifecycle.</p>
  *
  * @see EngineContext
- * @since 0.0.1
  * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 public final class ConcreteEngineContext implements EngineContext {
@@ -65,7 +64,6 @@ public final class ConcreteEngineContext implements EngineContext {
      * @param engineId the engineId
      * @param configuration the configuration
      * @param classParallelism the classParallelism
-     * @since 0.0.1
      */
     public ConcreteEngineContext(
             final @NonNull String engineId, final @NonNull Properties configuration, final int classParallelism) {
@@ -89,7 +87,9 @@ public final class ConcreteEngineContext implements EngineContext {
 
     @Override
     public Properties getConfiguration() {
-        return new Properties(configuration);
+        final Properties copy = new Properties();
+        copy.putAll(configuration);
+        return copy;
     }
 
     @Override
@@ -117,7 +117,6 @@ public final class ConcreteEngineContext implements EngineContext {
      * A value of {@code 1} indicates sequential execution of test classes.</p>
      *
      * @return the maximum number of concurrent test classes; always positive
-     * @since 0.0.1
      */
     public int getClassParallelism() {
         return classParallelism;

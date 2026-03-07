@@ -32,6 +32,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Paramixel;
+import org.paramixel.engine.util.EngineConfigurationUtil;
 
 /**
  * JMH benchmarks for {@link RegexTagFilter} tag filtering operations.
@@ -39,7 +40,6 @@ import org.paramixel.api.Paramixel;
  * <p>Benchmarks measure the performance of tag pattern matching with various
  * configurations including include/exclude patterns and class hierarchies.</p>
  *
- * @since 0.0.1
  * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 @State(Scope.Thread)
@@ -52,8 +52,6 @@ public class RegexTagFilterBenchmark {
 
     /**
      * Creates a new benchmark instance.
-     *
-     * @since 0.0.1
      */
     public RegexTagFilterBenchmark() {
         // INTENTIONALLY EMPTY
@@ -105,7 +103,6 @@ public class RegexTagFilterBenchmark {
      * Test class with single tag.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     @Paramixel.Tags({"unit"})
@@ -113,8 +110,6 @@ public class RegexTagFilterBenchmark {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public UnitTest() {
             // INTENTIONALLY EMPTY
@@ -125,7 +120,6 @@ public class RegexTagFilterBenchmark {
      * Test class with integration tag.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     @Paramixel.Tags({"integration-database"})
@@ -133,8 +127,6 @@ public class RegexTagFilterBenchmark {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public IntegrationDatabaseTest() {
             // INTENTIONALLY EMPTY
@@ -145,7 +137,6 @@ public class RegexTagFilterBenchmark {
      * Test class with multiple tags.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     @Paramixel.Tags({"integration-api", "fast"})
@@ -153,8 +144,6 @@ public class RegexTagFilterBenchmark {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public IntegrationApiTest() {
             // INTENTIONALLY EMPTY
@@ -165,7 +154,6 @@ public class RegexTagFilterBenchmark {
      * Test class with slow tag.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     @Paramixel.Tags({"integration-kafka", "slow"})
@@ -173,8 +161,6 @@ public class RegexTagFilterBenchmark {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public SlowIntegrationTest() {
             // INTENTIONALLY EMPTY
@@ -185,7 +171,6 @@ public class RegexTagFilterBenchmark {
      * Test class with complex versioned tag.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     @Paramixel.Tags({"api-v2.0", "integration-mongo"})
@@ -193,8 +178,6 @@ public class RegexTagFilterBenchmark {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public VersionedApiTest() {
             // INTENTIONALLY EMPTY
@@ -205,7 +188,6 @@ public class RegexTagFilterBenchmark {
      * Base class with tags.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     @Paramixel.Tags({"base-integration"})
@@ -213,8 +195,6 @@ public class RegexTagFilterBenchmark {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public BaseTest() {
             // INTENTIONALLY EMPTY
@@ -225,7 +205,6 @@ public class RegexTagFilterBenchmark {
      * Child class that inherits tags.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     @Paramixel.Tags({"child-fast"})
@@ -233,8 +212,6 @@ public class RegexTagFilterBenchmark {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public ChildTest() {
             // INTENTIONALLY EMPTY
@@ -245,15 +222,12 @@ public class RegexTagFilterBenchmark {
      * Test class with no tags.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     @Paramixel.TestClass
     public static class UntaggedTest {
 
         /**
          * Creates a new test class instance.
-         *
-         * @since 0.0.1
          */
         public UntaggedTest() {
             // INTENTIONALLY EMPTY
@@ -262,23 +236,40 @@ public class RegexTagFilterBenchmark {
 
     /**
      * Sets up filters before each benchmark iteration.
-     *
-     * @since 0.0.1
      */
     @Setup
     public void setup() {
-        includeOnlyFilter = new RegexTagFilter(INCLUDE_PATTERNS, Collections.emptyList());
-        excludeOnlyFilter = new RegexTagFilter(Collections.emptyList(), EXCLUDE_PATTERNS);
-        includeExcludeFilter = new RegexTagFilter(INCLUDE_PATTERNS, EXCLUDE_PATTERNS);
-        complexPatternsFilter = new RegexTagFilter(COMPLEX_PATTERNS, Collections.emptyList());
-        noPatternsFilter = new RegexTagFilter(Collections.emptyList(), Collections.emptyList());
+        includeOnlyFilter = new RegexTagFilter(
+                INCLUDE_PATTERNS,
+                Collections.<String>emptyList(),
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
+        excludeOnlyFilter = new RegexTagFilter(
+                Collections.<String>emptyList(),
+                EXCLUDE_PATTERNS,
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
+        includeExcludeFilter = new RegexTagFilter(
+                INCLUDE_PATTERNS,
+                EXCLUDE_PATTERNS,
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
+        complexPatternsFilter = new RegexTagFilter(
+                COMPLEX_PATTERNS,
+                Collections.<String>emptyList(),
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
+        noPatternsFilter = new RegexTagFilter(
+                Collections.<String>emptyList(),
+                Collections.<String>emptyList(),
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
     }
 
     /**
      * Benchmarks include-only filter with matching class.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void includeOnlyMatch(final Blackhole blackhole) {
@@ -290,7 +281,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks include-only filter with non-matching class.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void includeOnlyNoMatch(final Blackhole blackhole) {
@@ -302,7 +292,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks exclude-only filter with matching class.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void excludeOnlyMatch(final Blackhole blackhole) {
@@ -314,7 +303,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks exclude-only filter with non-matching class.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void excludeOnlyNoMatch(final Blackhole blackhole) {
@@ -326,7 +314,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks combined include/exclude filter.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void includeExcludeFilter(final Blackhole blackhole) {
@@ -338,7 +325,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks complex regex patterns.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void complexPatternsMatch(final Blackhole blackhole) {
@@ -350,7 +336,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks tag inheritance from parent class.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void inheritedTagsMatch(final Blackhole blackhole) {
@@ -362,7 +347,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks no patterns filter (pass-through).
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void noPatternsFilter(final Blackhole blackhole) {
@@ -374,7 +358,6 @@ public class RegexTagFilterBenchmark {
      * Benchmarks filter with multiple test classes.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void filterMultipleClasses(final Blackhole blackhole) {

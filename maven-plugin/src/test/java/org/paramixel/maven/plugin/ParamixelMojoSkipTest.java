@@ -42,7 +42,7 @@ public class ParamixelMojoSkipTest {
 
         final MojoFailureException ex = assertThrows(MojoFailureException.class, mojo::execute);
         assertEquals(
-                "Invalid paramixel.summary.classNameMaxLength: value must be an integer in range [1, 2147483647] (raw='0')",
+                "Invalid configuration: paramixel.summary.classNameMaxLength: must be an integer in range [1, 2147483647] (source=maven-plugin raw='0' normalized='0')",
                 ex.getMessage());
     }
 

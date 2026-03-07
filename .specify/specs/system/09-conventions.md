@@ -5,7 +5,7 @@
 | Module | Root Package | Sub-packages |
 |---|---|---|
 | `paramixel-api` | `org.paramixel.api` | None (flat) |
-| `paramixel-engine` | `org.paramixel.engine` | `api`, `descriptor`, `discovery`, `execution`, `filter`, `invoker`, `listener`, `util`, `validation` |
+| `paramixel-engine` | `org.paramixel.engine` | `api`, `configuration`, `descriptor`, `discovery`, `execution`, `filter`, `invoker`, `listener`, `util`, `validation` |
 | `paramixel-maven-plugin` | `org.paramixel.maven.plugin` | None |
 | `paramixel-tests` | `test` (or `test.<subpackage>`) | `argument`, `lifecycle`, `named`, `order`, `store`, `tags` |
 | `paramixel-examples` | `examples` | `simple`, `complex`, `support`, `testcontainers.*` |
@@ -110,8 +110,12 @@ Every Javadoc block MUST document:
 - `@author` MUST appear only on type-level Javadoc for `class`, `interface`, or `enum`.
   It MUST NOT appear on `record`, annotation, field, method, or constructor Javadoc.
 - `@author` MUST include name and email: `@author Full Name (email@domain)`.
-- `@since` MUST appear on every type, method, and constructor Javadoc.
-  It MUST NOT appear on field Javadoc.
+- `@since` is the only API stability tag supported by Paramixel.
+- In `paramixel-api` production sources (`api/src/main/java/**`):
+  - `@since` MUST appear on every public type, method, constructor, and field Javadoc.
+  - `@since` MUST NOT appear on any non-public (private, protected, or package-private) declaration.
+- In all other modules (engine, maven-plugin, tests, examples, benchmarks):
+  - `@since` MUST NOT appear in any Javadoc block.
 - `@apiNote`, `@implSpec`, `@implNote` MAY be used when appropriate.
 
 ### Format
