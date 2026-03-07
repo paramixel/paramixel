@@ -52,6 +52,12 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
     private long startTimeMillis;
 
     /**
+     * Column headers for the summary table.
+     */
+    private static final String[] TABLE_HEADERS =
+            new String[] {"Class", "Args", "Methods", "Passed", "Failed", "Status", "Time"};
+
+    /**
      * Creates a listener that writes the report to the provided printer.
      *
      * @param printer the printer to receive report lines; never {@code null}
@@ -76,34 +82,6 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
 
         ExecutionSummary summary = getExecutionSummary();
 
-        // Print header
-        printLine(INFO + " ╔══════════════════════════════════════════════════════════════╗");
-        printLine(INFO + " ║                    Paramixel Test Summary                    ║");
-        printLine(INFO + " ╠══════════════════════════════════════════════════════════════╣");
-        String durationContent = " Duration: " + duration;
-        int contentWidth = 62;
-        int padding = contentWidth - durationContent.length();
-        StringBuilder durationLine = new StringBuilder();
-        durationLine.append("║");
-        durationLine.append(durationContent);
-        durationLine.append(" ".repeat(Math.max(0, padding)));
-        durationLine.append("║");
-        printLine(INFO + " " + durationLine);
-        printLine(INFO + " ╚══════════════════════════════════════════════════════════════╝");
-        printer.accept(INFO);
-
-        // Print hierarchical summary
-        int totalClasses = summary.getTestClassPassed() + summary.getTestClassFailed() + summary.getTestClassSkipped();
-        int totalArguments =
-                summary.getTestArgumentPassed() + summary.getTestArgumentFailed() + summary.getTestArgumentSkipped();
-        int totalMethods =
-                summary.getTestMethodPassed() + summary.getTestMethodFailed() + summary.getTestMethodSkipped();
-
-        printer.accept(INFO + " " + totalClasses + " Classes tested");
-        printer.accept(INFO + " └── " + totalArguments + " Arguments tested");
-        printer.accept(INFO + "     └── " + totalMethods + " Test methods tested");
-        printer.accept(INFO);
-
         // Build class breakdown table
         ConcurrentHashMap<String, ExecutionSummary.ClassStats> classStatsMap = summary.getClassStatsMap();
         List<String> classNames = new ArrayList<>(classStatsMap.keySet());
@@ -119,20 +97,9 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
         if (classNames.isEmpty()) {
             printer.accept(INFO + " No test classes executed.");
         } else {
-            // Calculate column widths
-            int maxClassWidth = 40;
-            for (String className : classNames) {
-                if (className.length() > maxClassWidth) {
-                    maxClassWidth = Math.min(className.length(), 50);
-                }
-            }
+            ColumnWidths widths = new ColumnWidths(TABLE_HEADERS);
+            List<TableRow> rows = new ArrayList<>(classNames.size());
 
-            // Print table header with proper separator
-            printSeparatorLine(maxClassWidth);
-            printTableRow(maxClassWidth, "Class", "Args", "Methods", "Passed", "Failed", "Status", "Duration");
-            printSeparatorLine(maxClassWidth);
-
-            // Print data rows
             for (String className : classNames) {
                 int argCount = summary.getClassArgumentCount(className);
                 int methodCount = summary.getClassMethodCount(className);
@@ -140,23 +107,19 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
                 int passed = stats != null ? stats.passed.get() : 0;
                 int failed = stats != null ? stats.failed.get() : 0;
                 String status = failed > 0 ? "X" : "OK";
-                long classDuration = summary.getClassDuration(className);
+                long classDuration = stats != null ? stats.getTotalDurationMillis() : 0L;
+                String classDurationString = DurationUtils.formatMillis(classDuration);
 
-                // Truncate class name if too long
-                String displayName = className;
-                if (displayName.length() > maxClassWidth) {
-                    displayName = displayName.substring(0, maxClassWidth - 3) + "...";
-                }
-
-                printTableRow(
-                        maxClassWidth,
-                        displayName,
+                TableRow row = new TableRow(
+                        className,
                         String.valueOf(argCount),
                         String.valueOf(methodCount),
                         String.valueOf(passed),
                         String.valueOf(failed),
                         status,
-                        DurationUtils.formatMillis(classDuration));
+                        classDurationString);
+                rows.add(row);
+                widths.observeRow(row);
 
                 totalArgs += argCount;
                 totalMethodsAll += methodCount;
@@ -165,10 +128,7 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
                 totalDuration += classDuration;
             }
 
-            // Print total row
-            printSeparatorLine(maxClassWidth);
-            printTableRow(
-                    maxClassWidth,
+            TableRow totalRow = new TableRow(
                     "TOTAL",
                     String.valueOf(totalArgs),
                     String.valueOf(totalMethodsAll),
@@ -176,7 +136,32 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
                     String.valueOf(totalFailed),
                     totalFailed > 0 ? "X" : "OK",
                     DurationUtils.formatMillis(totalDuration));
-            printSeparatorLine(maxClassWidth);
+            widths.observeRow(totalRow);
+
+            ColumnConfig[] columns = new ColumnConfig[] {
+                new ColumnConfig(TABLE_HEADERS[0], widths.classWidth, false),
+                new ColumnConfig(TABLE_HEADERS[1], widths.argsWidth, true),
+                new ColumnConfig(TABLE_HEADERS[2], widths.methodsWidth, true),
+                new ColumnConfig(TABLE_HEADERS[3], widths.passedWidth, true),
+                new ColumnConfig(TABLE_HEADERS[4], widths.failedWidth, true),
+                new ColumnConfig(TABLE_HEADERS[5], widths.statusWidth, false),
+                new ColumnConfig(TABLE_HEADERS[6], widths.timeWidth, true)
+            };
+
+            String separator = buildSeparatorLine(columns);
+            printer.accept(INFO + " " + separator);
+            printTableTitleRow(separator.length(), "Paramixel Test Summary", duration);
+            printer.accept(INFO + " " + separator);
+            printer.accept(INFO + " " + buildHeaderRow(columns));
+            printer.accept(INFO + " " + separator);
+
+            for (TableRow row : rows) {
+                printer.accept(INFO + " " + buildDataRow(columns, row));
+            }
+
+            printer.accept(INFO + " " + separator);
+            printer.accept(INFO + " " + buildDataRow(columns, totalRow));
+            printer.accept(INFO + " " + separator);
         }
 
         printer.accept(INFO);
@@ -192,124 +177,297 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
     }
 
     /**
-     * Prints a formatted line using {@link String#format(String, Object...)}.
+     * Prints a title row that spans all columns with left-aligned title and duration.
      *
-     * @param format the format string; never {@code null}
-     * @param args format arguments; may be empty
+     * @param tableWidth the width of the full table line in characters
+     * @param title the title text
+     * @param duration the duration string
      * @since 0.0.1
      */
-    private void printLine(final @NonNull String format, final Object... args) {
-        printer.accept(String.format(format, args));
-    }
+    private void printTableTitleRow(final int tableWidth, final @NonNull String title, final @NonNull String duration) {
+        String content = title + " | " + duration;
+        int contentWidth = tableWidth - 4;
+        int padding = contentWidth - content.length();
 
-    /**
-     * Prints a table separator line sized for the class-name column width.
-     *
-     * @param classWidth the class column width in characters; must be {@code >= 0}
-     * @since 0.0.1
-     */
-    private void printSeparatorLine(final int classWidth) {
-        StringBuilder sep = new StringBuilder();
-        sep.append("+");
-        // Class column: width + 2 (for spaces)
-        for (int i = 0; i < classWidth + 2; i++) {
-            sep.append("-");
-        }
-        sep.append("+");
-        // Args column: 4 + 2 = 6
-        for (int i = 0; i < 6; i++) {
-            sep.append("-");
-        }
-        sep.append("+");
-        // Methods column: 7 + 2 = 9
-        for (int i = 0; i < 9; i++) {
-            sep.append("-");
-        }
-        sep.append("+");
-        // Passed column: 6 + 2 = 8
-        for (int i = 0; i < 8; i++) {
-            sep.append("-");
-        }
-        sep.append("+");
-        // Failed column: 6 + 2 = 8
-        for (int i = 0; i < 8; i++) {
-            sep.append("-");
-        }
-        sep.append("+");
-        // Status column: 6 + 2 = 8
-        for (int i = 0; i < 8; i++) {
-            sep.append("-");
-        }
-        sep.append("+");
-        // Duration column: 10 + 2 = 12 (value + space + unit)
-        for (int i = 0; i < 12; i++) {
-            sep.append("-");
-        }
-        sep.append("+");
-        printLine(INFO + " " + sep);
-    }
-
-    /**
-     * Performs printTableRow.
-     *
-     * @param classWidth the classWidth
-     * @param className the className
-     * @param args the args
-     * @param methods the methods
-     * @param passed the passed
-     * @param failed the failed
-     * @param status the status
-     * @param duration the duration
-     * @since 0.0.1
-     */
-    private void printTableRow(
-            final int classWidth,
-            final String className,
-            final String args,
-            final String methods,
-            final String passed,
-            final String failed,
-            final String status,
-            final String duration) {
         StringBuilder row = new StringBuilder();
-        row.append("| ");
+        row.append("| ").append(content);
+        row.append(" ".repeat(Math.max(0, padding)));
+        row.append(" |");
 
-        // Class column - left aligned, padded to classWidth
-        row.append(className);
-        for (int i = className.length(); i < classWidth; i++) {
+        printer.accept(INFO + " " + row);
+    }
+
+    /**
+     * Column width accumulator for the summary table.
+     *
+     * @since 0.0.1
+     */
+    private static final class ColumnWidths {
+
+        /**
+         * Width of the class column.
+         */
+        private int classWidth;
+
+        /**
+         * Width of the args column.
+         */
+        private int argsWidth;
+
+        /**
+         * Width of the methods column.
+         */
+        private int methodsWidth;
+
+        /**
+         * Width of the passed column.
+         */
+        private int passedWidth;
+
+        /**
+         * Width of the failed column.
+         */
+        private int failedWidth;
+
+        /**
+         * Width of the status column.
+         */
+        private int statusWidth;
+
+        /**
+         * Width of the time column.
+         */
+        private int timeWidth;
+
+        /**
+         * Creates a new column-width accumulator initialized from headers.
+         *
+         * @param headers the table headers
+         * @since 0.0.1
+         */
+        private ColumnWidths(final @NonNull String[] headers) {
+            Objects.requireNonNull(headers, "headers must not be null");
+            this.classWidth = headers[0].length();
+            this.argsWidth = headers[1].length();
+            this.methodsWidth = headers[2].length();
+            this.passedWidth = headers[3].length();
+            this.failedWidth = headers[4].length();
+            this.statusWidth = headers[5].length();
+            this.timeWidth = headers[6].length();
+        }
+
+        /**
+         * Observes a row and updates all tracked column widths.
+         *
+         * @param row the row to observe
+         * @since 0.0.1
+         */
+        private void observeRow(final @NonNull TableRow row) {
+            Objects.requireNonNull(row, "row must not be null");
+            this.classWidth = Math.max(this.classWidth, row.className.length());
+            this.argsWidth = Math.max(this.argsWidth, row.args.length());
+            this.methodsWidth = Math.max(this.methodsWidth, row.methods.length());
+            this.passedWidth = Math.max(this.passedWidth, row.passed.length());
+            this.failedWidth = Math.max(this.failedWidth, row.failed.length());
+            this.statusWidth = Math.max(this.statusWidth, row.status.length());
+            this.timeWidth = Math.max(this.timeWidth, row.time.length());
+        }
+    }
+
+    /**
+     * A single row of data for the summary table.
+     *
+     * @since 0.0.1
+     */
+    private static final class TableRow {
+
+        /**
+         * Value for the class column.
+         */
+        private final String className;
+
+        /**
+         * Value for the args column.
+         */
+        private final String args;
+
+        /**
+         * Value for the methods column.
+         */
+        private final String methods;
+
+        /**
+         * Value for the passed column.
+         */
+        private final String passed;
+
+        /**
+         * Value for the failed column.
+         */
+        private final String failed;
+
+        /**
+         * Value for the status column.
+         */
+        private final String status;
+
+        /**
+         * Value for the time column.
+         */
+        private final String time;
+
+        /**
+         * Creates a new table row.
+         *
+         * @param className the class name
+         * @param args the args count
+         * @param methods the method count
+         * @param passed the passed count
+         * @param failed the failed count
+         * @param status the status
+         * @param time the time
+         * @since 0.0.1
+         */
+        private TableRow(
+                final @NonNull String className,
+                final @NonNull String args,
+                final @NonNull String methods,
+                final @NonNull String passed,
+                final @NonNull String failed,
+                final @NonNull String status,
+                final @NonNull String time) {
+            this.className = Objects.requireNonNull(className, "className must not be null");
+            this.args = Objects.requireNonNull(args, "args must not be null");
+            this.methods = Objects.requireNonNull(methods, "methods must not be null");
+            this.passed = Objects.requireNonNull(passed, "passed must not be null");
+            this.failed = Objects.requireNonNull(failed, "failed must not be null");
+            this.status = Objects.requireNonNull(status, "status must not be null");
+            this.time = Objects.requireNonNull(time, "time must not be null");
+        }
+    }
+
+    /**
+     * Column configuration for table rendering.
+     *
+     * @since 0.0.1
+     */
+    private static final class ColumnConfig {
+
+        /**
+         * Column header text.
+         */
+        private final String header;
+
+        /**
+         * Column width.
+         */
+        private final int width;
+
+        /**
+         * Whether values are right-aligned.
+         */
+        private final boolean rightAligned;
+
+        /**
+         * Creates a new column config.
+         *
+         * @param header the header
+         * @param width the width
+         * @param rightAligned true for right alignment
+         * @since 0.0.1
+         */
+        private ColumnConfig(final @NonNull String header, final int width, final boolean rightAligned) {
+            this.header = Objects.requireNonNull(header, "header must not be null");
+            this.width = width;
+            this.rightAligned = rightAligned;
+        }
+    }
+
+    /**
+     * Builds a separator line for the given columns.
+     *
+     * @param columns the column configurations
+     * @return the separator line
+     * @since 0.0.1
+     */
+    private String buildSeparatorLine(final @NonNull ColumnConfig[] columns) {
+        Objects.requireNonNull(columns, "columns must not be null");
+        StringBuilder sep = new StringBuilder();
+        sep.append('+');
+        for (ColumnConfig column : columns) {
+            sep.append("-".repeat(Math.max(0, column.width + 2)));
+            sep.append('+');
+        }
+        return sep.toString();
+    }
+
+    /**
+     * Builds a header row for the given columns.
+     *
+     * @param columns the column configurations
+     * @return the header row
+     * @since 0.0.1
+     */
+    private String buildHeaderRow(final @NonNull ColumnConfig[] columns) {
+        Objects.requireNonNull(columns, "columns must not be null");
+        StringBuilder row = new StringBuilder();
+        row.append('|');
+        for (ColumnConfig column : columns) {
             row.append(' ');
+            row.append(pad(column.header, column.width, column.rightAligned));
+            row.append(' ');
+            row.append('|');
+        }
+        return row.toString();
+    }
+
+    /**
+     * Builds a data row for the given columns.
+     *
+     * @param columns the column configurations
+     * @param row the row values
+     * @return the rendered data row
+     * @since 0.0.1
+     */
+    private String buildDataRow(final @NonNull ColumnConfig[] columns, final @NonNull TableRow row) {
+        Objects.requireNonNull(columns, "columns must not be null");
+        Objects.requireNonNull(row, "row must not be null");
+
+        String[] values =
+                new String[] {row.className, row.args, row.methods, row.passed, row.failed, row.status, row.time};
+
+        StringBuilder out = new StringBuilder();
+        out.append('|');
+        for (int i = 0; i < columns.length; i++) {
+            ColumnConfig column = columns[i];
+            out.append(' ');
+            out.append(pad(values[i], column.width, column.rightAligned));
+            out.append(' ');
+            out.append('|');
+        }
+        return out.toString();
+    }
+
+    /**
+     * Pads a value to the requested width.
+     *
+     * @param value the value
+     * @param width the target width
+     * @param rightAligned true to right-align, false to left-align
+     * @return the padded value
+     * @since 0.0.1
+     */
+    private String pad(final @NonNull String value, final int width, final boolean rightAligned) {
+        Objects.requireNonNull(value, "value must not be null");
+        int padding = Math.max(0, width - value.length());
+        if (padding == 0) {
+            return value;
         }
 
-        // Fixed-width columns with proper padding
-        // Args: 4 chars + 2 spaces = 6 total
-        row.append(" | ").append(String.format("%4s", args));
-        // Methods: 7 chars + 2 spaces = 9 total
-        row.append(" | ").append(String.format("%7s", methods));
-        // Passed: 6 chars + 2 spaces = 8 total
-        row.append(" | ").append(String.format("%6s", passed));
-        // Failed: 6 chars + 2 spaces = 8 total
-        row.append(" | ").append(String.format("%6s", failed));
-        // Status: 6 chars + 2 spaces = 8 total
-        row.append(" | ").append(String.format("%6s", status));
-        // Duration: 10 chars total (right-aligned value, left-aligned unit)
-        // Split duration into value and unit parts
-        String durationValue;
-        String durationUnit;
-        int spaceIndex = duration.lastIndexOf(' ');
-        if (spaceIndex > 0) {
-            durationValue = duration.substring(0, spaceIndex);
-            durationUnit = duration.substring(spaceIndex + 1);
-        } else {
-            durationValue = duration;
-            durationUnit = "";
+        if (rightAligned) {
+            return " ".repeat(padding) + value;
         }
-        // Format: " | " + 7 chars right-aligned value + " " + 2 chars left-aligned unit + " |"
-        row.append(" | ")
-                .append(String.format("%7s", durationValue))
-                .append(" ")
-                .append(String.format("%-2s", durationUnit))
-                .append(" |");
 
-        printLine(INFO + " " + row);
+        return value + " ".repeat(padding);
     }
 }

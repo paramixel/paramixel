@@ -221,9 +221,23 @@ The `ExecutionSummary.ClassStats` inner class includes total duration tracking:
 
 ### Duration Display
 
-The `ParamixelEngineDescriptorEngineExecutionListener` displays durations in the
-final summary table as the rightmost column. Durations are formatted using
-`DurationUtils.formatMillis()` for human-readable output.
+The `ParamixelEngineDescriptorEngineExecutionListener` displays a summary table with
+a title row showing "Paramixel Test Summary | {duration}" followed by class-level
+details. Durations are formatted using `DurationUtils.formatMillis()` for human-readable
+output.
+
+**Table Format:**
+```
++------------------------------------------------------------------+
+| Paramixel Test Summary | 457 ms                                  |
++------------+------+---------+--------+--------+--------+---------+
+| Class      | Args | Methods | Passed | Failed | Status |    Time |
++------------+------+---------+--------+--------+--------+---------+
+| TestClass1 |   10 |      20 |     18 |      2 | X      |  150 ms |
++------------+------+---------+--------+--------+--------+---------+
+| TOTAL      |  252 |     455 |    400 |     55 | X      |    2 s  |
++------------+------+---------+--------+--------+--------+---------+
+```
 
 #### Duration in Test Output
 

@@ -61,8 +61,7 @@ public final class ParamixelTestClassDescriptorEngineExecutionListener extends A
             final @NonNull TestDescriptor testDescriptor, final @NonNull TestExecutionResult testExecutionResult) {
         String descriptorId = testDescriptor.getUniqueId().toString();
         String className = testDescriptor.getDisplayName();
-        long duration = getExecutionSummary()
-                .recordEnd(descriptorId, getExecutionSummary().getClassDurations());
+        long duration = getExecutionSummary().recordEnd(descriptorId);
         ExecutionSummary.ClassStats stats = getExecutionSummary()
                 .getClassStatsMap()
                 .computeIfAbsent(className, k -> new ExecutionSummary.ClassStats(className));

@@ -21,6 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +87,8 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
 
         final String output = out.toString();
         assertThat(output).contains("Paramixel Test Summary");
-        assertThat(output).contains("Classes tested");
+        // Verify title row format with duration separator
+        assertThat(output).contains(" | ");
     }
 
     @Test
@@ -104,23 +109,58 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
     public void formatDuration_branchesAreExercised() throws Exception {
         final UniqueId rootId = UniqueId.forEngine("paramixel");
         final ParamixelEngineDescriptor engine = new ParamixelEngineDescriptor(rootId, "paramixel");
+        final ParamixelTestClassDescriptor clazz =
+                new ParamixelTestClassDescriptor(rootId.append("class", "c"), String.class, "C");
+        final ParamixelTestArgumentDescriptor arg =
+                new ParamixelTestArgumentDescriptor(clazz.getUniqueId().append("argument", "0"), 0, null, "A0");
+        final var m = ParamixelEngineDescriptorEngineExecutionListenerTest.class.getDeclaredMethod("dummy");
+        final ParamixelTestMethodDescriptor method =
+                new ParamixelTestMethodDescriptor(arg.getUniqueId().append("method", "m"), m, "M");
+        clazz.addChild(arg);
+        arg.addChild(method);
+        engine.addChild(clazz);
+
         final ParamixelEngineDescriptorEngineExecutionListener engineListener =
                 new ParamixelEngineDescriptorEngineExecutionListener(printer);
+        final ParamixelEngineExecutionListener routingListener = new ParamixelEngineExecutionListener(printer);
 
+        // Test milliseconds duration
         engineListener.executionStarted(engine);
         setStartTimeMillis(engineListener, System.currentTimeMillis() - 250);
+        routingListener.executionStarted(clazz);
+        routingListener.executionStarted(arg);
+        routingListener.executionStarted(method);
+        routingListener.executionFinished(method, TestExecutionResult.successful());
+        routingListener.executionFinished(arg, TestExecutionResult.successful());
+        routingListener.executionFinished(clazz, TestExecutionResult.successful());
         engineListener.executionFinished(engine, TestExecutionResult.successful());
 
+        // Test seconds duration
         engineListener.executionStarted(engine);
         setStartTimeMillis(engineListener, System.currentTimeMillis() - 2500);
+        routingListener.executionStarted(clazz);
+        routingListener.executionStarted(arg);
+        routingListener.executionStarted(method);
+        routingListener.executionFinished(method, TestExecutionResult.successful());
+        routingListener.executionFinished(arg, TestExecutionResult.successful());
+        routingListener.executionFinished(clazz, TestExecutionResult.successful());
         engineListener.executionFinished(engine, TestExecutionResult.successful());
 
+        // Test minutes duration
         engineListener.executionStarted(engine);
         setStartTimeMillis(engineListener, System.currentTimeMillis() - 65_000);
+        routingListener.executionStarted(clazz);
+        routingListener.executionStarted(arg);
+        routingListener.executionStarted(method);
+        routingListener.executionFinished(method, TestExecutionResult.successful());
+        routingListener.executionFinished(arg, TestExecutionResult.successful());
+        routingListener.executionFinished(clazz, TestExecutionResult.successful());
         engineListener.executionFinished(engine, TestExecutionResult.successful());
 
         final String output = out.toString();
-        assertThat(output).contains("Duration:");
+        // Verify title row format - duration is now in "Paramixel Test Summary | {duration}"
+        assertThat(output).contains("Paramixel Test Summary");
+        assertThat(output).contains(" | ");
         assertThat(output).contains("ms");
         assertThat(output).contains("s");
         assertThat(output).contains("m");
@@ -132,6 +172,97 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         final Field field = ParamixelEngineDescriptorEngineExecutionListener.class.getDeclaredField("startTimeMillis");
         field.setAccessible(true);
         field.setLong(listener, startTimeMillis);
+    }
+
+    @Test
+    public void tableBordersAreAligned_andClassNamesAreNotTruncated_andColumnsExpandForData() throws Exception {
+        final UniqueId rootId = UniqueId.forEngine("paramixel");
+        final ParamixelEngineDescriptor engine = new ParamixelEngineDescriptor(rootId, "paramixel");
+
+        final String longClassName = "test." + "VeryLongClassName_".repeat(12) + "Tail";
+        final ParamixelTestClassDescriptor clazz =
+                new ParamixelTestClassDescriptor(rootId.append("class", "c"), String.class, longClassName);
+        final ParamixelTestArgumentDescriptor arg =
+                new ParamixelTestArgumentDescriptor(clazz.getUniqueId().append("argument", "0"), 0, null, "A0");
+        final var m = ParamixelEngineDescriptorEngineExecutionListenerTest.class.getDeclaredMethod("dummy");
+        final ParamixelTestMethodDescriptor method =
+                new ParamixelTestMethodDescriptor(arg.getUniqueId().append("method", "m"), m, "M");
+        clazz.addChild(arg);
+        arg.addChild(method);
+        engine.addChild(clazz);
+
+        final ParamixelEngineDescriptorEngineExecutionListener engineListener =
+                new ParamixelEngineDescriptorEngineExecutionListener(printer);
+        final ParamixelEngineExecutionListener routingListener = new ParamixelEngineExecutionListener(printer);
+
+        engineListener.executionStarted(engine);
+        routingListener.executionStarted(clazz);
+        routingListener.executionStarted(arg);
+        routingListener.executionStarted(method);
+        routingListener.executionFinished(method, TestExecutionResult.successful());
+        routingListener.executionFinished(arg, TestExecutionResult.successful());
+        routingListener.executionFinished(clazz, TestExecutionResult.successful());
+
+        AbstractEngineExecutionListener.ExecutionSummary summary = AbstractEngineExecutionListener.EXECUTION_SUMMARY;
+        AbstractEngineExecutionListener.ExecutionSummary.ClassStats stats =
+                summary.getClassStatsMap().get(longClassName);
+        stats.passed.set(123456);
+        stats.failed.set(0);
+        stats.totalDurationMillis.set(9876543210L);
+        setClassArgumentCount(summary, longClassName, 12345);
+        setClassMethodCount(summary, longClassName, 678901);
+
+        engineListener.executionFinished(engine, TestExecutionResult.successful());
+
+        final String output = out.toString();
+        String normalizedOutput = stripAnsi(output);
+        assertThat(normalizedOutput).contains(longClassName);
+
+        List<Integer> tableLineLengths = getTableLineLengths(normalizedOutput);
+        assertThat(tableLineLengths).as("Should have found table lines").isNotEmpty();
+        int expectedLength = tableLineLengths.get(0);
+        for (int i = 1; i < tableLineLengths.size(); i++) {
+            assertThat(tableLineLengths.get(i))
+                    .as("Table line " + i + " should have same length (" + expectedLength + ") as first line")
+                    .isEqualTo(expectedLength);
+        }
+    }
+
+    private static List<Integer> getTableLineLengths(final String output) {
+        String[] lines = output.split("\n");
+        List<Integer> lengths = new ArrayList<>();
+        for (String line : lines) {
+            if (line.startsWith("[INFO] +") || line.startsWith("[INFO] |")) {
+                lengths.add(line.substring(7).length());
+            }
+        }
+        return lengths;
+    }
+
+    private static String stripAnsi(final String input) {
+        return input.replaceAll("\\u001B\\[[;\\d]*m", "");
+    }
+
+    private static void setClassArgumentCount(
+            final AbstractEngineExecutionListener.ExecutionSummary summary, final String className, final int count)
+            throws Exception {
+        final Field field =
+                AbstractEngineExecutionListener.ExecutionSummary.class.getDeclaredField("classArgumentCounts");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, AtomicInteger> map = (Map<String, AtomicInteger>) field.get(summary);
+        map.put(className, new AtomicInteger(count));
+    }
+
+    private static void setClassMethodCount(
+            final AbstractEngineExecutionListener.ExecutionSummary summary, final String className, final int count)
+            throws Exception {
+        final Field field =
+                AbstractEngineExecutionListener.ExecutionSummary.class.getDeclaredField("classMethodCounts");
+        field.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, AtomicInteger> map = (Map<String, AtomicInteger>) field.get(summary);
+        map.put(className, new AtomicInteger(count));
     }
 
     private static void dummy() {

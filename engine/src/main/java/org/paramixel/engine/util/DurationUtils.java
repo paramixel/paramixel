@@ -40,9 +40,11 @@ public final class DurationUtils {
      *
      * <p>Rules:
      * <ul>
-     *   <li>{@code < 1000}: {@code "{millis} ms"}
+     *   <li>{@code < 1000}: milliseconds with 3 decimals (e.g. {@code "250.000 ms"})
      *   <li>{@code < 60000}: seconds with 3 decimals (e.g. {@code "1.500 s"})
-     *   <li>{@code >= 60000}: {@code "{m} m {s} s {ms} ms"}
+     *   <li>{@code < 3600000}: minutes with 3 decimals (e.g. {@code "1.083 m"})
+     *   <li>{@code < 86400000}: hours with 3 decimals (e.g. {@code "1.000 h"})
+     *   <li>{@code >= 86400000}: days with 3 decimals (e.g. {@code "1.000 d"})
      * </ul>
      *
      * @param millis duration in milliseconds; must be {@code >= 0}
@@ -56,16 +58,21 @@ public final class DurationUtils {
         }
 
         if (millis < 1000) {
-            return millis + " ms";
+            return String.format("%.3f ms", millis / 1.0);
         }
 
         if (millis < 60000) {
             return String.format("%.3f s", millis / 1000.0);
         }
 
-        final long minutes = millis / 60000;
-        final long seconds = (millis % 60000) / 1000;
-        final long remainingMillis = millis % 1000;
-        return String.format("%d m %d s %d ms", minutes, seconds, remainingMillis);
+        if (millis < 3600000) {
+            return String.format("%.3f m", millis / 60000.0);
+        }
+
+        if (millis < 86400000) {
+            return String.format("%.3f h", millis / 3600000.0);
+        }
+
+        return String.format("%.3f d", millis / 86400000.0);
     }
 }

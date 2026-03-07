@@ -29,12 +29,6 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - Website: https://maven.apache.org/
   - License: Apache License 2.0
 
-- ASCII Table (freva/ascii-table)
-  - Coordinates: com.github.freva:ascii-table
-  - Website: https://github.com/freva/ascii-table
-  - License: MIT
-  - Copyright: 2017-2026 freva
-
 - AssertJ
   - Coordinates: org.assertj:assertj-core
   - Website: https://assertj.github.io/doc/
