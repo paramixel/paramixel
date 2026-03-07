@@ -184,7 +184,7 @@ public class ParamixelTestEngineTest {
     }
 
     @Test
-    public void execute_withInvalidSummaryClassNameMaxLengthConfigParam_fails() {
+    public void execute_withWhitespaceSummaryClassNameMaxLengthConfigParam_doesNotFail() {
         final ParamixelTestEngine engine = new ParamixelTestEngine();
         final var request = LauncherDiscoveryRequestBuilder.request()
                 .selectors(DiscoverySelectors.selectClass(NotATestClass.class))
@@ -202,11 +202,7 @@ public class ParamixelTestEngineTest {
             @Override
             public void executionFinished(
                     final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {
-                assertThat(testExecutionResult.getStatus()).isEqualTo(TestExecutionResult.Status.FAILED);
-                assertThat(testExecutionResult.getThrowable()).isPresent();
-                assertThat(testExecutionResult.getThrowable().get())
-                        .hasMessage(
-                                "Invalid paramixel.summary.classNameMaxLength: value must not have leading/trailing whitespace (raw=' 60' trimmed='60')");
+                assertThat(testExecutionResult.getStatus()).isEqualTo(TestExecutionResult.Status.SUCCESSFUL);
             }
         };
 
@@ -239,7 +235,7 @@ public class ParamixelTestEngineTest {
                 assertThat(testExecutionResult.getThrowable()).isPresent();
                 assertThat(testExecutionResult.getThrowable().get())
                         .hasMessage(
-                                "Invalid paramixel.summary.classNameMaxLength: value must be an integer in range [1, 2147483647] (raw='0')");
+                                "Invalid configuration: paramixel.summary.classNameMaxLength: must be an integer in range [1, 2147483647] (source=junit raw='0' normalized='0')");
             }
         };
 

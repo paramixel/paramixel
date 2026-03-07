@@ -16,9 +16,6 @@
 
 package org.paramixel.engine;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -26,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Future;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.EngineDiscoveryRequest;
@@ -38,6 +36,8 @@ import org.junit.platform.engine.UniqueId;
 import org.paramixel.api.ClassContext;
 import org.paramixel.engine.api.ConcreteClassContext;
 import org.paramixel.engine.api.ConcreteEngineContext;
+import org.paramixel.engine.configuration.EngineConfiguration;
+import org.paramixel.engine.configuration.EngineConfigurationResolver;
 import org.paramixel.engine.descriptor.AbstractParamixelDescriptor;
 import org.paramixel.engine.descriptor.ParamixelEngineDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
@@ -47,7 +47,7 @@ import org.paramixel.engine.execution.ParamixelConcurrencyLimiter;
 import org.paramixel.engine.execution.ParamixelExecutionRuntime;
 import org.paramixel.engine.listener.ParamixelEngineExecutionListener;
 import org.paramixel.engine.util.FastIdUtil;
-import org.paramixel.engine.util.SummaryClassNameUtil;
+import org.paramixel.engine.util.PropertiesLoaderUtil;
 
 /**
  * Provides the Paramixel JUnit Platform {@link TestEngine} implementation.
@@ -69,7 +69,6 @@ import org.paramixel.engine.util.SummaryClassNameUtil;
  * {@link #execute(ExecutionRequest)}.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelTestEngine implements TestEngine {
 
@@ -92,14 +91,17 @@ public final class ParamixelTestEngine implements TestEngine {
             Math.max(1, Runtime.getRuntime().availableProcessors());
 
     /**
-     * Configuration key controlling the maximum rendered class-name length in the Maven summary table.
+     * Properties file name used for project-root configuration.
      */
-    private static final String SUMMARY_CLASS_NAME_MAX_LENGTH_KEY = "paramixel.summary.classNameMaxLength";
+    private static final String PROPERTIES_FILE_NAME = "paramixel.properties";
+
+    /**
+     * Configuration key used for reporting properties I/O errors.
+     */
+    private static final String PROPERTIES_FILE_KEY = "paramixel.properties";
 
     /**
      * Creates a new test engine instance.
-     *
-     * @since 0.0.1
      */
     public ParamixelTestEngine() {
         // INTENTIONALLY EMPTY
@@ -122,107 +124,86 @@ public final class ParamixelTestEngine implements TestEngine {
 
     @Override
     public void execute(final @NonNull ExecutionRequest executionRequest) {
-        final boolean invokedByMaven = executionRequest
-                .getConfigurationParameters()
-                .get("invokedBy")
-                .or(() -> executionRequest.getConfigurationParameters().get("invokedBy"))
-                .map("maven"::equals)
-                .orElse(false);
-
-        // Load base properties from file
-        final Properties properties = new Properties();
-        final File propertiesFile = new File("paramixel.properties");
-        if (propertiesFile.isFile()) {
-            try (InputStream in = new FileInputStream(propertiesFile)) {
-                properties.load(in);
-            } catch (Exception e) {
-                LOGGER.warning("Failed to load paramixel.properties: " + e.getMessage());
-            }
-        }
-
-        // Determine parallelism: config params override properties file
-        final int maxParallelism = executionRequest
-                .getConfigurationParameters()
-                .get("paramixel.parallelism")
-                .map(Integer::parseInt)
-                .orElseGet(() -> {
-                    String value = properties.getProperty("paramixel.parallelism");
-                    if (value != null && !value.trim().isEmpty()) {
-                        try {
-                            return Integer.parseInt(value.trim());
-                        } catch (NumberFormatException e) {
-                            LOGGER.warning("Invalid paramixel.parallelism value in properties file: " + value);
-                        }
-                    }
-                    return DEFAULT_PARALLELISM;
-                });
-
+        EngineConfiguration engineConfiguration = null;
         Exception exception = null;
 
-        int summaryClassNameMaxLength = Integer.MAX_VALUE;
         try {
-            summaryClassNameMaxLength = resolveSummaryClassNameMaxLength(executionRequest, properties);
+            final Properties rawProperties =
+                    PropertiesLoaderUtil.loadProjectRootPropertiesOrFail(PROPERTIES_FILE_NAME, PROPERTIES_FILE_KEY);
+            final Properties normalizedProperties = PropertiesLoaderUtil.normalizeAllValues(rawProperties);
+            engineConfiguration = EngineConfigurationResolver.resolveForExecution(
+                    executionRequest.getConfigurationParameters(), normalizedProperties, DEFAULT_PARALLELISM);
         } catch (Exception e) {
             exception = e;
+            LOGGER.log(Level.SEVERE, e.getMessage(), e);
         }
 
-        final EngineExecutionListener engineExecutionListener = invokedByMaven
-                ? new ParamixelEngineExecutionListener(
-                        executionRequest.getEngineExecutionListener(), summaryClassNameMaxLength)
-                : executionRequest.getEngineExecutionListener();
+        final boolean mavenInvocationMode = engineConfiguration != null && engineConfiguration.mavenInvocationMode();
+        final EngineExecutionListener engineExecutionListener;
+        if (mavenInvocationMode) {
+            engineExecutionListener = new ParamixelEngineExecutionListener(
+                    executionRequest.getEngineExecutionListener(), engineConfiguration.summaryClassNameMaxLength());
+        } else {
+            engineExecutionListener = executionRequest.getEngineExecutionListener();
+        }
 
         engineExecutionListener.executionStarted(executionRequest.getRootTestDescriptor());
+
+        if (exception != null) {
+            engineExecutionListener.executionFinished(
+                    executionRequest.getRootTestDescriptor(), TestExecutionResult.failed(exception));
+            if (mavenInvocationMode) {
+                LOGGER.info("TESTS FAILED");
+            }
+            return;
+        }
 
         final Map<Class<?>, ClassContext> classContexts = new HashMap<>();
         final Map<Class<?>, Object> testInstances = new HashMap<>();
 
-        if (exception == null) {
-            try {
-                properties.setProperty("invokedBy", invokedByMaven ? "maven" : "junit");
-                properties.setProperty("paramixel.parallelism", String.valueOf(maxParallelism));
-                properties.setProperty(SUMMARY_CLASS_NAME_MAX_LENGTH_KEY, String.valueOf(summaryClassNameMaxLength));
+        try {
+            final Properties properties = engineConfiguration.normalizedProperties();
 
-                if (invokedByMaven) {
-                    LOGGER.info("Paramixel Engine invoked by Maven");
-                    LOGGER.info("Paramixel Engine Configuration:");
-                    properties.stringPropertyNames().stream().sorted().forEach(k -> {
-                        LOGGER.info("  " + k + " = " + properties.getProperty(k));
-                    });
-                }
-
-                final ConcreteEngineContext engineContext =
-                        new ConcreteEngineContext(ENGINE_ID, properties, maxParallelism);
-
-                final List<ParamixelTestClassDescriptor> classDescriptors =
-                        executionRequest.getRootTestDescriptor().getChildren().stream()
-                                .filter(d -> d instanceof ParamixelTestClassDescriptor)
-                                .map(d -> (ParamixelTestClassDescriptor) d)
-                                .sorted(Comparator.comparing(AbstractParamixelDescriptor::getDisplayName))
-                                .toList();
-
-                try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(maxParallelism)) {
-                    final ParamixelClassRunner classRunner = new ParamixelClassRunner(
-                            runtime, engineContext, engineExecutionListener, classContexts, testInstances);
-
-                    final List<Future<?>> futures = new ArrayList<>();
-                    for (ParamixelTestClassDescriptor classDescriptor : classDescriptors) {
-                        final ParamixelConcurrencyLimiter.ClassPermit permit =
-                                runtime.limiter().acquireClassExecution();
-                        futures.add(runtime.submitNamed(FastIdUtil.getId(6), () -> {
-                            try (permit) {
-                                classRunner.runTestClass(classDescriptor);
-                            }
-                        }));
-                    }
-
-                    for (Future<?> future : futures) {
-                        future.get();
-                    }
-                }
-
-            } catch (Exception e) {
-                exception = e;
+            if (mavenInvocationMode) {
+                LOGGER.info("Paramixel Engine invoked by Maven");
+                LOGGER.info("Paramixel Engine Configuration:");
+                properties.stringPropertyNames().stream().sorted().forEach(k -> {
+                    LOGGER.info("  " + k + " = " + properties.getProperty(k));
+                });
             }
+
+            final ConcreteEngineContext engineContext =
+                    new ConcreteEngineContext(ENGINE_ID, properties, engineConfiguration.parallelism());
+
+            final List<ParamixelTestClassDescriptor> classDescriptors =
+                    executionRequest.getRootTestDescriptor().getChildren().stream()
+                            .filter(d -> d instanceof ParamixelTestClassDescriptor)
+                            .map(d -> (ParamixelTestClassDescriptor) d)
+                            .sorted(Comparator.comparing(AbstractParamixelDescriptor::getDisplayName))
+                            .toList();
+
+            try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(engineConfiguration.parallelism())) {
+                final ParamixelClassRunner classRunner = new ParamixelClassRunner(
+                        runtime, engineContext, engineExecutionListener, classContexts, testInstances);
+
+                final List<Future<?>> futures = new ArrayList<>();
+                for (ParamixelTestClassDescriptor classDescriptor : classDescriptors) {
+                    final ParamixelConcurrencyLimiter.ClassPermit permit =
+                            runtime.limiter().acquireClassExecution();
+                    futures.add(runtime.submitNamed(FastIdUtil.getId(6), () -> {
+                        try (permit) {
+                            classRunner.runTestClass(classDescriptor);
+                        }
+                    }));
+                }
+
+                for (Future<?> future : futures) {
+                    future.get();
+                }
+            }
+
+        } catch (Exception e) {
+            exception = e;
         }
 
         Throwable firstTestFailure = null;
@@ -246,35 +227,5 @@ public final class ParamixelTestEngine implements TestEngine {
         }
 
         engineExecutionListener.executionFinished(executionRequest.getRootTestDescriptor(), rootResult);
-    }
-
-    /**
-     * Resolves the maximum rendered class-name length for the Maven summary table.
-     *
-     * <p>Configuration parameter values take precedence over the properties file. If the key is not
-     * provided from either source, {@link Integer#MAX_VALUE} is returned.
-     *
-     * @param executionRequest the engine execution request
-     * @param properties the loaded properties file
-     * @return the resolved maximum class-name length
-     * @throws IllegalStateException when a provided value is invalid
-     * @since 0.0.1
-     */
-    private static int resolveSummaryClassNameMaxLength(
-            final @NonNull ExecutionRequest executionRequest, final @NonNull Properties properties) {
-        final var configValue = executionRequest.getConfigurationParameters().get(SUMMARY_CLASS_NAME_MAX_LENGTH_KEY);
-        if (configValue.isPresent()) {
-            return SummaryClassNameUtil.parseProvidedMaxLength(SUMMARY_CLASS_NAME_MAX_LENGTH_KEY, configValue.get());
-        }
-
-        if (properties.containsKey(SUMMARY_CLASS_NAME_MAX_LENGTH_KEY)) {
-            String raw = properties.getProperty(SUMMARY_CLASS_NAME_MAX_LENGTH_KEY);
-            if (raw == null) {
-                raw = "";
-            }
-            return SummaryClassNameUtil.parseProvidedMaxLength(SUMMARY_CLASS_NAME_MAX_LENGTH_KEY, raw);
-        }
-
-        return Integer.MAX_VALUE;
     }
 }

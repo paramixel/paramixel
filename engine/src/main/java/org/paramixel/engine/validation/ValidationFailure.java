@@ -23,7 +23,6 @@ import org.jspecify.annotations.NonNull;
  * Represents a validation failure with a descriptive message.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ValidationFailure {
 
@@ -36,7 +35,6 @@ public final class ValidationFailure {
      * Creates a new validation failure.
      *
      * @param message the failure description
-     * @since 0.0.1
      */
     public ValidationFailure(final @NonNull String message) {
         this.message = Objects.requireNonNull(message, "message must not be null");
@@ -46,7 +44,6 @@ public final class ValidationFailure {
      * Returns the failure description.
      *
      * @return the failure message
-     * @since 0.0.1
      */
     public String getMessage() {
         return message;

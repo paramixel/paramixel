@@ -34,7 +34,6 @@ import org.paramixel.api.Store;
  * <p>Null values are not stored. A {@code put(key, null)} behaves like {@link #remove(String)}.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ConcreteStore implements Store {
 
@@ -45,8 +44,6 @@ public final class ConcreteStore implements Store {
 
     /**
      * Creates an empty store.
-     *
-     * @since 0.0.1
      */
     public ConcreteStore() {
         this(10);
@@ -56,7 +53,6 @@ public final class ConcreteStore implements Store {
      * Creates an empty store with an expected capacity.
      *
      * @param initialCapacity the expected number of entries in the store; used to optimize internal data structures
-     * @since 0.0.1
      */
     public ConcreteStore(final int initialCapacity) {
         this.map = new ConcurrentHashMap<>(Math.max(0, initialCapacity));

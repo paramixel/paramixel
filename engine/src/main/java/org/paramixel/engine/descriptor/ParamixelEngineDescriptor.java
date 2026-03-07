@@ -34,7 +34,6 @@ import org.junit.platform.engine.UniqueId;
  * all discovered test class descriptors.</p>
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelEngineDescriptor implements TestDescriptor {
 
@@ -58,7 +57,6 @@ public final class ParamixelEngineDescriptor implements TestDescriptor {
      *
      * @param uniqueId the unique ID for the engine descriptor
      * @param displayName the display name for the engine
-     * @since 0.0.1
      */
     public ParamixelEngineDescriptor(final @NonNull UniqueId uniqueId, final @NonNull String displayName) {
         this.uniqueId = Objects.requireNonNull(uniqueId, "uniqueId must not be null");

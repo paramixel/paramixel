@@ -40,7 +40,6 @@ import org.paramixel.engine.descriptor.ParamixelTestMethodDescriptor;
  * {@link AbstractEngineExecutionListener.ExecutionSummary}.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelEngineExecutionListener extends AbstractEngineExecutionListener {
 
@@ -63,8 +62,6 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
 
     /**
      * Creates a listener that prints to standard output with a no-op delegate.
-     *
-     * @since 0.0.1
      */
     public ParamixelEngineExecutionListener() {
         this(
@@ -79,7 +76,6 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      * Creates a listener that prints to standard output and delegates to {@code delegate}.
      *
      * @param delegate the delegate listener; never {@code null}
-     * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(final @NonNull EngineExecutionListener delegate) {
         this(System.out::println, delegate, Integer.MAX_VALUE);
@@ -90,7 +86,6 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      *
      * @param delegate the delegate listener; never {@code null}
      * @param summaryClassNameMaxLength the maximum rendered class-name length
-     * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(
             final @NonNull EngineExecutionListener delegate, final int summaryClassNameMaxLength) {
@@ -101,7 +96,6 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      * Creates a listener that prints to the provided printer with a no-op delegate.
      *
      * @param printer the printer to receive output lines; never {@code null}
-     * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(final @NonNull Consumer<String> printer) {
         this(
@@ -117,7 +111,6 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      *
      * @param printer the printer
      * @param delegate the delegate
-     * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(
             final @NonNull Consumer<String> printer, final @NonNull EngineExecutionListener delegate) {
@@ -130,7 +123,6 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      * @param printer the printer
      * @param delegate the delegate
      * @param summaryClassNameMaxLength the maximum rendered class-name length
-     * @since 0.0.1
      */
     public ParamixelEngineExecutionListener(
             final @NonNull Consumer<String> printer,
@@ -159,7 +151,6 @@ public final class ParamixelEngineExecutionListener extends AbstractEngineExecut
      *
      * @param testDescriptor the descriptor to inspect; may be {@code null}
      * @return the parent class display name, or {@code null} when not found
-     * @since 0.0.1
      */
     private String getParentClassName(final @NonNull TestDescriptor testDescriptor) {
         TestDescriptor current = testDescriptor;

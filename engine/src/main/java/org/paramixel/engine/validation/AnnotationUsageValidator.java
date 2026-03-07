@@ -38,7 +38,6 @@ import org.paramixel.api.Paramixel;
  * </ul>
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class AnnotationUsageValidator {
 
@@ -57,8 +56,6 @@ public final class AnnotationUsageValidator {
 
     /**
      * Creates a new instance.
-     *
-     * @since 0.0.1
      */
     private AnnotationUsageValidator() {
         // INTENTIONALLY EMPTY
@@ -69,7 +66,6 @@ public final class AnnotationUsageValidator {
      *
      * @param testClass the test class to validate
      * @return validation failures; empty when valid
-     * @since 0.0.1
      */
     public static List<ValidationFailure> validateTestClass(final @NonNull Class<?> testClass) {
         final List<ValidationFailure> failures = new ArrayList<>();
@@ -87,7 +83,6 @@ public final class AnnotationUsageValidator {
      *
      * @param testClass the testClass
      * @param failures the failures
-     * @since 0.0.1
      */
     private static void validateTagsUsage(final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
         // Check if class has @Tags annotation
@@ -124,7 +119,6 @@ public final class AnnotationUsageValidator {
      *
      * @param testClass the testClass
      * @param failures the failures
-     * @since 0.0.1
      */
     private static void validateDisplayName(final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
         final Paramixel.DisplayName classDisplayName = testClass.getAnnotation(Paramixel.DisplayName.class);
@@ -152,7 +146,6 @@ public final class AnnotationUsageValidator {
      *
      * @param testClass the testClass
      * @param failures the failures
-     * @since 0.0.1
      */
     private static void validateArgumentsCollectorUsage(
             final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
@@ -175,7 +168,6 @@ public final class AnnotationUsageValidator {
      *
      * @param testClass the testClass
      * @param failures the failures
-     * @since 0.0.1
      */
     private static void validateMethodAnnotationUsage(
             final @NonNull Class<?> testClass, final List<ValidationFailure> failures) {
@@ -194,7 +186,6 @@ public final class AnnotationUsageValidator {
      * @param declaringClass the declaringClass
      * @param method the method
      * @param failures the failures
-     * @since 0.0.1
      */
     private static void validateMutualExclusion(
             final Class<?> declaringClass, final Method method, final List<ValidationFailure> failures) {

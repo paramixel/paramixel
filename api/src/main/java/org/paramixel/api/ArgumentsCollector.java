@@ -67,10 +67,6 @@ import org.jspecify.annotations.NonNull;
  * }
  * }</pre>
  *
- * <p><b>Compatibility note:</b> The signature shown in the example ({@code arguments(ArgumentsCollector)})
- * depends on whether/where the collector-driven pattern is supported by the calling integration.
- * This interface defines the contract for the collector itself.
- *
  * @author Douglas Hoard (doug.hoard@gmail.com)
  * @since 0.0.1
  */

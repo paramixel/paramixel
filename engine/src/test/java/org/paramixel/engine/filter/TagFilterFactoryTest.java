@@ -23,6 +23,7 @@ import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.Paramixel;
+import org.paramixel.engine.util.ConfigurationException;
 
 public class TagFilterFactoryTest {
 
@@ -70,9 +71,9 @@ public class TagFilterFactoryTest {
     }
 
     @Test
-    public void fromProperties_commaSeparatedPatterns() {
+    public void fromProperties_singleIncludePattern_matchesMultipleTags() {
         Properties props = new Properties();
-        props.setProperty("paramixel.tags.include", "^unit$,^fast$");
+        props.setProperty("paramixel.tags.include", "^(unit|fast)$");
         TagFilter filter = TagFilterFactory.fromProperties(props);
 
         assertThat(filter.matches(UnitTest.class)).isTrue();
@@ -103,8 +104,8 @@ public class TagFilterFactoryTest {
         props.setProperty("paramixel.tags.include", "integration[");
 
         assertThatThrownBy(() -> TagFilterFactory.fromProperties(props))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("paramixel.tags.include");
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("Invalid configuration: paramixel.tags.include");
     }
 
     @Test
@@ -113,8 +114,30 @@ public class TagFilterFactoryTest {
         props.setProperty("paramixel.tags.exclude", "slow(");
 
         assertThatThrownBy(() -> TagFilterFactory.fromProperties(props))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("paramixel.tags.exclude");
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("Invalid configuration: paramixel.tags.exclude");
+    }
+
+    @Test
+    public void fromProperties_blankIncludePattern_throws() {
+        Properties props = new Properties();
+        props.setProperty("paramixel.tags.include", "   ");
+
+        assertThatThrownBy(() -> TagFilterFactory.fromProperties(props))
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("Invalid configuration: paramixel.tags.include")
+                .hasMessageContaining("must not be blank");
+    }
+
+    @Test
+    public void fromProperties_blankExcludePattern_throws() {
+        Properties props = new Properties();
+        props.setProperty("paramixel.tags.exclude", "\t");
+
+        assertThatThrownBy(() -> TagFilterFactory.fromProperties(props))
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("Invalid configuration: paramixel.tags.exclude")
+                .hasMessageContaining("must not be blank");
     }
 
     // Test classes

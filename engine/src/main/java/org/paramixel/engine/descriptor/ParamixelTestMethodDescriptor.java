@@ -47,7 +47,6 @@ import org.junit.platform.engine.support.descriptor.MethodSource;
  * @see ParamixelTestClassDescriptor
  * @see ParamixelTestArgumentDescriptor
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelTestMethodDescriptor extends AbstractParamixelDescriptor {
 
@@ -62,7 +61,6 @@ public final class ParamixelTestMethodDescriptor extends AbstractParamixelDescri
      * @param uniqueId the uniqueId
      * @param testMethod the testMethod
      * @param displayName the displayName
-     * @since 0.0.1
      */
     public ParamixelTestMethodDescriptor(
             final @NonNull UniqueId uniqueId, final @NonNull Method testMethod, final @NonNull String displayName) {
@@ -77,7 +75,6 @@ public final class ParamixelTestMethodDescriptor extends AbstractParamixelDescri
      * Returns the test method this descriptor represents.
      *
      * @return the test method
-     * @since 0.0.1
      */
     public Method getTestMethod() {
         return testMethod;

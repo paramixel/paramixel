@@ -24,12 +24,22 @@ import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.Paramixel;
+import org.paramixel.engine.util.ConfigurationException;
+import org.paramixel.engine.util.EngineConfigurationUtil;
 
 public class RegexTagFilterTest {
 
+    private static RegexTagFilter filter(final List<String> include, final List<String> exclude) {
+        return new RegexTagFilter(
+                include,
+                exclude,
+                EngineConfigurationUtil.Source.PROGRAMMATIC,
+                EngineConfigurationUtil.Source.PROGRAMMATIC);
+    }
+
     @Test
     public void matches_noFilters_includesAllClasses() {
-        RegexTagFilter filter = new RegexTagFilter(List.of(), List.of());
+        RegexTagFilter filter = filter(List.of(), List.of());
 
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isTrue();
         assertThat(filter.matches(UnitFastTest.class)).isTrue();
@@ -38,7 +48,7 @@ public class RegexTagFilterTest {
 
     @Test
     public void matches_includePattern_matchesClassWithTag() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("integration-.*"), List.of());
+        RegexTagFilter filter = filter(List.of("integration-.*"), List.of());
 
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isTrue();
         assertThat(filter.matches(IntegrationApiTest.class)).isTrue();
@@ -48,7 +58,7 @@ public class RegexTagFilterTest {
 
     @Test
     public void matches_includePattern_exactMatch() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("^unit$"), List.of());
+        RegexTagFilter filter = filter(List.of("^unit$"), List.of());
 
         assertThat(filter.matches(UnitFastTest.class)).isTrue();
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isFalse();
@@ -57,7 +67,7 @@ public class RegexTagFilterTest {
 
     @Test
     public void matches_includePattern_multiplePatterns() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("^unit$", "^fast$"), List.of());
+        RegexTagFilter filter = filter(List.of("^unit$", "^fast$"), List.of());
 
         assertThat(filter.matches(UnitFastTest.class)).isTrue();
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isFalse();
@@ -66,7 +76,7 @@ public class RegexTagFilterTest {
 
     @Test
     public void matches_excludePattern_excludesMatchingClass() {
-        RegexTagFilter filter = new RegexTagFilter(List.of(), List.of(".*slow.*"));
+        RegexTagFilter filter = filter(List.of(), List.of(".*slow.*"));
 
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isFalse();
         assertThat(filter.matches(UnitFastTest.class)).isTrue();
@@ -76,7 +86,7 @@ public class RegexTagFilterTest {
 
     @Test
     public void matches_includeAndExclude_combined() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("integration-.*"), List.of(".*slow.*"));
+        RegexTagFilter filter = filter(List.of("integration-.*"), List.of(".*slow.*"));
 
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isFalse();
         assertThat(filter.matches(IntegrationApiTest.class)).isTrue();
@@ -85,21 +95,21 @@ public class RegexTagFilterTest {
 
     @Test
     public void matches_untaggedClass_notIncludedWhenIncludeFilterPresent() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("unit"), List.of());
+        RegexTagFilter filter = filter(List.of("unit"), List.of());
 
         assertThat(filter.matches(UntaggedTest.class)).isFalse();
     }
 
     @Test
     public void matches_untaggedClass_includedWhenNoIncludeFilter() {
-        RegexTagFilter filter = new RegexTagFilter(List.of(), List.of("slow"));
+        RegexTagFilter filter = filter(List.of(), List.of("slow"));
 
         assertThat(filter.matches(UntaggedTest.class)).isTrue();
     }
 
     @Test
     public void matches_escapedMetacharacters() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("v1\\.0"), List.of());
+        RegexTagFilter filter = filter(List.of("v1\\.0"), List.of());
 
         assertThat(filter.matches(VersionTest.class)).isTrue();
         assertThat(filter.matches(UnitFastTest.class)).isFalse();
@@ -107,33 +117,33 @@ public class RegexTagFilterTest {
 
     @Test
     public void matches_caseSensitive() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("Unit"), List.of());
+        RegexTagFilter filter = filter(List.of("Unit"), List.of());
 
         assertThat(filter.matches(UnitFastTest.class)).isFalse();
     }
 
     @Test
     public void hasIncludePatterns_empty_returnsFalse() {
-        RegexTagFilter filter = new RegexTagFilter(List.of(), List.of("slow"));
+        RegexTagFilter filter = filter(List.of(), List.of("slow"));
         assertThat(filter.hasIncludePatterns()).isFalse();
     }
 
     @Test
     public void hasIncludePatterns_withPatterns_returnsTrue() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("unit"), List.of());
+        RegexTagFilter filter = filter(List.of("unit"), List.of());
         assertThat(filter.hasIncludePatterns()).isTrue();
     }
 
     @Test
     public void invalidRegexPattern_throws() {
-        assertThatThrownBy(() -> new RegexTagFilter(List.of("integration[", "unit"), List.of()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("paramixel.tags.include");
+        assertThatThrownBy(() -> filter(List.of("integration[", "unit"), List.of()))
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("Invalid configuration: paramixel.tags.include");
     }
 
     @Test
     public void emptyPatternString_ignored() {
-        RegexTagFilter filter = new RegexTagFilter(List.of("", "  ", "unit"), List.of());
+        RegexTagFilter filter = filter(List.of("", "  ", "unit"), List.of());
 
         assertThat(filter.getIncludePatternCount()).isEqualTo(1);
         assertThat(filter.matches(UnitFastTest.class)).isTrue();
@@ -143,7 +153,7 @@ public class RegexTagFilterTest {
     public void matches_allTagsChecked() {
         // Class has tags: "integration-database", "slow"
         // Pattern matches "integration-database" which is different from just "database"
-        RegexTagFilter filter = new RegexTagFilter(List.of("integration-database"), List.of());
+        RegexTagFilter filter = filter(List.of("integration-database"), List.of());
 
         assertThat(filter.matches(IntegrationDatabaseTest.class)).isTrue();
     }
@@ -154,7 +164,7 @@ public class RegexTagFilterTest {
         // Parent has: "integration", "database"
         // Child has: "fast"
         // Combined: ["integration", "database", "fast"]
-        RegexTagFilter filter = new RegexTagFilter(List.of("integration"), List.of());
+        RegexTagFilter filter = filter(List.of("integration"), List.of());
 
         // Should match because parent has "integration" tag
         assertThat(filter.matches(ChildTestWithInheritedTags.class)).isTrue();
@@ -166,7 +176,7 @@ public class RegexTagFilterTest {
         // Parent has: "integration", "database"
         // Child has: "fast"
         // Combined: ["integration", "database", "fast"]
-        RegexTagFilter filter = new RegexTagFilter(List.of("fast"), List.of());
+        RegexTagFilter filter = filter(List.of("fast"), List.of());
 
         // Should match because child has "fast" tag
         assertThat(filter.matches(ChildTestWithInheritedTags.class)).isTrue();
@@ -178,13 +188,13 @@ public class RegexTagFilterTest {
         // Parent has: "integration", "database"
         // Child has: "fast"
         // Combined: ["integration", "database", "fast"]
-        RegexTagFilter filter = new RegexTagFilter(List.of(), List.of("slow"));
+        RegexTagFilter filter = filter(List.of(), List.of("slow"));
 
         // Should match because neither parent nor child has "slow" tag
         assertThat(filter.matches(ChildTestWithInheritedTags.class)).isTrue();
 
         // Create filter that excludes "database" - should exclude because parent has it
-        RegexTagFilter excludeFilter = new RegexTagFilter(List.of(), List.of("database"));
+        RegexTagFilter excludeFilter = filter(List.of(), List.of("database"));
         assertThat(excludeFilter.matches(ChildTestWithInheritedTags.class)).isFalse();
     }
 

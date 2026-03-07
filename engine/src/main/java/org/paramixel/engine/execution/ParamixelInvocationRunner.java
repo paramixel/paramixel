@@ -57,7 +57,6 @@ import org.paramixel.engine.util.FastIdUtil;
  * single-threaded use by {@link ParamixelClassRunner}.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelInvocationRunner {
 
@@ -99,7 +98,6 @@ public final class ParamixelInvocationRunner {
      * @param listener the listener
      * @param classContext the classContext
      * @param testInstance the testInstance
-     * @since 0.0.1
      */
     public ParamixelInvocationRunner(
             final ParamixelExecutionRuntime runtime,
@@ -119,7 +117,6 @@ public final class ParamixelInvocationRunner {
      * @param argument the argument
      * @param argumentIndex the argumentIndex
      * @return the result
-     * @since 0.0.1
      */
     public TestExecutionResult runInvocations(
             final ParamixelTestClassDescriptor classDescriptor, final Object argument, final int argumentIndex) {
@@ -216,7 +213,6 @@ public final class ParamixelInvocationRunner {
      * @param argument the argument
      * @param argumentIndex the argumentIndex
      * @return the result
-     * @since 0.0.1
      */
     private TestExecutionResult executeInvocation(
             final ParamixelTestMethodDescriptor methodDescriptor,
@@ -284,7 +280,6 @@ public final class ParamixelInvocationRunner {
      * @param testClass the test class; never {@code null}
      * @param argumentContext the argument context passed to hooks; never {@code null}
      * @return the first failure, or {@code null} when all hooks succeed
-     * @since 0.0.1
      */
     private Throwable runBeforeEach(final Class<?> testClass, final ArgumentContext argumentContext) {
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.BeforeEach.class);
@@ -308,7 +303,6 @@ public final class ParamixelInvocationRunner {
      * @param testClass the test class; never {@code null}
      * @param argumentContext the argument context passed to hooks; never {@code null}
      * @return the first failure, or {@code null} when all hooks succeed
-     * @since 0.0.1
      */
     private Throwable runAfterEach(final Class<?> testClass, final ArgumentContext argumentContext) {
         final List<Method> methods = getLifecycleMethods(testClass, Paramixel.AfterEach.class);
@@ -333,7 +327,6 @@ public final class ParamixelInvocationRunner {
      * @param testClass the testClass
      * @param annotationType the annotationType
      * @return the result
-     * @since 0.0.1
      */
     private List<Method> getLifecycleMethods(
             final Class<?> testClass, final Class<? extends Annotation> annotationType) {
@@ -368,7 +361,6 @@ public final class ParamixelInvocationRunner {
      *
      * @param method the method
      * @return the result
-     * @since 0.0.1
      */
     private static int getOrderValue(final @NonNull Method method) {
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
@@ -383,7 +375,6 @@ public final class ParamixelInvocationRunner {
      *
      * @param method the method
      * @return the result
-     * @since 0.0.1
      */
     private static String signatureKey(final @NonNull Method method) {
         final StringBuilder builder = new StringBuilder();
@@ -406,7 +397,6 @@ public final class ParamixelInvocationRunner {
      * <p>This type is private because it is an internal memoization detail.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     private static final class LifecycleCacheKey {
 
@@ -425,7 +415,6 @@ public final class ParamixelInvocationRunner {
          *
          * @param testClass the test class; never {@code null}
          * @param annotationType the lifecycle annotation type; never {@code null}
-         * @since 0.0.1
          */
         private LifecycleCacheKey(final Class<?> testClass, final Class<? extends Annotation> annotationType) {
             this.testClass = testClass;

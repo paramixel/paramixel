@@ -27,7 +27,6 @@ import org.jspecify.annotations.NonNull;
  * abbreviates package segments while preserving the final segment intact.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class SummaryClassNameUtil {
 
@@ -43,50 +42,9 @@ public final class SummaryClassNameUtil {
 
     /**
      * Creates a new instance.
-     *
-     * @since 0.0.1
      */
     private SummaryClassNameUtil() {
         // INTENTIONALLY EMPTY
-    }
-
-    /**
-     * Parses a provided maximum length value.
-     *
-     * <p>This method is strict: the value must be non-blank, have no leading/trailing whitespace,
-     * and be a base-10 integer within range.
-     *
-     * @param propertyKey the property key used in error messages; never {@code null}
-     * @param rawValue the raw value as provided; never {@code null}
-     * @return the parsed maximum length
-     * @throws IllegalStateException when the value is invalid
-     * @since 0.0.1
-     */
-    public static int parseProvidedMaxLength(final @NonNull String propertyKey, final @NonNull String rawValue) {
-        Objects.requireNonNull(propertyKey, "propertyKey must not be null");
-        Objects.requireNonNull(rawValue, "rawValue must not be null");
-
-        if (rawValue.isBlank()) {
-            throw new IllegalStateException(blankErrorMessage(propertyKey, rawValue));
-        }
-
-        final String trimmed = rawValue.trim();
-        if (!rawValue.equals(trimmed)) {
-            throw new IllegalStateException(whitespaceErrorMessage(propertyKey, rawValue, trimmed));
-        }
-
-        final int value;
-        try {
-            value = Integer.parseInt(rawValue);
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException(integerRangeErrorMessage(propertyKey, rawValue), e);
-        }
-
-        if (value < MIN_MAX_LENGTH) {
-            throw new IllegalStateException(integerRangeErrorMessage(propertyKey, rawValue));
-        }
-
-        return value;
     }
 
     /**
@@ -105,7 +63,6 @@ public final class SummaryClassNameUtil {
      * @param fullClassName the class name to abbreviate; never {@code null}
      * @param maxLength the configured maximum length
      * @return the abbreviated class name
-     * @since 0.0.1
      */
     public static String abbreviateClassName(
             final @NonNull String propertyKey, final @NonNull String fullClassName, final int maxLength) {
@@ -160,7 +117,6 @@ public final class SummaryClassNameUtil {
      *
      * @param segments the split class name segments
      * @return the minimal abbreviation string
-     * @since 0.0.1
      */
     private static String buildMinimalAbbreviation(final @NonNull String[] segments) {
         Objects.requireNonNull(segments, "segments must not be null");
@@ -178,7 +134,6 @@ public final class SummaryClassNameUtil {
      *
      * @param segment the segment to abbreviate
      * @return the abbreviated segment
-     * @since 0.0.1
      */
     private static String abbreviateSegmentToOneCharacter(final @NonNull String segment) {
         Objects.requireNonNull(segment, "segment must not be null");
@@ -187,57 +142,5 @@ public final class SummaryClassNameUtil {
             return segment;
         }
         return segment.substring(0, 1);
-    }
-
-    /**
-     * Creates a blank-value error message.
-     *
-     * @param propertyKey the property key
-     * @param rawValue the raw value
-     * @return the error message
-     * @since 0.0.1
-     */
-    private static String blankErrorMessage(final @NonNull String propertyKey, final @NonNull String rawValue) {
-        return "Invalid " + propertyKey + ": value must not be blank (raw='" + rawValue + "')";
-    }
-
-    /**
-     * Creates a whitespace error message.
-     *
-     * @param propertyKey the property key
-     * @param rawValue the raw value
-     * @param trimmed the trimmed value
-     * @return the error message
-     * @since 0.0.1
-     */
-    private static String whitespaceErrorMessage(
-            final @NonNull String propertyKey, final @NonNull String rawValue, final @NonNull String trimmed) {
-        return "Invalid "
-                + propertyKey
-                + ": value must not have leading/trailing whitespace (raw='"
-                + rawValue
-                + "' trimmed='"
-                + trimmed
-                + "')";
-    }
-
-    /**
-     * Creates an integer range error message.
-     *
-     * @param propertyKey the property key
-     * @param rawValue the raw value
-     * @return the error message
-     * @since 0.0.1
-     */
-    private static String integerRangeErrorMessage(final @NonNull String propertyKey, final @NonNull String rawValue) {
-        return "Invalid "
-                + propertyKey
-                + ": value must be an integer in range ["
-                + MIN_MAX_LENGTH
-                + ", "
-                + MAX_MAX_LENGTH
-                + "] (raw='"
-                + rawValue
-                + "')";
     }
 }

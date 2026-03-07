@@ -505,6 +505,10 @@ Practical examples showcasing test engine capabilities:
 
 The examples module serves as a reference for writing tests with various complexity levels and integration patterns.
 
+## Pronunciation
+
+**Paramixel** *(pronounced "pair-uh-mick-suhl")*
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.

@@ -32,6 +32,7 @@ public final class NamedValue<T> implements Named {
      * Stores the name.
      */
     private final String name;
+
     /**
      * Stores the value.
      */
@@ -42,7 +43,6 @@ public final class NamedValue<T> implements Named {
      *
      * @param name the name
      * @param value the value
-     * @since 0.0.1
      */
     private NamedValue(final @NonNull String name, final T value) {
         this.name = Objects.requireNonNull(name, "name must not be null");

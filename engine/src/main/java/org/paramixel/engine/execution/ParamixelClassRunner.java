@@ -62,7 +62,6 @@ import org.paramixel.engine.util.FastIdUtil;
  * classes concurrently, the caller must provide thread-safe map implementations.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelClassRunner {
 
@@ -116,7 +115,6 @@ public final class ParamixelClassRunner {
      * @param listener the listener
      * @param classContexts the classContexts
      * @param testInstances the testInstances
-     * @since 0.0.1
      */
     public ParamixelClassRunner(
             final ParamixelExecutionRuntime runtime,
@@ -146,7 +144,6 @@ public final class ParamixelClassRunner {
      * </ul>
      *
      * @param classDescriptor the class descriptor to execute; never {@code null}
-     * @since 0.0.1
      */
     public void runTestClass(final ParamixelTestClassDescriptor classDescriptor) {
         final Class<?> testClass = classDescriptor.getTestClass();
@@ -220,7 +217,6 @@ public final class ParamixelClassRunner {
      * @param argumentDescriptors the argumentDescriptors
      * @param arguments the arguments
      * @param argumentParallelism the argumentParallelism
-     * @since 0.0.1
      */
     private void executeArgumentsInlineFirst(
             final ParamixelTestClassDescriptor classDescriptor,
@@ -315,7 +311,6 @@ public final class ParamixelClassRunner {
      *
      * @param argumentDescriptors the argument descriptors in index order; never {@code null}
      * @param i the argument index into {@code argumentDescriptors}
-     * @since 0.0.1
      */
     private void startArgumentDescriptor(final List<ParamixelTestArgumentDescriptor> argumentDescriptors, final int i) {
         if (argumentDescriptors.isEmpty()) {
@@ -331,7 +326,6 @@ public final class ParamixelClassRunner {
      * @param argumentDescriptors the argumentDescriptors
      * @param i the i
      * @param result the result
-     * @since 0.0.1
      */
     private void finishArgumentDescriptor(
             final List<ParamixelTestArgumentDescriptor> argumentDescriptors,
@@ -355,7 +349,6 @@ public final class ParamixelClassRunner {
      * @param argumentIndex the argumentIndex
      * @param argumentThreadName the argumentThreadName
      * @return the result
-     * @since 0.0.1
      */
     private TestExecutionResult executeArgumentBody(
             final ParamixelTestClassDescriptor classDescriptor,
@@ -416,7 +409,6 @@ public final class ParamixelClassRunner {
      * @param testClass the class to instantiate; never {@code null}
      * @return a new test instance; never {@code null}
      * @throws Throwable if instantiation fails for any reason
-     * @since 0.0.1
      */
     private Object instantiateTestClass(final Class<?> testClass) throws Throwable {
         try {
@@ -436,7 +428,6 @@ public final class ParamixelClassRunner {
      * @param classContext the classContext
      * @param testInstance the testInstance
      * @return the result
-     * @since 0.0.1
      */
     private boolean runInitialize(
             final Class<?> testClass, final ConcreteClassContext classContext, final Object testInstance) {
@@ -459,7 +450,6 @@ public final class ParamixelClassRunner {
      * @param testClass the testClass
      * @param classContext the classContext
      * @param testInstance the testInstance
-     * @since 0.0.1
      */
     private void runFinalize(
             final @NonNull Class<?> testClass,
@@ -485,7 +475,6 @@ public final class ParamixelClassRunner {
      * @param argument the argument
      * @param argumentIndex the argumentIndex
      * @return the result
-     * @since 0.0.1
      */
     private Throwable runBeforeAll(
             final @NonNull Class<?> testClass,
@@ -518,7 +507,6 @@ public final class ParamixelClassRunner {
      * @param argument the argument
      * @param argumentIndex the argumentIndex
      * @return the result
-     * @since 0.0.1
      */
     private Throwable runAfterAll(
             final @NonNull Class<?> testClass,
@@ -552,7 +540,6 @@ public final class ParamixelClassRunner {
      * @param testClass the testClass
      * @param annotationType the annotationType
      * @return the result
-     * @since 0.0.1
      */
     private List<Method> getLifecycleMethods(
             final Class<?> testClass, final Class<? extends Annotation> annotationType) {
@@ -589,7 +576,6 @@ public final class ParamixelClassRunner {
      *
      * @param method the method
      * @return the result
-     * @since 0.0.1
      */
     private static int getOrderValue(final @NonNull Method method) {
         final Paramixel.Order order = method.getAnnotation(Paramixel.Order.class);
@@ -604,7 +590,6 @@ public final class ParamixelClassRunner {
      *
      * @param method the method
      * @return the result
-     * @since 0.0.1
      */
     private static String signatureKey(final @NonNull Method method) {
         final StringBuilder builder = new StringBuilder();
@@ -629,7 +614,6 @@ public final class ParamixelClassRunner {
      * @param testClassName the testClassName
      * @param classContext the classContext
      * @return the result
-     * @since 0.0.1
      */
     private Throwable closeAutoCloseable(
             final Object resource,
@@ -655,7 +639,6 @@ public final class ParamixelClassRunner {
      *
      * @param classDescriptor the classDescriptor
      * @return the result
-     * @since 0.0.1
      */
     private List<ParamixelTestArgumentDescriptor> getSortedArgumentDescriptors(
             final ParamixelTestClassDescriptor classDescriptor) {
@@ -677,7 +660,6 @@ public final class ParamixelClassRunner {
      *
      * @param argumentDescriptors argument descriptors in index order; never {@code null}
      * @return an argument array; never {@code null}
-     * @since 0.0.1
      */
     private Object[] argumentsFromDescriptors(final List<ParamixelTestArgumentDescriptor> argumentDescriptors) {
         if (argumentDescriptors.isEmpty()) {
@@ -696,7 +678,6 @@ public final class ParamixelClassRunner {
      * <p>This type is private because it is an internal memoization detail.
      *
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     private static final class LifecycleCacheKey {
 
@@ -715,7 +696,6 @@ public final class ParamixelClassRunner {
          *
          * @param testClass the test class; never {@code null}
          * @param annotationType the lifecycle annotation type; never {@code null}
-         * @since 0.0.1
          */
         private LifecycleCacheKey(final Class<?> testClass, final Class<? extends Annotation> annotationType) {
             this.testClass = testClass;
@@ -750,7 +730,6 @@ public final class ParamixelClassRunner {
      *
      * @param <T> the held value type
      * @author Douglas Hoard (doug.hoard@gmail.com)
-     * @since 0.0.1
      */
     private static final class AtomicReferenceHolder<T> {
 
@@ -763,7 +742,6 @@ public final class ParamixelClassRunner {
          * Creates a holder with an initial value.
          *
          * @param initial the initial value
-         * @since 0.0.1
          */
         private AtomicReferenceHolder(final T initial) {
             this.value = initial;
@@ -773,7 +751,6 @@ public final class ParamixelClassRunner {
          * Sets the held value.
          *
          * @param value the new value
-         * @since 0.0.1
          */
         private void set(final T value) {
             this.value = value;
@@ -783,7 +760,6 @@ public final class ParamixelClassRunner {
          * Returns the current held value.
          *
          * @return the current value
-         * @since 0.0.1
          */
         private T get() {
             return value;

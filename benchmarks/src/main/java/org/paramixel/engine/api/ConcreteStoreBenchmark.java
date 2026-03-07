@@ -36,7 +36,6 @@ import org.openjdk.jmh.infra.Blackhole;
  * <p>Benchmarks measure the throughput of common Store operations including
  * put, get, contains, remove, and computeIfAbsent under various conditions.</p>
  *
- * @since 0.0.1
  * @author Douglas Hoard (doug.hoard@gmail.com)
  */
 @State(Scope.Thread)
@@ -49,8 +48,6 @@ public class ConcreteStoreBenchmark {
 
     /**
      * Creates a new benchmark instance.
-     *
-     * @since 0.0.1
      */
     public ConcreteStoreBenchmark() {
         // INTENTIONALLY EMPTY
@@ -75,8 +72,6 @@ public class ConcreteStoreBenchmark {
 
     /**
      * Sets up the store before each benchmark iteration.
-     *
-     * @since 0.0.1
      */
     @Setup
     public void setup() {
@@ -85,8 +80,6 @@ public class ConcreteStoreBenchmark {
 
     /**
      * Cleans up the store after each benchmark iteration.
-     *
-     * @since 0.0.1
      */
     @TearDown
     public void tearDown() {
@@ -97,7 +90,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks simple put operation.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void putOperation(final Blackhole blackhole) {
@@ -109,7 +101,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks put with type checking.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void putTypedOperation(final Blackhole blackhole) {
@@ -121,7 +112,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks get operation on existing key.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void getExistingKey(final Blackhole blackhole) {
@@ -134,7 +124,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks get with type checking on existing key.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void getTypedExistingKey(final Blackhole blackhole) {
@@ -147,7 +136,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks contains operation on existing key.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void containsExistingKey(final Blackhole blackhole) {
@@ -160,7 +148,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks remove operation.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void removeOperation(final Blackhole blackhole) {
@@ -173,7 +160,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks remove with type checking.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void removeTypedOperation(final Blackhole blackhole) {
@@ -186,7 +172,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks computeIfAbsent when key is absent.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void computeIfAbsentKeyAbsent(final Blackhole blackhole) {
@@ -198,7 +183,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks computeIfAbsent when key already exists.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void computeIfAbsentKeyExists(final Blackhole blackhole) {
@@ -211,7 +195,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks size operation.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void sizeOperation(final Blackhole blackhole) {
@@ -223,7 +206,6 @@ public class ConcreteStoreBenchmark {
      * Benchmarks mixed workload simulating realistic usage.
      *
      * @param blackhole JMH blackhole to prevent dead code elimination
-     * @since 0.0.1
      */
     @Benchmark
     public void mixedWorkload(final Blackhole blackhole) {

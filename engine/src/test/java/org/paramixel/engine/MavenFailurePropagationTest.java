@@ -53,7 +53,7 @@ public class MavenFailurePropagationTest {
             final LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
                     .selectors(DiscoverySelectors.selectClass(FailingParamixelTest.class))
                     .filters(EngineFilter.includeEngines("paramixel"))
-                    .configurationParameter("invokedBy", "maven")
+                    .configurationParameter("paramixel.internal.invoker", "paramixe-maven-plugin")
                     .build();
 
             final Launcher launcher = LauncherFactory.create();

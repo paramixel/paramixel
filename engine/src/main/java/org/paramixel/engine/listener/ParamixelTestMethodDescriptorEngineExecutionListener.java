@@ -29,7 +29,6 @@ import org.junit.platform.engine.TestExecutionResult;
  * display names.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelTestMethodDescriptorEngineExecutionListener extends AbstractEngineExecutionListener {
 
@@ -42,7 +41,6 @@ public final class ParamixelTestMethodDescriptorEngineExecutionListener extends 
      * Creates a listener for method descriptors.
      *
      * @param printer the printer to receive output lines; never {@code null}
-     * @since 0.0.1
      */
     public ParamixelTestMethodDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
         this.printer = Objects.requireNonNull(printer, "printer must not be null");

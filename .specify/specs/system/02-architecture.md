@@ -78,7 +78,7 @@ IntelliJ IDEA, etc.).
 2. **`ParamixelMojo.execute()`** builds a `URLClassLoader` from test output + test classpath, then scans `.class` files for classes annotated `@Paramixel.TestClass`. For each found class, it adds a `ClassSelector` to a `LauncherDiscoveryRequest` filtered to engine `"paramixel"`.
 3. **JUnit Platform Launcher** calls `ParamixelTestEngine.discover()`.
 4. **`ParamixelDiscovery.discoverTests()`** processes each selector, validates method signatures via `MethodValidator`, and invokes the `@Paramixel.ArgumentsCollector` method to enumerate arguments. It builds the four-level descriptor tree (engine -> class -> argument -> method). See `04-lifecycle.md` for argument collector rules and inheritance behavior.
-5. **`ParamixelTestEngine.execute()`** reads the `invokedBy=maven` configuration parameter and installs the custom `ParamixelEngineExecutionListener` for console output. It creates a `ConcreteEngineContext` loading configuration from `paramixel.properties`.
+5. **`ParamixelTestEngine.execute()`** reads `paramixel.internal.invoker=paramixe-maven-plugin` (JUnit Platform configuration parameter) and installs the custom `ParamixelEngineExecutionListener` for console output when present. It creates a `ConcreteEngineContext` loading configuration from `paramixel.properties`.
 6. **`ParamixelExecutionRuntime`** provides a virtual-thread executor and a `ParamixelConcurrencyLimiter`. See `05-concurrency.md` for semaphore configuration.
 7. For each `ParamixelTestClassDescriptor`, a class-level permit is acquired and the class is submitted to the virtual-thread executor via `ParamixelClassRunner.runTestClass()`.
 8. **`ParamixelClassRunner`** instantiates the test class (no-arg constructor), runs `@Paramixel.Initialize`, then for each argument acquires an argument permit and delegates to `ParamixelInvocationRunner`. See `04-lifecycle.md` for the full execution sequence.
@@ -120,7 +120,7 @@ ordering.
 
 ### ADR-6: Custom Listener Only in Maven Invocation Mode
 
-When `invokedBy=maven`, the engine substitutes its own `ParamixelEngineExecutionListener`
+When `paramixel.internal.invoker=paramixe-maven-plugin`, the engine substitutes its own `ParamixelEngineExecutionListener`
 for the JUnit Platform's standard listener. In IDE/direct-JUnit-Platform mode, the standard
 listener is used.
 

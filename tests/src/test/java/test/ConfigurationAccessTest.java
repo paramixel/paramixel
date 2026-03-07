@@ -50,8 +50,8 @@ public class ConfigurationAccessTest {
         assertThat(engineContext.getStore()).isNotNull();
 
         // Test configuration value access
-        String invokedBy = engineContext.getConfigurationValue("invokedBy");
-        assertThat(invokedBy).isNotNull();
+        String parallelism = engineContext.getConfigurationValue("paramixel.parallelism");
+        assertThat(parallelism).isNotNull();
 
         // Test default value for missing key
         String missing = engineContext.getConfigurationValue("nonexistent.key", "default");

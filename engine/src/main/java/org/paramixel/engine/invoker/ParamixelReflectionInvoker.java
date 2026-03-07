@@ -37,7 +37,6 @@ import org.paramixel.api.ClassContext;
  * {@link Method#setAccessible(boolean)} calls.
  *
  * @author Douglas Hoard (doug.hoard@gmail.com)
- * @since 0.0.1
  */
 public final class ParamixelReflectionInvoker {
 
@@ -50,8 +49,6 @@ public final class ParamixelReflectionInvoker {
 
     /**
      * Creates a new instance.
-     *
-     * @since 0.0.1
      */
     private ParamixelReflectionInvoker() {
         // INTENTIONALLY EMPTY
@@ -63,7 +60,6 @@ public final class ParamixelReflectionInvoker {
      * @param method the static method to invoke; never {@code null}
      * @return the returned value (may be {@code null})
      * @throws Throwable when the invoked method throws, or when reflection fails
-     * @since 0.0.1
      */
     public static Object invokeStatic(final @NonNull Method method) throws Throwable {
         return invokeStaticMethod(method);
@@ -76,7 +72,6 @@ public final class ParamixelReflectionInvoker {
      * @param parameter the single parameter to pass; never {@code null}
      * @return the returned value (may be {@code null})
      * @throws Throwable when the invoked method throws, or when reflection fails
-     * @since 0.0.1
      */
     public static Object invokeStatic(final @NonNull Method method, final @NonNull Object parameter) throws Throwable {
         return invokeStaticMethod(method, parameter);
@@ -89,7 +84,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param classContext the classContext
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     public static void invokeInitialize(
             final @NonNull Method method, final @NonNull Object instance, final @NonNull ClassContext classContext)
@@ -104,7 +98,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param argumentContext the argumentContext
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     public static void invokeBeforeAll(
             final @NonNull Method method,
@@ -121,7 +114,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param argumentContext the argumentContext
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     public static void invokeBeforeEach(
             final @NonNull Method method,
@@ -138,7 +130,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param argumentContext the argumentContext
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     public static void invokeTestMethod(
             final @NonNull Method method,
@@ -155,7 +146,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param argumentContext the argumentContext
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     public static void invokeAfterEach(
             final @NonNull Method method,
@@ -172,7 +162,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param argumentContext the argumentContext
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     public static void invokeAfterAll(
             final @NonNull Method method,
@@ -189,7 +178,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param classContext the classContext
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     public static void invokeFinalize(
             final @NonNull Method method, final @NonNull Object instance, final @NonNull ClassContext classContext)
@@ -204,7 +192,6 @@ public final class ParamixelReflectionInvoker {
      * @param instance the instance
      * @param parameter the parameter
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     private static void invokeMethod(
             final @NonNull Method method, final @NonNull Object instance, final @NonNull Object parameter)
@@ -229,7 +216,6 @@ public final class ParamixelReflectionInvoker {
      * @param parameters the parameters
      * @return the result
      * @throws Throwable if an error occurs
-     * @since 0.0.1
      */
     private static Object invokeStaticMethod(final @NonNull Method method, final Object... parameters)
             throws Throwable {
