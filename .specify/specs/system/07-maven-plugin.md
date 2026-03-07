@@ -21,8 +21,8 @@ classes in the test output directory and executes them via the JUnit Platform La
 | `failIfNoTests` | `paramixel.failIfNoTests` | `true` | `boolean` | Fails build if no `@Paramixel.TestClass` found |
 | `parallelism` | `paramixel.parallelism` | (engine default) | `Integer` | Global max parallelism; when unset, engine default applies |
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |
-| `includeTags` | `paramixel.tags.include` | (none) | `String` | Comma-separated regex patterns; includes matching tags |
-| `excludeTags` | `paramixel.tags.exclude` | (none) | `String` | Comma-separated regex patterns; excludes matching tags |
+| `tagsInclude` | `paramixel.tags.include` | (none) | `String` | Comma-separated regex patterns; includes matching tags |
+| `tagsExclude` | `paramixel.tags.exclude` | (none) | `String` | Comma-separated regex patterns; excludes matching tags |
 
 ## Execution Behavior
 
@@ -101,8 +101,8 @@ regular expressions.
     <groupId>org.paramixel</groupId>
     <artifactId>paramixel-maven-plugin</artifactId>
     <configuration>
-        <includeTags>integration-.*</includeTags>
-        <excludeTags>.*-slow</excludeTags>
+        <tagsInclude>integration-.*</tagsInclude>
+        <tagsExclude>.*-slow</tagsExclude>
     </configuration>
 </plugin>
 ```
