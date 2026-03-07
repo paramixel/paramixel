@@ -27,9 +27,9 @@
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.platform.version>6.0.3</junit.platform.version>
-        <maven.plugin.api.version>3.9.12</maven.plugin.api.version>
+        <maven.plugin.api.version>3.15.2</maven.plugin.api.version>
         <maven.core.version>3.9.12</maven.core.version>
-        <maven.artifact.version>3.9.12</maven.artifact.version>
+        <maven.artifact.version>3.9.13</maven.artifact.version>
         <maven.resolver.version>2.0.16</maven.resolver.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>6.0.3</junit.version>
@@ -112,7 +112,7 @@
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
-                    <version>3.2.1</version>
+                    <version>3.3.0</version>
                     <configuration>
                         <licenseHeader>
                             <file>assets/license-header.txt</file>
@@ -136,7 +136,7 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>versions-maven-plugin</artifactId>
-                    <version>2.18.0</version>
+                    <version>2.21.0</version>
                     <configuration>
                         <rulesUri>file://${maven.multiModuleProjectDirectory}/versions-rules.xml</rulesUri>
                     </configuration>
@@ -144,7 +144,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>3.5.0</version>
+                    <version>3.6.2</version>
                     <executions>
                         <execution>
                             <id>enforce-maven</id>
@@ -167,7 +167,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.5.0</version>
+                <version>3.6.2</version>
             </plugin>
         </plugins>
     </build>
