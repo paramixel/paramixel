@@ -23,6 +23,7 @@ classes in the test output directory and executes them via the JUnit Platform La
 | `verbose` | `paramixel.verbose` | `false` | `boolean` | Enables verbose output (partially implemented) |
 | `tagsInclude` | `paramixel.tags.include` | (none) | `String` | Comma-separated regex patterns; includes matching tags |
 | `tagsExclude` | `paramixel.tags.exclude` | (none) | `String` | Comma-separated regex patterns; excludes matching tags |
+| `summaryClassNameMaxLength` | `paramixel.summary.classNameMaxLength` | `2147483647` | `Integer` | Maximum rendered class-name length in the Maven-only summary table |
 
 ## Execution Behavior
 
@@ -103,6 +104,7 @@ regular expressions.
     <configuration>
         <tagsInclude>integration-.*</tagsInclude>
         <tagsExclude>.*-slow</tagsExclude>
+        <summaryClassNameMaxLength>60</summaryClassNameMaxLength>
     </configuration>
 </plugin>
 ```
@@ -125,3 +127,54 @@ paramixel.tags.exclude=.*slow.*,.*flaky.*
 **Strict Validation:** Invalid regex patterns in `paramixel.tags.include` or
 `paramixel.tags.exclude` MUST cause immediate test execution failure. The engine
 MUST validate all patterns during initialization, before test discovery begins.
+
+---
+
+## Maven Summary Table Class Name Rendering
+
+When invoked by Maven (`invokedBy=maven`), Paramixel emits a `Paramixel Test Summary` table.
+The class name column can be abbreviated to improve readability.
+
+### Configuration Parameter
+
+| Key | Description |
+|---|---|
+| `paramixel.summary.classNameMaxLength` | Maximum length in characters for the rendered class name in the summary table (best-effort; final segment is always preserved) |
+
+### Abbreviation Rules
+
+If a configured maximum length is smaller than the full class name, the engine abbreviates the
+name by shortening package segments while keeping the final segment intact.
+
+1. The final segment (after the last `.`) is always kept intact.
+2. Every other segment is either the full segment or its first character.
+3. Start with all non-final segments abbreviated to 1 character, then attempt to expand segments
+   from right to left to their full names while the overall rendered value remains within the
+   maximum. If a segment cannot be expanded without exceeding the maximum, the engine stops
+   expanding and all remaining segments to the left remain abbreviated.
+
+If the final segment alone exceeds the configured maximum, it is still kept intact and the
+rendered class name may exceed the configured maximum.
+
+Example: `foo.bar.Class`
+
+- With `paramixel.summary.classNameMaxLength=11`: `f.bar.Class`
+- With `paramixel.summary.classNameMaxLength=10`: `f.b.Class`
+
+Example: `test.argument.ArgumentsTest`
+
+- With `paramixel.summary.classNameMaxLength=20`: `t.a.ArgumentsTest`
+
+This is display-only and may cause ambiguous/colliding rendered names. Increase the maximum
+length when you need unambiguous output.
+
+### Properties File Configuration
+
+```properties
+paramixel.summary.classNameMaxLength=60
+```
+
+### Error Handling
+
+**Strict validation:** If `paramixel.summary.classNameMaxLength` is provided, it MUST be a base-10
+integer in the range `[1, 2147483647]`. Invalid values MUST fail test execution immediately.

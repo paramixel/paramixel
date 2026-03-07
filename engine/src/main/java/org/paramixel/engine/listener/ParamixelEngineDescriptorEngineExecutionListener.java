@@ -25,6 +25,7 @@ import org.jspecify.annotations.NonNull;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.paramixel.engine.util.DurationUtils;
+import org.paramixel.engine.util.SummaryClassNameUtil;
 
 /**
  * Reports a summarized execution report for the engine root descriptor.
@@ -47,6 +48,11 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
     private final Consumer<String> printer;
 
     /**
+     * Maximum rendered class-name length for the summary table class column.
+     */
+    private final int summaryClassNameMaxLength;
+
+    /**
      * Start time for the current engine execution in epoch milliseconds.
      */
     private long startTimeMillis;
@@ -64,7 +70,20 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
      * @since 0.0.1
      */
     public ParamixelEngineDescriptorEngineExecutionListener(final @NonNull Consumer<String> printer) {
+        this(printer, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Creates a listener that writes the report to the provided printer.
+     *
+     * @param printer the printer to receive report lines; never {@code null}
+     * @param summaryClassNameMaxLength the maximum rendered class-name length
+     * @since 0.0.1
+     */
+    public ParamixelEngineDescriptorEngineExecutionListener(
+            final @NonNull Consumer<String> printer, final int summaryClassNameMaxLength) {
         this.printer = Objects.requireNonNull(printer, "printer must not be null");
+        this.summaryClassNameMaxLength = summaryClassNameMaxLength;
     }
 
     @Override
@@ -101,6 +120,8 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
             List<TableRow> rows = new ArrayList<>(classNames.size());
 
             for (String className : classNames) {
+                final String renderedClassName = SummaryClassNameUtil.abbreviateClassName(
+                        "paramixel.summary.classNameMaxLength", className, summaryClassNameMaxLength);
                 int argCount = summary.getClassArgumentCount(className);
                 int methodCount = summary.getClassMethodCount(className);
                 ExecutionSummary.ClassStats stats = classStatsMap.get(className);
@@ -111,7 +132,7 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
                 String classDurationString = DurationUtils.formatMillis(classDuration);
 
                 TableRow row = new TableRow(
-                        className,
+                        renderedClassName,
                         String.valueOf(argCount),
                         String.valueOf(methodCount),
                         String.valueOf(passed),

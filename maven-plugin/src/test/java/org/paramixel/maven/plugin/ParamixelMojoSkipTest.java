@@ -17,19 +17,33 @@
 package org.paramixel.maven.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.maven.plugin.MojoFailureException;
 import org.junit.jupiter.api.Test;
 
 public class ParamixelMojoSkipTest {
 
     @Test
-    void execute_skipsWhenSkipTestsTrue() {
+    public void execute_skipsWhenSkipTestsTrue() {
         final ParamixelMojo mojo = new ParamixelMojo();
 
         assertDoesNotThrow(() -> {
             setField(mojo, "skipTests", true);
             mojo.execute();
         });
+    }
+
+    @Test
+    public void execute_failsFastForInvalidSummaryClassNameMaxLength() throws Exception {
+        final ParamixelMojo mojo = new ParamixelMojo();
+        setField(mojo, "summaryClassNameMaxLength", 0);
+
+        final MojoFailureException ex = assertThrows(MojoFailureException.class, mojo::execute);
+        assertEquals(
+                "Invalid paramixel.summary.classNameMaxLength: value must be an integer in range [1, 2147483647] (raw='0')",
+                ex.getMessage());
     }
 
     private static void setField(final Object target, final String fieldName, final Object value)

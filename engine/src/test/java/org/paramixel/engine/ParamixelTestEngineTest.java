@@ -183,6 +183,72 @@ public class ParamixelTestEngineTest {
         }
     }
 
+    @Test
+    public void execute_withInvalidSummaryClassNameMaxLengthConfigParam_fails() {
+        final ParamixelTestEngine engine = new ParamixelTestEngine();
+        final var request = LauncherDiscoveryRequestBuilder.request()
+                .selectors(DiscoverySelectors.selectClass(NotATestClass.class))
+                .build();
+
+        final UniqueId uniqueId = UniqueId.forEngine("paramixel");
+        final TestDescriptor descriptor = engine.discover(request, uniqueId);
+
+        final EngineExecutionListener listener = new EngineExecutionListener() {
+            @Override
+            public void executionStarted(final TestDescriptor testDescriptor) {
+                // INTENTIONALLY EMPTY
+            }
+
+            @Override
+            public void executionFinished(
+                    final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {
+                assertThat(testExecutionResult.getStatus()).isEqualTo(TestExecutionResult.Status.FAILED);
+                assertThat(testExecutionResult.getThrowable()).isPresent();
+                assertThat(testExecutionResult.getThrowable().get())
+                        .hasMessage(
+                                "Invalid paramixel.summary.classNameMaxLength: value must not have leading/trailing whitespace (raw=' 60' trimmed='60')");
+            }
+        };
+
+        final ExecutionRequest execRequest =
+                new ExecutionRequest(descriptor, listener, createConfigParamsWithSummaryClassNameMaxLength(" 60"));
+
+        engine.execute(execRequest);
+    }
+
+    @Test
+    public void execute_withOutOfRangeSummaryClassNameMaxLengthConfigParam_fails() {
+        final ParamixelTestEngine engine = new ParamixelTestEngine();
+        final var request = LauncherDiscoveryRequestBuilder.request()
+                .selectors(DiscoverySelectors.selectClass(NotATestClass.class))
+                .build();
+
+        final UniqueId uniqueId = UniqueId.forEngine("paramixel");
+        final TestDescriptor descriptor = engine.discover(request, uniqueId);
+
+        final EngineExecutionListener listener = new EngineExecutionListener() {
+            @Override
+            public void executionStarted(final TestDescriptor testDescriptor) {
+                // INTENTIONALLY EMPTY
+            }
+
+            @Override
+            public void executionFinished(
+                    final TestDescriptor testDescriptor, final TestExecutionResult testExecutionResult) {
+                assertThat(testExecutionResult.getStatus()).isEqualTo(TestExecutionResult.Status.FAILED);
+                assertThat(testExecutionResult.getThrowable()).isPresent();
+                assertThat(testExecutionResult.getThrowable().get())
+                        .hasMessage(
+                                "Invalid paramixel.summary.classNameMaxLength: value must be an integer in range [1, 2147483647] (raw='0')");
+            }
+        };
+
+        final ExecutionRequest execRequest =
+                new ExecutionRequest(descriptor, listener, createConfigParamsWithSummaryClassNameMaxLength("0"));
+
+        engine.execute(execRequest);
+    }
+
     private org.junit.platform.engine.ConfigurationParameters createEmptyConfigParams() {
         return new org.junit.platform.engine.ConfigurationParameters() {
             public Optional<String> get(final String key) {
@@ -222,6 +288,30 @@ public class ParamixelTestEngineTest {
 
             public java.util.Set<String> keySet() {
                 return java.util.Collections.singleton("paramixel.parallelism");
+            }
+        };
+    }
+
+    private org.junit.platform.engine.ConfigurationParameters createConfigParamsWithSummaryClassNameMaxLength(
+            final String rawValue) {
+        return new org.junit.platform.engine.ConfigurationParameters() {
+            public Optional<String> get(final String key) {
+                if ("paramixel.summary.classNameMaxLength".equals(key)) {
+                    return Optional.of(rawValue);
+                }
+                return Optional.empty();
+            }
+
+            public Optional<Boolean> getBoolean(final String key) {
+                return Optional.empty();
+            }
+
+            public int size() {
+                return 1;
+            }
+
+            public java.util.Set<String> keySet() {
+                return java.util.Collections.singleton("paramixel.summary.classNameMaxLength");
             }
         };
     }
