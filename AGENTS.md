@@ -19,9 +19,9 @@ This project uses specification-oriented development. The authoritative system s
 ## Module Boundaries
 
 - **paramixel-api**: Public annotations + context interfaces only. No engine, plugin, or persistence code. No dependency on `paramixel-engine`.
-- **paramixel-engine**: Engine implementation only. No Maven plugin APIs. No `@Paramixel.TestClass`-annotated test classes in production source. Must not reference `paramixel-maven-plugin`.
-- **paramixel-maven-plugin**: Maven Mojo only. No engine-internal package imports. No test author code.
-- **paramixel-tests**: Functional tests via `@Paramixel.TestClass`. No JUnit Jupiter `@Test`. No Testcontainers. Imports only `paramixel-api` and `paramixel-engine`.
+- **paramixel-engine**: Engine implementation only. No Maven plugin APIs. No `@Paramixel.TestClass`-annotated classes in production source (`src/main/java`). Test source (`src/test/java`) MAY contain `@Paramixel.TestClass`-annotated classes when used as test data for JUnit Jupiter unit tests (internal helpers for testing discovery/validation). Must not reference `paramixel-maven-plugin`.
+- **paramixel-maven-plugin**: Maven Mojo only. No engine-internal package imports. No test author code. No `@Paramixel.TestClass`-annotated classes.
+- **paramixel-tests**: Functional tests via `@Paramixel.TestClass`. No JUnit Jupiter `@Test`. No Testcontainers. Imports only `paramixel-api` and `paramixel-engine`. Must not contain JUnit Jupiter test classes or test helper classes.
 - **paramixel-examples**: Demonstrative tests. No engine unit tests. All Testcontainers dependencies are `test` scope only.
 - **paramixel-benchmarks**: JMH benchmarks only. Must not run in standard builds or CI. Requires `-Pbenchmarks` profile.
 

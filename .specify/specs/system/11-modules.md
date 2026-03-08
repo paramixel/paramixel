@@ -67,6 +67,10 @@ org.paramixel.engine
 - MUST NOT depend on `paramixel-maven-plugin`.
 - MUST NOT use HTTP clients or messaging clients.
 - MUST NOT store persistent state between test runs.
+- **Production source (`src/main/java`)** MUST NOT contain `@Paramixel.TestClass`-annotated classes.
+- **Test source (`src/test/java`)** MAY contain `@Paramixel.TestClass`-annotated classes when used as
+  test data for JUnit Jupiter unit tests (e.g., testing discovery or validation logic).
+  These are internal test helpers, not functional tests.
 
 ---
 
