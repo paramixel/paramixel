@@ -141,7 +141,15 @@ Every Javadoc block MUST document:
 SLF4J API is a declared dependency but JUL is the primary logger. Do not use SLF4J
 `Logger` directly in engine code.
 
-## 8. Code Style and Formatting
+## 8. Java Version Compatibility
+
+- **Target Version:** Java 17 LTS (source/target/release=17)
+- **Minimum Runtime:** Java 17+
+- **Dynamic Feature Detection:** Use `JavaVersionUtil` for runtime feature detection
+- **Virtual Thread Support:** Automatically enabled for Java 21+
+- **Fallback Compatibility:** Use platform threads transparently for Java 17-20
+
+## 9. Code Style and Formatting
 
 - **Formatter:** Palantir Java Format 2.87.0 (PALANTIR style).
 - **Applied at:** Every `compile` phase via `spotless-maven-plugin:apply`.
@@ -184,6 +192,8 @@ Any empty method or constructor body MUST contain the comment `// INTENTIONALLY 
 11. Error messages mentioning Paramixel annotations MUST use `@Paramixel.<Name>` form.
 12. Empty method/constructor bodies MUST contain `// INTENTIONALLY EMPTY`.
 13. All production classes MUST declare explicit constructors.
+14. All code MUST compile and run on Java 17+ with automatic feature detection.
+15. Reflective calls MUST be used for Java 21+ APIs to maintain Java 17 compatibility.
 
 ---
 
@@ -208,8 +218,9 @@ Any empty method or constructor body MUST contain the comment `// INTENTIONALLY 
    - Test sources (`*/src/test/java/**`) MAY use `setAccessible(true)`.
 10. MUST NOT bypass `ParamixelConcurrencyLimiter` when submitting class or argument tasks.
 11. MUST NOT modify a `paramixel-api` interface without updating `03-domain-model.md` and
-    `04-lifecycle.md`.
+     `04-lifecycle.md`.
 12. MUST NOT add a new Maven dependency without explicit user approval and spec update.
+13. MUST NOT use Java 21+ APIs directly without reflection compatibility guards for Java 17.
 
 ---
 

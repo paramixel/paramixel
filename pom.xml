@@ -6,7 +6,7 @@
 
     <groupId>org.paramixel</groupId>
     <artifactId>paramixel-parent</artifactId>
-    <version>0.0.1</version>
+    <version>0.1.0-alpha-1</version>
     <packaging>pom</packaging>
 
     <name>Paramixel Parent</name>
@@ -22,10 +22,14 @@
     </modules>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.testSourceEncoding>UTF-8</project.build.testSourceEncoding>
+        <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
+        <project.reporting.sourceEncoding>UTF-8</project.reporting.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <junit.platform.version>6.0.3</junit.platform.version>
         <maven.plugin.api.version>3.9.13</maven.plugin.api.version>
         <maven.plugin.annotations.version>3.15.2</maven.plugin.annotations.version>

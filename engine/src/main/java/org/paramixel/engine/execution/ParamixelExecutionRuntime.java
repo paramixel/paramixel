@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.paramixel.engine.util.JavaVersionUtil;
 
 /**
  * Provides an executor and concurrency limiter for engine execution.
@@ -76,7 +77,22 @@ public final class ParamixelExecutionRuntime implements AutoCloseable {
      * @throws IllegalArgumentException if {@code cores < 1}
      */
     public ParamixelExecutionRuntime(final int cores) {
-        this.executor = Executors.newVirtualThreadPerTaskExecutor();
+        if (JavaVersionUtil.supportsVirtualThreads()) {
+            try {
+                // Use reflection to avoid compilation issues with Java < 21
+                final var executorsClass = Executors.class;
+                final var method = executorsClass.getMethod("newVirtualThreadPerTaskExecutor");
+                this.executor = (ExecutorService) method.invoke(null);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create virtual thread executor", e);
+            }
+        } else {
+            // On Java 17, use a fixed thread pool sized to the total permit pool (cores * 2)
+            // to avoid deadlock when all threads try to acquire permits concurrently
+            // Use Math.max(2, cores * 2) to ensure minimum 2 threads even for cores=1
+            final int executorSize = Math.max(2, cores * 2);
+            this.executor = Executors.newFixedThreadPool(executorSize);
+        }
         this.limiter = new ParamixelConcurrencyLimiter(cores);
     }
 
