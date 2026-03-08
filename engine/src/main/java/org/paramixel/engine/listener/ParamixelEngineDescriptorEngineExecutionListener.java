@@ -190,6 +190,7 @@ public final class ParamixelEngineDescriptorEngineExecutionListener extends Abst
             printer.accept(INFO + "\033[1;32m" + " TESTS PASSED " + "\033[0m");
         } else {
             printer.accept(INFO + "\033[1;31m" + " TESTS FAILED " + "\033[0m");
+            printer.accept(INFO);
         }
     }
 

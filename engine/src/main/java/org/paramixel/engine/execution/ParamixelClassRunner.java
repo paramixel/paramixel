@@ -232,25 +232,46 @@ public final class ParamixelClassRunner {
         }
 
         final String classThreadName = Thread.currentThread().getName();
-        final int maxAsyncArguments = Math.max(0, argumentParallelism - 1);
+        final int maxAsyncArguments = Math.max(0, argumentParallelism);
         int asyncStarted = 0;
         final List<Future<?>> futures = new ArrayList<>();
 
-        // Always execute arg0 inline to guarantee progress.
-        startArgumentDescriptor(argumentDescriptors, 0);
-        final String arg0ThreadName = classThreadName + "/" + FastIdUtil.getId(6);
-        final TestExecutionResult arg0Result = executeArgumentBody(
-                classDescriptor, testClass, classContext, testInstance, arguments[0], 0, arg0ThreadName);
-        finishArgumentDescriptor(argumentDescriptors, 0, arg0Result);
-
-        for (int argumentIndex = 1; argumentIndex < arguments.length; argumentIndex++) {
+        boolean progressMade = false;
+        for (int argumentIndex = 0; argumentIndex < arguments.length; argumentIndex++) {
             startArgumentDescriptor(argumentDescriptors, argumentIndex);
 
             final int argumentIndexCopy = argumentIndex;
             final Object argument = arguments[argumentIndexCopy];
             final String argumentThreadName = classThreadName + "/" + FastIdUtil.getId(6);
 
+            // Progress guarantee: ensure at least one argument executes
+            if (!progressMade) {
+                final Optional<ParamixelConcurrencyLimiter.ArgumentPermit> permitOpt =
+                        runtime.limiter().tryAcquireArgumentExecution();
+                if (permitOpt.isPresent()) {
+                    progressMade = true;
+                    asyncStarted++;
+                    final ParamixelConcurrencyLimiter.ArgumentPermit permit = permitOpt.get();
+                    futures.add(runtime.submitNamed(argumentThreadName, () -> {
+                        try (permit) {
+                            final TestExecutionResult result = executeArgumentBody(
+                                    classDescriptor,
+                                    testClass,
+                                    classContext,
+                                    testInstance,
+                                    argument,
+                                    argumentIndexCopy,
+                                    argumentThreadName);
+                            finishArgumentDescriptor(argumentDescriptors, argumentIndexCopy, result);
+                        }
+                    }));
+                    continue;
+                }
+            }
+
+            // Standard concurrency logic
             if (argumentParallelism <= 1 || asyncStarted >= maxAsyncArguments) {
+                // Execute inline if parallelism limited or max async reached
                 final TestExecutionResult result = executeArgumentBody(
                         classDescriptor,
                         testClass,
@@ -260,12 +281,17 @@ public final class ParamixelClassRunner {
                         argumentIndexCopy,
                         argumentThreadName);
                 finishArgumentDescriptor(argumentDescriptors, argumentIndexCopy, result);
+                if (!progressMade) {
+                    progressMade = true; // Mark progress after inline execution
+                }
                 continue;
             }
 
+            // Try to acquire permit for concurrent execution
             final Optional<ParamixelConcurrencyLimiter.ArgumentPermit> permitOpt =
                     runtime.limiter().tryAcquireArgumentExecution();
             if (permitOpt.isEmpty()) {
+                // No permit available, execute inline
                 final TestExecutionResult result = executeArgumentBody(
                         classDescriptor,
                         testClass,
@@ -275,9 +301,13 @@ public final class ParamixelClassRunner {
                         argumentIndexCopy,
                         argumentThreadName);
                 finishArgumentDescriptor(argumentDescriptors, argumentIndexCopy, result);
+                if (!progressMade) {
+                    progressMade = true;
+                }
                 continue;
             }
 
+            // Permit acquired successfully, execute concurrently
             asyncStarted++;
             final ParamixelConcurrencyLimiter.ArgumentPermit permit = permitOpt.get();
             futures.add(runtime.submitNamed(argumentThreadName, () -> {
@@ -532,6 +562,43 @@ public final class ParamixelClassRunner {
 
         classContext.removeArgumentContext(argumentIndex);
         return firstFailure;
+    }
+
+    /**
+     * Performs getLifecycleMethods.
+     *
+     * @param testClass the testClass
+     * @param annotationType the annotationType
+     * @return the result
+     */
+    static List<Method> getLifecycleMethodsStatic(
+            final Class<?> testClass, final Class<? extends Annotation> annotationType) {
+        final LifecycleCacheKey cacheKey = new LifecycleCacheKey(testClass, annotationType);
+        return LIFECYCLE_METHOD_CACHE.computeIfAbsent(cacheKey, key -> {
+            final Map<String, Method> bySignature = new ConcurrentHashMap<>();
+            for (Class<?> current = testClass;
+                    current != null && current != Object.class;
+                    current = current.getSuperclass()) {
+                for (Method method : current.getDeclaredMethods()) {
+                    if (!method.isAnnotationPresent(annotationType)) {
+                        continue;
+                    }
+                    if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
+                        continue;
+                    }
+
+                    final String signatureKey = signatureKey(method);
+
+                    // Most-specific (subclass) declaration wins.
+                    bySignature.putIfAbsent(signatureKey, method);
+                }
+            }
+
+            final List<Method> methods = new ArrayList<>(bySignature.values());
+            methods.sort(
+                    Comparator.comparingInt(ParamixelClassRunner::getOrderValue).thenComparing(Method::getName));
+            return Collections.unmodifiableList(methods);
+        });
     }
 
     /**

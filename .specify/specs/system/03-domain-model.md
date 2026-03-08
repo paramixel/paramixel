@@ -4,6 +4,9 @@ Paramixel is a test framework, not a data-persistence application. There are no 
 no databases, and no ORM mappings. The "domain model" consists of public API interfaces,
 annotations, and value objects that carry state through the test execution pipeline.
 
+**Version Note:** Paramixel is compiled with Java 17 target compatibility and supports
+runtime detection of Java 21+ features for optimal performance with virtual threads.
+
 ## Definitions
 
 - **Test class**: A class annotated with `@Paramixel.TestClass`.

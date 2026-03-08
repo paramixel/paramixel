@@ -150,20 +150,20 @@ public final class ParamixelConcurrencyLimiter {
      * @throws InterruptedException if the current thread is interrupted while acquiring permits
      */
     public ClassPermit acquireClassExecution() throws InterruptedException {
-        classSlots.acquire();
-        boolean totalAcquired = false;
+        totalSlots.acquire();
+        boolean classAcquired = false;
         try {
-            totalSlots.acquire();
-            totalAcquired = true;
+            classSlots.acquire();
+            classAcquired = true;
             return new ClassPermit(this);
         } catch (InterruptedException e) {
-            if (!totalAcquired) {
+            if (!classAcquired) {
                 // INTENTIONALLY EMPTY
             }
-            classSlots.release();
+            totalSlots.release();
             throw e;
         } catch (RuntimeException e) {
-            classSlots.release();
+            totalSlots.release();
             throw e;
         }
     }
@@ -203,8 +203,8 @@ public final class ParamixelConcurrencyLimiter {
      * <p>This method is private because only {@link ArgumentPermit} should release permits.
      */
     private void releaseArgumentExecution() {
-        argumentSlots.release();
         totalSlots.release();
+        argumentSlots.release();
     }
 
     /**
