@@ -15,6 +15,10 @@ A high-performance JUnit Platform-based test engine for Java 17+ featuring autom
 > - 🔧 **Enhanced Configuration System** - Multiple configuration sources
 > - 📊 **Detailed Maven Reporting** - Better test execution insights
 
+## Pronunciation
+
+**Paramixel** *(pronounced "pair-uh-mick-suhl")*
+
 ## 📖 Quick Navigation
 
 - [🌟 Why Choose Paramixel?](#-why-choose-paramixel)
@@ -182,7 +186,6 @@ Paramixel provides advanced testing capabilities that surpass traditional JUnit 
 - **Advanced Tag Filtering**: Regex-based inclusion/exclusion with complex patterns
 
 ## 🏗️ Architecture
-## 🏗️ Architecture
 
 ### Actor-Based Execution Model
 
@@ -190,25 +193,25 @@ Paramixel uses a message-passing actor system for execution, providing clear sep
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Actor-Based Execution System                        │
+│                           Actor-Based Execution System                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                               │
-│  ClassActor       ArgumentDispatcher    MethodDispatcher    LifecycleActor    │
-│       │                 │                     │                  │            │
-│       ▼                 ▼                     ▼                  ▼            │
+│                                                                             │
+│  ClassActor       ArgumentDispatcher    MethodDispatcher    LifecycleActor  │
+│       │                 │                     │                  │          │
+│       ▼                 ▼                     ▼                  ▼          │
 │  ┌────────┐      ┌──────────────┐      ┌──────────────┐    ┌──────────┐     │
 │  │ Class  │      │ Argument     │      │ Method       │    │ Lifecycle│     │
 │  │ Queue  │      │ Queue        │      │ Queues       │    │ Queue    │     │
 │  └────────┘      └──────────────┘      └──────────────┘    └──────────┘     │
-│       │                 │                     │                  │            │
-│       └─────────────────┴─────────────────────┴──────────────────┘            │
-│                                 │                                             │
-│                                 ▼                                             │
-│                      ┌─────────────────────────┐                              │
-│                      │   TaskDispatcher        │                              │
-│                      │   (Message Router)      │                              │
-│                      └─────────────────────────┘                              │
-│                                                                               │
+│       │                 │                     │                  │          │
+│       └─────────────────┴─────────────────────┴──────────────────┘          │
+│                                 │                                           │
+│                                 ▼                                           │
+│                      ┌─────────────────────────┐                            │
+│                      │   TaskDispatcher        │                            │
+│                      │   (Message Router)      │                            │
+│                      └─────────────────────────┘                            │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -491,7 +494,7 @@ Create a `paramixel.properties` file in your project root:
 paramixel.tags.include=integration-.*
 paramixel.tags.exclude=.*slow.*,.*flaky.*
 
-# Control test class parallelism (default: number of available processors)
+# Control parallelism (default: number of available processors)
 paramixel.parallelism=4
 
 # Limit class name width in the Maven-only summary table
@@ -628,7 +631,7 @@ jobs:
 
 #### 🔄 Coexisting with Standard JUnit Tests
 
-When using Paramixel tests alongside standard JUnit Jupiter tests in the same Maven module, you need to configure both Maven Surefire (for JUnit tests) and the Paramixel plugin (for Paramixel tests) properly to avoid engine conflicts.
+When using Paramixel tests alongside standard JUnit Jupiter tests in the same Maven module, configure Maven Surefire to exclude the Paramixel engine. Without exclusion, Maven Surefire will attempt to execute Paramixel tests as JUnit tests, causing failures.
 
 #### Configuration for Mixed Test Environments
 
@@ -637,12 +640,15 @@ When using Paramixel tests alongside standard JUnit Jupiter tests in the same Ma
 ```xml
 <build>
     <plugins>
-        <!-- Standard JUnit Tests (excludes Paramixel engine) -->
+        <!-- Standard JUnit Tests (includes JUnit files, excludes Paramixel engine) -->
         <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <version>3.5.5</version>
             <configuration>
+                <includes>
+                    <include>**/*Test.java</include>
+                </includes>
                 <properties>
                     <configurationParameters>
                         junit.platform.engine.exclude = paramixel
@@ -675,6 +681,7 @@ When using Paramixel tests alongside standard JUnit Jupiter tests in the same Ma
 #### Configuration Breakdown
 
 **Maven Surefire Configuration:**
+- **`<includes><include>**/*Test.java</include></includes>`**: Filters to run only JUnit test files
 - **`junit.platform.engine.exclude = paramixel`**: Prevents Paramixel tests from running during standard JUnit execution
 - **`junit.jupiter.extensions.autodetection.enabled=false`**: Disables auto-detection to avoid conflicts
 
@@ -684,19 +691,68 @@ When using Paramixel tests alongside standard JUnit Jupiter tests in the same Ma
 
 #### Usage Scenarios
 
-**1. Gradual Migration from JUnit to Paramixel:**
+**1. Same Module with Both JUnit and Paramixel Tests:**
+
+When JUnit tests and Paramixel tests are in the same Maven module, configure Maven Surefire to include only JUnit test files (e.g., `**/*Test.java`) AND exclude the Paramixel engine. This prevents JUnit from discovering or executing Paramixel tests:
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <version>3.5.5</version>
+    <configuration>
+        <includes>
+            <include>**/*Test.java</include>
+        </includes>
+        <properties>
+            <configurationParameters>
+                junit.platform.engine.exclude = paramixel
+            </configurationParameters>
+        </properties>
+        <systemPropertyVariables>
+            <junit.jupiter.extensions.autodetection.enabled>false</junit.jupiter.extensions.autodetection.enabled>
+        </systemPropertyVariables>
+    </configuration>
+</plugin>
+
+<plugin>
+    <groupId>org.paramixel</groupId>
+    <artifactId>paramixel-maven-plugin</artifactId>
+    <executions>
+        <execution>
+            <phase>test</phase>
+            <goals>
+                <goal>test</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+Maven Surefire runs only files matching the include pattern (JUnit tests), excluding the Paramixel engine. The Paramixel plugin runs separately and discovers `@Paramixel.TestClass` tests via classpath scanning.
+
+**2. Gradual Migration from JUnit to Paramixel:**
+
+When migrating incrementally, configure Maven Surefire to include only JUnit test files AND exclude the Paramixel engine:
 
 ```xml
 <!-- Keep existing JUnit tests unchanged -->
 <plugin>
     <groupId>org.apache.maven.plugins</groupId>
     <artifactId>maven-surefire-plugin</artifactId>
+    <version>3.5.5</version>
     <configuration>
+        <includes>
+            <include>**/*Test.java</include>
+        </includes>
         <properties>
             <configurationParameters>
                 junit.platform.engine.exclude = paramixel
             </configurationParameters>
         </properties>
+        <systemPropertyVariables>
+            <junit.jupiter.extensions.autodetection.enabled>false</junit.jupiter.extensions.autodetection.enabled>
+        </systemPropertyVariables>
     </configuration>
 </plugin>
 
@@ -715,7 +771,7 @@ When using Paramixel tests alongside standard JUnit Jupiter tests in the same Ma
 </plugin>
 ```
 
-**2. Running Specific Test Types Separately:**
+**3. Running Specific Test Types Separately:**
 
 ```bash
 # Run only JUnit tests (excludes Paramixel)
@@ -728,7 +784,7 @@ When using Paramixel tests alongside standard JUnit Jupiter tests in the same Ma
 ./mvnw test
 ```
 
-**3. Tag-Based Filtering Example:**
+**4. Tag-Based Filtering Example:**
 
 ```xml
 <plugin>
@@ -740,6 +796,65 @@ When using Paramixel tests alongside standard JUnit Jupiter tests in the same Ma
     </configuration>
 </plugin>
 ```
+
+#### How It Works
+
+When JUnit tests and Paramixel tests coexist in the same module:
+
+- **Maven Surefire** runs only files matching the include pattern (e.g., `**/*Test.java`), excluding the Paramixel engine via `junit.platform.engine.exclude = paramixel`
+- **Paramixel plugin** runs separately and discovers `@Paramixel.TestClass` tests via classpath scanning in the `test-classes` directory
+- Both run during the `test` phase; Surefire runs first, then the Paramixel plugin
+- No conflicts occur because Surefire filters by file pattern and excludes the Paramixel engine
+
+When JUnit and Paramixel tests are in the same module, configure Maven Surefire with both `<includes>` for JUnit test files AND `<properties><junit.platform.engine.exclude>paramixel</junit.platform.engine.exclude></properties>`.
+
+#### Suggested Package Structure
+
+For cleaner separation and easier filtering, consider organizing tests into separate packages:
+
+**Option 1: By Test Type**
+```
+src/test/java/
+├── unit/                 # JUnit Jupiter tests
+│   └── MyServiceTest.java
+└── paramixel/            # Paramixel tests
+    └── MyParameterizedTest.java
+```
+
+Maven configuration:
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <configuration>
+        <includes>
+            <include>**/unit/*Test.java</include>
+        </includes>
+        <properties>
+            <configurationParameters>
+                junit.platform.engine.exclude = paramixel
+            </configurationParameters>
+        </properties>
+    </configuration>
+</plugin>
+```
+
+**Option 2: By Test Domain** (mix both test types per domain)
+```
+src/test/java/
+└── com/example/
+    └── billing/
+        ├── JUnitTests/          # Standard unit tests
+        │   ├── InvoiceServiceTest.java
+        │   └── CalculatorTest.java
+        └── ParamixelTests/      # Parameterized tests
+            └── PricingIntegrationTest.java
+```
+
+This approach keeps related tests together while allowing selective execution:
+- Run all billing tests: `./mvnw test`
+- Run only JUnit: `./mvnw surefire:test -Dtest='**/JUnitTests/*Test.java'`
+- Run only Paramixel: `./mvnw paramixel:test`
 
 #### Troubleshooting Common Issues
 
@@ -812,10 +927,6 @@ Practical examples showcasing test engine capabilities:
 - **Resource Management** - Examples of test resource handling
 
 The examples module serves as a reference for writing tests with various complexity levels and integration patterns.
-
-## Pronunciation
-
-**Paramixel** *(pronounced "pair-uh-mick-suhl")*
 
 ## 🤝 Contributing
 
