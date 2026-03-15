@@ -76,39 +76,42 @@ public class ParamixelMojo extends AbstractMojo {
     private boolean failIfNoTests;
 
     /**
-     * The global parallelism setting for test class execution.
-     */
-    @Parameter(property = "paramixel.parallelism")
-    private Integer parallelism;
-
-    /**
-     * Whether to print verbose output.
-     */
-    @Parameter(property = "paramixel.verbose", defaultValue = "false")
-    private boolean verbose;
-
-    /**
-     * Include tags for test filtering.
-     * Regex pattern.
-     */
-    @Parameter(property = "paramixel.tags.include")
-    private String tagsInclude;
-
-    /**
-     * Exclude tags for test filtering.
-     * Regex pattern.
-     */
-    @Parameter(property = "paramixel.tags.exclude")
-    private String tagsExclude;
-
-    /**
-     * Maximum rendered class-name length in the Maven-only summary table.
+     * Configuration properties passed to the Paramixel engine.
      *
-     * <p>When set, class names in the {@code Paramixel Test Summary} table are abbreviated by
-     * shortening package segments while keeping the final segment intact.
+     * <p>Each property has a key and value. Supported keys:
+     * <ul>
+     *   <li>{@code paramixel.parallelism} - positive integer for parallel test execution</li>
+     *   <li>{@code paramixel.summary.classNameMaxLength} - positive integer for summary class name truncation</li>
+     *   <li>{@code paramixel.tags.include} - regex pattern for including tests by tag</li>
+     *   <li>{@code paramixel.tags.exclude} - regex pattern for excluding tests by tag</li>
+     * </ul>
      */
-    @Parameter(property = "paramixel.summary.classNameMaxLength")
-    private Integer summaryClassNameMaxLength;
+    @Parameter(property = "paramixel.properties")
+    private List<Property> properties;
+
+    /**
+     * A key-value pair for Paramixel configuration.
+     */
+    public static class Property {
+        private String key;
+        private String value;
+
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+    }
 
     /**
      * Creates a new Mojo instance.
@@ -124,25 +127,7 @@ public class ParamixelMojo extends AbstractMojo {
             return;
         }
 
-        if (parallelism != null && parallelism < 1) {
-            final String raw = String.valueOf(parallelism);
-            throw new MojoFailureException(
-                    "Invalid configuration: paramixel.parallelism: must be an integer in range [1, 2147483647] (source=maven-plugin raw='"
-                            + raw
-                            + "' normalized='"
-                            + raw
-                            + "')");
-        }
-
-        if (summaryClassNameMaxLength != null && summaryClassNameMaxLength < 1) {
-            final String raw = String.valueOf(summaryClassNameMaxLength);
-            throw new MojoFailureException(
-                    "Invalid configuration: paramixel.summary.classNameMaxLength: must be an integer in range [1, 2147483647] (source=maven-plugin raw='"
-                            + raw
-                            + "' normalized='"
-                            + raw
-                            + "')");
-        }
+        validateProperties();
 
         /*
         if (verbose) {
@@ -284,43 +269,22 @@ public class ParamixelMojo extends AbstractMojo {
 
         requestBuilder.configurationParameter("paramixel.internal.invoker", "paramixe-maven-plugin");
 
-        if (parallelism != null) {
-            requestBuilder.configurationParameter("paramixel.parallelism", String.valueOf(parallelism));
-            getLog().info("Paramixel parallelism: " + parallelism);
-        }
+        if (properties != null) {
+            for (Property prop : properties) {
+                final String key = prop.getKey();
+                final String value = prop.getValue();
+                requestBuilder.configurationParameter(key, value);
 
-        if (summaryClassNameMaxLength != null) {
-            requestBuilder.configurationParameter(
-                    "paramixel.summary.classNameMaxLength", String.valueOf(summaryClassNameMaxLength));
-            getLog().info("Paramixel summary class name max length: " + summaryClassNameMaxLength);
-        }
-
-        if (tagsInclude != null) {
-            final String normalized = tagsInclude.trim();
-            if (normalized.isEmpty()) {
-                throw new MojoFailureException(
-                        "Invalid configuration: paramixel.tags.include: must not be blank (source=maven-plugin raw='"
-                                + tagsInclude
-                                + "' normalized='"
-                                + normalized
-                                + "')");
+                if ("paramixel.parallelism".equals(key)) {
+                    getLog().info("Paramixel parallelism: " + value);
+                } else if ("paramixel.summary.classNameMaxLength".equals(key)) {
+                    getLog().info("Paramixel summary class name max length: " + value);
+                } else if ("paramixel.tags.include".equals(key)) {
+                    getLog().info("Including tests with tags matching: " + value);
+                } else if ("paramixel.tags.exclude".equals(key)) {
+                    getLog().info("Excluding tests with tags matching: " + value);
+                }
             }
-            requestBuilder.configurationParameter("paramixel.tags.include", normalized);
-            getLog().info("Including tests with tags matching: " + normalized);
-        }
-
-        if (tagsExclude != null) {
-            final String normalized = tagsExclude.trim();
-            if (normalized.isEmpty()) {
-                throw new MojoFailureException(
-                        "Invalid configuration: paramixel.tags.exclude: must not be blank (source=maven-plugin raw='"
-                                + tagsExclude
-                                + "' normalized='"
-                                + normalized
-                                + "')");
-            }
-            requestBuilder.configurationParameter("paramixel.tags.exclude", normalized);
-            getLog().info("Excluding tests with tags matching: " + normalized);
         }
 
         final LauncherDiscoveryRequest request = requestBuilder.build();
@@ -339,6 +303,87 @@ public class ParamixelMojo extends AbstractMojo {
         if (testsFailed > 0) {
             throw new MojoFailureException(
                     "Tests failed: " + testsFailed + " of " + summary.getTestsFoundCount() + " tests");
+        }
+    }
+
+    /**
+     * Validates the properties configuration.
+     *
+     * @throws MojoFailureException if validation fails
+     */
+    private void validateProperties() throws MojoFailureException {
+        if (properties == null) {
+            return;
+        }
+
+        for (Property prop : properties) {
+            final String key = prop.getKey();
+            final String value = prop.getValue();
+
+            if (key == null || key.isEmpty()) {
+                throw new MojoFailureException("Property key must not be empty");
+            }
+
+            if ("paramixel.parallelism".equals(key)) {
+                validatePositiveInt(key, value);
+            } else if ("paramixel.summary.classNameMaxLength".equals(key)) {
+                validatePositiveInt(key, value);
+            } else if ("paramixel.tags.include".equals(key)) {
+                validateNotBlank(key, value);
+            } else if ("paramixel.tags.exclude".equals(key)) {
+                validateNotBlank(key, value);
+            }
+        }
+    }
+
+    /**
+     * Validates that a value is a positive integer.
+     *
+     * @param key the configuration key
+     * @param value the raw value
+     * @throws MojoFailureException if validation fails
+     */
+    private void validatePositiveInt(String key, String value) throws MojoFailureException {
+        if (value == null || value.trim().isEmpty()) {
+            throw new MojoFailureException(
+                    "Invalid configuration: " + key + ": must not be blank (source=maven-plugin)");
+        }
+
+        try {
+            final int intValue = Integer.parseInt(value.trim());
+            if (intValue < 1) {
+                throw new MojoFailureException("Invalid configuration: " + key
+                        + ": must be an integer in range [1, 2147483647] (source=maven-plugin raw='"
+                        + value
+                        + "' normalized='"
+                        + value.trim()
+                        + "')");
+            }
+        } catch (NumberFormatException e) {
+            throw new MojoFailureException("Invalid configuration: " + key
+                    + ": must be an integer in range [1, 2147483647] (source=maven-plugin raw='"
+                    + value
+                    + "' normalized='"
+                    + value.trim()
+                    + "')");
+        }
+    }
+
+    /**
+     * Validates that a value is not blank.
+     *
+     * @param key the configuration key
+     * @param value the raw value
+     * @throws MojoFailureException if validation fails
+     */
+    private void validateNotBlank(String key, String value) throws MojoFailureException {
+        if (value == null || value.trim().isEmpty()) {
+            throw new MojoFailureException(
+                    "Invalid configuration: " + key + ": must not be blank (source=maven-plugin raw='"
+                            + (value == null ? "" : value)
+                            + "' normalized='"
+                            + (value == null ? "" : value.trim())
+                            + "')");
         }
     }
 

@@ -266,11 +266,11 @@ paramixel-benchmarks <─────────────────┘
 | Build tool           | Apache Maven 3.9+ with `./mvnw` wrapper     |
 | Test platform        | JUnit Platform 6.0.3                        |
 | Assertions           | AssertJ 3.27.7                              |
-| Logging              | `java.util.logging` (JUL) + SLF4J API 2.0.17|
+| Logging              | `java.util.logging` (JUL)                    |
 | Concurrency          | Java 21 virtual threads                     |
 | Code formatting      | Spotless + Palantir Java Format 2.87.0      |
 | Code coverage        | JaCoCo 0.8.14                               |
-| Table output         | `ascii-table` 1.9.0                         |
+| Table output         | Custom implementation (SummaryTableRenderer) |
 | Null safety          | `org.jspecify` (`@NonNull`)                 |
 | Integration examples | Testcontainers 2.0.3                        |
 
@@ -521,8 +521,8 @@ public class DatabaseIntegrationTest extends BaseIntegrationTest {
 4. **Case sensitivity**: Patterns are case-sensitive
 
 **Configuration Precedence** (highest to lowest):
-1. Command line (`-D` flags)
-2. Maven plugin config (`<configuration>`)
+1. System properties (`-Dparamixel.*` flags)
+2. Maven plugin config (`<properties>` in `<configuration>`)
 3. Properties file (`paramixel.properties`)
 4. Defaults (no filtering)
 
@@ -532,8 +532,16 @@ public class DatabaseIntegrationTest extends BaseIntegrationTest {
     <groupId>org.paramixel</groupId>
     <artifactId>paramixel-maven-plugin</artifactId>
     <configuration>
-        <tagsInclude>integration-.*</tagsInclude>
-        <tagsExclude>.*slow.*,.*flaky.*</tagsExclude>
+        <properties>
+            <property>
+                <key>paramixel.tags.include</key>
+                <value>integration-.*</value>
+            </property>
+            <property>
+                <key>paramixel.tags.exclude</key>
+                <value>.*slow.*,.*flaky.*</value>
+            </property>
+        </properties>
     </configuration>
 </plugin>
 ```
@@ -741,11 +749,16 @@ src/test/java/
 |-----------------------------|------------------------------------|-------------------|--------------------------------------|
 | `skipTests`                 | `paramixel.skipTests`              | `false`           | Skips all test execution             |
 | `failIfNoTests`             | `paramixel.failIfNoTests`          | `true`            | Fails if no @Paramixel.TestClass found |
-| `parallelism`               | `paramixel.parallelism`            | (engine default)  | Global max parallelism               |
-| `verbose`                   | `paramixel.verbose`                | `false`           | Enables verbose output               |
-| `tagsInclude`               | `paramixel.tags.include`           | (none)            | Regex pattern for inclusion          |
-| `tagsExclude`               | `paramixel.tags.exclude`           | (none)            | Regex pattern for exclusion          |
-| `summaryClassNameMaxLength` | `paramixel.summary.classNameMaxLength` | `2147483647`  | Max class name length in summary     |
+| `properties`                | (see below)                        | (none)            | Key-value pairs for engine config    |
+
+**Properties Configuration:**
+
+| Key                                   | Value Type | Default           | Description                          |
+|---------------------------------------|------------|-------------------|--------------------------------------|
+| `paramixel.parallelism`               | int        | `availableProcessors()` | Global max parallelism        |
+| `paramixel.tags.include`              | String     | (none)            | Regex pattern for tag inclusion      |
+| `paramixel.tags.exclude`              | String     | (none)            | Regex pattern for tag exclusion      |
+| `paramixel.summary.classNameMaxLength`| int        | `2147483647`      | Max class name length in summary     |
 
 ---
 
@@ -753,22 +766,21 @@ src/test/java/
 
 ### Properties Table
 
-| Property Key                     | Source                  | Default           | Description                          |
-|----------------------------------|-------------------------|-------------------|--------------------------------------|
-| `paramixel.parallelism`          | CLI / Maven / properties| `availableProcessors()` | Global max concurrent test classes |
-| `paramixel.tags.include`         | CLI / Maven / properties| (none)            | Regex pattern for tag inclusion      |
-| `paramixel.tags.exclude`         | CLI / Maven / properties| (none)            | Regex pattern for tag exclusion      |
-| `paramixel.verbose`              | CLI / Maven             | `false`           | Enables verbose output               |
-| `paramixel.skipTests`            | CLI / Maven             | `false`           | Skips test execution                 |
-| `paramixel.failIfNoTests`        | CLI / Maven             | `true`            | Fails if no tests found              |
-| `paramixel.summary.classNameMaxLength` | CLI / Maven       | `2147483647`      | Summary table class name max length  |
+| Property Key                     | System Property          | Maven Property                      | Properties File     | Default           | Description                          |
+|----------------------------------|--------------------------|-------------------------------------|---------------------|-------------------|--------------------------------------|
+| `paramixel.parallelism`          | `-Dparamixel.parallelism` | `paramixel.parallelism`           | `paramixel.parallelism` | `availableProcessors()` | Global max concurrent test classes |
+| `paramixel.tags.include`         | `-Dparamixel.tags.include` | `paramixel.tags.include`         | `paramixel.tags.include` | (none)            | Regex pattern for tag inclusion      |
+| `paramixel.tags.exclude`         | `-Dparamixel.tags.exclude` | `paramixel.tags.exclude`         | `paramixel.tags.exclude` | (none)            | Regex pattern for tag exclusion      |
+| `paramixel.summary.classNameMaxLength` | `-Dparamixel.summary.classNameMaxLength` | `paramixel.summary.classNameMaxLength` | `paramixel.summary.classNameMaxLength` | `2147483647` | Max class name length in summary    |
 
 ### Configuration Precedence
 
-1. **Command line** (`-D` flags) - Highest
-2. **Maven plugin config** (`<configuration>`)
-3. **Properties file** (`paramixel.properties`)
-4. **Defaults** - No filtering
+The following precedence order applies to all engine configuration properties:
+
+1. **System properties** (`-Dparamixel.*` flags) - Highest priority
+2. **Maven plugin** (`<properties>` in `<configuration>`)
+3. **Properties file** (`paramixel.properties` in project root)
+4. **Default values** - Lowest priority
 
 ### Summary Table Class Name Abbreviation
 

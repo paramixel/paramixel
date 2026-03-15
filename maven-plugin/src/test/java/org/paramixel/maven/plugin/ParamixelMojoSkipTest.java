@@ -20,8 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.List;
 import org.apache.maven.plugin.MojoFailureException;
 import org.junit.jupiter.api.Test;
+import org.paramixel.maven.plugin.ParamixelMojo.Property;
 
 public class ParamixelMojoSkipTest {
 
@@ -38,7 +40,11 @@ public class ParamixelMojoSkipTest {
     @Test
     public void execute_failsFastForInvalidSummaryClassNameMaxLength() throws Exception {
         final ParamixelMojo mojo = new ParamixelMojo();
-        setField(mojo, "summaryClassNameMaxLength", 0);
+
+        Property prop = new Property();
+        prop.setKey("paramixel.summary.classNameMaxLength");
+        prop.setValue("0");
+        setField(mojo, "properties", List.of(prop));
 
         final MojoFailureException ex = assertThrows(MojoFailureException.class, mojo::execute);
         assertEquals(
