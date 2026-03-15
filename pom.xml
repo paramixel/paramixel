@@ -34,7 +34,7 @@
         <maven.plugin.api.version>3.9.13</maven.plugin.api.version>
         <maven.plugin.annotations.version>3.15.2</maven.plugin.annotations.version>
         <maven.core.version>3.9.13</maven.core.version>
-        <maven.artifact.version>3.9.13</maven.artifact.version>
+        <maven.artifact.version>3.9.14</maven.artifact.version>
         <maven.resolver.version>2.0.16</maven.resolver.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>6.0.3</junit.version>
