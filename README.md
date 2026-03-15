@@ -2,257 +2,40 @@
 [![Java Version](https://img.shields.io/badge/Java-17%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/17/)
 [![Maven Central](https://img.shields.io/maven-central/v/org.paramixel/paramixel-api)](https://central.sonatype.com/search?namespace=org.paramixel)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![DCO](https://img.shields.io/badge/DCO-1.1-brightgreen.svg)](https://developercertificate.org/)
 
-# Paramixel Test Engine ⚡
+# Paramixel Test Engine
 
-A high-performance JUnit Platform-based test engine for Java 17+ featuring automatic virtual thread optimization, advanced lifecycle management, and enhanced parallel execution capabilities.
+A high-performance parameterized test engine for Java 17+ with automatic virtual thread optimization and advanced parallel execution.
 
-> **Key Advantages Over Standard Parameterized Testing:**
-> - 🚀 **Automatic Virtual Thread Optimization** (Java 21+) - 2-3x performance boost
-> - ⚡ **Advanced Queue-Based Parallelism** - Better resource utilization
-> - 🎯 **Comprehensive Lifecycle Management** - 6 hooks vs JUnit's 2
-> - 🔧 **Enhanced Configuration System** - Multiple configuration sources
-> - 📊 **Detailed Maven Reporting** - Better test execution insights
+**Key Benefits:**
+- 🚀 **2-3x performance boost** with virtual threads (Java 21+)
+- ⚡ **True parallel execution** with queue-based scheduling
+- 🎯 **6 lifecycle hooks** vs JUnit's 2 (@Initialize, @BeforeAll, @BeforeEach, @AfterEach, @AfterAll, @Finalize)
+- 📊 **Enhanced Maven reporting** with detailed execution summaries
+- 🔧 **Flexible configuration** via system properties, Maven config, or properties files
 
-## Pronunciation
+---
 
-**Paramixel** *(pronounced "pair-uh-mick-suhl")*
+## Quick Start
 
-## 📖 Quick Navigation
+### Add Dependency
 
-- [🌟 Why Choose Paramixel?](#-why-choose-paramixel)
-- [⚡ Comparison with JUnit Jupiter Parameterized Tests](#-comparison-with-junit-jupiter-parameterized-tests)
-- [🚀 Getting Started](#-getting-started)
-- [📚 Features](#-features)
-- [🏗️ Architecture](#️-architecture)
-- [🔧 Configuration](#-configuration)
-  - [🔄 Coexisting with Standard JUnit Tests](#-coexisting-with-standard-junit-tests)
-- [🏭 Modules](#-modules)
-- [📖 Documentation](#-documentation)
-- [🤝 Contributing](#-contributing)
-
-## 🌟 Why Choose Paramixel?
-
-Paramixel offers significant advantages over traditional parameterized testing approaches:
-
-- **🎯 Automatic Performance Optimization** - Leverages virtual threads on Java 21+ automatically
-- **⚡ Advanced Parallel Execution** - Queue-based architecture for optimal resource utilization
-- **🔧 Comprehensive Lifecycle Management** - More granular control than standard JUnit hooks
-- **📊 Enhanced Reporting** - Detailed execution summaries with Maven integration
-- **🚀 Modern Java Compatibility** - Built for Java 17+ with forward-looking features
-
-## ⚡ Comparison with JUnit Jupiter Parameterized Tests
-
-Paramixel provides superior capabilities for complex parameterized testing scenarios:
-
-| Feature | JUnit Jupiter Parameterized | Paramixel | Advantage |
-|---------|----------------------------|-----------|-----------|
-| **Parallel Execution** | Limited (manual configuration) | **True parallel execution with fire-and-forget model** | ⚡ Optimal resource utilization across all arguments |
-| **Thread Management** | Platform threads only | **Automatic virtual thread detection** (Java 21+) | 🚀 Optimal performance |
-| **Lifecycle Hooks** | Basic (@BeforeEach/AfterEach) | **6 comprehensive hooks** per test lifecycle | 🎯 More control |
-| **Maven Integration** | Standard reporting | **Enhanced reporting** with detailed summaries | 📊 Better visibility |
-| **Argument Suppliers** | Standard sources (CSV, enum, etc.) | **Dynamic collections** with programmatic control | 💡 More flexibility |
-
-### Key Differences Summary
-
-**Performance Optimization:**
-- Paramixel automatically detects and uses virtual threads on Java 21+ for optimal performance
-- JUnit Jupiter Parameterized Tests use platform threads exclusively
-
-**Execution Control:**
-- Paramixel offers queue-based parallel execution with per-class parallelism configuration
-- JUnit provides basic parallel execution without advanced scheduling
-
-**Lifecycle Management:**
-- Paramixel: @Initialize, @BeforeAll, @BeforeEach, @AfterEach, @AfterAll, @Finalize
-- JUnit: @BeforeEach, @AfterEach only
-
-**Configuration Flexibility:**
-- Paramixel supports system properties, Maven configuration, and properties files
-- JUnit primarily uses system properties
-
-### Enhanced Parallel Execution Capability
-
-Paramixel's execution model has been significantly enhanced to provide true parallel execution across all arguments:
-
-**Key Improvements:**
-- 🚀 **Eliminated sequential bottlenecks** - Argument 0 no longer executes inline
-- 🔄 **Fire-and-forget model** - Argument slots recycle immediately after completion
-- ⚖️ **Dynamic resource allocation** - Global argument slots shared across all test classes
-- 🚦 **Progress guarantee** - First-permit acquisition prevents starvation
-
-**Before Enhancement:**
-- Argument 0 executed sequentially before other arguments could start
-- Limited effective parallelism for argument-heavy tests
-
-**After Enhancement:**
-- All arguments execute concurrently from the beginning
-- Maximum resource utilization across the entire test suite
-- Improved performance particularly for tests with many arguments
-
-### Performance Impact
-
-For test classes with:
-- **6+ arguments**: Up to 20% reduction in execution time
-- **High argument count**: Even greater improvements due to eliminated bottlenecks
-- **I/O-bound tests**: Optimal performance with virtual thread utilization
-
-### Resource Allocation Model
-
-Paramixel uses a sophisticated concurrency model:
-- **Total slots = cores × 2** (48 slots on 24-core system)
-- **Class slots = cores** (max per class)
-- **Argument slots = cores** (shared globally)
-- **Recycling slots** - Argument slots immediately free up after completion
-
-### When to Choose Paramixel
-
-Choose Paramixel when you need:
-- ✅ Advanced parallel execution control
-- ✅ Automatic performance optimization (virtual threads)
-- ✅ Comprehensive test lifecycle management
-- ✅ Enhanced Maven integration and reporting
-- ✅ Multiple configuration methods
-- ✅ Modern Java (17+) compatibility
-- ⚡ **True parallel execution** - Eliminated sequential bottlenecks
-
-Paramixel complements JUnit rather than replacing it.
-
-- You can freely mix Paramixel and standard JUnit tests in the same codebase, using each where it makes the most sense.
-
-### Migration from JUnit Jupiter Parameterized Tests
-
-Migrating from JUnit Jupiter Parameterized Tests to Paramixel is straightforward:
-
-1. **Replace Dependencies:** Swap JUnit Jupiter for Paramixel artifacts
-2. **Update Annotations:** Change `@ParameterizedTest` to `@Paramixel.Test`
-3. **Enhance Lifecycle:** Add advanced lifecycle hooks (@Initialize, @Finalize)
-4. **Configure Parallelism:** Use `ArgumentsCollector.setParallelism()`
-5. **Leverage Features:** Utilize enhanced configuration and reporting
-
-### 🚀 Performance Benefits
-
-Paramixel's architecture provides tangible performance improvements:
-
-**Virtual Threads (Java 21+):**
-- ⚡ **Significantly reduced memory overhead** compared to platform threads
-- ⚡ **Improved scalability** for I/O-bound test workloads
-- ⚡ **Automatic optimization** without manual configuration
-
-**True Parallel Execution:**
-- ⚡ **Fire-and-forget model** - All arguments execute truly in parallel
-- ⚡ **Eliminated sequential bottlenecks** - No forced inline execution of argument 0
-- ⚡ **Optimal resource utilization** - Global argument slots shared across all classes
-- ⚡ **Progress guarantee** - Prevents starvation with first-permit acquisition
-
-**Compared to JUnit Jupiter Parameterized Tests:**
-- ✅ **Up to 20% performance improvement** for argument-heavy tests by eliminating sequential bottlenecks
-- ✅ **True parallel execution** - All arguments execute concurrently vs sequential execution of argument 0
-- ✅ **More consistent execution** across varying test workloads
-- ✅ **Better resource management** preventing OOME in large test suites
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-## 📚 Features
-
-Paramixel provides advanced testing capabilities that surpass traditional JUnit parameterized testing:
-
-### ⚡ Performance Optimizations
-- **Automatic Thread Optimization**: Uses virtual threads on Java 21+, platform threads on Java 17-20
-- **Queue-Based Parallel Execution**: Optimal resource utilization with configurable concurrency
-- **Intelligent Scheduling**: Manages thread allocation across test classes and arguments
-
-### 🔧 Advanced Lifecycle Management
-- **6 Comprehensive Hooks**: @Initialize, @BeforeAll, @BeforeEach, @AfterEach, @AfterAll, @Finalize
-- **Hierarchical Context Management**: EngineContext → ClassContext → ArgumentContext with isolated stores
-- **Guaranteed Execution**: After hooks run even after failures
-
-### 📊 Enhanced Configuration System
-- **Multiple Configuration Sources**: System properties, Maven plugin config, properties files
-- **Per-Class Parallelism**: Individual test classes can specify their own concurrency limits
-- **Flexible Test Filtering**: Regex-based tag filtering with inheritance support
-
-### 🚀 Modern Development Experience
-- **Seamless Maven Integration**: Detailed reporting and automatic test discovery
-- **Java 17+ Compatibility**: Targets modern Java features while maintaining compatibility
-- **Production-Ready Architecture**: Built on JUnit Platform with comprehensive error handling
-
-### 🎯 Unique Capabilities
-- **Dynamic Argument Suppliers**: Programmatic argument collection with full context access
-- **Named Argument Support**: Custom display names for argument values
-- **Advanced Tag Filtering**: Regex-based inclusion/exclusion with complex patterns
-
-## 🏗️ Architecture
-
-### Actor-Based Execution Model
-
-Paramixel uses a message-passing actor system for execution, providing clear separation of concerns and optimal resource utilization:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Actor-Based Execution System                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ClassActor       ArgumentDispatcher    MethodDispatcher    LifecycleActor  │
-│       │                 │                     │                  │          │
-│       ▼                 ▼                     ▼                  ▼          │
-│  ┌────────┐      ┌──────────────┐      ┌──────────────┐    ┌──────────┐     │
-│  │ Class  │      │ Argument     │      │ Method       │    │ Lifecycle│     │
-│  │ Queue  │      │ Queue        │      │ Queues       │    │ Queue    │     │
-│  └────────┘      └──────────────┘      └──────────────┘    └──────────┘     │
-│       │                 │                     │                  │          │
-│       └─────────────────┴─────────────────────┴──────────────────┘          │
-│                                 │                                           │
-│                                 ▼                                           │
-│                      ┌─────────────────────────┐                            │
-│                      │   TaskDispatcher        │                            │
-│                      │   (Message Router)      │                            │
-│                      └─────────────────────────┘                            │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+**Maven:**
+```xml
+<dependency>
+    <groupId>org.paramixel</groupId>
+    <artifactId>paramixel-api</artifactId>
+    <version>0.1.0-alpha-1</version>
+    <scope>test</scope>
+</dependency>
 ```
 
-**Key Components:**
+**Gradle:**
+```kotlin
+testImplementation("org.paramixel:paramixel-api:0.1.0-alpha-1")
+```
 
-* **ExecutionTask Interface**: Sealed interface defining all task types (ClassTask, ArgumentTask, MethodTask, LifecycleTask)
-
-* **MessageQueue<T>**: Thread-safe queue for each actor type, supporting blocking operations
-
-* **Actors**: Single-threaded consumers that process messages from their assigned queues
-
-* **SharedPermitManager**: Manages concurrency limits from `ParamixelConcurrencyLimiter`
-
-**Concurrency Limits:**
-
-The execution system respects three levels of parallelism:
-
-| Level | Limit | Description |
-|-------|-------|-------------|
-| **Total slots** | `cores × 2` | Hard global cap on concurrent work |
-| **Class slots** | `cores` | Maximum concurrent test classes |
-| **Argument slots** | `cores` | Maximum concurrent arguments |
-
-**Execution Flow:**
-
-1. **Class Task**: Actor receives `ClassTask` with test class and arguments
-2. **Argument Dispatch**: Arguments are dispatched based on `argumentParallelism` setting
-3. **Method Execution**: Each argument gets its own method queue for parallel execution
-4. **Lifecycle Handling**: All lifecycle hooks run through the lifecycle actor
-
-**Benefits:**
-
-* **Clear Separation**: Each actor type handles one concern (class/argument/method/lifecycle)
-* **True Isolation**: No shared mutable state between actors
-* **Respectful Limits**: Per-class and global parallelism enforced
-* **Progress Guarantee**: Prevents starvation with fair scheduling
-
-## 🚀 Getting Started
-
-### Prerequisites
-### Basic Test Class
+### Write Your First Test
 
 ```java
 import org.paramixel.api.Paramixel;
@@ -260,11 +43,283 @@ import org.paramixel.api.ArgumentContext;
 import org.paramixel.api.ArgumentsCollector;
 
 @Paramixel.TestClass
+public class MyTest {
+
+    @Paramixel.ArgumentsCollector
+    public static void arguments(ArgumentsCollector collector) {
+        collector.addArguments("A", "B", "C");
+    }
+
+    @Paramixel.Test
+    public void test(ArgumentContext ctx) {
+        String arg = ctx.getArgument(String.class);
+        // Your test logic here
+    }
+}
+```
+
+### Run Tests
+
+```bash
+./mvnw test
+```
+
+---
+
+## Installation
+
+### Prerequisites
+
+- **Java 17 or higher** (Java 21+ recommended for virtual threads)
+- Maven 3.9+ or Gradle 8+
+
+### Build from Source
+
+```bash
+# Clone repository
+git clone https://github.com/paramixel/paramixel.git
+cd paramixel
+
+# Build and install
+./mvnw clean install
+```
+
+### Verify Installation
+
+```bash
+# Run test suite
+./mvnw clean verify
+
+# Expected: BUILD SUCCESS, all tests pass
+```
+
+---
+
+## Features
+
+### Performance Optimizations
+
+- **Automatic Thread Optimization**: Uses virtual threads on Java 21+, platform threads on Java 17-20
+- **Queue-Based Parallel Execution**: Optimal resource utilization with configurable concurrency
+- **True Parallel Execution**: All arguments execute concurrently (not sequentially)
+- **Three-Level Concurrency Cap**:
+  - Total: `cores × 2` (global concurrent work cap)
+  - Class: `cores` (max concurrent test classes)
+  - Argument: `cores` (max concurrent arguments per class)
+
+### Advanced Lifecycle Management
+
+- **6 Comprehensive Hooks**: @Initialize, @BeforeAll, @BeforeEach, @AfterEach, @AfterAll, @Finalize
+- **Hierarchical Context**: EngineContext → ClassContext → ArgumentContext with isolated stores
+- **Guaranteed Execution**: After hooks run even after failures
+- **AutoCloseable Support**: Automatic resource cleanup for test instances and arguments
+
+### Enhanced Configuration
+
+- **Multiple Sources**: System properties, Maven plugin config, properties files
+- **Per-Class Parallelism**: Individual test classes specify their own concurrency limits
+- **Tag Filtering**: Regex-based inclusion/exclusion with inheritance support
+
+### Modern Development Experience
+
+- **Seamless Maven Integration**: Detailed reporting and automatic test discovery
+- **Java 17+ Compatibility**: Targets modern Java features
+- **Production-Ready**: Built on JUnit Platform with comprehensive error handling
+
+---
+
+## Architecture
+
+### Execution Model
+
+Paramixel uses a queue-based actor system for optimal resource utilization:
+
+```
+┌───────────────────────────────────────────┐
+│           Paramixel Engine                │
+├───────────────────────────────────────────┤
+│  Class Queue → Argument Queue → Method    │
+│       ↓              ↓              ↓      │
+│  Virtual Threads (Java 21+)               │
+│  Platform Threads (Java 17-20)            │
+└───────────────────────────────────────────┘
+```
+
+### Component Interaction
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│  Test Author Code                                                     │
+│  @Paramixel.TestClass / @Paramixel.Test / @Paramixel.ArgumentsCollector│
+└───────────────────────────────┬───────────────────────────────────────┘
+                                │ uses
+                                ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│  paramixel-api                                                        │
+│  Paramixel (annotations)  ArgumentContext  ClassContext                │
+│  EngineContext  ArgumentsCollector  Store  Named  NamedValue           │
+└───────────────────────────────┬───────────────────────────────────────┘
+                                │ implements/depends on
+                                ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│  paramixel-engine                                                     │
+│                                                                       │
+│  ParamixelTestEngine (JUnit Platform TestEngine SPI)                  │
+│    │                                                                  │
+│    ├─ discover() → ParamixelDiscovery                                 │
+│    │   ├─ scans classpath for @Paramixel.TestClass                    │
+│    │   ├─ validates method signatures                                 │
+│    │   ├─ invokes @Paramixel.ArgumentsCollector                       │
+│    │   └─ builds descriptor tree                                      │
+│    │                                                                  │
+│    └─ execute() → ParamixelExecutionRuntime (virtual threads)         │
+│        ├─ ParamixelConcurrencyLimiter (semaphores)                    │
+│        ├─ ParamixelClassRunner (per class)                            │
+│        ├─ ParamixelInvocationRunner (per argument)                    │
+│        └─ ParamixelEngineExecutionListener (reporting)                │
+└───────────────────────────────┬───────────────────────────────────────┘
+                                │ launched by
+                                ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│  paramixel-maven-plugin                                               │
+│  ParamixelMojo (goal: test, phase: test)                              │
+│    ├─ Scans test-classes dir for @Paramixel.TestClass                 │
+│    ├─ Fires JUnit Platform Launcher with EngineFilter=paramixel       │
+│    └─ Fails build on any test failure                                 │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow: Maven Running Tests
+
+1. **Maven lifecycle** reaches the `test` phase. The `paramixel-maven-plugin:test` goal executes.
+2. **ParamixelMojo** builds a `URLClassLoader` from test output + test classpath, then scans `.class` files for `@Paramixel.TestClass`.
+3. **JUnit Platform Launcher** calls `ParamixelTestEngine.discover()`.
+4. **ParamixelDiscovery** processes each selector, validates method signatures, invokes `@Paramixel.ArgumentsCollector`, and builds the descriptor tree.
+5. **ParamixelTestEngine.execute()** reads configuration and creates a `ConcreteEngineContext`.
+6. **ParamixelExecutionRuntime** provides a virtual-thread executor and concurrency limiter.
+7. For each test class, a class-level permit is acquired and the class is submitted to the virtual-thread executor.
+8. **ParamixelClassRunner** instantiates the test class, runs @Initialize, then processes each argument.
+9. **ParamixelInvocationRunner** executes @BeforeEach, @Test, @AfterEach for each test method.
+10. Results flow back as `TestExecutionResult` to `EngineExecutionListener`.
+11. **ParamixelMojo** checks for failures and throws `MojoFailureException` if any tests failed.
+
+### Architectural Decisions
+
+**ADR-1: Descriptor Tree Built at Discovery Time**
+Arguments are enumerated during `discover()`, not `execute()`. This allows IDE integration and report counts to be accurate before execution starts.
+
+**ADR-2: Virtual Threads for All Concurrency**
+All parallel work uses `Executors.newVirtualThreadPerTaskExecutor()`. Virtual threads eliminate thread-pool sizing concerns.
+
+**ADR-3: Three-Level Concurrency Cap**
+Three fair semaphores cap concurrency at total, class, and argument levels.
+
+**ADR-4: Separate Context Hierarchy**
+State scoping: `EngineContext -> ClassContext -> ArgumentContext`. Each has its own `Store` backed by `ConcurrentHashMap`.
+
+**ADR-5: AutoCloseable Resources Auto-Closed**
+Test class instances and argument values implementing `AutoCloseable` are closed automatically after the appropriate lifecycle phase.
+
+**ADR-6: Custom Listener Only in Maven Invocation Mode**
+When invoked by Maven, the engine substitutes its own listener for console output. In IDE mode, the standard listener is used.
+
+**ADR-7: Flattened Method Inheritance**
+Lifecycle hooks and test methods are discovered across the full class hierarchy and treated as a single flattened set.
+
+---
+
+## Modules
+
+### Module Inventory
+
+| Module               | Packaging      | Responsibility                             | Key Dependencies                                      |
+|----------------------|----------------|--------------------------------------------|-------------------------------------------------------|
+| `paramixel-api`      | `jar`          | Public annotations and context interfaces  | `junit-platform-commons`                              |
+| `paramixel-engine`   | `jar`          | JUnit Platform TestEngine implementation   | `paramixel-api`, `junit-platform-engine`, `slf4j-api` |
+| `paramixel-maven-plugin` | `maven-plugin` | Maven Mojo for test execution            | `paramixel-api`, `paramixel-engine`, `maven-plugin-api` |
+| `paramixel-tests`    | `jar`          | Functional/integration tests               | `paramixel-api` (test)                                |
+| `paramixel-examples` | `jar`          | Demonstrative test classes                 | `paramixel-api` (test), `testcontainers`              |
+| `paramixel-benchmarks` | `jar`        | JMH performance benchmarks                 | `paramixel-api` (test), `jmh-core`                    |
+
+### Module Dependency Graph
+
+```
+paramixel-api
+     ▲
+     │
+paramixel-engine ──────────────────────┐
+     ▲                                │
+     │                                │
+paramixel-maven-plugin                 │
+     ▲                                │
+     │                                │
+paramixel-tests ──── (uses plugin) ────┤
+paramixel-examples ── (uses plugin) ───┤
+paramixel-benchmarks <─────────────────┘
+```
+
+### Technology Stack
+
+| Concern              | Technology                                  |
+|----------------------|---------------------------------------------|
+| Language             | Java 21 (compiled with `--release 21`)      |
+| Build tool           | Apache Maven 3.9+ with `./mvnw` wrapper     |
+| Test platform        | JUnit Platform 6.0.3                        |
+| Assertions           | AssertJ 3.27.7                              |
+| Logging              | `java.util.logging` (JUL) + SLF4J API 2.0.17|
+| Concurrency          | Java 21 virtual threads                     |
+| Code formatting      | Spotless + Palantir Java Format 2.87.0      |
+| Code coverage        | JaCoCo 0.8.14                               |
+| Table output         | `ascii-table` 1.9.0                         |
+| Null safety          | `org.jspecify` (`@NonNull`)                 |
+| Integration examples | Testcontainers 2.0.3                        |
+
+### Repository Layout
+
+```
+paramixel/
+├── api/                       Public API jar — annotations + context interfaces
+│   └── src/main/java/org/paramixel/api/
+├── engine/                    Core test engine jar
+│   └── src/main/java/org/paramixel/engine/
+│       ├── api/               Concrete context/store implementations
+│       ├── descriptor/        JUnit Platform TestDescriptor hierarchy
+│       ├── discovery/         Test class scanner
+│       ├── execution/         Runners + concurrency primitives
+│       ├── filter/            Tag-based test filtering
+│       ├── invoker/           Reflective method invoker
+│       ├── listener/          Execution event listeners / reporters
+│       ├── util/              FastIdUtil generator
+│       └── validation/        Method signature validator
+├── maven-plugin/              Maven Mojo (goal: test)
+│   └── src/main/java/org/paramixel/maven/plugin/
+├── tests/                     Functional test suite
+│   └── src/test/java/test/
+├── examples/                  Illustrative tests including Testcontainers
+│   └── src/test/java/examples/
+├── benchmarks/                JMH performance benchmarks
+│   └── src/main/java/org/paramixel/engine/
+├── assets/
+│   └── license-header.txt     Apache 2.0 license header for Spotless
+├── .github/workflows/
+│   └── build.yaml             CI: push + PR → ./mvnw -B clean verify
+├── paramixel.properties       Project-root properties (loaded by engine at runtime)
+├── mvnw / .mvn/               Maven wrapper
+└── pom.xml                    Parent POM
+```
+
+---
+
+## Usage Guide
+
+### Basic Test Class
+
+```java
+@Paramixel.TestClass
 public class ParameterizedTest {
 
     @Paramixel.ArgumentsCollector
     public static void arguments(ArgumentsCollector collector) {
-        // Called once to provide arguments for parameterized tests
         collector.setParallelism(4);
         collector.addArguments("arg1", "arg2", "arg3");
     }
@@ -279,45 +334,43 @@ public class ParameterizedTest {
 
 ### Lifecycle Hooks
 
- ```java
- import org.paramixel.api.Paramixel;
- import org.paramixel.api.ArgumentContext;
- import org.paramixel.api.ArgumentsCollector;
- import org.paramixel.api.ClassContext;
- 
- @Paramixel.TestClass
- public class LifecycleTest {
+Paramixel provides 6 lifecycle hooks with guaranteed pairing:
+
+```java
+@Paramixel.TestClass
+public class LifecycleTest {
 
     @Paramixel.ArgumentsCollector
     public static void arguments(ArgumentsCollector collector) {
-        // Called once to provide arguments for parameterized tests
-        collector.setParallelism(4);
         collector.addArguments("arg1", "arg2", "arg3");
     }
     
     @Paramixel.Initialize
     public void initialize(ClassContext context) {
         // Called once per class before any test methods
+        // Paired with @Finalize
     }
 
     @Paramixel.BeforeAll
     public void beforeAll(ArgumentContext context) {
         // Called once per argument before all test methods
+        // Paired with @AfterAll
     }
 
     @Paramixel.BeforeEach
     public void beforeEach(ArgumentContext context) {
-        // Called once per argument before each test method
+        // Called before each test method
+        // Paired with @AfterEach
     }
 
     @Paramixel.Test
     public void test(ArgumentContext context) {
-        // Test implementation per argument
+        // Test implementation
     }
 
     @Paramixel.AfterEach
     public void afterEach(ArgumentContext context) {
-        // Called once per argument after each test method
+        // Called after each test method (even on failure)
     }
 
     @Paramixel.AfterAll
@@ -332,11 +385,49 @@ public class ParameterizedTest {
 }
 ```
 
+### Execution Order
+
+```
+[Per class]
+  @Paramixel.ArgumentsCollector (static)
+  TestClass.newInstance()         (no-arg constructor)
+  @Paramixel.Initialize(ClassContext)
+  [Per argument]
+    @Paramixel.BeforeAll(ArgumentContext)
+    [Per test method]
+      @Paramixel.BeforeEach(ArgumentContext)
+      @Paramixel.Test(ArgumentContext)
+      @Paramixel.AfterEach(ArgumentContext)
+    [End per test method]
+    @Paramixel.AfterAll(ArgumentContext)
+    argument.close()              (if implements AutoCloseable)
+  [End per argument]
+  @Paramixel.Finalize(ClassContext)
+  testInstance.close()            (if implements AutoCloseable)
+[End per class]
+```
+
+### Annotation Contracts
+
+| Annotation          | Target       | Required Signature                           | Notes                                          |
+|---------------------|--------------|----------------------------------------------|------------------------------------------------|
+| `@TestClass`        | TYPE         | N/A                                          | Marks class for discovery; requires no-arg constructor |
+| `@Test`             | METHOD       | `public void method(ArgumentContext)`        | Instance method, NOT static                    |
+| `@ArgumentsCollector` | METHOD     | `public static void method(ArgumentsCollector)` | Static, only one per hierarchy               |
+| `@Initialize`       | METHOD       | `public void method(ClassContext)`           | Instance, NOT static; paired with @Finalize    |
+| `@BeforeAll`        | METHOD       | `public void method(ArgumentContext)`        | Static or instance; paired with @AfterAll      |
+| `@BeforeEach`       | METHOD       | `public void method(ArgumentContext)`        | Instance, NOT static; paired with @AfterEach   |
+| `@AfterEach`        | METHOD       | `public void method(ArgumentContext)`        | Instance, NOT static                           |
+| `@AfterAll`         | METHOD       | `public void method(ArgumentContext)`        | Static or instance                             |
+| `@Finalize`         | METHOD       | `public void method(ClassContext)`           | Instance, NOT static                           |
+| `@Disabled`         | TYPE, METHOD | N/A                                          | Skips class or method during discovery         |
+| `@DisplayName`      | TYPE, METHOD | `String value()`                             | Replaces default display name                  |
+| `@Order`            | METHOD       | `int value()` (> 0)                          | Execution order; forces sequential execution   |
+| `@Tags`             | TYPE         | `String[] value()`                           | Categorizes for filtering; inherited           |
+
 ### Named Arguments
 
 ```java
-import org.paramixel.api.Named;
-
 public class TestData implements Named {
     
     private final String name;
@@ -358,206 +449,105 @@ public class TestData implements Named {
 }
 ```
 
-## Available Annotations
+### Parallelism Configuration
 
-### Class-Level Annotations
+**Global Parallelism:**
+```bash
+./mvnw test -Dparamixel.parallelism=4
+```
 
-- `@Paramixel.TestClass` - Marks a class as containing test methods
-- `@Paramixel.DisplayName("name")` - Custom display name for the test class
-- `@Paramixel.Disabled("reason")` - Disables the test class
-
-### Method-Level Annotations
-
-#### Test Execution
-- `@Paramixel.Test` - Marks a method as a test method
-- `@Paramixel.ArgumentsCollector` - Provides arguments for parameterized tests (parallelism is configured via `ArgumentsCollector.setParallelism(N)`)
-
-#### Lifecycle Hooks
-- `@Paramixel.Initialize` - Executed once before any other lifecycle method
-- `@Paramixel.BeforeAll` - Executed once before all test methods
-- `@Paramixel.BeforeEach` - Executed before each test method
-- `@Paramixel.AfterEach` - Executed after each test method
-- `@Paramixel.AfterAll` - Executed once after all test methods
-- `@Paramixel.Finalize` - Executed once after all execution completes
-
-#### Control
-- `@Paramixel.Disabled("reason")` - Disables individual test methods
-- `@Paramixel.DisplayName("name")` - Custom display name for test methods
-
-### Tags
-
-The `@Paramixel.Tags` annotation allows you to categorize test classes for selective execution:
-
+**Per-Class Parallelism:**
 ```java
-@Paramixel.TestClass
-@Paramixel.Tags({"integration", "database", "slow"})
-public class DatabaseIntegrationTest {
-    // This test is tagged with "integration", "database", and "slow"
-}
-
-@Paramixel.TestClass
-@Paramixel.Tags({"unit", "fast"})
-public class UnitTest {
-    // This test is tagged with "unit" and "fast"
+@Paramixel.ArgumentsCollector
+public static void arguments(ArgumentsCollector collector) {
+    collector.setParallelism(4);
 }
 ```
 
-**Tag Validation Requirements:**
-- Tags annotation can only be used on classes annotated with `@Paramixel.TestClass`
-- Tags array must contain at least one tag
-- Each tag value must be non-null and non-empty (after trimming)
-- At most one `@Tags` annotation is allowed per class (each class in a hierarchy can have its own `@Tags`)
-- Tags are inherited from parent classes and combined when filtering
-- Invalid tag usage will cause test discovery to fail with an error
+**Constraint:** Per-class parallelism cannot exceed global parallelism.
 
-**Tag Inheritance:**
-When a test class extends another test class, tags from both classes are combined:
+**Sequential Execution Trigger:**
+When ANY `@Paramixel.Test` method has `@Paramixel.Order`, ALL test methods for that argument bucket execute sequentially (even if parallelism > 1).
 
-```java
-@Paramixel.TestClass
-@Paramixel.Tags({"integration"})
-public class BaseIntegrationTest {
-    // Base class with "integration" tag
-}
+### Tag Filtering
 
-@Paramixel.TestClass
-@Paramixel.Tags({"database", "slow"})
-public class DatabaseIntegrationTest extends BaseIntegrationTest {
-    // Inherits "integration" tag, has its own "database" and "slow" tags
-    // Combined tags: ["integration", "database", "slow"]
-}
-```
-
-When filtering with `-Dparamixel.tags.include="integration"`, the `DatabaseIntegrationTest` will match because it inherits the "integration" tag from its parent class.
-
-## Tag-Based Test Filtering
-
-Paramixel supports filtering tests based on their `@Tags` annotations using regular expressions. This allows you to run specific subsets of tests during development or CI/CD pipelines.
-
-### Using System Properties
+Filter tests using regex patterns:
 
 ```bash
-# Run only integration tests
+# Include integration tests
 ./mvnw test -Dparamixel.tags.include="integration-.*"
 
 # Exclude slow tests
 ./mvnw test -Dparamixel.tags.exclude=".*slow.*"
 
-# Include integration tests but exclude slow ones
-./mvnw test -Dparamixel.tags.include="integration-.*" -Dparamixel.tags.exclude=".*slow.*"
+# Combined filters
+./mvnw test -Dparamixel.tags.include="integration" -Dparamixel.tags.exclude="slow"
 
-# Include multiple patterns (OR logic)
-./mvnw test -Dparamixel.tags.include="^unit$,^fast$"
+# Multiple includes (OR logic)
+./mvnw test -Dparamixel.tags.include="unit,fast,integration"
 
-# Match tags with special characters (escape regex metacharacters)
-./mvnw test -Dparamixel.tags.include="v1\\.0"
+# Exact match
+./mvnw test -Dparamixel.tags.include="^unit$"
 ```
 
-### Using Maven Plugin Configuration
+**Pattern Syntax:**
+- `integration` - Tags containing "integration"
+- `^integration$` - Exact match "integration"
+- `integration-.*` - Starts with "integration-"
+- `.*-slow` - Ends with "-slow"
+- `^unit$,^fast$` - Either "unit" OR "fast"
+- `v1\\.0` - Literal "v1.0" (dot escaped)
 
+**Tag Inheritance:**
+```java
+@Paramixel.TestClass
+@Paramixel.Tags({"integration"})
+public class BaseIntegrationTest {
+    // Tag: integration
+}
+
+@Paramixel.TestClass
+@Paramixel.Tags({"database", "slow"})
+public class DatabaseIntegrationTest extends BaseIntegrationTest {
+    // Tags: integration (inherited) + database, slow (declared)
+    // Combined: [integration, database, slow]
+}
+```
+
+**Filtering Behavior:**
+1. **Include filters**: Select classes where ANY tag matches ANY include pattern
+2. **Exclude filters**: Remove classes where ANY tag matches ANY exclude pattern
+3. **Untagged classes**: Included only when no include filter is specified
+4. **Case sensitivity**: Patterns are case-sensitive
+
+**Configuration Precedence** (highest to lowest):
+1. Command line (`-D` flags)
+2. Maven plugin config (`<configuration>`)
+3. Properties file (`paramixel.properties`)
+4. Defaults (no filtering)
+
+**Maven Plugin Configuration:**
 ```xml
 <plugin>
     <groupId>org.paramixel</groupId>
     <artifactId>paramixel-maven-plugin</artifactId>
-    <version>0.0.1</version>
     <configuration>
         <tagsInclude>integration-.*</tagsInclude>
-        <tagsExclude>.*-slow,.*-flaky</tagsExclude>
-        <summaryClassNameMaxLength>60</summaryClassNameMaxLength>
+        <tagsExclude>.*slow.*,.*flaky.*</tagsExclude>
     </configuration>
 </plugin>
 ```
 
-`summaryClassNameMaxLength` abbreviates class names in the Maven-only `Paramixel Test Summary`
-table by shortening package segments while keeping the final segment intact. This is display-only
-and may cause ambiguous/colliding rendered names; increase the maximum length when you need
-unambiguous output.
-
-If the final segment alone exceeds the configured maximum, it is still kept intact and the
-rendered class name may exceed the configured maximum.
-
-Example: `foo.bar.Class`
-
-- With `paramixel.summary.classNameMaxLength=11`: `f.bar.Class`
-- With `paramixel.summary.classNameMaxLength=10`: `f.b.Class`
-
-Example: `test.argument.ArgumentsTest`
-
-- With `paramixel.summary.classNameMaxLength=20`: `t.a.ArgumentsTest`
-
-### Using Properties File
-
-Create a `paramixel.properties` file in your project root:
-
+**Properties File:**
 ```properties
-# Run integration tests except slow ones
 paramixel.tags.include=integration-.*
-paramixel.tags.exclude=.*slow.*,.*flaky.*
-
-# Control parallelism (default: number of available processors)
-paramixel.parallelism=4
-
-# Limit class name width in the Maven-only summary table
-paramixel.summary.classNameMaxLength=60
+paramixel.tags.exclude=.*slow.*
 ```
 
-### Configuration Precedence
+### CI/CD Examples
 
-When a property is defined in multiple places, the following precedence applies (highest to lowest):
-
-1. **Command line system properties** (e.g., `-Dparamixel.parallelism=8`)
-2. **Properties file** (`paramixel.properties`)
-3. **Default value**
-
-### Controlling Parallelism
-
-Paramixel automatically optimizes thread usage based on your Java version:
-- **Java 21+**: Uses virtual threads for optimal performance
-- **Java 17-20**: Uses efficient platform thread pools
-
-The degree of parallelism can be controlled at both the global and per-class levels.
-
-**Global Parallelism (`paramixel.parallelism`)**
-
-The `paramixel.parallelism` property establishes the overall maximum number of concurrent test classes that may execute simultaneously across the entire test suite. This serves as the upper bound for all parallelism within the engine.
-
-```bash
-# Run with 4 concurrent test classes
-./mvnw test -Dparamixel.parallelism=4
-```
-
-Or in `paramixel.properties`:
-```properties
-paramixel.parallelism=4
-```
-
-**Per-Class Parallelism (`ArgumentsCollector.setParallelism()`)**
-
-Individual test classes may specify their own parallelism limit via `ArgumentsCollector.setParallelism()`. This value represents the maximum concurrency permitted for that specific test class. However, the effective parallelism for any class is constrained by the global `paramixel.parallelism` setting—the per-class value cannot exceed the global limit.
-
-For example, if `paramixel.parallelism=4` (global) and a test class calls `setParallelism(8)` (per-class), the effective parallelism for that class will be 4.
-
-### Regex Pattern Examples
-
-| Pattern | Matches |
-|---------|---------|
-| `integration-.*` | Tags starting with "integration-" |
-| `^unit$` | Exactly "unit" |
-| `.*slow.*` | Tags containing "slow" |
-| `^fast$\|^api$` | Either "fast" or "api" |
-| `v1\\.0` | Literally "v1.0" (dot escaped) |
-
-### Filtering Behavior
-
-1. **Include filters** select classes where ANY tag matches ANY include pattern
-2. **Exclude filters** remove classes where ANY tag matches ANY exclude pattern
-3. **Untagged classes** are only included when no include filter is specified
-4. **Case sensitivity**: Patterns are case-sensitive (Java regex default)
-
-### CI/CD Example
-
+**GitHub Actions:**
 ```yaml
-# GitHub Actions workflow
 jobs:
   fast-tests:
     runs-on: ubuntu-latest
@@ -571,7 +561,7 @@ jobs:
     needs: fast-tests
     steps:
       - uses: actions/checkout@v4
-      - name: Run integration tests (excluding slow)
+      - name: Run integration tests
         run: ./mvnw test -Dparamixel.tags.include="integration" -Dparamixel.tags.exclude="slow"
         
   database-tests:
@@ -585,116 +575,49 @@ jobs:
         run: ./mvnw test -Dparamixel.tags.include="database"
 ```
 
-## 🛠️ Building from Source
+**GitLab CI:**
+```yaml
+stages:
+  - test
+  - integration
 
-**Requirements:**
-- **Java 17 or higher** (Java 21+ recommended for virtual thread testing)
-- Maven 3.9+
+unit:
+  stage: test
+  script:
+    - ./mvnw test -Dparamixel.tags.include="unit"
 
-```bash
-# Clean and build all modules
-./mvnw clean verify
-
-# Install to local Maven repository
-./mvnw clean install
-
-# Build specific module
-./mvnw clean verify -pl api
-
-# Run tests only
-./mvnw clean test
+integration:
+  stage: integration
+  script:
+    - ./mvnw test -Dparamixel.tags.include="integration" -Dparamixel.tags.exclude="slow"
 ```
 
-## 🔧 Configuration
-
-### Maven Plugin Configuration
-
-```xml
-<plugin>
-    <groupId>org.paramixel</groupId>
-    <artifactId>paramixel-maven-plugin</artifactId>
-    <version>0.0.1</version>
-    <configuration>
-        <verbose>true</verbose>
-        <failIfNoTests>false</failIfNoTests>
-    </configuration>
-    <executions>
-        <execution>
-            <phase>test</phase>
-            <goals>
-                <goal>test</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
-```
-
-#### 🔄 Coexisting with Standard JUnit Tests
-
-When using Paramixel tests alongside standard JUnit Jupiter tests in the same Maven module, configure Maven Surefire to exclude the Paramixel engine. Without exclusion, Maven Surefire will attempt to execute Paramixel tests as JUnit tests, causing failures.
-
-#### Configuration for Mixed Test Environments
-
-**Complete Maven Configuration Example:**
-
-```xml
-<build>
-    <plugins>
-        <!-- Standard JUnit Tests (includes JUnit files, excludes Paramixel engine) -->
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <version>3.5.5</version>
-            <configuration>
-                <includes>
-                    <include>**/*Test.java</include>
-                </includes>
-                <properties>
-                    <configurationParameters>
-                        junit.platform.engine.exclude = paramixel
-                    </configurationParameters>
-                </properties>
-                <systemPropertyVariables>
-                    <junit.jupiter.extensions.autodetection.enabled>false</junit.jupiter.extensions.autodetection.enabled>
-                </systemPropertyVariables>
-            </configuration>
-        </plugin>
+**Jenkins Pipeline:**
+```groovy
+pipeline {
+    agent any
+    
+    stages {
+        stage('Unit Tests') {
+            steps {
+                sh './mvnw test -Dparamixel.tags.include="unit,fast"'
+            }
+        }
         
-        <!-- Paramixel Tests -->
-        <plugin>
-            <groupId>org.paramixel</groupId>
-            <artifactId>paramixel-maven-plugin</artifactId>
-            <version>0.0.1</version>
-            <executions>
-                <execution>
-                    <phase>test</phase>
-                    <goals>
-                        <goal>test</goal>
-                    </goals>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
-</build>
+        stage('Integration Tests') {
+            steps {
+                sh './mvnw test -Dparamixel.tags.include="integration"'
+            }
+        }
+    }
+}
 ```
 
-#### Configuration Breakdown
+### Coexisting with JUnit
 
-**Maven Surefire Configuration:**
-- **`<includes><include>**/*Test.java</include></includes>`**: Filters to run only JUnit test files
-- **`junit.platform.engine.exclude = paramixel`**: Prevents Paramixel tests from running during standard JUnit execution
-- **`junit.jupiter.extensions.autodetection.enabled=false`**: Disables auto-detection to avoid conflicts
+Run Paramixel and JUnit tests in the same module using one of three strategies:
 
-**Paramixel Plugin Configuration:**
-- Executes during the `test` phase alongside Maven Surefire
-- Automatically discovers and runs only `@Paramixel.TestClass` annotated tests
-
-#### Usage Scenarios
-
-**1. Same Module with Both JUnit and Paramixel Tests:**
-
-When JUnit tests and Paramixel tests are in the same Maven module, configure Maven Surefire to include only JUnit test files (e.g., `**/*Test.java`) AND exclude the Paramixel engine. This prevents JUnit from discovering or executing Paramixel tests:
-
+**Option 1: File Pattern Filtering (Recommended)**
 ```xml
 <plugin>
     <groupId>org.apache.maven.plugins</groupId>
@@ -718,6 +641,7 @@ When JUnit tests and Paramixel tests are in the same Maven module, configure Mav
 <plugin>
     <groupId>org.paramixel</groupId>
     <artifactId>paramixel-maven-plugin</artifactId>
+    <version>0.1.0-alpha-1</version>
     <executions>
         <execution>
             <phase>test</phase>
@@ -729,99 +653,14 @@ When JUnit tests and Paramixel tests are in the same Maven module, configure Mav
 </plugin>
 ```
 
-Maven Surefire runs only files matching the include pattern (JUnit tests), excluding the Paramixel engine. The Paramixel plugin runs separately and discovers `@Paramixel.TestClass` tests via classpath scanning.
-
-**2. Gradual Migration from JUnit to Paramixel:**
-
-When migrating incrementally, configure Maven Surefire to include only JUnit test files AND exclude the Paramixel engine:
-
-```xml
-<!-- Keep existing JUnit tests unchanged -->
-<plugin>
-    <groupId>org.apache.maven.plugins</groupId>
-    <artifactId>maven-surefire-plugin</artifactId>
-    <version>3.5.5</version>
-    <configuration>
-        <includes>
-            <include>**/*Test.java</include>
-        </includes>
-        <properties>
-            <configurationParameters>
-                junit.platform.engine.exclude = paramixel
-            </configurationParameters>
-        </properties>
-        <systemPropertyVariables>
-            <junit.jupiter.extensions.autodetection.enabled>false</junit.jupiter.extensions.autodetection.enabled>
-        </systemPropertyVariables>
-    </configuration>
-</plugin>
-
-<!-- Add Paramixel for new tests -->
-<plugin>
-    <groupId>org.paramixel</groupId>
-    <artifactId>paramixel-maven-plugin</artifactId>
-    <executions>
-        <execution>
-            <phase>test</phase>
-            <goals>
-                <goal>test</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
-```
-
-**3. Running Specific Test Types Separately:**
-
-```bash
-# Run only JUnit tests (excludes Paramixel)
-./mvnw surefire:test
-
-# Run only Paramixel tests
-./mvnw paramixel:test
-
-# Run all tests (both engines)
-./mvnw test
-```
-
-**4. Tag-Based Filtering Example:**
-
-```xml
-<plugin>
-    <groupId>org.paramixel</groupId>
-    <artifactId>paramixel-maven-plugin</artifactId>
-    <configuration>
-        <tagsInclude>integration</tagsInclude>
-        <tagsExclude>slow</tagsExclude>
-    </configuration>
-</plugin>
-```
-
-#### How It Works
-
-When JUnit tests and Paramixel tests coexist in the same module:
-
-- **Maven Surefire** runs only files matching the include pattern (e.g., `**/*Test.java`), excluding the Paramixel engine via `junit.platform.engine.exclude = paramixel`
-- **Paramixel plugin** runs separately and discovers `@Paramixel.TestClass` tests via classpath scanning in the `test-classes` directory
-- Both run during the `test` phase; Surefire runs first, then the Paramixel plugin
-- No conflicts occur because Surefire filters by file pattern and excludes the Paramixel engine
-
-When JUnit and Paramixel tests are in the same module, configure Maven Surefire with both `<includes>` for JUnit test files AND `<properties><junit.platform.engine.exclude>paramixel</junit.platform.engine.exclude></properties>`.
-
-#### Suggested Package Structure
-
-For cleaner separation and easier filtering, consider organizing tests into separate packages:
-
-**Option 1: By Test Type**
+**Option 2: Package Separation**
 ```
 src/test/java/
-├── unit/                 # JUnit Jupiter tests
+├── unit/                  # JUnit tests
 │   └── MyServiceTest.java
-└── paramixel/            # Paramixel tests
+└── paramixel/             # Paramixel tests
     └── MyParameterizedTest.java
 ```
-
-Maven configuration:
 ```xml
 <plugin>
     <groupId>org.apache.maven.plugins</groupId>
@@ -839,124 +678,331 @@ Maven configuration:
 </plugin>
 ```
 
-**Option 2: By Test Domain** (mix both test types per domain)
-```
-src/test/java/
-└── com/example/
-    └── billing/
-        ├── JUnitTests/          # Standard unit tests
-        │   ├── InvoiceServiceTest.java
-        │   └── CalculatorTest.java
-        └── ParamixelTests/      # Parameterized tests
-            └── PricingIntegrationTest.java
-```
-
-This approach keeps related tests together while allowing selective execution:
-- Run all billing tests: `./mvnw test`
-- Run only JUnit: `./mvnw surefire:test -Dtest='**/JUnitTests/*Test.java'`
-- Run only Paramixel: `./mvnw paramixel:test`
-
-#### Troubleshooting Common Issues
-
-**Issue**: Tests running twice or engine conflicts
-**Solution**: Ensure `junit.platform.engine.exclude = paramixel` is set in Maven Surefire configuration
-
-**Issue**: Paramixel tests not discovered
-**Solution**: Verify `@Paramixel.TestClass` annotation is present and Paramixel plugin is configured
-
-**Issue**: Mixed test execution order problems
-**Solution**: Both plugins run in the `test` phase; execution order is determined by Maven lifecycle
-
-#### Best Practices
-
-✅ **Separate Test Types**: Consider keeping Paramixel and JUnit tests in different packages
-✅ **Clear Naming**: Use naming conventions to distinguish test types
-✅ **Configuration Management**: Use Maven profiles for different test scenarios
-✅ **Documentation**: Clearly document which tests use which framework
-
-### Parallelism
-
-Control parallelism using `ArgumentsCollector.setParallelism(...)` inside your `@Paramixel.ArgumentsCollector`:
-
-```java
-@Paramixel.ArgumentsCollector
-public static void arguments(ArgumentsCollector collector) {
-    collector.setParallelism(4); // Up to 4 concurrent invocations
-    collector.addArgument(...)
-}
+**Option 3: Maven Profiles**
+```xml
+<profiles>
+    <profile>
+        <id>junit-tests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <includes>
+                            <include>**/*Test.java</include>
+                        </includes>
+                        <properties>
+                            <junit.platform.engine.exclude>paramixel</junit.platform.engine.exclude>
+                        </properties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    
+    <profile>
+        <id>paramixel-tests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.paramixel</groupId>
+                    <artifactId>paramixel-maven-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <phase>test</phase>
+                            <goals>
+                                <goal>test</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+</profiles>
 ```
 
-## 🏭 Modules
+**Usage:**
+```bash
+# Run JUnit only
+./mvnw test -Pjunit-tests
 
-### API (`paramixel-api`)
+# Run Paramixel only
+./mvnw test -Pparamixel-tests
 
-Provides the public API including:
-- Annotations (`@TestClass`, `@Test`, `@BeforeAll`, etc.)
-- Context classes (`ArgumentContext`, `ClassContext`, `EngineContext`)
-- Support interfaces (`Named`)
+# Run both (default)
+./mvnw test
+```
 
-### Engine (`paramixel-engine`)
+### Maven Plugin Parameters
 
-Core test execution engine:
-- Test discovery and filtering
-- Parallel test scheduling
-- Lifecycle method execution
-- JUnit Platform integration
+| Parameter                   | Property                           | Default           | Description                          |
+|-----------------------------|------------------------------------|-------------------|--------------------------------------|
+| `skipTests`                 | `paramixel.skipTests`              | `false`           | Skips all test execution             |
+| `failIfNoTests`             | `paramixel.failIfNoTests`          | `true`            | Fails if no @Paramixel.TestClass found |
+| `parallelism`               | `paramixel.parallelism`            | (engine default)  | Global max parallelism               |
+| `verbose`                   | `paramixel.verbose`                | `false`           | Enables verbose output               |
+| `tagsInclude`               | `paramixel.tags.include`           | (none)            | Regex pattern for inclusion          |
+| `tagsExclude`               | `paramixel.tags.exclude`           | (none)            | Regex pattern for exclusion          |
+| `summaryClassNameMaxLength` | `paramixel.summary.classNameMaxLength` | `2147483647`  | Max class name length in summary     |
 
-### Maven Plugin (`paramixel-maven-plugin`)
+---
 
-Maven build integration:
-- Automatic test discovery
-- Test execution during Maven test phase
-- Detailed execution reporting
+## Configuration Reference
 
-### Tests (`paramixel-tests`)
+### Properties Table
 
-Sample tests demonstrating:
-- Basic test structure
-- Parameterized tests
-- Lifecycle hooks
-- Parallel execution
+| Property Key                     | Source                  | Default           | Description                          |
+|----------------------------------|-------------------------|-------------------|--------------------------------------|
+| `paramixel.parallelism`          | CLI / Maven / properties| `availableProcessors()` | Global max concurrent test classes |
+| `paramixel.tags.include`         | CLI / Maven / properties| (none)            | Regex pattern for tag inclusion      |
+| `paramixel.tags.exclude`         | CLI / Maven / properties| (none)            | Regex pattern for tag exclusion      |
+| `paramixel.verbose`              | CLI / Maven             | `false`           | Enables verbose output               |
+| `paramixel.skipTests`            | CLI / Maven             | `false`           | Skips test execution                 |
+| `paramixel.failIfNoTests`        | CLI / Maven             | `true`            | Fails if no tests found              |
+| `paramixel.summary.classNameMaxLength` | CLI / Maven       | `2147483647`      | Summary table class name max length  |
 
-### Examples (`paramixel-examples`)
+### Configuration Precedence
 
-Practical examples showcasing test engine capabilities:
-- **Simple Tests** - Basic sequential and parallel argument tests
-- **Complex Tests** - Advanced parameterized test patterns
-- **Testcontainers Integration** - Integration tests with Docker containers (Nginx, Kafka, MongoDB)
-- **Resource Management** - Examples of test resource handling
+1. **Command line** (`-D` flags) - Highest
+2. **Maven plugin config** (`<configuration>`)
+3. **Properties file** (`paramixel.properties`)
+4. **Defaults** - No filtering
 
-The examples module serves as a reference for writing tests with various complexity levels and integration patterns.
+### Summary Table Class Name Abbreviation
 
-## 🤝 Contributing
+When invoked by Maven, class names can be abbreviated:
 
-We welcome contributions from the community! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started.
+**Rules:**
+1. Final segment (after last `.`) is always kept intact
+2. Other segments are abbreviated to first character
+3. Segments expand from right to left within max length
 
-- 🐛 **Report Bugs**: Create issues with detailed reproduction steps
+**Examples:**
+- `foo.bar.Class` with max=11: `f.bar.Class`
+- `foo.bar.Class` with max=10: `f.b.Class`
+- `test.argument.ArgumentsTest` with max=20: `t.a.ArgumentsTest`
+
+---
+
+## Troubleshooting
+
+### Tests Not Running
+
+**Problem:** Expected tests don't execute
+
+**Solution:**
+1. Verify `@Paramixel.TestClass` annotation is present
+2. Check pattern syntax (escape special chars)
+3. Use verbose mode to see filtered tests
+   ```bash
+   ./mvnw test -X | grep "Tag filter"
+   ```
+
+### Pattern Not Matching
+
+**Problem:** Pattern should match but doesn't
+
+**Solution:**
+1. Test pattern with online regex tester
+2. Try simpler pattern first
+3. Check case sensitivity
+   ```bash
+   ./mvnw test -Dparamixel.tags.include="(?i)integration"
+   ```
+
+### Inheritance Not Working
+
+**Problem:** Parent class tags not inherited
+
+**Solution:**
+1. Ensure parent class has `@Paramixel.TestClass`
+2. Verify `@Tags` annotation on parent
+3. Check class hierarchy (direct extends only)
+
+### Tests Running Twice
+
+**Problem:** Same test file executes in both engines
+
+**Solution:** Ensure file pattern filtering AND engine exclusion:
+```xml
+<includes>
+    <include>**/*Test.java</include>
+</includes>
+<properties>
+    <junit.platform.engine.exclude>paramixel</junit.platform.engine.exclude>
+</properties>
+```
+
+### Paramixel Tests Not Discovered
+
+**Problem:** Paramixel tests don't run
+
+**Solution:**
+1. Verify `@Paramixel.TestClass` annotation
+2. Check Paramixel plugin is configured
+3. Ensure classes are in `test-classes` directory
+4. Run with verbose: `./mvnw paramixel:test -X`
+
+### Engine Conflicts
+
+**Problem:** JUnit Platform errors
+
+**Solution:** Disable extension auto-detection:
+```xml
+<systemPropertyVariables>
+    <junit.jupiter.extensions.autodetection.enabled>false</junit.jupiter.extensions.autodetection.enabled>
+</systemPropertyVariables>
+```
+
+### Build Hangs
+
+**Problem:** Build hangs after tests complete
+
+**Solution:** Check for:
+1. Unclosed resources in `@Finalize` hooks
+2. Thread pool shutdown issues
+3. Missing `executor.shutdown()` calls
+
+### Invalid Regex Pattern
+
+**Problem:** Test execution fails with regex error
+
+**Solution:**
+1. Escape special characters: `\\.`, `\\-`, etc.
+2. Test pattern in online regex tester
+3. Start with simple pattern, add complexity gradually
+
+### No Matching Classes After Filtering
+
+**Problem:** All tests filtered out
+
+**Solution:**
+1. Verify tag annotations on test classes
+2. Check pattern matches actual tag values
+3. Try without filters to confirm tests run
+4. Use verbose mode to see filtering decisions
+
+### Per-Class Parallelism Ignored
+
+**Problem:** Class parallelism setting has no effect
+
+**Solution:**
+1. Verify `setParallelism()` is called in `@ArgumentsCollector`
+2. Remember: per-class cannot exceed global parallelism
+3. Check if `@Order` forces sequential execution
+
+### AutoCloseable Not Closed
+
+**Problem:** Resources not automatically closed
+
+**Solution:**
+1. Verify class/argument implements `AutoCloseable`
+2. Check `close()` method signature
+3. Review lifecycle order (after @AfterAll / @Finalize)
+
+---
+
+## Best Practices
+
+### Tag Naming
+
+✅ **Use descriptive tag names**: `integration-api`, `unit-core`, `perf-load`
+
+✅ **Establish naming conventions**: Consistent prefixes make patterns easier
+
+✅ **Document tag usage**: List available tags in project README
+
+✅ **Start simple**: Begin with exact matches, add complexity as needed
+
+✅ **Test patterns**: Verify patterns work before committing to CI/CD
+
+❌ **Avoid overly complex patterns**: If pattern is hard to read, simplify
+
+❌ **Don't over-tag**: 3-5 tags per class is typical
+
+❌ **Mix naming conventions**: Pick one style (kebab-case, camelCase, etc.)
+
+### Test Organization
+
+✅ **Use file pattern filtering**: Most reliable separation method
+
+✅ **Exclude Paramixel engine**: Always set `junit.platform.engine.exclude = paramixel`
+
+✅ **Document test types**: Clearly mark which tests use which framework
+
+✅ **Consider package separation**: Easier to maintain and filter
+
+✅ **Use profiles for CI/CD**: Different environments may need different test sets
+
+❌ **Don't rely on naming only**: `*Test.java` pattern alone isn't enough
+
+❌ **Don't mix test types in same file**: Keep JUnit and Paramixel tests separate
+
+❌ **Don't skip engine exclusion**: Will cause discovery failures
+
+### Thread Safety
+
+⚠️ **One test instance per class**: Shared across all argument invocations
+
+✅ **Use thread-safe fields**: `ConcurrentHashMap`, `AtomicReference`, etc.
+
+✅ **Avoid mutable shared state**: Each argument should be independent
+
+✅ **Synchronize if needed**: For shared resources
+
+❌ **Don't assume sequential execution**: Arguments run in parallel by default
+
+### Performance Tuning
+
+✅ **Use virtual threads**: Java 21+ recommended
+
+✅ **Set appropriate parallelism**: `cores` is usually optimal
+
+✅ **Profile with benchmarks**: Use `paramixel-benchmarks` module
+
+✅ **Monitor resource usage**: Watch for thread starvation
+
+❌ **Don't over-parallelize**: Too many permits causes contention
+
+❌ **Don't ignore @Order side effect**: Forces sequential execution
+
+### Common Anti-Patterns
+
+❌ **Complex regex without testing**: Always verify patterns first
+
+❌ **Ignoring AutoCloseable**: Resources must be closed
+
+❌ **Static test state**: Breaks parallel execution
+
+❌ **Blocking in lifecycle hooks**: Use async patterns
+
+❌ **Swallowing exceptions**: Let engine handle failures
+
+❌ **Manual thread management**: Use engine's virtual threads
+
+---
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+- 🐛 **Report Bugs**: Create issues with reproduction steps
 - 💡 **Suggest Features**: Share ideas for improvement
-- 🔧 **Submit Pull Requests**: Code contributions are greatly appreciated
+- 🔧 **Submit PRs**: Code contributions appreciated
 
-## 📖 Documentation & Support
-
-### 📚 Comprehensive Documentation
-- [Java 17+ Compatibility Guide](docs/java-17-plus-compatibility.md) - Detailed compatibility information
-- [System Specifications](.specify/specs/system/) - Complete architecture and design documentation
-- API Documentation - Generated JavaDoc available with builds
-
-### 💬 Getting Help
-- **GitHub Issues**: Create issues for bugs and feature requests
-- **Documentation**: Review tests in `tests/` and examples in `examples/` modules
-- **API Reference**: Explore the public API in `org.paramixel.api` package
+---
 
 ## Sponsorship
 
 ![YourKit logo](https://www.yourkit.com/images/yklogo.png)
 
-[YourKit](https://www.yourkit.com/) supports open source projects with innovative and intelligent tools for monitoring and profiling Java and .NET applications.
+[YourKit](https://www.yourkit.com/) supports open source projects with innovative tools for Java and .NET profiling.
 
-YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a>,
-<a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a>,
-and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.****
+YourKit is the creator of [YourKit Java Profiler](https://www.yourkit.com/java/profiler/), [YourKit .NET Profiler](https://www.yourkit.com/dotnet-profiler/), and [YourKit YouMonitor](https://www.yourkit.com/youmonitor/).
+
+---
 
 ## License
 
