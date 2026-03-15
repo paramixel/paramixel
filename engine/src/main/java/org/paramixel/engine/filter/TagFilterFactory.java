@@ -113,22 +113,42 @@ public final class TagFilterFactory {
         final boolean includeFromConfig = configParameters.get(TAGS_INCLUDE_KEY).isPresent();
         final boolean excludeFromConfig = configParameters.get(TAGS_EXCLUDE_KEY).isPresent();
 
-        final boolean includePresent = includeFromConfig || properties.containsKey(TAGS_INCLUDE_KEY);
-        final boolean excludePresent = excludeFromConfig || properties.containsKey(TAGS_EXCLUDE_KEY);
+        final String includeFromSystem = System.getProperty(TAGS_INCLUDE_KEY);
+        final String excludeFromSystem = System.getProperty(TAGS_EXCLUDE_KEY);
 
-        final String includeValue = includeFromConfig
-                ? configParameters.get(TAGS_INCLUDE_KEY).orElse("")
-                : properties.getProperty(TAGS_INCLUDE_KEY);
-        final String excludeValue = excludeFromConfig
-                ? configParameters.get(TAGS_EXCLUDE_KEY).orElse("")
-                : properties.getProperty(TAGS_EXCLUDE_KEY);
+        final boolean includeFromSystemPresent = includeFromSystem != null;
+        final boolean excludeFromSystemPresent = excludeFromSystem != null;
 
-        final EngineConfigurationUtil.Source includeSource = includeFromConfig
-                ? EngineConfigurationUtil.Source.JUNIT_CONFIG
-                : EngineConfigurationUtil.Source.PROPERTIES_FILE;
-        final EngineConfigurationUtil.Source excludeSource = excludeFromConfig
-                ? EngineConfigurationUtil.Source.JUNIT_CONFIG
-                : EngineConfigurationUtil.Source.PROPERTIES_FILE;
+        final boolean includePresent =
+                includeFromConfig || includeFromSystemPresent || properties.containsKey(TAGS_INCLUDE_KEY);
+        final boolean excludePresent =
+                excludeFromConfig || excludeFromSystemPresent || properties.containsKey(TAGS_EXCLUDE_KEY);
+
+        final String includeValue;
+        final EngineConfigurationUtil.Source includeSource;
+        if (includeFromConfig) {
+            includeValue = configParameters.get(TAGS_INCLUDE_KEY).orElse("");
+            includeSource = EngineConfigurationUtil.Source.JUNIT_CONFIG;
+        } else if (includeFromSystemPresent) {
+            includeValue = includeFromSystem;
+            includeSource = EngineConfigurationUtil.Source.SYSTEM_PROPERTIES;
+        } else {
+            includeValue = properties.getProperty(TAGS_INCLUDE_KEY);
+            includeSource = EngineConfigurationUtil.Source.PROPERTIES_FILE;
+        }
+
+        final String excludeValue;
+        final EngineConfigurationUtil.Source excludeSource;
+        if (excludeFromConfig) {
+            excludeValue = configParameters.get(TAGS_EXCLUDE_KEY).orElse("");
+            excludeSource = EngineConfigurationUtil.Source.JUNIT_CONFIG;
+        } else if (excludeFromSystemPresent) {
+            excludeValue = excludeFromSystem;
+            excludeSource = EngineConfigurationUtil.Source.SYSTEM_PROPERTIES;
+        } else {
+            excludeValue = properties.getProperty(TAGS_EXCLUDE_KEY);
+            excludeSource = EngineConfigurationUtil.Source.PROPERTIES_FILE;
+        }
 
         return fromOptionalPatterns(
                 includeValue, includePresent, excludeValue, excludePresent, includeSource, excludeSource);

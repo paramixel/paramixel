@@ -112,6 +112,14 @@ public final class EngineConfigurationResolver {
     /**
      * Resolves a positive integer configuration value.
      *
+     * <p>Precedence order (highest to lowest):
+     * <ol>
+     *   <li>JUnit ConfigurationParameters</li>
+     *   <li>System properties</li>
+     *   <li>Properties file</li>
+     *   <li>Default value</li>
+     * </ol>
+     *
      * @param configParameters the configuration parameters
      * @param properties the normalized properties
      * @param key the key to resolve
@@ -131,6 +139,12 @@ public final class EngineConfigurationResolver {
         if (configValue.isPresent()) {
             return EngineConfigurationUtil.parseProvidedPositiveInt(
                     key, configValue.get(), configSource, 1, Integer.MAX_VALUE);
+        }
+
+        final String systemProperty = System.getProperty(key);
+        if (systemProperty != null) {
+            return EngineConfigurationUtil.parseProvidedPositiveInt(
+                    key, systemProperty, EngineConfigurationUtil.Source.SYSTEM_PROPERTIES, 1, Integer.MAX_VALUE);
         }
 
         if (properties.containsKey(key)) {
