@@ -158,12 +158,18 @@ public class ParamixelEngineDescriptorEngineExecutionListenerTest {
         engineListener.executionFinished(engine, TestExecutionResult.successful());
 
         final String output = out.toString();
-        // Verify title row format - duration is now in "Paramixel Test Summary | {duration}"
+        // Verify title row format - duration removed from title row
         assertThat(output).contains("Paramixel Test Summary");
-        assertThat(output).contains(" | ");
+        assertThat(output).doesNotContain("Paramixel Test Summary |");
+
+        // Verify status line with prefix and colon alignment
+        assertThat(output).contains(" Status         : ");
+
+        // Verify execution time line
+        assertThat(output).contains(" Execution Time : ");
+
+        // Verify duration is still formatted
         assertThat(output).contains("ms");
-        assertThat(output).contains("s");
-        assertThat(output).contains("m");
     }
 
     private static void setStartTimeMillis(

@@ -35,15 +35,6 @@ public final class DurationUtils {
     /**
      * Formats a duration in milliseconds for human-readable output.
      *
-     * <p>Rules:
-     * <ul>
-     *   <li>{@code < 1000}: milliseconds with 3 decimals (e.g. {@code "250.000 ms"})
-     *   <li>{@code < 60000}: seconds with 3 decimals (e.g. {@code "1.500 s"})
-     *   <li>{@code < 3600000}: minutes with 3 decimals (e.g. {@code "1.083 m"})
-     *   <li>{@code < 86400000}: hours with 3 decimals (e.g. {@code "1.000 h"})
-     *   <li>{@code >= 86400000}: days with 3 decimals (e.g. {@code "1.000 d"})
-     * </ul>
-     *
      * @param millis duration in milliseconds; must be {@code >= 0}
      * @return formatted duration string; never {@code null}
      * @throws IllegalArgumentException if {@code millis < 0}
@@ -52,23 +43,40 @@ public final class DurationUtils {
         if (millis < 0) {
             throw new IllegalArgumentException("millis must be >= 0, got: " + millis);
         }
+        return DurationUnit.forMillis(millis).format(millis);
+    }
 
-        if (millis < 1000) {
-            return String.format("%.3f ms", millis / 1.0);
+    /**
+     * Duration units with formatting logic.
+     */
+    private enum DurationUnit {
+        MILLISECONDS(1.0, "ms", 1000),
+        SECONDS(1000.0, "s", 60000),
+        MINUTES(60000.0, "m", 3600000),
+        HOURS(3600000.0, "h", 86400000),
+        DAYS(86400000.0, "d", Long.MAX_VALUE);
+
+        private final double divisor;
+        private final String suffix;
+        private final long threshold;
+
+        DurationUnit(final double divisor, final String suffix, final long threshold) {
+            this.divisor = divisor;
+            this.suffix = suffix;
+            this.threshold = threshold;
         }
 
-        if (millis < 60000) {
-            return String.format("%.3f s", millis / 1000.0);
+        public String format(final long millis) {
+            return String.format("%.3f %s", millis / divisor, suffix);
         }
 
-        if (millis < 3600000) {
-            return String.format("%.3f m", millis / 60000.0);
+        public static DurationUnit forMillis(final long millis) {
+            for (DurationUnit unit : values()) {
+                if (millis < unit.threshold) {
+                    return unit;
+                }
+            }
+            return DAYS;
         }
-
-        if (millis < 86400000) {
-            return String.format("%.3f h", millis / 3600000.0);
-        }
-
-        return String.format("%.3f d", millis / 86400000.0);
     }
 }

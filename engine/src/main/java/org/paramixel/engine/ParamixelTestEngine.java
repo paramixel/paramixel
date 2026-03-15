@@ -16,13 +16,10 @@
 
 package org.paramixel.engine;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jspecify.annotations.NonNull;
@@ -38,15 +35,12 @@ import org.paramixel.engine.api.ConcreteClassContext;
 import org.paramixel.engine.api.ConcreteEngineContext;
 import org.paramixel.engine.configuration.EngineConfiguration;
 import org.paramixel.engine.configuration.EngineConfigurationResolver;
-import org.paramixel.engine.descriptor.AbstractParamixelDescriptor;
 import org.paramixel.engine.descriptor.ParamixelEngineDescriptor;
 import org.paramixel.engine.descriptor.ParamixelTestClassDescriptor;
 import org.paramixel.engine.discovery.ParamixelDiscovery;
-import org.paramixel.engine.execution.ParamixelClassRunner;
-import org.paramixel.engine.execution.ParamixelConcurrencyLimiter;
-import org.paramixel.engine.execution.ParamixelExecutionRuntime;
+import org.paramixel.engine.execution.SimpleClassExecutor;
+import org.paramixel.engine.execution.SimpleExecutorFactory;
 import org.paramixel.engine.listener.ParamixelEngineExecutionListener;
-import org.paramixel.engine.util.FastIdUtil;
 import org.paramixel.engine.util.PropertiesLoaderUtil;
 
 /**
@@ -59,9 +53,9 @@ import org.paramixel.engine.util.PropertiesLoaderUtil;
  *
  * <p><b>Execution model</b>
  * <ul>
- *   <li>Uses virtual threads for concurrency.
- *   <li>Applies a global concurrency cap via {@link ParamixelConcurrencyLimiter}.
- *   <li>Delegates test-class execution to {@link ParamixelClassRunner}.
+ *   <li>Uses virtual threads for concurrency (Java 21+) or platform threads (Java 17-20).
+ *   <li>Applies a global concurrency cap via engine parallelism configuration.
+ *   <li>Delegates test-class execution to {@link SimpleClassExecutor}.
  * </ul>
  *
  * <p><b>Thread safety</b>
@@ -179,27 +173,12 @@ public final class ParamixelTestEngine implements TestEngine {
                     executionRequest.getRootTestDescriptor().getChildren().stream()
                             .filter(d -> d instanceof ParamixelTestClassDescriptor)
                             .map(d -> (ParamixelTestClassDescriptor) d)
-                            .sorted(Comparator.comparing(AbstractParamixelDescriptor::getDisplayName))
                             .toList();
 
-            try (ParamixelExecutionRuntime runtime = new ParamixelExecutionRuntime(engineConfiguration.parallelism())) {
-                final ParamixelClassRunner classRunner = new ParamixelClassRunner(
-                        runtime, engineContext, engineExecutionListener, classContexts, testInstances);
-
-                final List<Future<?>> futures = new ArrayList<>();
-                for (ParamixelTestClassDescriptor classDescriptor : classDescriptors) {
-                    final ParamixelConcurrencyLimiter.ClassPermit permit =
-                            runtime.limiter().acquireClassExecution();
-                    futures.add(runtime.submitNamed(FastIdUtil.getId(6), () -> {
-                        try (permit) {
-                            classRunner.runTestClass(classDescriptor);
-                        }
-                    }));
-                }
-
-                for (Future<?> future : futures) {
-                    future.get();
-                }
+            final SimpleExecutorFactory executorFactory = new SimpleExecutorFactory();
+            try (SimpleClassExecutor executor =
+                    executorFactory.createExecutor(engineContext, engineExecutionListener)) {
+                executor.executeAll(classDescriptors);
             }
 
         } catch (Exception e) {

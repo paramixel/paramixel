@@ -16,12 +16,10 @@
 
 package org.paramixel.engine.execution;
 
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.paramixel.engine.util.JavaVersionUtil;
 
@@ -110,30 +108,26 @@ public final class WorkerPoolManager implements AutoCloseable {
     }
 
     /**
-     * Submits a task for execution.
+     * Creates an executor service sized to the specified parallelism.
      *
-     * @param task the task to execute; never {@code null}
+     * @param parallelism the parallelism; must be {@code >= 1}
+     * @return an executor service; never {@code null}
      */
-    public void submit(final ExecutionTask task) {
-        Objects.requireNonNull(task, "task must not be null");
-        executor.submit(() -> {
-            final String previousThreadName = Thread.currentThread().getName();
+    public static ExecutorService createExecutor(final int parallelism) {
+        if (parallelism < 1) {
+            throw new IllegalArgumentException("parallelism must be >= 1");
+        }
+        if (JavaVersionUtil.supportsVirtualThreads()) {
             try {
-                // Set thread name for better debugging
-                if (!usesVirtualThreads) {
-                    Thread.currentThread()
-                            .setName("ParamixelWorker-" + task.getPriority() + "-" + System.identityHashCode(task));
-                }
-                task.execute();
+                final var executorsClass = Executors.class;
+                final var method = executorsClass.getMethod("newVirtualThreadPerTaskExecutor");
+                return (ExecutorService) method.invoke(null);
             } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Task execution failed", e);
-            } finally {
-                // Restore previous thread name
-                if (!usesVirtualThreads) {
-                    Thread.currentThread().setName(previousThreadName);
-                }
+                throw new RuntimeException("Failed to create virtual thread executor", e);
             }
-        });
+        } else {
+            return Executors.newFixedThreadPool(parallelism, new WorkerThreadFactory());
+        }
     }
 
     /**
