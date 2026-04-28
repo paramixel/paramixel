@@ -91,15 +91,17 @@ public static Action actionFactory() {
                 },
                 methods,
                 context -> {
-                    new CleanupRunner()
-                        .addTask(env::destroy)
-                        .addTask(context.removeAttachment(), att -> {
-                            if (att instanceof Attachment a && a.network() != null) {
-                                a.network().close();
-                            }
-                        })
-                        .executeAndThrow();
-                })));
+                     new CleanupRunner(CleanupRunner.Mode.FORWARD)
+                         .add(env::destroy)
+                         .add(() -> {
+                             context.removeAttachment().ifPresent(att -> {
+                                 if (att instanceof Attachment a && a.network() != null) {
+                                     a.network().close();
+                                 }
+                             });
+                         })
+                         .runAndThrow();
+                 })));
     }
 
     return Parallel.of("KafkaExample", 2, versionActions);
@@ -174,19 +176,23 @@ public static Action actionFactory() {
                         }
                     }),
                 context -> {
-                    new CleanupRunner()
-                        .addTask(context.removeAttachment(), att -> {
-                            if (att instanceof Attachment a && a.mongo() != null) {
-                                a.mongo().stop();
-                            }
-                        })
-                        .addTask(context.removeAttachment(), att -> {
-                            if (att instanceof Attachment a && a.network() != null) {
-                                a.network().close();
-                            }
-                        })
-                        .executeAndThrow();
-                })));
+                     new CleanupRunner(CleanupRunner.Mode.FORWARD)
+                         .add(() -> {
+                             context.removeAttachment().ifPresent(att -> {
+                                 if (att instanceof Attachment a && a.mongo() != null) {
+                                     a.mongo().stop();
+                                 }
+                             });
+                         })
+                         .add(() -> {
+                             context.removeAttachment().ifPresent(att -> {
+                                 if (att instanceof Attachment a && a.network() != null) {
+                                     a.network().close();
+                                 }
+                             });
+                         })
+                         .runAndThrow();
+                 })));
     }
 
     return Parallel.of("MongoDBExample", 2, versionActions);
@@ -224,19 +230,23 @@ public static Action actionFactory() {
                         assertThat(content).contains("Welcome to nginx!");
                     }),
                 context -> {
-                    new CleanupRunner()
-                        .addTask(context.removeAttachment(), att -> {
-                            if (att instanceof Attachment a && a.nginx() != null) {
-                                a.nginx().stop();
-                            }
-                        })
-                        .addTask(context.removeAttachment(), att -> {
-                            if (att instanceof Attachment a && a.network() != null) {
-                                a.network().close();
-                            }
-                        })
-                        .executeAndThrow();
-                })));
+                     new CleanupRunner(CleanupRunner.Mode.FORWARD)
+                         .add(() -> {
+                             context.removeAttachment().ifPresent(att -> {
+                                 if (att instanceof Attachment a && a.nginx() != null) {
+                                     a.nginx().stop();
+                                 }
+                             });
+                         })
+                         .add(() -> {
+                             context.removeAttachment().ifPresent(att -> {
+                                 if (att instanceof Attachment a && a.network() != null) {
+                                     a.network().close();
+                                 }
+                             });
+                         })
+                         .runAndThrow();
+                 })));
     }
 
     return Parallel.of("NginxExample", 2, versionActions);
@@ -245,7 +255,7 @@ public static Action actionFactory() {
 
 ## Common Patterns
 
-> **Note:** `CleanupRunner` and `NetworkFactory` are example utilities provided in the `examples/support/` package. They are not part of the Paramixel public API but serve as useful patterns for Testcontainers integration.
+> **Note:** `CleanupRunner` is a utility class provided in `org.paramixel.core.support`. `NetworkFactory` is an example utility in the `examples/support/` package. These serve as useful patterns for Testcontainers integration.
 
 ### NetworkFactory
 
@@ -263,36 +273,33 @@ public static Network createNetwork() {
 
 ### CleanupRunner
 
+`CleanupRunner` is provided in `org.paramixel.core.support` and executes cleanup tasks in the order specified by the `Mode`:
+
 ```java
 public class CleanupRunner {
-    private final List<ThrowingRunnable> tasks = new ArrayList<>();
-
-    public CleanupRunner addTask(ThrowingRunnable task) {
-        tasks.add(task);
-        return this;
+    public enum Mode {
+        FORWARD,  // Execute in registration order
+        REVERSE   // Execute in reverse registration order
     }
 
-    public CleanupRunner addTask(Optional<?> optional, Consumer<?> cleanup) {
-        optional.ifPresent(value -> addTask(() -> cleanup.accept(value)));
-        return this;
-    }
+    public CleanupRunner(Mode mode) { ... }
 
-    public void executeAndThrow() {
-        Throwable primary = null;
-        for (int i = tasks.size() - 1; i >= 0; i--) {
-            try {
-                tasks.get(i).run();
-            } catch (Throwable t) {
-                if (primary == null) {
-                    primary = t;
-                } else {
-                    primary.addSuppressed(t);
-                }
-            }
-        }
-        if (primary != null) {
-            throw new RuntimeException(primary);
-        }
+    public CleanupRunner add(Executable executable) { ... }
+
+    public CleanupRunner add(Executable... executables) { ... }
+
+    public CleanupRunner add(List<Executable> executables) { ... }
+
+    public CleanupRunner addWhen(Supplier<Boolean> condition, Executable executable) { ... }
+
+    public CleanupRunner addWhen(boolean condition, Executable executable) { ... }
+
+    public CleanupRunner run() { ... }
+
+    public void runAndThrow() throws Throwable { ... }
+
+    public interface Executable {
+        void run() throws Throwable;
     }
 }
 ```
@@ -300,14 +307,16 @@ public class CleanupRunner {
 Usage:
 
 ```java
-new CleanupRunner()
-    .addTask(container::stop)
-    .addTask(context.removeAttachment(), att -> {
-        if (att instanceof Attachment a && a.network() != null) {
-            a.network().close();
-        }
+new CleanupRunner(CleanupRunner.Mode.FORWARD)
+    .add(container::stop)
+    .add(() -> {
+        context.removeAttachment().ifPresent(att -> {
+            if (att instanceof Attachment a && a.network() != null) {
+                a.network().close();
+            }
+        });
     })
-    .executeAndThrow();
+    .runAndThrow();
 ```
 
 ### Version Lists from Resources
