@@ -6,7 +6,7 @@
 
     <groupId>org.paramixel</groupId>
     <artifactId>parent</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.0-beta</version>
     <packaging>pom</packaging>
 
     <name>Paramixel Parent</name>
