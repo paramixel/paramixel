@@ -18,7 +18,6 @@ package examples.testcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import examples.support.CleanupRunner;
 import examples.support.Logger;
 import examples.support.NetworkFactory;
 import java.io.BufferedReader;
@@ -33,6 +32,7 @@ import org.paramixel.core.Runner;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Parallel;
+import org.paramixel.core.support.CleanupRunner;
 import org.testcontainers.containers.Network;
 
 public class NginxExample {
@@ -73,14 +73,16 @@ public class NginxExample {
                     context -> {
                         LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                        new CleanupRunner()
-                                .addTask(environment::destroy)
-                                .addTask(context.removeAttachment(), attachment -> {
-                                    if (attachment instanceof Attachment a && a.network() != null) {
-                                        a.network().close();
-                                    }
+                        new CleanupRunner(CleanupRunner.Mode.FORWARD)
+                                .add(environment::destroy)
+                                .add(() -> {
+                                    context.removeAttachment().ifPresent(attachment -> {
+                                        if (attachment instanceof Attachment a && a.network() != null) {
+                                            a.network().close();
+                                        }
+                                    });
                                 })
-                                .executeAndThrow();
+                                .runAndThrow();
                     });
 
             argumentActions.add(lifecycleAction);

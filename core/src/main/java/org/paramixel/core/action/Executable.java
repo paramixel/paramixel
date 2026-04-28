@@ -25,14 +25,6 @@ import org.paramixel.core.Context;
 public interface Executable {
 
     /**
-     * Executes the code block.
-     *
-     * @param context The execution context; must not be null.
-     * @throws Throwable If execution fails.
-     */
-    void execute(Context context) throws Throwable;
-
-    /**
      * Returns an executable that does nothing.
      *
      * @return A no-op executable.
@@ -40,4 +32,12 @@ public interface Executable {
     static Executable noop() {
         return context -> {};
     }
+
+    /**
+     * Executes the code block.
+     *
+     * @param context The execution context; must not be null.
+     * @throws Throwable If execution fails.
+     */
+    void execute(Context context) throws Throwable;
 }
