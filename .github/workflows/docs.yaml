@@ -1,0 +1,98 @@
+name: Documentation
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  docs:
+    name: Build and Deploy Documentation
+    runs-on:
+      group: Default
+      labels: runner
+    if: github.event_name != 'pull_request'
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'website/package-lock.json'
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'corretto'
+          cache: 'maven'
+
+      - name: Install Docusaurus dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Clean build artifacts
+        run: rm -rf website/build website/.docusaurus
+
+      - name: Build Javadoc
+        run: |
+          ./mvnw package javadoc:javadoc -B -DskipTests -Dparamixel.maven.skipTests -Dspotbugs.skip=true -Dpmd.skip=true -Djar.skip=true -pl core
+
+      - name: Copy Javadoc to static
+        run: |
+          mkdir -p website/static/javadoc
+          cp -r core/target/reports/apidocs/* website/static/javadoc/
+
+      - name: Build Docusaurus
+        working-directory: website
+        run: npm run build
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: website/build
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v5
+
+  lint:
+    name: Lint Documentation
+    runs-on:
+      group: Default
+      labels: runner
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'website/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Build (check for errors)
+        working-directory: website
+        run: npm run build

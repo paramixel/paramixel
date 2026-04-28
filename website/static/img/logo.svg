@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g fill="currentColor" stroke="none">
+    <!-- inner ring -->
+    <path fill-rule="evenodd" d="
+      M 220 164
+      A 92 92 0 1 1 220 348
+      A 92 92 0 1 1 220 164
+      M 220 201
+      A 55 55 0 1 0 220 311
+      A 55 55 0 1 0 220 201
+    "/>
+    <!-- center diamond -->
+    <rect x="188" y="224" width="64" height="64" rx="8" ry="8" transform="rotate(45 220 256)" />
+    <!-- outer arc -->
+    <path d="M 230 125
+             C 303 132, 368 179, 387 250
+             C 405 321, 376 393, 300 430"
+          fill="none" stroke="currentColor" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

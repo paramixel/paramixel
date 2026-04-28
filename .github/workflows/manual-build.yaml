@@ -1,0 +1,69 @@
+name: Manual Build
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and Test (Java ${{ matrix.java-version }})
+    runs-on:
+      group: Default
+      labels: runner
+
+    strategy:
+      matrix:
+        java-version: [17, 21, 25]
+        include:
+          - java-version: 17
+            description: "Java 17 Compatibility Test"
+            runner-description: "Java 17 Compatibility Test"
+          - java-version: 21
+            description: "Java 21 Compatibility Test"
+            runner-description: "Java 21 Compatibility Test"
+          - java-version: 25
+            description: "Java 25 Compatibility Test"
+            runner-description: "Java 25 Compatibility Test"
+
+    env:
+      JAVA_VERSION: ${{ matrix.java-version }}
+      RUNNER_DESCRIPTION: ${{ matrix.runner-description }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: corretto
+          cache: maven
+          cache-dependency-path: '**/pom.xml'
+
+      - name: Verify Java Runtime
+        run: |
+          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
+          java -version
+          javac -version
+
+      - name: Build and Test
+        run: |
+          if [ "$JAVA_VERSION" = "25" ]; then
+            ./mvnw -B clean verify -Dspotbugs.skip=true -Dpmd.skip=true
+          else
+            ./mvnw -B clean verify
+          fi
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
+
+      - name: Verify Compatibility
+        run: |
+          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
+
+      - name: Verify Threading Mode
+        run: |
+          echo "Testing complete for: $RUNNER_DESCRIPTION"
+          echo "Java version used: $JAVA_VERSION"

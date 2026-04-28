@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter xmlns="https://github.com/spotbugs/filter/xsd">
+    
+    <!--
+    SpotBugs exclusion filter for Paramixel project.
+    
+    This file configures which SpotBugs warnings should be suppressed.
+    -->
+    
+    <!-- Exclude test examples from certain analyses -->
+    <Match>
+        <Package name="~examples\..*"/>
+        <Or>
+            <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+            <Bug pattern="DM_DEFAULT_ENCODING"/>
+            <Bug pattern="RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE"/>
+        </Or>
+    </Match>
+    
+    <!-- Exclude generated code -->
+    <Match>
+        <Source name="~.*Generated.*"/>
+    </Match>
+    
+    <!-- Exclude benchmark code from performance warnings -->
+    <Match>
+        <Package name="~org\.paramixel\.engine\.benchmark\..*"/>
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+    </Match>
+    
+    <!-- Allow certain patterns in test code -->
+    <Match>
+        <Class name="~.*Test"/>
+        <Or>
+            <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+            <Bug pattern="DM_DEFAULT_ENCODING"/>
+        </Or>
+    </Match>
+    
+    <!-- Exclude Interceptor adapter pattern (6 methods required by interface) -->
+    <Match>
+        <Class name="~.*Interceptor"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    
+</FindBugsFilter>

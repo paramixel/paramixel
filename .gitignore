@@ -1,0 +1,43 @@
+# BlueJ files
+# Compiled class file
+# Docusaurus
+# Log file
+# Mobile Tools for Java (J2ME)
+# Package Files #
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+**/*.iml
+**/.idea/*
+**/.vscode/*
+**/target/*
+*.class
+*.ctxt
+*.ear
+*.jar
+*.log
+*.nar
+*.rar
+*.tar.gz
+*.war
+*.zip
+.mtjplan/
+.workspace/
+__pycache__/
+agent/tmp/
+dependency-reduced-pom.xml
+hs_err_pid*
+pom.xml.releaseBackup
+release.properties
+sync.sh
+.opencode/plans/
+website/.DS_Store
+website/.cache/
+website/.docusaurus/
+website/.env.development.local
+website/.env.local
+website/.env.production.local
+website/.env.test.local
+website/build/
+website/node_modules/
+website/static/javadoc/
+website/versioned_docs/
+website/versioned_sidebars/

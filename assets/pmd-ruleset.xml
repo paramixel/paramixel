@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Paramixel PMD Ruleset"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    
+    <description>
+        PMD ruleset for Paramixel project.
+        Focuses on detecting dead code, unused code, and code quality issues.
+    </description>
+    
+    <!-- Best Practices Category -->
+    <rule ref="category/java/bestpractices.xml">
+        <exclude name="GuardLogStatement"/>
+    </rule>
+    
+    <!-- Code Style -->
+    <rule ref="category/java/codestyle.xml">
+        <exclude name="LongVariable"/>
+        <exclude name="OnlyOneReturn"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="ShortMethodName"/>
+    </rule>
+    
+    <!-- Design -->
+    <rule ref="category/java/design.xml">
+        <exclude name="LawOfDemeter"/>
+        <exclude name="UseUtilityClass"/>
+        <exclude name="AvoidCatchingGenericException"/>
+        <exclude name="LoosePackageCoupling"/>
+    </rule>
+    
+    <!-- Error Prone -->
+    <rule ref="category/java/errorprone.xml">
+        <exclude name="AvoidDuplicateLiterals"/>
+        <exclude name="AvoidFieldNameMatchingTypeName"/>
+        <exclude name="AvoidLiteralsInIfCondition"/>
+    </rule>
+    
+    <!-- Security -->
+    <rule ref="category/java/security.xml"/>
+    
+    <!-- Exclude package-info files -->
+    <exclude-pattern>.*/package-info\.java</exclude-pattern>
+    
+</ruleset>

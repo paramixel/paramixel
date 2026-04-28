@@ -1,0 +1,47 @@
+// @ts-check
+
+/** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
+const sidebars = {
+  docsSidebar: [
+    'intro',
+    'quick-start',
+    {
+      type: 'category',
+      label: 'Built-in Actions',
+      collapsed: false,
+      items: [
+        'actions/direct',
+        'actions/noop',
+        'actions/sequential',
+        'actions/strict-sequential',
+        'actions/random-sequential',
+        'actions/strict-random-sequential',
+        'actions/parallel',
+        'actions/lifecycle',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Usage Guide',
+      collapsed: false,
+      items: [
+        'usage/action-composition',
+        'usage/context',
+        'usage/error-handling',
+        'usage/maven-plugin',
+        'usage/integration-testing',
+        'usage/discovery',
+      ],
+    },
+    'configuration',
+    'architecture',
+    {
+      type: 'category',
+      label: 'API Reference',
+      collapsed: true,
+      items: ['api/intro'],
+    },
+  ],
+};
+
+module.exports = sidebars;
