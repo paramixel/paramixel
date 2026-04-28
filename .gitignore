@@ -27,7 +27,7 @@ dependency-reduced-pom.xml
 hs_err_pid*
 pom.xml.releaseBackup
 release.properties
-sync.sh
+**/.flattened-pom.xml
 .opencode/plans/
 website/.DS_Store
 website/.cache/
