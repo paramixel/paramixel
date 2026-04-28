@@ -30,7 +30,7 @@ We welcome feature suggestions! Please create an issue with:
 1. Fork the repository
 2. Create a feature branch from `main`:
    ```bash
-   git checkout -b feature-your-feature-name
+   git checkout -b "feature/your-feature-name"
    ```
 3. Make your changes
 4. Run tests to ensure all tests pass:
