@@ -21,88 +21,90 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
 import examples.support.NetworkFactory;
-import java.util.ArrayList;
 import org.bson.Document;
 import org.paramixel.core.Action;
+import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
-import org.paramixel.core.Result;
-import org.paramixel.core.Runner;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Parallel;
-import org.paramixel.core.support.CleanupRunner;
+import org.paramixel.core.support.Cleanup;
 import org.testcontainers.containers.Network;
 
 public class MongoDBExample {
 
+    private static class TestAttachment {
+        public Network network;
+        public MongoDBTestEnvironment environment;
+    }
+
     private static final Logger LOGGER = Logger.createLogger(MongoDBExample.class);
 
-    record Attachment(Network network, MongoDBTestEnvironment environment) {}
+    public static void main(String[] args) throws Throwable {
+        ConsoleRunner.runAndExit(actionFactory());
+    }
 
     @Paramixel.ActionFactory
     public static Action actionFactory() throws Throwable {
-        var argumentActions = new ArrayList<Action>();
-
-        for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            Action testAction = Direct.of("test insert and query", context -> {
-                var lifecycleContext = context.parent().orElseThrow();
-                Attachment attachment =
-                        lifecycleContext.attachment(Attachment.class).orElseThrow();
-                LOGGER.info(
-                        "[%s] testing insert and query ...",
-                        attachment.environment().name());
-
-                try (var mongoClient =
-                        MongoClients.create(attachment.environment().getConnectionString())) {
-                    var database = mongoClient.getDatabase("testdb");
-                    var collection = database.getCollection("testcol");
-                    collection.insertOne(new Document("key", "value"));
-
-                    Document found =
-                            collection.find(new Document("key", "value")).first();
-
-                    assertThat(found).isNotNull();
-                    assertThat(found.getString("key")).isEqualTo("value");
-                }
-            });
-
-            Action lifecycleAction = Lifecycle.of(
-                    environment.name(),
-                    context -> {
-                        LOGGER.info("[%s] initialize test environment ...", environment.name());
-
-                        Network network = NetworkFactory.createNetwork();
-
-                        environment.initialize(network);
-                        assertThat(environment.isRunning()).isTrue();
-
-                        context.setAttachment(new Attachment(network, environment));
-                    },
-                    testAction,
-                    context -> {
-                        LOGGER.info("[%s] destroy test environment ...", environment.name());
-
-                        new CleanupRunner(CleanupRunner.Mode.FORWARD)
-                                .add(environment::destroy)
-                                .add(() -> {
-                                    context.removeAttachment().ifPresent(attachment -> {
-                                        if (attachment instanceof Attachment a && a.network() != null) {
-                                            a.network().close();
-                                        }
-                                    });
-                                })
-                                .runAndThrow();
-                    });
-
-            argumentActions.add(lifecycleAction);
-        }
-
-        return Parallel.of("MongoDBExample", argumentActions);
+        return Parallel.of(
+                "MongoDBExample",
+                MongoDBTestEnvironment.createTestEnvironments().stream()
+                        .map(MongoDBExample::createLifecycleAction)
+                        .toList());
     }
 
-    public static void main(String[] args) throws Throwable {
-        Result result = Runner.builder().build().run(actionFactory());
-        int exitCode = result.status() == Result.Status.PASS ? 0 : 1;
-        System.exit(exitCode);
+    private static Action createLifecycleAction(MongoDBTestEnvironment environment) {
+        Action testAction = Direct.of("test insert and query", context -> {
+            var lifecycleContext = context.findContext(1).orElseThrow();
+            TestAttachment testAttachment = lifecycleContext
+                    .getAttachment()
+                    .flatMap(a -> a.to(TestAttachment.class))
+                    .orElseThrow();
+
+            LOGGER.info("[%s] testing insert and query ...", testAttachment.environment.name());
+
+            try (var mongoClient = MongoClients.create(testAttachment.environment.getConnectionString())) {
+                var database = mongoClient.getDatabase("testdb");
+                var collection = database.getCollection("testcol");
+                collection.insertOne(new Document("key", "value"));
+
+                Document found = collection.find(new Document("key", "value")).first();
+
+                assertThat(found).isNotNull();
+                assertThat(found.getString("key")).isEqualTo("value");
+            }
+        });
+
+        return Lifecycle.of(
+                environment.name(),
+                Direct.of("before", context -> {
+                    LOGGER.info("[%s] initialize test environment ...", environment.name());
+
+                    Network network = NetworkFactory.createNetwork();
+
+                    environment.initialize(network);
+                    assertThat(environment.isRunning()).isTrue();
+
+                    TestAttachment testAttachment = new TestAttachment();
+                    testAttachment.network = network;
+                    testAttachment.environment = environment;
+
+                    context.setAttachment(testAttachment);
+                }),
+                testAction,
+                Direct.of("after", context -> {
+                    LOGGER.info("[%s] destroy test environment ...", environment.name());
+
+                    TestAttachment testAttachment = context.removeAttachment()
+                            .flatMap(a -> a.to(TestAttachment.class))
+                            .orElse(null);
+
+                    if (testAttachment != null) {
+                        new Cleanup(Cleanup.Mode.FORWARD)
+                                .addCloseable(testAttachment.environment)
+                                .addCloseable(testAttachment.network)
+                                .runAndThrow();
+                    }
+                }));
     }
 }

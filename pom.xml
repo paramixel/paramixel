@@ -39,8 +39,6 @@
     <modules>
         <module>core</module>
         <module>maven-plugin</module>
-        <module>gui</module>
-        <module>tests</module>
         <module>examples</module>
     </modules>
 
@@ -85,7 +83,6 @@
         <pmd.skip>false</pmd.skip>
         <jacoco.skip>false</jacoco.skip>
         <maven.dependency.plugin.version>3.10.0</maven.dependency.plugin.version>
-        <javafx.version>22.0.2</javafx.version>
         <classgraph.version>4.8.184</classgraph.version>
         <palantir.java.format.version>2.90.0</palantir.java.format.version>
     </properties>
@@ -196,21 +193,6 @@
                 <groupId>net.bytebuddy</groupId>
                 <artifactId>byte-buddy-agent</artifactId>
                 <version>${bytebuddy.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-controls</artifactId>
-                <version>${javafx.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-graphics</artifactId>
-                <version>${javafx.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-base</artifactId>
-                <version>${javafx.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.classgraph</groupId>

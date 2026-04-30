@@ -24,20 +24,20 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Describes the outcome of executing all cleanup tasks registered with a {@link CleanupRunner}.
+ * Describes the outcome of executing all cleanup tasks registered with a {@link Cleanup}.
  *
- * <p>Instances are immutable and obtained exclusively via {@link CleanupRunner#run()}.
+ * <p>Instances are immutable and obtained exclusively via {@link Cleanup#run()}.
  * Each result captures the number of tasks executed and any exceptions thrown,
  * indexed by the original registration order.
  */
 public final class CleanupResult {
 
-    private final int taskCount;
+    private final int executableCount;
 
     private final List<Throwable> exceptions;
 
-    CleanupResult(int taskCount, List<Throwable> exceptions) {
-        this.taskCount = taskCount;
+    CleanupResult(int executableCount, List<Throwable> exceptions) {
+        this.executableCount = executableCount;
         this.exceptions =
                 Collections.unmodifiableList(Objects.requireNonNull(exceptions, "exceptions must not be null"));
     }
@@ -47,8 +47,8 @@ public final class CleanupResult {
      *
      * @return The number of executed cleanup tasks.
      */
-    public int taskCount() {
-        return taskCount;
+    public int getExecutableCount() {
+        return executableCount;
     }
 
     /**
@@ -76,7 +76,7 @@ public final class CleanupResult {
      *         is out of bounds or the executable completed successfully.
      */
     public Optional<Throwable> getException(final int index) {
-        if (index < 0 || index >= taskCount) {
+        if (index < 0 || index >= executableCount) {
             return Optional.empty();
         }
         return Optional.ofNullable(exceptions.get(index));
@@ -92,7 +92,7 @@ public final class CleanupResult {
      * @return {@code true} if the executable completed without throwing an exception.
      */
     public boolean isSuccess(final int index) {
-        if (index < 0 || index >= taskCount) {
+        if (index < 0 || index >= executableCount) {
             return false;
         }
         return exceptions.get(index) == null;
@@ -106,7 +106,7 @@ public final class CleanupResult {
      *
      * @return An unmodifiable map of executable index to exception for all failed executables; never null.
      */
-    public Map<Integer, Throwable> exceptionsByIndex() {
+    public Map<Integer, Throwable> getExceptionsByIndex() {
         var failures = new HashMap<Integer, Throwable>();
         for (int i = 0; i < exceptions.size(); i++) {
             Throwable exception = exceptions.get(i);

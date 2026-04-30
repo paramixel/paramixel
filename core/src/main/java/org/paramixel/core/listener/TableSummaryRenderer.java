@@ -20,8 +20,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import org.paramixel.core.Result;
+import org.paramixel.core.Action;
 import org.paramixel.core.Runner;
+import org.paramixel.core.Status;
 import org.paramixel.core.internal.util.AnsiColor;
 
 class TableSummaryRenderer implements SummaryRenderer {
@@ -32,38 +33,33 @@ class TableSummaryRenderer implements SummaryRenderer {
     private static final String PARAMIXEL = Listeners.PARAMIXEL;
 
     @Override
-    public void renderSummary(Runner runner, Result result) {
-        List<Result> allResults = collectAllResults(result);
-        long passed = allResults.stream()
-                .filter(r -> r.status() == Result.Status.PASS)
+    public void renderSummary(Runner runner, Action action) {
+        List<Action> allActions = collectAllActions(action);
+        long passed = allActions.stream()
+                .filter(a -> a.getResult().getStatus().isPass())
                 .count();
-        long failed = allResults.stream()
-                .filter(r -> r.status() == Result.Status.FAIL)
+        long failed = allActions.stream()
+                .filter(a -> a.getResult().getStatus().isFailure())
                 .count();
-        long skipped = allResults.stream()
-                .filter(r -> r.status() == Result.Status.SKIP)
+        long skipped = allActions.stream()
+                .filter(a -> a.getResult().getStatus().isSkip())
                 .count();
-        Duration totalTiming = allResults.stream().map(Result::timing).reduce(Duration.ZERO, Duration::plus);
+        Duration totalTiming =
+                allActions.stream().map(a -> a.getResult().getElapsedTime()).reduce(Duration.ZERO, Duration::plus);
 
         System.out.println(PARAMIXEL);
         System.out.println(PARAMIXEL + "Summary:");
         System.out.println(PARAMIXEL);
 
-        for (Result r : allResults) {
-            String status = formatStatus(r.status());
-            String action = truncate(r.action().name(), ACTION_WIDTH);
-            String kind = formatKind(r.action());
-            String time = formatTiming(r.timing());
-            String failureInfo = r.status() == Result.Status.FAIL
-                    ? r.failure()
-                            .map(f -> " → " + f.getClass().getSimpleName() + ": " + f.getMessage())
-                            .orElse("")
-                    : r.status() == Result.Status.SKIP
-                            ? r.failure().map(f -> " → " + f.getMessage()).orElse("")
-                            : "";
+        for (Action a : allActions) {
+            String status = formatStatus(a.getResult().getStatus());
+            String actionName = truncate(a.getName(), ACTION_WIDTH);
+            String kind = formatKind(a);
+            String time = formatTiming(a.getResult().getElapsedTime());
+            String failureInfo = formatFailureInfo(a.getResult().getStatus());
 
-            System.out.println(PARAMIXEL + " " + status + " " + String.format("%-" + ACTION_WIDTH + "s", action) + " ("
-                    + kind + ") " + time + failureInfo);
+            System.out.println(PARAMIXEL + " " + status + " " + String.format("%-" + ACTION_WIDTH + "s", actionName)
+                    + " (" + kind + ") " + time + failureInfo);
         }
 
         System.out.println(PARAMIXEL);
@@ -73,26 +69,43 @@ class TableSummaryRenderer implements SummaryRenderer {
         System.out.println(PARAMIXEL + resultSummary);
     }
 
-    private List<Result> collectAllResults(Result result) {
-        List<Result> results = new ArrayList<>();
-        collectAllResults(result, results);
-        return results;
+    private List<Action> collectAllActions(Action action) {
+        List<Action> actions = new ArrayList<>();
+        collectAllActions(action, actions);
+        return actions;
     }
 
-    private void collectAllResults(Result result, List<Result> results) {
-        results.add(result);
-        for (Result child : result.children()) {
-            collectAllResults(child, results);
+    private void collectAllActions(Action action, List<Action> actions) {
+        actions.add(action);
+        for (Action child : action.getChildren()) {
+            collectAllActions(child, actions);
         }
     }
 
-    private String formatStatus(Result.Status status) {
+    private String formatStatus(Status status) {
         Objects.requireNonNull(status, "status must not be null");
-        return switch (status) {
-            case PASS -> String.format("%-" + STATUS_WIDTH + "s", AnsiColor.GREEN_TEXT.format("PASS"));
-            case FAIL -> String.format("%-" + STATUS_WIDTH + "s", AnsiColor.RED_TEXT.format("FAIL"));
-            case SKIP -> String.format("%-" + STATUS_WIDTH + "s", AnsiColor.YELLOW_TEXT.format("SKIP"));
-        };
+        if (status.isStaged()) {
+            return String.format("%-" + STATUS_WIDTH + "s", AnsiColor.BOLD_GRAY_TEXT.format("STAGED"));
+        } else if (status.isPass()) {
+            return String.format("%-" + STATUS_WIDTH + "s", AnsiColor.GREEN_TEXT.format("PASS"));
+        } else if (status.isFailure()) {
+            return String.format("%-" + STATUS_WIDTH + "s", AnsiColor.RED_TEXT.format("FAIL"));
+        } else {
+            return String.format("%-" + STATUS_WIDTH + "s", AnsiColor.YELLOW_TEXT.format("SKIP"));
+        }
+    }
+
+    private String formatFailureInfo(Status status) {
+        if (status.isFailure()) {
+            return status.getThrowable()
+                    .map(f -> " → " + f.getClass().getSimpleName() + ": " + f.getMessage())
+                    .or(() -> status.getMessage().map(m -> " → " + m))
+                    .orElse("");
+        } else if (status.isSkip()) {
+            return status.getMessage().map(reason -> " → " + reason).orElse("");
+        } else {
+            return "";
+        }
     }
 
     private String formatTiming(Duration timing) {
@@ -110,7 +123,7 @@ class TableSummaryRenderer implements SummaryRenderer {
         return s.substring(0, maxLength - 3) + "...";
     }
 
-    private String formatKind(org.paramixel.core.Action action) {
+    private String formatKind(Action action) {
         Class<?> actionClass = action.getClass();
         if (actionClass.getPackageName().equals("org.paramixel.core.action")) {
             return actionClass.getSimpleName();

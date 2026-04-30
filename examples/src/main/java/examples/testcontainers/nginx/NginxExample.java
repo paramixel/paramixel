@@ -24,77 +24,83 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URLConnection;
-import java.util.ArrayList;
 import org.paramixel.core.Action;
+import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
-import org.paramixel.core.Result;
-import org.paramixel.core.Runner;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Parallel;
-import org.paramixel.core.support.CleanupRunner;
+import org.paramixel.core.support.Cleanup;
 import org.testcontainers.containers.Network;
 
 public class NginxExample {
 
+    private static class TestAttachment {
+        public Network network;
+        public NginxTestEnvironment environment;
+    }
+
     private static final Logger LOGGER = Logger.createLogger(NginxExample.class);
 
-    record Attachment(Network network, NginxTestEnvironment environment) {}
+    public static void main(String[] args) throws Throwable {
+        ConsoleRunner.runAndExit(actionFactory());
+    }
 
     @Paramixel.ActionFactory
     public static Action actionFactory() throws Throwable {
-        var argumentActions = new ArrayList<Action>();
-
-        for (NginxTestEnvironment environment : NginxTestEnvironment.createTestEnvironments()) {
-            Action testAction = Direct.of("get", context -> {
-                var lifecycleContext = context.parent().orElseThrow();
-                Attachment attachment =
-                        lifecycleContext.attachment(Attachment.class).orElseThrow();
-                LOGGER.info("[%s] testing GET ...", attachment.environment().name());
-
-                int port = attachment.environment().getNginxContainer().getMappedPort(80);
-                String content = doGet("http://localhost:" + port);
-                assertThat(content).contains("Welcome to nginx!");
-            });
-
-            Action lifecycleAction = Lifecycle.of(
-                    environment.name(),
-                    context -> {
-                        LOGGER.info("[%s] initialize test environment ...", environment.name());
-
-                        Network network = NetworkFactory.createNetwork();
-
-                        environment.initialize(network);
-                        assertThat(environment.isRunning()).isTrue();
-
-                        context.setAttachment(new Attachment(network, environment));
-                    },
-                    testAction,
-                    context -> {
-                        LOGGER.info("[%s] destroy test environment ...", environment.name());
-
-                        new CleanupRunner(CleanupRunner.Mode.FORWARD)
-                                .add(environment::destroy)
-                                .add(() -> {
-                                    context.removeAttachment().ifPresent(attachment -> {
-                                        if (attachment instanceof Attachment a && a.network() != null) {
-                                            a.network().close();
-                                        }
-                                    });
-                                })
-                                .runAndThrow();
-                    });
-
-            argumentActions.add(lifecycleAction);
-        }
-
-        return Parallel.of("NginxExample", argumentActions);
+        return Parallel.of(
+                "NginxExample",
+                NginxTestEnvironment.createTestEnvironments().stream()
+                        .map(NginxExample::createLifecycleAction)
+                        .toList());
     }
 
-    public static void main(String[] args) throws Throwable {
-        Result result = Runner.builder().build().run(actionFactory());
-        int exitCode = result.status() == Result.Status.PASS ? 0 : 1;
-        System.exit(exitCode);
+    private static Action createLifecycleAction(NginxTestEnvironment environment) {
+        Action testAction = Direct.of("get", context -> {
+            var lifecycleContext = context.findContext(1).orElseThrow();
+            TestAttachment testAttachment = lifecycleContext
+                    .getAttachment()
+                    .flatMap(a -> a.to(TestAttachment.class))
+                    .orElseThrow();
+
+            LOGGER.info("[%s] testing GET ...", testAttachment.environment.name());
+
+            int port = testAttachment.environment.getNginxContainer().getMappedPort(80);
+            String content = doGet("http://localhost:" + port);
+            assertThat(content).contains("Welcome to nginx!");
+        });
+
+        return Lifecycle.of(
+                environment.name(),
+                Direct.of("before", context -> {
+                    LOGGER.info("[%s] initialize test environment ...", environment.name());
+
+                    Network network = NetworkFactory.createNetwork();
+
+                    environment.initialize(network);
+                    assertThat(environment.isRunning()).isTrue();
+
+                    TestAttachment testAttachment = new TestAttachment();
+                    testAttachment.network = network;
+                    testAttachment.environment = environment;
+
+                    context.setAttachment(testAttachment);
+                }),
+                testAction,
+                Direct.of("after", context -> {
+                    LOGGER.info("[%s] destroy test environment ...", environment.name());
+
+                    TestAttachment testAttachment = context.removeAttachment()
+                            .flatMap(a -> a.to(TestAttachment.class))
+                            .orElse(null);
+
+                    if (testAttachment != null) {
+                        new Cleanup(Cleanup.Mode.FORWARD)
+                                .addCloseable(testAttachment.environment)
+                                .addCloseable(testAttachment.network)
+                                .runAndThrow();
+                    }
+                }));
     }
 
     private static String doGet(final String url) throws Exception {

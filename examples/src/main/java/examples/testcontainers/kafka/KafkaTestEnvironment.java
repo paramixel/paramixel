@@ -36,7 +36,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
-public class KafkaTestEnvironment {
+public class KafkaTestEnvironment implements AutoCloseable {
 
     private static final Duration INITIALIZE_TIMEOUT = Duration.ofMinutes(3);
 
@@ -226,7 +226,7 @@ public class KafkaTestEnvironment {
         return kafkaContainer.getBootstrapServers();
     }
 
-    public void destroy() {
+    public void close() {
         stopQuietly();
     }
 

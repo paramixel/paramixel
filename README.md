@@ -5,23 +5,25 @@
 
 # Paramixel
 
-An action-based test engine for Java 17+ with composable action trees, lifecycle management, and parallel execution.
+An action-based test framework for Java 17+ with composable action trees, lifecycle management, parallel execution, etc.
 
 ## Why Paramixel?
 
-Most Java test frameworks treat tests as a flat list of annotated methods. That works — until your tests need shared setup with guaranteed cleanup, conditional execution, dynamic generation, or fine-grained control over parallelism. Then you're fighting the framework.
+Most Java test frameworks bake test structure into the framework itself. You describe your tests with annotations — what runs, in what order, with what setup — but only in ways the framework anticipated. Need a loop that generates tests dynamically? A conditional that skips a group based on runtime state? Parallelism at one branch but sequential execution at another? You're working around the framework, not with it.
 
-Paramixel treats tests as **composable trees, not flat lists.** Build test plans with plain Java code — loops, conditionals, dynamic generation — using `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` actions that compose to any depth. Topology is explicit. Teardown is guaranteed. Parallelism is per-node.
+Annotations can't call methods. They can't branch. They can't compose. Every time a framework adds a new feature, it adds a new annotation — and you're stuck learning the framework's model instead of expressing your own.
+
+Paramixel treats tests as **composable trees built with code, not annotations.** Build test plans with plain Java — loops, conditionals, dynamic generation — using `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` actions that compose to any depth. Need something the built-in actions don't cover? Write a custom `Action` — implement `doExecute()` and it composes like any other. Topology is explicit. After is guaranteed. Parallelism is per-node. The full power of Java is available at test definition time, because test plans are just code.
 
 Paramixel runs anywhere Java runs. Use the Maven plugin for CI/CD integration, or embed the programmatic API directly — no build tool lock-in, no custom runners, no special CI configuration. Need more control? Implement the `Runner` interface to customize execution semantics, integrate with external systems, or build your own test orchestration.
 
 **Key Benefits:**
-- **Tests are trees, not flat lists** — `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` compose to arbitrary depth, making test topology explicit
+- **Tests are composable trees built with code, not annotations** — `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` compose to arbitrary depth, making test topology explicit
 - **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) instead of declarative annotations
-- **Guaranteed teardown with `Lifecycle`** — cleanup always runs, even on failure or skip; teardown errors are attached as suppressed exceptions, following try-with-resources semantics
+- **Guaranteed after with `Lifecycle`** — cleanup always runs, even on failure or skip; after errors are attached as suppressed exceptions, following try-with-resources semantics
 - **Parallel execution at any depth** — embed `Parallel` nodes anywhere in the tree with per-node parallelism control
 - **Fail-fast or run-all semantics** — `StrictSequential` stops on first failure; `Sequential` runs all children regardless; choose the right behavior per group
-- **Extensible by design** — actions own their execution via `doExecute()` and use `Context.execute()` / `Context.executeAsync()` for children; write custom actions with zero executor changes
+- **Write custom actions** — implement `doExecute()` to define your own execution semantics; custom actions compose alongside built-in actions with zero framework changes
 - **Single factory method produces the entire test plan** — one `@Paramixel.ActionFactory` method returns the full action tree; no per-method reflection at test time
 - **No test class instantiation** — only the static factory method is called; state flows through `Context` attachments, not instance fields
 - **Context attachments for state sharing** — each context can hold one typed object; navigate parent chain to share state across actions
@@ -88,14 +90,12 @@ public class MyTest {
     @Paramixel.ActionFactory
     public static Action actionFactory() {
         return Sequential.of("MyTest",
-            Action.of("first test", Direct.of("first test",
-                context -> {
-                    // test something
-                })),
-            Action.of("second test", Direct.of("second test",
-                context -> {
-                    // test something else
-                })));
+            Direct.of("first test", context -> {
+                // test something
+            }),
+            Direct.of("second test", context -> {
+                // test something else
+            }));
     }
 }
 ```

@@ -18,13 +18,19 @@ package org.paramixel.core;
 
 /**
  * Signals an error during configuration loading.
+ *
+ * <p>ConfigurationException is thrown when configuration properties cannot be loaded
+ * or parsed from available sources (classpath resources, system properties).</p>
+ *
+ * @see Configuration
+ * @see ResolverException
  */
 public class ConfigurationException extends RuntimeException {
 
     /**
      * Creates a configuration error with a detail message.
      *
-     * @param message The detail message; may be null.
+     * @param message the detail message; may be {@code null}
      */
     public ConfigurationException(final String message) {
         super(message);
@@ -33,8 +39,8 @@ public class ConfigurationException extends RuntimeException {
     /**
      * Creates a configuration error with a detail message and cause.
      *
-     * @param message The detail message; may be null.
-     * @param cause The cause; may be null.
+     * @param message the detail message; may be {@code null}
+     * @param cause the cause; may be {@code null}
      */
     public ConfigurationException(final String message, final Throwable cause) {
         super(message, cause);

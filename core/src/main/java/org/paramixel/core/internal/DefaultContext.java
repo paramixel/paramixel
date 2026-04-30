@@ -16,53 +16,49 @@
 
 package org.paramixel.core.internal;
 
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import org.paramixel.core.Action;
+import java.util.concurrent.ExecutorService;
+import org.paramixel.core.Attachment;
+import org.paramixel.core.Configuration;
 import org.paramixel.core.Context;
 import org.paramixel.core.Listener;
-import org.paramixel.core.Result;
-import org.paramixel.core.Runner;
 
 /**
- * The default implementation of {@link Context}.
+ * The default internal implementation of {@link Context}.
  */
 public final class DefaultContext implements Context {
 
-    private final Action action;
-    private final Context parent;
+    private final DefaultContext parent;
     private Object attachment;
-    private final Runner runner;
+    private final Map<String, String> configuration;
     private final Listener listener;
+    private final ExecutorService executorService;
 
-    DefaultContext(Action action, Context parent, Runner runner) {
-        this.action = Objects.requireNonNull(action, "action must not be null");
+    public DefaultContext(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
+        this(null, configuration, listener, executorService);
+    }
+
+    public DefaultContext(
+            DefaultContext parent,
+            Map<String, String> configuration,
+            Listener listener,
+            ExecutorService executorService) {
         this.parent = parent;
-        this.attachment = null;
-        this.runner = Objects.requireNonNull(runner, "runner must not be null");
-        this.listener = runner.listener();
+        this.configuration = configuration != null ? Map.copyOf(configuration) : Configuration.defaultProperties();
+        this.listener = Objects.requireNonNull(listener, "listener must not be null");
+        this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
     }
 
-    /**
-     * Creates a root context.
-     *
-     * @param action The action.
-     * @param runner The runner.
-     * @return A new DefaultContext.
-     */
-    public static DefaultContext create(Action action, Runner runner) {
-        return new DefaultContext(action, null, runner);
+    public DefaultContext(DefaultContext parent) {
+        this(parent, parent.configuration, parent.listener, parent.executorService);
     }
 
     @Override
-    public Optional<Context> parent() {
+    public Optional<Context> getParent() {
         return Optional.ofNullable(parent);
-    }
-
-    @Override
-    public Action action() {
-        return action;
     }
 
     @Override
@@ -72,55 +68,65 @@ public final class DefaultContext implements Context {
     }
 
     @Override
-    public <T> Optional<T> attachment(Class<T> type) {
-        if (attachment == null || !type.isInstance(attachment)) {
+    public Optional<Attachment> getAttachment() {
+        if (attachment == null) {
             return Optional.empty();
         }
-        return Optional.of(type.cast(attachment));
+
+        return Optional.of(new DefaultAttachment(attachment));
     }
 
     @Override
-    public Optional<Object> removeAttachment() {
-        Object removed = this.attachment;
-        this.attachment = null;
-        return Optional.ofNullable(removed);
-    }
-
-    @Override
-    public Context createChild(Action child) {
-        return new DefaultContext(child, this, runner);
-    }
-
-    @Override
-    public Result execute(Action child) {
-        return child.execute(createChild(child));
-    }
-
-    @Override
-    public CompletableFuture<Result> executeAsync(Action child) {
-        if (!(runner instanceof DefaultRunner defaultRunner)) {
-            CompletableFuture<Result> future = new CompletableFuture<>();
-            future.completeExceptionally(new IllegalStateException("ExecutorService access requires DefaultRunner"));
-            return future;
+    public Optional<Attachment> removeAttachment() {
+        if (attachment == null) {
+            return Optional.empty();
         }
-        int parallelism = Integer.parseInt(
-                runner.configuration().getOrDefault(org.paramixel.core.Configuration.RUNNER_PARALLELISM, "4"));
-        java.util.concurrent.ExecutorService executorService = defaultRunner.getOrCreateExecutorService(parallelism);
-        return CompletableFuture.supplyAsync(() -> child.execute(createChild(child)), executorService);
+
+        Object removed = attachment;
+        attachment = null;
+        return Optional.of(new DefaultAttachment(removed));
     }
 
     @Override
-    public void beforeAction(Context context, Action action) {
-        listener.beforeAction(context, action);
+    public Map<String, String> getConfiguration() {
+        return configuration;
     }
 
     @Override
-    public void afterAction(Context context, Action action, Result result) {
-        listener.afterAction(context, action, result);
+    public Listener getListener() {
+        return listener;
+    }
+
+    @Override
+    public ExecutorService getExecutorService() {
+        return executorService;
+    }
+
+    @Override
+    public Optional<Context> findContext(int level) {
+        if (level < 0) {
+            throw new IllegalArgumentException("level must not be negative: " + level);
+        }
+
+        Context current = this;
+        for (int i = 0; i < level; i++) {
+            Optional<Context> parent = current.getParent();
+            if (parent.isEmpty()) {
+                throw new NoSuchElementException("Context ancestor not found at level " + level);
+            }
+            current = parent.get();
+        }
+
+        return Optional.of(current);
+    }
+
+    @Override
+    public Optional<Attachment> findAttachment(int level) {
+        return findContext(level).flatMap(Context::getAttachment);
     }
 
     @Override
     public String toString() {
-        return "DefaultContext[action=" + action.name() + "]";
+        return "DefaultContext[" + (parent == null ? "root" : "child") + "]";
     }
 }

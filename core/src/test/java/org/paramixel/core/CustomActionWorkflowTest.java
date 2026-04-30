@@ -27,6 +27,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.AbstractAction;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.internal.DefaultContext;
+import org.paramixel.core.internal.Results;
 
 @DisplayName("Custom action workflows")
 class CustomActionWorkflowTest {
@@ -41,19 +43,21 @@ class CustomActionWorkflowTest {
         Action repeatTwice = new RepeatEachChildAction("repeat-twice", 2, List.of(repeated));
         Action root = new ReverseSequentialAction("reverse-sequential", List.of(first, repeatTwice, last));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(executions).containsExactly("last", "repeated", "repeated", "first");
-        assertThat(root.children()).containsExactly(first, repeatTwice, last);
-        assertThat(first.parent()).contains(root);
-        assertThat(repeatTwice.parent()).contains(root);
-        assertThat(repeated.parent()).contains(repeatTwice);
-        assertThat(last.parent()).contains(root);
+        assertThat(root.getChildren()).containsExactly(first, repeatTwice, last);
+        assertThat(first.getParent()).contains(root);
+        assertThat(repeatTwice.getParent()).contains(root);
+        assertThat(repeated.getParent()).contains(repeatTwice);
+        assertThat(last.getParent()).contains(root);
     }
 
     private static Action recordingAction(String name, List<String> executions) {
-        return Direct.of(name, context -> executions.add(context.action().name()));
+        return Direct.of(name, context -> executions.add(name));
     }
 
     private static final class ReverseSequentialAction extends AbstractAction {
@@ -63,26 +67,36 @@ class CustomActionWorkflowTest {
         private ReverseSequentialAction(String name, List<Action> children) {
             super(name);
             this.children = copyChildren(children);
-            this.children.forEach(this::adopt);
+            this.children.forEach(this::addChild);
         }
 
         @Override
-        public List<Action> children() {
+        public List<Action> getChildren() {
             return children;
         }
 
         @Override
-        protected Result doExecute(Context context, Instant start) throws Throwable {
+        public void execute(Context context) {
+            Objects.requireNonNull(context, "context must not be null");
+            this.result = Results.staged();
+            context.getListener().beforeAction(context, this);
+            Instant start = Instant.now();
+
             List<Action> reversed = new ArrayList<>(children);
             Collections.reverse(reversed);
+            DefaultContext defaultContext = (DefaultContext) context;
             for (Action child : reversed) {
-                var result = context.execute(child);
-                if (result.status() == Result.Status.FAIL) {
-                    throw new AssertionError(
-                            child.name() + " failed", result.failure().orElse(null));
+                child.execute(new DefaultContext(defaultContext));
+                if (child.getResult().getStatus().isFailure()) {
+                    this.result = Results.fail(
+                            durationSince(start),
+                            child.getResult().getStatus().getThrowable().orElse(null));
+                    context.getListener().afterAction(context, this, this.result);
+                    return;
                 }
             }
-            return Result.pass(this, durationSince(start));
+            this.result = Results.pass(durationSince(start));
+            context.getListener().afterAction(context, this, this.result);
         }
     }
 
@@ -98,26 +112,36 @@ class CustomActionWorkflowTest {
             }
             this.repetitions = repetitions;
             this.children = copyChildren(children);
-            this.children.forEach(this::adopt);
+            this.children.forEach(this::addChild);
         }
 
         @Override
-        public List<Action> children() {
+        public List<Action> getChildren() {
             return children;
         }
 
         @Override
-        protected Result doExecute(Context context, Instant start) throws Throwable {
+        public void execute(Context context) {
+            Objects.requireNonNull(context, "context must not be null");
+            this.result = Results.staged();
+            context.getListener().beforeAction(context, this);
+            Instant start = Instant.now();
+
+            DefaultContext defaultContext = (DefaultContext) context;
             for (int i = 0; i < repetitions; i++) {
                 for (Action child : children) {
-                    var result = context.execute(child);
-                    if (result.status() == Result.Status.FAIL) {
-                        throw new AssertionError(
-                                child.name() + " failed", result.failure().orElse(null));
+                    child.execute(new DefaultContext(defaultContext));
+                    if (child.getResult().getStatus().isFailure()) {
+                        this.result = Results.fail(
+                                durationSince(start),
+                                child.getResult().getStatus().getThrowable().orElse(null));
+                        context.getListener().afterAction(context, this, this.result);
+                        return;
                     }
                 }
             }
-            return Result.pass(this, durationSince(start));
+            this.result = Results.pass(durationSince(start));
+            context.getListener().afterAction(context, this, this.result);
         }
     }
 

@@ -20,9 +20,8 @@ import examples.support.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import org.paramixel.core.Action;
+import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
-import org.paramixel.core.Result;
-import org.paramixel.core.Runner;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Parallel;
@@ -32,6 +31,10 @@ public class ParallelArgumentExample2 {
 
     private static final Logger LOGGER = Logger.createLogger(ParallelArgumentExample2.class);
 
+    public static void main(String[] args) {
+        ConsoleRunner.runAndExit(actionFactory());
+    }
+
     @Paramixel.ActionFactory
     public static Action actionFactory() {
         var suiteName = "Parallel argument example 2";
@@ -40,33 +43,19 @@ public class ParallelArgumentExample2 {
         for (int i = 0; i < 5; i++) {
             var argumentValue = "string-" + i;
 
-            Action testAction1 = Direct.of(
-                    "test1",
-                    context -> LOGGER.info(
-                            "test1() argument [%s]",
-                            context.action().parent().orElseThrow().name()));
+            Action testAction1 = Direct.of("test1", context -> LOGGER.info("test1() argument [%s]", argumentValue));
 
-            Action testAction2 = Direct.of(
-                    "test2",
-                    context -> LOGGER.info(
-                            "test2() argument [%s]",
-                            context.action().parent().orElseThrow().name()));
+            Action testAction2 = Direct.of("test2", context -> LOGGER.info("test2() argument [%s]", argumentValue));
 
-            Action testAction3 = Direct.of(
-                    "test3",
-                    context -> LOGGER.info(
-                            "test3() argument [%s]",
-                            context.action().parent().orElseThrow().name()));
+            Action testAction3 = Direct.of("test3", context -> LOGGER.info("test3() argument [%s]", argumentValue));
 
             Action argumentAction = Sequential.of("method", List.of(testAction1, testAction2, testAction3));
 
             Action lifecycleAction = Lifecycle.of(
                     argumentValue,
-                    context ->
-                            LOGGER.info("setUpArgument() [%s]", context.action().name()),
+                    Direct.of("before", context -> LOGGER.info("beforeArgument() [%s]", argumentValue)),
                     argumentAction,
-                    context -> LOGGER.info(
-                            "tearDownArgument() [%s]", context.action().name()));
+                    Direct.of("after", context -> LOGGER.info("afterArgument() [%s]", argumentValue)));
 
             argumentActions.add(lifecycleAction);
         }
@@ -74,14 +63,8 @@ public class ParallelArgumentExample2 {
         Action arguments = Parallel.of(suiteName, 5, argumentActions);
         return Lifecycle.of(
                 suiteName,
-                context -> LOGGER.info("setUpAction()"),
+                Direct.of("before", context -> LOGGER.info("beforeAction()")),
                 arguments,
-                context -> LOGGER.info("tearDownAction()"));
-    }
-
-    public static void main(String[] args) {
-        Result result = Runner.builder().build().run(actionFactory());
-        int exitCode = result.status() == Result.Status.PASS ? 0 : 1;
-        System.exit(exitCode);
+                Direct.of("after", context -> LOGGER.info("afterAction()")));
     }
 }

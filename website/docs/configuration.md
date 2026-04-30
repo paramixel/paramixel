@@ -1,212 +1,114 @@
 ---
-id: configuration
 title: Configuration
-description: All configuration options
+description: Paramixel configuration sources and built-in keys.
 ---
 
 # Configuration
 
-Paramixel configuration is loaded from multiple sources with a defined precedence.
+## Core configuration sources
 
-## Configuration Class
-
-The `Configuration` class loads configuration from classpath resources and system properties:
+`org.paramixel.core.Configuration` exposes three entry points:
 
 ```java
-import org.paramixel.core.Configuration;
-
-// Load from classpath paramixel.properties and system properties
-Map<String, String> config = Configuration.defaultProperties();
-
-// Classpath only
 Map<String, String> classpath = Configuration.classpathProperties();
-
-// System properties only
 Map<String, String> system = Configuration.systemProperties();
+Map<String, String> defaults = Configuration.defaultProperties();
 ```
 
-## Configuration Precedence
+### `Configuration.defaultProperties()` precedence
 
-Configuration is merged from multiple sources (higher priority wins):
+1. `paramixel.properties` from the classpath root
+2. JVM system properties
+3. built-in defaults
 
-1. **`paramixel.properties`** (classpath resource)
-2. **Maven plugin `<properties>`** (POM configuration)
-3. **System properties** (`-D` flags)
+Built-in defaults currently add `paramixel.parallelism` when absent.
 
-System properties always override other sources.
+## Built-in key
 
-## paramixel.properties
+### `paramixel.parallelism`
 
-Create `src/test/resources/paramixel.properties`:
+Controls default runner parallelism.
 
 ```properties
-# Runner parallelism
-paramixel.core.runner.parallelism=4
+paramixel.parallelism=8
 ```
 
-## Maven Plugin Properties
+Notes:
 
-Configure in `pom.xml`:
+- `Configuration.defaultProperties()` sets it to `Runtime.getRuntime().availableProcessors()` when absent.
+- `Runner` and the Maven plugin only fall back to `availableProcessors() * 2` if that key is somehow missing from the configuration they use.
+- Individual `Parallel` actions can also set an explicit per-node limit with `Parallel.of(name, parallelism, ...)`.
 
-```xml
-<plugin>
-    <groupId>org.paramixel</groupId>
-    <artifactId>maven-plugin</artifactId>
-    <version>${paramixel.version}</version>
-    <configuration>
-        <properties>
-            <property>
-                <key>paramixel.core.runner.parallelism</key>
-                <value>4</value>
-            </property>
-        </properties>
-    </configuration>
-</plugin>
+## Accessing configuration inside actions
+
+Prefer `Context#getConfiguration()`.
+
+```java
+Direct.of("print config", context -> {
+    String value = context.getConfiguration().get("my.custom.property");
+});
 ```
 
-## System Properties
+## `paramixel.properties`
 
-Set via JVM flags:
+Place the file on the runtime classpath, for example:
 
-```bash
-./mvnw test -Dparamixel.core.runner.parallelism=8
-```
+- `src/test/resources/paramixel.properties` for ordinary tests
+- `src/main/resources/paramixel.properties` when examples live under `src/main/java`
 
-## Configuration Keys
-
-### Runner Parallelism
-
-**Key:** `paramixel.core.runner.parallelism`
-
-**Default:** `Runtime.getRuntime().availableProcessors()`
-
-**Description:** Default parallelism level for `Parallel` actions. Individual `Parallel` actions can override this with their own `parallelism` parameter. The executor uses this value when no explicit parallelism is specified on a `Parallel` action.
-
-**Examples:**
+Example:
 
 ```properties
-paramixel.core.runner.parallelism=4
+paramixel.parallelism=4
+my.custom.property=hello
 ```
+
+## System properties
+
+System properties override file values.
 
 ```bash
-./mvnw test -Dparamixel.core.runner.parallelism=8
+./mvnw test -Dparamixel.parallelism=16
 ```
 
-### Skip Tests
+## Programmatic runner configuration
 
-**Key:** `paramixel.maven.skipTests`
+`Runner.Builder#configuration(Map<String, String>)` overrides values from `Configuration.defaultProperties()`.
 
-**Default:** `false`
-
-**Description:** Skip Paramixel test execution entirely.
-
-**Examples:**
-
-```properties
-paramixel.maven.skipTests=true
+```java
+Runner runner = Runner.builder()
+        .configuration(Map.of("paramixel.parallelism", "6"))
+        .build();
 ```
 
-```bash
-./mvnw test -Dparamixel.maven.skipTests=true
-```
+## Maven plugin configuration
 
-### Fail If No Tests
+The plugin accepts `<properties>` entries and also reads system properties.
 
-**Key:** `paramixel.maven.failIfNoTests`
+Precedence in the plugin is:
 
-**Default:** `true`
+1. `Configuration.defaultProperties()`
+2. plugin `<properties>`
+3. system properties whose keys start with `paramixel.`
 
-**Description:** Fail the build if no `@Paramixel.ActionFactory` methods are discovered.
-
-**Examples:**
-
-```properties
-paramixel.maven.failIfNoTests=false
-```
-
-```bash
-./mvnw test -Dparamixel.maven.failIfNoTests=false
-```
-
-## Custom Properties
-
-Pass custom properties via system properties or Maven plugin configuration:
+Example:
 
 ```xml
 <configuration>
     <properties>
         <property>
-            <key>my.custom.property</key>
-            <value>value</value>
+            <key>paramixel.parallelism</key>
+            <value>4</value>
         </property>
     </properties>
 </configuration>
 ```
 
-Access custom properties:
-
-```java
-@Paramixel.ActionFactory
-public static Action actionFactory() {
-    String customValue = System.getProperty("my.custom.property");
-    ...
-}
-```
-
-## Complete Example
-
-`src/test/resources/paramixel.properties`:
-
-```properties
-# Runner configuration
-paramixel.core.runner.parallelism=4
-
-paramixel.maven.failIfNoTests=false
-```
-
-`pom.xml`:
-
-```xml
-<plugin>
-    <groupId>org.paramixel</groupId>
-    <artifactId>maven-plugin</artifactId>
-    <version>${paramixel.version}</version>
-    <configuration>
-        <properties>
-            <property>
-                <key>paramixel.core.runner.parallelism</key>
-                <value>8</value>
-            </property>
-        </properties>
-    </configuration>
-</plugin>
-```
-
-CLI:
+Plugin flags:
 
 ```bash
-./mvnw test -Dparamixel.core.runner.parallelism=16
+./mvnw test -Dparamixel.skipTests=true
+./mvnw test -Dparamixel.failIfNoTests=false
 ```
 
-**Result:**
-- `paramixel.core.runner.parallelism` = `16` (system property wins)
-- `paramixel.maven.failIfNoTests` = `false` (from file)
-
-## Programmatic Configuration
-
-Pass configuration programmatically to `Runner`:
-
-```java
-Map<String, String> config = Map.of(
-    "paramixel.core.runner.parallelism", "8"
-);
-
-Runner executor = Runner.builder()
-    .configuration(config)
-    .build();
-```
-
-## See Also
-
-- [Parallel](actions/parallel) - Configuring parallelism
-- [Maven Plugin](usage/maven-plugin) - Plugin-specific configuration
+`paramixel.skipTests` and `paramixel.failIfNoTests` are Maven plugin parameters, not core `Configuration` keys.

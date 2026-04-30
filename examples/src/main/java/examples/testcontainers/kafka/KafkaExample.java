@@ -22,7 +22,6 @@ import examples.support.Logger;
 import examples.support.NetworkFactory;
 import examples.testcontainers.util.RandomUtil;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -35,124 +34,126 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.paramixel.core.Action;
+import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
-import org.paramixel.core.Result;
-import org.paramixel.core.Runner;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Parallel;
-import org.paramixel.core.action.Sequential;
-import org.paramixel.core.support.CleanupRunner;
+import org.paramixel.core.action.StrictSequential;
+import org.paramixel.core.support.Cleanup;
 import org.testcontainers.containers.Network;
 
 public class KafkaExample {
 
-    record Attachment(Network network, KafkaTestEnvironment environment, String message) {}
+    private static class TestAttachment {
+        public Network network;
+        public KafkaTestEnvironment environment;
+        public String message;
+    }
 
     private static final Logger LOGGER = Logger.createLogger(KafkaExample.class);
     private static final String TOPIC = "test";
     private static final String GROUP_ID = "test-group-id";
     private static final String EARLIEST = "earliest";
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() throws Throwable {
-        var argumentActions = new ArrayList<Action>();
-
-        for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
-            Action produceMethodAction = Direct.of("test produce", context -> {
-                var sequentialContext = context.parent().orElseThrow();
-                var lifecycleContext = sequentialContext.parent().orElseThrow();
-                Attachment attachment =
-                        lifecycleContext.attachment(Attachment.class).orElseThrow();
-                LOGGER.info(
-                        "[%s] testing produce() ...", attachment.environment().name());
-
-                String message = RandomUtil.getRandomString(16);
-                lifecycleContext.setAttachment(new Attachment(attachment.network(), attachment.environment(), message));
-
-                LOGGER.info(
-                        "[%s] producing message [%s] ...",
-                        attachment.environment().name(), message);
-
-                try (KafkaProducer<String, String> producer = createKafkaProducer(attachment.environment())) {
-                    producer.send(new ProducerRecord<>(TOPIC, message)).get();
-                }
-
-                LOGGER.info(
-                        "[%s] message [%s] produced", attachment.environment().name(), message);
-            });
-
-            Action consumeMethodAction = Direct.of("test consume", context -> {
-                var sequentialContext = context.parent().orElseThrow();
-                var lifecycleContext = sequentialContext.parent().orElseThrow();
-                Attachment attachment =
-                        lifecycleContext.attachment(Attachment.class).orElseThrow();
-                String message = attachment.message();
-                LOGGER.info(
-                        "[%s] expected message [%s]", attachment.environment().name(), message);
-
-                boolean messageMatched = false;
-                try (var consumer = createKafkaConsumer(attachment.environment())) {
-                    consumer.subscribe(Collections.singletonList(TOPIC));
-
-                    var consumerRecords = consumer.poll(Duration.ofMillis(10_000));
-                    for (ConsumerRecord<String, String> consumerRecord : consumerRecords) {
-                        LOGGER.info(
-                                "[%s] consumed message [%s]",
-                                attachment.environment().name(), consumerRecord.value());
-                        assertThat(consumerRecord.value()).isEqualTo(message);
-                        messageMatched = true;
-                    }
-
-                    assertThat(messageMatched).isTrue();
-                    assertThat(consumer.poll(Duration.ofMillis(2_000)).isEmpty())
-                            .isTrue();
-                }
-            });
-
-            Action methodsAction = Sequential.of("methods", List.of(produceMethodAction, consumeMethodAction));
-
-            Action lifecycleAction = Lifecycle.of(
-                    environment.name(),
-                    context -> {
-                        LOGGER.info("[%s] initialize test environment ...", environment.name());
-
-                        Network network = NetworkFactory.createNetwork();
-
-                        environment.initialize(network);
-                        assertThat(environment.isRunning()).isTrue();
-
-                        LOGGER.info("bootstrap servers: %s", environment.getBootstrapServers());
-                        environment.createTopic(TOPIC);
-
-                        context.setAttachment(new Attachment(network, environment, null));
-                    },
-                    methodsAction,
-                    context -> {
-                        LOGGER.info("[%s] destroy test environment ...", environment.name());
-
-                        new CleanupRunner(CleanupRunner.Mode.FORWARD)
-                                .add(environment::destroy)
-                                .add(() -> {
-                                    context.removeAttachment().ifPresent(attachment -> {
-                                        if (attachment instanceof Attachment a && a.network() != null) {
-                                            a.network().close();
-                                        }
-                                    });
-                                })
-                                .runAndThrow();
-                    });
-
-            argumentActions.add(lifecycleAction);
-        }
-
-        return Parallel.of("KafkaExample", argumentActions);
+    public static void main(String[] args) throws Throwable {
+        ConsoleRunner.runAndExit(actionFactory());
     }
 
-    public static void main(String[] args) throws Throwable {
-        Result result = Runner.builder().build().run(actionFactory());
-        int exitCode = result.status() == Result.Status.PASS ? 0 : 1;
-        System.exit(exitCode);
+    @Paramixel.ActionFactory
+    public static Action actionFactory() throws Throwable {
+        return Parallel.of(
+                "KafkaExample",
+                KafkaTestEnvironment.createTestEnvironments().stream()
+                        .map(KafkaExample::createLifecycleAction)
+                        .toList());
+    }
+
+    private static Action createLifecycleAction(KafkaTestEnvironment environment) {
+        Action produceMethodAction = Direct.of("test produce", context -> {
+            var lifecycleContext = context.findContext(2).orElseThrow();
+            TestAttachment testAttachment = lifecycleContext
+                    .getAttachment()
+                    .flatMap(a -> a.to(TestAttachment.class))
+                    .orElseThrow();
+
+            LOGGER.info("[%s] testing produce() ...", testAttachment.environment.name());
+
+            String message = RandomUtil.getRandomString(16);
+            testAttachment.message = message;
+
+            LOGGER.info("[%s] producing message [%s] ...", testAttachment.environment.name(), message);
+
+            try (KafkaProducer<String, String> producer = createKafkaProducer(testAttachment.environment)) {
+                producer.send(new ProducerRecord<>(TOPIC, message)).get();
+            }
+
+            LOGGER.info("[%s] message [%s] produced", testAttachment.environment.name(), message);
+        });
+
+        Action consumeMethodAction = Direct.of("test consume", context -> {
+            var lifecycleContext = context.findContext(2).orElseThrow();
+            TestAttachment testAttachment = lifecycleContext
+                    .getAttachment()
+                    .flatMap(a -> a.to(TestAttachment.class))
+                    .orElseThrow();
+
+            String message = testAttachment.message;
+            LOGGER.info("[%s] expected message [%s]", testAttachment.environment.name(), message);
+
+            boolean messageMatched = false;
+            try (KafkaConsumer<String, String> consumer = createKafkaConsumer(testAttachment.environment)) {
+                consumer.subscribe(Collections.singletonList(TOPIC));
+
+                var consumerRecords = consumer.poll(Duration.ofMillis(10_000));
+                for (ConsumerRecord<String, String> consumerRecord : consumerRecords) {
+                    LOGGER.info(
+                            "[%s] consumed message [%s]", testAttachment.environment.name(), consumerRecord.value());
+                    assertThat(consumerRecord.value()).isEqualTo(message);
+                    messageMatched = true;
+                }
+
+                assertThat(messageMatched).isTrue();
+                assertThat(consumer.poll(Duration.ofMillis(2_000)).isEmpty()).isTrue();
+            }
+        });
+
+        Action testMethodsAction = StrictSequential.of("methods", List.of(produceMethodAction, consumeMethodAction));
+
+        return Lifecycle.of(
+                environment.name(),
+                Direct.of("before", context -> {
+                    LOGGER.info("[%s] initialize test environment ...", environment.name());
+
+                    Network network = NetworkFactory.createNetwork();
+
+                    environment.initialize(network);
+                    assertThat(environment.isRunning()).isTrue();
+
+                    LOGGER.info("bootstrap servers: %s", environment.getBootstrapServers());
+                    environment.createTopic(TOPIC);
+
+                    TestAttachment testAttachment = new TestAttachment();
+                    testAttachment.network = network;
+                    testAttachment.environment = environment;
+
+                    context.setAttachment(testAttachment);
+                }),
+                testMethodsAction,
+                Direct.of("after", context -> {
+                    LOGGER.info("[%s] destroy test environment ...", environment.name());
+
+                    TestAttachment testAttachment = context.removeAttachment()
+                            .flatMap(a -> a.to(TestAttachment.class))
+                            .orElse(null);
+
+                    if (testAttachment != null) {
+                        new Cleanup(Cleanup.Mode.FORWARD)
+                                .addCloseable(testAttachment.environment)
+                                .addCloseable(testAttachment.network)
+                                .runAndThrow();
+                    }
+                }));
     }
 
     private static KafkaProducer<String, String> createKafkaProducer(final KafkaTestEnvironment environment) {

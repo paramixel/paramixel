@@ -19,8 +19,9 @@ package org.paramixel.core.listener;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-import org.paramixel.core.Result;
+import org.paramixel.core.Action;
 import org.paramixel.core.Runner;
+import org.paramixel.core.Status;
 import org.paramixel.core.internal.util.AnsiColor;
 
 class TreeSummaryRenderer implements SummaryRenderer {
@@ -28,46 +29,33 @@ class TreeSummaryRenderer implements SummaryRenderer {
     private static final String PARAMIXEL = Listeners.PARAMIXEL;
 
     @Override
-    public void renderSummary(Runner runner, Result result) {
+    public void renderSummary(Runner runner, Action action) {
         System.out.println(PARAMIXEL);
-        String status = formatStatus(result.status());
-        String actionName = result.action().name();
-        String kind = formatKind(result.action());
-        String timing = formatTiming(result.timing());
-        String failureInfo = result.status() == Result.Status.FAIL
-                ? result.failure()
-                        .map(f -> " → " + f.getClass().getSimpleName() + ": " + f.getMessage())
-                        .orElse("")
-                : result.status() == Result.Status.SKIP
-                        ? result.failure().map(f -> " → " + f.getMessage()).orElse("")
-                        : "";
+        String status = formatStatus(action.getResult().getStatus());
+        String actionName = action.getName();
+        String kind = formatKind(action);
+        String timing = formatTiming(action.getResult().getElapsedTime());
+        String failureInfo = formatFailureInfo(action.getResult().getStatus());
         System.out.println(PARAMIXEL + status + " " + actionName + " (" + kind + ") " + timing + failureInfo);
 
-        List<Result> children = result.children();
+        List<Action> children = action.getChildren();
         for (int i = 0; i < children.size(); i++) {
             renderTree(children.get(i), "", i == children.size() - 1);
         }
-        System.out.println(PARAMIXEL);
     }
 
-    private void renderTree(Result result, String prefix, boolean isLast) {
-        String status = formatStatus(result.status());
-        String actionName = result.action().name();
-        String kind = formatKind(result.action());
-        String timing = formatTiming(result.timing());
-        String failureInfo = result.status() == Result.Status.FAIL
-                ? result.failure()
-                        .map(f -> " → " + f.getClass().getSimpleName() + ": " + f.getMessage())
-                        .orElse("")
-                : result.status() == Result.Status.SKIP
-                        ? result.failure().map(f -> " → " + f.getMessage()).orElse("")
-                        : "";
+    private void renderTree(Action action, String prefix, boolean isLast) {
+        String status = formatStatus(action.getResult().getStatus());
+        String actionName = action.getName();
+        String kind = formatKind(action);
+        String timing = formatTiming(action.getResult().getElapsedTime());
+        String failureInfo = formatFailureInfo(action.getResult().getStatus());
 
         String connector = isLast ? "└── " : "├── ";
         String line = prefix + connector + status + " " + actionName + " (" + kind + ") " + timing + failureInfo;
         System.out.println(PARAMIXEL + line);
 
-        List<Result> children = result.children();
+        List<Action> children = action.getChildren();
         if (!children.isEmpty()) {
             String childPrefix = prefix + (isLast ? "    " : "│   ");
             for (int i = 0; i < children.size(); i++) {
@@ -76,13 +64,30 @@ class TreeSummaryRenderer implements SummaryRenderer {
         }
     }
 
-    private String formatStatus(Result.Status status) {
+    private String formatStatus(Status status) {
         Objects.requireNonNull(status, "status must not be null");
-        return switch (status) {
-            case PASS -> AnsiColor.GREEN_TEXT.format("PASS");
-            case FAIL -> AnsiColor.RED_TEXT.format("FAIL");
-            case SKIP -> AnsiColor.YELLOW_TEXT.format("SKIP");
-        };
+        if (status.isStaged()) {
+            return AnsiColor.BOLD_GRAY_TEXT.format("STAGED");
+        } else if (status.isPass()) {
+            return AnsiColor.BOLD_GREEN_TEXT.format("PASS");
+        } else if (status.isFailure()) {
+            return AnsiColor.BOLD_RED_TEXT.format("FAIL");
+        } else {
+            return AnsiColor.BOLD_YELLOW_TEXT.format("SKIP");
+        }
+    }
+
+    private String formatFailureInfo(Status status) {
+        if (status.isFailure()) {
+            return status.getThrowable()
+                    .map(f -> " → " + f.getClass().getSimpleName() + ": " + f.getMessage())
+                    .or(() -> status.getMessage().map(m -> " → " + m))
+                    .orElse("");
+        } else if (status.isSkip()) {
+            return status.getMessage().map(reason -> " → " + reason).orElse("");
+        } else {
+            return "";
+        }
     }
 
     private String formatTiming(Duration timing) {
@@ -90,7 +95,7 @@ class TreeSummaryRenderer implements SummaryRenderer {
         return timing.toMillis() + " ms";
     }
 
-    private String formatKind(org.paramixel.core.Action action) {
+    private String formatKind(Action action) {
         Class<?> actionClass = action.getClass();
         if (actionClass.getPackageName().equals("org.paramixel.core.action")) {
             return actionClass.getSimpleName();

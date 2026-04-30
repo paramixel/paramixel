@@ -21,10 +21,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Executable;
 import org.paramixel.core.internal.DefaultContext;
 import org.paramixel.core.internal.DefaultResult;
 
@@ -35,11 +38,10 @@ class DefaultListenerTest {
     @DisplayName("prints action kind before and after execution")
     void printsActionKindBeforeAndAfterExecution() {
         Listener listener = Listener.defaultListener();
-        Executable executable = context -> {};
+        Direct.Executable executable = context -> {};
         Action action = Direct.of("direct", executable);
-        Action spec = Direct.of("leaf", executable);
-        Context context = DefaultContext.create(spec, Runner.builder().build());
-        Result result = DefaultResult.pass(spec, java.time.Duration.ZERO);
+        Context context = new DefaultContext(Configuration.defaultProperties(), listener, directExecutorService());
+        Result result = DefaultResult.pass(java.time.Duration.ZERO);
         var output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
 
@@ -52,6 +54,43 @@ class DefaultListenerTest {
             System.setOut(originalOut);
         }
 
-        assertThat(output.toString(StandardCharsets.UTF_8)).contains("leaf").contains("PASS");
+        assertThat(output.toString(StandardCharsets.UTF_8)).contains("direct").contains("PASS");
+    }
+
+    private static ExecutorService directExecutorService() {
+        return new AbstractExecutorService() {
+            private boolean shutdown;
+
+            @Override
+            public void shutdown() {
+                shutdown = true;
+            }
+
+            @Override
+            public List<Runnable> shutdownNow() {
+                shutdown = true;
+                return List.of();
+            }
+
+            @Override
+            public boolean isShutdown() {
+                return shutdown;
+            }
+
+            @Override
+            public boolean isTerminated() {
+                return shutdown;
+            }
+
+            @Override
+            public boolean awaitTermination(long timeout, TimeUnit unit) {
+                return shutdown;
+            }
+
+            @Override
+            public void execute(Runnable command) {
+                command.run();
+            }
+        };
     }
 }

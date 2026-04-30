@@ -17,16 +17,16 @@
 package org.paramixel.core.action;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
-import org.paramixel.core.Result;
+import org.paramixel.core.internal.DefaultContext;
+import org.paramixel.core.internal.Results;
+import org.paramixel.core.internal.util.Arguments;
 
 /**
- * An {@link AbstractAction} that executes child actions sequentially.
+ * A built-in action that executes child actions sequentially.
  */
 public class Sequential extends AbstractAction {
 
@@ -34,51 +34,60 @@ public class Sequential extends AbstractAction {
 
     protected Sequential(String name, List<Action> children) {
         super(name);
-        Objects.requireNonNull(children, "children must not be null");
-        if (children.isEmpty()) {
-            throw new IllegalArgumentException("sequential action must have at least one child");
-        }
-        List<Action> validated = new ArrayList<>(children.size());
-        for (Action child : children) {
-            validated.add(Objects.requireNonNull(child, "children must not contain null elements"));
-        }
-        this.children = Collections.unmodifiableList(validated);
-        this.children.forEach(this::adopt);
+        this.children = validateChildren(children);
     }
 
     /**
      * Creates a sequential action.
-     * @param name The action name; must not be null.
-     * @param children The child actions; must not be null or empty.
-     * @return new Sequential action.
+     *
+     * @param name the action name; must not be {@code null}
+     * @param children the child actions; must not be {@code null} or empty
+     * @return a new sequential action
      */
     public static Sequential of(String name, List<Action> children) {
+        Objects.requireNonNull(name, "name must not be null");
+        Arguments.requireNotBlank(name, "name must not be blank");
         return new Sequential(name, children);
     }
 
     /**
-     * Creates a sequential action.
-     * @param name The action name; must not be null.
-     * @param children The child actions; must not be null or empty.
-     * @return new Sequential action.
+     * Creates a sequential action from varargs children.
+     *
+     * @param name the action name; must not be {@code null}
+     * @param children the child actions; must not be {@code null} or empty
+     * @return a new sequential action
      */
     public static Sequential of(String name, Action... children) {
+        Objects.requireNonNull(name, "name must not be null");
+        Arguments.requireNotBlank(name, "name must not be blank");
         Objects.requireNonNull(children, "children must not be null");
         return new Sequential(name, List.of(children));
     }
 
+    /**
+     * Returns the child actions executed by this sequential action.
+     *
+     * <p>The returned list is unmodifiable and reflects the execution order established
+     * at construction time.</p>
+     *
+     * @return the child actions
+     */
     @Override
-    public List<Action> children() {
+    public List<Action> getChildren() {
         return children;
     }
 
     @Override
-    protected Result doExecute(Context context, Instant start) throws Throwable {
-        List<Result> childResults = new ArrayList<>();
-        for (Action child : children()) {
-            childResults.add(context.execute(child));
+    public void execute(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        this.result = Results.staged();
+        context.getListener().beforeAction(context, this);
+        Instant start = Instant.now();
+        DefaultContext defaultContext = (DefaultContext) context;
+        for (Action child : getChildren()) {
+            child.execute(new DefaultContext(defaultContext));
         }
-        return Result.of(
-                this, computeStatus(childResults), durationSince(start), findFailure(childResults), childResults);
+        this.result = Results.of(computeStatus(), durationSince(start));
+        context.getListener().afterAction(context, this, this.result);
     }
 }

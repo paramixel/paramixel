@@ -41,7 +41,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
 
-public class BufstreamTestEnvironment {
+public class BufstreamTestEnvironment implements AutoCloseable {
 
     private final String dockerImageName;
 
@@ -107,7 +107,7 @@ public class BufstreamTestEnvironment {
         return genericContainer.getHost() + ":" + genericContainer.getMappedPort(9092);
     }
 
-    public void destroy() {
+    public void close() {
         if (genericContainer != null) {
             genericContainer.stop();
             genericContainer = null;

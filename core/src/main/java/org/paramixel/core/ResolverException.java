@@ -18,13 +18,20 @@ package org.paramixel.core;
 
 /**
  * Signals an error during action factory resolution.
+ *
+ * <p>ResolverException is thrown when action factory methods cannot be discovered,
+ * validated, or invoked during classpath scanning.</p>
+ *
+ * @see org.paramixel.core.discovery.Resolver
+ * @see Paramixel.ActionFactory
+ * @see ConfigurationException
  */
 public class ResolverException extends RuntimeException {
 
     /**
      * Creates a resolution error with a detail message.
      *
-     * @param message The detail message; may be null.
+     * @param message the detail message; may be {@code null}
      */
     public ResolverException(final String message) {
         super(message);
@@ -33,8 +40,8 @@ public class ResolverException extends RuntimeException {
     /**
      * Creates a resolution error with a detail message and cause.
      *
-     * @param message The detail message; may be null.
-     * @param cause The cause; may be null.
+     * @param message the detail message; may be {@code null}
+     * @param cause the cause; may be {@code null}
      */
     public ResolverException(final String message, final Throwable cause) {
         super(message, cause);

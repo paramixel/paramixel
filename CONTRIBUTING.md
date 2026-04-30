@@ -62,8 +62,7 @@ cd paramixel
 
 - `core/` - Main library (public API + implementation)
 - `maven-plugin/` - Maven plugin for test execution
-- `tests/` - Self-tests using Paramixel's own framework
-- `examples/` - Example test classes
+- `examples/` - Test classes and examples using Paramixel's own framework
 - `assets/` - License header template and shared resources
 - `website/` - Docusaurus documentation site
 
@@ -119,12 +118,12 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 ./mvnw verify
 
 # Build without Paramixel tests
-./mvnw clean install -Dparamixel.maven.skipTests
+./mvnw clean install -Dparamixel.skipTests
 ```
 
 ### Writing Tests
 
-- Place tests in the `tests/` or `examples/` modules under `src/main/java/`
+- Place tests in the `examples/` module under `src/main/java/`
 - Use the `@Paramixel.ActionFactory` annotation on static methods that return `Action` trees
 - Use descriptive test names and argument names
 - Test edge cases and error conditions

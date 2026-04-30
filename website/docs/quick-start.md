@@ -1,21 +1,21 @@
 ---
-id: quick-start
 title: Quick Start
-description: Get started with Paramixel in 5 minutes
+description: Get a Paramixel test running quickly.
 ---
 
 # Quick Start
 
-This guide will help you get started with Paramixel in just a few minutes.
+## Requirements
 
-## Prerequisites
+- Java 17+
 
-- **Java 17 or higher**
-- **Maven 3.9+**
+If you want to run Paramixel through the Maven plugin, you also need:
 
-## Add Dependency
+- Maven 3.9+
 
-Add Paramixel to your `pom.xml`:
+## Add dependencies
+
+Add the Paramixel core dependency:
 
 ```xml
 <properties>
@@ -29,7 +29,11 @@ Add Paramixel to your `pom.xml`:
         <version>${paramixel.version}</version>
     </dependency>
 </dependencies>
+```
 
+If you want to run Paramixel tests with Maven, also add the Paramixel Maven plugin:
+
+```xml
 <build>
     <plugins>
         <plugin>
@@ -38,7 +42,6 @@ Add Paramixel to your `pom.xml`:
             <version>${paramixel.version}</version>
             <executions>
                 <execution>
-                    <phase>test</phase>
                     <goals>
                         <goal>test</goal>
                     </goals>
@@ -49,13 +52,7 @@ Add Paramixel to your `pom.xml`:
 </build>
 ```
 
-The Maven plugin discovers `@Paramixel.ActionFactory` methods and executes the returned action trees during the `test` phase.
-
-Use the latest published Paramixel release for `YOUR_PARAMIXEL_VERSION`.
-
-## Write Your First Test
-
-Create a test class with an `@Paramixel.ActionFactory` method:
+## Write a test factory
 
 ```java
 import org.paramixel.core.Action;
@@ -63,76 +60,47 @@ import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Sequential;
 
-public class MyTest {
+public class ExampleTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        return Sequential.of("MyTest",
-            Action.of("first test", Direct.of("first test",
-                context -> {
-                })),
-            Action.of("second test", Direct.of("second test",
-                context -> {
-                })));
+        return Sequential.of(
+                "ExampleTest",
+                Direct.of("first", context -> {}),
+                Direct.of("second", context -> {}));
     }
 }
 ```
 
-### Key Concepts
+## Run with Maven
 
-- **`@Paramixel.ActionFactory`** — Marks a public static method that returns an `Action` tree
-- **`Sequential.of()`** — Creates a composite action that runs children in order
-- **`Action.of()`** — Wraps an action with a descriptive name
-- **`Direct.of()`** — Creates a leaf action that executes an `Executable` callback
-- **`Context`** — Provides access to `attachments`, `child execution`, and `listener notifications` during execution
-
-## Run Tests
+If you added the Paramixel Maven plugin, run:
 
 ```bash
 ./mvnw test
 ```
 
-The Maven plugin discovers all `@Paramixel.ActionFactory` methods, executes the action trees, and prints a summary table:
+The plugin discovers `@Paramixel.ActionFactory` methods on the test classpath and executes the returned actions.
 
-```
-+---------------------------------------------+-----+------+-----+-----+-----+------+-----------+
-| Paramixel Test Summary                                                                  |
-+---------------------------------------------+-----+------+-----+-----+-----+------+-----------+
-| Class                                        | Args|Methods|Passed|Failed|Skipped|Status| Time      |
-+---------------------------------------------+-----+------+-----+-----+-----+------+-----------+
-| MyTest                                       |   0 |    2 |   2 |   0 |   0 | PASS | 0.015 s   |
-+---------------------------------------------+-----+------+-----+-----+-----+------+-----------+
-| TOTAL                                        |   0 |    2 |   2 |   0 |   0 | PASS |           |
-+---------------------------------------------+-----+------+-----+-----+-----+------+-----------+
+## Run directly from `main`
 
-Status         : TESTS PASSED
-Execution Time : 0.015 s
+```java
+import org.paramixel.core.ConsoleRunner;
+
+public static void main(String[] args) {
+    ConsoleRunner.runAndExit(actionFactory());
+}
 ```
 
-## Next Steps
+## Check the result programmatically
 
-- [Action Composition](usage/action-composition) - Learn how to compose action trees with `Sequential`, `Parallel`, and `Lifecycle`
-- [Lifecycle](actions/lifecycle) - Setup and teardown with guaranteed cleanup
-- [Context](usage/context) - Attachments for sharing state
-- [Maven Plugin](usage/maven-plugin) - Configure the Maven plugin and output formats
-- [Configuration](configuration) - All configuration options
+```java
+Action action = ExampleTest.actionFactory();
+Runner.builder().build().run(action);
 
-## Build from Source
-
-To build Paramixel from source:
-
-```bash
-git clone https://github.com/paramixel/paramixel.git
-cd paramixel
-./mvnw clean install
+if (action.getResult().getStatus().isPass()) {
+    System.out.println("passed");
+}
 ```
 
-## Verify Installation
-
-Verify Paramixel is installed correctly by running the test suite:
-
-```bash
-./mvnw clean verify
-```
-
-Expected output (on supported JDKs): `BUILD SUCCESS`
+`Runner.run(action)` does not return a `Result`.

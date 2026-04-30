@@ -16,7 +16,6 @@
 
 package examples.support;
 
-import org.paramixel.core.SkipException;
 import org.testcontainers.containers.Network;
 
 public final class NetworkFactory {
@@ -24,12 +23,8 @@ public final class NetworkFactory {
     private NetworkFactory() {}
 
     public static Network createNetwork() {
-        try {
-            Network network = Network.newNetwork();
-            network.getId();
-            return network;
-        } catch (IllegalStateException e) {
-            throw new SkipException("Docker not available", e);
-        }
+        Network network = Network.newNetwork();
+        network.getId();
+        return network;
     }
 }

@@ -8,40 +8,4 @@
         <ignoreVersion type="regex">.*[-_\.](alpha|Alpha|ALPHA|b|beta|Dev|Beta|BETA|rc|RC|M|EA|ea|SNAPSHOT)[-_.+]?[0-9]*</ignoreVersion>
     </ignoreVersions>
     
-    <rules>
-        <rule groupId="org.openjfx" artifactId="javafx-base" comparisonMethod="maven">
-            <ignoreVersions>
-                <ignoreVersion type="regex">.*[-_\.](alpha|Alpha|ALPHA|b|beta|Dev|Beta|BETA|rc|RC|M|EA|ea|SNAPSHOT)[-_.+]?[0-9]*</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9]\..*</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9]\..*</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9]</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9]</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9].*</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9].*</ignoreVersion>
-            </ignoreVersions>
-        </rule>
-        <rule groupId="org.openjfx" artifactId="javafx-controls" comparisonMethod="maven">
-            <ignoreVersions>
-                <ignoreVersion type="regex">.*[-_\.](alpha|Alpha|ALPHA|b|beta|Dev|Beta|BETA|rc|RC|M|EA|ea|SNAPSHOT)[-_.+]?[0-9]*</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9]\..*</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9]\..*</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9]</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9]</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9].*</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9].*</ignoreVersion>
-            </ignoreVersions>
-        </rule>
-        <rule groupId="org.openjfx" artifactId="javafx-graphics" comparisonMethod="maven">
-            <ignoreVersions>
-                <ignoreVersion type="regex">.*[-_\.](alpha|Alpha|ALPHA|b|beta|Dev|Beta|BETA|rc|RC|M|EA|ea|SNAPSHOT)[-_.+]?[0-9]*</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9]\..*</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9]\..*</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9]</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9]</ignoreVersion>
-                <ignoreVersion type="regex">2[3-9].*</ignoreVersion>
-                <ignoreVersion type="regex">[3-9][0-9].*</ignoreVersion>
-            </ignoreVersions>
-        </rule>
-    </rules>
-    
 </ruleset>

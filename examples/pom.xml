@@ -29,9 +29,9 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.paramixel</groupId>
-            <artifactId>gui</artifactId>
-            <version>${project.version}</version>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.assertj</groupId>

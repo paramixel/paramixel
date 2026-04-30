@@ -38,7 +38,7 @@ public class Configuration {
 
     public static final String CONFIG_FILE_NAME = "paramixel.properties";
 
-    public static final String RUNNER_PARALLELISM = "paramixel.core.runner.parallelism";
+    public static final String RUNNER_PARALLELISM = "paramixel.parallelism";
 
     private Configuration() {
         // Intentionally empty
