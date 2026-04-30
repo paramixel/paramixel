@@ -16,168 +16,382 @@
 
 package org.paramixel.core.action;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
-import org.paramixel.core.Result;
-import org.paramixel.core.SkipException;
+import org.paramixel.core.Status;
+import org.paramixel.core.internal.DefaultContext;
+import org.paramixel.core.internal.DefaultStatus;
+import org.paramixel.core.internal.Results;
+import org.paramixel.core.internal.util.Arguments;
 
 /**
- * An {@link AbstractAction} that manages setup, execution, and teardown phases.
+ * A built-in action that manages before, main, and after phases.
+ *
+ * <p>Lifecycle implements the common pattern of setup (before), execution (main), and
+ * cleanup (after) phases. It guarantees that the after phase always runs, even if the
+ * before or main phases fail.</p>
+ *
+ * <h3>Key Characteristics</h3>
+ * <ul>
+ *   <li>Three-phase execution: before → main → after</li>
+ *   <li>After phase always runs (cleanup guarantee)</li>
+ *   <li>Phases share a common context for attachment passing</li>
+ *   <li>Propagates status according to phase outcomes</li>
+ *   <li>Skips descendants appropriately when phases fail</li>
+ * </ul>
+ *
+ * <h3>Phase Execution Order</h3>
+ * <ol>
+ *   <li><strong>Before:</strong> Setup phase (e.g., acquire resources, initialize state)</li>
+ *   <li><strong>Main:</strong> Core execution (only if before passed)</li>
+ *   <li><strong>After:</strong> Cleanup phase (always runs, even on failure)</li>
+ * </ol>
+ *
+ * <h3>Status Propagation Rules</h3>
+ * <table border="1">
+ *   <tr>
+ *     <th>Before</th>
+ *     <th>Main</th>
+ *     <th>After</th>
+ *     <th>Final Status</th>
+ *   </tr>
+ *   <tr>
+ *     <td>PASS</td>
+ *     <td>PASS</td>
+ *     <td>PASS</td>
+ *     <td>PASS</td>
+ *   </tr>
+ *   <tr>
+ *     <td>PASS</td>
+ *     <td>PASS</td>
+ *     <td>FAIL</td>
+ *     <td>FAIL</td>
+ *   </tr>
+ *   <tr>
+ *     <td>PASS</td>
+ *     <td>FAIL</td>
+ *     <td>any</td>
+ *     <td>FAIL</td>
+ *   </tr>
+ *   <tr>
+ *     <td>PASS</td>
+ *     <td>SKIP</td>
+ *     <td>any</td>
+ *     <td>SKIP</td>
+ *   </tr>
+ *   <tr>
+ *     <td>FAIL</td>
+ *     <td>skipped</td>
+ *     <td>any</td>
+ *     <td>FAIL</td>
+ *   </tr>
+ *   <tr>
+ *     <td>SKIP</td>
+ *     <td>skipped</td>
+ *     <td>any</td>
+ *     <td>SKIP</td>
+ *   </tr>
+ * </table>
+ *
+ * <h3>Context Sharing</h3>
+ * <p>The before and after phases share a common context, allowing the before phase
+ * to set attachments that the after phase can access:</p>
+ * <pre>{@code
+ * Lifecycle.of("databaseTest",
+ *     Direct.of("setup", ctx -> {
+ *         Connection conn = createConnection();
+ *         ctx.setAttachment(conn);
+ *     }),
+ *     Direct.of("test", ctx -> {
+ *         Connection conn = ctx.findAttachment(1).flatMap(a -> a.to(Connection.class)).orElseThrow();
+ *         // Run tests with connection
+ *     }),
+ *     Direct.of("cleanup", ctx -> {
+ *         Connection conn = ctx.getAttachment().flatMap(a -> a.to(Connection.class)).orElseThrow();
+ *         conn.close();
+ *     })
+ * );
+ * }</pre>
+ *
+ * <h3>Usage Examples</h3>
+ * <p><strong>Database Test Lifecycle:</strong></p>
+ * <pre>{@code
+ * Action test = Lifecycle.of("userCrudTest",
+ *     Direct.of("setup", ctx -> {
+ *         Database db = Database.create();
+ *         db.insert(testUser);
+ *         ctx.setAttachment(db);
+ *     }),
+ *     Direct.of("test", ctx -> {
+ *         Database db = ctx.getAttachment().flatMap(a -> a.to(Database.class)).orElseThrow();
+ *         User found = db.findUser(testUser.getId());
+ *         assertNotNull(found);
+ *     }),
+ *     Direct.of("teardown", ctx -> {
+ *         Database db = ctx.getAttachment().flatMap(a -> a.to(Database.class)).orElseThrow();
+ *         db.delete(testUser);
+ *         db.close();
+ *     })
+ * );
+ * }</pre>
+ *
+ * <p><strong>Resource Management:</strong></p>
+ * <pre>{@code
+ * Action action = Lifecycle.of("fileProcessing",
+ *     Direct.of("open", ctx -> {
+ *         InputStream stream = new FileInputStream("data.txt");
+ *         ctx.setAttachment(stream);
+ *     }),
+ *     Direct.of("process", ctx -> {
+ *         InputStream stream = ctx.getAttachment().flatMap(a -> a.to(InputStream.class)).orElseThrow();
+ *         // Process file
+ *     }),
+ *     Direct.of("close", ctx -> {
+ *         InputStream stream = ctx.getAttachment().flatMap(a -> a.to(InputStream.class)).orElseThrow();
+ *         stream.close();
+ *     })
+ * );
+ * }</pre>
+ *
+ * <h3>Comparison with Sequential</h3>
+ * <table border="1">
+ *   <tr>
+ *     <th>Aspect</th>
+ *     <th>Lifecycle</th>
+ *     <th>Sequential</th>
+ *   </tr>
+ *   <tr>
+ *     <td>Phase Semantics</td>
+ *     <td>Explicit before/main/after</td>
+ *     <td>Generic ordered execution</td>
+ *   </tr>
+ *   <tr>
+ *     <td>Context Sharing</td>
+ *     <td>Before and after share context</td>
+ *     <td>Each child has own context</td>
+ *   </tr>
+ *   <tr>
+ *     <td>Cleanup Guarantee</td>
+ *     <td>After always runs</td>
+ *     <td>Stops on failure</td>
+ *   </tr>
+ *   <tr>
+ *     <td>Use Case</td>
+ *     <td>Setup/teardown patterns</td>
+ *     <td>General sequential execution</td>
+ *   </tr>
+ * </table>
+ *
+ * <h3>Error Handling</h3>
+ * <p>When the main phase fails:
+ * <ul>
+ *   <li>Main phase result is FAIL</li>
+ *   <li>After phase still runs</li>
+ *   <li>Final result is FAIL (from main)</li>
+ *   <li>After failure message only used if main had no message</li>
+ * </ul>
+ *
+ * <p>When the before phase fails:
+ * <ul>
+ *   <li>Main phase is skipped (along with its descendants)</li>
+ *   <li>After phase still runs</li>
+ *   <li>Final result is FAIL (from before)</li>
+ * </ul>
+ *
+ * <h3>Thread Safety</h3>
+ * <p>Lifecycle is thread-safe for parallel execution. Each phase execution receives
+ * its own child context. The shared context between before and after phases is
+ * isolated per execution.</p>
+ *
+ * @see Sequential
+ * @see Direct
+ * @see Context#setAttachment(Object)
+ * @see Context#findAttachment(int)
  */
 public final class Lifecycle extends AbstractAction {
 
-    private final Executable setup;
-    private final Action body;
-    private final Executable teardown;
+    private final Action before;
+    private final Action main;
+    private final Action after;
+    private final List<Action> actions;
 
-    private Lifecycle(String name, Executable setup, Action body, Executable teardown) {
+    private Lifecycle(String name, Action before, Action main, Action after) {
         super(name);
-        this.setup = setup;
-        this.body = Objects.requireNonNull(body, "body must not be null");
-        this.teardown = teardown;
-        adopt(body);
+        this.before = Objects.requireNonNull(before, "before must not be null");
+        this.main = Objects.requireNonNull(main, "main must not be null");
+        this.after = Objects.requireNonNull(after, "after must not be null");
+        this.actions = validateChildren(List.of(this.before, this.main, this.after));
     }
 
     /**
-     * Creates a lifecycle action with only a body.
+     * Creates a lifecycle action with before, main, and after phases.
      *
-     * @param name The action name; must not be null.
-     * @param body The body action; must not be null.
-     * @return A new Lifecycle action.
+     * <p>All three phases are required and must not be {@code null}. Use
+     * {@link Noop#DEFAULT} for phases that don't need implementation.</p>
+     *
+     * <p><strong>Parameter Validation:</strong></p>
+     * <ul>
+     *   <li>Name must not be {@code null} or blank</li>
+     *   <li>Before phase must not be {@code null}</li>
+     *   <li>Main phase must not be {@code null}</li>
+     *   <li>After phase must not be {@code null}</li>
+     * </ul>
+     *
+     * <p><strong>Example:</strong></p>
+     * <pre>{@code
+     * Lifecycle action = Lifecycle.of("test",
+     *     Direct.of("setup", this::setup),
+     *     Direct.of("test", this::runTest),
+     *     Direct.of("teardown", this::teardown)
+     * );
+     * }</pre>
+     *
+     * <p><strong>With No-op Phases:</strong></p>
+     * <pre>{@code
+     * Lifecycle action = Lifecycle.of("simple",
+     *     Noop.DEFAULT,              // No setup
+     *     Direct.of("test", this::runTest),
+     *     Direct.of("cleanup", this::cleanup)
+     * );
+     * }</pre>
+     *
+     * @param name the action name; must not be {@code null} or blank
+     * @param before the action to run before the main phase; must not be {@code null}
+     * @param main the main action; must not be {@code null}
+     * @param after the action to run after the main phase; must not be {@code null}
+     * @return a new lifecycle action; never {@code null}
+     * @throws NullPointerException if any parameter is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     * @see Noop#DEFAULT
      */
-    public static Lifecycle of(String name, Action body) {
-        return new Lifecycle(name, null, body, null);
+    public static Lifecycle of(String name, Action before, Action main, Action after) {
+        Objects.requireNonNull(name, "name must not be null");
+        Objects.requireNonNull(before, "before must not be null");
+        Objects.requireNonNull(main, "main must not be null");
+        Objects.requireNonNull(after, "after must not be null");
+        Arguments.requireNotBlank(name, "name must not be blank");
+        return new Lifecycle(name, before, main, after);
     }
 
     /**
-     * Creates a lifecycle action with a setup and body.
+     * Returns the lifecycle phases in execution order: before, main, then after.
      *
-     * @param name The action name; must not be null.
-     * @param setup The setup executable; may be null.
-     * @param body The body action; must not be null.
-     * @return A new Lifecycle action.
-     */
-    public static Lifecycle of(String name, Executable setup, Action body) {
-        return new Lifecycle(name, setup, body, null);
-    }
-
-    /**
-     * Creates a lifecycle action with a body and teardown.
+     * <p>The returned list is unmodifiable and contains exactly three actions in the
+     * order they are executed.</p>
      *
-     * @param name The action name; must not be null.
-     * @param body The body action; must not be null.
-     * @param teardown The teardown executable; may be null.
-     * @return A new Lifecycle action.
+     * @return the lifecycle child actions; never {@code null}, always contains exactly 3 actions
      */
-    public static Lifecycle of(String name, Action body, Executable teardown) {
-        return new Lifecycle(name, null, body, teardown);
-    }
-
-    /**
-     * Creates a lifecycle action with setup, body, and teardown.
-     *
-     * @param name The action name; must not be null.
-     * @param setup The setup executable; may be null.
-     * @param body The body action; must not be null.
-     * @param teardown The teardown executable; may be null.
-     * @return A new Lifecycle action.
-     */
-    public static Lifecycle of(String name, Executable setup, Action body, Executable teardown) {
-        return new Lifecycle(name, setup, body, teardown);
-    }
-
-    /**
-     * Returns the setup executable.
-     *
-     * @return An {@link Optional} containing the setup, or empty if not set.
-     */
-    public Optional<Executable> setup() {
-        return Optional.ofNullable(setup);
-    }
-
-    /**
-     * Returns the body action.
-     *
-     * @return The body action.
-     */
-    public Action body() {
-        return body;
-    }
-
-    /**
-     * Returns the teardown executable.
-     *
-     * @return An {@link Optional} containing the teardown, or empty if not set.
-     */
-    public Optional<Executable> teardown() {
-        return Optional.ofNullable(teardown);
-    }
-
     @Override
-    public List<Action> children() {
-        return List.of(body);
+    public List<Action> getChildren() {
+        return actions;
     }
 
+    /**
+     * Executes the lifecycle phases in order with proper error handling.
+     *
+     * <p><strong>Execution Flow:</strong></p>
+     * <ol>
+     *   <li>Set result to STAGED</li>
+     *   <li>Invoke listener's beforeAction callback</li>
+     *   <li>Record start time</li>
+     *   <li>Execute before phase</li>
+     *   <li>If before passed: execute main phase</li>
+     *   <li>If before failed/skipped: skip main and its descendants</li>
+     *   <li>Execute after phase (always)</li>
+     *   <li>Compute final status from phase results</li>
+     *   <li>Invoke listener's afterAction callback</li>
+     * </ol>
+     *
+     * <p><strong>Status Computation:</strong></p>
+     * <ul>
+     *   <li>If before failed → FAIL (before's message/throwable)</li>
+     *   <li>If before skipped → SKIP (before's message)</li>
+     *   <li>If main failed → FAIL (main's message/throwable)</li>
+     *   <li>If main skipped → SKIP (main's message)</li>
+     *   <li>If after failed → FAIL (main's message if present, else after's message)</li>
+     *   <li>Otherwise → PASS</li>
+     * </ul>
+     *
+     * <p><strong>Context Behavior:</strong></p>
+     * <ul>
+     *   <li>Before and after phases share a common context</li>
+     *   <li>Main phase receives a child context of the shared context</li>
+     *   <li>Attachments set in before are accessible in main (via findAttachment) and after</li>
+     * </ul>
+     *
+     * <p><strong>Thread Safety:</strong></p>
+     * <p>This method is thread-safe and can be called concurrently from multiple threads.</p>
+     *
+     * @param context the execution context; must not be {@code null}
+     * @throws NullPointerException if {@code context} is {@code null}
+     */
     @Override
-    protected Result doExecute(Context context, Instant start) throws Throwable {
-        Throwable primaryFailure = null;
-        boolean setupPassed = false;
-        Throwable skipReason = null;
+    public void execute(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        this.result = Results.staged();
+        context.getListener().beforeAction(context, this);
+        Instant start = Instant.now();
 
-        try {
-            if (setup != null) {
-                setup.execute(context);
-            }
-            setupPassed = true;
-        } catch (SkipException e) {
-            skipReason = e;
-        } catch (Throwable t) {
-            primaryFailure = t;
+        List<Action> executedActions = new ArrayList<>(3);
+        Status computedStatus = DefaultStatus.pass();
+
+        DefaultContext lifecycleContext = new DefaultContext((DefaultContext) context);
+        before.execute(lifecycleContext);
+        executedActions.add(before);
+        if (before.getResult().getStatus().isSkip()) {
+            computedStatus = DefaultStatus.skip(
+                    before.getResult().getStatus().getMessage().orElse(null));
+        } else if (before.getResult().getStatus().isFailure()) {
+            computedStatus = DefaultStatus.failure(
+                    before.getResult().getStatus().getMessage().orElse(null));
         }
 
-        List<Result> children = new ArrayList<>();
-        if (setupPassed) {
-            Result bodyResult = context.execute(body);
-            children.add(bodyResult);
-            if (bodyResult.status() == Result.Status.FAIL) {
-                primaryFailure = bodyResult.failure().orElse(null);
+        if (computedStatus.isPass()) {
+            main.execute(new DefaultContext(lifecycleContext));
+            executedActions.add(main);
+            if (main.getResult().getStatus().isFailure()) {
+                String mainFailureMessage =
+                        main.getResult().getStatus().getMessage().orElse(null);
+                computedStatus = DefaultStatus.failure(mainFailureMessage);
+            } else if (main.getResult().getStatus().isSkip()) {
+                computedStatus = DefaultStatus.skip(
+                        main.getResult().getStatus().getMessage().orElse(null));
             }
         } else {
-            children.add(createSkipResult(body, skipReason));
+            skipWithDescendants(main, new DefaultContext(lifecycleContext));
         }
 
-        if (teardown != null) {
-            try {
-                teardown.execute(context);
-            } catch (Throwable t) {
-                if (primaryFailure != null) {
-                    primaryFailure.addSuppressed(t);
-                } else {
-                    primaryFailure = t;
-                }
+        after.execute(lifecycleContext);
+        executedActions.add(after);
+        if (after.getResult().getStatus().isFailure()) {
+            String afterFailureMessage =
+                    after.getResult().getStatus().getMessage().orElse(null);
+            if (!computedStatus.isFailure() || computedStatus.getMessage().isEmpty()) {
+                computedStatus = DefaultStatus.failure(afterFailureMessage);
             }
         }
 
-        if (primaryFailure != null) {
-            return Result.of(this, Result.Status.FAIL, durationSince(start), primaryFailure, children);
-        } else if (!setupPassed) {
-            return Result.of(this, Result.Status.SKIP, durationSince(start), skipReason, children);
-        } else {
-            return Result.of(this, Result.Status.PASS, durationSince(start), null, children);
-        }
+        this.result = Results.of(computedStatus, durationSince(start));
+        context.getListener().afterAction(context, this, this.result);
     }
 
-    private static Result createSkipResult(Action action, Throwable skipReason) {
-        List<Result> children = new ArrayList<>();
-        for (Action child : action.children()) {
-            children.add(createSkipResult(child, skipReason));
+    /**
+     * Recursively skips an action and all its descendants.
+     *
+     * <p>This method is used when the before phase fails or skips, ensuring that
+     * the main phase and all its descendants are properly marked as skipped.</p>
+     *
+     * @param action the action to skip (along with descendants)
+     * @param context the execution context
+     */
+    private static void skipWithDescendants(Action action, Context context) {
+        for (Action child : action.getChildren()) {
+            skipWithDescendants(child, context);
         }
-        return Result.of(action, Result.Status.SKIP, Duration.ZERO, skipReason, children);
+        action.skip(context);
     }
 }

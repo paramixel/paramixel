@@ -32,27 +32,29 @@ class StrictSequentialTest {
 
     @Test
     @DisplayName("rejects actions without children")
-    void rejectsActionsWithoutChildren() {
+    void rejectsActionsWithoutGetChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> StrictSequential.of("empty", List.of()))
-                .withMessage("sequential action must have at least one child");
+                .withMessage("action must have at least one child");
     }
 
     @Test
     @DisplayName("passes when all children pass")
-    void passesWhenAllChildrenPass() {
+    void passesWhenAllGetChildrenPass() {
         Action first = Direct.of("first", context -> {});
         Action second = Direct.of("second", context -> {});
         Action third = Direct.of("third", context -> {});
         Action root = StrictSequential.of("root", List.of(first, second, third));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children()).hasSize(3);
-        assertThat(result.children().get(0).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(1).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(2).status()).isEqualTo(Result.Status.PASS);
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(root.getChildren()).hasSize(3);
+        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(1).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(2).getResult().getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -71,14 +73,17 @@ class StrictSequentialTest {
         });
         Action root = StrictSequential.of("root", List.of(first, second, third));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.FAIL);
+        assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(executions).containsExactly("first", "second");
-        assertThat(result.children()).hasSize(3);
-        assertThat(result.children().get(0).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(1).status()).isEqualTo(Result.Status.FAIL);
-        assertThat(result.children().get(2).status()).isEqualTo(Result.Status.SKIP);
+        assertThat(root.getChildren()).hasSize(3);
+        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(1).getResult().getStatus().isFailure())
+                .isTrue();
+        assertThat(root.getChildren().get(2).getResult().getStatus().isSkip()).isTrue();
     }
 
     @Test
@@ -100,15 +105,18 @@ class StrictSequentialTest {
         });
         Action root = StrictSequential.of("root", List.of(first, second, third, fourth));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.FAIL);
+        assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(executions).containsExactly("first", "second", "third");
-        assertThat(result.children()).hasSize(4);
-        assertThat(result.children().get(0).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(1).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(2).status()).isEqualTo(Result.Status.FAIL);
-        assertThat(result.children().get(3).status()).isEqualTo(Result.Status.SKIP);
+        assertThat(root.getChildren()).hasSize(4);
+        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(1).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(2).getResult().getStatus().isFailure())
+                .isTrue();
+        assertThat(root.getChildren().get(3).getResult().getStatus().isSkip()).isTrue();
     }
 
     @Test
@@ -127,19 +135,22 @@ class StrictSequentialTest {
         });
         Action root = StrictSequential.of("root", List.of(first, second, third));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.FAIL);
+        assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(executions).containsExactly("first", "second", "third");
-        assertThat(result.children()).hasSize(3);
-        assertThat(result.children().get(0).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(1).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(2).status()).isEqualTo(Result.Status.FAIL);
+        assertThat(root.getChildren()).hasSize(3);
+        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(1).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(2).getResult().getStatus().isFailure())
+                .isTrue();
     }
 
     @Test
     @DisplayName("fires before and after callbacks for skipped children")
-    void firesBeforeAndAfterCallbacksForSkippedChildren() {
+    void firesBeforeAndAfterCallbacksForSkippedGetChildren() {
         var events = new CopyOnWriteArrayList<String>();
         Action first = Direct.of("first", context -> {});
         Action second = Direct.of("second", context -> {
@@ -151,18 +162,20 @@ class StrictSequentialTest {
         Listener listener = new Listener() {
             @Override
             public void beforeAction(Context context, Action action) {
-                events.add("before:" + action.name());
+                events.add("before:" + action.getName());
             }
 
             @Override
             public void afterAction(Context context, Action action, Result result) {
-                events.add("after:" + action.name() + ":" + result.status());
+                events.add("after:" + action.getName() + ":" + result.getStatus());
             }
         };
 
-        Result result = Runner.builder().listener(listener).build().run(root);
+        Runner runner = Runner.builder().listener(listener).build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.FAIL);
+        assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(events)
                 .containsExactly(
                         "before:root",
@@ -183,26 +196,24 @@ class StrictSequentialTest {
         Action third = Direct.of("third", context -> {});
         Action root = StrictSequential.of("root", List.of(first, second, third));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.parent()).isEmpty();
-        assertThat(result.children()).hasSize(3);
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(root.getParent()).isEmpty();
+        assertThat(root.getChildren()).hasSize(3);
 
-        Result firstResult = result.children().get(0);
-        Result secondResult = result.children().get(1);
-        Result thirdResult = result.children().get(2);
-
-        assertThat(firstResult.parent()).contains(result);
-        assertThat(secondResult.parent()).contains(result);
-        assertThat(thirdResult.parent()).contains(result);
+        assertThat(first.getParent()).contains(root);
+        assertThat(second.getParent()).contains(root);
+        assertThat(third.getParent()).contains(root);
     }
 
     @Test
-    @DisplayName("is instance of Sequential")
-    void isInstanceOfSequential() {
+    @DisplayName("is not instance of Sequential (separate class hierarchy)")
+    void isNotInstanceOfSequential() {
         Action root = StrictSequential.of("root", List.of(Direct.of("child", context -> {})));
 
-        assertThat(root).isInstanceOf(org.paramixel.core.action.Sequential.class);
+        assertThat(root).isNotInstanceOf(org.paramixel.core.action.Sequential.class);
     }
 }

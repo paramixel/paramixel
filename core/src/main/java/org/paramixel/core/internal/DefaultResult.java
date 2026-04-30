@@ -17,168 +17,104 @@
 package org.paramixel.core.internal;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import org.paramixel.core.Action;
 import org.paramixel.core.Result;
+import org.paramixel.core.Status;
 
 /**
  * The default implementation of {@link Result}.
  */
 public final class DefaultResult implements Result {
 
-    private final Action action;
     private final Status status;
     private final Duration timing;
-    private final Throwable failure;
-    private final List<Result> children;
-    private volatile Result parent;
 
-    private DefaultResult(Action action, Status status, Duration timing, Throwable failure, List<Result> children) {
-        this.action = Objects.requireNonNull(action, "action must not be null");
+    private DefaultResult(Status status, Duration timing) {
         this.status = Objects.requireNonNull(status, "status must not be null");
         this.timing = Objects.requireNonNull(timing, "timing must not be null");
-        this.failure = failure;
-        this.children = Collections.unmodifiableList(Objects.requireNonNull(children, "children must not be null"));
-        for (Result child : children) {
-            if (child instanceof DefaultResult dr) {
-                dr.setParent(this);
-            }
-        }
     }
 
     /**
      * Creates a result.
      *
-     * @param action The action.
      * @param status The status.
      * @param timing The timing.
-     * @param failure The failure, if any.
-     * @param children The child results.
      * @return A new DefaultResult.
      */
-    public static DefaultResult of(
-            Action action, Status status, Duration timing, Throwable failure, List<Result> children) {
-        return new DefaultResult(action, status, timing, failure, children);
+    public static DefaultResult of(Status status, Duration timing) {
+        return new DefaultResult(status, timing);
+    }
+
+    /**
+     * Creates a staged result.
+     *
+     * @return A new DefaultResult with STAGED status and zero duration.
+     */
+    public static DefaultResult staged() {
+        return new DefaultResult(DefaultStatus.staged(), Duration.ZERO);
     }
 
     /**
      * Creates a passing result.
      *
-     * @param action The action.
      * @param timing The timing.
      * @return A new DefaultResult.
      */
-    public static DefaultResult pass(Action action, Duration timing) {
-        return of(action, Status.PASS, timing, null, List.of());
-    }
-
-    /**
-     * Creates a passing result with children.
-     *
-     * @param action The action.
-     * @param timing The timing.
-     * @param children The child results.
-     * @return A new DefaultResult.
-     */
-    public static DefaultResult pass(Action action, Duration timing, List<Result> children) {
-        return of(action, Status.PASS, timing, null, children);
+    public static DefaultResult pass(Duration timing) {
+        return new DefaultResult(DefaultStatus.pass(), timing);
     }
 
     /**
      * Creates a failing result.
      *
-     * @param action The action.
      * @param timing The timing.
      * @param failure The failure.
      * @return A new DefaultResult.
      */
-    public static DefaultResult fail(Action action, Duration timing, Throwable failure) {
-        return of(action, Status.FAIL, timing, failure, List.of());
+    public static DefaultResult fail(Duration timing, Throwable failure) {
+        return new DefaultResult(DefaultStatus.failure(failure), timing);
     }
 
     /**
-     * Creates a failing result with children.
+     * Creates a failing result with a message.
      *
-     * @param action The action.
      * @param timing The timing.
-     * @param failure The failure.
-     * @param children The child results.
+     * @param failureMessage The failure message.
      * @return A new DefaultResult.
      */
-    public static DefaultResult fail(Action action, Duration timing, Throwable failure, List<Result> children) {
-        return of(action, Status.FAIL, timing, failure, children);
+    public static DefaultResult fail(Duration timing, String failureMessage) {
+        return new DefaultResult(DefaultStatus.failure(failureMessage), timing);
     }
 
     /**
      * Creates a skipped result.
      *
-     * @param action The action.
      * @param timing The timing.
      * @return A new DefaultResult.
      */
-    public static DefaultResult skip(Action action, Duration timing) {
-        return of(action, Status.SKIP, timing, null, List.of());
+    public static DefaultResult skip(Duration timing) {
+        return new DefaultResult(DefaultStatus.skip(), timing);
     }
 
     /**
      * Creates a skipped result with a reason.
      *
-     * @param action The action.
      * @param timing The timing.
      * @param skipReason The reason for skipping.
      * @return A new DefaultResult.
      */
-    public static DefaultResult skip(Action action, Duration timing, Throwable skipReason) {
-        return of(action, Status.SKIP, timing, skipReason, List.of());
-    }
-
-    /**
-     * Creates a skipped result with children.
-     *
-     * @param action The action.
-     * @param timing The timing.
-     * @param children The child results.
-     * @return A new DefaultResult.
-     */
-    public static DefaultResult skip(Action action, Duration timing, List<Result> children) {
-        return of(action, Status.SKIP, timing, null, children);
+    public static DefaultResult skip(Duration timing, String skipReason) {
+        return new DefaultResult(DefaultStatus.skip(skipReason), timing);
     }
 
     @Override
-    public Action action() {
-        return action;
-    }
-
-    @Override
-    public Status status() {
+    public Status getStatus() {
         return status;
     }
 
     @Override
-    public Duration timing() {
+    public Duration getElapsedTime() {
         return timing;
-    }
-
-    @Override
-    public Optional<Throwable> failure() {
-        return Optional.ofNullable(failure);
-    }
-
-    @Override
-    public Optional<Result> parent() {
-        return Optional.ofNullable(parent);
-    }
-
-    void setParent(Result parent) {
-        this.parent = parent;
-    }
-
-    @Override
-    public List<Result> children() {
-        return children;
     }
 
     @Override

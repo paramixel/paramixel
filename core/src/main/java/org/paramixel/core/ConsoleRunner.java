@@ -17,71 +17,97 @@
 package org.paramixel.core;
 
 import java.util.Optional;
+import org.paramixel.core.discovery.Resolver;
+import org.paramixel.core.discovery.Selector;
 
 /**
- * Executes resolved actions using the standard console runtime.
+ * Executes actions using the standard console-oriented runtime.
  *
- * <p>This utility resolves an {@link Action} from a supplied {@link Selector},
- * executes it with the default {@link Runner}, and provides convenience
- * methods for converting the result into a process exit code.</p>
+ * <p>ConsoleRunner provides convenience methods for resolving actions from a {@link Selector},
+ * running actions directly, converting outcomes to process exit codes, and terminating the JVM.</p>
  *
- * <p>If no action is resolved for the selector, execution is skipped and
- * {@link Optional#empty()} is returned from {@link #run(Selector)}.</p>
- *
- * <p>This class cannot be instantiated.</p>
+ * @see Selector
+ * @see Runner
+ * @see ConsoleRunner#run(Selector)
+ * @see ConsoleRunner#runAndExit(Selector)
  */
 public final class ConsoleRunner {
 
-    /**
-     * Prevents instantiation of this utility class.
-     */
     private ConsoleRunner() {}
 
     /**
-     * Resolves and executes an action using the default runner.
+     * Resolves an action from the supplied selector and executes it.
      *
-     * @param selector selector used to resolve an action
-     * @return the execution result, or {@link Optional#empty()} if no action was resolved
+     * @param selector the selector used to resolve an action
+     * @return an optional containing the execution result, or an empty optional when no action is resolved
      */
     public static Optional<Result> run(Selector selector) {
         Optional<Action> optionalAction = Resolver.resolveActions(selector);
-
         if (optionalAction.isEmpty()) {
             return Optional.empty();
         }
-
-        Runner runner = Runner.builder().build();
-        return Optional.of(runner.run(optionalAction.orElseThrow()));
+        Action action = optionalAction.get();
+        Runner.builder().build().run(action);
+        return Optional.of(action.getResult());
     }
 
     /**
-     * Executes an action and converts the result to a process exit code.
+     * Resolves an action from the supplied selector, executes it, and returns a process exit code.
      *
-     * <ul>
-     *     <li>{@code 0} if no action was resolved</li>
-     *     <li>{@code 0} if execution passed</li>
-     *     <li>{@code 1} if execution failed</li>
-     * </ul>
+     * <p>Returns {@code 0} when no action is resolved or when the resolved action passes. Returns
+     * {@code 1} for all other resolved outcomes.</p>
      *
-     * @param selector selector used to resolve an action
-     * @return process exit code representing the execution result
+     * @param selector the selector used to resolve an action
+     * @return the process exit code for the resolved execution result
      */
     public static int runAndReturnExitCode(Selector selector) {
         Optional<Result> result = run(selector);
-
-        if (result.isEmpty()) {
-            return 0;
-        }
-
-        return result.get().status() == Result.Status.PASS ? 0 : 1;
+        return result.filter(value -> !value.getStatus().isPass())
+                .map(value -> 1)
+                .orElse(0);
     }
 
     /**
-     * Executes an action and terminates the JVM using the resulting exit code.
+     * Resolves an action from the supplied selector, executes it, and exits the JVM with the
+     * corresponding process exit code.
      *
-     * @param selector selector used to resolve an action
+     * @param selector the selector used to resolve an action
      */
     public static void runAndExit(Selector selector) {
         System.exit(runAndReturnExitCode(selector));
+    }
+
+    /**
+     * Executes the supplied action.
+     *
+     * @param action the action to execute
+     * @return the execution result
+     */
+    public static Result run(Action action) {
+        Runner.builder().build().run(action);
+        return action.getResult();
+    }
+
+    /**
+     * Executes the supplied action and returns a process exit code.
+     *
+     * <p>Returns {@code 0} when the action passes or is skipped. Returns {@code 1} for all other
+     * outcomes.</p>
+     *
+     * @param action the action to execute
+     * @return the process exit code for the action result
+     */
+    public static int runAndReturnExitCode(Action action) {
+        Result result = run(action);
+        return result.getStatus().isPass() || result.getStatus().isSkip() ? 0 : 1;
+    }
+
+    /**
+     * Executes the supplied action and exits the JVM with the corresponding process exit code.
+     *
+     * @param action the action to execute
+     */
+    public static void runAndExit(Action action) {
+        System.exit(runAndReturnExitCode(action));
     }
 }

@@ -16,10 +16,27 @@
 
 package org.paramixel.core.listener;
 
-import org.paramixel.core.Result;
+import org.paramixel.core.Action;
 import org.paramixel.core.Runner;
 
+/**
+ * Strategy interface for rendering execution summaries.
+ *
+ * <p>SummaryRenderer implementations define how execution summaries are formatted
+ * and displayed. Different implementations provide different visual formats:
+ * table, tree, etc.</p>
+ *
+ * @see TableSummaryRenderer
+ * @see TreeSummaryRenderer
+ * @see SummaryListener
+ */
 interface SummaryRenderer {
 
-    void renderSummary(Runner runner, Result result);
+    /**
+     * Renders the execution summary.
+     *
+     * @param runner the runner that executed the action
+     * @param action the root action to render
+     */
+    void renderSummary(Runner runner, Action action);
 }

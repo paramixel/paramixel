@@ -31,32 +31,34 @@ class RandomSequentialTest {
 
     @Test
     @DisplayName("rejects actions without children")
-    void rejectsActionsWithoutChildren() {
+    void rejectsActionsWithoutGetChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> RandomSequential.of("empty", List.of()))
-                .withMessage("sequential action must have at least one child");
+                .withMessage("action must have at least one child");
     }
 
     @Test
     @DisplayName("passes when all children pass")
-    void passesWhenAllChildrenPass() {
+    void passesWhenAllGetChildrenPass() {
         Action first = Direct.of("first", context -> {});
         Action second = Direct.of("second", context -> {});
         Action third = Direct.of("third", context -> {});
         Action root = RandomSequential.of("root", List.of(first, second, third));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children()).hasSize(3);
-        assertThat(result.children().get(0).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(1).status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children().get(2).status()).isEqualTo(Result.Status.PASS);
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(root.getChildren()).hasSize(3);
+        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(1).getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getChildren().get(2).getResult().getStatus().isPass()).isTrue();
     }
 
     @Test
     @DisplayName("executes all children regardless of failure")
-    void executesAllChildrenRegardlessOfFailure() {
+    void executesAllGetChildrenRegardlessOfFailure() {
         var executions = new ArrayList<String>();
         Action first = Direct.of("first", context -> {
             executions.add("first");
@@ -70,14 +72,25 @@ class RandomSequentialTest {
         });
         Action root = RandomSequential.of("root", List.of(first, second, third));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.FAIL);
+        assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(executions).hasSize(3);
-        assertThat(result.children()).hasSize(3);
-        assertThat(result.children().get(0).status()).isIn(Result.Status.PASS, Result.Status.FAIL);
-        assertThat(result.children().get(1).status()).isIn(Result.Status.PASS, Result.Status.FAIL);
-        assertThat(result.children().get(2).status()).isIn(Result.Status.PASS, Result.Status.FAIL);
+        assertThat(root.getChildren()).hasSize(3);
+        assertThat(root.getChildren().get(0).getResult().getStatus())
+                .satisfiesAnyOf(
+                        status -> assertThat(status.isPass()).isTrue(),
+                        status -> assertThat(status.isFailure()).isTrue());
+        assertThat(root.getChildren().get(1).getResult().getStatus())
+                .satisfiesAnyOf(
+                        status -> assertThat(status.isPass()).isTrue(),
+                        status -> assertThat(status.isFailure()).isTrue());
+        assertThat(root.getChildren().get(2).getResult().getStatus())
+                .satisfiesAnyOf(
+                        status -> assertThat(status.isPass()).isTrue(),
+                        status -> assertThat(status.isFailure()).isTrue());
     }
 
     @Test
@@ -130,10 +143,12 @@ class RandomSequentialTest {
         Action child3 = Direct.of("child3", context -> {});
         Action root = RandomSequential.of("root", List.of(child1, child2, child3));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.children()).hasSize(3);
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(root.getChildren()).hasSize(3);
     }
 
     @Test
@@ -144,44 +159,40 @@ class RandomSequentialTest {
         Action third = Direct.of("third", context -> {});
         Action root = RandomSequential.of("root", List.of(first, second, third));
 
-        Result result = Runner.builder().build().run(root);
+        Runner runner = Runner.builder().build();
+        runner.run(root);
+        Result result = root.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.parent()).isEmpty();
-        assertThat(result.children()).hasSize(3);
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(root.getParent()).isEmpty();
+        assertThat(root.getChildren()).hasSize(3);
 
-        Result firstResult = result.children().get(0);
-        Result secondResult = result.children().get(1);
-        Result thirdResult = result.children().get(2);
-
-        assertThat(firstResult.parent()).contains(result);
-        assertThat(secondResult.parent()).contains(result);
-        assertThat(thirdResult.parent()).contains(result);
+        assertThat(first.getParent()).contains(root);
+        assertThat(second.getParent()).contains(root);
+        assertThat(third.getParent()).contains(root);
     }
 
     @Test
-    @DisplayName("is instance of Sequential")
-    void isInstanceOfSequential() {
+    @DisplayName("is not instance of Sequential (separate class hierarchy)")
+    void isNotInstanceOfSequential() {
         Action root = RandomSequential.of("root", List.of(Direct.of("child", context -> {})));
 
-        assertThat(root).isInstanceOf(org.paramixel.core.action.Sequential.class);
+        assertThat(root).isNotInstanceOf(org.paramixel.core.action.Sequential.class);
     }
 
     @Test
     @DisplayName("returns empty seed when unseeded")
     void returnsEmptySeedWhenUnseeded() {
-        Action root = RandomSequential.of("root", List.of(Direct.of("child", context -> {})));
+        RandomSequential root = RandomSequential.of("root", List.of(Direct.of("child", context -> {})));
 
-        org.paramixel.core.action.RandomSequential random = (org.paramixel.core.action.RandomSequential) root;
-        assertThat(random.seed()).isEmpty();
+        assertThat(root.seed()).isEmpty();
     }
 
     @Test
     @DisplayName("returns seed when seeded")
     void returnsSeedWhenSeeded() {
-        Action root = RandomSequential.of("root", 42L, List.of(Direct.of("child", context -> {})));
+        RandomSequential root = RandomSequential.of("root", 42L, List.of(Direct.of("child", context -> {})));
 
-        org.paramixel.core.action.RandomSequential random = (org.paramixel.core.action.RandomSequential) root;
-        assertThat(random.seed()).hasValue(42L);
+        assertThat(root.seed()).hasValue(42L);
     }
 }

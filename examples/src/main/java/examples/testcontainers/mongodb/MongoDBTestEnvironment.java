@@ -26,7 +26,7 @@ import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.utility.DockerImageName;
 
-public class MongoDBTestEnvironment {
+public class MongoDBTestEnvironment implements AutoCloseable {
 
     private final String dockerImageName;
 
@@ -66,7 +66,7 @@ public class MongoDBTestEnvironment {
         return mongoDBContainer.getConnectionString();
     }
 
-    public void destroy() {
+    public void close() {
         if (mongoDBContainer != null) {
             mongoDBContainer.stop();
             mongoDBContainer = null;

@@ -26,7 +26,7 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.NginxContainer;
 import org.testcontainers.utility.DockerImageName;
 
-public class NginxTestEnvironment {
+public class NginxTestEnvironment implements AutoCloseable {
 
     private final String dockerImageName;
 
@@ -66,7 +66,7 @@ public class NginxTestEnvironment {
         return nginxContainer;
     }
 
-    public void destroy() {
+    public void close() {
         if (nginxContainer != null) {
             nginxContainer.stop();
             nginxContainer = null;

@@ -17,111 +17,180 @@
 package org.paramixel.core;
 
 import java.util.Map;
-import org.paramixel.core.internal.DefaultRunner;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.paramixel.core.internal.DefaultContext;
+import org.paramixel.core.listener.SafeListener;
 
 /**
- * Coordinates the execution of actions and action groups.
+ * Coordinates top-level execution of actions.
+ *
+ * <p>A runner owns the configuration, listener, and executor service used to execute an
+ * {@link Action}. Create instances with {@link #builder()} and then invoke {@link #run(Action)} to
+ * execute a plan.</p>
  */
-public interface Runner {
+public final class Runner {
 
-    /**
-     * Returns the listener notified during execution.
-     *
-     * @return The execution listener.
-     */
-    Listener listener();
+    private final Listener listener;
+    private final Map<String, String> configuration;
+    private final ExecutorService executorService;
+    private final boolean ownsExecutorService;
 
-    /**
-     * Returns the configuration map for this runner.
-     *
-     * @return The configuration map; never null.
-     */
-    default Map<String, String> configuration() {
-        return Configuration.defaultProperties();
+    private Runner(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
+        this.listener = Objects.requireNonNull(listener, "listener must not be null");
+        this.configuration = configuration != null ? Map.copyOf(configuration) : Configuration.defaultProperties();
+
+        if (executorService != null) {
+            this.executorService = executorService;
+            this.ownsExecutorService = false;
+        } else {
+            this.executorService = createExecutorService(this.configuration);
+            this.ownsExecutorService = true;
+        }
     }
 
     /**
-     * Executes an action as a root action.
+     * Creates a new builder for constructing {@link Runner} instances.
      *
-     * @param action The action to execute; must not be null.
-     * @return The execution result.
+     * @return a new runner builder
      */
-    Result run(Action action);
-
-    /**
-     * Executes the action represented by an existing context.
-     *
-     * @param context The context to execute; must not be null.
-     * @return The execution result.
-     */
-    Result run(Context context);
-
-    /**
-     * Executes an action as a child of an existing context.
-     *
-     * @param action The action to execute; must not be null.
-     * @param parentContext The parent context; must not be null.
-     * @return The execution result.
-     */
-    Result run(Action action, Context parentContext);
-
-    static Builder builder() {
+    public static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Returns the immutable configuration used by this runner.
+     *
+     * @return the runner configuration
+     */
+    public Map<String, String> getConfiguration() {
+        return configuration;
+    }
+
+    /**
+     * Returns the listener that receives lifecycle callbacks for this runner.
+     *
+     * @return the runner listener
+     */
+    public Listener getListener() {
+        return listener;
+    }
+
+    /**
+     * Executes the supplied action.
+     *
+     * <p>The configured listener is notified before execution starts and after it completes. If this
+     * runner created its own executor service, that executor service is shut down after execution.</p>
+     *
+     * @param action the action to execute
+     * @throws NullPointerException if {@code action} is {@code null}
+     */
+    public void run(Action action) {
+        Objects.requireNonNull(action, "action must not be null");
+
+        Listener safeListener = new SafeListener(listener);
+        safeListener.runStarted(this, action);
+
+        try {
+            DefaultContext context = new DefaultContext(configuration, safeListener, executorService);
+            action.execute(context);
+            safeListener.runCompleted(this, action);
+        } finally {
+            if (ownsExecutorService) {
+                shutdownExecutorService(executorService);
+            }
+        }
+    }
+
+    private static ExecutorService createExecutorService(Map<String, String> configuration) {
+        int parallelism = Integer.parseInt(configuration.getOrDefault(
+                Configuration.RUNNER_PARALLELISM,
+                String.valueOf(Runtime.getRuntime().availableProcessors() * 2)));
+
+        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
+                parallelism, parallelism, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {
+                    Thread thread = new Thread(runnable, "paramixel");
+                    thread.setDaemon(true);
+                    return thread;
+                });
+
+        threadPoolExecutor.prestartAllCoreThreads();
+        return threadPoolExecutor;
+    }
+
+    private static void shutdownExecutorService(ExecutorService executorService) {
+        executorService.shutdown();
+
+        try {
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
      * Builds {@link Runner} instances with optional custom components.
      */
-    class Builder {
+    public static final class Builder {
 
-        private Runner runner;
-        private final DefaultRunner.Builder defaultRunnerBuilder = DefaultRunner.builder();
         private Map<String, String> configuration;
+        private Listener listener = Listener.treeListener();
+        private ExecutorService executorService;
 
         /**
-         * Uses an existing runner instead of building a default runner.
+         * Sets the configuration properties for the runner being built.
          *
-         * @param runner The runner to return from {@link #build()}; may be
-         *     null to use the default builder.
-         * @return This builder.
-         */
-        public Builder runner(Runner runner) {
-            this.runner = runner;
-            return this;
-        }
-
-        /**
-         * Sets the listener used by the default runner.
+         * <p>The provided map is defensively copied.</p>
          *
-         * @param listener The listener to notify; must not be null.
-         * @return This builder.
-         */
-        public Builder listener(Listener listener) {
-            defaultRunnerBuilder.listener(listener);
-            return this;
-        }
-
-        /**
-         * Sets the configuration for the default runner.
-         *
-         * @param properties The configuration properties; must not be null.
-         * @return This builder.
+         * @param properties the configuration properties to use
+         * @return this builder
+         * @throws NullPointerException if {@code properties} is {@code null}
          */
         public Builder configuration(Map<String, String> properties) {
-            defaultRunnerBuilder.configuration(properties);
+            this.configuration = Map.copyOf(Objects.requireNonNull(properties, "configuration must not be null"));
             return this;
         }
 
         /**
-         * Builds the configured runner.
+         * Sets the listener for the runner being built.
          *
-         * @return The configured custom runner, or a default runner.
+         * @param listener the listener to use
+         * @return this builder
+         * @throws NullPointerException if {@code listener} is {@code null}
+         */
+        public Builder listener(Listener listener) {
+            this.listener = Objects.requireNonNull(listener, "listener must not be null");
+            return this;
+        }
+
+        /**
+         * Sets the executor service for the runner being built.
+         *
+         * <p>When supplied, the built runner uses this executor service and does not manage its
+         * lifecycle.</p>
+         *
+         * @param executorService the executor service to use
+         * @return this builder
+         * @throws NullPointerException if {@code executorService} is {@code null}
+         */
+        public Builder executorService(ExecutorService executorService) {
+            this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
+            return this;
+        }
+
+        /**
+         * Builds a new {@link Runner} from the current builder state.
+         *
+         * @return a new runner instance
          */
         public Runner build() {
-            if (runner != null) {
-                return runner;
-            }
-            return defaultRunnerBuilder.build();
+            return new Runner(configuration, listener, executorService);
         }
     }
 }

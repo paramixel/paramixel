@@ -27,6 +27,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -36,10 +40,10 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.paramixel.core.Action;
+import org.paramixel.core.Configuration;
 import org.paramixel.core.Listener;
-import org.paramixel.core.Resolver;
-import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
+import org.paramixel.core.discovery.Resolver;
 import org.paramixel.maven.plugin.internal.util.Arguments;
 
 @Mojo(name = "test", defaultPhase = LifecyclePhase.TEST, requiresDependencyResolution = ResolutionScope.TEST)
@@ -48,10 +52,10 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
 
-    @Parameter(property = "paramixel.maven.skipTests", defaultValue = "false")
+    @Parameter(property = "paramixel.skipTests", defaultValue = "false")
     private boolean skipTests;
 
-    @Parameter(property = "paramixel.maven.failIfNoTests", defaultValue = "true")
+    @Parameter(property = "paramixel.failIfNoTests", defaultValue = "true")
     private boolean failIfNoTests;
 
     @Parameter
@@ -59,13 +63,14 @@ public class ParamixelMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        if (skipTests || Boolean.getBoolean("paramixel.maven.skipTests")) {
+        if (skipTests || Boolean.getBoolean("paramixel.skipTests")) {
             getLog().info("Tests are skipped.");
             return;
         }
 
         final var configuration = buildConfiguration();
         final var originalClassLoader = Thread.currentThread().getContextClassLoader();
+        ExecutorService executorService = null;
 
         try (URLClassLoader testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
@@ -81,18 +86,27 @@ public class ParamixelMojo extends AbstractMojo {
                 return;
             }
 
-            Runner runner = buildRunner(configuration);
-            Result result = runner.run(optionalAction.get());
+            executorService = createExecutorService(configuration);
 
-            if (result.status() == Result.Status.FAIL) {
+            Runner runner = Runner.builder()
+                    .configuration(configuration)
+                    .executorService(executorService)
+                    .listener(Listener.treeListener())
+                    .build();
+
+            Action action = optionalAction.get();
+            runner.run(action);
+
+            if (action.getResult().getStatus().isFailure()) {
                 throw new MojoFailureException("There are test failures");
             }
-
         } catch (MojoFailureException e) {
             throw e;
         } catch (Exception e) {
             throw new MojoExecutionException("Failed to execute Paramixel specs", e);
         } finally {
+            shutdownExecutorService(executorService);
+
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
     }
@@ -134,13 +148,6 @@ public class ParamixelMojo extends AbstractMojo {
         return configuration;
     }
 
-    private Runner buildRunner(Map<String, String> configuration) {
-        return Runner.builder()
-                .configuration(configuration)
-                .listener(Listener.treeListener())
-                .build();
-    }
-
     private URLClassLoader buildTestClassLoader() throws MojoExecutionException {
         final List<URL> classpathUrls = buildTestClasspathUrls();
 
@@ -180,6 +187,37 @@ public class ParamixelMojo extends AbstractMojo {
         }
 
         return new ArrayList<>(classpathUrls);
+    }
+
+    private static ExecutorService createExecutorService(Map<String, String> configuration) {
+        int parallelism = Integer.parseInt(configuration.getOrDefault(
+                Configuration.RUNNER_PARALLELISM,
+                String.valueOf(Runtime.getRuntime().availableProcessors() * 2)));
+
+        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
+                parallelism, parallelism, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {
+                    Thread thread = new Thread(runnable, "paramixel");
+                    thread.setDaemon(true);
+                    return thread;
+                });
+
+        threadPoolExecutor.prestartAllCoreThreads();
+        return threadPoolExecutor;
+    }
+
+    private static void shutdownExecutorService(ExecutorService executorService) {
+        if (executorService != null) {
+            executorService.shutdown();
+
+            try {
+                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     public static class Property {

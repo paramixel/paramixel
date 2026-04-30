@@ -17,11 +17,12 @@
 package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.core.action.Executable;
 import org.paramixel.core.action.Noop;
+import org.paramixel.core.action.Sequential;
 
 @DisplayName("Action")
 class ActionTest {
@@ -31,21 +32,23 @@ class ActionTest {
     void createsNoopActionsThatCompleteWithoutDoingWork() {
         Action action = Noop.of("noop");
 
-        Result result = Runner.builder().build().run(action);
+        Runner.builder().build().run(action);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.failure()).isEmpty();
-        assertThat(result.action()).isSameAs(action);
-        assertThat(result.action()).isInstanceOf(Noop.class);
-        assertThat(result.children()).isEmpty();
+        assertThat(action.getResult().getStatus().isPass()).isTrue();
+        assertThat(action.getResult().getStatus().getThrowable()).isEmpty();
+        assertThat(action.getResult()).isNotNull();
     }
 
     @Test
-    @DisplayName("creates reusable noop executables")
-    void createsReusableNoopExecutables() throws Throwable {
-        var noop = Executable.noop();
+    @DisplayName("returns unmodifiable children and links each child to its parent")
+    void returnsUnmodifiableChildrenAndLinksEachChildToItsParent() {
+        Action first = Noop.of("first");
+        Action second = Noop.of("second");
+        Action root = Sequential.of("root", first, second);
 
-        noop.execute(null);
-        noop.execute(null);
+        assertThat(root.getChildren()).containsExactly(first, second);
+        assertThat(first.getParent()).contains(root);
+        assertThat(second.getParent()).contains(root);
+        assertThatThrownBy(() -> root.getChildren().remove(0)).isInstanceOf(UnsupportedOperationException.class);
     }
 }

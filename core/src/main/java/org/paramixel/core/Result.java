@@ -17,136 +17,70 @@
 package org.paramixel.core;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.Optional;
-import org.paramixel.core.internal.DefaultResult;
 
 /**
  * Describes the outcome of executing an {@link Action}.
+ *
+ * <p>Result is a lightweight object containing only status and timing information.
+ * Navigate the {@link Action} tree to access hierarchy and names.</p>
+ *
+ * <p>Each action owns exactly one result, which transitions through the following lifecycle:
+ * <ul>
+ *   <li>{@link Status#isStaged()} - Before execution begins</li>
+ *   <li>{@link Status#isPass()} - After successful execution</li>
+ *   <li>{@link Status#isFailure()} - After failed execution (exception thrown or {@link FailException})</li>
+ *   <li>{@link Status#isSkip()} - After skipped execution ({@link SkipException} or parent-level skip)</li>
+ * </ul>
+ *
+ * <p>Results are immutable and thread-safe. Access the result via {@link Action#getResult()}.</p>
+ *
+ * <p><strong>Usage Example:</strong></p>
+ * <pre>{@code
+ * Action action = Direct.of("myAction", ctx -> {
+ *     System.out.println("Executing");
+ * });
+ * runner.run(action);
+ * Result result = action.getResult();
+ * if (result.getStatus().isPass()) {
+ *     System.out.println("Success in " + result.getElapsedTime().toMillis() + "ms");
+ * }
+ * }</pre>
  */
 public interface Result {
 
     /**
-     * Identifies the terminal state of an executed action.
+     * Returns the execution status.
+     *
+     * <p>The status indicates the outcome of the action execution:
+     * <ul>
+     *   <li>{@link Status#isStaged()} - Before execution starts (during {@link Listener#beforeAction})</li>
+     *   <li>{@link Status#isPass()} - After successful completion (no exceptions)</li>
+     *   <li>{@link Status#isFailure()} - After failure (exception thrown or {@link FailException})</li>
+     *   <li>{@link Status#isSkip()} - After skip ({@link SkipException} or parent-level skip)</li>
+     * </ul>
+     *
+     * <p>Status transitions are guaranteed: STAGED → PASS/FAIL/SKIP exactly once per execution.</p>
+     *
+     * @return the execution status; never {@code null}
+     * @see Status
+     * @see Listener#afterAction(Context, Action, Result)
      */
-    enum Status {
-
-        /**
-         * Indicates that the action completed successfully.
-         */
-        PASS,
-
-        /**
-         * Indicates that the action failed.
-         */
-        FAIL,
-
-        /**
-         * Indicates that the action was skipped.
-         */
-        SKIP
-    }
+    Status getStatus();
 
     /**
-     * Returns the action that produced this result.
+     * Returns the elapsed time for this action's execution.
      *
-     * @return The executed action.
-     */
-    Action action();
-
-    /**
-     * Returns the terminal status of the action.
+     * <p>The duration is measured from the moment {@link Listener#beforeAction} is invoked
+     * until {@link Listener#afterAction} is invoked. This includes the execution of all child actions.</p>
      *
-     * @return The action status.
-     */
-    Status status();
-
-    /**
-     * Returns the elapsed execution time.
+     * <p>For parent actions, the duration includes the total time spent executing all children,
+     * accounting for sequential or parallel execution patterns as defined by the action type.</p>
      *
-     * @return The measured duration.
-     */
-    Duration timing();
-
-    /**
-     * Returns the failure that caused this result, when present.
+     * <p>Timing precision is typically milliseconds, but the exact precision depends on the
+     * underlying system clock and the {@link java.time.Duration} implementation.</p>
      *
-     * @return An {@link Optional} containing the failure, or empty when the
-     *     action did not fail.
+     * @return the elapsed execution time; never {@code null}, may be zero for instant actions
+     * @see java.time.Duration
      */
-    Optional<Throwable> failure();
-
-    /**
-     * Returns the parent result when this result was produced by a child action.
-     *
-     * @return the parent result in the execution tree, or empty when this result was produced by a root action.
-     */
-    Optional<Result> parent();
-
-    /**
-     * Returns results produced by child actions.
-     *
-     * @return The child results in execution order; never null.
-     */
-    List<Result> children();
-
-    /**
-     * Creates a passing result.
-     *
-     * @param action The action; must not be null.
-     * @param timing The execution duration; must not be null.
-     * @return A passing result.
-     */
-    static Result pass(Action action, Duration timing) {
-        return DefaultResult.pass(action, timing);
-    }
-
-    /**
-     * Creates a failing result.
-     *
-     * @param action The action; must not be null.
-     * @param timing The execution duration; must not be null.
-     * @param failure The failure; may be null.
-     * @return A failing result.
-     */
-    static Result fail(Action action, Duration timing, Throwable failure) {
-        return DefaultResult.fail(action, timing, failure);
-    }
-
-    /**
-     * Creates a skipped result.
-     *
-     * @param action The action; must not be null.
-     * @param timing The execution duration; must not be null.
-     * @return A skipped result.
-     */
-    static Result skip(Action action, Duration timing) {
-        return DefaultResult.skip(action, timing);
-    }
-
-    /**
-     * Creates a skipped result with a reason.
-     *
-     * @param action The action; must not be null.
-     * @param timing The execution duration; must not be null.
-     * @param skipReason The reason for skipping; may be null.
-     * @return A skipped result.
-     */
-    static Result skip(Action action, Duration timing, Throwable skipReason) {
-        return DefaultResult.skip(action, timing, skipReason);
-    }
-
-    /**
-     * Creates a result with the specified status.
-     *
-     * @param action The action; must not be null.
-     * @param status The result status; must not be null.
-     * @param timing The execution duration; must not be null.
-     * @param failure The failure; may be null.
-     * @param children The child results; must not be null.
-     * @return A result with the specified properties.
-     */
-    static Result of(Action action, Status status, Duration timing, Throwable failure, List<Result> children) {
-        return DefaultResult.of(action, status, timing, failure, children);
-    }
+    Duration getElapsedTime();
 }

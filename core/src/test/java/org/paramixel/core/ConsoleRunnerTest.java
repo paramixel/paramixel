@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.core.action.Direct;
+import org.paramixel.core.discovery.Selector;
 
 @DisplayName("ConsoleRunner")
 class ConsoleRunnerTest {
@@ -42,5 +44,37 @@ class ConsoleRunnerTest {
         int exitCode = ConsoleRunner.runAndReturnExitCode(selector);
 
         assertThat(exitCode).isZero();
+    }
+
+    @Test
+    @DisplayName("run returns result with PASS status for passing action")
+    void runReturnsPassResultForPassingAction() {
+        Action action = org.paramixel.core.action.Noop.of("passing");
+
+        Result result = ConsoleRunner.run(action);
+
+        assertThat(result.getStatus().isPass()).isTrue();
+    }
+
+    @Test
+    @DisplayName("runAndReturnExitCode returns 0 for passing action")
+    void runAndReturnExitCodeReturns0ForPassingAction() {
+        Action action = org.paramixel.core.action.Noop.of("passing");
+
+        int exitCode = ConsoleRunner.runAndReturnExitCode(action);
+
+        assertThat(exitCode).isZero();
+    }
+
+    @Test
+    @DisplayName("runAndReturnExitCode returns 1 for failing action")
+    void runAndReturnExitCodeReturns1ForFailingAction() {
+        Action action = Direct.of("failing", context -> {
+            throw new RuntimeException("test failure");
+        });
+
+        int exitCode = ConsoleRunner.runAndReturnExitCode(action);
+
+        assertThat(exitCode).isEqualTo(1);
     }
 }

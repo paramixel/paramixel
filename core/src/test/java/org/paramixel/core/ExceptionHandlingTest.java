@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
+import org.paramixel.core.action.Noop;
 
 @DisplayName("Exception handling tests")
 class ExceptionHandlingTest {
@@ -34,10 +35,13 @@ class ExceptionHandlingTest {
             throw expectedException;
         });
 
-        Result result = Runner.builder().build().run(action);
+        Runner runner = Runner.builder().build();
+        runner.run(action);
+        Result result = action.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.FAIL);
-        assertThat(result.failure()).isPresent().get().isSameAs(expectedException);
+        assertThat(result.getStatus().isFailure()).isTrue();
+        assertThat(result.getStatus().getThrowable().isPresent()).isTrue();
+        assertThat(result.getStatus().getThrowable().get()).isSameAs(expectedException);
     }
 
     @Test
@@ -48,30 +52,37 @@ class ExceptionHandlingTest {
             throw skipException;
         });
 
-        Result result = Runner.builder().build().run(action);
+        Runner runner = Runner.builder().build();
+        runner.run(action);
+        Result result = action.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.SKIP);
-        assertThat(result.failure()).isPresent();
-        assertThat(result.failure().get().getMessage()).isEqualTo("database not available");
+        assertThat(result.getStatus().isSkip()).isTrue();
+        assertThat(result.getStatus().getMessage()).isPresent();
+        assertThat(result.getStatus().getMessage().get()).isEqualTo("database not available");
+        assertThat(result.getStatus().getThrowable()).isEmpty();
     }
 
     @Test
-    @DisplayName("Lifecycle setup SkipException stores reason in Result")
-    void lifecycleSetupSkipExceptionStoresReason() {
-        var skipException = new SkipException("setup condition not met");
-        Action body = Direct.of("body", context -> {});
+    @DisplayName("Lifecycle before SkipException stores reason in Result")
+    void lifecycleBeforeSkipExceptionStoresReason() {
+        var skipException = new SkipException("before condition not met");
+        Action main = Direct.of("main", context -> {});
         Lifecycle lifecycle = Lifecycle.of(
                 "test",
-                context -> {
+                Direct.of("before", context -> {
                     throw skipException;
-                },
-                body);
+                }),
+                main,
+                Noop.of("after"));
 
-        Result result = Runner.builder().build().run(lifecycle);
+        Runner runner = Runner.builder().build();
+        runner.run(lifecycle);
+        Result result = lifecycle.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.SKIP);
-        assertThat(result.failure()).isPresent().get().isSameAs(skipException);
-        assertThat(result.failure().get().getMessage()).isEqualTo("setup condition not met");
+        assertThat(result.getStatus().isSkip()).isTrue();
+        assertThat(result.getStatus().getMessage()).isPresent();
+        assertThat(result.getStatus().getMessage().get()).isEqualTo("before condition not met");
+        assertThat(result.getStatus().getThrowable()).isEmpty();
     }
 
     @Test
@@ -81,11 +92,13 @@ class ExceptionHandlingTest {
             throw new RuntimeException("something went wrong");
         });
 
-        Result result = Runner.builder().build().run(action);
+        Runner runner = Runner.builder().build();
+        runner.run(action);
+        Result result = action.getResult();
 
-        assertThat(result.status()).isEqualTo(Result.Status.FAIL);
-        assertThat(result.failure()).isPresent();
-        Throwable failure = result.failure().get();
+        assertThat(result.getStatus().isFailure()).isTrue();
+        assertThat(result.getStatus().getThrowable()).isPresent();
+        Throwable failure = result.getStatus().getThrowable().get();
         assertThat(failure.getClass().getSimpleName()).isEqualTo("RuntimeException");
         assertThat(failure.getMessage()).isEqualTo("something went wrong");
     }

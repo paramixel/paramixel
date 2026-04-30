@@ -40,7 +40,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.utility.DockerImageName;
 
-public class TansuTestEnvironment {
+public class TansuTestEnvironment implements AutoCloseable {
 
     private final String dockerImageName;
 
@@ -106,7 +106,7 @@ public class TansuTestEnvironment {
         return "localhost:" + hostKafkaPort;
     }
 
-    public void destroy() {
+    public void close() {
         if (genericContainer != null) {
             genericContainer.stop();
             genericContainer = null;

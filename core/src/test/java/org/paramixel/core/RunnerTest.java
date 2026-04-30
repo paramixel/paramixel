@@ -18,20 +18,22 @@ package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.action.Sequential;
-import org.paramixel.core.internal.DefaultRunner;
 
 @DisplayName("DefaultRunner")
 class RunnerTest {
@@ -41,7 +43,7 @@ class RunnerTest {
     void rejectsSequentialActionsWithoutChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> Sequential.of("empty", List.of()))
-                .withMessage("sequential action must have at least one child");
+                .withMessage("action must have at least one child");
     }
 
     @Test
@@ -49,7 +51,7 @@ class RunnerTest {
     void rejectsParallelActionsWithoutChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> Parallel.of("empty", List.of()))
-                .withMessage("parallel action must have at least one child");
+                .withMessage("action must have at least one child");
     }
 
     @Test
@@ -64,37 +66,32 @@ class RunnerTest {
                         parallelAction("parallel-0", sequentialExecutions, directExecutionCount),
                         parallelAction("parallel-1", sequentialExecutions, directExecutionCount)));
 
-        Result result = Runner.builder().build().run(root);
+        Runner.builder().build().run(root);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.failure()).isEmpty();
-        assertThat(result.action()).isSameAs(root);
-        assertThat(result.action()).isInstanceOf(Parallel.class);
-        assertThat(result.children()).hasSize(2);
+        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getResult().getStatus().getThrowable()).isEmpty();
+        assertThat(root.getChildren()).hasSize(2);
 
-        for (int depth1Index = 0; depth1Index < result.children().size(); depth1Index++) {
-            Result depth1Result = result.children().get(depth1Index);
-            assertThat(depth1Result.status()).isEqualTo(Result.Status.PASS);
-            assertThat(depth1Result.action().name()).isEqualTo("parallel-" + depth1Index);
-            assertThat(depth1Result.action()).isInstanceOf(Parallel.class);
-            assertThat(depth1Result.children()).hasSize(2);
+        for (int depth1Index = 0; depth1Index < root.getChildren().size(); depth1Index++) {
+            Action depth1Action = root.getChildren().get(depth1Index);
+            assertThat(depth1Action.getResult().getStatus().isPass()).isTrue();
+            assertThat(depth1Action.getName()).isEqualTo("parallel-" + depth1Index);
+            assertThat(depth1Action.getChildren()).hasSize(2);
 
-            for (int depth2Index = 0; depth2Index < depth1Result.children().size(); depth2Index++) {
-                Result depth2Result = depth1Result.children().get(depth2Index);
+            for (int depth2Index = 0; depth2Index < depth1Action.getChildren().size(); depth2Index++) {
+                Action depth2Action = depth1Action.getChildren().get(depth2Index);
                 String sequentialName = "parallel-" + depth1Index + "-sequential-" + depth2Index;
 
-                assertThat(depth2Result.status()).isEqualTo(Result.Status.PASS);
-                assertThat(depth2Result.action().name()).isEqualTo(sequentialName);
-                assertThat(depth2Result.action()).isInstanceOf(Sequential.class);
-                assertThat(depth2Result.children()).hasSize(4);
+                assertThat(depth2Action.getResult().getStatus().isPass()).isTrue();
+                assertThat(depth2Action.getName()).isEqualTo(sequentialName);
+                assertThat(depth2Action.getChildren()).hasSize(4);
 
-                for (int leafIndex = 0; leafIndex < depth2Result.children().size(); leafIndex++) {
-                    Result leafResult = depth2Result.children().get(leafIndex);
+                for (int leafIndex = 0; leafIndex < depth2Action.getChildren().size(); leafIndex++) {
+                    Action leafAction = depth2Action.getChildren().get(leafIndex);
 
-                    assertThat(leafResult.status()).isEqualTo(Result.Status.PASS);
-                    assertThat(leafResult.action().name()).isEqualTo(sequentialName + "-direct-" + leafIndex);
-                    assertThat(leafResult.action()).isInstanceOf(Direct.class);
-                    assertThat(leafResult.children()).isEmpty();
+                    assertThat(leafAction.getResult().getStatus().isPass()).isTrue();
+                    assertThat(leafAction.getName()).isEqualTo(sequentialName + "-direct-" + leafIndex);
+                    assertThat(leafAction.getChildren()).isEmpty();
                 }
             }
         }
@@ -111,13 +108,13 @@ class RunnerTest {
     }
 
     @Test
-    @DisplayName("root result has no parent")
-    void rootResultHasNoParent() {
+    @DisplayName("root action has no parent")
+    void rootActionHasNoParent() {
         Action root = Direct.of("root", context -> {});
-        Result result = Runner.builder().build().run(root);
+        Runner.builder().build().run(root);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.parent()).isEmpty();
+        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getParent()).isEmpty();
     }
 
     @Test
@@ -127,17 +124,14 @@ class RunnerTest {
         Action right = Direct.of("right", context -> {});
         Action root = Sequential.of("root", List.of(left, right));
 
-        Result result = Runner.builder().build().run(root);
+        Runner.builder().build().run(root);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.parent()).isEmpty();
-        assertThat(result.children()).hasSize(2);
+        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getParent()).isEmpty();
+        assertThat(root.getChildren()).hasSize(2);
 
-        Result leftResult = result.children().get(0);
-        Result rightResult = result.children().get(1);
-
-        assertThat(leftResult.parent()).contains(result);
-        assertThat(rightResult.parent()).contains(result);
+        assertThat(left.getParent()).contains(root);
+        assertThat(right.getParent()).contains(root);
     }
 
     @Test
@@ -147,17 +141,14 @@ class RunnerTest {
         Action right = Direct.of("right", context -> {});
         Action root = Parallel.of("root", List.of(left, right));
 
-        Result result = Runner.builder().build().run(root);
+        Runner.builder().build().run(root);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.parent()).isEmpty();
-        assertThat(result.children()).hasSize(2);
+        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getParent()).isEmpty();
+        assertThat(root.getChildren()).hasSize(2);
 
-        Result leftResult = result.children().get(0);
-        Result rightResult = result.children().get(1);
-
-        assertThat(leftResult.parent()).contains(result);
-        assertThat(rightResult.parent()).contains(result);
+        assertThat(left.getParent()).contains(root);
+        assertThat(right.getParent()).contains(root);
     }
 
     @Test
@@ -169,23 +160,17 @@ class RunnerTest {
         Action child2 = Sequential.of("child2", List.of(right));
         Action root = Parallel.of("root", List.of(child1, child2));
 
-        Result result = Runner.builder().build().run(root);
+        Runner.builder().build().run(root);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(result.parent()).isEmpty();
-        assertThat(result.children()).hasSize(2);
+        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getParent()).isEmpty();
+        assertThat(root.getChildren()).hasSize(2);
 
-        Result child1Result = result.children().get(0);
-        Result child2Result = result.children().get(1);
+        assertThat(child1.getParent()).contains(root);
+        assertThat(child2.getParent()).contains(root);
 
-        assertThat(child1Result.parent()).contains(result);
-        assertThat(child2Result.parent()).contains(result);
-
-        Result leftResult = child1Result.children().get(0);
-        Result rightResult = child2Result.children().get(0);
-
-        assertThat(leftResult.parent()).contains(child1Result);
-        assertThat(rightResult.parent()).contains(child2Result);
+        assertThat(left.getParent()).contains(child1);
+        assertThat(right.getParent()).contains(child2);
     }
 
     @Test
@@ -200,22 +185,22 @@ class RunnerTest {
                         parallelAction("parallel-0", sequentialExecutions, directExecutionCount),
                         parallelAction("parallel-1", sequentialExecutions, directExecutionCount)));
 
-        Result result = Runner.builder().build().run(root);
+        Runner.builder().build().run(root);
 
-        assertThat(result.parent()).isEmpty();
-        assertThat(result.children()).hasSize(2);
+        assertThat(root.getParent()).isEmpty();
+        assertThat(root.getChildren()).hasSize(2);
 
-        for (int depth1Index = 0; depth1Index < result.children().size(); depth1Index++) {
-            Result depth1Result = result.children().get(depth1Index);
-            assertThat(depth1Result.parent()).contains(result);
+        for (int depth1Index = 0; depth1Index < root.getChildren().size(); depth1Index++) {
+            Action depth1Action = root.getChildren().get(depth1Index);
+            assertThat(depth1Action.getParent()).contains(root);
 
-            for (int depth2Index = 0; depth2Index < depth1Result.children().size(); depth2Index++) {
-                Result depth2Result = depth1Result.children().get(depth2Index);
-                assertThat(depth2Result.parent()).contains(depth1Result);
+            for (int depth2Index = 0; depth2Index < depth1Action.getChildren().size(); depth2Index++) {
+                Action depth2Action = depth1Action.getChildren().get(depth2Index);
+                assertThat(depth2Action.getParent()).contains(depth1Action);
 
-                for (int leafIndex = 0; leafIndex < depth2Result.children().size(); leafIndex++) {
-                    Result leafResult = depth2Result.children().get(leafIndex);
-                    assertThat(leafResult.parent()).contains(depth2Result);
+                for (int leafIndex = 0; leafIndex < depth2Action.getChildren().size(); leafIndex++) {
+                    Action leafAction = depth2Action.getChildren().get(leafIndex);
+                    assertThat(leafAction.getParent()).contains(depth2Action);
                 }
             }
         }
@@ -223,11 +208,21 @@ class RunnerTest {
 
     @Test
     @DisplayName("notifies listener before and after each action")
-    void notifiesListenerBeforeAndAfterEachAction() {
+    void notifiesGetListenerBeforeAndAfterEachAction() {
         var events = new CopyOnWriteArrayList<String>();
         Action root =
                 Sequential.of("root", List.of(Direct.of("first", context -> {}), Direct.of("second", context -> {})));
         Listener listener = new Listener() {
+            @Override
+            public void runStarted(Runner runner, Action action) {
+                events.add("runStarted:" + action.getClass().getSimpleName().charAt(0));
+            }
+
+            @Override
+            public void runCompleted(Runner runner, Action action) {
+                events.add("runCompleted:" + action.getClass().getSimpleName().charAt(0));
+            }
+
             @Override
             public void beforeAction(Context context, Action action) {
                 events.add("before:" + action.getClass().getSimpleName().charAt(0));
@@ -235,15 +230,23 @@ class RunnerTest {
 
             @Override
             public void afterAction(Context context, Action action, Result result) {
-                events.add("after:" + action.getClass().getSimpleName().charAt(0) + ":" + result.status());
+                events.add("after:" + action.getClass().getSimpleName().charAt(0) + ":" + result.getStatus());
             }
         };
 
-        Result result = Runner.builder().listener(listener).build().run(root);
+        Runner.builder().listener(listener).build().run(root);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
+        assertThat(root.getResult().getStatus().isPass()).isTrue();
         assertThat(events)
-                .containsExactly("before:S", "before:D", "after:D:PASS", "before:D", "after:D:PASS", "after:S:PASS");
+                .containsExactly(
+                        "runStarted:S",
+                        "before:S",
+                        "before:D",
+                        "after:D:PASS",
+                        "before:D",
+                        "after:D:PASS",
+                        "after:S:PASS",
+                        "runCompleted:S");
     }
 
     @Test
@@ -253,13 +256,161 @@ class RunnerTest {
         Action right = Direct.of("right", context -> {});
         Action root = Sequential.of("root", List.of(left, right));
 
-        Result result = Runner.builder().build().run(root);
+        Runner.builder().build().run(root);
 
-        assertThat(result.status()).isEqualTo(Result.Status.PASS);
-        assertThat(root.parent()).isEmpty();
-        assertThat(root.children()).containsExactly(left, right);
-        assertThat(left.parent()).contains(root);
-        assertThat(right.parent()).contains(root);
+        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(root.getParent()).isEmpty();
+        assertThat(root.getChildren()).containsExactly(left, right);
+        assertThat(left.getParent()).contains(root);
+        assertThat(right.getParent()).contains(root);
+    }
+
+    @Test
+    @DisplayName("stores and returns provided configuration map")
+    void storesAndReturnsProvidedGetConfigurationMap() {
+        var expectedConfig = Map.of("key1", "value1", "key2", "value2");
+        var runner = Runner.builder().configuration(expectedConfig).build();
+        assertThat(runner.getConfiguration()).isEqualTo(expectedConfig);
+    }
+
+    @Test
+    @DisplayName("defensively copies configuration map")
+    void defensivelyCopiesGetConfigurationMap() {
+        var originalConfig = new HashMap<String, String>();
+        originalConfig.put("key1", "value1");
+        Runner runner = Runner.builder().configuration(originalConfig).build();
+        originalConfig.put("key2", "value2");
+        assertThat(runner.getConfiguration()).doesNotContainKey("key2");
+    }
+
+    @Test
+    @DisplayName("parallel with custom executor service runs children on user's pool")
+    void parallelWithCustomExecutorService() {
+        var executorService = Executors.newFixedThreadPool(4);
+        var executionCount = new AtomicInteger();
+
+        Action action = Parallel.of(
+                "test",
+                executorService,
+                List.of(
+                        Direct.of("child 1", context -> executionCount.incrementAndGet()),
+                        Direct.of("child 2", context -> executionCount.incrementAndGet()),
+                        Direct.of("child 3", context -> executionCount.incrementAndGet())));
+
+        Runner.builder().build().run(action);
+
+        assertThat(action.getResult().getStatus().isPass()).isTrue();
+        assertThat(executionCount).hasValue(3);
+
+        executorService.shutdown();
+    }
+
+    @Test
+    @DisplayName("parallel with custom executor service varargs runs children on user's pool")
+    void parallelWithCustomExecutorServiceVarargs() {
+        var executorService = Executors.newFixedThreadPool(4);
+        var executionCount = new AtomicInteger();
+
+        Action action = Parallel.of(
+                "test",
+                executorService,
+                Direct.of("child 1", context -> executionCount.incrementAndGet()),
+                Direct.of("child 2", context -> executionCount.incrementAndGet()),
+                Direct.of("child 3", context -> executionCount.incrementAndGet()));
+
+        Runner.builder().build().run(action);
+
+        assertThat(action.getResult().getStatus().isPass()).isTrue();
+        assertThat(executionCount).hasValue(3);
+
+        executorService.shutdown();
+    }
+
+    @Test
+    @DisplayName("custom executor service is not shut down by runner")
+    void customExecutorServiceNotShutDownByRunner() {
+        var executorService = Executors.newFixedThreadPool(4);
+
+        Action action = Parallel.of("test", executorService, List.of(Direct.of("child", context -> {})));
+
+        Runner.builder().build().run(action);
+
+        assertThat(executorService.isShutdown()).isFalse();
+        assertThat(executorService.isTerminated()).isFalse();
+
+        executorService.shutdown();
+    }
+
+    @Test
+    @DisplayName("parallel workers preserve parent context class loader")
+    void parallelWorkersPreserveParentContextClassLoader() {
+        ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
+        ClassLoader expectedClassLoader = new URLClassLoader(new URL[0], originalClassLoader);
+        var observedClassLoaders = new CopyOnWriteArrayList<ClassLoader>();
+
+        try {
+            Thread.currentThread().setContextClassLoader(expectedClassLoader);
+
+            Action action = Parallel.of(
+                    "test",
+                    4,
+                    List.of(
+                            Direct.of(
+                                    "child 1",
+                                    context -> observedClassLoaders.add(
+                                            Thread.currentThread().getContextClassLoader())),
+                            Direct.of(
+                                    "child 2",
+                                    context -> observedClassLoaders.add(
+                                            Thread.currentThread().getContextClassLoader())),
+                            Direct.of(
+                                    "child 3",
+                                    context -> observedClassLoaders.add(
+                                            Thread.currentThread().getContextClassLoader())),
+                            Direct.of(
+                                    "child 4",
+                                    context -> observedClassLoaders.add(
+                                            Thread.currentThread().getContextClassLoader()))));
+
+            Runner.builder().build().run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(observedClassLoaders).hasSize(4).containsOnly(expectedClassLoader);
+        } finally {
+            Thread.currentThread().setContextClassLoader(originalClassLoader);
+        }
+    }
+
+    @Test
+    @DisplayName("nested parallel can use dedicated inner executor services")
+    void nestedParallelCanUseDedicatedInnerExecutorServices() {
+        var executionCount = new AtomicInteger();
+        var innerExecutorServices = new ArrayList<java.util.concurrent.ExecutorService>();
+
+        try {
+            List<Action> innerParallelActions = new ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                List<Action> leafActions = new ArrayList<>();
+                for (int j = 0; j < 3; j++) {
+                    leafActions.add(Direct.of("leaf " + i + "-" + j, context -> executionCount.incrementAndGet()));
+                }
+
+                var innerExecutorService = Executors.newFixedThreadPool(3);
+                innerExecutorServices.add(innerExecutorService);
+                innerParallelActions.add(Parallel.of("inner " + i, innerExecutorService, List.copyOf(leafActions)));
+            }
+
+            Action outerParallel = Parallel.of("outer", List.copyOf(innerParallelActions));
+
+            Runner.builder().build().run(outerParallel);
+
+            assertThat(outerParallel.getResult().getStatus().isPass()).isTrue();
+            assertThat(executionCount).hasValue(12);
+        } finally {
+            for (var executorService : innerExecutorServices) {
+                executorService.shutdown();
+            }
+        }
     }
 
     private static Action parallelAction(
@@ -297,67 +448,7 @@ class RunnerTest {
             directExecutionCount.incrementAndGet();
             sequentialExecutions
                     .computeIfAbsent(sequentialName, ignored -> new CopyOnWriteArrayList<>())
-                    .add(context.action().name());
+                    .add(directName);
         });
-    }
-
-    @Test
-    @DisplayName("returns default configuration when builder method not used")
-    void returnsDefaultConfigurationWhenBuilderMethodNotUsed() {
-        Runner runner = Runner.builder().build();
-        assertThat(runner.configuration()).isNotNull();
-        assertThat(runner.configuration()).isEqualTo(Configuration.defaultProperties());
-    }
-
-    @Test
-    @DisplayName("stores and returns provided configuration map")
-    void storesAndReturnsProvidedConfigurationMap() {
-        var expectedConfig = Map.of("key1", "value1", "key2", "value2");
-        var runner = Runner.builder().configuration(expectedConfig).build();
-        assertThat(runner.configuration()).isEqualTo(expectedConfig);
-    }
-
-    @Test
-    @DisplayName("replaces configuration when called multiple times")
-    void replacesConfigurationWhenCalledMultipleTimes() {
-        var firstConfig = Map.of("key1", "value1");
-        var secondConfig = Map.of("key2", "value2");
-        var runner = Runner.builder()
-                .configuration(firstConfig)
-                .configuration(secondConfig)
-                .build();
-        assertThat(runner.configuration()).isEqualTo(secondConfig);
-    }
-
-    @Test
-    @DisplayName("rejects null configuration")
-    void rejectsNullConfiguration() {
-        assertThatNullPointerException()
-                .isThrownBy(() -> Runner.builder().configuration(null))
-                .withMessage("configuration must not be null");
-    }
-
-    @Test
-    @DisplayName("defensively copies configuration map")
-    void defensivelyCopiesConfigurationMap() {
-        var originalConfig = new HashMap<String, String>();
-        originalConfig.put("key1", "value1");
-        Runner runner = Runner.builder().configuration(originalConfig).build();
-        originalConfig.put("key2", "value2");
-        assertThat(runner.configuration()).doesNotContainKey("key2");
-    }
-
-    @Test
-    @DisplayName("auto-closes executor service after parallel execution")
-    void autoClosesExecutorServiceAfterParallelExecution() {
-        Action action = Parallel.of("test", 4, List.of(Direct.of("child", context -> {})));
-        var runner = (DefaultRunner) Runner.builder().build();
-
-        var executorService = runner.executorService();
-        assertThat(executorService).isNull();
-
-        runner.run(action);
-        var postRunExecutorService = runner.executorService();
-        assertThat(postRunExecutorService).isNull();
     }
 }

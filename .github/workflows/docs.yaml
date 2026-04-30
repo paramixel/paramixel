@@ -51,7 +51,7 @@ jobs:
 
       - name: Build Javadoc
         run: |
-          ./mvnw package javadoc:javadoc -B -DskipTests -Dparamixel.maven.skipTests -Dspotbugs.skip=true -Dpmd.skip=true -Djar.skip=true -pl core
+          ./mvnw package javadoc:javadoc -B -DskipTests -Dparamixel.skipTests -Dspotbugs.skip=true -Dpmd.skip=true -Djar.skip=true -pl core
 
       - name: Copy Javadoc to static
         run: |
