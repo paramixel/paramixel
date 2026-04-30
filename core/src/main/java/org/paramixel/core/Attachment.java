@@ -16,6 +16,7 @@
 
 package org.paramixel.core;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -64,21 +65,6 @@ import java.util.Optional;
  *   <li>{@code ctx.getAttachment()} returns empty Optional</li>
  *   <li>Null values are treated as "no attachment"</li>
  * </ul>
- *
- * <h3>Why Attachment Interface?</h3>
- * <p>Without Attachment, you would need to handle raw Objects:
- * <pre>{@code
- * // Without Attachment
- * Object value = ctx.getAttachmentRaw();
- * String str = (String) value; // Unsafe cast
- * }</pre>
- *
- * <p>With Attachment, you get type safety:
- * <pre>{@code
- * // With Attachment
- * Optional<String> str = ctx.getAttachment()
- *     .flatMap(a -> a.to(String.class));
- * }</pre>
  *
  * <h3>Usage Examples</h3>
  * <p><strong>Setting and Retrieving:</strong></p>
@@ -144,7 +130,23 @@ import java.util.Optional;
  * @see Context#getAttachment()
  * @see Context#findAttachment(int)
  */
-public interface Attachment {
+public final class Attachment {
+
+    private final Object value;
+
+    private Attachment(Object value) {
+        this.value = value;
+    }
+
+    /**
+     * Creates an attachment wrapping the given value.
+     *
+     * @param value the value to wrap; may be {@code null}
+     * @return a new Attachment wrapping the value
+     */
+    public static Attachment of(Object value) {
+        return new Attachment(value);
+    }
 
     /**
      * Returns the runtime type of the attachment value.
@@ -187,14 +189,16 @@ public interface Attachment {
      * List<String> strings = new ArrayList<>();
      * ctx.setAttachment(strings);
      * // Returns ArrayList.class, not List<String>.class
-     * Class<?> type = ctx.getAttachment().flatMap(a -> a.getType()).orElse(null);
+     * Class<?> type = ctx.getAttachment().map(Attachment::getType).orElse(Object.class);
      * }</pre>
      *
-     * @return the class of the attachment value, or {@code null} if the attachment value is {@code null}
+     * @return the class of the attachment value, or {@code Object.class} if the attachment value is {@code null}
      * @see Object#getClass()
      * @see #to(Class)
      */
-    Class<?> getType();
+    public Class<?> getType() {
+        return value != null ? value.getClass() : Object.class;
+    }
 
     /**
      * Attempts to cast the attachment to the requested type.
@@ -292,5 +296,11 @@ public interface Attachment {
      * @see #getType()
      * @see Class#isInstance(Object)
      */
-    <T> Optional<T> to(Class<T> type);
+    public <T> Optional<T> to(Class<T> type) {
+        Objects.requireNonNull(type, "type must not be null");
+        if (value == null) {
+            return Optional.empty();
+        }
+        return Optional.of(type.cast(value));
+    }
 }

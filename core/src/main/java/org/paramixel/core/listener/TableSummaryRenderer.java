@@ -23,7 +23,7 @@ import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Status;
-import org.paramixel.core.internal.util.AnsiColor;
+import org.paramixel.core.support.AnsiColor;
 
 class TableSummaryRenderer implements SummaryRenderer {
 
@@ -32,6 +32,12 @@ class TableSummaryRenderer implements SummaryRenderer {
     private static final int TIME_WIDTH = 10;
     private static final String PARAMIXEL = Listeners.PARAMIXEL;
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation renders a flattened summary table covering the entire action
+     * tree and aggregate totals.</p>
+     */
     @Override
     public void renderSummary(Runner runner, Action action) {
         List<Action> allActions = collectAllActions(action);
@@ -91,7 +97,7 @@ class TableSummaryRenderer implements SummaryRenderer {
         } else if (status.isFailure()) {
             return String.format("%-" + STATUS_WIDTH + "s", AnsiColor.RED_TEXT.format("FAIL"));
         } else {
-            return String.format("%-" + STATUS_WIDTH + "s", AnsiColor.YELLOW_TEXT.format("SKIP"));
+            return String.format("%-" + STATUS_WIDTH + "s", AnsiColor.ORANGE_TEXT.format("SKIP"));
         }
     }
 

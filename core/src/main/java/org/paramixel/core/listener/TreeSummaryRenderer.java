@@ -22,12 +22,17 @@ import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Status;
-import org.paramixel.core.internal.util.AnsiColor;
+import org.paramixel.core.support.AnsiColor;
 
 class TreeSummaryRenderer implements SummaryRenderer {
 
     private static final String PARAMIXEL = Listeners.PARAMIXEL;
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation renders the action hierarchy as an indented tree.</p>
+     */
     @Override
     public void renderSummary(Runner runner, Action action) {
         System.out.println(PARAMIXEL);
@@ -73,7 +78,7 @@ class TreeSummaryRenderer implements SummaryRenderer {
         } else if (status.isFailure()) {
             return AnsiColor.BOLD_RED_TEXT.format("FAIL");
         } else {
-            return AnsiColor.BOLD_YELLOW_TEXT.format("SKIP");
+            return AnsiColor.BOLD_ORANGE_TEXT.format("SKIP");
         }
     }
 

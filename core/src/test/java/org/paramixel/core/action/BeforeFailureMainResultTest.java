@@ -39,7 +39,7 @@ class BeforeFailureMainResultTest {
                 Direct.of("main", context -> {
                     throw new RuntimeException("main should not execute");
                 }),
-                Noop.DEFAULT);
+                Noop.of("noop"));
 
         Runner runner = Runner.builder().build();
         runner.run(lifecycle);

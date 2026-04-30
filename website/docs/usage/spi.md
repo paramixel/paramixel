@@ -13,7 +13,22 @@ The main supported extension points are the public core APIs:
 
 Implement `Action` directly or extend `org.paramixel.core.action.AbstractAction`.
 
-For custom actions, implement `execute(Context)`.
+For most custom actions, extending `AbstractAction` is the simplest option because it provides:
+
+- id and name handling
+- parent tracking
+- default `skip(Context)` behavior
+- shared child validation for composite actions
+
+If you implement `Action` directly, your implementation must:
+
+- maintain its own parent reference
+- implement `setParent(Action parent)`
+- reject `null` parents
+- reject setting itself as its own parent
+- reject assigning a second parent
+
+In both cases, custom actions implement `execute(Context)`. Use direct `Action` implementations only when you need full control over the action model.
 
 ## Custom listeners
 

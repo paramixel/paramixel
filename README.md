@@ -13,7 +13,7 @@ Most Java test frameworks bake test structure into the framework itself. You des
 
 Annotations can't call methods. They can't branch. They can't compose. Every time a framework adds a new feature, it adds a new annotation — and you're stuck learning the framework's model instead of expressing your own.
 
-Paramixel treats tests as **composable trees built with code, not annotations.** Build test plans with plain Java — loops, conditionals, dynamic generation — using `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` actions that compose to any depth. Need something the built-in actions don't cover? Write a custom `Action` — implement `doExecute()` and it composes like any other. Topology is explicit. After is guaranteed. Parallelism is per-node. The full power of Java is available at test definition time, because test plans are just code.
+Paramixel treats tests as **composable trees built with code, not annotations.** Build test plans with plain Java — loops, conditionals, dynamic generation — using `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` actions that compose to any depth. Need something the built-in actions don't cover? Write a custom `Action` — either extend `AbstractAction` or implement `Action` directly, then implement `execute(Context)` and it composes like any other. Topology is explicit. After is guaranteed. Parallelism is per-node. The full power of Java is available at test definition time, because test plans are just code.
 
 Paramixel runs anywhere Java runs. Use the Maven plugin for CI/CD integration, or embed the programmatic API directly — no build tool lock-in, no custom runners, no special CI configuration. Need more control? Implement the `Runner` interface to customize execution semantics, integrate with external systems, or build your own test orchestration.
 
@@ -23,7 +23,7 @@ Paramixel runs anywhere Java runs. Use the Maven plugin for CI/CD integration, o
 - **Guaranteed after with `Lifecycle`** — cleanup always runs, even on failure or skip; after errors are attached as suppressed exceptions, following try-with-resources semantics
 - **Parallel execution at any depth** — embed `Parallel` nodes anywhere in the tree with per-node parallelism control
 - **Fail-fast or run-all semantics** — `StrictSequential` stops on first failure; `Sequential` runs all children regardless; choose the right behavior per group
-- **Write custom actions** — implement `doExecute()` to define your own execution semantics; custom actions compose alongside built-in actions with zero framework changes
+- **Write custom actions** — either extend `AbstractAction` or implement `Action` directly, then implement `execute(Context)` to define your own execution semantics; custom actions compose alongside built-in actions with zero framework changes
 - **Single factory method produces the entire test plan** — one `@Paramixel.ActionFactory` method returns the full action tree; no per-method reflection at test time
 - **No test class instantiation** — only the static factory method is called; state flows through `Context` attachments, not instance fields
 - **Context attachments for state sharing** — each context can hold one typed object; navigate parent chain to share state across actions

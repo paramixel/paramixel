@@ -203,6 +203,9 @@ class SummaryNodeTest {
             assertThat(Modifier.isVolatile(
                             SummaryNode.class.getDeclaredField("duration").getModifiers()))
                     .isTrue();
+            assertThat(Modifier.isVolatile(
+                            SummaryNode.class.getDeclaredField("status").getModifiers()))
+                    .isTrue();
         }
 
         @Test
@@ -225,6 +228,17 @@ class SummaryNodeTest {
             var node = new SummaryNode("id", "displayName");
             node.recordStart();
             assertThat(node.getStartTime()).isGreaterThan(0L);
+        }
+
+        @Test
+        @DisplayName("should reset duration when recordStart is called again")
+        void shouldResetDurationWhenRecordStartIsCalledAgain() {
+            var node = new SummaryNode("id", "displayName");
+            node.recordStart();
+            node.recordEnd();
+            assertThat(node.getDuration()).isGreaterThanOrEqualTo(0L);
+            node.recordStart();
+            assertThat(node.getDuration()).isEqualTo(0L);
         }
 
         @Test

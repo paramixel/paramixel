@@ -20,9 +20,9 @@ import java.time.Instant;
 import java.util.Objects;
 import org.paramixel.core.Context;
 import org.paramixel.core.FailException;
+import org.paramixel.core.Result;
 import org.paramixel.core.SkipException;
-import org.paramixel.core.internal.Results;
-import org.paramixel.core.internal.util.Arguments;
+import org.paramixel.core.support.Arguments;
 
 /**
  * A built-in action that executes a provided block directly.
@@ -153,8 +153,18 @@ public class Direct extends AbstractAction {
 
     protected final Executable executable;
 
+    /**
+     * Creates a direct action backed by the supplied executable callback.
+     *
+     * <p>Callers should normally use {@link #of(String, Executable)} so validation and
+     * initialization occur before the instance is published.</p>
+     *
+     * @param name the action name
+     * @param executable the callback invoked during execution
+     */
     protected Direct(String name, Executable executable) {
-        super(name);
+        super();
+        this.name = validateName(name);
         this.executable = executable;
     }
 
@@ -188,9 +198,11 @@ public class Direct extends AbstractAction {
      */
     public static Direct of(String name, Executable executable) {
         Objects.requireNonNull(name, "name must not be null");
+        Arguments.requireNonBlank(name, "name must not be blank");
         Objects.requireNonNull(executable, "executable must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
-        return new Direct(name, executable);
+        Direct instance = new Direct(name, executable);
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -232,19 +244,19 @@ public class Direct extends AbstractAction {
     @Override
     public void execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Results.staged();
+        this.result = Result.staged();
         context.getListener().beforeAction(context, this);
         Instant start = Instant.now();
         try {
             executable.execute(context);
-            this.result = Results.pass(durationSince(start));
+            this.result = Result.pass(durationSince(start));
         } catch (SkipException e) {
-            this.result = Results.skip(durationSince(start), e.getMessage());
+            this.result = Result.skip(durationSince(start), e.getMessage());
         } catch (FailException e) {
-            this.result = Results.fail(durationSince(start), e.getMessage());
+            this.result = Result.fail(durationSince(start), e.getMessage());
         } catch (Throwable t) {
             context.getListener().actionThrowable(context, this, t);
-            this.result = Results.fail(durationSince(start), t);
+            this.result = Result.fail(durationSince(start), t);
         }
 
         context.getListener().afterAction(context, this, this.result);

@@ -16,6 +16,8 @@
 
 package org.paramixel.core;
 
+import org.paramixel.core.support.Arguments;
+
 /**
  * Signals that an action should be marked as failed.
  *
@@ -57,7 +59,7 @@ package org.paramixel.core;
  * <p><strong>3. Constructor:</strong></p>
  * <pre>{@code
  * Direct.of("custom", ctx -> {
- *     throw new FailException("custom failure reason");
+ *     FailException.fail("custom failure reason");
  * });
  * }</pre>
  *
@@ -115,7 +117,7 @@ package org.paramixel.core;
  * @see Result
  * @see Listener
  */
-public class FailException extends RuntimeException {
+public final class FailException extends RuntimeException {
 
     /**
      * Creates a failure signal with a detail message.
@@ -139,8 +141,25 @@ public class FailException extends RuntimeException {
      *
      * @param message the detail message; may be {@code null}, but a descriptive message is recommended
      */
-    public FailException(final String message) {
+    private FailException(final String message) {
         super(message);
+    }
+
+    /**
+     * Creates a failure signal with a detail message.
+     *
+     * <p>The message is validated to be non-blank. This is the recommended factory method
+     * for creating a FailException when you need a reference rather than throwing immediately.</p>
+     *
+     * @param message the detail message; must not be blank
+     * @return a new FailException with the specified message
+     * @throws NullPointerException if {@code message} is null
+     * @throws IllegalArgumentException if {@code message} is blank
+     * @see #fail()
+     * @see #fail(String)
+     */
+    public static FailException of(String message) {
+        return new FailException(Arguments.requireNonBlank(message, "message must not be blank"));
     }
 
     /**

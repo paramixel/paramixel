@@ -16,10 +16,10 @@
 
 package org.paramixel.maven.plugin.internal.summary;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import org.paramixel.maven.plugin.internal.util.Arguments;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.paramixel.core.support.Arguments;
 
 public class SummaryNode {
 
@@ -27,11 +27,11 @@ public class SummaryNode {
 
     private final String displayName;
 
-    private final List<SummaryNode> children = new ArrayList<>();
+    private final List<SummaryNode> children = new CopyOnWriteArrayList<>();
 
-    private SummaryNode parent;
+    private volatile SummaryNode parent;
 
-    private SummaryStatus status;
+    private volatile SummaryStatus status;
 
     private Throwable throwable;
 
@@ -43,9 +43,9 @@ public class SummaryNode {
 
     public SummaryNode(String uniqueId, String displayName) {
         this.uniqueId = Objects.requireNonNull(uniqueId, "uniqueId must not be null");
-        Arguments.requireNotBlank(uniqueId, "uniqueId must not be blank");
+        Arguments.requireNonBlank(uniqueId, "uniqueId must not be blank");
         this.displayName = Objects.requireNonNull(displayName, "displayName must not be null");
-        Arguments.requireNotBlank(displayName, "displayName must not be blank");
+        Arguments.requireNonBlank(displayName, "displayName must not be blank");
     }
 
     public String getUniqueId() {
@@ -64,7 +64,7 @@ public class SummaryNode {
         return children;
     }
 
-    public synchronized void addChild(SummaryNode child) {
+    public void addChild(SummaryNode child) {
         Objects.requireNonNull(child, "child must not be null");
         child.parent = this;
         children.add(child);
@@ -93,7 +93,7 @@ public class SummaryNode {
 
     public void setSkipReason(String skipReason) {
         if (skipReason != null) {
-            Arguments.requireNotBlank(skipReason, "skipReason must not be blank");
+            Arguments.requireNonBlank(skipReason, "skipReason must not be blank");
         }
         this.skipReason = skipReason;
     }
@@ -111,11 +111,12 @@ public class SummaryNode {
         this.duration = duration;
     }
 
-    public void recordStart() {
+    public synchronized void recordStart() {
         this.startTime = System.currentTimeMillis();
+        this.duration = 0L;
     }
 
-    public void recordEnd() {
+    public synchronized void recordEnd() {
         long endTime = System.currentTimeMillis();
         this.duration = endTime - startTime;
     }

@@ -47,7 +47,7 @@ class ExceptionHandlingTest {
     @Test
     @DisplayName("SKIP exceptions store message in Result")
     void skipExceptionsStoreMessageInResult() {
-        var skipException = new SkipException("database not available");
+        var skipException = SkipException.of("database not available");
         Action action = Direct.of("test", context -> {
             throw skipException;
         });
@@ -65,7 +65,7 @@ class ExceptionHandlingTest {
     @Test
     @DisplayName("Lifecycle before SkipException stores reason in Result")
     void lifecycleBeforeSkipExceptionStoresReason() {
-        var skipException = new SkipException("before condition not met");
+        var skipException = SkipException.of("before condition not met");
         Action main = Direct.of("main", context -> {});
         Lifecycle lifecycle = Lifecycle.of(
                 "test",

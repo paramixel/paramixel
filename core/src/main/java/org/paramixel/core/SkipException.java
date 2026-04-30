@@ -16,6 +16,8 @@
 
 package org.paramixel.core;
 
+import org.paramixel.core.support.Arguments;
+
 /**
  * Signals that an action should be marked as skipped.
  *
@@ -58,7 +60,7 @@ package org.paramixel.core;
  * <p><strong>3. Constructor:</strong></p>
  * <pre>{@code
  * Direct.of("custom", ctx -> {
- *     throw new SkipException("precondition not met");
+ *     SkipException.skip("precondition not met");
  * });
  * }</pre>
  *
@@ -127,7 +129,7 @@ package org.paramixel.core;
  * @see Listener
  * @see Action#skip(Context)
  */
-public class SkipException extends RuntimeException {
+public final class SkipException extends RuntimeException {
 
     /**
      * Creates a skip signal with a detail message.
@@ -151,8 +153,25 @@ public class SkipException extends RuntimeException {
      *
      * @param message the detail message; may be {@code null}, but a descriptive message is recommended
      */
-    public SkipException(final String message) {
+    private SkipException(final String message) {
         super(message);
+    }
+
+    /**
+     * Creates a skip signal with a detail message.
+     *
+     * <p>The message is validated to be non-blank before creating the exception.
+     * Use this factory method to construct a SkipException when you need to throw
+     * it as a value rather than using the convenience {@link #skip()} or
+     * {@link #skip(String)} methods.</p>
+     *
+     * @param message the detail message; must not be blank
+     * @return a new SkipException with the specified message
+     * @throws NullPointerException if {@code message} is null
+     * @throws IllegalArgumentException if {@code message} is blank
+     */
+    public static SkipException of(String message) {
+        return new SkipException(Arguments.requireNonBlank(message, "message must not be blank"));
     }
 
     /**

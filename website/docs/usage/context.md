@@ -29,6 +29,8 @@ Contexts form a parent/child chain that mirrors nested execution.
 - `findContext(0)` returns the current context
 - `findContext(1)` returns the parent
 - larger levels walk farther up the chain
+- `findContext(level)` throws `IllegalArgumentException` for negative levels
+- `findContext(level)` throws `NoSuchElementException` when that ancestor does not exist
 
 ## Attachments
 
@@ -53,6 +55,8 @@ TestAttachment attachment = context.findAttachment(1)
         .flatMap(a -> a.to(TestAttachment.class))
         .orElseThrow();
 ```
+
+`findAttachment(level)` returns `Optional.empty()` only when the target ancestor exists but has no attachment. It also throws the same ancestor-navigation exceptions as `findContext(level)`.
 
 ## Example pattern
 

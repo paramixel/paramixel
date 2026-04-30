@@ -243,28 +243,30 @@ public final class Resolver {
     private static Action resolveActionFromMethod(Class<?> clazz, Method method) {
         int modifiers = method.getModifiers();
         if (!Modifier.isPublic(modifiers) || !Modifier.isStatic(modifiers)) {
-            throw new ResolverException("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
+            throw ResolverException.of("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
                     + method.getName() + ": method must be public static");
         }
         if (method.getParameterCount() != 0) {
-            throw new ResolverException("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
+            throw ResolverException.of("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
                     + method.getName() + ": method must have no parameters");
         }
         if (!Action.class.isAssignableFrom(method.getReturnType())) {
-            throw new ResolverException("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
+            throw ResolverException.of("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
                     + method.getName() + ": return type must be Action");
         }
         try {
             Object result = method.invoke(null);
             if (result == null) {
-                throw new ResolverException("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
+                throw ResolverException.of("Invalid @Paramixel.ActionFactory method on " + clazz.getName() + "#"
                         + method.getName() + ": method returned null");
             }
             return (Action) result;
         } catch (ReflectiveOperationException e) {
-            throw new ResolverException(
+            Throwable cause =
+                    e instanceof java.lang.reflect.InvocationTargetException && e.getCause() != null ? e.getCause() : e;
+            throw ResolverException.of(
                     "Failed to invoke @Paramixel.ActionFactory method on " + clazz.getName() + "#" + method.getName(),
-                    e);
+                    cause);
         }
     }
 }

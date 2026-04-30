@@ -28,8 +28,7 @@ import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
-import org.paramixel.core.internal.DefaultStatus;
-import org.paramixel.core.internal.Results;
+import org.paramixel.core.support.Arguments;
 
 /**
  * Convenience base class for implementing {@link Action}.
@@ -56,9 +55,17 @@ import org.paramixel.core.internal.Results;
  * public final class CustomComposite extends AbstractAction {
  *     private final List<Action> children;
  *
- *     public CustomComposite(String name, List<Action> children) {
- *         super(name);
+ *     private CustomComposite(String name, List<Action> children) {
+ *         super();
+ *         this.name = validateName(name);
  *         this.children = validateChildren(children);
+ *     }
+ *
+ *     public static CustomComposite of(String name, List<Action> children) {
+ *         Objects.requireNonNull(children, "children must not be null");
+ *         CustomComposite instance = new CustomComposite(name, children);
+ *         instance.initialize();
+ *         return instance;
  *     }
  *
  *     @Override
@@ -76,35 +83,93 @@ import org.paramixel.core.internal.Results;
 public abstract class AbstractAction implements Action {
 
     protected final String id;
-    protected final String name;
-    protected Action parent;
-    protected volatile Result result = Results.staged();
+    protected String name;
+    private volatile Action parent;
+    protected volatile Result result = Result.staged();
 
-    protected AbstractAction(String name) {
+    /**
+     * Creates a new abstract action with a generated unique identifier.
+     *
+     * <p>Subclasses are responsible for assigning and validating {@link #name} before the
+     * action becomes externally visible, typically from a factory method.</p>
+     */
+    protected AbstractAction() {
         this.id = UUID.randomUUID().toString();
-        this.name = name;
     }
 
+    /**
+     * Validates an action name before it is assigned to the action.
+     *
+     * <p>Names must be non-null and contain at least one non-whitespace character.</p>
+     *
+     * @param name the proposed action name
+     * @return the validated name, unchanged
+     * @throws NullPointerException if {@code name} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    protected String validateName(String name) {
+        Objects.requireNonNull(name, "name must not be null");
+        Arguments.requireNonBlank(name, "name must not be blank");
+        return name;
+    }
+
+    /**
+     * Hook method called by factory methods after construction.
+     *
+     * <p>Subclasses may override this method to perform post-construction setup
+     * that requires the fully initialized object. The default implementation does nothing.</p>
+     *
+     * <p>This method is called automatically by static factory methods (e.g., {@code of(...)})
+     * after construction. When subclassing, remember to call {@code initialize()} from your
+     * own factory methods.</p>
+     *
+     * <p>Name validation is handled by {@link #validateName(String)} in the constructor,
+     * not by this method.</p>
+     */
+    protected void initialize() {
+        // Default no-op. Subclasses may override for post-construction setup.
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public final String getId() {
         return id;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public final String getName() {
         return name;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public final Optional<Action> getParent() {
         return Optional.ofNullable(parent);
     }
 
+    /**
+     * Returns this action's child actions.
+     *
+     * <p>The base implementation returns an empty immutable list. Composite action types
+     * should override this method to expose their managed children.</p>
+     *
+     * @return an immutable list of child actions, empty for leaf actions
+     */
     @Override
     public List<Action> getChildren() {
         return List.of();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public final Result getResult() {
         return result;
@@ -125,13 +190,30 @@ public abstract class AbstractAction implements Action {
         if (child == this) {
             throw new IllegalArgumentException("action must not add itself as a child");
         }
-        if (!(child instanceof AbstractAction executableChild)) {
-            throw new IllegalArgumentException("child must extend AbstractAction");
+        child.setParent(this);
+    }
+
+    /**
+     * Assigns this action's parent exactly once.
+     *
+     * <p>This method prevents self-parenting and reassignment after a parent has already
+     * been established.</p>
+     *
+     * @param parent the parent action to assign
+     * @throws NullPointerException if {@code parent} is {@code null}
+     * @throws IllegalArgumentException if {@code parent == this}
+     * @throws IllegalStateException if this action already has a parent
+     */
+    @Override
+    public void setParent(Action parent) {
+        Objects.requireNonNull(parent, "parent must not be null");
+        if (parent == this) {
+            throw new IllegalArgumentException("action must not be its own parent");
         }
-        if (executableChild.parent != null) {
+        if (this.parent != null) {
             throw new IllegalStateException("child already has a parent");
         }
-        executableChild.parent = this;
+        this.parent = parent;
     }
 
     /**
@@ -154,9 +236,9 @@ public abstract class AbstractAction implements Action {
     @Override
     public void skip(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Results.staged();
+        this.result = Result.staged();
         context.getListener().beforeAction(context, this);
-        this.result = Results.skip(Duration.ZERO);
+        this.result = Result.skip(Duration.ZERO);
         context.getListener().afterAction(context, this, this.result);
     }
 
@@ -166,9 +248,9 @@ public abstract class AbstractAction implements Action {
      * <p>This method reads the result status from all children returned by {@link #getChildren()}
      * and returns a composite status based on the following rules:
      * <ul>
-     *   <li>If any child failed, returns {@link DefaultStatus#failure()}</li>
-     *   <li>Else if any child skipped, returns {@link DefaultStatus#skip()}</li>
-     *   <li>Otherwise returns {@link DefaultStatus#pass()}</li>
+     *   <li>If any child failed, returns {@link Status#failure()}</li>
+     *   <li>Else if any child skipped, returns {@link Status#skip()}</li>
+     *   <li>Otherwise returns {@link Status#pass()}</li>
      * </ul>
      *
      * @return The computed status.
@@ -177,15 +259,15 @@ public abstract class AbstractAction implements Action {
         for (Action child : getChildren()) {
             Objects.requireNonNull(child, "getChildren() must not contain null elements");
             if (child.getResult().getStatus().isFailure()) {
-                return DefaultStatus.failure();
+                return Status.failure();
             }
         }
         for (Action child : getChildren()) {
             if (child.getResult().getStatus().isSkip()) {
-                return DefaultStatus.skip();
+                return Status.skip();
             }
         }
-        return DefaultStatus.pass();
+        return Status.pass();
     }
 
     /**
@@ -211,7 +293,7 @@ public abstract class AbstractAction implements Action {
     protected List<Action> validateChildren(List<Action> children) {
         Objects.requireNonNull(children, "children must not be null");
         if (children.isEmpty()) {
-            throw new IllegalArgumentException("action must have at least one child");
+            throw new IllegalArgumentException("children must not be empty");
         }
         List<Action> validated = new ArrayList<>(children.size());
         for (Action child : children) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.paramixel.core.internal;
+package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,13 +23,13 @@ import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("DefaultResult")
-class DefaultResultTest {
+@DisplayName("Result")
+class ResultTest {
 
     @Test
     @DisplayName("creates staged result")
     void createsStagedResult() {
-        var result = DefaultResult.staged();
+        var result = Result.staged();
 
         assertThat(result.getStatus().isStaged()).isTrue();
         assertThat(result.getStatus().isPass()).isFalse();
@@ -44,7 +44,7 @@ class DefaultResultTest {
     void createsPassingResultViaPassFactory() {
         var timing = Duration.ofMillis(100);
 
-        var result = DefaultResult.pass(timing);
+        var result = Result.pass(timing);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -58,7 +58,7 @@ class DefaultResultTest {
         var timing = Duration.ofMillis(150);
         Throwable failure = new RuntimeException("test failure");
 
-        var result = DefaultResult.fail(timing, failure);
+        var result = Result.fail(timing, failure);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -71,7 +71,7 @@ class DefaultResultTest {
     void createsFailingResultWithMessageOnly() {
         var timing = Duration.ofMillis(150);
 
-        var result = DefaultResult.fail(timing, "failure message");
+        var result = Result.fail(timing, "failure message");
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -84,7 +84,7 @@ class DefaultResultTest {
     void createsSkippedResult() {
         var timing = Duration.ZERO;
 
-        var result = DefaultResult.skip(timing);
+        var result = Result.skip(timing);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -97,7 +97,7 @@ class DefaultResultTest {
     void createsSkippedResultWithReason() {
         var timing = Duration.ZERO;
 
-        var result = DefaultResult.skip(timing, "skipped for reason");
+        var result = Result.skip(timing, "skipped for reason");
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -108,10 +108,10 @@ class DefaultResultTest {
     @Test
     @DisplayName("creates result via of factory with all parameters")
     void createsResultViaOfFactoryWithAllParameters() {
-        var status = DefaultStatus.pass();
+        var status = Status.pass();
         var timing = Duration.ofMillis(123);
 
-        var result = DefaultResult.of(status, timing);
+        var result = Result.of(status, timing);
 
         assertThat(result.getStatus()).isSameAs(status);
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -124,7 +124,7 @@ class DefaultResultTest {
     void failsToCreateResultWithNullStatus() {
         var timing = Duration.ofMillis(100);
 
-        assertThatThrownBy(() -> DefaultResult.of(null, timing))
+        assertThatThrownBy(() -> Result.of(null, timing))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("status must not be null");
     }
@@ -132,9 +132,9 @@ class DefaultResultTest {
     @Test
     @DisplayName("fails to create result with null timing")
     void failsToCreateResultWithNullTiming() {
-        var status = DefaultStatus.pass();
+        var status = Status.pass();
 
-        assertThatThrownBy(() -> DefaultResult.of(status, null))
+        assertThatThrownBy(() -> Result.of(status, null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("timing must not be null");
     }
@@ -142,7 +142,7 @@ class DefaultResultTest {
     @Test
     @DisplayName("toString returns expected format")
     void toStringReturnsExpectedFormat() {
-        var result = DefaultResult.pass(Duration.ofMillis(123));
+        var result = Result.pass(Duration.ofMillis(123));
 
         assertThat(result.toString()).isEqualTo("PASS | 123 ms");
     }

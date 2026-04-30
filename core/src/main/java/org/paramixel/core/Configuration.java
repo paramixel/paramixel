@@ -88,7 +88,7 @@ public class Configuration {
         try (inputStream) {
             properties.load(inputStream);
         } catch (IOException e) {
-            throw new ConfigurationException("failed to load default properties resource: " + CONFIG_FILE_NAME, e);
+            throw ConfigurationException.of("failed to load default properties resource: " + CONFIG_FILE_NAME, e);
         }
         properties.forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
     }

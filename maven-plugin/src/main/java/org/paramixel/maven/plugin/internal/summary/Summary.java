@@ -20,7 +20,7 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.paramixel.maven.plugin.internal.util.Arguments;
+import org.paramixel.core.support.Arguments;
 
 public class Summary {
 
@@ -51,17 +51,17 @@ public class Summary {
 
     public SummaryNode findNode(String uniqueId) {
         Objects.requireNonNull(uniqueId, "uniqueId must not be null");
-        Arguments.requireNotBlank(uniqueId, "uniqueId must not be blank");
+        Arguments.requireNonBlank(uniqueId, "uniqueId must not be blank");
         return summaryNodeMap.get(uniqueId);
     }
 
     public SummaryNode createNode(String uniqueId, String displayName, String parentUniqueId) {
         Objects.requireNonNull(uniqueId, "uniqueId must not be null");
-        Arguments.requireNotBlank(uniqueId, "uniqueId must not be blank");
+        Arguments.requireNonBlank(uniqueId, "uniqueId must not be blank");
         Objects.requireNonNull(displayName, "displayName must not be null");
-        Arguments.requireNotBlank(displayName, "displayName must not be blank");
+        Arguments.requireNonBlank(displayName, "displayName must not be blank");
         if (parentUniqueId != null) {
-            Arguments.requireNotBlank(parentUniqueId, "parentUniqueId must not be blank");
+            Arguments.requireNonBlank(parentUniqueId, "parentUniqueId must not be blank");
         }
         SummaryNode node = new SummaryNode(uniqueId, displayName);
         summaryNodeMap.put(uniqueId, node);

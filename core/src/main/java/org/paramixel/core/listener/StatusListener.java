@@ -25,7 +25,7 @@ import org.paramixel.core.Context;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
-import org.paramixel.core.internal.util.AnsiColor;
+import org.paramixel.core.support.AnsiColor;
 
 /**
  * A {@link Listener} implementation that logs action execution status to standard output.
@@ -60,9 +60,18 @@ public class StatusListener implements Listener {
     private static final String PARAMIXEL = Listeners.PARAMIXEL;
 
     /**
+     * Creates a new status listener.
+     *
+     * @return a new status listener; never {@code null}
+     */
+    public static StatusListener of() {
+        return new StatusListener();
+    }
+
+    /**
      * Default constructor.
      */
-    public StatusListener() {}
+    private StatusListener() {}
 
     /**
      * Invoked before an {@link Action} is executed.
@@ -187,7 +196,7 @@ public class StatusListener implements Listener {
         } else if (status.isFailure()) {
             return AnsiColor.BOLD_RED_TEXT.format("FAIL");
         } else if (status.isSkip()) {
-            return AnsiColor.BOLD_YELLOW_TEXT.format("SKIP");
+            return AnsiColor.BOLD_ORANGE_TEXT.format("SKIP");
         } else {
             return AnsiColor.BOLD_GRAY_TEXT.format("STAGED");
         }

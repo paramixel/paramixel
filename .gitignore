@@ -30,6 +30,7 @@ release.properties
 **/.flattened-pom.xml
 .opencode/plans/
 stress-test.log
+.DS_Store
 website/.DS_Store
 website/.cache/
 website/.docusaurus/

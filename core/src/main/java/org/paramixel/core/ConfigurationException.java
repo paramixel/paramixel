@@ -16,6 +16,8 @@
 
 package org.paramixel.core;
 
+import java.util.Objects;
+
 /**
  * Signals an error during configuration loading.
  *
@@ -32,7 +34,7 @@ public class ConfigurationException extends RuntimeException {
      *
      * @param message the detail message; may be {@code null}
      */
-    public ConfigurationException(final String message) {
+    private ConfigurationException(final String message) {
         super(message);
     }
 
@@ -42,7 +44,33 @@ public class ConfigurationException extends RuntimeException {
      * @param message the detail message; may be {@code null}
      * @param cause the cause; may be {@code null}
      */
-    public ConfigurationException(final String message, final Throwable cause) {
+    private ConfigurationException(final String message, final Throwable cause) {
         super(message, cause);
+    }
+
+    /**
+     * Creates a configuration error with a detail message.
+     *
+     * @param message the detail message; must not be {@code null}
+     * @return a new {@code ConfigurationException}
+     * @throws NullPointerException if {@code message} is {@code null}
+     */
+    public static ConfigurationException of(String message) {
+        Objects.requireNonNull(message, "message must not be null");
+        return new ConfigurationException(message);
+    }
+
+    /**
+     * Creates a configuration error with a detail message and cause.
+     *
+     * @param message the detail message; must not be {@code null}
+     * @param cause the cause; must not be {@code null}
+     * @return a new {@code ConfigurationException}
+     * @throws NullPointerException if {@code message} or {@code cause} is {@code null}
+     */
+    public static ConfigurationException of(String message, Throwable cause) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(cause, "cause must not be null");
+        return new ConfigurationException(message, cause);
     }
 }

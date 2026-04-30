@@ -33,6 +33,6 @@ Direct step = Direct.of("create user", context -> {
 ## Result behavior
 
 - normal return -> `PASS`
-- `throw new SkipException(...)` -> `SKIP`
-- `throw new FailException(...)` -> `FAIL`
+- `throw SkipException.skip(...)` -> `SKIP`
+- `throw FailException.fail(...)` -> `FAIL`
 - any other thrown exception -> listener gets `actionThrowable(...)`, then result becomes `FAIL`

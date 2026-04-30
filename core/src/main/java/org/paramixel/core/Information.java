@@ -20,7 +20,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-public class Information {
+/**
+ * Exposes build and runtime metadata for the Paramixel core library.
+ *
+ * <p>This utility currently provides access to the Paramixel version declared in the
+ * classpath resource {@code information.properties}. The value is resolved once when
+ * the class is initialized and then cached for the lifetime of the class loader.</p>
+ *
+ * <p>The class is intended for informational use such as diagnostic logging, banners,
+ * or tooling that needs to report the active Paramixel version at runtime.</p>
+ */
+public final class Information {
 
     private static final String RESOURCE_NAME = "information.properties";
 
@@ -30,6 +40,15 @@ public class Information {
 
     private Information() {}
 
+    /**
+     * Returns the Paramixel version loaded from the bundled metadata resource.
+     *
+     * <p>The returned value is cached during class initialization, so repeated calls do
+     * not re-read the classpath resource.</p>
+     *
+     * @return the Paramixel version string; never {@code null} or blank
+     * @throws IllegalStateException if the version metadata resource is missing or invalid
+     */
     public static String getVersion() {
         return VERSION;
     }

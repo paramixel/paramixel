@@ -16,8 +16,6 @@
 
 package org.paramixel.core.listener;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Action;
@@ -45,15 +43,15 @@ import org.paramixel.core.Runner;
  * <h3>Usage Examples</h3>
  * <pre>{@code
  * // Combine multiple listeners
- * Listener combined = new CompositeListener(
- *     new StatusListener(),
+ * Listener combined = CompositeListener.of(
+ *     StatusListener.of(),
  *     new SummaryListener(new TableSummaryRenderer()),
  *     new CustomLoggingListener()
  * );
  *
  * // Use with varargs
- * Listener combined = new CompositeListener(
- *     new StatusListener(),
+ * Listener combined = CompositeListener.of(
+ *     StatusListener.of(),
  *     new FileLoggingListener("test.log")
  * );
  * }</pre>
@@ -73,29 +71,48 @@ public class CompositeListener implements Listener {
      * @throws NullPointerException if {@code listeners} is {@code null} or contains {@code null} elements
      * @throws IllegalArgumentException if {@code listeners} is empty
      */
-    public CompositeListener(List<Listener> listeners) {
+    private CompositeListener(List<Listener> listeners) {
+        this.listeners = listeners;
+    }
+
+    /**
+     * Creates a composite listener from a list of child listeners.
+     *
+     * @param listeners the child listeners to delegate to; must not be {@code null} or empty
+     * @return a new composite listener; never {@code null}
+     * @throws NullPointerException if {@code listeners} is {@code null} or contains {@code null} elements
+     * @throws IllegalArgumentException if {@code listeners} is empty
+     */
+    public static CompositeListener of(List<Listener> listeners) {
         Objects.requireNonNull(listeners, "listeners must not be null");
         if (listeners.isEmpty()) {
             throw new IllegalArgumentException("listeners must not be empty");
         }
-        List<Listener> validated = new ArrayList<>(listeners.size());
         for (Listener listener : listeners) {
-            validated.add(Objects.requireNonNull(listener, "listeners must not contain null elements"));
+            Objects.requireNonNull(listener, "listeners must not contain null elements");
         }
-        this.listeners = Collections.unmodifiableList(validated);
+        return new CompositeListener(listeners);
     }
 
     /**
      * Creates a composite listener from varargs child listeners.
      *
      * @param listeners the child listeners to delegate to; must not be {@code null} or empty
+     * @return a new composite listener; never {@code null}
      * @throws NullPointerException if {@code listeners} is {@code null} or contains {@code null} elements
      * @throws IllegalArgumentException if {@code listeners} is empty
      */
-    public CompositeListener(Listener... listeners) {
-        this(List.of(listeners));
+    public static CompositeListener of(Listener... listeners) {
+        Objects.requireNonNull(listeners, "listeners must not be null");
+        return new CompositeListener(List.of(listeners));
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation forwards the callback to each child listener in
+     * registration order.</p>
+     */
     @Override
     public void runStarted(Runner runner, Action action) {
         for (Listener listener : listeners) {
@@ -103,13 +120,12 @@ public class CompositeListener implements Listener {
         }
     }
 
-    @Override
-    public void runCompleted(Runner runner, Action action) {
-        for (Listener listener : listeners) {
-            listener.runCompleted(runner, action);
-        }
-    }
-
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation forwards the callback to each child listener in
+     * registration order.</p>
+     */
     @Override
     public void beforeAction(Context context, Action action) {
         for (Listener listener : listeners) {
@@ -117,6 +133,25 @@ public class CompositeListener implements Listener {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation forwards the callback to each child listener in
+     * registration order.</p>
+     */
+    @Override
+    public void actionThrowable(Context context, Action action, Throwable throwable) {
+        for (Listener listener : listeners) {
+            listener.actionThrowable(context, action, throwable);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation forwards the callback to each child listener in
+     * registration order.</p>
+     */
     @Override
     public void afterAction(Context context, Action action, Result result) {
         for (Listener listener : listeners) {
@@ -124,10 +159,16 @@ public class CompositeListener implements Listener {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation forwards the callback to each child listener in
+     * registration order.</p>
+     */
     @Override
-    public void actionThrowable(Context context, Action action, Throwable throwable) {
+    public void runCompleted(Runner runner, Action action) {
         for (Listener listener : listeners) {
-            listener.actionThrowable(context, action, throwable);
+            listener.runCompleted(runner, action);
         }
     }
 }

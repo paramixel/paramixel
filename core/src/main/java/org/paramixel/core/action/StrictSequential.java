@@ -21,9 +21,8 @@ import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
-import org.paramixel.core.internal.DefaultContext;
-import org.paramixel.core.internal.Results;
-import org.paramixel.core.internal.util.Arguments;
+import org.paramixel.core.Result;
+import org.paramixel.core.support.Arguments;
 
 /**
  * A built-in action that executes child actions sequentially and stops on the first failure.
@@ -118,12 +117,19 @@ import org.paramixel.core.internal.util.Arguments;
  * @see Sequential
  * @see RandomSequential
  */
-public final class StrictSequential extends AbstractAction {
+public class StrictSequential extends AbstractAction {
 
     private final List<Action> children;
 
-    private StrictSequential(String name, List<Action> children) {
-        super(name);
+    /**
+     * Creates a strict sequential action with the supplied children.
+     *
+     * @param name the action name
+     * @param children the child actions to execute in order
+     */
+    protected StrictSequential(String name, List<Action> children) {
+        super();
+        this.name = validateName(name);
         this.children = validateChildren(children);
     }
 
@@ -140,8 +146,12 @@ public final class StrictSequential extends AbstractAction {
      */
     public static StrictSequential of(String name, List<Action> children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
-        return new StrictSequential(name, children);
+        Arguments.requireNonBlank(name, "name must not be blank");
+        Arguments.requireNonEmpty(children, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        StrictSequential instance = new StrictSequential(name, children);
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -158,9 +168,13 @@ public final class StrictSequential extends AbstractAction {
      */
     public static StrictSequential of(String name, Action... children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
+        Arguments.requireNonBlank(name, "name must not be blank");
         Objects.requireNonNull(children, "children must not be null");
-        return new StrictSequential(name, List.of(children));
+        Arguments.require(children.length > 0, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        StrictSequential instance = new StrictSequential(name, List.of(children));
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -196,21 +210,20 @@ public final class StrictSequential extends AbstractAction {
     @Override
     public void execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Results.staged();
+        this.result = Result.staged();
         context.getListener().beforeAction(context, this);
         Instant start = Instant.now();
-        DefaultContext defaultContext = (DefaultContext) context;
         for (Action child : getChildren()) {
-            child.execute(new DefaultContext(defaultContext));
+            child.execute(context.createChild());
             if (child.getResult().getStatus().isFailure()) {
                 for (Action remaining : getChildren()
                         .subList(getChildren().indexOf(child) + 1, getChildren().size())) {
-                    remaining.skip(new DefaultContext(defaultContext));
+                    remaining.skip(context.createChild());
                 }
                 break;
             }
         }
-        this.result = Results.of(computeStatus(), durationSince(start));
+        this.result = Result.of(computeStatus(), durationSince(start));
         context.getListener().afterAction(context, this, this.result);
     }
 }

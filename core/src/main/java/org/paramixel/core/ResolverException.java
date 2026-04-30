@@ -16,6 +16,8 @@
 
 package org.paramixel.core;
 
+import java.util.Objects;
+
 /**
  * Signals an error during action factory resolution.
  *
@@ -26,14 +28,14 @@ package org.paramixel.core;
  * @see Paramixel.ActionFactory
  * @see ConfigurationException
  */
-public class ResolverException extends RuntimeException {
+public final class ResolverException extends RuntimeException {
 
     /**
      * Creates a resolution error with a detail message.
      *
      * @param message the detail message; may be {@code null}
      */
-    public ResolverException(final String message) {
+    private ResolverException(final String message) {
         super(message);
     }
 
@@ -43,7 +45,33 @@ public class ResolverException extends RuntimeException {
      * @param message the detail message; may be {@code null}
      * @param cause the cause; may be {@code null}
      */
-    public ResolverException(final String message, final Throwable cause) {
+    private ResolverException(final String message, final Throwable cause) {
         super(message, cause);
+    }
+
+    /**
+     * Creates a resolution error with a detail message.
+     *
+     * @param message the detail message; must not be {@code null}
+     * @return a new {@code ResolverException}
+     * @throws NullPointerException if {@code message} is {@code null}
+     */
+    public static ResolverException of(String message) {
+        Objects.requireNonNull(message, "message must not be null");
+        return new ResolverException(message);
+    }
+
+    /**
+     * Creates a resolution error with a detail message and cause.
+     *
+     * @param message the detail message; must not be {@code null}
+     * @param cause the cause; must not be {@code null}
+     * @return a new {@code ResolverException}
+     * @throws NullPointerException if {@code message} or {@code cause} is {@code null}
+     */
+    public static ResolverException of(String message, Throwable cause) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(cause, "cause must not be null");
+        return new ResolverException(message, cause);
     }
 }

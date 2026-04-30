@@ -16,9 +16,8 @@
 
 package org.paramixel.core;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
@@ -31,55 +30,47 @@ import org.junit.jupiter.api.Test;
 class ResolverExceptionTest {
 
     @Test
-    @DisplayName("constructor with message sets message")
-    void constructorWithMessage() {
+    @DisplayName("of with message sets message")
+    void ofWithMessage() {
         var message = "test message";
-        var exception = new ResolverException(message);
-        assertEquals(message, exception.getMessage());
-        assertNull(exception.getCause());
+        var exception = ResolverException.of(message);
+        assertThat(exception.getMessage()).isEqualTo(message);
+        assertThat(exception.getCause()).isNull();
     }
 
     @Test
-    @DisplayName("constructor with null message sets null message")
-    void constructorWithNullMessage() {
-        var exception = new ResolverException(null);
-        assertNull(exception.getMessage());
-        assertNull(exception.getCause());
+    @DisplayName("of rejects null message")
+    void ofRejectsNullMessage() {
+        assertThatThrownBy(() -> ResolverException.of(null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("constructor with message and cause sets both")
-    void constructorWithMessageAndCause() {
+    @DisplayName("of with message and cause sets both")
+    void ofWithMessageAndCause() {
         var message = "test message";
         Throwable cause = new IOException("test cause");
-        var exception = new ResolverException(message, cause);
-        assertEquals(message, exception.getMessage());
-        assertSame(cause, exception.getCause());
+        var exception = ResolverException.of(message, cause);
+        assertThat(exception.getMessage()).isEqualTo(message);
+        assertThat(exception.getCause()).isSameAs(cause);
     }
 
     @Test
-    @DisplayName("constructor with null message and null cause sets both to null")
-    void constructorWithNullMessageAndCause() {
-        var exception = new ResolverException(null, null);
-        assertNull(exception.getMessage());
-        assertNull(exception.getCause());
+    @DisplayName("of rejects null message and null cause")
+    void ofRejectsNullMessageAndNullCause() {
+        assertThatThrownBy(() -> ResolverException.of(null, null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("constructor with message and null cause sets message and null cause")
-    void constructorWithMessageAndNullCause() {
+    @DisplayName("of rejects message with null cause")
+    void ofRejectsMessageWithNullCause() {
         var message = "test message";
-        var exception = new ResolverException(message, null);
-        assertEquals(message, exception.getMessage());
-        assertNull(exception.getCause());
+        assertThatThrownBy(() -> ResolverException.of(message, null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("constructor with null message and cause sets null message and cause")
-    void constructorWithNullMessageAndNonNullCause() {
+    @DisplayName("of rejects null message with cause")
+    void ofRejectsNullMessageWithNonNullCause() {
         var cause = new IOException("test cause");
-        var exception = new ResolverException(null, cause);
-        assertNull(exception.getMessage());
-        assertSame(cause, exception.getCause());
+        assertThatThrownBy(() -> ResolverException.of(null, cause)).isInstanceOf(NullPointerException.class);
     }
 }

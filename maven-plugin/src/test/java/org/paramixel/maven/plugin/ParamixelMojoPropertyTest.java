@@ -21,6 +21,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +32,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.paramixel.core.Configuration;
 import org.paramixel.maven.plugin.ParamixelMojo.Property;
 
 @DisplayName("ParamixelMojo.Property tests")
@@ -154,6 +159,24 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
+        @DisplayName("test classpath paramixel.properties should be discovered")
+        void testClasspathPropertiesShouldBeDiscovered() throws Exception {
+            Files.writeString(
+                    tempDir.resolve(Configuration.CONFIG_FILE_NAME),
+                    Configuration.RUNNER_PARALLELISM + "=7\n",
+                    StandardCharsets.UTF_8);
+
+            var mojo = new ParamixelMojo();
+
+            try (URLClassLoader classLoader = new URLClassLoader(
+                    new URL[] {tempDir.toUri().toURL()}, getClass().getClassLoader())) {
+                var configuration = invokeBuildConfiguration(mojo, classLoader);
+
+                assertThat(configuration.get(Configuration.RUNNER_PARALLELISM)).isEqualTo("7");
+            }
+        }
+
+        @Test
         @DisplayName("missing Maven property key should throw descriptive exception")
         void missingMavenPropertyKeyShouldThrowDescriptiveException() throws Exception {
             var property = new Property();
@@ -163,8 +186,8 @@ class ParamixelMojoPropertyTest {
 
             assertThatThrownBy(() -> invokeBuildConfiguration(mojo))
                     .cause()
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessage("property key must not be null");
+                    .isInstanceOf(org.apache.maven.plugin.MojoExecutionException.class)
+                    .hasMessage("Paramixel property key must not be null");
         }
 
         @Test
@@ -177,8 +200,8 @@ class ParamixelMojoPropertyTest {
 
             assertThatThrownBy(() -> invokeBuildConfiguration(mojo))
                     .cause()
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessage("property value must not be null");
+                    .isInstanceOf(org.apache.maven.plugin.MojoExecutionException.class)
+                    .hasMessage("Paramixel property 'paramixel.custom' value must not be null");
         }
     }
 
@@ -187,6 +210,14 @@ class ParamixelMojoPropertyTest {
         Method method = ParamixelMojo.class.getDeclaredMethod("buildConfiguration");
         method.setAccessible(true);
         return (Map<String, String>) method.invoke(mojo);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> invokeBuildConfiguration(final ParamixelMojo mojo, final ClassLoader classLoader)
+            throws Exception {
+        Method method = ParamixelMojo.class.getDeclaredMethod("buildConfiguration", ClassLoader.class);
+        method.setAccessible(true);
+        return (Map<String, String>) method.invoke(mojo, classLoader);
     }
 
     private static void setField(final ParamixelMojo mojo, final String name, final Object value) throws Exception {

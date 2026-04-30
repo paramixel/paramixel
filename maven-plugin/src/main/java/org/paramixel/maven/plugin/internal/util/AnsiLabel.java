@@ -16,7 +16,7 @@
 
 package org.paramixel.maven.plugin.internal.util;
 
-import org.paramixel.core.internal.util.AnsiColor;
+import org.paramixel.core.support.AnsiColor;
 
 public enum AnsiLabel {
     INFO(AnsiColor.BOLD_BLUE_TEXT, "INFO", true),

@@ -17,16 +17,13 @@
 package org.paramixel.core.action;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
+import org.paramixel.core.Result;
 import org.paramixel.core.Status;
-import org.paramixel.core.internal.DefaultContext;
-import org.paramixel.core.internal.DefaultStatus;
-import org.paramixel.core.internal.Results;
-import org.paramixel.core.internal.util.Arguments;
+import org.paramixel.core.support.Arguments;
 
 /**
  * A built-in action that manages before, main, and after phases.
@@ -212,18 +209,30 @@ import org.paramixel.core.internal.util.Arguments;
  * @see Context#setAttachment(Object)
  * @see Context#findAttachment(int)
  */
-public final class Lifecycle extends AbstractAction {
+public class Lifecycle extends AbstractAction {
 
     private final Action before;
     private final Action main;
     private final Action after;
     private final List<Action> actions;
 
-    private Lifecycle(String name, Action before, Action main, Action after) {
-        super(name);
-        this.before = Objects.requireNonNull(before, "before must not be null");
-        this.main = Objects.requireNonNull(main, "main must not be null");
-        this.after = Objects.requireNonNull(after, "after must not be null");
+    /**
+     * Creates a lifecycle action with explicit before, main, and after phases.
+     *
+     * <p>Callers should normally use {@link #of(String, Action, Action, Action)} so the
+     * instance is validated and fully initialized before use.</p>
+     *
+     * @param name the lifecycle action name
+     * @param before the action executed before the main phase
+     * @param main the primary action
+     * @param after the action executed after the main phase
+     */
+    protected Lifecycle(String name, Action before, Action main, Action after) {
+        super();
+        this.name = validateName(name);
+        this.before = before;
+        this.main = main;
+        this.after = after;
         this.actions = validateChildren(List.of(this.before, this.main, this.after));
     }
 
@@ -231,7 +240,7 @@ public final class Lifecycle extends AbstractAction {
      * Creates a lifecycle action with before, main, and after phases.
      *
      * <p>All three phases are required and must not be {@code null}. Use
-     * {@link Noop#DEFAULT} for phases that don't need implementation.</p>
+     * {@link Noop#of(String)} for phases that don't need implementation.</p>
      *
      * <p><strong>Parameter Validation:</strong></p>
      * <ul>
@@ -253,7 +262,7 @@ public final class Lifecycle extends AbstractAction {
      * <p><strong>With No-op Phases:</strong></p>
      * <pre>{@code
      * Lifecycle action = Lifecycle.of("simple",
-     *     Noop.DEFAULT,              // No setup
+     *     Noop.of("noop"),          // No setup
      *     Direct.of("test", this::runTest),
      *     Direct.of("cleanup", this::cleanup)
      * );
@@ -266,15 +275,17 @@ public final class Lifecycle extends AbstractAction {
      * @return a new lifecycle action; never {@code null}
      * @throws NullPointerException if any parameter is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
-     * @see Noop#DEFAULT
+     * @see Noop#of(String)
      */
     public static Lifecycle of(String name, Action before, Action main, Action after) {
         Objects.requireNonNull(name, "name must not be null");
+        Arguments.requireNonBlank(name, "name must not be blank");
         Objects.requireNonNull(before, "before must not be null");
         Objects.requireNonNull(main, "main must not be null");
         Objects.requireNonNull(after, "after must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
-        return new Lifecycle(name, before, main, after);
+        Lifecycle instance = new Lifecycle(name, before, main, after);
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -332,50 +343,46 @@ public final class Lifecycle extends AbstractAction {
     @Override
     public void execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Results.staged();
+        this.result = Result.staged();
         context.getListener().beforeAction(context, this);
         Instant start = Instant.now();
 
-        List<Action> executedActions = new ArrayList<>(3);
-        Status computedStatus = DefaultStatus.pass();
+        Status computedStatus = Status.pass();
 
-        DefaultContext lifecycleContext = new DefaultContext((DefaultContext) context);
+        Context lifecycleContext = context.createChild();
         before.execute(lifecycleContext);
-        executedActions.add(before);
         if (before.getResult().getStatus().isSkip()) {
-            computedStatus = DefaultStatus.skip(
-                    before.getResult().getStatus().getMessage().orElse(null));
+            computedStatus =
+                    Status.skip(before.getResult().getStatus().getMessage().orElse(null));
         } else if (before.getResult().getStatus().isFailure()) {
-            computedStatus = DefaultStatus.failure(
-                    before.getResult().getStatus().getMessage().orElse(null));
+            computedStatus =
+                    Status.failure(before.getResult().getStatus().getMessage().orElse(null));
         }
 
         if (computedStatus.isPass()) {
-            main.execute(new DefaultContext(lifecycleContext));
-            executedActions.add(main);
+            main.execute(lifecycleContext.createChild());
             if (main.getResult().getStatus().isFailure()) {
                 String mainFailureMessage =
                         main.getResult().getStatus().getMessage().orElse(null);
-                computedStatus = DefaultStatus.failure(mainFailureMessage);
+                computedStatus = Status.failure(mainFailureMessage);
             } else if (main.getResult().getStatus().isSkip()) {
-                computedStatus = DefaultStatus.skip(
-                        main.getResult().getStatus().getMessage().orElse(null));
+                computedStatus =
+                        Status.skip(main.getResult().getStatus().getMessage().orElse(null));
             }
         } else {
-            skipWithDescendants(main, new DefaultContext(lifecycleContext));
+            skipWithDescendants(main, lifecycleContext.createChild());
         }
 
         after.execute(lifecycleContext);
-        executedActions.add(after);
         if (after.getResult().getStatus().isFailure()) {
             String afterFailureMessage =
                     after.getResult().getStatus().getMessage().orElse(null);
             if (!computedStatus.isFailure() || computedStatus.getMessage().isEmpty()) {
-                computedStatus = DefaultStatus.failure(afterFailureMessage);
+                computedStatus = Status.failure(afterFailureMessage);
             }
         }
 
-        this.result = Results.of(computedStatus, durationSince(start));
+        this.result = Result.of(computedStatus, durationSince(start));
         context.getListener().afterAction(context, this, this.result);
     }
 

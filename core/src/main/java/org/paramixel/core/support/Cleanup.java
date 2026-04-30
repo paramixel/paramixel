@@ -60,9 +60,30 @@ public class Cleanup {
     private boolean hasRun = false;
 
     /**
+     * Creates a new Cleanup with execution mode {@code Mode.FORWARD}.
+     *
+     * @return a new cleanup instance; never {@code null}
+     */
+    public static Cleanup of() {
+        return new Cleanup(Mode.FORWARD);
+    }
+
+    /**
+     * Creates a new Cleanup with the specified execution mode.
+     *
+     * @param mode The execution mode; must not be null.
+     * @return a new cleanup instance; never {@code null}
+     * @throws NullPointerException if {@code mode} is {@code null}
+     */
+    public static Cleanup of(final Mode mode) {
+        Objects.requireNonNull(mode, "mode must not be null");
+        return new Cleanup(mode);
+    }
+
+    /**
      * Creates a new Cleanup with execution mode {@code Mode.FORWARD}
      */
-    public Cleanup() {
+    private Cleanup() {
         this(Mode.FORWARD);
     }
 
@@ -71,8 +92,8 @@ public class Cleanup {
      *
      * @param mode The execution mode; must not be null.
      */
-    public Cleanup(final Mode mode) {
-        this.mode = Objects.requireNonNull(mode, "mode must not be null");
+    private Cleanup(final Mode mode) {
+        this.mode = mode;
     }
 
     /**
@@ -84,6 +105,14 @@ public class Cleanup {
         return executables.size();
     }
 
+    /**
+     * Returns whether this cleanup instance has already been executed.
+     *
+     * <p>Once {@link #run()} or {@link #runAndThrow()} has been called successfully, this
+     * method returns {@code true} until {@link #reset()} is invoked.</p>
+     *
+     * @return {@code true} if cleanup has already run; otherwise {@code false}
+     */
     public boolean hasRun() {
         return hasRun;
     }
@@ -185,12 +214,32 @@ public class Cleanup {
         return Collections.unmodifiableList(executables);
     }
 
+    /**
+     * Clears all registered executables and resets the execution state.
+     *
+     * <p>This method allows the same {@code Cleanup} instance to be reused after a prior
+     * run. Any previously collected run state is discarded.</p>
+     *
+     * @return this cleanup instance
+     */
     public Cleanup reset() {
         executables.clear();
         hasRun = false;
         return this;
     }
 
+    /**
+     * Executes all registered cleanup tasks and collects any thrown exceptions.
+     *
+     * <p>Tasks execute in the order defined by the configured {@link Mode}. Every task is
+     * given a chance to run even if earlier tasks fail. Thrown exceptions are captured in
+     * the returned {@link CleanupResult} by task index.</p>
+     *
+     * <p>This method may be called only once unless {@link #reset()} is invoked.</p>
+     *
+     * @return the aggregated cleanup result
+     * @throws IllegalStateException if this cleanup has already run and has not been reset
+     */
     public CleanupResult run() {
         if (hasRun) {
             throw new IllegalStateException("Cleanup has already run");

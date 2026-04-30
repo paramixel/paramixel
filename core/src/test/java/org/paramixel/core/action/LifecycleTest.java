@@ -132,7 +132,7 @@ class LifecycleTest {
     @Test
     @DisplayName("before SkipException skips main but runs after")
     void beforeSkipExceptionSkipsMainButRunsAfter() {
-        var skipException = new SkipException("before skipped");
+        var skipException = SkipException.of("before skipped");
         var mainRan = new AtomicBoolean();
         var afterRan = new AtomicBoolean();
         Action main = Direct.of("main", context -> mainRan.set(true));
@@ -206,7 +206,7 @@ class LifecycleTest {
         var lifecycle = Lifecycle.of(
                 "lifecycle",
                 Direct.of("before", context -> {
-                    throw new SkipException("skip");
+                    SkipException.skip();
                 }),
                 Noop.of("main"),
                 Direct.of("after", context -> afterRan.set(true)));

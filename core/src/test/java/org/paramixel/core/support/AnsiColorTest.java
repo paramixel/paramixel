@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.paramixel.core.internal.util;
+package org.paramixel.core.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

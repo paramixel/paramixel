@@ -59,7 +59,7 @@ public class NginxTestEnvironment implements AutoCloseable {
     }
 
     public boolean isRunning() {
-        return nginxContainer.isRunning();
+        return nginxContainer != null && nginxContainer.isRunning();
     }
 
     public NginxContainer<?> getNginxContainer() {

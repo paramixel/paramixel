@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.paramixel.core.internal.util;
+package org.paramixel.core.support;
 
 import java.util.Objects;
 
@@ -34,17 +34,13 @@ public enum AnsiColor {
 
     BOLD_GRAY_TEXT("\033[1;90m"),
 
-    BOLD_YELLOW_TEXT("\033[1;33m"),
-
     BOLD_WHITE_TEXT("\033[1;37m"),
 
     GREEN_TEXT("\033[32m"),
 
     RED_TEXT("\033[31m"),
 
-    ORANGE_TEXT("\033[33m"),
-
-    YELLOW_TEXT("\033[33m");
+    ORANGE_TEXT("\033[33m");
 
     private final String code;
 

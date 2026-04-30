@@ -35,7 +35,7 @@ class StrictSequentialTest {
     void rejectsActionsWithoutGetChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> StrictSequential.of("empty", List.of()))
-                .withMessage("action must have at least one child");
+                .withMessage("children must not be empty");
     }
 
     @Test

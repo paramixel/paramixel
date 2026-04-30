@@ -59,7 +59,7 @@ public class MongoDBTestEnvironment implements AutoCloseable {
     }
 
     public boolean isRunning() {
-        return mongoDBContainer.isRunning();
+        return mongoDBContainer != null && mongoDBContainer.isRunning();
     }
 
     public String getConnectionString() {

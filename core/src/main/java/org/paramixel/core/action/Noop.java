@@ -19,8 +19,8 @@ package org.paramixel.core.action;
 import java.time.Instant;
 import java.util.Objects;
 import org.paramixel.core.Context;
-import org.paramixel.core.internal.Results;
-import org.paramixel.core.internal.util.Arguments;
+import org.paramixel.core.Result;
+import org.paramixel.core.support.Arguments;
 
 /**
  * A built-in action that completes without doing any work.
@@ -59,7 +59,7 @@ import org.paramixel.core.internal.util.Arguments;
  * <pre>{@code
  * @Test
  * void testRunner() {
- *     Action action = Noop.DEFAULT;
+ *     Action action = Noop.of("noop");
  *     Runner.builder().build().run(action);
  *     assertEquals(Status.PASS, action.getResult().getStatus());
  * }
@@ -68,11 +68,6 @@ import org.paramixel.core.internal.util.Arguments;
  * <p><strong>Conditional Branching:</strong></p>
  * <pre>{@code
  * Action action = condition ? realAction : Noop.of("no-op");
- * }</pre>
- *
- * <p><strong>Using Default Instance:</strong></p>
- * <pre>{@code
- * Action action = Noop.DEFAULT; // Reusable singleton
  * }</pre>
  *
  * <h3>Comparison with Direct</h3>
@@ -111,12 +106,12 @@ import org.paramixel.core.internal.util.Arguments;
  *   <li>Intent is explicit (no-op vs empty lambda)</li>
  *   <li>Better performance (no lambda invocation)</li>
  *   <li>Self-documenting code</li>
- *   <li>Reusable singleton available via {@link #DEFAULT}</li>
+ *   <li>No custom executor or lambda required</li>
  * </ul>
  *
  * <h3>Thread Safety</h3>
- * <p>Noop actions are thread-safe and stateless. The {@link #DEFAULT} constant can be
- * reused across multiple executions safely.</p>
+ * <p>Noop actions are thread-safe and stateless. Create instances with {@link #of(String)}
+ * when you need a no-op action in an action tree.</p>
  *
  * @see Direct
  * @see Sequential
@@ -125,42 +120,23 @@ import org.paramixel.core.internal.util.Arguments;
 public final class Noop extends AbstractAction {
 
     /**
-     * Default no-op action instance with name "noop".
+     * Creates a named no-op action.
      *
-     * <p>This is a reusable singleton instance that can be used anywhere a no-op action
-     * is needed. Since Noop is stateless, this instance can be safely shared and reused.</p>
+     * <p>Callers should normally use {@link #of(String)}.</p>
      *
-     * <p><strong>Usage:</strong></p>
-     * <pre>{@code
-     * Action action = Noop.DEFAULT;
-     * runner.run(action);
-     * }</pre>
-     *
-     * <p><strong>When to Use:</strong></p>
-     * <ul>
-     *   <li>Testing and prototyping</li>
-     *   <li>Default placeholder action</li>
-     *   <li>Conditional branching where name doesn't matter</li>
-     * </ul>
-     *
-     * <p><strong>When Not to Use:</strong></p>
-     * <ul>
-     *   <li>When action name is important for logging/debugging (use {@link #of(String)})</li>
-     *   <li>When action needs to be part of a named sequence</li>
-     * </ul>
+     * @param name the action name
      */
-    public static final Noop DEFAULT = new Noop("noop");
-
-    private Noop(String name) {
-        super(name);
+    protected Noop(String name) {
+        super();
+        this.name = validateName(name);
     }
 
     /**
      * Creates a no-op action with the specified name.
      *
      * <p>Use this factory method when the action name is important for debugging,
-     * logging, or understanding execution traces. For cases where the name doesn't
-     * matter, consider using {@link #DEFAULT} for better performance.</p>
+     * logging, or understanding execution traces. When the name does not matter, callers
+     * can still use {@code "noop"} and create a fresh instance with {@code Noop.of("noop")}.</p>
      *
      * <p><strong>Parameter Validation:</strong></p>
      * <ul>
@@ -184,12 +160,13 @@ public final class Noop extends AbstractAction {
      * @return a new no-op action; never {@code null}
      * @throws NullPointerException if {@code name} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
-     * @see #DEFAULT
      */
     public static Noop of(String name) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
-        return new Noop(name);
+        Arguments.requireNonBlank(name, "name must not be blank");
+        Noop instance = new Noop(name);
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -222,10 +199,10 @@ public final class Noop extends AbstractAction {
     @Override
     public void execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Results.staged();
+        this.result = Result.staged();
         context.getListener().beforeAction(context, this);
         Instant start = Instant.now();
-        this.result = Results.pass(durationSince(start));
+        this.result = Result.pass(durationSince(start));
         context.getListener().afterAction(context, this, this.result);
     }
 }

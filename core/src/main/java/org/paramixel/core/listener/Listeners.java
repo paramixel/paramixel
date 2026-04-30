@@ -17,7 +17,7 @@
 package org.paramixel.core.listener;
 
 import org.paramixel.core.Listener;
-import org.paramixel.core.internal.util.AnsiColor;
+import org.paramixel.core.support.AnsiColor;
 
 /**
  * Factory methods for creating standard listener implementations.
@@ -89,7 +89,7 @@ public final class Listeners {
      * @see SummaryListener
      */
     public static Listener defaultListener() {
-        return new CompositeListener(new StatusListener(), new SummaryListener(new TableSummaryRenderer()));
+        return CompositeListener.of(StatusListener.of(), new SummaryListener(new TableSummaryRenderer()));
     }
 
     /**
@@ -128,6 +128,6 @@ public final class Listeners {
      * @see TreeSummaryRenderer
      */
     public static Listener treeListener() {
-        return new CompositeListener(new StatusListener(), new SummaryListener(new TreeSummaryRenderer()));
+        return CompositeListener.of(StatusListener.of(), new SummaryListener(new TreeSummaryRenderer()));
     }
 }

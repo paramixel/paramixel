@@ -32,7 +32,7 @@ class CleanupTest {
     @Test
     @DisplayName("constructor rejects null mode")
     void constructorRejectsNullMode() {
-        assertThatThrownBy(() -> new Cleanup(null))
+        assertThatThrownBy(() -> Cleanup.of(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("mode must not be null");
     }
@@ -41,12 +41,12 @@ class CleanupTest {
     @DisplayName("add and run executes in reverse order with REVERSE mode")
     void addAndRunExecutesInReverseOrder() {
         List<String> executionOrder = new ArrayList<>();
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE)
                 .add(() -> executionOrder.add("first"))
                 .add(() -> executionOrder.add("second"))
                 .add(() -> executionOrder.add("third"));
 
-        runner.run();
+        cleanup.run();
 
         assertThat(executionOrder).containsExactly("third", "second", "first");
     }
@@ -55,12 +55,12 @@ class CleanupTest {
     @DisplayName("add and run executes in forward order with FORWARD mode")
     void addAndRunExecutesInForwardOrder() {
         List<String> executionOrder = new ArrayList<>();
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> executionOrder.add("first"))
                 .add(() -> executionOrder.add("second"))
                 .add(() -> executionOrder.add("third"));
 
-        runner.run();
+        cleanup.run();
 
         assertThat(executionOrder).containsExactly("first", "second", "third");
     }
@@ -68,19 +68,19 @@ class CleanupTest {
     @Test
     @DisplayName("add returns this for method chaining")
     void addReturnsThis() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        Cleanup result = runner.add(() -> {});
+        Cleanup result = cleanup.add(() -> {});
 
-        assertThat(result).isSameAs(runner);
+        assertThat(result).isSameAs(cleanup);
     }
 
     @Test
     @DisplayName("add rejects null executable")
     void addRejectsNullExecutable() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> runner.add((Executable) null))
+        assertThatThrownBy(() -> cleanup.add((Executable) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("executable must not be null");
     }
@@ -94,7 +94,7 @@ class CleanupTest {
                 () -> executionOrder.add("second"),
                 () -> executionOrder.add("third"));
 
-        new Cleanup(Cleanup.Mode.REVERSE).add(tasks).run();
+        Cleanup.of(Cleanup.Mode.REVERSE).add(tasks).run();
 
         assertThat(executionOrder).containsExactly("third", "second", "first");
     }
@@ -108,7 +108,7 @@ class CleanupTest {
                 () -> executionOrder.add("second"),
                 () -> executionOrder.add("third"));
 
-        new Cleanup(Cleanup.Mode.FORWARD).add(tasks).run();
+        Cleanup.of(Cleanup.Mode.FORWARD).add(tasks).run();
 
         assertThat(executionOrder).containsExactly("first", "second", "third");
     }
@@ -116,9 +116,9 @@ class CleanupTest {
     @Test
     @DisplayName("add with list rejects null list")
     void addListRejectsNullList() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> runner.add((List<Executable>) null))
+        assertThatThrownBy(() -> cleanup.add((List<Executable>) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("executables must not be null");
     }
@@ -128,7 +128,7 @@ class CleanupTest {
     void addVarargRegistersAllGetExecutables() {
         List<String> executionOrder = new ArrayList<>();
 
-        new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup.of(Cleanup.Mode.REVERSE)
                 .add(
                         () -> executionOrder.add("first"),
                         () -> executionOrder.add("second"),
@@ -143,7 +143,7 @@ class CleanupTest {
     void addVarargRegistersAllGetExecutablesInForwardMode() {
         List<String> executionOrder = new ArrayList<>();
 
-        new Cleanup(Cleanup.Mode.FORWARD)
+        Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(
                         () -> executionOrder.add("first"),
                         () -> executionOrder.add("second"),
@@ -156,19 +156,19 @@ class CleanupTest {
     @Test
     @DisplayName("add with vararg returns this for method chaining")
     void addVarargReturnsThis() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        Cleanup result = runner.add(() -> {}, () -> {});
+        Cleanup result = cleanup.add(() -> {}, () -> {});
 
-        assertThat(result).isSameAs(runner);
+        assertThat(result).isSameAs(cleanup);
     }
 
     @Test
     @DisplayName("add with vararg rejects null array")
     void addVarargRejectsNullArray() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> runner.add((Executable[]) null))
+        assertThatThrownBy(() -> cleanup.add((Executable[]) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("executables must not be null");
     }
@@ -176,9 +176,9 @@ class CleanupTest {
     @Test
     @DisplayName("add with vararg rejects null element")
     void addVarargRejectsNullElement() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> runner.add(() -> {}, null))
+        assertThatThrownBy(() -> cleanup.add(() -> {}, null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("executable must not be null");
     }
@@ -186,11 +186,11 @@ class CleanupTest {
     @Test
     @DisplayName("add with vararg and no args does nothing")
     void addVarargWithNoArgsDoesNothing() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        runner.add().run();
+        cleanup.add().run();
 
-        assertThat(runner.getCount()).isZero();
+        assertThat(cleanup.getCount()).isZero();
     }
 
     @Test
@@ -198,7 +198,7 @@ class CleanupTest {
     void addWhenSupplierTrueExecutesAction() {
         List<String> executionOrder = new ArrayList<>();
 
-        new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup.of(Cleanup.Mode.REVERSE)
                 .addWhen(() -> true, () -> executionOrder.add("executed"))
                 .run();
 
@@ -210,7 +210,7 @@ class CleanupTest {
     void addWhenSupplierFalseSkipsAction() {
         List<String> executionOrder = new ArrayList<>();
 
-        new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup.of(Cleanup.Mode.REVERSE)
                 .addWhen(() -> false, () -> executionOrder.add("executed"))
                 .run();
 
@@ -222,7 +222,7 @@ class CleanupTest {
     void addWhenBooleanTrueExecutesAction() {
         List<String> executionOrder = new ArrayList<>();
 
-        new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup.of(Cleanup.Mode.REVERSE)
                 .addWhen(true, () -> executionOrder.add("executed"))
                 .run();
 
@@ -234,7 +234,7 @@ class CleanupTest {
     void addWhenBooleanFalseSkipsAction() {
         List<String> executionOrder = new ArrayList<>();
 
-        new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup.of(Cleanup.Mode.REVERSE)
                 .addWhen(false, () -> executionOrder.add("executed"))
                 .run();
 
@@ -244,9 +244,9 @@ class CleanupTest {
     @Test
     @DisplayName("addWhen rejects null condition supplier")
     void addWhenRejectsNullCondition() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> runner.addWhen((Supplier<Boolean>) null, () -> {}))
+        assertThatThrownBy(() -> cleanup.addWhen((Supplier<Boolean>) null, () -> {}))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("condition must not be null");
     }
@@ -254,9 +254,9 @@ class CleanupTest {
     @Test
     @DisplayName("addWhen rejects null executable")
     void addWhenRejectsNullExecutable() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> runner.addWhen(() -> true, (Executable) null))
+        assertThatThrownBy(() -> cleanup.addWhen(() -> true, (Executable) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("executable must not be null");
     }
@@ -264,7 +264,7 @@ class CleanupTest {
     @Test
     @DisplayName("run collects exceptions from failing executables in FORWARD mode")
     void runCollectsExceptionsInForwardMode() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> {
                     throw new RuntimeException("error 1");
                 })
@@ -274,7 +274,7 @@ class CleanupTest {
                 })
                 .add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.hasExceptions()).isTrue();
         assertThat(result.getException(0))
@@ -290,7 +290,7 @@ class CleanupTest {
     @Test
     @DisplayName("run collects exceptions from failing executables in REVERSE mode")
     void runCollectsExceptions() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE)
                 .add(() -> {})
                 .add(() -> {
                     throw new RuntimeException("error 1");
@@ -301,7 +301,7 @@ class CleanupTest {
                 })
                 .add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.hasExceptions()).isTrue();
         assertThat(result.getException(0)).isEmpty();
@@ -318,11 +318,11 @@ class CleanupTest {
     @Test
     @DisplayName("run throws on second call")
     void runThrowsOnSecondCall() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {});
 
-        runner.run();
+        cleanup.run();
 
-        assertThatThrownBy(() -> runner.run())
+        assertThatThrownBy(() -> cleanup.run())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Cleanup has already run");
     }
@@ -330,10 +330,10 @@ class CleanupTest {
     @Test
     @DisplayName("run returns CleanupResult with taskCount")
     void runReturnsCleanupResultWithTaskGetCount() {
-        Cleanup runner =
-                new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {}).add(() -> {});
+        Cleanup cleanup =
+                Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {}).add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.getExecutableCount()).isEqualTo(3);
     }
@@ -341,29 +341,29 @@ class CleanupTest {
     @Test
     @DisplayName("count returns correct size")
     void getCountReturnsCorrectSize() {
-        Cleanup runner =
-                new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {}).add(() -> {});
+        Cleanup cleanup =
+                Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {}).add(() -> {});
 
-        assertThat(runner.getCount()).isEqualTo(3);
+        assertThat(cleanup.getCount()).isEqualTo(3);
     }
 
     @Test
     @DisplayName("executables returns unmodifiable list")
     void getExecutablesReturnsUnmodifiableList() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {});
 
-        assertThatThrownBy(() -> runner.getExecutables().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> cleanup.getExecutables().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     @DisplayName("getException returns exception for failed executable")
     void getExceptionReturnsExceptionForFailedTask() {
         RuntimeException expectedException = new RuntimeException("failed");
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {
             throw expectedException;
         });
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.getException(1)).isPresent().contains(expectedException);
     }
@@ -371,9 +371,9 @@ class CleanupTest {
     @Test
     @DisplayName("getException returns empty for successful executable")
     void getExceptionReturnsEmptyForSuccessfulTask() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.getException(0)).isEmpty();
         assertThat(result.getException(1)).isEmpty();
@@ -382,9 +382,9 @@ class CleanupTest {
     @Test
     @DisplayName("getException returns empty for out of bounds index")
     void getExceptionReturnsEmptyForOutOfBounds() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.getException(-1)).isEmpty();
         assertThat(result.getException(1)).isEmpty();
@@ -393,9 +393,9 @@ class CleanupTest {
     @Test
     @DisplayName("isSuccess returns true for successful executable")
     void isSuccessReturnsTrueForSuccessfulTask() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.isSuccess(0)).isTrue();
         assertThat(result.isSuccess(1)).isTrue();
@@ -404,11 +404,11 @@ class CleanupTest {
     @Test
     @DisplayName("isSuccess returns false for failed executable")
     void isSuccessReturnsFalseForFailedTask() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {
             throw new RuntimeException("error");
         });
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.isSuccess(0)).isTrue();
         assertThat(result.isSuccess(1)).isFalse();
@@ -419,7 +419,7 @@ class CleanupTest {
     void exceptionsByIndexReturnsOnlyFailures() {
         RuntimeException exception1 = new RuntimeException("error 1");
         RuntimeException exception2 = new RuntimeException("error 2");
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE)
                 .add(() -> {})
                 .add(() -> {
                     throw exception1;
@@ -430,7 +430,7 @@ class CleanupTest {
                 })
                 .add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         var exceptions = result.getExceptionsByIndex();
         assertThat(exceptions).hasSize(2);
@@ -441,9 +441,9 @@ class CleanupTest {
     @Test
     @DisplayName("exceptionsByIndex returns empty when no failures")
     void exceptionsByIndexReturnsEmptyWhenNoFailures() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {});
 
-        CleanupResult result = runner.run();
+        CleanupResult result = cleanup.run();
 
         assertThat(result.getExceptionsByIndex()).isEmpty();
     }
@@ -455,7 +455,7 @@ class CleanupTest {
         RuntimeException secondException = new RuntimeException("second");
         RuntimeException thirdException = new RuntimeException("third");
 
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE)
                 .add(() -> {
                     throw thirdException;
                 })
@@ -466,7 +466,7 @@ class CleanupTest {
                     throw firstException;
                 });
 
-        assertThatThrownBy(() -> runner.runAndThrow()).isSameAs(firstException).satisfies(t -> {
+        assertThatThrownBy(() -> cleanup.runAndThrow()).isSameAs(firstException).satisfies(t -> {
             assertThat(t.getSuppressed()).hasSize(2);
             assertThat(t.getSuppressed()[0]).isSameAs(secondException);
             assertThat(t.getSuppressed()[1]).isSameAs(thirdException);
@@ -480,7 +480,7 @@ class CleanupTest {
         RuntimeException secondException = new RuntimeException("second");
         RuntimeException thirdException = new RuntimeException("third");
 
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> {
                     throw firstException;
                 })
@@ -491,7 +491,7 @@ class CleanupTest {
                     throw thirdException;
                 });
 
-        assertThatThrownBy(() -> runner.runAndThrow()).isSameAs(firstException).satisfies(t -> {
+        assertThatThrownBy(() -> cleanup.runAndThrow()).isSameAs(firstException).satisfies(t -> {
             assertThat(t.getSuppressed()).hasSize(2);
             assertThat(t.getSuppressed()[0]).isSameAs(secondException);
             assertThat(t.getSuppressed()[1]).isSameAs(thirdException);
@@ -501,21 +501,21 @@ class CleanupTest {
     @Test
     @DisplayName("runAndThrow does nothing when no exceptions")
     void runAndThrowDoesNothingWhenNoExceptions() throws Throwable {
-        Cleanup runner =
-                new Cleanup(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {}).add(() -> {});
+        Cleanup cleanup =
+                Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {}).add(() -> {}).add(() -> {});
 
-        runner.runAndThrow();
+        cleanup.runAndThrow();
     }
 
     @Test
     @DisplayName("runAndThrow runs if not yet run in REVERSE mode")
     void runAndThrowRunsIfNotYetRun() throws Throwable {
         List<String> executionOrder = new ArrayList<>();
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE)
                 .add(() -> executionOrder.add("first"))
                 .add(() -> executionOrder.add("second"));
 
-        runner.runAndThrow();
+        cleanup.runAndThrow();
 
         assertThat(executionOrder).containsExactly("second", "first");
     }
@@ -524,11 +524,11 @@ class CleanupTest {
     @DisplayName("runAndThrow runs if not yet run in FORWARD mode")
     void runAndThrowRunsIfNotYetRunInForwardMode() throws Throwable {
         List<String> executionOrder = new ArrayList<>();
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> executionOrder.add("first"))
                 .add(() -> executionOrder.add("second"));
 
-        runner.runAndThrow();
+        cleanup.runAndThrow();
 
         assertThat(executionOrder).containsExactly("first", "second");
     }
@@ -538,7 +538,7 @@ class CleanupTest {
     void executableCanThrowCheckedException() throws Exception {
         class CheckedException extends Exception {}
 
-        assertThatThrownBy(() -> new Cleanup(Cleanup.Mode.REVERSE)
+        assertThatThrownBy(() -> Cleanup.of(Cleanup.Mode.REVERSE)
                         .add(() -> {
                             throw new CheckedException();
                         })
@@ -549,71 +549,71 @@ class CleanupTest {
     @Test
     @DisplayName("hasRun returns false before run")
     void hasRunReturnsFalseBeforeRun() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThat(runner.hasRun()).isFalse();
+        assertThat(cleanup.hasRun()).isFalse();
     }
 
     @Test
     @DisplayName("hasRun returns true after run")
     void hasRunReturnsTrueAfterRun() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {});
 
-        runner.run();
+        cleanup.run();
 
-        assertThat(runner.hasRun()).isTrue();
+        assertThat(cleanup.hasRun()).isTrue();
     }
 
     @Test
     @DisplayName("hasRun returns false after reset")
     void hasRunReturnsFalseAfterReset() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE).add(() -> {});
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {});
 
-        runner.run();
-        runner.reset();
+        cleanup.run();
+        cleanup.reset();
 
-        assertThat(runner.hasRun()).isFalse();
+        assertThat(cleanup.hasRun()).isFalse();
     }
 
     @Test
     @DisplayName("reset clears executables and allows re-run")
     void resetClearsGetExecutablesAndAllowsReRun() {
         List<String> executionOrder = new ArrayList<>();
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD)
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> executionOrder.add("first"))
                 .add(() -> executionOrder.add("second"));
 
-        runner.run();
+        cleanup.run();
         assertThat(executionOrder).containsExactly("first", "second");
 
-        runner.reset();
-        assertThat(runner.getCount()).isZero();
+        cleanup.reset();
+        assertThat(cleanup.getCount()).isZero();
 
-        runner.add(() -> executionOrder.add("third")).add(() -> executionOrder.add("fourth"));
-        runner.run();
+        cleanup.add(() -> executionOrder.add("third")).add(() -> executionOrder.add("fourth"));
+        cleanup.run();
         assertThat(executionOrder).containsExactly("first", "second", "third", "fourth");
     }
 
     @Test
     @DisplayName("reset returns this for method chaining")
     void resetReturnsThis() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.REVERSE);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        Cleanup result = runner.reset();
+        Cleanup result = cleanup.reset();
 
-        assertThat(result).isSameAs(runner);
+        assertThat(result).isSameAs(cleanup);
     }
 
     @Test
     @DisplayName("reset on unrun runner is safe")
     void resetOnUnrunRunnerIsSafe() {
         List<String> executionOrder = new ArrayList<>();
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD).add(() -> executionOrder.add("executed"));
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> executionOrder.add("executed"));
 
-        runner.reset();
-        assertThat(runner.hasRun()).isFalse();
+        cleanup.reset();
+        assertThat(cleanup.hasRun()).isFalse();
 
-        runner.run();
+        cleanup.run();
         assertThat(executionOrder).isEmpty();
     }
 
@@ -629,7 +629,7 @@ class CleanupTest {
         }
 
         TestCloseable closeable = new TestCloseable();
-        new Cleanup(Cleanup.Mode.FORWARD).addCloseable(closeable).run();
+        Cleanup.of(Cleanup.Mode.FORWARD).addCloseable(closeable).run();
 
         assertThat(executionOrder).containsExactly("closed");
     }
@@ -637,31 +637,31 @@ class CleanupTest {
     @Test
     @DisplayName("addAutoCloseable skips null")
     void addAutoCloseableSkipsNull() throws Throwable {
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD).addCloseable((AutoCloseable) null);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).addCloseable((AutoCloseable) null);
 
-        runner.run();
+        cleanup.run();
 
-        assertThat(runner.getCount()).isZero();
+        assertThat(cleanup.getCount()).isZero();
     }
 
     @Test
     @DisplayName("addAutoCloseable returns this")
     void addAutoCloseableReturnsThis() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD);
 
-        Cleanup result = runner.addCloseable(() -> {});
+        Cleanup result = cleanup.addCloseable(() -> {});
 
-        assertThat(result).isSameAs(runner);
+        assertThat(result).isSameAs(cleanup);
     }
 
     @Test
     @DisplayName("addAutoCloseable returns this even with null")
     void addAutoCloseableReturnsThisEvenWithNull() {
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD);
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD);
 
-        Cleanup result = runner.addCloseable((AutoCloseable) null);
+        Cleanup result = cleanup.addCloseable((AutoCloseable) null);
 
-        assertThat(result).isSameAs(runner);
+        assertThat(result).isSameAs(cleanup);
     }
 
     @Test
@@ -674,8 +674,8 @@ class CleanupTest {
             }
         }
 
-        Cleanup runner = new Cleanup(Cleanup.Mode.FORWARD).addCloseable(new ThrowingCloseable());
-        CleanupResult result = runner.run();
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).addCloseable(new ThrowingCloseable());
+        CleanupResult result = cleanup.run();
 
         assertThat(result.hasExceptions()).isTrue();
         assertThat(result.getException(0))
@@ -700,7 +700,7 @@ class CleanupTest {
             }
         }
 
-        new Cleanup(Cleanup.Mode.FORWARD)
+        Cleanup.of(Cleanup.Mode.FORWARD)
                 .addCloseable(new TestCloseable("first"))
                 .addCloseable(new TestCloseable("second"))
                 .addCloseable(new TestCloseable("third"))
@@ -726,7 +726,7 @@ class CleanupTest {
             }
         }
 
-        new Cleanup(Cleanup.Mode.REVERSE)
+        Cleanup.of(Cleanup.Mode.REVERSE)
                 .addCloseable(new TestCloseable("first"))
                 .addCloseable(new TestCloseable("second"))
                 .addCloseable(new TestCloseable("third"))

@@ -100,7 +100,7 @@ public class MongoDBExample {
                             .orElse(null);
 
                     if (testAttachment != null) {
-                        new Cleanup(Cleanup.Mode.FORWARD)
+                        Cleanup.of(Cleanup.Mode.FORWARD)
                                 .addCloseable(testAttachment.environment)
                                 .addCloseable(testAttachment.network)
                                 .runAndThrow();

@@ -17,6 +17,8 @@
 package org.paramixel.core;
 
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
@@ -35,6 +37,10 @@ import java.util.concurrent.ExecutorService;
  * <p>Contexts form a tree structure mirroring the action tree. Each action receives its own
  * child context, allowing scoped state that is isolated from sibling actions. Parent contexts
  * are accessible via {@link #getParent()} or {@link #findContext(int)} for ancestor navigation.</p>
+ *
+ * <p><strong>Creation:</strong> Root contexts are created with {@link #of(Map, Listener, ExecutorService)}.
+ * Child contexts are created with {@link #createChild()}, which inherits configuration,
+ * listener, and executor service from the parent.</p>
  *
  * <p><strong>Thread Safety:</strong> Contexts are thread-safe for use within a single action's
  * execution. However, attachments are not synchronized across threads. When using parallel
@@ -72,7 +78,66 @@ import java.util.concurrent.ExecutorService;
  * @see Attachment
  * @see Configuration
  */
-public interface Context {
+public final class Context {
+
+    private final Context parent;
+    private Object attachment;
+    private final Map<String, String> configuration;
+    private final Listener listener;
+    private final ExecutorService executorService;
+
+    private Context(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
+        this(null, configuration, listener, executorService);
+    }
+
+    private Context(
+            Context parent, Map<String, String> configuration, Listener listener, ExecutorService executorService) {
+        this.parent = parent;
+        this.configuration = configuration != null ? Map.copyOf(configuration) : Configuration.defaultProperties();
+        this.listener = listener;
+        this.executorService = executorService;
+    }
+
+    private Context(Context parent) {
+        this(parent, parent.configuration, parent.listener, parent.executorService);
+    }
+
+    /**
+     * Creates a new root context with the specified configuration, listener, and executor service.
+     *
+     * <p>A root context has no parent. It is typically created by the {@link Runner} to begin
+     * action execution. Use {@link #createChild()} to create child contexts from a root context.</p>
+     *
+     * <p>If {@code configuration} is {@code null}, {@link Configuration#defaultProperties()} is used.</p>
+     *
+     * @param configuration the configuration properties; may be {@code null} to use defaults
+     * @param listener the execution listener; must not be {@code null}
+     * @param executorService the executor service for parallel execution; must not be {@code null}
+     * @return a new root context
+     * @throws NullPointerException if {@code listener} or {@code executorService} is {@code null}
+     */
+    public static Context of(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
+        Objects.requireNonNull(listener, "listener must not be null");
+        Objects.requireNonNull(listener, "listener must not be null");
+        Objects.requireNonNull(executorService, "executorService must not be null");
+        return new Context(configuration, listener, executorService);
+    }
+
+    /**
+     * Creates a new child context that inherits configuration, listener, and executor service
+     * from this context.
+     *
+     * <p>The child context's parent is set to this context, enabling hierarchy navigation
+     * via {@link #getParent()} and {@link #findContext(int)}.</p>
+     *
+     * <p>Child contexts provide isolated attachment storage while sharing configuration
+     * and executor resources with the parent.</p>
+     *
+     * @return a new child context with this context as its parent
+     */
+    public Context createChild() {
+        return new Context(this);
+    }
 
     /**
      * Returns the parent context for nested execution.
@@ -91,7 +156,9 @@ public interface Context {
      * @return an {@link Optional} containing the parent context, or empty for the root context
      * @see #findContext(int)
      */
-    Optional<Context> getParent();
+    public Optional<Context> getParent() {
+        return Optional.ofNullable(parent);
+    }
 
     /**
      * Returns the configuration properties for this execution.
@@ -119,7 +186,9 @@ public interface Context {
      * @see Configuration
      * @see Configuration#RUNNER_PARALLELISM
      */
-    Map<String, String> getConfiguration();
+    public Map<String, String> getConfiguration() {
+        return configuration;
+    }
 
     /**
      * Returns the listener that receives execution notifications.
@@ -144,7 +213,9 @@ public interface Context {
      * @see Listener
      * @see org.paramixel.core.listener.SafeListener
      */
-    Listener getListener();
+    public Listener getListener() {
+        return listener;
+    }
 
     /**
      * Returns the executor service for parallel execution.
@@ -155,7 +226,7 @@ public interface Context {
      *
      * <p>The executor is typically managed by the {@link Runner}. The thread pool size is
      * controlled by the {@code paramixel.parallelism} configuration property, defaulting to
-     * {@code Runtime.getRuntime().availableProcessors() * 2}.</p>
+     * {@code Runtime.getRuntime().availableProcessors()}.</p>
      *
      * <p><strong>Thread Safety:</strong> The executor service is thread-safe and can be used
      * concurrently from multiple actions. Submit tasks via {@link java.util.concurrent.ExecutorService#submit(Runnable)}
@@ -171,7 +242,9 @@ public interface Context {
      * @see Configuration#RUNNER_PARALLELISM
      * @see Runner.Builder#executorService(ExecutorService)
      */
-    ExecutorService getExecutorService();
+    public ExecutorService getExecutorService() {
+        return executorService;
+    }
 
     /**
      * Finds this context or one of its ancestors by level.
@@ -206,7 +279,22 @@ public interface Context {
      * @see #getParent()
      * @see #findAttachment(int)
      */
-    Optional<Context> findContext(int level);
+    public Optional<Context> findContext(int level) {
+        if (level < 0) {
+            throw new IllegalArgumentException("level must not be negative: " + level);
+        }
+
+        Context current = this;
+        for (int i = 0; i < level; i++) {
+            Optional<Context> parentContext = current.getParent();
+            if (parentContext.isEmpty()) {
+                throw new NoSuchElementException("Context ancestor not found at level " + level);
+            }
+            current = parentContext.get();
+        }
+
+        return Optional.of(current);
+    }
 
     /**
      * Sets an attachment on this context, replacing any existing attachment.
@@ -245,7 +333,10 @@ public interface Context {
      * @see #findAttachment(int)
      * @see Attachment
      */
-    <T> Context setAttachment(T attachment);
+    public <T> Context setAttachment(T attachment) {
+        this.attachment = attachment;
+        return this;
+    }
 
     /**
      * Returns the current attachment wrapped as an {@link Attachment} view.
@@ -276,7 +367,13 @@ public interface Context {
      * @see #findAttachment(int)
      * @see Attachment
      */
-    Optional<Attachment> getAttachment();
+    public Optional<Attachment> getAttachment() {
+        if (attachment == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(Attachment.of(attachment));
+    }
 
     /**
      * Removes and returns the current attachment wrapped as an {@link Attachment} view.
@@ -305,7 +402,15 @@ public interface Context {
      * @see #getAttachment()
      * @see #setAttachment(Object)
      */
-    Optional<Attachment> removeAttachment();
+    public Optional<Attachment> removeAttachment() {
+        if (attachment == null) {
+            return Optional.empty();
+        }
+
+        Object removed = attachment;
+        attachment = null;
+        return Optional.of(Attachment.of(removed));
+    }
 
     /**
      * Returns this context's attachment or an ancestor's attachment.
@@ -347,5 +452,17 @@ public interface Context {
      * @see #getAttachment()
      * @see Attachment
      */
-    Optional<Attachment> findAttachment(int level);
+    public Optional<Attachment> findAttachment(int level) {
+        return findContext(level).flatMap(Context::getAttachment);
+    }
+
+    /**
+     * Returns a concise string identifying whether this context is the root or a child context.
+     *
+     * @return a short diagnostic description of this context
+     */
+    @Override
+    public String toString() {
+        return "Context[" + (parent == null ? "root" : "child") + "]";
+    }
 }

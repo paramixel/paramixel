@@ -19,7 +19,7 @@ description: Manage explicit cleanup work.
 ## Example
 
 ```java
-Cleanup cleanup = new Cleanup(Cleanup.Mode.REVERSE)
+Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE)
         .add(() -> stopServer())
         .addCloseable(network);
 
@@ -29,7 +29,7 @@ CleanupResult result = cleanup.run();
 ## Throwing aggregated failures
 
 ```java
-new Cleanup(Cleanup.Mode.FORWARD)
+Cleanup.of(Cleanup.Mode.FORWARD)
         .addCloseable(resourceA)
         .addCloseable(resourceB)
         .runAndThrow();

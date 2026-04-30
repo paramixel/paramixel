@@ -25,9 +25,8 @@ import java.util.OptionalLong;
 import java.util.Random;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
-import org.paramixel.core.internal.DefaultContext;
-import org.paramixel.core.internal.Results;
-import org.paramixel.core.internal.util.Arguments;
+import org.paramixel.core.Result;
+import org.paramixel.core.support.Arguments;
 
 /**
  * A built-in action that executes child actions sequentially in random order and stops on the first failure.
@@ -114,13 +113,21 @@ import org.paramixel.core.internal.util.Arguments;
  * @see RandomSequential
  * @see StrictSequential
  */
-public final class StrictRandomSequential extends AbstractAction {
+public class StrictRandomSequential extends AbstractAction {
 
     private final List<Action> children;
     private final OptionalLong seed;
 
-    private StrictRandomSequential(String name, List<Action> children, OptionalLong seed) {
-        super(name);
+    /**
+     * Creates a strict random sequential action with optional deterministic seeding.
+     *
+     * @param name the action name
+     * @param children the child actions to execute
+     * @param seed the optional shuffle seed
+     */
+    protected StrictRandomSequential(String name, List<Action> children, OptionalLong seed) {
+        super();
+        this.name = validateName(name);
         this.children = validateChildren(children);
         this.seed = seed;
     }
@@ -138,8 +145,12 @@ public final class StrictRandomSequential extends AbstractAction {
      */
     public static StrictRandomSequential of(String name, List<Action> children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
-        return new StrictRandomSequential(name, children, OptionalLong.empty());
+        Arguments.requireNonBlank(name, "name must not be blank");
+        Arguments.requireNonEmpty(children, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        StrictRandomSequential instance = new StrictRandomSequential(name, children, OptionalLong.empty());
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -153,9 +164,13 @@ public final class StrictRandomSequential extends AbstractAction {
      */
     public static StrictRandomSequential of(String name, Action... children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
+        Arguments.requireNonBlank(name, "name must not be blank");
         Objects.requireNonNull(children, "children must not be null");
-        return new StrictRandomSequential(name, List.of(children), OptionalLong.empty());
+        Arguments.require(children.length > 0, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        StrictRandomSequential instance = new StrictRandomSequential(name, List.of(children), OptionalLong.empty());
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -172,8 +187,12 @@ public final class StrictRandomSequential extends AbstractAction {
      */
     public static StrictRandomSequential of(String name, long seed, List<Action> children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
-        return new StrictRandomSequential(name, children, OptionalLong.of(seed));
+        Arguments.requireNonBlank(name, "name must not be blank");
+        Arguments.requireNonEmpty(children, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        StrictRandomSequential instance = new StrictRandomSequential(name, children, OptionalLong.of(seed));
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -188,9 +207,13 @@ public final class StrictRandomSequential extends AbstractAction {
      */
     public static StrictRandomSequential of(String name, long seed, Action... children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
+        Arguments.requireNonBlank(name, "name must not be blank");
         Objects.requireNonNull(children, "children must not be null");
-        return new StrictRandomSequential(name, List.of(children), OptionalLong.of(seed));
+        Arguments.require(children.length > 0, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        StrictRandomSequential instance = new StrictRandomSequential(name, List.of(children), OptionalLong.of(seed));
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -236,7 +259,7 @@ public final class StrictRandomSequential extends AbstractAction {
     @Override
     public void execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Results.staged();
+        this.result = Result.staged();
         context.getListener().beforeAction(context, this);
         Instant start = Instant.now();
 
@@ -244,22 +267,18 @@ public final class StrictRandomSequential extends AbstractAction {
         Random random = seed.isPresent() ? new Random(seed.getAsLong()) : new Random();
         Collections.shuffle(shuffled, random);
 
-        List<Action> executed = new ArrayList<>();
-        DefaultContext defaultContext = (DefaultContext) context;
-        for (Action child : shuffled) {
-            child.execute(new DefaultContext(defaultContext));
-            executed.add(child);
+        for (int index = 0; index < shuffled.size(); index++) {
+            Action child = shuffled.get(index);
+            child.execute(context.createChild());
             if (child.getResult().getStatus().isFailure()) {
-                for (Action remaining : shuffled.subList(shuffled.indexOf(child) + 1, shuffled.size())) {
-                    if (!executed.contains(remaining)) {
-                        remaining.skip(new DefaultContext(defaultContext));
-                    }
+                for (Action remaining : shuffled.subList(index + 1, shuffled.size())) {
+                    remaining.skip(context.createChild());
                 }
                 break;
             }
         }
 
-        this.result = Results.of(computeStatus(), durationSince(start));
+        this.result = Result.of(computeStatus(), durationSince(start));
         context.getListener().afterAction(context, this, this.result);
     }
 }

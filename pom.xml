@@ -57,17 +57,14 @@
         <maven.plugin.annotations.version>3.15.2</maven.plugin.annotations.version>
         <maven.core.version>3.9.15</maven.core.version>
         <maven.artifact.version>3.9.15</maven.artifact.version>
-        <maven.resolver.version>2.0.16</maven.resolver.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>6.0.3</junit.version>
         <assertj.version>3.27.7</assertj.version>
-        <mockito.version>5.23.0</mockito.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers.kafka.version>1.21.4</testcontainers.kafka.version>
         <testcontainers.mongodb.version>1.21.4</testcontainers.mongodb.version>
         <testcontainers.nginx.version>1.21.4</testcontainers.nginx.version>
         <commons-compress.version>1.28.0</commons-compress.version>
-        <bytebuddy.version>1.18.8-jdk5</bytebuddy.version>
         <kafka-clients.version>4.2.0</kafka-clients.version>
         <mongodb-driver.version>5.6.5</mongodb-driver.version>
         <jacoco.version>0.8.14</jacoco.version>
@@ -130,11 +127,6 @@
                 <version>${maven.artifact.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.apache.maven.resolver</groupId>
-                <artifactId>maven-resolver-impl</artifactId>
-                <version>${maven.resolver.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
@@ -143,11 +135,6 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-core</artifactId>
-                <version>${mockito.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
@@ -188,11 +175,6 @@
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-nop</artifactId>
                 <version>${slf4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy-agent</artifactId>
-                <version>${bytebuddy.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.classgraph</groupId>
@@ -268,6 +250,9 @@
                                     <requireMavenVersion>
                                         <version>[3.9.0,)</version>
                                     </requireMavenVersion>
+                                    <requireJavaVersion>
+                                        <version>[17,)</version>
+                                    </requireJavaVersion>
                                 </rules>
                             </configuration>
                         </execution>

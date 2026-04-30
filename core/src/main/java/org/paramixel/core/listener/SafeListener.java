@@ -57,13 +57,25 @@ public class SafeListener implements Listener {
     private final Listener delegate;
 
     /**
+     * Wraps the given delegate listener with fault-tolerance.
+     *
+     * @param delegate the listener to wrap; must not be {@code null}
+     * @return a new safe listener; never {@code null}
+     * @throws NullPointerException if {@code delegate} is {@code null}
+     */
+    public static SafeListener of(Listener delegate) {
+        Objects.requireNonNull(delegate, "delegate must not be null");
+        return new SafeListener(delegate);
+    }
+
+    /**
      * Constructs a new {@code SafeListener} that wraps the given delegate.
      *
      * @param delegate the listener to wrap; must not be {@code null}
      * @throws NullPointerException if {@code delegate} is {@code null}
      */
-    public SafeListener(Listener delegate) {
-        this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
+    private SafeListener(Listener delegate) {
+        this.delegate = delegate;
     }
 
     /**
@@ -84,23 +96,6 @@ public class SafeListener implements Listener {
     }
 
     /**
-     * Invoked when a run has completed.
-     *
-     * <p>Any exception thrown by the delegate is caught and logged.</p>
-     *
-     * @param runner the runner managing execution
-     * @param action the root action that was executed
-     */
-    @Override
-    public void runCompleted(Runner runner, Action action) {
-        try {
-            delegate.runCompleted(runner, action);
-        } catch (Throwable t) {
-            log("runCompleted", t);
-        }
-    }
-
-    /**
      * Invoked before an individual action is executed.
      *
      * <p>Any exception thrown by the delegate is caught and logged.</p>
@@ -114,6 +109,25 @@ public class SafeListener implements Listener {
             delegate.beforeAction(context, action);
         } catch (Throwable t) {
             log("beforeAction", t);
+        }
+    }
+
+    /**
+     * Invoked when an action throws an exception.
+     *
+     * <p>Any exception thrown by the delegate while handling the original
+     * throwable is also caught and logged.</p>
+     *
+     * @param context   the current execution context
+     * @param action    the action that failed
+     * @param throwable the exception thrown by the action
+     */
+    @Override
+    public void actionThrowable(Context context, Action action, Throwable throwable) {
+        try {
+            delegate.actionThrowable(context, action, throwable);
+        } catch (Throwable t) {
+            log("actionThrowable", t);
         }
     }
 
@@ -136,21 +150,19 @@ public class SafeListener implements Listener {
     }
 
     /**
-     * Invoked when an action throws an exception.
+     * Invoked when a run has completed.
      *
-     * <p>Any exception thrown by the delegate while handling the original
-     * throwable is also caught and logged.</p>
+     * <p>Any exception thrown by the delegate is caught and logged.</p>
      *
-     * @param context   the current execution context
-     * @param action    the action that failed
-     * @param throwable the exception thrown by the action
+     * @param runner the runner managing execution
+     * @param action the root action that was executed
      */
     @Override
-    public void actionThrowable(Context context, Action action, Throwable throwable) {
+    public void runCompleted(Runner runner, Action action) {
         try {
-            delegate.actionThrowable(context, action, throwable);
+            delegate.runCompleted(runner, action);
         } catch (Throwable t) {
-            log("actionThrowable", t);
+            log("runCompleted", t);
         }
     }
 

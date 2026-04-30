@@ -18,6 +18,7 @@ package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -27,10 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.action.Sequential;
@@ -43,7 +47,7 @@ class RunnerTest {
     void rejectsSequentialActionsWithoutChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> Sequential.of("empty", List.of()))
-                .withMessage("action must have at least one child");
+                .withMessage("children must not be empty");
     }
 
     @Test
@@ -51,7 +55,20 @@ class RunnerTest {
     void rejectsParallelActionsWithoutChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> Parallel.of("empty", List.of()))
-                .withMessage("action must have at least one child");
+                .withMessage("children must not be empty");
+    }
+
+    @Test
+    @DisplayName("throws contextual configuration exception for invalid parallelism")
+    void throwsContextualConfigurationExceptionForInvalidParallelism() {
+        assertThatThrownBy(() -> Runner.builder()
+                        .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "not-a-number"))
+                        .build())
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessage("Invalid configuration for '" + Configuration.RUNNER_PARALLELISM
+                        + "': expected integer but was 'not-a-number'")
+                .cause()
+                .isInstanceOf(NumberFormatException.class);
     }
 
     @Test
@@ -204,6 +221,19 @@ class RunnerTest {
                 }
             }
         }
+    }
+
+    @Test
+    @DisplayName("reuses an already-safe listener without double wrapping")
+    void reusesAnAlreadySafeListenerWithoutDoubleWrapping() {
+        var delegate = new Listener() {};
+        var safeListener = org.paramixel.core.listener.SafeListener.of(delegate);
+        var observedListener = new java.util.concurrent.atomic.AtomicReference<Listener>();
+        Action action = Direct.of("root", context -> observedListener.set(context.getListener()));
+
+        Runner.builder().listener(safeListener).build().run(action);
+
+        assertThat(observedListener).hasValue(safeListener);
     }
 
     @Test
@@ -409,6 +439,38 @@ class RunnerTest {
         } finally {
             for (var executorService : innerExecutorServices) {
                 executorService.shutdown();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("nested parallel with dedicated inner executor services completes without deadlock")
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void nestedParallelWithDedicatedInnerExecutorServicesCompletesWithoutDeadlock() {
+        var executionCount = new AtomicInteger();
+        var innerExecutorServices = new ArrayList<ExecutorService>();
+
+        try {
+            List<Action> innerParallelActions = new ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                ExecutorService innerEs = Executors.newFixedThreadPool(2);
+                innerExecutorServices.add(innerEs);
+                innerParallelActions.add(Parallel.of(
+                        "inner-" + i,
+                        innerEs,
+                        Direct.of("leaf-" + i + "-0", context -> executionCount.incrementAndGet()),
+                        Direct.of("leaf-" + i + "-1", context -> executionCount.incrementAndGet())));
+            }
+
+            Action outerParallel = Parallel.of("outer", innerParallelActions);
+
+            Runner.builder().build().run(outerParallel);
+
+            assertThat(outerParallel.getResult().getStatus().isPass()).isTrue();
+            assertThat(executionCount).hasValue(8);
+        } finally {
+            for (ExecutorService es : innerExecutorServices) {
+                es.shutdown();
             }
         }
     }

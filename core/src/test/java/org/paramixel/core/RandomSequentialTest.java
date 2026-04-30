@@ -34,7 +34,7 @@ class RandomSequentialTest {
     void rejectsActionsWithoutGetChildren() {
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> RandomSequential.of("empty", List.of()))
-                .withMessage("action must have at least one child");
+                .withMessage("children must not be empty");
     }
 
     @Test

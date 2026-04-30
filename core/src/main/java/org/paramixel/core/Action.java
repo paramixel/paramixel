@@ -76,24 +76,40 @@ import java.util.Optional;
  * </ul>
  *
  * <h3>Custom Actions</h3>
- * <p>Two approaches to creating custom actions:
- * <ol>
- *   <li><strong>Subclass {@link org.paramixel.core.action.AbstractAction}:</strong>
- *       <pre>{@code
- *       public class MyAction extends AbstractAction {
- *           public MyAction() { super("myAction"); }
- *           @Override public void execute(Context ctx) {
- *               // Your logic here
- *           }
- *       }
- *       }</pre></li>
- *   <li><strong>Use {@link org.paramixel.core.action.Direct} with lambda:</strong>
- *       <pre>{@code
- *       Action myAction = Direct.of("myAction", ctx -> {
- *           // Your logic here
- *       });
- *       }</pre></li>
- * </ol>
+ * <p>Custom actions can either extend {@link org.paramixel.core.action.AbstractAction}
+ * or implement this interface directly. Direct implementations must maintain their own
+ * parent reference and implement {@link #setParent(Action)} according to this contract.</p>
+ *
+ * <p><strong>Subclassing Example:</strong></p>
+ * <pre>{@code
+ * public final class MyAction extends AbstractAction {
+ *     private MyAction(String name) { super(); this.name = validateName(name); }
+ *
+ *     public static MyAction of(String name) {
+ *         MyAction instance = new MyAction(name);
+ *         instance.initialize();
+ *         return instance;
+ *     }
+ *
+ *     @Override public void execute(Context ctx) {
+ *         // Your logic here
+ *     }
+ * }
+ * }</pre>
+ *
+ * <p><strong>Direct Implementation Example:</strong></p>
+ * <pre>{@code
+ * public final class MyAction implements Action {
+ *     private Action parent;
+ *
+ *     @Override
+ *     public void setParent(Action parent) {
+ *         this.parent = Objects.requireNonNull(parent, "parent must not be null");
+ *     }
+ *
+ *     // implement remaining Action methods
+ * }
+ * }</pre>
  *
  * @see Context
  * @see Result
@@ -153,9 +169,9 @@ public interface Action {
      * coordinate the execution of their children according to their execution pattern
      * (sequential, parallel, etc.).</p>
      *
-     * <p>Parent-child relationships are established via {@link #addChild(Action)}.
-     * An action can have at most one parent. The root action (top-level action in the tree)
-     * has no parent.</p>
+     * <p>Parent-child relationships are established via {@link #addChild(Action)} and
+     * {@link #setParent(Action)}. An action can have at most one parent. The root action
+     * (top-level action in the tree) has no parent.</p>
      *
      * <p>Accessing the parent is useful for:
      * <ul>
@@ -169,6 +185,28 @@ public interface Action {
      * @see #getChildren()
      */
     Optional<Action> getParent();
+
+    /**
+     * Sets this action's parent.
+     *
+     * <p>This method establishes the parent-child relationship for this action. It is
+     * typically called by composite actions during tree construction.</p>
+     *
+     * <p>Implementations must enforce the following invariants:</p>
+     * <ul>
+     *   <li>parent must not be {@code null}</li>
+     *   <li>an action must not be its own parent</li>
+     *   <li>a parent may only be assigned once</li>
+     * </ul>
+     *
+     * @param parent the parent action
+     * @throws NullPointerException if {@code parent} is {@code null}
+     * @throws IllegalArgumentException if {@code parent} is this action
+     * @throws IllegalStateException if this action already has a parent
+     * @see #getParent()
+     * @see #addChild(Action)
+     */
+    void setParent(Action parent);
 
     /**
      * Returns this action's child actions.
@@ -197,9 +235,10 @@ public interface Action {
     /**
      * Adds the given child action, making this action its parent.
      *
-     * <p>This method establishes a parent-child relationship between actions. The child's
-     * parent is set to this action. Composite action implementations are responsible for
-     * storing the child so it is exposed by {@link #getChildren()}.</p>
+     * <p>This method establishes a parent-child relationship between actions. Implementations
+     * typically do this by calling {@code child.setParent(this)}. Composite action
+     * implementations are responsible for storing the child so it is exposed by
+     * {@link #getChildren()}.</p>
      *
      * <p>Parent-child relationships are typically established when actions are constructed
      * and should not be changed after execution begins. Built-in action types automatically
@@ -266,7 +305,6 @@ public interface Action {
      *
      * @param context the execution context; must not be {@code null}
      * @throws NullPointerException if {@code context} is {@code null}
-     * @throws Exception if execution fails (exception is captured in result)
      * @see Context
      * @see Listener#beforeAction(Context, Action)
      * @see Listener#afterAction(Context, Action, Result)

@@ -15,6 +15,7 @@ This page is a compact map of the current public API.
 String getId()
 String getName()
 Optional<Action> getParent()
+void setParent(Action parent)
 List<Action> getChildren()
 void addChild(Action child)
 void execute(Context context)
@@ -26,6 +27,8 @@ Result getResult()
 
 ```java
 static Runner.Builder builder()
+Map<String, String> getConfiguration()
+Listener getListener()
 void run(Action action)
 ```
 
@@ -54,6 +57,8 @@ static void runAndExit(Action action)
 ### `Context`
 
 ```java
+static Context of(Map<String, String> configuration, Listener listener, ExecutorService executorService)
+Context createChild()
 Optional<Context> getParent()
 Map<String, String> getConfiguration()
 Listener getListener()
@@ -65,9 +70,18 @@ Optional<Attachment> removeAttachment()
 Optional<Attachment> findAttachment(int level)
 ```
 
+`findContext(level)` returns the current/ancestor context wrapped in `Optional`, but it throws if `level` is negative or the ancestor does not exist.
+
 ### `Result`
 
 ```java
+static Result of(Status status, Duration elapsedTime)
+static Result staged()
+static Result pass(Duration elapsedTime)
+static Result fail(Duration elapsedTime, Throwable throwable)
+static Result fail(Duration elapsedTime, String message)
+static Result skip(Duration elapsedTime)
+static Result skip(Duration elapsedTime, String message)
 Status getStatus()
 Duration getElapsedTime()
 ```
@@ -75,6 +89,14 @@ Duration getElapsedTime()
 ### `Status`
 
 ```java
+static Status staged()
+static Status pass()
+static Status failure(Throwable throwable)
+static Status failure(String message)
+static Status failure(Throwable throwable, String message)
+static Status failure()
+static Status skip()
+static Status skip(String message)
 boolean isStaged()
 boolean isPass()
 boolean isFailure()
@@ -87,9 +109,12 @@ Optional<Throwable> getThrowable()
 ### `Attachment`
 
 ```java
+static Attachment of(Object value)
 Class<?> getType()
 <T> Optional<T> to(Class<T> type)
 ```
+
+`Attachment.getType()` returns `Object.class` when the wrapped value is `null`.
 
 ### `Listener`
 
@@ -138,6 +163,7 @@ Optional<Action> resolveActionsFromClass(Class<?> clazz)
 ### `Selector`
 
 ```java
+String getRegex()
 Selector.byPackageName(String packageName)
 Selector.byPackageName(Class<?> clazz)
 Selector.byClassName(String className)
@@ -156,6 +182,7 @@ Direct.of(String name, Direct.Executable executable)
 
 ```java
 Lifecycle.of(String name, Action before, Action main, Action after)
+List<Action> getChildren()
 ```
 
 ### `Noop`
@@ -169,6 +196,7 @@ Noop.of(String name)
 ```java
 Sequential.of(String name, List<Action> children)
 Sequential.of(String name, Action... children)
+List<Action> getChildren()
 ```
 
 ### `StrictSequential`
@@ -176,6 +204,7 @@ Sequential.of(String name, Action... children)
 ```java
 StrictSequential.of(String name, List<Action> children)
 StrictSequential.of(String name, Action... children)
+List<Action> getChildren()
 ```
 
 ### `RandomSequential`
@@ -185,6 +214,7 @@ RandomSequential.of(String name, List<Action> children)
 RandomSequential.of(String name, Action... children)
 RandomSequential.of(String name, long seed, List<Action> children)
 RandomSequential.of(String name, long seed, Action... children)
+List<Action> getChildren()
 OptionalLong seed()
 ```
 
@@ -195,6 +225,7 @@ StrictRandomSequential.of(String name, List<Action> children)
 StrictRandomSequential.of(String name, Action... children)
 StrictRandomSequential.of(String name, long seed, List<Action> children)
 StrictRandomSequential.of(String name, long seed, Action... children)
+List<Action> getChildren()
 OptionalLong seed()
 ```
 
@@ -209,6 +240,7 @@ Parallel.of(String name, ExecutorService executorService, List<Action> children)
 Parallel.of(String name, ExecutorService executorService, Action... children)
 int parallelism()
 Optional<ExecutorService> executorService()
+List<Action> getChildren()
 ```
 
 ## Support

@@ -36,6 +36,5 @@ See:
 - `examples/testcontainers/kafka/KafkaExample.java`
 - `examples/testcontainers/mongodb/MongoDBExample.java`
 - `examples/testcontainers/nginx/NginxExample.java`
-- `examples/testcontainers/bufstream/BufstreamExample.java`
 
 These examples use `Lifecycle`, attachments, and `Cleanup` to manage Testcontainers resources.

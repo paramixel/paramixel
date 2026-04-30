@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -44,9 +45,13 @@ import org.paramixel.core.Configuration;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Runner;
 import org.paramixel.core.discovery.Resolver;
-import org.paramixel.maven.plugin.internal.util.Arguments;
+import org.paramixel.core.support.Arguments;
 
-@Mojo(name = "test", defaultPhase = LifecyclePhase.TEST, requiresDependencyResolution = ResolutionScope.TEST)
+@Mojo(
+        name = "test",
+        defaultPhase = LifecyclePhase.TEST,
+        requiresDependencyResolution = ResolutionScope.TEST,
+        threadSafe = true)
 public class ParamixelMojo extends AbstractMojo {
 
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
@@ -68,12 +73,12 @@ public class ParamixelMojo extends AbstractMojo {
             return;
         }
 
-        final var configuration = buildConfiguration();
         final var originalClassLoader = Thread.currentThread().getContextClassLoader();
         ExecutorService executorService = null;
 
         try (URLClassLoader testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
+            final var configuration = buildConfiguration(testClassLoader);
 
             Optional<Action> optionalAction = Resolver.resolveActions(testClassLoader);
 
@@ -111,9 +116,13 @@ public class ParamixelMojo extends AbstractMojo {
         }
     }
 
-    private Map<String, String> buildConfiguration() {
-        // Start with Configuration defaults (file properties + system properties + defaults)
-        Map<String, String> configuration = new LinkedHashMap<>(org.paramixel.core.Configuration.defaultProperties());
+    private Map<String, String> buildConfiguration() throws MojoExecutionException {
+        return buildConfiguration(Thread.currentThread().getContextClassLoader());
+    }
+
+    private Map<String, String> buildConfiguration(ClassLoader classLoader) throws MojoExecutionException {
+        Map<String, String> configuration =
+                new LinkedHashMap<>(withContextClassLoader(classLoader, Configuration::defaultProperties));
 
         // POM <properties> override file/defaults but not system properties
         if (properties != null) {
@@ -122,15 +131,15 @@ public class ParamixelMojo extends AbstractMojo {
                 String value = property.getValue();
 
                 if (key == null) {
-                    throw new NullPointerException("property key must not be null");
+                    throw new MojoExecutionException("Paramixel property key must not be null");
                 }
 
                 if (key.isBlank()) {
-                    throw new IllegalArgumentException("Property key must not be null or blank");
+                    throw new MojoExecutionException("Paramixel property key must not be blank");
                 }
 
                 if (value == null) {
-                    throw new NullPointerException("property value must not be null");
+                    throw new MojoExecutionException("Paramixel property '" + key + "' value must not be null");
                 }
 
                 configuration.put(key, value);
@@ -146,6 +155,20 @@ public class ParamixelMojo extends AbstractMojo {
         });
 
         return configuration;
+    }
+
+    private static <T> T withContextClassLoader(ClassLoader classLoader, Supplier<T> supplier) {
+        Objects.requireNonNull(classLoader, "classLoader must not be null");
+        Objects.requireNonNull(supplier, "supplier must not be null");
+
+        Thread currentThread = Thread.currentThread();
+        ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+        currentThread.setContextClassLoader(classLoader);
+        try {
+            return supplier.get();
+        } finally {
+            currentThread.setContextClassLoader(originalClassLoader);
+        }
     }
 
     private URLClassLoader buildTestClassLoader() throws MojoExecutionException {
@@ -178,8 +201,11 @@ public class ParamixelMojo extends AbstractMojo {
                 classpathUrls.add(classesDir.toURI().toURL());
             }
 
-            for (String dependency : project.getTestClasspathElements()) {
-                classpathUrls.add(new File(dependency).toURI().toURL());
+            for (var artifact : project.getArtifacts()) {
+                File artifactFile = artifact.getFile();
+                if (artifactFile != null) {
+                    classpathUrls.add(artifactFile.toURI().toURL());
+                }
             }
 
         } catch (Exception e) {
@@ -235,7 +261,7 @@ public class ParamixelMojo extends AbstractMojo {
         public void setKey(String key) {
             Objects.requireNonNull(key, "key must not be null");
 
-            Arguments.requireNotBlank(key, "key must not be blank");
+            Arguments.requireNonBlank(key, "key must not be blank");
 
             this.key = key;
         }

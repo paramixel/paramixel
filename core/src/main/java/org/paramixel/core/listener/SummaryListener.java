@@ -23,7 +23,7 @@ import org.paramixel.core.Information;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Status;
-import org.paramixel.core.internal.util.AnsiColor;
+import org.paramixel.core.support.AnsiColor;
 
 /**
  * A listener that generates an execution summary.
@@ -57,11 +57,22 @@ public class SummaryListener implements Listener {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation prints a start banner with the current Paramixel version.</p>
+     */
     @Override
     public void runStarted(Runner runner, Action action) {
         System.out.println(PARAMIXEL + "Paramixel v" + Information.getVersion() + " starting...");
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>This implementation renders the configured summary view and prints an execution
+     * footer containing aggregate status and timing information.</p>
+     */
     @Override
     public void runCompleted(Runner runner, Action action) {
         System.out.println(PARAMIXEL);

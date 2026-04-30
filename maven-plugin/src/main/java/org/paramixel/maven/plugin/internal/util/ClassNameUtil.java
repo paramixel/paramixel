@@ -17,6 +17,7 @@
 package org.paramixel.maven.plugin.internal.util;
 
 import java.util.Objects;
+import org.paramixel.core.support.Arguments;
 
 public class ClassNameUtil {
 
@@ -26,7 +27,7 @@ public class ClassNameUtil {
 
     public static String abbreviateClassName(final String fullClassName, final int maxLength) {
         Objects.requireNonNull(fullClassName, "fullClassName must not be null");
-        Arguments.requireNotBlank(fullClassName, "fullClassName must not be blank");
+        Arguments.requireNonBlank(fullClassName, "fullClassName must not be blank");
         Arguments.requirePositive(maxLength, "maxLength must be positive");
 
         if (maxLength == Integer.MAX_VALUE) {

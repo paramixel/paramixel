@@ -26,6 +26,8 @@ import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.action.Lifecycle;
+import org.paramixel.core.action.Noop;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.action.Sequential;
 
@@ -61,11 +63,15 @@ public class ArgumentCustomExecutorServiceTest {
             }
         });
 
-        return Sequential.of(
+        return Lifecycle.of(
                 "ArgumentCustomExecutorServiceTest",
-                List.of(
-                        Parallel.of("parallel-arguments", CUSTOM_EXECUTOR_SERVICE, List.of(first, second, third)),
-                        verify,
-                        shutdown));
+                Noop.of("before"),
+                Sequential.of(
+                        "main",
+                        List.of(
+                                Parallel.of(
+                                        "parallel-arguments", CUSTOM_EXECUTOR_SERVICE, List.of(first, second, third)),
+                                verify)),
+                shutdown);
     }
 }

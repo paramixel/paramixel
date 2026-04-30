@@ -22,12 +22,14 @@ Class<?> getType()
 - `findAttachment(level)` reads the current or ancestor context
 - `removeAttachment()` removes the current context's value and returns it as an `Attachment`
 
-If no attachment is present, the `Context` methods return `Optional.empty()`.
+If no attachment is present on the target context, the `Context` methods return `Optional.empty()`.
+`findAttachment(level)` still throws if `level` is negative or the ancestor does not exist.
 
 `Attachment#to(...)`:
 
 - returns `Optional.empty()` only when the underlying value is absent
 - otherwise uses `Class#cast`, so an incompatible type causes `ClassCastException`
+- `getType()` returns `Object.class` when the wrapped value is `null`
 
 ## Example
 

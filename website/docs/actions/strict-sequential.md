@@ -30,7 +30,7 @@ Action action = StrictSequential.of(
         "suite",
         Direct.of("first", context -> {}),
         Direct.of("second", context -> {
-            throw new FailException("boom");
+            FailException.fail("boom");
         }),
         Direct.of("third", context -> {}));
 ```

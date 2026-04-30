@@ -27,8 +27,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.AbstractAction;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.internal.DefaultContext;
-import org.paramixel.core.internal.Results;
 
 @DisplayName("Custom action workflows")
 class CustomActionWorkflowTest {
@@ -40,8 +38,8 @@ class CustomActionWorkflowTest {
         Action first = recordingAction("first", executions);
         Action repeated = recordingAction("repeated", executions);
         Action last = recordingAction("last", executions);
-        Action repeatTwice = new RepeatEachChildAction("repeat-twice", 2, List.of(repeated));
-        Action root = new ReverseSequentialAction("reverse-sequential", List.of(first, repeatTwice, last));
+        Action repeatTwice = RepeatEachChildAction.of("repeat-twice", 2, List.of(repeated));
+        Action root = ReverseSequentialAction.of("reverse-sequential", List.of(first, repeatTwice, last));
 
         Runner runner = Runner.builder().build();
         runner.run(root);
@@ -65,9 +63,16 @@ class CustomActionWorkflowTest {
         private final List<Action> children;
 
         private ReverseSequentialAction(String name, List<Action> children) {
-            super(name);
+            super();
+            this.name = validateName(name);
             this.children = copyChildren(children);
             this.children.forEach(this::addChild);
+        }
+
+        static ReverseSequentialAction of(String name, List<Action> children) {
+            ReverseSequentialAction instance = new ReverseSequentialAction(name, children);
+            instance.initialize();
+            return instance;
         }
 
         @Override
@@ -78,24 +83,23 @@ class CustomActionWorkflowTest {
         @Override
         public void execute(Context context) {
             Objects.requireNonNull(context, "context must not be null");
-            this.result = Results.staged();
+            this.result = Result.staged();
             context.getListener().beforeAction(context, this);
             Instant start = Instant.now();
 
             List<Action> reversed = new ArrayList<>(children);
             Collections.reverse(reversed);
-            DefaultContext defaultContext = (DefaultContext) context;
             for (Action child : reversed) {
-                child.execute(new DefaultContext(defaultContext));
+                child.execute(context.createChild());
                 if (child.getResult().getStatus().isFailure()) {
-                    this.result = Results.fail(
+                    this.result = Result.fail(
                             durationSince(start),
                             child.getResult().getStatus().getThrowable().orElse(null));
                     context.getListener().afterAction(context, this, this.result);
                     return;
                 }
             }
-            this.result = Results.pass(durationSince(start));
+            this.result = Result.pass(durationSince(start));
             context.getListener().afterAction(context, this, this.result);
         }
     }
@@ -106,13 +110,20 @@ class CustomActionWorkflowTest {
         private final List<Action> children;
 
         private RepeatEachChildAction(String name, int repetitions, List<Action> children) {
-            super(name);
+            super();
+            this.name = validateName(name);
             if (repetitions < 1) {
                 throw new IllegalArgumentException("repetitions must be positive");
             }
             this.repetitions = repetitions;
             this.children = copyChildren(children);
             this.children.forEach(this::addChild);
+        }
+
+        static RepeatEachChildAction of(String name, int repetitions, List<Action> children) {
+            RepeatEachChildAction instance = new RepeatEachChildAction(name, repetitions, children);
+            instance.initialize();
+            return instance;
         }
 
         @Override
@@ -123,16 +134,15 @@ class CustomActionWorkflowTest {
         @Override
         public void execute(Context context) {
             Objects.requireNonNull(context, "context must not be null");
-            this.result = Results.staged();
+            this.result = Result.staged();
             context.getListener().beforeAction(context, this);
             Instant start = Instant.now();
 
-            DefaultContext defaultContext = (DefaultContext) context;
             for (int i = 0; i < repetitions; i++) {
                 for (Action child : children) {
-                    child.execute(new DefaultContext(defaultContext));
+                    child.execute(context.createChild());
                     if (child.getResult().getStatus().isFailure()) {
-                        this.result = Results.fail(
+                        this.result = Result.fail(
                                 durationSince(start),
                                 child.getResult().getStatus().getThrowable().orElse(null));
                         context.getListener().afterAction(context, this, this.result);
@@ -140,7 +150,7 @@ class CustomActionWorkflowTest {
                     }
                 }
             }
-            this.result = Results.pass(durationSince(start));
+            this.result = Result.pass(durationSince(start));
             context.getListener().afterAction(context, this, this.result);
         }
     }

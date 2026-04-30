@@ -17,6 +17,7 @@
 package org.paramixel.core;
 
 import java.time.Duration;
+import java.util.Objects;
 
 /**
  * Describes the outcome of executing an {@link Action}.
@@ -46,7 +47,102 @@ import java.time.Duration;
  * }
  * }</pre>
  */
-public interface Result {
+public final class Result {
+
+    private final Status status;
+    private final Duration timing;
+
+    private Result(Status status, Duration timing) {
+        this.status = status;
+        this.timing = timing;
+    }
+
+    /**
+     * Creates a result.
+     *
+     * @param status the status; must not be {@code null}
+     * @param timing the timing; must not be {@code null}
+     * @return a new Result
+     * @throws NullPointerException if {@code status} or {@code timing} is {@code null}
+     */
+    public static Result of(Status status, Duration timing) {
+        Objects.requireNonNull(status, "status must not be null");
+        Objects.requireNonNull(timing, "timing must not be null");
+        return new Result(status, timing);
+    }
+
+    /**
+     * Creates a staged result.
+     *
+     * @return a new Result with STAGED status and zero duration
+     */
+    public static Result staged() {
+        return new Result(Status.staged(), Duration.ZERO);
+    }
+
+    /**
+     * Creates a passing result.
+     *
+     * @param timing the elapsed time; must not be {@code null}
+     * @return a new Result with PASS status
+     * @throws NullPointerException if {@code timing} is {@code null}
+     */
+    public static Result pass(Duration timing) {
+        Objects.requireNonNull(timing, "timing must not be null");
+        return new Result(Status.pass(), timing);
+    }
+
+    /**
+     * Creates a failing result.
+     *
+     * @param timing the elapsed time; must not be {@code null}
+     * @param failure the failure throwable; must not be {@code null}
+     * @return a new Result with FAIL status
+     * @throws NullPointerException if {@code timing} or {@code failure} is {@code null}
+     */
+    public static Result fail(Duration timing, Throwable failure) {
+        Objects.requireNonNull(timing, "timing must not be null");
+        Objects.requireNonNull(failure, "failure must not be null");
+        return new Result(Status.failure(failure), timing);
+    }
+
+    /**
+     * Creates a failing result with a message.
+     *
+     * @param timing the elapsed time; must not be {@code null}
+     * @param failureMessage the failure message
+     * @return a new Result with FAIL status
+     * @throws NullPointerException if {@code timing} is {@code null}
+     */
+    public static Result fail(Duration timing, String failureMessage) {
+        Objects.requireNonNull(timing, "timing must not be null");
+        return new Result(Status.failure(failureMessage), timing);
+    }
+
+    /**
+     * Creates a skipped result.
+     *
+     * @param timing the elapsed time; must not be {@code null}
+     * @return a new Result with SKIP status
+     * @throws NullPointerException if {@code timing} is {@code null}
+     */
+    public static Result skip(Duration timing) {
+        Objects.requireNonNull(timing, "timing must not be null");
+        return new Result(Status.skip(), timing);
+    }
+
+    /**
+     * Creates a skipped result with a reason.
+     *
+     * @param timing the elapsed time; must not be {@code null}
+     * @param skipReason the reason for skipping
+     * @return a new Result with SKIP status
+     * @throws NullPointerException if {@code timing} is {@code null}
+     */
+    public static Result skip(Duration timing, String skipReason) {
+        Objects.requireNonNull(timing, "timing must not be null");
+        return new Result(Status.skip(skipReason), timing);
+    }
 
     /**
      * Returns the execution status.
@@ -65,7 +161,9 @@ public interface Result {
      * @see Status
      * @see Listener#afterAction(Context, Action, Result)
      */
-    Status getStatus();
+    public Status getStatus() {
+        return status;
+    }
 
     /**
      * Returns the elapsed time for this action's execution.
@@ -77,10 +175,22 @@ public interface Result {
      * accounting for sequential or parallel execution patterns as defined by the action type.</p>
      *
      * <p>Timing precision is typically milliseconds, but the exact precision depends on the
-     * underlying system clock and the {@link java.time.Duration} implementation.</p>
+     * underlying system clock and the {@link Duration} implementation.</p>
      *
      * @return the elapsed execution time; never {@code null}, may be zero for instant actions
-     * @see java.time.Duration
+     * @see Duration
      */
-    Duration getElapsedTime();
+    public Duration getElapsedTime() {
+        return timing;
+    }
+
+    /**
+     * Returns a compact diagnostic representation of this result.
+     *
+     * @return a string containing the status display and elapsed time in milliseconds
+     */
+    @Override
+    public String toString() {
+        return status + " | " + timing.toMillis() + " ms";
+    }
 }

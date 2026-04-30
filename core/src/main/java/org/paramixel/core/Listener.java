@@ -84,8 +84,8 @@ import org.paramixel.core.listener.Listeners;
  * <h3>Listener Composition</h3>
  * <p>Combine multiple listeners using {@link org.paramixel.core.listener.CompositeListener}:</p>
  * <pre>{@code
- * Listener combined = new CompositeListener(
- *     new StatusListener(),
+ * Listener combined = CompositeListener.of(
+ *     StatusListener.of(),
  *     new SummaryListener(),
  *     new CustomListener()
  * );

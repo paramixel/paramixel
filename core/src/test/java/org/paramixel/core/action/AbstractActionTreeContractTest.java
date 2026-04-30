@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
@@ -31,7 +32,7 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("rejects null children")
     void rejectsNullChildren() {
-        CompositeAction parent = new CompositeAction("parent", List.of(LeafAction.of("child")));
+        CompositeAction parent = CompositeAction.of("parent", List.of(LeafAction.of("child")));
 
         assertThatThrownBy(() -> parent.addChild(null)).isInstanceOf(NullPointerException.class);
     }
@@ -48,7 +49,7 @@ class AbstractActionTreeContractTest {
     @DisplayName("rejects adding a child that already has a parent")
     void rejectsAddingChildThatAlreadyHasAParent() {
         LeafAction child = LeafAction.of("child");
-        CompositeAction firstParent = new CompositeAction("firstParent", List.of(child));
+        CompositeAction firstParent = CompositeAction.of("firstParent", List.of(child));
         LeafAction secondParent = LeafAction.of("secondParent");
 
         assertThat(firstParent.getChildren()).containsExactly(child);
@@ -60,7 +61,7 @@ class AbstractActionTreeContractTest {
     void validateChildrenReturnsAnUnmodifiableListAndAssignsParents() {
         LeafAction first = LeafAction.of("first");
         LeafAction second = LeafAction.of("second");
-        CompositeAction parent = new CompositeAction("parent", List.of(first, second));
+        CompositeAction parent = CompositeAction.of("parent", List.of(first, second));
 
         assertThat(parent.getChildren()).containsExactly(first, second);
         assertThat(first.getParent()).contains(parent);
@@ -69,13 +70,124 @@ class AbstractActionTreeContractTest {
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test
+    @DisplayName("accepts direct Action implementations as children")
+    void acceptsDirectActionImplementationsAsChildren() {
+        DirectLeafAction child = DirectLeafAction.of("child-id", "child");
+        CompositeAction parent = CompositeAction.of("parent", List.of(child));
+
+        assertThat(parent.getChildren()).containsExactly(child);
+        assertThat(child.getParent()).contains(parent);
+    }
+
+    @Test
+    @DisplayName("rejects null parents")
+    void rejectsNullParents() {
+        LeafAction child = LeafAction.of("child");
+
+        assertThatThrownBy(() -> child.setParent(null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("rejects setting itself as its own parent")
+    void rejectsSettingItselfAsItsOwnParent() {
+        LeafAction action = LeafAction.of("self");
+
+        assertThatThrownBy(() -> action.setParent(action)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("rejects setting a second parent")
+    void rejectsSettingASecondParent() {
+        LeafAction child = LeafAction.of("child");
+        LeafAction firstParent = LeafAction.of("firstParent");
+        LeafAction secondParent = LeafAction.of("secondParent");
+
+        child.setParent(firstParent);
+
+        assertThatThrownBy(() -> child.setParent(secondParent)).isInstanceOf(IllegalStateException.class);
+    }
+
+    private static final class DirectLeafAction implements Action {
+
+        private final String id;
+        private final String name;
+        private Action parent;
+
+        private DirectLeafAction(String id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        static DirectLeafAction of(String id, String name) {
+            return new DirectLeafAction(id, name);
+        }
+
+        @Override
+        public String getId() {
+            return id;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Optional<Action> getParent() {
+            return Optional.ofNullable(parent);
+        }
+
+        @Override
+        public void setParent(Action parent) {
+            if (parent == null) {
+                throw new NullPointerException("parent must not be null");
+            }
+            if (parent == this) {
+                throw new IllegalArgumentException("action must not be its own parent");
+            }
+            if (this.parent != null) {
+                throw new IllegalStateException("child already has a parent");
+            }
+            this.parent = parent;
+        }
+
+        @Override
+        public List<Action> getChildren() {
+            return List.of();
+        }
+
+        @Override
+        public void addChild(Action child) {
+            throw new UnsupportedOperationException("leaf action");
+        }
+
+        @Override
+        public org.paramixel.core.Result getResult() {
+            return org.paramixel.core.Result.staged();
+        }
+
+        @Override
+        public void execute(Context context) {}
+
+        @Override
+        public void skip(Context context) {}
+    }
+
     private static final class CompositeAction extends AbstractAction {
 
         private final List<Action> children;
 
         private CompositeAction(String name, List<Action> children) {
-            super(name);
+            super();
+            this.name = validateName(name);
             this.children = validateChildren(children);
+        }
+
+        static CompositeAction of(String name, List<Action> children) {
+            CompositeAction instance = new CompositeAction(name, children);
+            instance.initialize();
+            return instance;
         }
 
         @Override
@@ -90,11 +202,14 @@ class AbstractActionTreeContractTest {
     private static final class LeafAction extends AbstractAction {
 
         private LeafAction(String name) {
-            super(name);
+            super();
+            this.name = validateName(name);
         }
 
         private static LeafAction of(String name) {
-            return new LeafAction(name);
+            LeafAction instance = new LeafAction(name);
+            instance.initialize();
+            return instance;
         }
 
         @Override

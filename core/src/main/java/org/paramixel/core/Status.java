@@ -46,7 +46,105 @@ import java.util.Optional;
  * @see FailException
  * @see SkipException
  */
-public interface Status {
+public final class Status {
+
+    private enum Kind {
+        STAGED,
+        PASS,
+        FAILURE,
+        SKIP
+    }
+
+    private static final Status STAGED = new Status(Kind.STAGED, null, null);
+    private static final Status PASS = new Status(Kind.PASS, null, null);
+    private static final Status SKIP = new Status(Kind.SKIP, null, null);
+
+    private final Kind kind;
+    private final String message;
+    private final Throwable throwable;
+
+    private Status(Kind kind, String message, Throwable throwable) {
+        this.kind = kind;
+        this.message = message;
+        this.throwable = throwable;
+    }
+
+    /**
+     * Returns a STAGED status.
+     *
+     * @return a STAGED status
+     */
+    public static Status staged() {
+        return STAGED;
+    }
+
+    /**
+     * Returns a PASS status.
+     *
+     * @return a PASS status
+     */
+    public static Status pass() {
+        return PASS;
+    }
+
+    /**
+     * Returns a FAILURE status with the given throwable.
+     *
+     * @param t the throwable that caused the failure
+     * @return a FAILURE status
+     */
+    public static Status failure(Throwable t) {
+        return new Status(Kind.FAILURE, null, t);
+    }
+
+    /**
+     * Returns a FAILURE status with the given message.
+     *
+     * @param message the failure message
+     * @return a FAILURE status
+     */
+    public static Status failure(String message) {
+        return new Status(Kind.FAILURE, message, null);
+    }
+
+    /**
+     * Returns a FAILURE status with the given throwable and message.
+     *
+     * @param t the throwable that caused the failure
+     * @param message the failure message
+     * @return a FAILURE status
+     */
+    public static Status failure(Throwable t, String message) {
+        return new Status(Kind.FAILURE, message, t);
+    }
+
+    /**
+     * Returns a FAILURE status with no message or throwable.
+     *
+     * @return a FAILURE status
+     */
+    public static Status failure() {
+        return new Status(Kind.FAILURE, null, null);
+    }
+
+    /**
+     * Returns a SKIP status with no reason.
+     *
+     * @return a SKIP status
+     */
+    public static Status skip() {
+        return SKIP;
+    }
+
+    /**
+     * Returns a SKIP status with the given reason.
+     *
+     * @param reason the reason for skipping
+     * @return a SKIP status
+     */
+    public static Status skip(String reason) {
+        return new Status(Kind.SKIP, reason, null);
+    }
 
     /**
      * Returns whether this action is in the STAGED state.
@@ -62,7 +160,9 @@ public interface Status {
      *
      * @return {@code true} if this action is staged (not yet executed), {@code false} otherwise
      */
-    boolean isStaged();
+    public boolean isStaged() {
+        return kind == Kind.STAGED;
+    }
 
     /**
      * Returns whether this action completed successfully.
@@ -73,16 +173,18 @@ public interface Status {
      * <p>An action is PASS if and only if:
      * <ul>
      *   <li>No exceptions were thrown during execution</li>
-     *  >No {@link FailException} was thrown</li>
-     *  >No {@link SkipException} was thrown</li>
-     *   >For parent actions, all children completed with PASS status</li>
+     *   <li>No {@link FailException} was thrown</li>
+     *   <li>No {@link SkipException} was thrown</li>
+     *   <li>For parent actions, all children completed with PASS status</li>
      * </ul>
      *
      * <p>PASS is a terminal state; once set, it never changes.</p>
      *
      * @return {@code true} if this action passed, {@code false} otherwise
      */
-    boolean isPass();
+    public boolean isPass() {
+        return kind == Kind.PASS;
+    }
 
     /**
      * Returns whether this action failed during execution.
@@ -90,8 +192,8 @@ public interface Status {
      * <p>FAIL indicates that execution encountered an error. This can happen in several ways:
      * <ul>
      *   <li>An uncaught exception was thrown</li>
-     *   >A {@link FailException} was thrown explicitly</li>
-     *   >For parent actions, any child action failed</li>
+     *   <li>A {@link FailException} was thrown explicitly</li>
+     *   <li>For parent actions, any child action failed</li>
      * </ul>
      *
      * <p>When an action fails, the exception that caused the failure is available via
@@ -105,7 +207,9 @@ public interface Status {
      * @see #getThrowable()
      * @see #getMessage()
      */
-    boolean isFailure();
+    public boolean isFailure() {
+        return kind == Kind.FAILURE;
+    }
 
     /**
      * Returns whether this action was skipped.
@@ -128,7 +232,9 @@ public interface Status {
      * @see #getMessage()
      * @see SkipException
      */
-    boolean isSkip();
+    public boolean isSkip() {
+        return kind == Kind.SKIP;
+    }
 
     /**
      * Returns the human-readable display name for this status.
@@ -146,7 +252,14 @@ public interface Status {
      *
      * @return the display name; never {@code null}, always a non-empty uppercase string
      */
-    String getDisplayName();
+    public String getDisplayName() {
+        return switch (kind) {
+            case STAGED -> "STAGED";
+            case PASS -> "PASS";
+            case FAILURE -> "FAIL";
+            case SKIP -> "SKIP";
+        };
+    }
 
     /**
      * Returns a message providing additional context about the status.
@@ -166,7 +279,15 @@ public interface Status {
      * @return an {@link Optional} containing the status message, or empty if no message is available
      * @see #getThrowable()
      */
-    Optional<String> getMessage();
+    public Optional<String> getMessage() {
+        if (message != null) {
+            return Optional.of(message);
+        }
+        if (throwable != null) {
+            return Optional.ofNullable(throwable.getMessage());
+        }
+        return Optional.empty();
+    }
 
     /**
      * Returns the exception associated with this status, if any.
@@ -193,5 +314,17 @@ public interface Status {
      * @see FailException
      * @see SkipException
      */
-    Optional<Throwable> getThrowable();
+    public Optional<Throwable> getThrowable() {
+        return Optional.ofNullable(throwable);
+    }
+
+    /**
+     * Returns the human-readable display name for this status.
+     *
+     * @return the display name used by {@link Result} formatting and listeners
+     */
+    @Override
+    public String toString() {
+        return getDisplayName();
+    }
 }

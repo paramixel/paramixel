@@ -22,7 +22,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import org.paramixel.core.internal.DefaultContext;
 import org.paramixel.core.listener.SafeListener;
 
 /**
@@ -91,11 +90,11 @@ public final class Runner {
     public void run(Action action) {
         Objects.requireNonNull(action, "action must not be null");
 
-        Listener safeListener = new SafeListener(listener);
+        Listener safeListener = listener instanceof SafeListener ? listener : SafeListener.of(listener);
         safeListener.runStarted(this, action);
 
         try {
-            DefaultContext context = new DefaultContext(configuration, safeListener, executorService);
+            Context context = Context.of(configuration, safeListener, executorService);
             action.execute(context);
             safeListener.runCompleted(this, action);
         } finally {
@@ -106,9 +105,19 @@ public final class Runner {
     }
 
     private static ExecutorService createExecutorService(Map<String, String> configuration) {
-        int parallelism = Integer.parseInt(configuration.getOrDefault(
+        String configuredParallelism = configuration.getOrDefault(
                 Configuration.RUNNER_PARALLELISM,
-                String.valueOf(Runtime.getRuntime().availableProcessors() * 2)));
+                String.valueOf(Runtime.getRuntime().availableProcessors() * 2));
+
+        final int parallelism;
+        try {
+            parallelism = Integer.parseInt(configuredParallelism);
+        } catch (NumberFormatException e) {
+            throw ConfigurationException.of(
+                    "Invalid configuration for '" + Configuration.RUNNER_PARALLELISM + "': expected integer but was '"
+                            + configuredParallelism + "'",
+                    e);
+        }
 
         ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
                 parallelism, parallelism, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {

@@ -18,6 +18,7 @@ package org.paramixel.maven.plugin.internal.util;
 
 import java.util.List;
 import java.util.Objects;
+import org.paramixel.core.support.Arguments;
 
 public class DurationUtil {
 
@@ -25,7 +26,7 @@ public class DurationUtil {
 
         public FormattedDuration {
             Objects.requireNonNull(numberPart, "numberPart must not be null");
-            Arguments.requireNotBlank(numberPart, "numberPart must not be blank");
+            Arguments.requireNonBlank(numberPart, "numberPart must not be blank");
             Objects.requireNonNull(unit, "unit must not be null");
         }
     }
@@ -41,7 +42,7 @@ public class DurationUtil {
 
     public static FormattedDuration parseFormatted(final String formatted) {
         Objects.requireNonNull(formatted, "formatted must not be null");
-        Arguments.requireNotBlank(formatted, "formatted must not be blank");
+        Arguments.requireNonBlank(formatted, "formatted must not be blank");
         final var spaceIndex = formatted.lastIndexOf(' ');
         if (spaceIndex < 0) {
             return new FormattedDuration(formatted, "");
@@ -53,7 +54,7 @@ public class DurationUtil {
 
     public static String padForAlignment(final String formatted, final int maxIntegerWidth) {
         Objects.requireNonNull(formatted, "formatted must not be null");
-        Arguments.requireNotBlank(formatted, "formatted must not be blank");
+        Arguments.requireNonBlank(formatted, "formatted must not be blank");
         Arguments.requirePositive(maxIntegerWidth, "maxIntegerWidth must be positive");
         final var parsed = parseFormatted(formatted);
 

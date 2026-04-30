@@ -27,16 +27,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.core.internal.DefaultContext;
 
 @DisplayName("Context Attachment")
 class ContextAttachmentTest {
 
     record TestData(String value, int number) {}
 
-    private DefaultContext createContext() {
-        return new DefaultContext(
-                Configuration.defaultProperties(), Listener.defaultListener(), directExecutorService());
+    private Context createContext() {
+        return Context.of(Configuration.defaultProperties(), Listener.defaultListener(), directExecutorService());
     }
 
     private static ExecutorService directExecutorService() {
@@ -179,8 +177,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("child contexts have independent attachments")
     void childContextsHaveIndependentAttachments() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
         var parentData = new TestData("parent", 1);
         var childData = new TestData("child", 2);
 
@@ -194,8 +192,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("child contexts do not inherit parent attachments")
     void childContextsDoNotInheritGetParentAttachments() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
         var parentData = new TestData("parent", 1);
 
         parent.setAttachment(parentData);
@@ -244,8 +242,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("child context can access parent attachment using parent() chain (current pattern)")
     void childContextCanAccessParentGetAttachmentUsingGetParentChain() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
         var parentData = new TestData("parent", 1);
 
         parent.setAttachment(parentData);
@@ -261,9 +259,9 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("grandchild context can access grandparent attachment using parent() chain (current pattern)")
     void grandchildContextCanAccessGrandparentGetAttachmentUsingGetParentChain() {
-        DefaultContext grandparent = createContext();
-        DefaultContext parent = new DefaultContext(grandparent);
-        DefaultContext grandchild = new DefaultContext(parent);
+        Context grandparent = createContext();
+        Context parent = grandparent.createChild();
+        Context grandchild = parent.createChild();
         var grandparentData = new TestData("grandparent", 1);
 
         grandparent.setAttachment(grandparentData);
@@ -299,8 +297,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findAttachment with level 1 returns parent's attachment")
     void findAttachmentWithLevel1ReturnsParentsGetAttachment() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
         var parentData = new TestData("parent", 1);
 
         parent.setAttachment(parentData);
@@ -313,9 +311,9 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findAttachment with level 2 returns grandparent's attachment")
     void findAttachmentWithLevel2ReturnsGrandparentsGetAttachment() {
-        DefaultContext grandparent = createContext();
-        DefaultContext parent = new DefaultContext(grandparent);
-        DefaultContext grandchild = new DefaultContext(parent);
+        Context grandparent = createContext();
+        Context parent = grandparent.createChild();
+        Context grandchild = parent.createChild();
         var grandparentData = new TestData("grandparent", 1);
 
         grandparent.setAttachment(grandparentData);
@@ -328,8 +326,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findAttachment throws NoSuchElementException when ancestor at given level doesn't exist")
     void findAttachmentThrowsNoSuchElementExceptionWhenAncestorAtGivenLevelDoesntExist() {
-        DefaultContext root = createContext();
-        DefaultContext child = new DefaultContext(root);
+        Context root = createContext();
+        Context child = root.createChild();
 
         assertThatThrownBy(() -> child.findAttachment(2))
                 .isInstanceOf(NoSuchElementException.class)
@@ -343,8 +341,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findAttachment returns Attachment with correct type")
     void findAttachmentReturnsAttachmentWithCorrectType() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
         var parentData = new TestData("parent", 1);
 
         parent.setAttachment(parentData);
@@ -365,8 +363,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findAttachment works with interface type when implementation is attached")
     void findGetAttachmentWorksWithInterfaceTypeWhenImplementationIsAttached() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
 
         Runnable runnable = () -> {};
         parent.setAttachment(runnable);
@@ -379,8 +377,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findAttachment returns empty when ancestor context exists but has no attachment")
     void findAttachmentReturnsEmptyWhenAncestorContextExistsButHasNoAttachment() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
 
         assertThat(child.findAttachment(1)).isEmpty();
     }
@@ -396,8 +394,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findContext with level 1 returns Optional containing parent")
     void findContextWithLevel1ReturnsOptionalContainingParent() {
-        DefaultContext parent = createContext();
-        DefaultContext child = new DefaultContext(parent);
+        Context parent = createContext();
+        Context child = parent.createChild();
 
         assertThat(child.findContext(1)).isPresent().contains(parent);
     }
@@ -405,9 +403,9 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findContext with level 2 returns Optional containing grandparent")
     void findContextWithLevel2ReturnsOptionalContainingGrandparent() {
-        DefaultContext grandparent = createContext();
-        DefaultContext parent = new DefaultContext(grandparent);
-        DefaultContext grandchild = new DefaultContext(parent);
+        Context grandparent = createContext();
+        Context parent = grandparent.createChild();
+        Context grandchild = parent.createChild();
 
         assertThat(grandchild.findContext(2)).isPresent().contains(grandparent);
     }
@@ -415,8 +413,8 @@ class ContextAttachmentTest {
     @Test
     @DisplayName("findContext throws NoSuchElementException when ancestor at given level doesn't exist")
     void findContextThrowsNoSuchElementExceptionWhenAncestorAtGivenLevelDoesntExist() {
-        DefaultContext root = createContext();
-        DefaultContext child = new DefaultContext(root);
+        Context root = createContext();
+        Context child = root.createChild();
 
         assertThatThrownBy(() -> child.findContext(2))
                 .isInstanceOf(NoSuchElementException.class)

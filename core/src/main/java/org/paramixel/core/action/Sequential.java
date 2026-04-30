@@ -21,9 +21,8 @@ import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
-import org.paramixel.core.internal.DefaultContext;
-import org.paramixel.core.internal.Results;
-import org.paramixel.core.internal.util.Arguments;
+import org.paramixel.core.Result;
+import org.paramixel.core.support.Arguments;
 
 /**
  * A built-in action that executes child actions sequentially.
@@ -32,8 +31,18 @@ public class Sequential extends AbstractAction {
 
     private final List<Action> children;
 
+    /**
+     * Creates a sequential action with the supplied children.
+     *
+     * <p>Callers should normally use one of the public factory methods so validation and
+     * initialization happen before the instance is exposed.</p>
+     *
+     * @param name the action name
+     * @param children the child actions to execute in order
+     */
     protected Sequential(String name, List<Action> children) {
-        super(name);
+        super();
+        this.name = validateName(name);
         this.children = validateChildren(children);
     }
 
@@ -46,8 +55,12 @@ public class Sequential extends AbstractAction {
      */
     public static Sequential of(String name, List<Action> children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
-        return new Sequential(name, children);
+        Arguments.requireNonBlank(name, "name must not be blank");
+        Arguments.requireNonEmpty(children, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        Sequential instance = new Sequential(name, children);
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -59,9 +72,13 @@ public class Sequential extends AbstractAction {
      */
     public static Sequential of(String name, Action... children) {
         Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNotBlank(name, "name must not be blank");
+        Arguments.requireNonBlank(name, "name must not be blank");
         Objects.requireNonNull(children, "children must not be null");
-        return new Sequential(name, List.of(children));
+        Arguments.require(children.length > 0, "children must not be empty");
+        Arguments.requireNoNullElements(children, "children must not contain null elements");
+        Sequential instance = new Sequential(name, List.of(children));
+        instance.initialize();
+        return instance;
     }
 
     /**
@@ -77,17 +94,25 @@ public class Sequential extends AbstractAction {
         return children;
     }
 
+    /**
+     * Executes all child actions from first to last.
+     *
+     * <p>Every child is executed, and the final result is computed from the aggregated
+     * child results using the standard composite status rules.</p>
+     *
+     * @param context the execution context for this action
+     * @throws NullPointerException if {@code context} is {@code null}
+     */
     @Override
     public void execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Results.staged();
+        this.result = Result.staged();
         context.getListener().beforeAction(context, this);
         Instant start = Instant.now();
-        DefaultContext defaultContext = (DefaultContext) context;
         for (Action child : getChildren()) {
-            child.execute(new DefaultContext(defaultContext));
+            child.execute(context.createChild());
         }
-        this.result = Results.of(computeStatus(), durationSince(start));
+        this.result = Result.of(computeStatus(), durationSince(start));
         context.getListener().afterAction(context, this, this.result);
     }
 }

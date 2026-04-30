@@ -28,8 +28,6 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.internal.DefaultContext;
-import org.paramixel.core.internal.DefaultResult;
 
 @DisplayName("DefaultListener")
 class DefaultListenerTest {
@@ -40,8 +38,8 @@ class DefaultListenerTest {
         Listener listener = Listener.defaultListener();
         Direct.Executable executable = context -> {};
         Action action = Direct.of("direct", executable);
-        Context context = new DefaultContext(Configuration.defaultProperties(), listener, directExecutorService());
-        Result result = DefaultResult.pass(java.time.Duration.ZERO);
+        Context context = Context.of(Configuration.defaultProperties(), listener, directExecutorService());
+        Result result = Result.pass(java.time.Duration.ZERO);
         var output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
 
