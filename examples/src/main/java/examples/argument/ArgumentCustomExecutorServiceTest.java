@@ -14,22 +14,27 @@
  * limitations under the License.
  */
 
-package examples.test.argument;
+package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.action.Lifecycle;
+import org.paramixel.core.action.Noop;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.action.Sequential;
 
-public class ArgumentParallelismTest {
+public class ArgumentCustomExecutorServiceTest {
 
     private static final AtomicInteger INVOCATION_COUNT = new AtomicInteger();
+    private static ExecutorService CUSTOM_EXECUTOR_SERVICE;
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());
@@ -38,15 +43,35 @@ public class ArgumentParallelismTest {
     @Paramixel.ActionFactory
     public static Action actionFactory() {
         INVOCATION_COUNT.set(0);
+        CUSTOM_EXECUTOR_SERVICE = Executors.newFixedThreadPool(4);
 
         Action first = Direct.of("arg-0", context -> INVOCATION_COUNT.incrementAndGet());
         Action second = Direct.of("arg-1", context -> INVOCATION_COUNT.incrementAndGet());
         Action third = Direct.of("arg-2", context -> INVOCATION_COUNT.incrementAndGet());
-        Action verify = Direct.of(
-                "verify", context -> assertThat(INVOCATION_COUNT.get()).isEqualTo(3));
+        Action verify = Direct.of("verify", context -> {
+            assertThat(INVOCATION_COUNT.get()).isEqualTo(3);
+            assertThat(CUSTOM_EXECUTOR_SERVICE.isShutdown()).isFalse();
+        });
+        Action shutdown = Direct.of("shutdown", context -> {
+            CUSTOM_EXECUTOR_SERVICE.shutdown();
+            try {
+                assertThat(CUSTOM_EXECUTOR_SERVICE.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
+                        .isTrue();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while waiting for executor shutdown", e);
+            }
+        });
 
-        return Sequential.of(
-                "ArgumentParallelismTest",
-                List.of(Parallel.of("parallel-arguments", 3, List.of(first, second, third)), verify));
+        return Lifecycle.of(
+                "ArgumentCustomExecutorServiceTest",
+                Noop.of("before"),
+                Sequential.of(
+                        "main",
+                        List.of(
+                                Parallel.of(
+                                        "parallel-arguments", CUSTOM_EXECUTOR_SERVICE, List.of(first, second, third)),
+                                verify)),
+                shutdown);
     }
 }

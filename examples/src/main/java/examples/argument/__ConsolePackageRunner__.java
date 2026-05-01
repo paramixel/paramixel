@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package examples.test.argument;
+package examples.argument;
 
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.discovery.Selector;

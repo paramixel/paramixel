@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package examples.test.argument;
+package examples;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
+import examples.support.Logger;
+import java.util.ArrayList;
 import java.util.List;
 import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
@@ -25,7 +25,9 @@ import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Sequential;
 
-public class ArgumentPrimitiveTypesTest {
+public class SequentialArgumentTest {
+
+    private static final Logger LOGGER = Logger.createLogger(SequentialArgumentTest.class);
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());
@@ -33,13 +35,23 @@ public class ArgumentPrimitiveTypesTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        return Sequential.of(
-                "ArgumentPrimitiveTypesTest",
-                List.of(
-                        Direct.of("int", context -> assertThat(7).isEqualTo(7)),
-                        Direct.of("long", context -> assertThat(11L).isEqualTo(11L)),
-                        Direct.of("double", context -> assertThat(2.5d).isEqualTo(2.5d)),
-                        Direct.of("boolean", context -> assertThat(true).isTrue()),
-                        Direct.of("char", context -> assertThat('p').isEqualTo('p'))));
+        var suiteName = "Sequential argument example";
+
+        var argumentActions = new ArrayList<Action>();
+        for (int i = 0; i < 5; i++) {
+            var argumentValue = "string-" + i;
+
+            Action testAction1 = Direct.of("test1", context -> LOGGER.info("test1() argument [%s]", argumentValue));
+
+            Action testAction2 = Direct.of("test2", context -> LOGGER.info("test2() argument [%s]", argumentValue));
+
+            Action testAction3 = Direct.of("test3", context -> LOGGER.info("test3() argument [%s]", argumentValue));
+
+            Action sequentialAction = Sequential.of(argumentValue, List.of(testAction1, testAction2, testAction3));
+
+            argumentActions.add(sequentialAction);
+        }
+
+        return Sequential.of(suiteName, argumentActions);
     }
 }

@@ -14,14 +14,18 @@
  * limitations under the License.
  */
 
-package examples.test.util;
+package examples.lifecycle;
 
-public class Debug {
+import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.discovery.Selector;
 
-    public static boolean ENABLED = true;
+public class __ConsolePackageRunner__ {
 
-    public static void debug(String message) {
-        var threadName = Thread.currentThread().getName();
-        System.out.println("[DEBUG] DEBUG | " + threadName + " | " + message);
+    public static void main(String[] args) {
+        ConsoleRunner.runAndExit(selector());
+    }
+
+    private static Selector selector() {
+        return Selector.byPackageName(__ConsolePackageRunner__.class);
     }
 }

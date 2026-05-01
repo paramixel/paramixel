@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package examples.test.annotation;
+package examples.context;
 
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.discovery.Selector;

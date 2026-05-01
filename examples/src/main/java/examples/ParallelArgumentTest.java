@@ -26,9 +26,9 @@ import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.action.Sequential;
 
-public class ParallelArgumentExample {
+public class ParallelArgumentTest {
 
-    private static final Logger LOGGER = Logger.createLogger(ParallelArgumentExample.class);
+    private static final Logger LOGGER = Logger.createLogger(ParallelArgumentTest.class);
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());

@@ -14,31 +14,37 @@
  * limitations under the License.
  */
 
-package examples.test.annotation;
+package examples.argument;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Lifecycle;
+import org.paramixel.core.action.Sequential;
 
-public class DisabledTest {
-
-    private static final Runnable FAILING_ACTION = () -> {
-        throw new AssertionError("Disabled action must not execute");
-    };
+public class ArgumentCollectionTypesTest {
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());
     }
 
-    @Paramixel.Disabled("covered by resolver skip behavior")
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        return Lifecycle.of(
-                "DisabledTest",
-                Direct.of("before", context -> FAILING_ACTION.run()),
-                Direct.of("disabled-leaf", context -> FAILING_ACTION.run()),
-                Direct.of("after", context -> FAILING_ACTION.run()));
+        return Sequential.of(
+                "ArgumentCollectionTypesTest",
+                List.of(
+                        Direct.of(
+                                "list",
+                                context -> assertThat(List.of("a", "b", "c")).containsExactly("a", "b", "c")),
+                        Direct.of("set", context -> assertThat(Set.of(1, 2, 3)).containsExactlyInAnyOrder(1, 2, 3)),
+                        Direct.of(
+                                "map",
+                                context ->
+                                        assertThat(Map.of("one", 1, "two", 2)).containsEntry("two", 2))));
     }
 }
