@@ -16,6 +16,8 @@
 
 package org.paramixel.core.listener;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -59,6 +61,8 @@ public class StatusListener implements Listener {
      */
     private static final String PARAMIXEL = Listeners.PARAMIXEL;
 
+    private static final Object OUTPUT_LOCK = new Object();
+
     /**
      * Creates a new status listener.
      *
@@ -83,7 +87,13 @@ public class StatusListener implements Listener {
      */
     @Override
     public void beforeAction(Context context, Action action) {
-        System.out.println(PARAMIXEL + "TEST | " + buildDisplayName(action));
+        if (action.getName() == Action.HIDDEN) {
+            return;
+        }
+        String output = PARAMIXEL + "TEST | " + buildIdPath(action) + " | " + buildDisplayName(action);
+        synchronized (OUTPUT_LOCK) {
+            System.out.println(output);
+        }
     }
 
     /**
@@ -97,12 +107,20 @@ public class StatusListener implements Listener {
      */
     @Override
     public void afterAction(Context context, Action action, Result result) {
-        System.out.println(PARAMIXEL
+        if (action.getName() == Action.HIDDEN) {
+            return;
+        }
+        String output = PARAMIXEL
                 + formatStatus(result.getStatus())
+                + " | "
+                + buildIdPath(action)
                 + " | "
                 + buildDisplayName(action)
                 + " "
-                + formatTiming(result.getElapsedTime()));
+                + formatTiming(result.getElapsedTime());
+        synchronized (OUTPUT_LOCK) {
+            System.out.println(output);
+        }
     }
 
     /**
@@ -116,7 +134,16 @@ public class StatusListener implements Listener {
      */
     @Override
     public void actionThrowable(Context context, Action action, Throwable throwable) {
-        throwable.printStackTrace(System.err);
+        if (action.getName() == Action.HIDDEN) {
+            return;
+        }
+        StringWriter sw = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(sw));
+        String trace = sw.toString();
+        synchronized (OUTPUT_LOCK) {
+            System.err.println(PARAMIXEL + "EXCEPTION | " + buildIdPath(action) + " | " + buildDisplayName(action));
+            System.err.print(trace);
+        }
     }
 
     /**
@@ -158,8 +185,10 @@ public class StatusListener implements Listener {
      *
      * <p>The path is constructed by traversing the action's parent chain,
      * starting from the root and ending with the current action.
+     * Each segment is separated by {@code " / "} to indicate hierarchy.
      *
-     * <p>Each segment is separated by {@code " / "} to indicate hierarchy.
+     * <p>Actions whose name is the {@link Action#HIDDEN} sentinel are excluded
+     * from the path, so the root wrapper action does not appear in output.
      *
      * @param action the action whose path is to be built
      * @return a string representing the full action path
@@ -168,10 +197,37 @@ public class StatusListener implements Listener {
         Deque<String> names = new ArrayDeque<>();
         Action current = action;
         while (current != null) {
-            names.addFirst(current.getName());
+            if (current.getName() != Action.HIDDEN) {
+                names.addFirst(current.getName());
+            }
             current = current.getParent().orElse(null);
         }
         return String.join(" / ", names);
+    }
+
+    /**
+     * Builds the hierarchical ID path for an {@link Action}.
+     *
+     * <p>The path is constructed by traversing the action's parent chain,
+     * starting from the root and ending with the current action.
+     * Each segment is separated by {@code "/"} to indicate hierarchy.
+     *
+     * <p>Actions whose name is the {@link Action#HIDDEN} sentinel are excluded
+     * from the path, so the root wrapper action's ID does not appear in output.
+     *
+     * @param action the action whose ID path is to be built
+     * @return a string representing the full action ID path
+     */
+    private static String buildIdPath(Action action) {
+        Deque<String> ids = new ArrayDeque<>();
+        Action current = action;
+        while (current != null) {
+            if (current.getName() != Action.HIDDEN) {
+                ids.addFirst(current.getId());
+            }
+            current = current.getParent().orElse(null);
+        }
+        return String.join("-", ids);
     }
 
     /**

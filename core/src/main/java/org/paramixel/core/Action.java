@@ -121,6 +121,21 @@ import java.util.Optional;
 public interface Action {
 
     /**
+     * Sentinel name for root actions that should be hidden from output.
+     *
+     * <p>Created with {@code new String("<run>")} to prevent JVM interning,
+     * enabling identity comparison ({@code ==}) instead of value comparison
+     * ({@code equals}). This ensures only code that explicitly assigns
+     * {@code Action.HIDDEN} will match, not arbitrary {@code "<run>"} literals.
+     *
+     * <p>Listeners and renderers should check {@code action.getName() == Action.HIDDEN}
+     * and suppress the root action from hierarchical paths and display names.
+     *
+     * @see org.paramixel.core.listener.StatusListener
+     */
+    String HIDDEN = new String("<run>");
+
+    /**
      * Returns this action's unique identifier.
      *
      * <p>The ID is a randomly generated UUID that uniquely identifies this action instance.

@@ -35,17 +35,14 @@ class TreeSummaryRenderer implements SummaryRenderer {
      */
     @Override
     public void renderSummary(Runner runner, Action action) {
-        System.out.println(PARAMIXEL);
-        String status = formatStatus(action.getResult().getStatus());
-        String actionName = action.getName();
-        String kind = formatKind(action);
-        String timing = formatTiming(action.getResult().getElapsedTime());
-        String failureInfo = formatFailureInfo(action.getResult().getStatus());
-        System.out.println(PARAMIXEL + status + " " + actionName + " (" + kind + ") " + timing + failureInfo);
-
-        List<Action> children = action.getChildren();
-        for (int i = 0; i < children.size(); i++) {
-            renderTree(children.get(i), "", i == children.size() - 1);
+        List<Action> topActions;
+        if (action.getName() == Action.HIDDEN) {
+            topActions = action.getChildren();
+        } else {
+            topActions = List.of(action);
+        }
+        for (int i = 0; i < topActions.size(); i++) {
+            renderTree(topActions.get(i), "", i == topActions.size() - 1);
         }
     }
 
