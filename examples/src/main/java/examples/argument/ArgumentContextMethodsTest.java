@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 
-package examples;
+package examples.argument;
 
-import examples.support.Logger;
-import java.util.ArrayList;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.util.List;
 import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.action.Lifecycle;
+import org.paramixel.core.action.Noop;
 import org.paramixel.core.action.Sequential;
 
-public class SequentialArgumentExample {
+public class ArgumentContextMethodsTest {
 
-    private static final Logger LOGGER = Logger.createLogger(SequentialArgumentExample.class);
+    record TestAttachment(String argumentName) {}
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());
@@ -35,23 +37,20 @@ public class SequentialArgumentExample {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        var suiteName = "Sequential argument example";
+        return Sequential.of(
+                "ArgumentContextMethodsTest",
+                List.of(argumentAction("arg-0"), argumentAction("arg-1"), argumentAction("arg-2")));
+    }
 
-        var argumentActions = new ArrayList<Action>();
-        for (int i = 0; i < 5; i++) {
-            var argumentValue = "string-" + i;
+    private static Action argumentAction(String argumentName) {
+        Action body = Direct.of("assert-context", context -> {
+            assertThat(context.getParent()).isPresent();
+        });
 
-            Action testAction1 = Direct.of("test1", context -> LOGGER.info("test1() argument [%s]", argumentValue));
-
-            Action testAction2 = Direct.of("test2", context -> LOGGER.info("test2() argument [%s]", argumentValue));
-
-            Action testAction3 = Direct.of("test3", context -> LOGGER.info("test3() argument [%s]", argumentValue));
-
-            Action sequentialAction = Sequential.of(argumentValue, List.of(testAction1, testAction2, testAction3));
-
-            argumentActions.add(sequentialAction);
-        }
-
-        return Sequential.of(suiteName, argumentActions);
+        return Lifecycle.of(
+                argumentName,
+                Direct.of("before", context -> context.setAttachment(new TestAttachment(argumentName))),
+                Sequential.of(argumentName + "-body", List.of(body)),
+                Noop.of("after"));
     }
 }

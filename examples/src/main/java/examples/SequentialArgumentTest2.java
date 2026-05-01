@@ -26,9 +26,9 @@ import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Sequential;
 
-public class SequentialArgumentExample2 {
+public class SequentialArgumentTest2 {
 
-    private static final Logger LOGGER = Logger.createLogger(SequentialArgumentExample2.class);
+    private static final Logger LOGGER = Logger.createLogger(SequentialArgumentTest2.class);
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());

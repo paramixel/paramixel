@@ -14,20 +14,18 @@
  * limitations under the License.
  */
 
-package examples.test.argument;
+package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Sequential;
 
-public class ArgumentCollectionTypesTest {
+public class ArgumentPrimitiveTypesTest {
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());
@@ -36,15 +34,12 @@ public class ArgumentCollectionTypesTest {
     @Paramixel.ActionFactory
     public static Action actionFactory() {
         return Sequential.of(
-                "ArgumentCollectionTypesTest",
+                "ArgumentPrimitiveTypesTest",
                 List.of(
-                        Direct.of(
-                                "list",
-                                context -> assertThat(List.of("a", "b", "c")).containsExactly("a", "b", "c")),
-                        Direct.of("set", context -> assertThat(Set.of(1, 2, 3)).containsExactlyInAnyOrder(1, 2, 3)),
-                        Direct.of(
-                                "map",
-                                context ->
-                                        assertThat(Map.of("one", 1, "two", 2)).containsEntry("two", 2))));
+                        Direct.of("int", context -> assertThat(7).isEqualTo(7)),
+                        Direct.of("long", context -> assertThat(11L).isEqualTo(11L)),
+                        Direct.of("double", context -> assertThat(2.5d).isEqualTo(2.5d)),
+                        Direct.of("boolean", context -> assertThat(true).isTrue()),
+                        Direct.of("char", context -> assertThat('p').isEqualTo('p'))));
     }
 }

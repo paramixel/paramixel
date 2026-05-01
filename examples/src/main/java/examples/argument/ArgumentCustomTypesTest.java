@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package examples.test.argument;
+package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

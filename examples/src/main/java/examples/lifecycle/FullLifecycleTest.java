@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package examples.test.lifecycle;
+package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

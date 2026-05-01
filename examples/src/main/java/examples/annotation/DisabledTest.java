@@ -14,36 +14,31 @@
  * limitations under the License.
  */
 
-package examples.test.argument;
+package examples.annotation;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.List;
 import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Sequential;
+import org.paramixel.core.action.Lifecycle;
 
-public class ArgumentStringAndBigNumberTest {
+public class DisabledTest {
+
+    private static final Runnable FAILING_ACTION = () -> {
+        throw new AssertionError("Disabled action must not execute");
+    };
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());
     }
 
+    @Paramixel.Disabled("covered by resolver skip behavior")
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        return Sequential.of(
-                "ArgumentStringAndBigNumberTest",
-                List.of(
-                        Direct.of("string", context -> assertThat("paramixel").startsWith("param")),
-                        Direct.of(
-                                "big-integer",
-                                context -> assertThat(new BigInteger("42")).isEqualTo(new BigInteger("42"))),
-                        Direct.of(
-                                "big-decimal",
-                                context -> assertThat(new BigDecimal("3.14")).isEqualByComparingTo("3.14"))));
+        return Lifecycle.of(
+                "DisabledTest",
+                Direct.of("before", context -> FAILING_ACTION.run()),
+                Direct.of("disabled-leaf", context -> FAILING_ACTION.run()),
+                Direct.of("after", context -> FAILING_ACTION.run()));
     }
 }

@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-package examples.test.argument;
+package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import org.paramixel.core.Action;
 import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Lifecycle;
-import org.paramixel.core.action.Noop;
 import org.paramixel.core.action.Sequential;
 
-public class ArgumentContextMethodsTest {
-
-    record TestAttachment(String argumentName) {}
+public class ArgumentStringAndBigNumberTest {
 
     public static void main(String[] args) {
         ConsoleRunner.runAndExit(actionFactory());
@@ -38,19 +36,14 @@ public class ArgumentContextMethodsTest {
     @Paramixel.ActionFactory
     public static Action actionFactory() {
         return Sequential.of(
-                "ArgumentContextMethodsTest",
-                List.of(argumentAction("arg-0"), argumentAction("arg-1"), argumentAction("arg-2")));
-    }
-
-    private static Action argumentAction(String argumentName) {
-        Action body = Direct.of("assert-context", context -> {
-            assertThat(context.getParent()).isPresent();
-        });
-
-        return Lifecycle.of(
-                argumentName,
-                Direct.of("before", context -> context.setAttachment(new TestAttachment(argumentName))),
-                Sequential.of(argumentName + "-body", List.of(body)),
-                Noop.of("after"));
+                "ArgumentStringAndBigNumberTest",
+                List.of(
+                        Direct.of("string", context -> assertThat("paramixel").startsWith("param")),
+                        Direct.of(
+                                "big-integer",
+                                context -> assertThat(new BigInteger("42")).isEqualTo(new BigInteger("42"))),
+                        Direct.of(
+                                "big-decimal",
+                                context -> assertThat(new BigDecimal("3.14")).isEqualByComparingTo("3.14"))));
     }
 }
