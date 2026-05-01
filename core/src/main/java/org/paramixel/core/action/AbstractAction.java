@@ -23,12 +23,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
 import org.paramixel.core.support.Arguments;
+import org.paramixel.core.support.FastId;
 
 /**
  * Convenience base class for implementing {@link Action}.
@@ -94,7 +94,7 @@ public abstract class AbstractAction implements Action {
      * action becomes externally visible, typically from a factory method.</p>
      */
     protected AbstractAction() {
-        this.id = UUID.randomUUID().toString();
+        this.id = FastId.generateId();
     }
 
     /**

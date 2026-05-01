@@ -33,14 +33,14 @@ import org.paramixel.core.action.Parallel;
 import org.paramixel.core.support.Cleanup;
 import org.testcontainers.containers.Network;
 
-public class NginxExample {
+public class NginxTest {
 
     private static class TestAttachment {
         public Network network;
         public NginxTestEnvironment environment;
     }
 
-    private static final Logger LOGGER = Logger.createLogger(NginxExample.class);
+    private static final Logger LOGGER = Logger.createLogger(NginxTest.class);
 
     public static void main(String[] args) throws Throwable {
         ConsoleRunner.runAndExit(actionFactory());
@@ -51,7 +51,7 @@ public class NginxExample {
         return Parallel.of(
                 "NginxExample",
                 NginxTestEnvironment.createTestEnvironments().stream()
-                        .map(NginxExample::createLifecycleAction)
+                        .map(NginxTest::createLifecycleAction)
                         .toList());
     }
 

@@ -43,7 +43,7 @@ import org.paramixel.core.action.StrictSequential;
 import org.paramixel.core.support.Cleanup;
 import org.testcontainers.containers.Network;
 
-public class KafkaExample {
+public class KafkaTest {
 
     private static class TestAttachment {
         public Network network;
@@ -51,7 +51,7 @@ public class KafkaExample {
         public String message;
     }
 
-    private static final Logger LOGGER = Logger.createLogger(KafkaExample.class);
+    private static final Logger LOGGER = Logger.createLogger(KafkaTest.class);
     private static final String TOPIC = "test";
     private static final String GROUP_ID = "test-group-id";
     private static final String EARLIEST = "earliest";
@@ -65,7 +65,7 @@ public class KafkaExample {
         return Parallel.of(
                 "KafkaExample",
                 KafkaTestEnvironment.createTestEnvironments().stream()
-                        .map(KafkaExample::createLifecycleAction)
+                        .map(KafkaTest::createLifecycleAction)
                         .toList());
     }
 

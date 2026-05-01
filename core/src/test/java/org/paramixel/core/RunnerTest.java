@@ -18,6 +18,7 @@ package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URL;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.paramixel.core.action.Direct;
@@ -412,6 +414,77 @@ class RunnerTest {
     }
 
     @Test
+    @DisplayName(
+            "top-level default parallel uses runner executor and nested default parallel uses dedicated parallel executor")
+    void topLevelDefaultParallelUsesRunnerExecutorAndNestedDefaultParallelUsesDedicatedParallelExecutor() {
+        var outerThreadNames = new CopyOnWriteArrayList<String>();
+        var innerThreadNames = new CopyOnWriteArrayList<String>();
+        ExecutorService runnerExecutorService = Executors.newFixedThreadPool(2, runnable -> {
+            Thread thread = new Thread(runnable, "custom-runner");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        try {
+            Action action = Parallel.of(
+                    "outer",
+                    List.of(
+                            Parallel.of(
+                                    "inner-0",
+                                    List.of(
+                                            Direct.of(
+                                                    "leaf-0-0",
+                                                    context -> innerThreadNames.add(Thread.currentThread()
+                                                            .getName())),
+                                            Direct.of(
+                                                    "leaf-0-1",
+                                                    context -> innerThreadNames.add(Thread.currentThread()
+                                                            .getName())))),
+                            Direct.of(
+                                    "outer-direct",
+                                    context -> outerThreadNames.add(
+                                            Thread.currentThread().getName()))));
+
+            Runner.builder().executorService(runnerExecutorService).build().run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(outerThreadNames).allMatch(name -> name.contains("custom-runner"));
+            assertThat(innerThreadNames).allMatch(name -> name.contains("paramixel-parallel"));
+        } finally {
+            runnerExecutorService.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName(
+            "nested default parallel completes without deadlock when outer uses runner executor and inner uses default parallel executor")
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void nestedDefaultParallelCompletesWithoutDeadlockWhenOuterUsesRunnerExecutorAndInnerUsesDefaultParallelExecutor() {
+        var executionCount = new AtomicInteger();
+        Action action = Parallel.of(
+                "outer",
+                List.of(
+                        Parallel.of(
+                                "inner-0",
+                                List.of(
+                                        Direct.of("leaf-0-0", context -> executionCount.incrementAndGet()),
+                                        Direct.of("leaf-0-1", context -> executionCount.incrementAndGet()))),
+                        Parallel.of(
+                                "inner-1",
+                                List.of(
+                                        Direct.of("leaf-1-0", context -> executionCount.incrementAndGet()),
+                                        Direct.of("leaf-1-1", context -> executionCount.incrementAndGet())))));
+
+        Runner.builder()
+                .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "2"))
+                .build()
+                .run(action);
+
+        assertThat(action.getResult().getStatus().isPass()).isTrue();
+        assertThat(executionCount).hasValue(4);
+    }
+
+    @Test
     @DisplayName("nested parallel can use dedicated inner executor services")
     void nestedParallelCanUseDedicatedInnerExecutorServices() {
         var executionCount = new AtomicInteger();
@@ -512,5 +585,213 @@ class RunnerTest {
                     .computeIfAbsent(sequentialName, ignored -> new CopyOnWriteArrayList<>())
                     .add(directName);
         });
+    }
+
+    @Nested
+    @DisplayName("deadlock detection in run()")
+    class DeadlockDetection {
+
+        @Test
+        @DisplayName("rejects three-level nested default Parallel with parallelism=1")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void rejectsThreeLevelNestingWithParallelism1() {
+            Action action = Parallel.of(
+                    "A",
+                    Parallel.of(
+                            "B",
+                            Parallel.of("C", Direct.of("C1", ctx -> {}), Direct.of("C2", ctx -> {})),
+                            Direct.of("B2", ctx -> {})),
+                    Direct.of("A2", ctx -> {}));
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> Runner.builder()
+                            .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                            .build()
+                            .run(action))
+                    .withMessageContaining("thread-starvation deadlock")
+                    .withMessageContaining("3 levels")
+                    .withMessageContaining("1 thread");
+        }
+
+        @Test
+        @DisplayName("accepts two-level nested default Parallel with parallelism=1")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsTwoLevelNestingWithParallelism1() {
+            Action action = Parallel.of(
+                    "outer", Parallel.of("inner", Direct.of("leaf-0", ctx -> {}), Direct.of("leaf-1", ctx -> {})));
+
+            Runner.builder()
+                    .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                    .build()
+                    .run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+        }
+
+        @Test
+        @DisplayName("accepts three-level nested default Parallel with parallelism=2")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsThreeLevelNestingWithParallelism2() {
+            Action action = Parallel.of(
+                    "A",
+                    Parallel.of(
+                            "B",
+                            Parallel.of("C", Direct.of("C1", ctx -> {}), Direct.of("C2", ctx -> {})),
+                            Direct.of("B2", ctx -> {})),
+                    Direct.of("A2", ctx -> {}));
+
+            Runner.builder()
+                    .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "2"))
+                    .build()
+                    .run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+        }
+
+        @Test
+        @DisplayName("accepts deeply nested Parallel with custom inner executors")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsDeepNestingWithCustomExecutors() {
+            ExecutorService innerEs1 = Executors.newFixedThreadPool(2);
+            ExecutorService innerEs2 = Executors.newFixedThreadPool(2);
+            try {
+                Action action = Parallel.of(
+                        "A",
+                        Parallel.of(
+                                "B",
+                                innerEs1,
+                                Parallel.of("C", innerEs2, Direct.of("C1", ctx -> {}), Direct.of("C2", ctx -> {})),
+                                Direct.of("B2", ctx -> {})),
+                        Direct.of("A2", ctx -> {}));
+
+                Runner.builder()
+                        .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                        .build()
+                        .run(action);
+
+                assertThat(action.getResult().getStatus().isPass()).isTrue();
+            } finally {
+                innerEs1.shutdown();
+                innerEs2.shutdown();
+            }
+        }
+
+        @Test
+        @DisplayName("accepts single Parallel with parallelism=1 and many children")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsSingleParallelWithParallelism1() {
+            Action action = Parallel.of(
+                    "root", 1, Direct.of("a", ctx -> {}), Direct.of("b", ctx -> {}), Direct.of("c", ctx -> {}));
+
+            Runner.builder()
+                    .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                    .build()
+                    .run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+        }
+
+        @Test
+        @DisplayName("detects deadlock with Sequential between Parallel nodes")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void detectsDeadlockWithSequentialBetweenParallels() {
+            Action action = Parallel.of(
+                    "A", Sequential.of("S", Parallel.of("B", Parallel.of("C", Direct.of("leaf", ctx -> {})))));
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> Runner.builder()
+                            .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                            .build()
+                            .run(action))
+                    .withMessageContaining("thread-starvation deadlock");
+        }
+
+        @Test
+        @DisplayName("detects deadlock in deepest branch of asymmetric tree")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void detectsDeadlockInAsymmetricTree() {
+            Action action = Parallel.of(
+                    "root",
+                    Parallel.of("safe-inner", Direct.of("safe-leaf", ctx -> {})),
+                    Parallel.of(
+                            "danger-A",
+                            Parallel.of("danger-B", Parallel.of("danger-C", Direct.of("danger-leaf", ctx -> {})))));
+
+            assertThatIllegalStateException()
+                    .isThrownBy(() -> Runner.builder()
+                            .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                            .build()
+                            .run(action))
+                    .withMessageContaining("4 levels");
+        }
+
+        @Test
+        @DisplayName("accepts non-Parallel tree (Sequential with Direct children only)")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsNonParallelTree() {
+            Action action = Sequential.of("root", Direct.of("a", ctx -> {}), Direct.of("b", ctx -> {}));
+
+            Runner.builder()
+                    .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                    .build()
+                    .run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+        }
+
+        @Test
+        @DisplayName("accepts single leaf action (Direct) with parallelism=1")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsSingleLeafAction() {
+            Action action = Direct.of("leaf", ctx -> {});
+
+            Runner.builder()
+                    .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                    .build()
+                    .run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+        }
+
+        @Test
+        @DisplayName("accepts multiple custom-executor Parallels at same level")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsMultipleCustomExecutorsAtSameLevel() {
+            ExecutorService es1 = Executors.newSingleThreadExecutor();
+            ExecutorService es2 = Executors.newSingleThreadExecutor();
+            try {
+                Action action = Parallel.of(
+                        "outer",
+                        Parallel.of("inner1", es1, Direct.of("a", ctx -> {})),
+                        Parallel.of("inner2", es2, Direct.of("b", ctx -> {})));
+
+                Runner.builder()
+                        .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
+                        .build()
+                        .run(action);
+
+                assertThat(action.getResult().getStatus().isPass()).isTrue();
+            } finally {
+                es1.shutdown();
+                es2.shutdown();
+            }
+        }
+
+        @Test
+        @DisplayName("accepts deep default-executor Parallel with high parallelism")
+        @Timeout(value = 5, unit = TimeUnit.SECONDS)
+        void acceptsDeepNestingWithHighParallelism() {
+            Action action = Parallel.of(
+                    "A",
+                    Parallel.of(
+                            "B",
+                            Parallel.of("C", Direct.of("C1", ctx -> {}), Direct.of("C2", ctx -> {})),
+                            Direct.of("B2", ctx -> {})),
+                    Direct.of("A2", ctx -> {}));
+
+            Runner.builder().build().run(action);
+
+            assertThat(action.getResult().getStatus().isPass()).isTrue();
+        }
     }
 }

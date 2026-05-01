@@ -195,7 +195,7 @@ public final class Resolver {
             }
             actions.add(resolveActionFromMethod(clazz, method));
         }
-        return collapse(actions, clazz.getSimpleName(), Composition.SEQUENTIAL);
+        return collapse(actions, Action.HIDDEN, Composition.SEQUENTIAL);
     }
 
     private static Optional<Action> scan(
@@ -223,7 +223,7 @@ public final class Resolver {
                 .peek(list -> list.sort(Comparator.comparing(Action::getName)))
                 .flatMap(List::stream)
                 .toList();
-        return collapse(actions, "<run>", composition);
+        return collapse(actions, Action.HIDDEN, composition);
     }
 
     private static Optional<Action> collapse(List<Action> actions, String branchName, Composition composition) {

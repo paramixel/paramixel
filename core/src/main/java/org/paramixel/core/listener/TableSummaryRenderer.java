@@ -82,7 +82,9 @@ class TableSummaryRenderer implements SummaryRenderer {
     }
 
     private void collectAllActions(Action action, List<Action> actions) {
-        actions.add(action);
+        if (action.getName() != Action.HIDDEN) {
+            actions.add(action);
+        }
         for (Action child : action.getChildren()) {
             collectAllActions(child, actions);
         }

@@ -31,14 +31,14 @@ import org.paramixel.core.action.Parallel;
 import org.paramixel.core.support.Cleanup;
 import org.testcontainers.containers.Network;
 
-public class MongoDBExample {
+public class MongoDBTest {
 
     private static class TestAttachment {
         public Network network;
         public MongoDBTestEnvironment environment;
     }
 
-    private static final Logger LOGGER = Logger.createLogger(MongoDBExample.class);
+    private static final Logger LOGGER = Logger.createLogger(MongoDBTest.class);
 
     public static void main(String[] args) throws Throwable {
         ConsoleRunner.runAndExit(actionFactory());
@@ -49,7 +49,7 @@ public class MongoDBExample {
         return Parallel.of(
                 "MongoDBExample",
                 MongoDBTestEnvironment.createTestEnvironments().stream()
-                        .map(MongoDBExample::createLifecycleAction)
+                        .map(MongoDBTest::createLifecycleAction)
                         .toList());
     }
 

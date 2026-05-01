@@ -27,10 +27,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -74,7 +70,6 @@ public class ParamixelMojo extends AbstractMojo {
         }
 
         final var originalClassLoader = Thread.currentThread().getContextClassLoader();
-        ExecutorService executorService = null;
 
         try (URLClassLoader testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
@@ -91,11 +86,8 @@ public class ParamixelMojo extends AbstractMojo {
                 return;
             }
 
-            executorService = createExecutorService(configuration);
-
             Runner runner = Runner.builder()
                     .configuration(configuration)
-                    .executorService(executorService)
                     .listener(Listener.treeListener())
                     .build();
 
@@ -110,8 +102,6 @@ public class ParamixelMojo extends AbstractMojo {
         } catch (Exception e) {
             throw new MojoExecutionException("Failed to execute Paramixel specs", e);
         } finally {
-            shutdownExecutorService(executorService);
-
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
     }
@@ -213,37 +203,6 @@ public class ParamixelMojo extends AbstractMojo {
         }
 
         return new ArrayList<>(classpathUrls);
-    }
-
-    private static ExecutorService createExecutorService(Map<String, String> configuration) {
-        int parallelism = Integer.parseInt(configuration.getOrDefault(
-                Configuration.RUNNER_PARALLELISM,
-                String.valueOf(Runtime.getRuntime().availableProcessors() * 2)));
-
-        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
-                parallelism, parallelism, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {
-                    Thread thread = new Thread(runnable, "paramixel");
-                    thread.setDaemon(true);
-                    return thread;
-                });
-
-        threadPoolExecutor.prestartAllCoreThreads();
-        return threadPoolExecutor;
-    }
-
-    private static void shutdownExecutorService(ExecutorService executorService) {
-        if (executorService != null) {
-            executorService.shutdown();
-
-            try {
-                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                executorService.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
     }
 
     public static class Property {

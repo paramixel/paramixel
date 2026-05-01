@@ -31,6 +31,58 @@ If no executor is supplied directly to the action, it uses `context.getExecutorS
 
 If you pass an `ExecutorService` to `Parallel.of(...)`, Paramixel uses it but does not manage its lifecycle for you.
 
+## Deadlock Prevention
+
+Paramixel detects nested `Parallel` configurations that would cause thread starvation before execution begins.
+
+### How detection works
+
+`Parallel` actions that use the default executor share a thread pool sized by `paramixel.parallelism`. When `Parallel` actions are nested deeper than the pool can service, a thread-starvation deadlock occurs:
+
+```java
+// This throws IllegalStateException when paramixel.parallelism=1:
+Action danger = Parallel.of("A",
+        Parallel.of("B",
+                Parallel.of("C",
+                        Direct.of("leaf1", ctx -> {}),
+                        Direct.of("leaf2", ctx -> {}))));
+
+Runner.builder()
+    .configuration(Map.of("paramixel.parallelism", "1"))
+    .build()
+    .run(danger); // throws IllegalStateException
+```
+
+`Runner` walks the action tree before execution and rejects configurations where the nesting depth exceeds what the shared pool can handle.
+
+### The fix
+
+There are two ways to resolve this:
+
+1. **Supply dedicated executors** to inner `Parallel` actions (preferred for fine-grained control):
+
+```java
+ExecutorService innerEs = Executors.newFixedThreadPool(4);
+Action safe = Parallel.of("A",
+        Parallel.of("B", innerEs,
+                Parallel.of("C",
+                        Direct.of("leaf1", ctx -> {}),
+                        Direct.of("leaf2", ctx -> {}))));
+```
+
+2. **Increase `paramixel.parallelism`** to match the nesting depth:
+
+```java
+Runner.builder()
+    .configuration(Map.of("paramixel.parallelism", "2"))
+    .build()
+    .run(danger); // safe with 2 threads
+```
+
+### When detection resets
+
+Detection resets the depth counter at any `Parallel` node that has a custom `ExecutorService`, because custom executors provide their own thread pool and do not contend for shared pool threads.
+
 ## Examples
 
 ### Default executor
