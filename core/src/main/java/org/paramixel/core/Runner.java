@@ -16,6 +16,7 @@
 
 package org.paramixel.core;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,9 +32,18 @@ import org.paramixel.core.listener.SafeListener;
 /**
  * Coordinates top-level execution of actions.
  *
- * <p>A runner owns the configuration, listener, and executor service used to execute an
- * {@link Action}. Create instances with {@link #builder()} and then invoke {@link #run(Action)} to
- * execute a plan.</p>
+ * <p>A runner holds the configuration and listener used to execute {@link Action} instances.
+ * Create instances with {@link #builder()} and invoke {@link #run(Action)} to execute a plan.</p>
+ *
+ * <p><strong>Reusability:</strong> A runner can execute multiple actions. Each call to
+ * {@link #run(Action)} creates fresh executor services (if none was supplied to the builder)
+ * and shuts them down when the call completes. When an external {@link ExecutorService} is
+ * supplied via {@link Builder#executorService(ExecutorService)}, the runner uses it for
+ * top-level action execution but does not manage its lifecycle.</p>
+ *
+ * <p><strong>Concurrency:</strong> It is safe to call {@code run()} concurrently from
+ * multiple threads on the same runner instance. Each invocation uses its own executor pools
+ * and execution scope, so concurrent runs are fully independent.</p>
  */
 public final class Runner {
 
@@ -43,28 +53,14 @@ public final class Runner {
 
     private final Listener listener;
     private final Map<String, String> configuration;
-    private final ExecutorService executorService;
-    private final ExecutorService runnerExecutorService;
-    private final ExecutorService parallelExecutorService;
-    private final boolean ownsExecutorService;
-    private final boolean ownsParallelExecutorService;
-    private final Object executionDomain = new Object();
+    private final ExecutorService externalExecutorService;
 
-    private Runner(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
+    private Runner(Map<String, String> configuration, Listener listener, ExecutorService externalExecutorService) {
         this.listener = Objects.requireNonNull(listener, "listener must not be null");
-        this.configuration = configuration != null ? Map.copyOf(configuration) : Configuration.defaultProperties();
-
-        if (executorService != null) {
-            this.runnerExecutorService = executorService;
-            this.ownsExecutorService = false;
-        } else {
-            this.runnerExecutorService = createExecutorService(this.configuration, RUNNER_THREAD_NAME);
-            this.ownsExecutorService = true;
-        }
-
-        this.parallelExecutorService = createExecutorService(this.configuration, PARALLEL_THREAD_NAME);
-        this.ownsParallelExecutorService = true;
-        this.executorService = new RoutingExecutorService();
+        this.configuration =
+                configuration != null ? Map.copyOf(configuration) : Map.copyOf(Configuration.defaultProperties());
+        this.externalExecutorService = externalExecutorService;
+        resolveParallelism(this.configuration);
     }
 
     /**
@@ -97,14 +93,33 @@ public final class Runner {
     /**
      * Executes the supplied action.
      *
-     * <p>The configured listener is notified before execution starts and after it completes. If this
-     * runner created its own executor service, that executor service is shut down after execution.</p>
+     * <p>The configured listener is notified before execution starts and after it completes. Owned
+     * executor services are created before execution and shut down after execution completes. If the
+     * runner was built with an external {@link ExecutorService}, it is used but not shut down.</p>
+     *
+     * <p>This method may be called multiple times on the same runner instance. Each invocation
+     * creates fresh executor services (when none was supplied) and is independent of prior runs.</p>
      *
      * @param action the action to execute
      * @throws NullPointerException if {@code action} is {@code null}
      */
     public void run(Action action) {
         Objects.requireNonNull(action, "action must not be null");
+
+        Object executionDomain = new Object();
+        ExecutorService runnerExec;
+        boolean ownsRunnerExec;
+
+        if (externalExecutorService != null) {
+            runnerExec = externalExecutorService;
+            ownsRunnerExec = false;
+        } else {
+            runnerExec = createExecutorService(configuration, RUNNER_THREAD_NAME);
+            ownsRunnerExec = true;
+        }
+
+        ExecutorService parallelExec = createExecutorService(configuration, PARALLEL_THREAD_NAME);
+        ExecutorService routingExec = new RoutingExecutorService(runnerExec, parallelExec, executionDomain);
 
         Listener safeListener = listener instanceof SafeListener ? listener : SafeListener.of(listener);
         safeListener.runStarted(this, action);
@@ -115,17 +130,15 @@ public final class Runner {
         try {
             validateNoDeadlock(action);
 
-            Context context = Context.of(configuration, safeListener, executorService);
+            Context context = Context.of(configuration, safeListener, routingExec);
             action.execute(context);
             safeListener.runCompleted(this, action);
         } finally {
             restoreExecutionScope(previousScope);
-            if (ownsExecutorService) {
-                shutdownExecutorService(runnerExecutorService);
+            if (ownsRunnerExec) {
+                shutdownExecutorService(runnerExec);
             }
-            if (ownsParallelExecutorService) {
-                shutdownExecutorService(parallelExecutorService);
-            }
+            shutdownExecutorService(parallelExec);
         }
     }
 
@@ -216,14 +229,32 @@ public final class Runner {
         }
     }
 
-    private final class RoutingExecutorService extends AbstractExecutorService {
+    private static final class RoutingExecutorService extends AbstractExecutorService {
+
+        private final ExecutorService runnerExecutorService;
+        private final ExecutorService parallelExecutorService;
+        private final Object executionDomain;
+
+        RoutingExecutorService(
+                ExecutorService runnerExecutorService,
+                ExecutorService parallelExecutorService,
+                Object executionDomain) {
+            this.runnerExecutorService = runnerExecutorService;
+            this.parallelExecutorService = parallelExecutorService;
+            this.executionDomain = executionDomain;
+        }
 
         @Override
-        public void shutdown() {}
+        public void shutdown() {
+            runnerExecutorService.shutdown();
+            parallelExecutorService.shutdown();
+        }
 
         @Override
         public List<Runnable> shutdownNow() {
-            return List.of();
+            List<Runnable> runnables = new ArrayList<>(runnerExecutorService.shutdownNow());
+            runnables.addAll(parallelExecutorService.shutdownNow());
+            return runnables;
         }
 
         @Override
@@ -237,8 +268,15 @@ public final class Runner {
         }
 
         @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit) {
-            return isTerminated();
+        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+            long deadline = System.nanoTime() + unit.toNanos(timeout);
+            boolean runnerTerminated = runnerExecutorService.awaitTermination(timeout, unit);
+            long remainingNanos = deadline - System.nanoTime();
+            if (remainingNanos <= 0) {
+                return runnerTerminated && parallelExecutorService.isTerminated();
+            }
+            boolean parallelTerminated = parallelExecutorService.awaitTermination(remainingNanos, TimeUnit.NANOSECONDS);
+            return runnerTerminated && parallelTerminated;
         }
 
         @Override
@@ -301,8 +339,10 @@ public final class Runner {
         /**
          * Sets the executor service for the runner being built.
          *
-         * <p>When supplied, the built runner uses this executor service and does not manage its
-         * lifecycle.</p>
+         * <p>When supplied, the built runner uses this executor service for top-level action execution
+         * and does not manage its lifecycle. The parallel executor used for nested parallel actions is
+         * always created and managed by the runner. Callers are responsible for shutting down their own
+         * executor service when it is no longer needed.</p>
          *
          * @param executorService the executor service to use
          * @return this builder

@@ -36,3 +36,4 @@ Direct step = Direct.of("create user", context -> {
 - `throw SkipException.skip(...)` -> `SKIP`
 - `throw FailException.fail(...)` -> `FAIL`
 - any other thrown exception -> listener gets `actionThrowable(...)`, then result becomes `FAIL`
+- `throw Error` -> propagates immediately (not caught, no result set)

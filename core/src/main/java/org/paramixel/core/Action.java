@@ -67,12 +67,16 @@ import java.util.Optional;
  * Some action types (e.g., Lifecycle) have special result composition rules.</p>
  *
  * <h3>Thread Safety</h3>
- * <p>Actions are not thread-safe by default. However:
+ * <p>Action instances are not designed for concurrent re-execution. Each instance
+ * carries mutable state (its {@link Result}) that transitions during execution.
+ * Reusing the same action instance across concurrent or sequential executions is
+ * unsafe. Use separate instances for separate executions.</p>
+ *
+ * <p>Within a single execution, the framework provides safe concurrency:
  * <ul>
- *   <li>Each action executes with its own {@link Context}</li>
- *   <li>Parallel actions execute in separate threads</li>
+ *   <li>Each action receives its own {@link Context}</li>
  *   <li>Parent actions coordinate child execution safely via synchronization</li>
- *   <li>Custom action implementations must ensure thread-safety if accessed concurrently</li>
+ *   <li>{@link org.paramixel.core.action.Parallel} assigns each child a dedicated context</li>
  * </ul>
  *
  * <h3>Custom Actions</h3>
@@ -100,11 +104,22 @@ import java.util.Optional;
  * <p><strong>Direct Implementation Example:</strong></p>
  * <pre>{@code
  * public final class MyAction implements Action {
- *     private Action parent;
+ *     private final AtomicReference<Action> parent = new AtomicReference<>();
  *
  *     @Override
  *     public void setParent(Action parent) {
- *         this.parent = Objects.requireNonNull(parent, "parent must not be null");
+ *         Objects.requireNonNull(parent, "parent must not be null");
+ *         if (parent == this) {
+ *             throw new IllegalArgumentException("action must not be its own parent");
+ *         }
+ *         if (!this.parent.compareAndSet(null, parent)) {
+ *             throw new IllegalStateException("child already has a parent");
+ *         }
+ *     }
+ *
+ *     @Override
+ *     public Optional<Action> getParent() {
+ *         return Optional.ofNullable(parent.get());
  *     }
  *
  *     // implement remaining Action methods
@@ -121,25 +136,10 @@ import java.util.Optional;
 public interface Action {
 
     /**
-     * Sentinel name for root actions that should be hidden from output.
-     *
-     * <p>Created with {@code new String("<run>")} to prevent JVM interning,
-     * enabling identity comparison ({@code ==}) instead of value comparison
-     * ({@code equals}). This ensures only code that explicitly assigns
-     * {@code Action.HIDDEN} will match, not arbitrary {@code "<run>"} literals.
-     *
-     * <p>Listeners and renderers should check {@code action.getName() == Action.HIDDEN}
-     * and suppress the root action from hierarchical paths and display names.
-     *
-     * @see org.paramixel.core.listener.StatusListener
-     */
-    String HIDDEN = new String("<run>");
-
-    /**
      * Returns this action's unique identifier.
      *
-     * <p>The ID is a randomly generated UUID that uniquely identifies this action instance.
-     * IDs are useful for:
+     * <p>The ID is a randomly generated 4-character string from a-z and A-Z that uniquely
+     * identifies this action instance. IDs are useful for:
      * <ul>
      *   <li>Tracking actions across logs and monitoring</li>
      *   <li>Correlating actions with their results in listeners</li>
@@ -149,7 +149,7 @@ public interface Action {
      * <p>The ID is generated once at construction time and never changes. Two different
      * action instances will always have different IDs, even if they have the same name.</p>
      *
-     * @return the generated action identifier; never {@code null}, always a valid UUID string
+     * @return the generated action identifier; never {@code null}, always a 4-character alphanumeric string
      */
     String getId();
 
@@ -213,6 +213,11 @@ public interface Action {
      *   <li>an action must not be its own parent</li>
      *   <li>a parent may only be assigned once</li>
      * </ul>
+     *
+     * <p>Implementations must use atomic compare-and-set or equivalent synchronization
+     * to ensure that concurrent calls to {@code setParent} do not silently overwrite an
+     * existing parent assignment. Exactly one caller should succeed; all others must throw
+     * {@link IllegalStateException}.</p>
      *
      * @param parent the parent action
      * @throws NullPointerException if {@code parent} is {@code null}
@@ -314,8 +319,9 @@ public interface Action {
      * </ul>
      *
      * <p><strong>Thread Safety:</strong></p>
-     * <p>This method may be called concurrently for parallel actions. Implementations must
-     * be thread-safe or use synchronization as needed. Each invocation receives its own
+     * <p>Action instances carry mutable state and are not designed for concurrent
+     * re-execution. Each action instance should be executed at most once. Use separate
+     * instances for parallel or repeated execution. Each invocation receives its own
      * {@link Context} instance.</p>
      *
      * @param context the execution context; must not be {@code null}
@@ -371,6 +377,19 @@ public interface Action {
      * @see #execute(Context)
      */
     void skip(Context context);
+
+    /**
+     * Sets this action's execution result.
+     *
+     * <p>This method allows composite action implementations to manage the result lifecycle
+     * explicitly, for example when skipping a tree of actions with interleaved listener
+     * callbacks where the parent result must be set after all children have been skipped.</p>
+     *
+     * @param result the result to set; must not be {@code null}
+     * @throws NullPointerException if {@code result} is {@code null}
+     * @see #getResult()
+     */
+    void setResult(Result result);
 
     /**
      * Returns this action's execution result.

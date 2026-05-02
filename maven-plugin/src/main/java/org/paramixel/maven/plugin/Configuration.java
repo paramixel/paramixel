@@ -20,6 +20,8 @@ public class Configuration {
 
     public static final String RUNNER_PARALLELISM = org.paramixel.core.Configuration.RUNNER_PARALLELISM;
 
+    public static final String FAILURE_ON_SKIP = org.paramixel.core.Configuration.FAILURE_ON_SKIP;
+
     private Configuration() {
         // Intentionally empty
     }

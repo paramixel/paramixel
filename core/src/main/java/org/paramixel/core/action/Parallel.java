@@ -258,6 +258,14 @@ public class Parallel extends AbstractAction {
      * <p>Each child runs with its own child {@link Context}. Concurrency is capped by the
      * configured parallelism even if the underlying executor could schedule more tasks.</p>
      *
+     * <p><strong>Interrupt handling:</strong> If the executing thread is interrupted during
+     * semaphore acquisition, the action transitions to a FAIL result with the
+     * {@link InterruptedException} as the cause, fires
+     * {@link org.paramixel.core.Listener#afterAction}, and then re-interrupts the thread
+     * before re-throwing a {@link RuntimeException} wrapping the cause. This ensures the
+     * lifecycle contract ({@code this.result} transitions to a terminal state and
+     * {@code afterAction} is always invoked) is honored even under interrupt conditions.</p>
+     *
      * @param context the execution context for this action
      * @throws NullPointerException if {@code context} is {@code null}
      */
@@ -272,29 +280,42 @@ public class Parallel extends AbstractAction {
         Semaphore semaphore = new Semaphore(parallelism, true);
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-        for (Action child : getChildren()) {
-            try {
-                semaphore.acquire();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
+        try {
+            for (Action child : getChildren()) {
+                try {
+                    semaphore.acquire();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+                futures.add(CompletableFuture.runAsync(
+                        () -> {
+                            try {
+                                child.execute(context.createChild());
+                            } finally {
+                                semaphore.release();
+                            }
+                        },
+                        es));
             }
-            futures.add(CompletableFuture.runAsync(
-                    () -> {
-                        try {
-                            child.execute(context.createChild());
-                        } finally {
-                            semaphore.release();
-                        }
-                    },
-                    es));
-        }
 
-        for (CompletableFuture<Void> f : futures) {
-            f.join();
-        }
+            for (CompletableFuture<Void> f : futures) {
+                f.join();
+            }
 
-        this.result = Result.of(computeStatus(), durationSince(start));
+            this.result = Result.of(computeStatus(), durationSince(start));
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof InterruptedException) {
+                this.result = Result.fail(durationSince(start), e.getCause());
+                context.getListener().afterAction(context, this, this.result);
+                Thread.currentThread().interrupt();
+            } else {
+                this.result = Result.fail(durationSince(start), e);
+                context.getListener().afterAction(context, this, this.result);
+                throw e;
+            }
+            throw e;
+        }
         context.getListener().afterAction(context, this, this.result);
     }
 }

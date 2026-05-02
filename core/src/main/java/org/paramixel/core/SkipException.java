@@ -16,6 +16,7 @@
 
 package org.paramixel.core;
 
+import java.util.Objects;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -248,12 +249,15 @@ public final class SkipException extends RuntimeException {
      *   <li>"Skipped: precondition 'database populated' not met"</li>
      * </ul>
      *
-     * @param message the detail message explaining why the action was skipped; may be {@code null},
-     *                but a descriptive message is strongly recommended
+     * @param message the detail message explaining why the action was skipped; must not be
+     *                {@code null} or blank
+     * @throws NullPointerException if {@code message} is null
+     * @throws IllegalArgumentException if {@code message} is blank
      * @throws SkipException always thrown with the specified message
      * @see #skip()
      */
     public static void skip(final String message) {
-        throw new SkipException(message);
+        throw new SkipException(Arguments.requireNonBlank(
+                Objects.requireNonNull(message, "message must not be null"), "message must not be blank"));
     }
 }

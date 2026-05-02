@@ -56,6 +56,8 @@ import org.paramixel.core.support.AnsiColor;
  */
 public class StatusListener implements Listener {
 
+    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+
     /**
      * Prefix used for all output lines, typically branding or framework identifier.
      */
@@ -87,7 +89,7 @@ public class StatusListener implements Listener {
      */
     @Override
     public void beforeAction(Context context, Action action) {
-        if (action.getName() == Action.HIDDEN) {
+        if (HIDDEN_ROOT.equals(action.getName())) {
             return;
         }
         String output = PARAMIXEL + "TEST | " + buildIdPath(action) + " | " + buildDisplayName(action);
@@ -107,7 +109,7 @@ public class StatusListener implements Listener {
      */
     @Override
     public void afterAction(Context context, Action action, Result result) {
-        if (action.getName() == Action.HIDDEN) {
+        if (HIDDEN_ROOT.equals(action.getName())) {
             return;
         }
         String output = PARAMIXEL
@@ -134,7 +136,7 @@ public class StatusListener implements Listener {
      */
     @Override
     public void actionThrowable(Context context, Action action, Throwable throwable) {
-        if (action.getName() == Action.HIDDEN) {
+        if (HIDDEN_ROOT.equals(action.getName())) {
             return;
         }
         StringWriter sw = new StringWriter();
@@ -187,8 +189,8 @@ public class StatusListener implements Listener {
      * starting from the root and ending with the current action.
      * Each segment is separated by {@code " / "} to indicate hierarchy.
      *
-     * <p>Actions whose name is the {@link Action#HIDDEN} sentinel are excluded
-     * from the path, so the root wrapper action does not appear in output.
+     * <p>The hidden root sentinel is excluded from the path,
+     * so the root wrapper action does not appear in output.
      *
      * @param action the action whose path is to be built
      * @return a string representing the full action path
@@ -197,7 +199,7 @@ public class StatusListener implements Listener {
         Deque<String> names = new ArrayDeque<>();
         Action current = action;
         while (current != null) {
-            if (current.getName() != Action.HIDDEN) {
+            if (!HIDDEN_ROOT.equals(current.getName())) {
                 names.addFirst(current.getName());
             }
             current = current.getParent().orElse(null);
@@ -212,8 +214,8 @@ public class StatusListener implements Listener {
      * starting from the root and ending with the current action.
      * Each segment is separated by {@code "/"} to indicate hierarchy.
      *
-     * <p>Actions whose name is the {@link Action#HIDDEN} sentinel are excluded
-     * from the path, so the root wrapper action's ID does not appear in output.
+     * <p>The hidden root sentinel is excluded from the path,
+     * so the root wrapper action's ID does not appear in output.
      *
      * @param action the action whose ID path is to be built
      * @return a string representing the full action ID path
@@ -222,7 +224,7 @@ public class StatusListener implements Listener {
         Deque<String> ids = new ArrayDeque<>();
         Action current = action;
         while (current != null) {
-            if (current.getName() != Action.HIDDEN) {
+            if (!HIDDEN_ROOT.equals(current.getName())) {
                 ids.addFirst(current.getId());
             }
             current = current.getParent().orElse(null);

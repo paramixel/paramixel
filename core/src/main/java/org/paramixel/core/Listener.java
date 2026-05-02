@@ -60,7 +60,9 @@ import org.paramixel.core.listener.Listeners;
  * <h3>Exception Handling</h3>
  * <p>Exceptions thrown by listener methods can interrupt execution. To prevent listener
  * exceptions from breaking the execution flow, wrap listeners in
- * {@link org.paramixel.core.listener.SafeListener} which catches and logs exceptions.</p>
+ * {@link org.paramixel.core.listener.SafeListener} which catches and logs non-fatal
+ * exceptions. Note that {@link Error} subclasses are never caught by {@code SafeListener}
+ * and always propagate immediately.</p>
  *
  * <h3>Built-in Listeners</h3>
  * <p>The framework provides several built-in listeners:</p>
@@ -249,7 +251,8 @@ public interface Listener {
      *
      * <p><strong>Exception Handling:</strong> Exceptions thrown from this method
      * propagate up and may interrupt execution. Wrap listeners in
-     * {@link org.paramixel.core.listener.SafeListener} to prevent this.</p>
+     * {@link org.paramixel.core.listener.SafeListener} to prevent this.
+     * Note that {@link Error} subclasses are always rethrown, even by {@code SafeListener}.</p>
      *
      * <p><strong>Default Implementation:</strong> Does nothing.</p>
      *
@@ -302,7 +305,8 @@ public interface Listener {
      *
      * <p><strong>Exception Handling:</strong> Exceptions thrown from this method
      * propagate up and may interrupt execution. Wrap listeners in
-     * {@link org.paramixel.core.listener.SafeListener} to prevent this.</p>
+     * {@link org.paramixel.core.listener.SafeListener} to prevent this.
+     * Note that {@link Error} subclasses are always rethrown, even by {@code SafeListener}.</p>
      *
      * <p><strong>Default Implementation:</strong> Does nothing.</p>
      *

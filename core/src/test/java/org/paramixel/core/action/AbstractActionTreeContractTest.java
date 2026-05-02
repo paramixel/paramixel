@@ -20,7 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
@@ -108,11 +113,50 @@ class AbstractActionTreeContractTest {
         assertThatThrownBy(() -> child.setParent(secondParent)).isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    @DisplayName("concurrent setParent assigns exactly one parent")
+    void concurrentSetParentAssignsExactlyOneParent() throws Exception {
+        LeafAction child = LeafAction.of("child");
+        int threadCount = 8;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failureCount = new AtomicInteger(0);
+        AtomicReference<Action> winner = new AtomicReference<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            LeafAction parentCandidate = LeafAction.of("parent-" + i);
+            new Thread(() -> {
+                        try {
+                            startLatch.await();
+                            child.setParent(parentCandidate);
+                            successCount.incrementAndGet();
+                            winner.set(parentCandidate);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        } catch (IllegalStateException e) {
+                            failureCount.incrementAndGet();
+                        } finally {
+                            doneLatch.countDown();
+                        }
+                    })
+                    .start();
+        }
+
+        startLatch.countDown();
+        boolean completed = doneLatch.await(5, TimeUnit.SECONDS);
+
+        assertThat(completed).isTrue();
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(failureCount.get()).isEqualTo(threadCount - 1);
+        assertThat(child.getParent()).contains(winner.get());
+    }
+
     private static final class DirectLeafAction implements Action {
 
         private final String id;
         private final String name;
-        private Action parent;
+        private final AtomicReference<Action> parent = new AtomicReference<>();
 
         private DirectLeafAction(String id, String name) {
             this.id = id;
@@ -135,21 +179,18 @@ class AbstractActionTreeContractTest {
 
         @Override
         public Optional<Action> getParent() {
-            return Optional.ofNullable(parent);
+            return Optional.ofNullable(parent.get());
         }
 
         @Override
         public void setParent(Action parent) {
-            if (parent == null) {
-                throw new NullPointerException("parent must not be null");
-            }
+            Objects.requireNonNull(parent, "parent must not be null");
             if (parent == this) {
                 throw new IllegalArgumentException("action must not be its own parent");
             }
-            if (this.parent != null) {
+            if (!this.parent.compareAndSet(null, parent)) {
                 throw new IllegalStateException("child already has a parent");
             }
-            this.parent = parent;
         }
 
         @Override
@@ -172,6 +213,9 @@ class AbstractActionTreeContractTest {
 
         @Override
         public void skip(Context context) {}
+
+        @Override
+        public void setResult(org.paramixel.core.Result result) {}
     }
 
     private static final class CompositeAction extends AbstractAction {

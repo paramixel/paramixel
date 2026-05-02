@@ -18,7 +18,6 @@ package org.paramixel.core.support;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,8 +27,9 @@ import java.util.function.Supplier;
  * Collects and executes cleanup tasks in the specified order.
  *
  * <p>Tasks are executed in the order determined by the {@link Mode} specified
- * at construction. Any exceptions thrown by tasks are collected in the
- * {@link CleanupResult} returned by {@link #run()}.
+ * at construction. Non-fatal exceptions thrown by tasks are collected in the
+ * {@link CleanupResult} returned by {@link #run()}. {@link Error} subclasses
+ * propagate immediately and abort the cleanup loop.</p>
  *
  * @see CleanupResult
  * @see Executable
@@ -109,7 +109,7 @@ public class Cleanup {
      * Returns whether this cleanup instance has already been executed.
      *
      * <p>Once {@link #run()} or {@link #runAndThrow()} has been called successfully, this
-     * method returns {@code true} until {@link #reset()} is invoked.</p>
+     * method returns {@code true} until {@link #reset()} or {@link #clear()} is invoked.</p>
      *
      * @return {@code true} if cleanup has already run; otherwise {@code false}
      */
@@ -206,23 +206,41 @@ public class Cleanup {
     }
 
     /**
-     * Returns the registered cleanup executables.
+     * Returns a snapshot of the registered cleanup executables.
      *
-     * @return An unmodifiable list of registered cleanup executables; never null.
+     * <p>The returned list is immutable and does not reflect later changes
+     * to this {@code Cleanup} instance's registered executables.</p>
+     *
+     * @return An immutable snapshot of registered cleanup executables; never null.
      */
     public List<Executable> getExecutables() {
-        return Collections.unmodifiableList(executables);
+        return List.copyOf(executables);
+    }
+
+    /**
+     * Resets the execution state, allowing this Cleanup to be re-run with its
+     * currently registered tasks.
+     *
+     * <p>Registered executables are preserved. Use {@link #clear()} to remove
+     * all executables and reset the execution state.</p>
+     *
+     * @return this cleanup instance
+     */
+    public Cleanup reset() {
+        hasRun = false;
+        return this;
     }
 
     /**
      * Clears all registered executables and resets the execution state.
      *
-     * <p>This method allows the same {@code Cleanup} instance to be reused after a prior
-     * run. Any previously collected run state is discarded.</p>
+     * <p>This method allows the same {@code Cleanup} instance to be reused from
+     * scratch after a prior run. All previously registered executables are removed
+     * and the run state is discarded.</p>
      *
      * @return this cleanup instance
      */
-    public Cleanup reset() {
+    public Cleanup clear() {
         executables.clear();
         hasRun = false;
         return this;
@@ -232,13 +250,18 @@ public class Cleanup {
      * Executes all registered cleanup tasks and collects any thrown exceptions.
      *
      * <p>Tasks execute in the order defined by the configured {@link Mode}. Every task is
-     * given a chance to run even if earlier tasks fail. Thrown exceptions are captured in
+     * given a chance to run even if earlier tasks fail. Non-fatal exceptions are captured in
      * the returned {@link CleanupResult} by task index.</p>
      *
-     * <p>This method may be called only once unless {@link #reset()} is invoked.</p>
+     * <p>{@link Error} subclasses (such as {@link OutOfMemoryError}) are <strong>not caught</strong>
+     * and propagate immediately, aborting the cleanup loop. Remaining cleanup tasks will not run.</p>
+     *
+     * <p>This method may be called only once unless {@link #reset()} or {@link #clear()}
+     * is invoked.</p>
      *
      * @return the aggregated cleanup result
      * @throws IllegalStateException if this cleanup has already run and has not been reset
+     * @throws Error if a cleanup task throws an {@link Error}; it propagates immediately
      */
     public CleanupResult run() {
         if (hasRun) {
@@ -253,6 +276,8 @@ public class Cleanup {
         for (int index : indices) {
             try {
                 executables.get(index).run();
+            } catch (Error e) {
+                throw e;
             } catch (Throwable e) {
                 exceptions[index] = e;
             }
@@ -316,7 +341,12 @@ public class Cleanup {
         /**
          * Executes the cleanup executable.
          *
-         * @throws Throwable If the cleanup executable fails.
+         * <p>Non-fatal exceptions thrown by cleanup executables are collected in
+         * {@link CleanupResult}. {@link Error} subclasses propagate immediately
+         * and abort the cleanup loop.</p>
+         *
+         * @throws Throwable if the cleanup executable fails; non-fatal exceptions
+         *                   are collected, while {@link Error} propagates immediately
          */
         void run() throws Throwable;
     }

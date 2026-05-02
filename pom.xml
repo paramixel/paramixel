@@ -381,27 +381,27 @@
                 <configuration>
                     <failOnError>true</failOnError>
                     <doclint>none</doclint>
-                    <tags>
-                        <tag>
-                            <name>api.note</name>
-                            <placement>a</placement>
-                            <head>API Note:</head>
-                        </tag>
-                        <tag>
-                            <name>impl.spec</name>
-                            <placement>a</placement>
-                            <head>Implementation Requirements:</head>
-                        </tag>
-                        <tag>
-                            <name>impl.note</name>
-                            <placement>a</placement>
-                            <head>Implementation Note:</head>
-                        </tag>
-                    </tags>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
+<tags>
+                                <tag>
+                                    <name>apiNote</name>
+                                    <placement>a</placement>
+                                    <head>API Note:</head>
+                                </tag>
+                                <tag>
+                                    <name>implSpec</name>
+                                    <placement>a</placement>
+                                    <head>Implementation Requirements:</head>
+                                </tag>
+                                <tag>
+                                    <name>implNote</name>
+                                    <placement>a</placement>
+                                    <head>Implementation Note:</head>
+                                </tag>
+                            </tags>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <configuration>
                     <skip>${spotbugs.skip}</skip>
@@ -455,23 +455,23 @@
                             <additionalJOptions>
                                 <additionalJOption>-Werror</additionalJOption>
                             </additionalJOptions>
-                            <tags>
-                                <tag>
-                                    <name>api.note</name>
-                                    <placement>a</placement>
-                                    <head>API Note:</head>
-                                </tag>
-                                <tag>
-                                    <name>impl.spec</name>
-                                    <placement>a</placement>
-                                    <head>Implementation Requirements:</head>
-                                </tag>
-                                <tag>
-                                    <name>impl.note</name>
-                                    <placement>a</placement>
-                                    <head>Implementation Note:</head>
-                                </tag>
-                            </tags>
+<tags>
+                                        <tag>
+                                            <name>apiNote</name>
+                                            <placement>a</placement>
+                                            <head>API Note:</head>
+                                        </tag>
+                                        <tag>
+                                            <name>implSpec</name>
+                                            <placement>a</placement>
+                                            <head>Implementation Requirements:</head>
+                                        </tag>
+                                        <tag>
+                                            <name>implNote</name>
+                                            <placement>a</placement>
+                                            <head>Implementation Note:</head>
+                                        </tag>
+                                    </tags>
                         </configuration>
                     </plugin>
                 </plugins>

@@ -348,11 +348,31 @@ class CleanupTest {
     }
 
     @Test
-    @DisplayName("executables returns unmodifiable list")
-    void getExecutablesReturnsUnmodifiableList() {
+    @DisplayName("getExecutables returns immutable snapshot")
+    void getExecutablesReturnsImmutableSnapshot() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {});
 
         assertThatThrownBy(() -> cleanup.getExecutables().clear()).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    @DisplayName("getExecutables returns snapshot not affected by later mutations")
+    void getExecutablesReturnsSnapshotNotAffectedByLaterMutations() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD);
+        List<Executable> snapshot = cleanup.getExecutables();
+        assertThat(snapshot).isEmpty();
+
+        cleanup.add(() -> {});
+        assertThat(snapshot).isEmpty();
+        assertThat(cleanup.getCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("getExecutables snapshot reflects executables at time of call")
+    void getExecutablesSnapshotReflectsStateAtCallTime() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {}).add(() -> {});
+        List<Executable> snapshot = cleanup.getExecutables();
+        assertThat(snapshot).hasSize(2);
     }
 
     @Test
@@ -576,8 +596,8 @@ class CleanupTest {
     }
 
     @Test
-    @DisplayName("reset clears executables and allows re-run")
-    void resetClearsGetExecutablesAndAllowsReRun() {
+    @DisplayName("reset preserves executables and allows re-run")
+    void resetPreservesExecutablesAndAllowsReRun() {
         List<String> executionOrder = new ArrayList<>();
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> executionOrder.add("first"))
@@ -587,6 +607,25 @@ class CleanupTest {
         assertThat(executionOrder).containsExactly("first", "second");
 
         cleanup.reset();
+        assertThat(cleanup.getCount()).isEqualTo(2);
+        assertThat(cleanup.hasRun()).isFalse();
+
+        cleanup.run();
+        assertThat(executionOrder).containsExactly("first", "second", "first", "second");
+    }
+
+    @Test
+    @DisplayName("clear clears executables and allows re-run")
+    void clearClearsExecutablesAndAllowsReRun() {
+        List<String> executionOrder = new ArrayList<>();
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
+                .add(() -> executionOrder.add("first"))
+                .add(() -> executionOrder.add("second"));
+
+        cleanup.run();
+        assertThat(executionOrder).containsExactly("first", "second");
+
+        cleanup.clear();
         assertThat(cleanup.getCount()).isZero();
 
         cleanup.add(() -> executionOrder.add("third")).add(() -> executionOrder.add("fourth"));
@@ -605,8 +644,18 @@ class CleanupTest {
     }
 
     @Test
-    @DisplayName("reset on unrun runner is safe")
-    void resetOnUnrunRunnerIsSafe() {
+    @DisplayName("clear returns this for method chaining")
+    void clearReturnsThis() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
+
+        Cleanup result = cleanup.clear();
+
+        assertThat(result).isSameAs(cleanup);
+    }
+
+    @Test
+    @DisplayName("reset on unrun cleanup preserves executables")
+    void resetOnUnrunCleanupPreservesExecutables() {
         List<String> executionOrder = new ArrayList<>();
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> executionOrder.add("executed"));
 
@@ -614,7 +663,39 @@ class CleanupTest {
         assertThat(cleanup.hasRun()).isFalse();
 
         cleanup.run();
-        assertThat(executionOrder).isEmpty();
+        assertThat(executionOrder).containsExactly("executed");
+    }
+
+    @Test
+    @DisplayName("clear on unrun cleanup clears executables and resets state")
+    void clearOnUnrunCleanupClearsExecutables() {
+        List<String> executionOrder = new ArrayList<>();
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> executionOrder.add("executed"));
+
+        cleanup.clear();
+        assertThat(cleanup.hasRun()).isFalse();
+        assertThat(cleanup.getCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("clear then run is a no-op since executables are removed")
+    void clearThenRunIsNoOp() {
+        List<String> executionOrder = new ArrayList<>();
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
+                .add(() -> executionOrder.add("first"))
+                .add(() -> executionOrder.add("second"));
+
+        cleanup.run();
+        assertThat(executionOrder).containsExactly("first", "second");
+
+        cleanup.clear();
+        assertThat(cleanup.getCount()).isZero();
+        assertThat(cleanup.hasRun()).isFalse();
+
+        CleanupResult result = cleanup.run();
+        assertThat(executionOrder).containsExactly("first", "second");
+        assertThat(result.getExecutableCount()).isZero();
+        assertThat(result.hasExceptions()).isFalse();
     }
 
     @Test
@@ -733,5 +814,60 @@ class CleanupTest {
                 .run();
 
         assertThat(executionOrder).containsExactly("third", "second", "first");
+    }
+
+    @Test
+    @DisplayName("run rethrows Error")
+    void runRethrowsError() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {
+            throw new OutOfMemoryError("simulated oom");
+        });
+
+        assertThatThrownBy(() -> cleanup.run())
+                .isInstanceOf(OutOfMemoryError.class)
+                .hasMessage("simulated oom");
+    }
+
+    @Test
+    @DisplayName("run stops executing further tasks on Error")
+    void runStopsExecutingFurtherTasksOnError() {
+        List<String> executionOrder = new ArrayList<>();
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
+                .add(() -> executionOrder.add("first"))
+                .add(() -> {
+                    throw new StackOverflowError("simulated soe");
+                })
+                .add(() -> executionOrder.add("third"));
+
+        assertThatThrownBy(() -> cleanup.run()).isInstanceOf(StackOverflowError.class);
+
+        assertThat(executionOrder).containsExactly("first");
+    }
+
+    @Test
+    @DisplayName("run collects RuntimeException but propagates Error")
+    void runCollectsRuntimeExceptionButPropagatesError() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
+                .add(() -> {
+                    throw new RuntimeException("non-fatal");
+                })
+                .add(() -> {
+                    throw new OutOfMemoryError("simulated oom");
+                })
+                .add(() -> {});
+
+        assertThatThrownBy(() -> cleanup.run()).isInstanceOf(OutOfMemoryError.class);
+    }
+
+    @Test
+    @DisplayName("runAndThrow propagates Error")
+    void runAndThrowPropagatesError() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {
+            throw new OutOfMemoryError("simulated oom");
+        });
+
+        assertThatThrownBy(() -> cleanup.runAndThrow())
+                .isInstanceOf(OutOfMemoryError.class)
+                .hasMessage("simulated oom");
     }
 }

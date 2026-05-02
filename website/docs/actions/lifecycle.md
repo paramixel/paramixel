@@ -35,6 +35,8 @@ Important behavior from the current implementation:
 
 That means data attached in `before` is usually read from `main` via `context.findContext(1)` or `context.findAttachment(1)`.
 
+When `main` is skipped (because `before` failed or skipped), each skipped action and its descendants receive their own child contexts, mirroring the action tree. Listener callbacks interleave the same way as normal execution: parent `beforeAction`, then children, then parent `afterAction`.
+
 ## Example
 
 Pattern used in `examples/test/lifecycle/FullLifecycleTest.java`:

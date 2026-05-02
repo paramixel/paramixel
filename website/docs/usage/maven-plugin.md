@@ -19,6 +19,13 @@ The Paramixel Maven plugin provides the `test` goal.
 - property: `paramixel.failIfNoTests`
 - default: `true`
 
+### `failureOnSkip`
+
+- property: `paramixel.failureOnSkip`
+- default: `false`
+
+When `true`, skipped tests cause the build to fail (equivalent to exit code `1`). When `false` (default), skipped tests are treated as successful (exit code `0`).
+
 ### `properties`
 
 Custom key/value pairs merged into Paramixel runtime configuration.
@@ -54,6 +61,7 @@ Custom key/value pairs merged into Paramixel runtime configuration.
 ```bash
 ./mvnw test -Dparamixel.skipTests=true
 ./mvnw test -Dparamixel.failIfNoTests=false
+./mvnw test -Dparamixel.failureOnSkip=true
 ./mvnw test -Dparamixel.parallelism=8
 ```
 
@@ -68,8 +76,10 @@ The plugin builds a test classloader from:
 It then calls:
 
 ```java
-Resolver.resolveActions(testClassLoader)
+Resolver.resolveActions(testClassLoader, configuration)
 ```
+
+The configuration map is passed to the resolver so that `paramixel.parallelism` controls both thread pool sizing (in `Runner`) and discovered action parallelism (in `Resolver`).
 
 That means discovered factories are combined with the resolver default, which is `Resolver.Composition.PARALLEL`.
 

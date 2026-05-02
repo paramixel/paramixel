@@ -93,7 +93,8 @@ public final class Context {
     private Context(
             Context parent, Map<String, String> configuration, Listener listener, ExecutorService executorService) {
         this.parent = parent;
-        this.configuration = configuration != null ? Map.copyOf(configuration) : Configuration.defaultProperties();
+        this.configuration =
+                configuration != null ? Map.copyOf(configuration) : Map.copyOf(Configuration.defaultProperties());
         this.listener = listener;
         this.executorService = executorService;
     }
@@ -117,7 +118,6 @@ public final class Context {
      * @throws NullPointerException if {@code listener} or {@code executorService} is {@code null}
      */
     public static Context of(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
-        Objects.requireNonNull(listener, "listener must not be null");
         Objects.requireNonNull(listener, "listener must not be null");
         Objects.requireNonNull(executorService, "executorService must not be null");
         return new Context(configuration, listener, executorService);
@@ -204,7 +204,8 @@ public final class Context {
      *
      * <p>Actions can invoke listener methods directly to trigger notifications at custom points.
      * The returned listener is typically wrapped in {@link org.paramixel.core.listener.SafeListener}
-     * to prevent listener exceptions from interrupting execution.</p>
+     * to prevent listener exceptions from interrupting execution. Note that {@link Error}
+     * subclasses are always rethrown, even by {@code SafeListener}.</p>
      *
      * <p>The listener is shared across all contexts in the same execution. All actions notify
      * the same listener instance.</p>
@@ -311,8 +312,9 @@ public final class Context {
      *   <li>Parent contexts cannot access child attachments</li>
      * </ul>
      *
-     * <p>Attachments support any type including {@code null}. When {@code null} is set,
-     * {@link #getAttachment()} will return an empty {@link Optional}.</p>
+     * <p>Passing {@code null} clears the attachment, making it equivalent to calling
+     * {@link #removeAttachment()}. After clearing, {@link #getAttachment()} will return
+     * an empty {@link Optional}.</p>
      *
      * <p>This method returns {@code this} context for method chaining, enabling fluent
      * attachment setup:</p>
@@ -327,7 +329,7 @@ public final class Context {
      * attachments concurrently from multiple threads.</p>
      *
      * @param <T> the attachment type
-     * @param attachment the attachment to set; may be {@code null}
+     * @param attachment the attachment to set; {@code null} clears the attachment
      * @return this context for method chaining
      * @see #getAttachment()
      * @see #findAttachment(int)
@@ -350,8 +352,9 @@ public final class Context {
      *   <li>{@link Attachment#to(Class)} - Casts to a specific type</li>
      * </ul>
      *
-     * <p>If no attachment is present, returns an empty {@link Optional}. This includes the
-     * case where {@code null} was set via {@link #setAttachment(Object)}.</p>
+     * <p>If no attachment is present — either because none was set or because it was
+     * cleared via {@link #setAttachment(Object) setAttachment(null)} or
+     * {@link #removeAttachment()} — returns an empty {@link Optional}.</p>
      *
      * <p><strong>Usage Example:</strong></p>
      * <pre>{@code
@@ -395,8 +398,9 @@ public final class Context {
      * }
      * }</pre>
      *
-     * <p>If no attachment is present, returns an empty {@link Optional}. This includes the
-     * case where {@code null} was set via {@link #setAttachment(Object)}.</p>
+     * <p>If no attachment is present — either because none was set or because it was
+     * cleared via {@link #setAttachment(Object) setAttachment(null)} or
+     * {@link #removeAttachment()} — returns an empty {@link Optional}.</p>
      *
      * @return an {@link Optional} containing the removed attachment wrapper, or empty if no attachment is present
      * @see #getAttachment()

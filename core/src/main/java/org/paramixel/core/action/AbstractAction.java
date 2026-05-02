@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
@@ -84,11 +85,11 @@ public abstract class AbstractAction implements Action {
 
     protected final String id;
     protected String name;
-    private volatile Action parent;
+    private final AtomicReference<Action> parent = new AtomicReference<>();
     protected volatile Result result = Result.staged();
 
     /**
-     * Creates a new abstract action with a generated unique identifier.
+     * Creates a new abstract action with a generated 4-character unique identifier.
      *
      * <p>Subclasses are responsible for assigning and validating {@link #name} before the
      * action becomes externally visible, typically from a factory method.</p>
@@ -151,7 +152,7 @@ public abstract class AbstractAction implements Action {
      */
     @Override
     public final Optional<Action> getParent() {
-        return Optional.ofNullable(parent);
+        return Optional.ofNullable(parent.get());
     }
 
     /**
@@ -197,8 +198,12 @@ public abstract class AbstractAction implements Action {
      * Assigns this action's parent exactly once.
      *
      * <p>This method prevents self-parenting and reassignment after a parent has already
-     * been established.</p>
+     * been established. Parent assignment is thread-safe; if multiple threads attempt to
+     * set the parent concurrently, exactly one will succeed and all others will receive
+     * an {@link IllegalStateException}.</p>
      *
+     * @apiNote This implementation uses atomic compare-and-set, so concurrent calls are
+     *          safe and will not silently overwrite an existing parent assignment.
      * @param parent the parent action to assign
      * @throws NullPointerException if {@code parent} is {@code null}
      * @throws IllegalArgumentException if {@code parent == this}
@@ -210,10 +215,9 @@ public abstract class AbstractAction implements Action {
         if (parent == this) {
             throw new IllegalArgumentException("action must not be its own parent");
         }
-        if (this.parent != null) {
+        if (!this.parent.compareAndSet(null, parent)) {
             throw new IllegalStateException("child already has a parent");
         }
-        this.parent = parent;
     }
 
     /**
@@ -229,7 +233,11 @@ public abstract class AbstractAction implements Action {
     /**
      * Skips this action without running it.
      *
-     * <p>The default implementation sets the result to SKIP and fires the appropriate listener callbacks.</p>
+     * <p>The default implementation fires {@code beforeAction}, sets the result to SKIP, and fires
+     * {@code afterAction} atomically. This is appropriate for leaf actions. Composite actions that
+     * need to skip descendants with interleaved listener callbacks (parent beforeAction, then
+     * children, then parent afterAction) should manage the skip lifecycle manually using
+     * {@link #setResult(Result)}.</p>
      *
      * @param context The execution context.
      */
@@ -240,6 +248,15 @@ public abstract class AbstractAction implements Action {
         context.getListener().beforeAction(context, this);
         this.result = Result.skip(Duration.ZERO);
         context.getListener().afterAction(context, this, this.result);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setResult(Result result) {
+        Objects.requireNonNull(result, "result must not be null");
+        this.result = result;
     }
 
     /**

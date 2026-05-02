@@ -27,6 +27,8 @@ import org.paramixel.core.support.AnsiColor;
 
 class TableSummaryRenderer implements SummaryRenderer {
 
+    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+
     private static final int STATUS_WIDTH = 6;
     private static final int ACTION_WIDTH = 30;
     private static final int TIME_WIDTH = 10;
@@ -50,8 +52,7 @@ class TableSummaryRenderer implements SummaryRenderer {
         long skipped = allActions.stream()
                 .filter(a -> a.getResult().getStatus().isSkip())
                 .count();
-        Duration totalTiming =
-                allActions.stream().map(a -> a.getResult().getElapsedTime()).reduce(Duration.ZERO, Duration::plus);
+        Duration totalTiming = action.getResult().getElapsedTime();
 
         System.out.println(PARAMIXEL);
         System.out.println(PARAMIXEL + "Summary:");
@@ -82,7 +83,7 @@ class TableSummaryRenderer implements SummaryRenderer {
     }
 
     private void collectAllActions(Action action, List<Action> actions) {
-        if (action.getName() != Action.HIDDEN) {
+        if (!HIDDEN_ROOT.equals(action.getName())) {
             actions.add(action);
         }
         for (Action child : action.getChildren()) {
