@@ -18,10 +18,15 @@ package org.paramixel.core.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
+import org.paramixel.core.Context;
+import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.SkipException;
@@ -277,5 +282,157 @@ class LifecycleTest {
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(afterRan).isTrue();
+    }
+
+    @Test
+    @DisplayName("skipped main receives child context with proper parent hierarchy")
+    void skippedMainReceivesChildContextWithProperParentHierarchy() {
+        var mainContext = new AtomicReference<Context>();
+
+        Listener capturingListener = new Listener() {
+            @Override
+            public void beforeAction(Context context, Action action) {
+                if (action.getName().equals("main")) {
+                    mainContext.set(context);
+                }
+            }
+        };
+
+        Action main = Noop.of("main");
+        Lifecycle lifecycle = Lifecycle.of(
+                "lifecycle",
+                Direct.of("before", context -> {
+                    throw new RuntimeException("before failed");
+                }),
+                main,
+                Noop.of("after"));
+
+        Runner runner = Runner.builder().listener(capturingListener).build();
+        runner.run(lifecycle);
+
+        assertThat(main.getResult().getStatus().isSkip()).isTrue();
+        assertThat(mainContext.get()).isNotNull();
+        assertThat(mainContext.get().getParent()).isPresent();
+    }
+
+    @Test
+    @DisplayName("skipped descendants receive child contexts mirroring action tree")
+    void skippedDescendantsReceiveChildContextsMirroringActionTree() {
+        var nestedContext = new AtomicReference<Context>();
+        var grandchildContext = new AtomicReference<Context>();
+
+        Listener capturingListener = new Listener() {
+            @Override
+            public void beforeAction(Context context, Action action) {
+                if (action.getName().equals("nested")) {
+                    nestedContext.set(context);
+                } else if (action.getName().equals("grandchild")) {
+                    grandchildContext.set(context);
+                }
+            }
+        };
+
+        Action grandchild = Noop.of("grandchild");
+        Action nestedMain = Lifecycle.of("nested", Noop.of("nested-before"), grandchild, Noop.of("nested-after"));
+
+        Lifecycle lifecycle = Lifecycle.of(
+                "lifecycle",
+                Direct.of("before", context -> {
+                    throw new RuntimeException("before failed");
+                }),
+                nestedMain,
+                Noop.of("after"));
+
+        Runner runner = Runner.builder().listener(capturingListener).build();
+        runner.run(lifecycle);
+
+        assertThat(nestedMain.getResult().getStatus().isSkip()).isTrue();
+        assertThat(nestedContext.get()).isNotNull();
+        assertThat(grandchildContext.get()).isNotNull();
+        assertThat(grandchildContext.get().getParent()).contains(nestedContext.get());
+    }
+
+    @Test
+    @DisplayName("skip listener callbacks interleave parent before children then parent after")
+    void skipListenerCallbacksInterleaveCorrectly() {
+        List<String> callbackOrder = new ArrayList<>();
+
+        Listener trackingListener = new Listener() {
+            @Override
+            public void beforeAction(Context context, Action action) {
+                callbackOrder.add("before:" + action.getName());
+            }
+
+            @Override
+            public void afterAction(Context context, Action action, Result result) {
+                callbackOrder.add("after:" + action.getName());
+            }
+        };
+
+        Action grandchild = Noop.of("grandchild");
+        Action nestedMain = Lifecycle.of("nested", Noop.of("nested-before"), grandchild, Noop.of("nested-after"));
+
+        Lifecycle lifecycle = Lifecycle.of(
+                "lifecycle",
+                Direct.of("before", context -> {
+                    throw new RuntimeException("before failed");
+                }),
+                nestedMain,
+                Noop.of("after"));
+
+        Runner runner = Runner.builder().listener(trackingListener).build();
+        runner.run(lifecycle);
+
+        int nestedBeforeIdx = callbackOrder.indexOf("before:nested");
+        int grandchildBeforeIdx = callbackOrder.indexOf("before:grandchild");
+        int grandchildAfterIdx = callbackOrder.indexOf("after:grandchild");
+        int nestedAfterIdx = callbackOrder.indexOf("after:nested");
+
+        assertThat(nestedBeforeIdx).isGreaterThan(-1);
+        assertThat(grandchildBeforeIdx).isGreaterThan(-1);
+        assertThat(grandchildAfterIdx).isGreaterThan(-1);
+        assertThat(nestedAfterIdx).isGreaterThan(-1);
+
+        assertThat(nestedBeforeIdx).isLessThan(grandchildBeforeIdx);
+        assertThat(grandchildAfterIdx).isLessThan(nestedAfterIdx);
+    }
+
+    @Test
+    @DisplayName("skipped descendants can access parent attachment via findAttachment")
+    void skippedDescendantsCanAccessParentAttachmentViaFindAttachment() {
+        var grandchildFoundAttachment = new AtomicBoolean();
+
+        Listener capturingListener = new Listener() {
+            @Override
+            public void beforeAction(Context context, Action action) {
+                if (action.getName().equals("grandchild")) {
+                    context.findAttachment(2).ifPresent(a -> grandchildFoundAttachment.set(true));
+                }
+            }
+        };
+
+        Action grandchild = Noop.of("grandchild");
+        Action nestedMain = Lifecycle.of(
+                "nested",
+                Direct.of("nested-before", context -> {
+                    context.setAttachment(new TestData("nested-data"));
+                }),
+                grandchild,
+                Noop.of("nested-after"));
+
+        Lifecycle lifecycle = Lifecycle.of(
+                "lifecycle",
+                Direct.of("before", context -> {
+                    context.setAttachment(new TestData("lifecycle-data"));
+                    throw new RuntimeException("before failed");
+                }),
+                nestedMain,
+                Noop.of("after"));
+
+        Runner runner = Runner.builder().listener(capturingListener).build();
+        runner.run(lifecycle);
+
+        assertThat(nestedMain.getResult().getStatus().isSkip()).isTrue();
+        assertThat(grandchildFoundAttachment).isTrue();
     }
 }

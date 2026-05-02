@@ -26,6 +26,8 @@ import org.paramixel.core.support.AnsiColor;
 
 class TreeSummaryRenderer implements SummaryRenderer {
 
+    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+
     private static final String PARAMIXEL = Listeners.PARAMIXEL;
 
     /**
@@ -36,7 +38,7 @@ class TreeSummaryRenderer implements SummaryRenderer {
     @Override
     public void renderSummary(Runner runner, Action action) {
         List<Action> topActions;
-        if (action.getName() == Action.HIDDEN) {
+        if (HIDDEN_ROOT.equals(action.getName())) {
             topActions = action.getChildren();
         } else {
             topActions = List.of(action);

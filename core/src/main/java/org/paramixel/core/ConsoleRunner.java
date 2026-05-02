@@ -16,6 +16,7 @@
 
 package org.paramixel.core;
 
+import java.util.Map;
 import java.util.Optional;
 import org.paramixel.core.discovery.Resolver;
 import org.paramixel.core.discovery.Selector;
@@ -26,8 +27,14 @@ import org.paramixel.core.discovery.Selector;
  * <p>ConsoleRunner provides convenience methods for resolving actions from a {@link Selector},
  * running actions directly, converting outcomes to process exit codes, and terminating the JVM.</p>
  *
+ * <p>By default, both PASS and SKIP results produce exit code {@code 0}, while FAIL produces
+ * exit code {@code 1}. This behavior can be changed by setting {@link Configuration#FAILURE_ON_SKIP}
+ * to {@code "true"} in the configuration passed to the overloaded methods, which causes SKIP
+ * to produce exit code {@code 1} as well.</p>
+ *
  * @see Selector
  * @see Runner
+ * @see Configuration#FAILURE_ON_SKIP
  * @see ConsoleRunner#run(Selector)
  * @see ConsoleRunner#runAndExit(Selector)
  */
@@ -54,15 +61,39 @@ public final class ConsoleRunner {
     /**
      * Resolves an action from the supplied selector, executes it, and returns a process exit code.
      *
-     * <p>Returns {@code 0} when no action is resolved or when the resolved action passes. Returns
-     * {@code 1} for all other resolved outcomes.</p>
+     * <p>Returns {@code 0} when no action is resolved, when the resolved action passes, or when the
+     * resolved action is skipped. Returns {@code 1} when the resolved action fails.</p>
+     *
+     * <p>SKIP results produce exit code {@code 0} by default. To treat SKIP as a failure (exit code
+     * {@code 1}), use {@link #runAndReturnExitCode(Selector, Map)} with
+     * {@link Configuration#FAILURE_ON_SKIP} set to {@code "true"}.</p>
      *
      * @param selector the selector used to resolve an action
      * @return the process exit code for the resolved execution result
      */
     public static int runAndReturnExitCode(Selector selector) {
+        return runAndReturnExitCode(selector, Configuration.defaultProperties());
+    }
+
+    /**
+     * Resolves an action from the supplied selector, executes it, and returns a process exit code
+     * using the provided configuration.
+     *
+     * <p>Returns {@code 0} when no action is resolved, when the resolved action passes, or when the
+     * resolved action is skipped and {@link Configuration#FAILURE_ON_SKIP} is not {@code "true"}.
+     * Returns {@code 1} when the resolved action fails, or when the resolved action is skipped and
+     * {@link Configuration#FAILURE_ON_SKIP} is {@code "true"}.</p>
+     *
+     * @param selector the selector used to resolve an action
+     * @param configuration the configuration controlling exit code behavior
+     * @return the process exit code for the resolved execution result
+     */
+    public static int runAndReturnExitCode(Selector selector, Map<String, String> configuration) {
         Optional<Result> result = run(selector);
-        return result.filter(value -> !value.getStatus().isPass())
+        boolean failureOnSkip =
+                Boolean.parseBoolean(configuration.getOrDefault(Configuration.FAILURE_ON_SKIP, "false"));
+        return result.filter(value ->
+                        !value.getStatus().isPass() && !(value.getStatus().isSkip() && !failureOnSkip))
                 .map(value -> 1)
                 .orElse(0);
     }
@@ -72,9 +103,25 @@ public final class ConsoleRunner {
      * corresponding process exit code.
      *
      * @param selector the selector used to resolve an action
+     * @see #runAndReturnExitCode(Selector)
      */
     public static void runAndExit(Selector selector) {
-        System.exit(runAndReturnExitCode(selector));
+        System.exit(runAndReturnExitCode(selector, Configuration.defaultProperties()));
+    }
+
+    /**
+     * Resolves an action from the supplied selector, executes it, and exits the JVM with the
+     * corresponding process exit code using the provided configuration.
+     *
+     * <p>Exit code rules follow {@link #runAndReturnExitCode(Selector, Map)}.</p>
+     *
+     * @param selector the selector used to resolve an action
+     * @param configuration the configuration controlling exit code behavior
+     * @see #runAndReturnExitCode(Selector, Map)
+     * @see Configuration#FAILURE_ON_SKIP
+     */
+    public static void runAndExit(Selector selector, Map<String, String> configuration) {
+        System.exit(runAndReturnExitCode(selector, configuration));
     }
 
     /**
@@ -91,23 +138,69 @@ public final class ConsoleRunner {
     /**
      * Executes the supplied action and returns a process exit code.
      *
-     * <p>Returns {@code 0} when the action passes or is skipped. Returns {@code 1} for all other
-     * outcomes.</p>
+     * <p>Returns {@code 0} when the action passes or is skipped. Returns {@code 1} when the action
+     * fails.</p>
+     *
+     * <p>SKIP results produce exit code {@code 0} by default. To treat SKIP as a failure (exit code
+     * {@code 1}), use {@link #runAndReturnExitCode(Action, Map)} with
+     * {@link Configuration#FAILURE_ON_SKIP} set to {@code "true"}.</p>
      *
      * @param action the action to execute
      * @return the process exit code for the action result
      */
     public static int runAndReturnExitCode(Action action) {
+        return runAndReturnExitCode(action, Configuration.defaultProperties());
+    }
+
+    /**
+     * Executes the supplied action and returns a process exit code using the provided configuration.
+     *
+     * <p>Returns {@code 0} when the action passes, or when the action is skipped and
+     * {@link Configuration#FAILURE_ON_SKIP} is not {@code "true"}. Returns {@code 1} when the action
+     * fails, or when the action is skipped and {@link Configuration#FAILURE_ON_SKIP} is
+     * {@code "true"}.</p>
+     *
+     * @param action the action to execute
+     * @param configuration the configuration controlling exit code behavior
+     * @return the process exit code for the action result
+     */
+    public static int runAndReturnExitCode(Action action, Map<String, String> configuration) {
         Result result = run(action);
-        return result.getStatus().isPass() || result.getStatus().isSkip() ? 0 : 1;
+        boolean failureOnSkip =
+                Boolean.parseBoolean(configuration.getOrDefault(Configuration.FAILURE_ON_SKIP, "false"));
+        if (result.getStatus().isPass()) {
+            return 0;
+        }
+        if (result.getStatus().isSkip() && !failureOnSkip) {
+            return 0;
+        }
+        return 1;
     }
 
     /**
      * Executes the supplied action and exits the JVM with the corresponding process exit code.
      *
+     * <p>Exit code rules follow {@link #runAndReturnExitCode(Action)}.</p>
+     *
      * @param action the action to execute
+     * @see #runAndReturnExitCode(Action)
      */
     public static void runAndExit(Action action) {
         System.exit(runAndReturnExitCode(action));
+    }
+
+    /**
+     * Executes the supplied action and exits the JVM with the corresponding process exit code
+     * using the provided configuration.
+     *
+     * <p>Exit code rules follow {@link #runAndReturnExitCode(Action, Map)}.</p>
+     *
+     * @param action the action to execute
+     * @param configuration the configuration controlling exit code behavior
+     * @see #runAndReturnExitCode(Action, Map)
+     * @see Configuration#FAILURE_ON_SKIP
+     */
+    public static void runAndExit(Action action, Map<String, String> configuration) {
+        System.exit(runAndReturnExitCode(action, configuration));
     }
 }

@@ -14,16 +14,9 @@ This page is a compact map of the current public API.
 ```java
 String getId()
 String getName()
-Optional<Action> getParent()
-void setParent(Action parent)
-List<Action> getChildren()
-void addChild(Action child)
-void execute(Context context)
-void skip(Context context)
-Result getResult()
 ```
 
-### `Runner`
+`getId()` returns a randomly generated 4-character string (a–z, A–Z) that uniquely identifies the action instance.
 
 ```java
 static Runner.Builder builder()
@@ -41,17 +34,23 @@ Builder executorService(ExecutorService executorService)
 Runner build()
 ```
 
-`Runner.run(action)` returns `void`. Read the result from `action.getResult()`.
+`Runner.run(action)` returns `void`. Results are read from `action.getResult()`.
+
+A `Runner` can be reused — calling `run()` multiple times is safe and each call is independent. Owned executor services (the runner and parallel pools) are created and shut down per invocation. External executors supplied via `executorService(...)` are not managed by the runner.
 
 ### `ConsoleRunner`
 
 ```java
 static Optional<Result> run(Selector selector)
 static int runAndReturnExitCode(Selector selector)
+static int runAndReturnExitCode(Selector selector, Map<String, String> configuration)
 static void runAndExit(Selector selector)
+static void runAndExit(Selector selector, Map<String, String> configuration)
 static Result run(Action action)
 static int runAndReturnExitCode(Action action)
+static int runAndReturnExitCode(Action action, Map<String, String> configuration)
 static void runAndExit(Action action)
+static void runAndExit(Action action, Map<String, String> configuration)
 ```
 
 ### `Context`
@@ -114,7 +113,7 @@ Class<?> getType()
 <T> Optional<T> to(Class<T> type)
 ```
 
-`Attachment.getType()` returns `Object.class` when the wrapped value is `null`.
+`Attachment.getType()` returns `Object.class` when the wrapped value is `null`. Calling `setAttachment(null)` clears the attachment; `getAttachment()` will return `Optional.empty()`.
 
 ### `Listener`
 
@@ -153,6 +152,8 @@ Optional<Action> resolveActions(ClassLoader classLoader, Predicate<String> packa
 Optional<Action> resolveActions(Selector selector)
 Optional<Action> resolveActions(Selector selector, Resolver.Composition composition)
 Optional<Action> resolveActionsFromClass(Class<?> clazz)
+
+`resolveActionsFromClass` walks the full superclass chain and throws `ResolverException` if more than one `@Paramixel.ActionFactory` method is found in the hierarchy.
 ```
 
 `Resolver.Composition` values:

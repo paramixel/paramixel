@@ -16,6 +16,7 @@
 
 package org.paramixel.core.action;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -200,9 +201,10 @@ import org.paramixel.core.support.Arguments;
  * </ul>
  *
  * <h3>Thread Safety</h3>
- * <p>Lifecycle is thread-safe for parallel execution. Each phase execution receives
- * its own child context. The shared context between before and after phases is
- * isolated per execution.</p>
+ * <p>Lifecycle action instances carry mutable state and are not designed for concurrent
+ * re-execution. Use separate instances for separate executions. Each phase execution
+ * receives its own child context. The shared context between before and after phases
+ * is isolated per execution.</p>
  *
  * @see Sequential
  * @see Direct
@@ -335,7 +337,8 @@ public class Lifecycle extends AbstractAction {
      * </ul>
      *
      * <p><strong>Thread Safety:</strong></p>
-     * <p>This method is thread-safe and can be called concurrently from multiple threads.</p>
+     * <p>Each Lifecycle instance should be executed at most once. Use separate instances
+     * for parallel or repeated execution.</p>
      *
      * @param context the execution context; must not be {@code null}
      * @throws NullPointerException if {@code context} is {@code null}
@@ -387,18 +390,26 @@ public class Lifecycle extends AbstractAction {
     }
 
     /**
-     * Recursively skips an action and all its descendants.
+     * Recursively skips an action and all its descendants with interleaved listener callbacks
+     * and proper context hierarchy.
      *
-     * <p>This method is used when the before phase fails or skips, ensuring that
-     * the main phase and all its descendants are properly marked as skipped.</p>
+     * <p>For each action, this method fires {@code beforeAction}, skips all children (each in
+     * its own child context), then fires {@code afterAction}. This mirrors the listener callback
+     * order of normal execution: parent beforeAction, then children, then parent afterAction.</p>
+     *
+     * <p>Each level of recursion creates a child context via {@link Context#createChild()},
+     * so the context tree mirrors the action tree during skip just as it does during execution.</p>
      *
      * @param action the action to skip (along with descendants)
-     * @param context the execution context
+     * @param context the execution context for this action
      */
     private static void skipWithDescendants(Action action, Context context) {
+        action.setResult(Result.staged());
+        context.getListener().beforeAction(context, action);
         for (Action child : action.getChildren()) {
-            skipWithDescendants(child, context);
+            skipWithDescendants(child, context.createChild());
         }
-        action.skip(context);
+        action.setResult(Result.skip(Duration.ZERO));
+        context.getListener().afterAction(context, action, action.getResult());
     }
 }

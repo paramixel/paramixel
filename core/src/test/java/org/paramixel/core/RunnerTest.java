@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
@@ -792,6 +793,88 @@ class RunnerTest {
             Runner.builder().build().run(action);
 
             assertThat(action.getResult().getStatus().isPass()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("Runner reusability")
+    class Reusability {
+
+        @Test
+        @DisplayName("run() can be called multiple times on the same Runner instance")
+        void runCanBeCalledMultipleTimes() {
+            Runner runner = Runner.builder().build();
+
+            Action first = Direct.of("first", context -> {});
+            runner.run(first);
+
+            Action second = Direct.of("second", context -> {});
+            runner.run(second);
+
+            assertThat(first.getResult().getStatus().isPass()).isTrue();
+            assertThat(second.getResult().getStatus().isPass()).isTrue();
+        }
+
+        @Test
+        @DisplayName("each run() uses fresh executor services")
+        void eachRunUsesFreshExecutors() {
+            Runner runner = Runner.builder().build();
+
+            Action first = Direct.of("first", context -> {});
+            runner.run(first);
+
+            Action second =
+                    Parallel.of("second", Direct.of("child-1", context -> {}), Direct.of("child-2", context -> {}));
+            runner.run(second);
+
+            assertThat(first.getResult().getStatus().isPass()).isTrue();
+            assertThat(second.getResult().getStatus().isPass()).isTrue();
+        }
+
+        @Test
+        @DisplayName("external executor service is not shut down by run() and survives multiple runs")
+        void externalExecutorServiceNotShutDownByRun() {
+            ExecutorService external = Executors.newFixedThreadPool(2);
+            try {
+                Runner runner = Runner.builder().executorService(external).build();
+
+                Action first = Direct.of("first", context -> {});
+                runner.run(first);
+
+                Action second = Direct.of("second", context -> {});
+                runner.run(second);
+
+                assertThat(external.isShutdown()).isFalse();
+                assertThat(first.getResult().getStatus().isPass()).isTrue();
+                assertThat(second.getResult().getStatus().isPass()).isTrue();
+            } finally {
+                external.shutdown();
+            }
+        }
+
+        @Test
+        @DisplayName("concurrent run() calls on the same Runner are independent")
+        @Timeout(value = 10, unit = TimeUnit.SECONDS)
+        void concurrentRunsAreIndependent() throws Exception {
+            Runner runner = Runner.builder().build();
+            AtomicInteger counter = new AtomicInteger();
+
+            ExecutorService testPool = Executors.newFixedThreadPool(2);
+            try {
+                Future<?> f1 = testPool.submit(() -> {
+                    Action action = Direct.of("concurrent-1", context -> counter.incrementAndGet());
+                    runner.run(action);
+                });
+                Future<?> f2 = testPool.submit(() -> {
+                    Action action = Direct.of("concurrent-2", context -> counter.incrementAndGet());
+                    runner.run(action);
+                });
+                f1.get();
+                f2.get();
+                assertThat(counter).hasValue(2);
+            } finally {
+                testPool.shutdown();
+            }
         }
     }
 }

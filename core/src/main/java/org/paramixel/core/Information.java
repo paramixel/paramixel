@@ -29,6 +29,13 @@ import java.util.Properties;
  *
  * <p>The class is intended for informational use such as diagnostic logging, banners,
  * or tooling that needs to report the active Paramixel version at runtime.</p>
+ *
+ * <h3>Class-loader resolution</h3>
+ * <p>Resources are loaded using the thread context class loader first. If the context
+ * class loader is unavailable ({@code null}) or cannot find the resource, the defining
+ * class loader ({@code Information.class.getClassLoader()}) is tried as a fallback.
+ * This ensures reliable resource loading in containers, plugins, and test runners that
+ * set a restricted or different context class loader.</p>
  */
 public final class Information {
 
@@ -46,6 +53,10 @@ public final class Information {
      * <p>The returned value is cached during class initialization, so repeated calls do
      * not re-read the classpath resource.</p>
      *
+     * <p>The version is resolved using the thread context class loader first. If the
+     * context class loader is unavailable or cannot locate the resource, the defining
+     * class loader is used as a fallback.</p>
+     *
      * @return the Paramixel version string; never {@code null} or blank
      * @throws IllegalStateException if the version metadata resource is missing or invalid
      */
@@ -54,8 +65,7 @@ public final class Information {
     }
 
     private static String loadVersion() {
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        InputStream inputStream = classLoader.getResourceAsStream(RESOURCE_NAME);
+        InputStream inputStream = getResourceAsStream(RESOURCE_NAME);
         if (inputStream == null) {
             throw new IllegalStateException("missing classpath resource: " + RESOURCE_NAME);
         }
@@ -70,5 +80,20 @@ public final class Information {
             throw new IllegalStateException("missing property: " + VERSION_PROPERTY);
         }
         return version;
+    }
+
+    static InputStream getResourceAsStream(String name) {
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        if (contextClassLoader != null) {
+            InputStream stream = contextClassLoader.getResourceAsStream(name);
+            if (stream != null) {
+                return stream;
+            }
+        }
+        ClassLoader definingClassLoader = Information.class.getClassLoader();
+        if (definingClassLoader != null) {
+            return definingClassLoader.getResourceAsStream(name);
+        }
+        return ClassLoader.getSystemResourceAsStream(name);
     }
 }

@@ -34,7 +34,7 @@ Contexts form a parent/child chain that mirrors nested execution.
 
 ## Attachments
 
-Each context can hold one attachment.
+Each context can hold one attachment. Setting `null` clears the attachment.
 
 ```java
 context.setAttachment(new TestAttachment("value"));
@@ -56,7 +56,7 @@ TestAttachment attachment = context.findAttachment(1)
         .orElseThrow();
 ```
 
-`findAttachment(level)` returns `Optional.empty()` only when the target ancestor exists but has no attachment. It also throws the same ancestor-navigation exceptions as `findContext(level)`.
+`findAttachment(level)` returns `Optional.empty()` when the target ancestor exists but has no attachment (never set, or cleared via `setAttachment(null)` or `removeAttachment()`). It also throws the same ancestor-navigation exceptions as `findContext(level)`.
 
 ## Example pattern
 

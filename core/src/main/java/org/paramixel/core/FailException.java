@@ -16,6 +16,7 @@
 
 package org.paramixel.core;
 
+import java.util.Objects;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -240,12 +241,15 @@ public final class FailException extends RuntimeException {
      *   <li>"User 'john.doe' lacks required permission: ADMIN"</li>
      * </ul>
      *
-     * @param message the detail message explaining why the action failed; may be {@code null},
-     *                but a descriptive message is strongly recommended
+     * @param message the detail message explaining why the action failed; must not be
+     *                {@code null} or blank
+     * @throws NullPointerException if {@code message} is null
+     * @throws IllegalArgumentException if {@code message} is blank
      * @throws FailException always thrown with the specified message
      * @see #fail()
      */
     public static void fail(final String message) {
-        throw new FailException(message);
+        throw new FailException(Arguments.requireNonBlank(
+                Objects.requireNonNull(message, "message must not be null"), "message must not be blank"));
     }
 }

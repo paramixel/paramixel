@@ -33,6 +33,42 @@ class InformationTest {
         assertThat(version).isEqualTo(loadVersionFromResource());
     }
 
+    @Test
+    void shouldFindResourceWithNullContextClassLoader() {
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(null);
+            InputStream stream = Information.getResourceAsStream("information.properties");
+            assertThat(stream).isNotNull();
+        } finally {
+            Thread.currentThread().setContextClassLoader(original);
+        }
+    }
+
+    @Test
+    void shouldFallBackToDefiningClassLoaderWhenContextClassLoaderCannotFindResource() {
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(new ClassLoader(null) {});
+            InputStream stream = Information.getResourceAsStream("information.properties");
+            assertThat(stream).isNotNull();
+        } finally {
+            Thread.currentThread().setContextClassLoader(original);
+        }
+    }
+
+    @Test
+    void shouldLoadVersionWhenContextClassLoaderIsNull() {
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(null);
+            String version = Information.getVersion();
+            assertThat(version).isNotBlank();
+        } finally {
+            Thread.currentThread().setContextClassLoader(original);
+        }
+    }
+
     private static String loadVersionFromResource() throws IOException {
         InputStream inputStream =
                 Thread.currentThread().getContextClassLoader().getResourceAsStream("information.properties");
@@ -42,5 +78,26 @@ class InformationTest {
             properties.load(inputStream);
         }
         return properties.getProperty("version");
+    }
+
+    @Test
+    void shouldReturnConsistentVersionAcrossCalls() {
+        String first = Information.getVersion();
+        String second = Information.getVersion();
+        assertThat(first).isSameAs(second);
+        assertThat(first).isNotBlank();
+    }
+
+    @Test
+    void shouldReturnNonNullNonBlankVersion() {
+        String version = Information.getVersion();
+        assertThat(version).isNotNull();
+        assertThat(version).isNotBlank();
+    }
+
+    @Test
+    void shouldReturnNullStreamForNonexistentResource() {
+        InputStream stream = Information.getResourceAsStream("nonexistent.resource.that.does.not.exist");
+        assertThat(stream).isNull();
     }
 }

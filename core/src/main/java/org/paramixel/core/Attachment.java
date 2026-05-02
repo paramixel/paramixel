@@ -59,11 +59,11 @@ import java.util.Optional;
  * }</pre>
  *
  * <h3>Null Handling</h3>
- * <p>Attachments can be null. When null is set:
+ * <p>Null values are not stored as attachments. When null is involved:
  * <ul>
- *   <li>{@code ctx.setAttachment(null)} is valid</li>
- *   <li>{@code ctx.getAttachment()} returns empty Optional</li>
- *   <li>Null values are treated as "no attachment"</li>
+ *   <li>{@code ctx.setAttachment(null)} clears the attachment, equivalent to {@link Context#removeAttachment()}</li>
+ *   <li>{@code ctx.getAttachment()} returns empty {@code Optional} when no attachment is present</li>
+ *   <li>Null is not a distinguishable stored value — "never set" and "cleared" are identical states</li>
  * </ul>
  *
  * <h3>Usage Examples</h3>
@@ -157,7 +157,7 @@ public final class Attachment {
      *
      * <p><strong>Null Handling:</strong></p>
      * <ul>
-     *   <li>If the attachment value is {@code null}, returns {@code null}</li>
+     *   <li>If the attachment value is {@code null}, returns {@link Object#getClass() Object.class}</li>
      *   <li>Otherwise returns the value's {@link Object#getClass()}</li>
      * </ul>
      *
@@ -209,7 +209,7 @@ public final class Attachment {
      *
      * <p><strong>Casting Behavior:</strong></p>
      * <ul>
-     *   <li>If attachment value is {@code null} → returns empty Optional</li>
+     *   <li>If attachment value is {@code null} → returns empty Optional (defensive; not reachable via {@link Context} APIs)</li>
      *   <li>If attachment value is instance of requested type → returns Optional with value</li>
      *   <li>If attachment value is not instance of requested type → throws ClassCastException</li>
      * </ul>
@@ -290,7 +290,7 @@ public final class Attachment {
      * @param <T> the requested type
      * @param type the class token for the requested type; must not be {@code null}
      * @return an {@link Optional} containing the attachment if present and matches the requested type,
-     *         or empty if the attachment is null or the type doesn't match
+     *         or empty if the type doesn't match
      * @throws NullPointerException if {@code type} is {@code null}
      * @throws ClassCastException if the attachment is present but cannot be cast to the requested type
      * @see #getType()

@@ -27,15 +27,19 @@ import org.paramixel.core.Runner;
  * A {@link Listener} decorator that provides fault-tolerance by wrapping another listener
  * and guarding all callback invocations with {@code try/catch} blocks.
  *
- * <p>This class ensures that exceptions thrown by the wrapped {@link Listener} do not
- * interrupt or break the execution flow of the {@link Runner}. Any {@link Throwable}
- * raised during a callback is:</p>
+ * <p>This class ensures that non-fatal exceptions thrown by the wrapped {@link Listener}
+ * do not interrupt or break the execution flow of the {@link Runner}. Any non-fatal
+ * {@link Throwable} (i.e., not an {@link Error}) raised during a callback is:</p>
  *
  * <ul>
  *   <li>Caught and suppressed</li>
  *   <li>Logged to {@code System.err}</li>
  *   <li>Followed by continuation of execution</li>
  * </ul>
+ *
+ * <p>{@link Error} subclasses (such as {@link OutOfMemoryError}, {@link StackOverflowError},
+ * or {@link ThreadDeath}) are <strong>not caught</strong> and propagate immediately, since
+ * they represent serious JVM-level failures that should not be silently suppressed.</p>
  *
  * <p>This is particularly useful in environments where listeners are optional,
  * user-provided, or non-critical, and should not compromise the stability of
@@ -81,15 +85,19 @@ public class SafeListener implements Listener {
     /**
      * Invoked when a run is starting.
      *
-     * <p>Any exception thrown by the delegate is caught and logged.</p>
+     * <p>Any non-fatal exception thrown by the delegate is caught and logged.
+     * {@link Error} subclasses are rethrown immediately.</p>
      *
      * @param runner the runner managing execution
      * @param action the root action being executed
+     * @throws Error if the delegate throws an {@link Error}
      */
     @Override
     public void runStarted(Runner runner, Action action) {
         try {
             delegate.runStarted(runner, action);
+        } catch (Error e) {
+            throw e;
         } catch (Throwable t) {
             log("runStarted", t);
         }
@@ -98,15 +106,19 @@ public class SafeListener implements Listener {
     /**
      * Invoked before an individual action is executed.
      *
-     * <p>Any exception thrown by the delegate is caught and logged.</p>
+     * <p>Any non-fatal exception thrown by the delegate is caught and logged.
+     * {@link Error} subclasses are rethrown immediately.</p>
      *
      * @param context the current execution context
      * @param action  the action about to be executed
+     * @throws Error if the delegate throws an {@link Error}
      */
     @Override
     public void beforeAction(Context context, Action action) {
         try {
             delegate.beforeAction(context, action);
+        } catch (Error e) {
+            throw e;
         } catch (Throwable t) {
             log("beforeAction", t);
         }
@@ -115,17 +127,20 @@ public class SafeListener implements Listener {
     /**
      * Invoked when an action throws an exception.
      *
-     * <p>Any exception thrown by the delegate while handling the original
-     * throwable is also caught and logged.</p>
+     * <p>Any non-fatal exception thrown by the delegate while handling the original
+     * throwable is also caught and logged. {@link Error} subclasses are rethrown immediately.</p>
      *
      * @param context   the current execution context
      * @param action    the action that failed
      * @param throwable the exception thrown by the action
+     * @throws Error if the delegate throws an {@link Error}
      */
     @Override
     public void actionThrowable(Context context, Action action, Throwable throwable) {
         try {
             delegate.actionThrowable(context, action, throwable);
+        } catch (Error e) {
+            throw e;
         } catch (Throwable t) {
             log("actionThrowable", t);
         }
@@ -134,16 +149,20 @@ public class SafeListener implements Listener {
     /**
      * Invoked after an individual action has completed successfully.
      *
-     * <p>Any exception thrown by the delegate is caught and logged.</p>
+     * <p>Any non-fatal exception thrown by the delegate is caught and logged.
+     * {@link Error} subclasses are rethrown immediately.</p>
      *
      * @param context the current execution context
      * @param action  the action that was executed
      * @param result  the result produced by the action
+     * @throws Error if the delegate throws an {@link Error}
      */
     @Override
     public void afterAction(Context context, Action action, Result result) {
         try {
             delegate.afterAction(context, action, result);
+        } catch (Error e) {
+            throw e;
         } catch (Throwable t) {
             log("afterAction", t);
         }
@@ -152,15 +171,19 @@ public class SafeListener implements Listener {
     /**
      * Invoked when a run has completed.
      *
-     * <p>Any exception thrown by the delegate is caught and logged.</p>
+     * <p>Any non-fatal exception thrown by the delegate is caught and logged.
+     * {@link Error} subclasses are rethrown immediately.</p>
      *
      * @param runner the runner managing execution
      * @param action the root action that was executed
+     * @throws Error if the delegate throws an {@link Error}
      */
     @Override
     public void runCompleted(Runner runner, Action action) {
         try {
             delegate.runCompleted(runner, action);
+        } catch (Error e) {
+            throw e;
         } catch (Throwable t) {
             log("runCompleted", t);
         }

@@ -130,9 +130,10 @@ import org.paramixel.core.support.Arguments;
  * </ul>
  *
  * <h3>Thread Safety</h3>
- * <p>RandomSequential is thread-safe for parallel execution. The Random instance
- * is created per execution and is not shared. Each child action executes in its
- * own child context.</p>
+ * <p>RandomSequential action instances carry mutable state and are not designed for
+ * concurrent re-execution. Use separate instances for separate executions. The
+ * {@link java.util.Random} instance is created per execution and is not shared.
+ * Each child action executes in its own child context.</p>
  *
  * <h3>Performance</h3>
  * <ul>
@@ -351,8 +352,9 @@ public class RandomSequential extends AbstractAction {
      * </ul>
      *
      * <p><strong>Thread Safety:</strong></p>
-     * <p>This method is thread-safe. The Random instance is created per execution
-     * and is not shared across threads.</p>
+     * <p>Each RandomSequential instance should be executed at most once. Use separate
+     * instances for parallel or repeated execution. The Random instance is created per
+     * execution and is not shared across threads.</p>
      *
      * @param context the execution context; must not be {@code null}
      * @throws NullPointerException if {@code context} is {@code null}

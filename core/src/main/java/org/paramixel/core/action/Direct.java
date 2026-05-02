@@ -37,12 +37,13 @@ import org.paramixel.core.support.Arguments;
  *   <li>Has no child actions (leaf action)</li>
  *   <li>Captures and handles exceptions appropriately</li>
  *   <li>Supports lambda expressions and method references</li>
- *   <li>Thread-safe for parallel execution</li>
+ *   <li>Not designed for concurrent re-execution (use separate instances)</li>
  * </ul>
  *
  * <h3>Exception Handling</h3>
  * <p>Direct handles exceptions thrown by the executable block:</p>
  * <ul>
+ *   <li>{@link Error} - Propagated immediately (not caught)</li>
  *   <li>{@link SkipException} - Result is SKIP with exception message</li>
  *   <li>{@link FailException} - Result is FAIL with exception message</li>
  *   <li>Other exceptions - Result is FAIL, listener's actionThrowable callback is invoked</li>
@@ -128,9 +129,11 @@ import org.paramixel.core.support.Arguments;
  * </table>
  *
  * <h3>Thread Safety</h3>
- * <p>Direct actions are thread-safe when used with parallel execution. Each execution
- * receives its own {@link Context} instance. However, the executable block must be
- * thread-safe if it accesses shared state.</p>
+ * <p>Direct action instances carry mutable state (their result) and are not designed
+ * for concurrent re-execution. Use separate instances for separate executions. Each
+ * execution receives its own {@link Context} instance. The executable block must be
+ * safe if it accesses shared state, since parallel actions execute concurrently
+ * with their own contexts.</p>
  *
  * <h3>Performance</h3>
  * <p>Direct has minimal overhead:
@@ -216,6 +219,7 @@ public class Direct extends AbstractAction {
      *   <li>Invoke the executable block</li>
      *   <li>Handle any exceptions:</li>
      *     <ul>
+     *       <li>{@link Error} → propagated immediately (not caught)</li>
      *       <li>{@link SkipException} → result is SKIP</li>
      *       <li>{@link FailException} → result is FAIL</li>
      *       <li>Other exceptions → result is FAIL, call listener's actionThrowable callback</li>
@@ -226,17 +230,19 @@ public class Direct extends AbstractAction {
      *
      * <p><strong>Exception Behavior:</strong></p>
      * <ul>
-     *   <li>All exceptions are caught and converted to appropriate result status</li>
+     *   <li>Non-fatal exceptions are caught and converted to appropriate result status</li>
+     *   <li>{@link Error} subclasses propagate immediately and are not caught</li>
      *   <li>Only unexpected exceptions trigger listener's actionThrowable callback</li>
-     *   <li>Exceptions do not propagate to parent actions</li>
+     *   <li>Non-fatal exceptions do not propagate to parent actions</li>
      * </ul>
      *
      * <p><strong>Thread Safety:</strong></p>
-     * <p>This method is thread-safe and can be called concurrently from multiple threads.
-     * Each invocation receives its own context instance.</p>
+     * <p>Each action instance should be executed at most once. Use separate instances
+     * for parallel or repeated execution. Each invocation receives its own context instance.</p>
      *
      * @param context the execution context; must not be {@code null}
      * @throws NullPointerException if {@code context} is {@code null}
+     * @throws Error if the executable block throws an {@link Error}; it propagates immediately
      * @see Executable#execute(Context)
      * @see FailException
      * @see SkipException
@@ -254,6 +260,8 @@ public class Direct extends AbstractAction {
             this.result = Result.skip(durationSince(start), e.getMessage());
         } catch (FailException e) {
             this.result = Result.fail(durationSince(start), e.getMessage());
+        } catch (Error e) {
+            throw e;
         } catch (Throwable t) {
             context.getListener().actionThrowable(context, this, t);
             this.result = Result.fail(durationSince(start), t);
@@ -340,16 +348,17 @@ public class Direct extends AbstractAction {
          *
          * <p><strong>Exception Guidelines:</strong></p>
          * <ul>
-         *   <li>Throw {@link SkipException} to mark action as skipped</li>
+         * <li>Throw {@link SkipException} to mark action as skipped</li>
          *   <li>Throw {@link FailException} to mark action as failed</li>
-         *   <li>Throw other exceptions for unexpected errors</li>
+         *   <li>Throw other exceptions for unexpected errors (captured as FAIL)</li>
+         *   <li>{@link Error} is not caught and will propagate immediately</li>
          *   <li>Avoid catching and suppressing exceptions unless intentional</li>
          * </ul>
          *
          * <p><strong>Thread Safety:</strong></p>
-         * <p>If this method accesses shared state, it must be thread-safe. The
-         * context is unique per execution but may be accessed from multiple threads
-         * during parallel execution.</p>
+         * <p>If this method accesses shared state, it must be safe for concurrent access. The
+         * context is unique per execution. Note: the {@code Direct} action instance itself is
+         * not designed for concurrent re-execution; use separate instances instead.</p>
          *
          * @param context the execution context providing runtime state; never {@code null}
          * @throws Throwable if execution fails (will be captured and handled by Direct)

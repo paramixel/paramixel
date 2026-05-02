@@ -31,6 +31,21 @@ If no executor is supplied directly to the action, it uses `context.getExecutorS
 
 If you pass an `ExecutorService` to `Parallel.of(...)`, Paramixel uses it but does not manage its lifecycle for you.
 
+## Runner executor ownership
+
+When no `ExecutorService` is supplied to `Runner.builder()`, each `run()` call creates two thread pools:
+
+1. **Runner pool** — used for top-level `Parallel` tasks (threads named `paramixel-runner-N`)
+2. **Parallel pool** — used for nested `Parallel` tasks using the default executor (threads named `paramixel-parallel-N`)
+
+Both pools are shut down when `run()` completes. A `Runner` can be called multiple times; each call gets fresh pools.
+
+When `Runner.builder().executorService(myPool)` is used:
+
+- `myPool` is used for top-level action dispatch
+- The parallel pool is still created and managed per `run()` call
+- `myPool` is **never** shut down by the runner — you control its lifecycle
+
 ## Deadlock Prevention
 
 Paramixel detects nested `Parallel` configurations that would cause thread starvation before execution begins.
@@ -82,6 +97,10 @@ Runner.builder()
 ### When detection resets
 
 Detection resets the depth counter at any `Parallel` node that has a custom `ExecutorService`, because custom executors provide their own thread pool and do not contend for shared pool threads.
+
+## Interrupt handling
+
+If the executing thread is interrupted during concurrency semaphore acquisition, the `Parallel` action transitions to a `FAIL` result with the `InterruptedException` as the cause, fires `afterAction`, and then re-interrupts the thread before re-throwing a `RuntimeException` wrapping the cause. This ensures the lifecycle contract (result transitions to a terminal state and `afterAction` is always invoked) is honored even under interrupt conditions.
 
 ## Examples
 

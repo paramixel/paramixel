@@ -33,7 +33,7 @@ These are implemented with classes in `org.paramixel.core.listener`, including `
 
 ## Safe listener wrapper
 
-`org.paramixel.core.listener.SafeListener` wraps another listener and catches listener-thrown exceptions so they do not break execution.
+`org.paramixel.core.listener.SafeListener` wraps another listener and catches listener-thrown exceptions so they do not break execution. `Error` subclasses (such as `OutOfMemoryError` and `StackOverflowError`) are rethrown immediately rather than caught and logged.
 
 ## Custom listener example
 

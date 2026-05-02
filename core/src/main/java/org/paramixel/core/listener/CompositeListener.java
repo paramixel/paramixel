@@ -23,6 +23,7 @@ import org.paramixel.core.Context;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
+import org.paramixel.core.support.Arguments;
 
 /**
  * A {@link Listener} that delegates to multiple child listeners.
@@ -85,13 +86,9 @@ public class CompositeListener implements Listener {
      */
     public static CompositeListener of(List<Listener> listeners) {
         Objects.requireNonNull(listeners, "listeners must not be null");
-        if (listeners.isEmpty()) {
-            throw new IllegalArgumentException("listeners must not be empty");
-        }
-        for (Listener listener : listeners) {
-            Objects.requireNonNull(listener, "listeners must not contain null elements");
-        }
-        return new CompositeListener(listeners);
+        Arguments.requireNonEmpty(listeners, "listeners must not be empty");
+        Arguments.requireNoNullElements(listeners, "listeners must not contain null elements");
+        return new CompositeListener(List.copyOf(listeners));
     }
 
     /**
@@ -104,6 +101,8 @@ public class CompositeListener implements Listener {
      */
     public static CompositeListener of(Listener... listeners) {
         Objects.requireNonNull(listeners, "listeners must not be null");
+        Arguments.require(listeners.length > 0, "listeners must not be empty");
+        Arguments.requireNoNullElements(listeners, "listeners must not contain null elements");
         return new CompositeListener(List.of(listeners));
     }
 

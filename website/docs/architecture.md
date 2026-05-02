@@ -21,7 +21,7 @@ Paramixel has two main phases:
 
 ## Discovery
 
-`Resolver` uses ClassGraph to scan classes and invoke discovered factory methods.
+`Resolver` uses ClassGraph to scan classes and invoke discovered factory methods. Discovery is not purely a scanning operation — `@ActionFactory` methods are invoked via reflection, so any side effects in factory method bodies occur at discovery time.
 
 A valid factory method must be:
 
@@ -30,9 +30,12 @@ A valid factory method must be:
 - zero-argument
 - annotated with `@Paramixel.ActionFactory`
 - return an `Action`
+- the only `@ActionFactory` method in its class hierarchy
 
 Methods annotated with `@Paramixel.Disabled` are excluded.
 Invalid factories are not silently skipped; discovery throws `ResolverException`.
+
+When resolving a single class, `resolveActionsFromClass()` walks the full superclass chain. Only the outermost (most-derived) method for any given signature is considered. If more than one `@ActionFactory` method is found across the hierarchy, discovery throws `ResolverException`.
 
 Discovered actions are combined with either:
 
@@ -50,6 +53,7 @@ Important details:
 - contexts form a hierarchy that mirrors execution nesting
 - attachments are scoped to individual contexts
 - `Parallel` uses an `ExecutorService`; runner-created executors are `ThreadPoolExecutor` instances
+- **A `Runner` can be reused — calling `run()` multiple times on the same instance is safe.** Each call creates fresh owned executor services (if no external executor was supplied) and shuts them down when the call completes. If an `ExecutorService` was provided via `Runner.builder().executorService(...)`, the runner uses it but does not shut it down.
 
 ## Lifecycle model
 

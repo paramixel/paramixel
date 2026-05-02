@@ -33,7 +33,7 @@ import org.paramixel.core.support.Arguments;
  *   <li>Always passes (result is PASS)</li>
  *   <li>Has no child actions (leaf action)</li>
  *   <li>Executes instantly with zero timing</li>
- *   <li>Thread-safe and stateless</li>
+ *   <li>Not designed for concurrent re-execution (use separate instances)</li>
  * </ul>
  *
  * <h3>Use Cases</h3>
@@ -110,8 +110,10 @@ import org.paramixel.core.support.Arguments;
  * </ul>
  *
  * <h3>Thread Safety</h3>
- * <p>Noop actions are thread-safe and stateless. Create instances with {@link #of(String)}
- * when you need a no-op action in an action tree.</p>
+ * <p>Noop actions are stateless in behavior but inherit mutable result state from
+ * {@link org.paramixel.core.action.AbstractAction}. Use separate instances for separate
+ * executions. Create instances with {@link #of(String)} when you need a no-op action
+ * in an action tree.</p>
  *
  * @see Direct
  * @see Sequential
@@ -126,7 +128,7 @@ public final class Noop extends AbstractAction {
      *
      * @param name the action name
      */
-    protected Noop(String name) {
+    private Noop(String name) {
         super();
         this.name = validateName(name);
     }
@@ -191,7 +193,8 @@ public final class Noop extends AbstractAction {
      * </ul>
      *
      * <p><strong>Thread Safety:</strong></p>
-     * <p>This method is thread-safe and can be called concurrently from multiple threads.</p>
+     * <p>Each Noop instance should be executed at most once. Use separate instances for
+     * parallel or repeated execution.</p>
      *
      * @param context the execution context; must not be {@code null}
      * @throws NullPointerException if {@code context} is {@code null}

@@ -88,7 +88,7 @@ class ContextAttachmentTest {
     }
 
     @Test
-    @DisplayName("returns empty when attachment is null")
+    @DisplayName("returns empty when no attachment has been set")
     void returnsEmptyWhenGetAttachmentIsNull() {
         Context context = createContext();
 
@@ -110,7 +110,7 @@ class ContextAttachmentTest {
     }
 
     @Test
-    @DisplayName("sets null attachment and returns empty")
+    @DisplayName("setAttachment(null) clears the attachment and returns empty")
     void setsNullGetAttachmentAndReturnsEmpty() {
         Context context = createContext();
         var testData = new TestData("test-value", 42);
@@ -158,6 +158,35 @@ class ContextAttachmentTest {
 
         Optional<Attachment> removed = context.removeAttachment();
         assertThat(removed).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getAttachment returns empty after removeAttachment")
+    void getAttachmentReturnsEmptyAfterRemoveAttachment() {
+        Context context = createContext();
+        var testData = new TestData("test-value", 42);
+
+        context.setAttachment(testData);
+        assertThat(context.getAttachment()).isPresent();
+
+        context.removeAttachment();
+        assertThat(context.getAttachment()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("setAttachment(null) is equivalent to removeAttachment")
+    void setAttachmentNullIsEquivalentToRemoveAttachment() {
+        Context context = createContext();
+        var testData = new TestData("test-value", 42);
+
+        context.setAttachment(testData);
+
+        context.setAttachment(null);
+        assertThat(context.getAttachment()).isEmpty();
+
+        context.setAttachment(testData);
+        context.removeAttachment();
+        assertThat(context.getAttachment()).isEmpty();
     }
 
     @Test
@@ -447,7 +476,7 @@ class ContextAttachmentTest {
     }
 
     @Test
-    @DisplayName("Attachment is empty for null attachment")
+    @DisplayName("Attachment is empty after setAttachment(null)")
     void attachmentIsEmptyForNullAttachment() {
         Context context = createContext();
 

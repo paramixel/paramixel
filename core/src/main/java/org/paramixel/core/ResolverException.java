@@ -22,7 +22,8 @@ import java.util.Objects;
  * Signals an error during action factory resolution.
  *
  * <p>ResolverException is thrown when action factory methods cannot be discovered,
- * validated, or invoked during classpath scanning.</p>
+ * validated, or invoked during classpath scanning, or when more than one
+ * {@code @Paramixel.ActionFactory} method is found in a class hierarchy.</p>
  *
  * @see org.paramixel.core.discovery.Resolver
  * @see Paramixel.ActionFactory

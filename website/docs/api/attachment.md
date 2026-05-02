@@ -16,20 +16,19 @@ Class<?> getType()
 
 ## Behavior
 
-- a context stores at most one attachment value
+- a context stores at most one attachment value; setting `null` clears the attachment
 - `setAttachment(value)` replaces the current value
 - `getAttachment()` only reads the current context
 - `findAttachment(level)` reads the current or ancestor context
 - `removeAttachment()` removes the current context's value and returns it as an `Attachment`
 
-If no attachment is present on the target context, the `Context` methods return `Optional.empty()`.
+If no attachment is present on the target context (never set, or cleared via `setAttachment(null)` or `removeAttachment()`), the `Context` methods return `Optional.empty()`.
 `findAttachment(level)` still throws if `level` is negative or the ancestor does not exist.
 
 `Attachment#to(...)`:
 
 - returns `Optional.empty()` only when the underlying value is absent
 - otherwise uses `Class#cast`, so an incompatible type causes `ClassCastException`
-- `getType()` returns `Object.class` when the wrapped value is `null`
 
 ## Example
 

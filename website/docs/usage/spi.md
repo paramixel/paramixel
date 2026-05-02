@@ -15,7 +15,7 @@ Implement `Action` directly or extend `org.paramixel.core.action.AbstractAction`
 
 For most custom actions, extending `AbstractAction` is the simplest option because it provides:
 
-- id and name handling
+- ID generation (4-character unique string) and name handling
 - parent tracking
 - default `skip(Context)` behavior
 - shared child validation for composite actions
@@ -23,10 +23,10 @@ For most custom actions, extending `AbstractAction` is the simplest option becau
 If you implement `Action` directly, your implementation must:
 
 - maintain its own parent reference
-- implement `setParent(Action parent)`
+- implement `setParent(Action parent)` using atomic compare-and-set or equivalent synchronization
 - reject `null` parents
 - reject setting itself as its own parent
-- reject assigning a second parent
+- reject assigning a second parent (must be thread-safe)
 
 In both cases, custom actions implement `execute(Context)`. Use direct `Action` implementations only when you need full control over the action model.
 

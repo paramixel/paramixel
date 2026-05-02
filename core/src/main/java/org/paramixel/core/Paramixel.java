@@ -66,34 +66,23 @@ import java.lang.annotation.Target;
  * <p>Discovered actions are combined using {@link org.paramixel.core.discovery.Resolver.Composition}:</p>
  * <ul>
  *   <li>{@code SEQUENTIAL} - Execute in alphabetical order by package and action name</li>
- *   <li>{@code PARALLEL} - Execute concurrently with default parallelism</li>
+ *   <li>{@code PARALLEL} - Execute concurrently with parallelism from
+ *       {@link org.paramixel.core.Configuration#RUNNER_PARALLELISM}</li>
  * </ul>
  *
  * <h3>Usage Examples</h3>
  * <p><strong>Defining Actions:</strong></p>
+ * <p>Each class hierarchy may have at most one {@code @ActionFactory} method.
+ * To compose multiple actions, return a {@code Sequential} or {@code Parallel} root:</p>
  * <pre>{@code
  * public class MyTests {
  *
  *     @ActionFactory
- *     public static Action createUser() {
- *         return Direct.of("createUser", ctx -> {
- *             // Test logic
- *         });
- *     }
- *
- *     @ActionFactory
- *     public static Action deleteUser() {
- *         return Direct.of("deleteUser", ctx -> {
- *             // Test logic
- *         });
- *     }
- *
- *     @ActionFactory
- *     @Disabled("Not implemented yet")
- *     public static Action updateUser() {
- *         return Direct.of("updateUser", ctx -> {
- *             // Test logic
- *         });
+ *     public static Action allTests() {
+ *         return Sequential.of("MyTests",
+ *             Direct.of("createUser", ctx -> { /* ... *&#47; }),
+ *             Direct.of("deleteUser", ctx -> { /* ... *&#47; })
+ *         );
  *     }
  * }
  * }</pre>
@@ -113,6 +102,10 @@ import java.lang.annotation.Target;
  * // Resolve with specific composition mode
  * Optional<Action> root = Resolver.resolveActions(
  *     Resolver.Composition.PARALLEL);
+ *
+ * // Resolve with configuration (parallelism from config)
+ * Optional<Action> root = Resolver.resolveActions(
+ *     Map.of(Configuration.RUNNER_PARALLELISM, "4"));
  * }</pre>
  *
  * <p><strong>Executing Discovered Actions:</strong></p>
@@ -140,6 +133,7 @@ import java.lang.annotation.Target;
  *   <li>"method must have no parameters"</li>
  *   <li>"return type must be Action"</li>
  *   <li>"method returned null"</li>
+ *   <li>"has more than one @Paramixel.ActionFactory method in its hierarchy"</li>
  *   <li>Reflection invocation failures</li>
  * </ul>
  *
@@ -177,6 +171,7 @@ public final class Paramixel {
      *   <li>Return type: Must return {@link Action} or a subtype</li>
      *   <li>Return value: Must not return {@code null}</li>
      *   <li>Exceptions: Should not throw checked exceptions</li>
+     *   <li>Uniqueness: At most one {@code @ActionFactory} method per class hierarchy</li>
      * </ul>
      *
      * <p>Violating these requirements throws {@link ResolverException} during resolution.</p>
@@ -191,23 +186,38 @@ public final class Paramixel {
      * }
      * }</pre>
      *
-     * <h3>Multiple Actions Per Class</h3>
-     * <p>A single class can have multiple factory methods:
+     * <h3>One Factory Per Hierarchy</h3>
+     * <p>Each class hierarchy may have at most one {@code @ActionFactory} method.
+     * If more than one is found across the superclass chain, discovery throws
+     * {@link ResolverException}. To compose multiple test actions, return a
+     * {@code Sequential} or {@code Parallel} root from a single factory method:</p>
      * <pre>{@code
      * public class UserTests {
      *     @ActionFactory
-     *     public static Action testCreate() { ... }
-     *
-     *     @ActionFactory
-     *     public static Action testRead() { ... }
-     *
-     *     @ActionFactory
-     *     public static Action testUpdate() { ... }
-     *
-     *     @ActionFactory
-     *     public static Action testDelete() { ... }
+     *     public static Action allTests() {
+     *         return Sequential.of("UserTests",
+     *             Direct.of("createUser", ctx -> { /* ... *&#47; }),
+     *             Direct.of("readUser",   ctx -> { /* ... *&#47; }),
+     *             Direct.of("updateUser", ctx -> { /* ... *&#47; }),
+     *             Direct.of("deleteUser", ctx -> { /* ... *&#47; })
+     *         );
+     *     }
      * }
      * }</pre>
+     *
+     * <h3>Inheritance</h3>
+     * <p>When a class is resolved, the entire superclass chain (up to but not including
+     * {@code java.lang.Object}) is searched for {@code @ActionFactory} methods.
+     * Only the outermost (most-derived) method for any given signature is considered:</p>
+     * <ul>
+     *   <li>If a child class overrides a parent's {@code @ActionFactory} method with its own
+     *       {@code @ActionFactory} annotation, the child's method shadows the parent's</li>
+     *   <li>If a child class overrides a parent's {@code @ActionFactory} method <em>without</em>
+     *       the {@code @ActionFactory} annotation, the parent's factory is no longer discovered
+     *       for that class</li>
+     *   <li>If a child class declares its own {@code @ActionFactory} method (different name)
+     *       and also inherits one from a parent, discovery throws {@link ResolverException}</li>
+     * </ul>
      *
      * <h3>Return Types</h3>
      * <p>The return type can be {@link Action} or any subtype:</p>

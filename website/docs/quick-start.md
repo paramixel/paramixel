@@ -104,3 +104,21 @@ if (action.getResult().getStatus().isPass()) {
 ```
 
 `Runner.run(action)` does not return a `Result`.
+
+A `Runner` can execute multiple actions. Each `run()` call is independent:
+
+```java
+Runner runner = Runner.builder().build();
+runner.run(firstAction);
+runner.run(secondAction);
+// Owned executors are created and shut down per run
+```
+
+When you provide your own `ExecutorService`, the runner uses it but does not manage its lifecycle:
+
+```java
+ExecutorService myPool = Executors.newFixedThreadPool(4);
+Runner runner = Runner.builder().executorService(myPool).build();
+runner.run(action);
+myPool.shutdown(); // you are responsible for shutting down
+```
