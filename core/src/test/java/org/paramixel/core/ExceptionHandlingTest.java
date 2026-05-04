@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Noop;
+import org.paramixel.core.exception.SkipException;
 
 @DisplayName("Exception handling tests")
 class ExceptionHandlingTest {
@@ -35,9 +36,7 @@ class ExceptionHandlingTest {
             throw expectedException;
         });
 
-        Runner runner = Runner.builder().build();
-        runner.run(action);
-        Result result = action.getResult();
+        Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getThrowable().isPresent()).isTrue();
@@ -52,9 +51,7 @@ class ExceptionHandlingTest {
             throw skipException;
         });
 
-        Runner runner = Runner.builder().build();
-        runner.run(action);
-        Result result = action.getResult();
+        Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -75,9 +72,7 @@ class ExceptionHandlingTest {
                 main,
                 Noop.of("after"));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -92,9 +87,7 @@ class ExceptionHandlingTest {
             throw new RuntimeException("something went wrong");
         });
 
-        Runner runner = Runner.builder().build();
-        runner.run(action);
-        Result result = action.getResult();
+        Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getThrowable()).isPresent();

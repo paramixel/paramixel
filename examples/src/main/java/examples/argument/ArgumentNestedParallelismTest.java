@@ -22,11 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.action.DependentSequential;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Parallel;
-import org.paramixel.core.action.StrictSequential;
 
 public class ArgumentNestedParallelismTest {
 
@@ -35,7 +35,7 @@ public class ArgumentNestedParallelismTest {
     private static final int INNER_PARALLEL_COUNT = 3;
 
     public static void main(String[] args) {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.ActionFactory
@@ -60,6 +60,6 @@ public class ArgumentNestedParallelismTest {
         Action verify = Direct.of(
                 "verify", context -> assertThat(INVOCATIONS).hasSize(OUTER_PARALLEL_COUNT * INNER_PARALLEL_COUNT));
 
-        return StrictSequential.of("ArgumentNestedParallelismTest", List.of(outerParallel, verify));
+        return DependentSequential.of("ArgumentNestedParallelismTest", List.of(outerParallel, verify));
     }
 }

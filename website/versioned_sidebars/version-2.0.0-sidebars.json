@@ -1,0 +1,50 @@
+{
+  "docsSidebar": [
+    "intro",
+    "quick-start",
+    {
+      "type": "category",
+      "label": "Built-in Actions",
+      "collapsed": false,
+      "items": [
+        "actions/direct",
+        "actions/noop",
+        "actions/sequential",
+        "actions/dependent-sequential",
+        "actions/random-sequential",
+        "actions/dependent-random-sequential",
+        "actions/parallel",
+        "actions/lifecycle"
+      ]
+    },
+    {
+      "type": "category",
+      "label": "Usage Guide",
+      "collapsed": false,
+      "items": [
+        "usage/action-composition",
+        "usage/context",
+        "usage/error-handling",
+        "usage/listener",
+        "usage/cleanup",
+        "usage/maven-plugin",
+        "usage/integration-testing",
+        "usage/discovery",
+        "usage/spi",
+        "usage/migration-guide"
+      ]
+    },
+    "configuration",
+    "architecture",
+    {
+      "type": "category",
+      "label": "API Reference",
+      "collapsed": true,
+      "items": [
+        "api/intro",
+        "api/status",
+        "api/store"
+      ]
+    }
+  ]
+}

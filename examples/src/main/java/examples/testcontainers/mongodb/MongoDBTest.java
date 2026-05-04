@@ -23,8 +23,9 @@ import examples.support.Logger;
 import examples.support.NetworkFactory;
 import org.bson.Document;
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.Value;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Parallel;
@@ -33,15 +34,12 @@ import org.testcontainers.containers.Network;
 
 public class MongoDBTest {
 
-    private static class TestAttachment {
-        public Network network;
-        public MongoDBTestEnvironment environment;
-    }
-
+    private static final String NETWORK = "network";
+    private static final String ENVIRONMENT = "environment";
     private static final Logger LOGGER = Logger.createLogger(MongoDBTest.class);
 
     public static void main(String[] args) throws Throwable {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.ActionFactory
@@ -55,15 +53,13 @@ public class MongoDBTest {
 
     private static Action createLifecycleAction(MongoDBTestEnvironment environment) {
         Action testAction = Direct.of("test insert and query", context -> {
-            var lifecycleContext = context.findContext(1).orElseThrow();
-            TestAttachment testAttachment = lifecycleContext
-                    .getAttachment()
-                    .flatMap(a -> a.to(TestAttachment.class))
-                    .orElseThrow();
+            var lifecycleContext = context.findAncestor(1).orElseThrow();
+            MongoDBTestEnvironment testEnvironment =
+                    lifecycleContext.getStore().get(ENVIRONMENT).orElseThrow().cast(MongoDBTestEnvironment.class);
 
-            LOGGER.info("[%s] testing insert and query ...", testAttachment.environment.name());
+            LOGGER.info("[%s] testing insert and query ...", testEnvironment.name());
 
-            try (var mongoClient = MongoClients.create(testAttachment.environment.getConnectionString())) {
+            try (var mongoClient = MongoClients.create(testEnvironment.getConnectionString())) {
                 var database = mongoClient.getDatabase("testdb");
                 var collection = database.getCollection("testcol");
                 collection.insertOne(new Document("key", "value"));
@@ -85,24 +81,23 @@ public class MongoDBTest {
                     environment.initialize(network);
                     assertThat(environment.isRunning()).isTrue();
 
-                    TestAttachment testAttachment = new TestAttachment();
-                    testAttachment.network = network;
-                    testAttachment.environment = environment;
-
-                    context.setAttachment(testAttachment);
+                    context.getStore().put(NETWORK, Value.of(network));
+                    context.getStore().put(ENVIRONMENT, Value.of(environment));
                 }),
                 testAction,
                 Direct.of("after", context -> {
                     LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                    TestAttachment testAttachment = context.removeAttachment()
-                            .flatMap(a -> a.to(TestAttachment.class))
-                            .orElse(null);
+                    var removedNetwork = context.getStore().remove(NETWORK);
+                    var removedEnvironment = context.getStore().remove(ENVIRONMENT);
+                    if (removedNetwork.isPresent() && removedEnvironment.isPresent()) {
+                        Network network = removedNetwork.orElseThrow().cast(Network.class);
+                        MongoDBTestEnvironment testEnvironment =
+                                removedEnvironment.orElseThrow().cast(MongoDBTestEnvironment.class);
 
-                    if (testAttachment != null) {
                         Cleanup.of(Cleanup.Mode.FORWARD)
-                                .addCloseable(testAttachment.environment)
-                                .addCloseable(testAttachment.network)
+                                .addCloseable(testEnvironment)
+                                .addCloseable(network)
                                 .runAndThrow();
                     }
                 }));

@@ -22,6 +22,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.core.action.Noop;
+import org.paramixel.core.spi.DefaultResult;
+import org.paramixel.core.spi.DefaultStatus;
 
 @DisplayName("Result")
 class ResultTest {
@@ -29,7 +32,8 @@ class ResultTest {
     @Test
     @DisplayName("creates staged result")
     void createsStagedResult() {
-        var result = Result.staged();
+        Action action = Noop.of("test");
+        var result = new DefaultResult(action);
 
         assertThat(result.getStatus().isStaged()).isTrue();
         assertThat(result.getStatus().isPass()).isFalse();
@@ -40,11 +44,14 @@ class ResultTest {
     }
 
     @Test
-    @DisplayName("creates passing result via pass factory")
-    void createsPassingResultViaPassFactory() {
+    @DisplayName("creates passing result via status and elapsed time setters")
+    void createsPassingResultViaSetters() {
+        Action action = Noop.of("test");
         var timing = Duration.ofMillis(100);
 
-        var result = Result.pass(timing);
+        DefaultResult result = new DefaultResult(action);
+        result.setStatus(DefaultStatus.PASS);
+        result.setElapsedTime(timing);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -53,12 +60,15 @@ class ResultTest {
     }
 
     @Test
-    @DisplayName("creates failing result via fail factory with throwable")
-    void createsFailingResultViaFailFactoryWithThrowable() {
+    @DisplayName("creates failing result with throwable")
+    void createsFailingResultWithThrowable() {
+        Action action = Noop.of("test");
         var timing = Duration.ofMillis(150);
         Throwable failure = new RuntimeException("test failure");
 
-        var result = Result.fail(timing, failure);
+        DefaultResult result = new DefaultResult(action);
+        result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, failure));
+        result.setElapsedTime(timing);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -69,9 +79,12 @@ class ResultTest {
     @Test
     @DisplayName("creates failing result with message only")
     void createsFailingResultWithMessageOnly() {
+        Action action = Noop.of("test");
         var timing = Duration.ofMillis(150);
 
-        var result = Result.fail(timing, "failure message");
+        DefaultResult result = new DefaultResult(action);
+        result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, "failure message"));
+        result.setElapsedTime(timing);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -82,9 +95,12 @@ class ResultTest {
     @Test
     @DisplayName("creates skipped result")
     void createsSkippedResult() {
+        Action action = Noop.of("test");
         var timing = Duration.ZERO;
 
-        var result = Result.skip(timing);
+        DefaultResult result = new DefaultResult(action);
+        result.setStatus(DefaultStatus.SKIP);
+        result.setElapsedTime(timing);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -95,9 +111,12 @@ class ResultTest {
     @Test
     @DisplayName("creates skipped result with reason")
     void createsSkippedResultWithReason() {
+        Action action = Noop.of("test");
         var timing = Duration.ZERO;
 
-        var result = Result.skip(timing, "skipped for reason");
+        DefaultResult result = new DefaultResult(action);
+        result.setStatus(new DefaultStatus(DefaultStatus.Kind.SKIP, "skipped for reason"));
+        result.setElapsedTime(timing);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -108,10 +127,11 @@ class ResultTest {
     @Test
     @DisplayName("creates result via of factory with all parameters")
     void createsResultViaOfFactoryWithAllParameters() {
-        var status = Status.pass();
+        Action action = Noop.of("test");
+        var status = DefaultStatus.PASS;
         var timing = Duration.ofMillis(123);
 
-        var result = Result.of(status, timing);
+        var result = new DefaultResult(action, status, timing);
 
         assertThat(result.getStatus()).isSameAs(status);
         assertThat(result.getElapsedTime()).isEqualTo(timing);
@@ -120,29 +140,45 @@ class ResultTest {
     }
 
     @Test
-    @DisplayName("fails to create result with null status")
-    void failsToCreateResultWithNullStatus() {
+    @DisplayName("of factory rejects null status")
+    void ofFactoryRejectsNullStatus() {
+        Action action = Noop.of("test");
         var timing = Duration.ofMillis(100);
 
-        assertThatThrownBy(() -> Result.of(null, timing))
+        assertThatThrownBy(() -> new DefaultResult(action, null, timing))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("status must not be null");
     }
 
     @Test
-    @DisplayName("fails to create result with null timing")
-    void failsToCreateResultWithNullTiming() {
-        var status = Status.pass();
+    @DisplayName("of factory rejects null timing")
+    void ofFactoryRejectsNullTiming() {
+        Action action = Noop.of("test");
+        var status = DefaultStatus.PASS;
 
-        assertThatThrownBy(() -> Result.of(status, null))
+        assertThatThrownBy(() -> new DefaultResult(action, status, null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("timing must not be null");
+                .hasMessage("elapsedTime must not be null");
+    }
+
+    @Test
+    @DisplayName("of factory rejects null action")
+    void ofFactoryRejectsNullAction() {
+        var status = DefaultStatus.PASS;
+        var timing = Duration.ofMillis(100);
+
+        assertThatThrownBy(() -> new DefaultResult(null, status, timing))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
     }
 
     @Test
     @DisplayName("toString returns expected format")
     void toStringReturnsExpectedFormat() {
-        var result = Result.pass(Duration.ofMillis(123));
+        Action action = Noop.of("test");
+        DefaultResult result = new DefaultResult(action);
+        result.setStatus(DefaultStatus.PASS);
+        result.setElapsedTime(Duration.ofMillis(123));
 
         assertThat(result.toString()).isEqualTo("PASS | 123 ms");
     }

@@ -17,7 +17,7 @@
 package examples.annotation;
 
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
@@ -29,7 +29,7 @@ public class DisabledTest {
     };
 
     public static void main(String[] args) {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.Disabled("covered by resolver skip behavior")

@@ -38,10 +38,10 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.paramixel.core.Action;
 import org.paramixel.core.Configuration;
-import org.paramixel.core.Listener;
+import org.paramixel.core.Factory;
+import org.paramixel.core.Resolver;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.discovery.Resolver;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -51,8 +51,8 @@ import org.paramixel.core.support.Arguments;
  * executes them with a {@link Runner}, and fails the build when the root action result
  * is {@code FAIL} (or {@code SKIP} when {@code failureOnSkip} is {@code true}).</p>
  *
- * <p>The action tree is executed exactly once. The result is read directly from the
- * action after execution, avoiding redundant re-execution.</p>
+ * <p>The action tree is executed exactly once. The result is returned
+ * directly from the runner, avoiding redundant re-execution.</p>
  */
 @Mojo(
         name = "test",
@@ -92,7 +92,7 @@ public class ParamixelMojo extends AbstractMojo {
             Thread.currentThread().setContextClassLoader(testClassLoader);
             final var configuration = buildConfiguration(testClassLoader);
 
-            Optional<Action> optionalAction = Resolver.resolveActions(testClassLoader, configuration);
+            Optional<Action> optionalAction = Resolver.resolveActions(configuration);
 
             if (optionalAction.isEmpty()) {
                 if (failIfNoTests) {
@@ -105,13 +105,11 @@ public class ParamixelMojo extends AbstractMojo {
 
             Runner runner = Runner.builder()
                     .configuration(configuration)
-                    .listener(Listener.treeListener())
+                    .listener(Factory.defaultListener())
                     .build();
 
             Action action = optionalAction.get();
-            runner.run(action);
-
-            Result result = action.getResult();
+            Result result = runner.run(action);
             if (result.getStatus().isFailure() || (result.getStatus().isSkip() && failureOnSkip)) {
                 throw new MojoFailureException("There are test failures");
             }

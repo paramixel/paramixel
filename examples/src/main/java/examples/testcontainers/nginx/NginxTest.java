@@ -25,8 +25,9 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URLConnection;
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.Value;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Parallel;
@@ -35,15 +36,12 @@ import org.testcontainers.containers.Network;
 
 public class NginxTest {
 
-    private static class TestAttachment {
-        public Network network;
-        public NginxTestEnvironment environment;
-    }
-
+    private static final String NETWORK = "network";
+    private static final String ENVIRONMENT = "environment";
     private static final Logger LOGGER = Logger.createLogger(NginxTest.class);
 
     public static void main(String[] args) throws Throwable {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.ActionFactory
@@ -57,15 +55,13 @@ public class NginxTest {
 
     private static Action createLifecycleAction(NginxTestEnvironment environment) {
         Action testAction = Direct.of("get", context -> {
-            var lifecycleContext = context.findContext(1).orElseThrow();
-            TestAttachment testAttachment = lifecycleContext
-                    .getAttachment()
-                    .flatMap(a -> a.to(TestAttachment.class))
-                    .orElseThrow();
+            var lifecycleContext = context.findAncestor(1).orElseThrow();
+            NginxTestEnvironment testEnvironment =
+                    lifecycleContext.getStore().get(ENVIRONMENT).orElseThrow().cast(NginxTestEnvironment.class);
 
-            LOGGER.info("[%s] testing GET ...", testAttachment.environment.name());
+            LOGGER.info("[%s] testing GET ...", testEnvironment.name());
 
-            int port = testAttachment.environment.getNginxContainer().getMappedPort(80);
+            int port = testEnvironment.getNginxContainer().getMappedPort(80);
             String content = doGet("http://localhost:" + port);
             assertThat(content).contains("Welcome to nginx!");
         });
@@ -80,24 +76,23 @@ public class NginxTest {
                     environment.initialize(network);
                     assertThat(environment.isRunning()).isTrue();
 
-                    TestAttachment testAttachment = new TestAttachment();
-                    testAttachment.network = network;
-                    testAttachment.environment = environment;
-
-                    context.setAttachment(testAttachment);
+                    context.getStore().put(NETWORK, Value.of(network));
+                    context.getStore().put(ENVIRONMENT, Value.of(environment));
                 }),
                 testAction,
                 Direct.of("after", context -> {
                     LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                    TestAttachment testAttachment = context.removeAttachment()
-                            .flatMap(a -> a.to(TestAttachment.class))
-                            .orElse(null);
+                    var removedNetwork = context.getStore().remove(NETWORK);
+                    var removedEnvironment = context.getStore().remove(ENVIRONMENT);
+                    if (removedNetwork.isPresent() && removedEnvironment.isPresent()) {
+                        Network network = removedNetwork.orElseThrow().cast(Network.class);
+                        NginxTestEnvironment testEnvironment =
+                                removedEnvironment.orElseThrow().cast(NginxTestEnvironment.class);
 
-                    if (testAttachment != null) {
                         Cleanup.of(Cleanup.Mode.FORWARD)
-                                .addCloseable(testAttachment.environment)
-                                .addCloseable(testAttachment.network)
+                                .addCloseable(testEnvironment)
+                                .addCloseable(network)
                                 .runAndThrow();
                     }
                 }));

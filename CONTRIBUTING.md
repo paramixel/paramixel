@@ -103,6 +103,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 - Follow existing code style and patterns
 - Write clear, self-documenting code with meaningful variable names
 - Add Javadoc for public APIs
+- Follow `assets/javadoc-style-guide.md` for Javadoc conventions
 - Keep methods focused and reasonably sized
 - Write unit tests for new functionality
 

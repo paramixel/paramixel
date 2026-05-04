@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Sequential;
@@ -30,7 +30,7 @@ import org.paramixel.core.action.Sequential;
 public class ArgumentStringAndBigNumberTest {
 
     public static void main(String[] args) {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.ActionFactory

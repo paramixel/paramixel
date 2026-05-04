@@ -43,7 +43,7 @@ class ConfigurationTest {
         ClassLoader original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(null);
-            InputStream stream = Configuration.getResourceAsStream("information.properties");
+            InputStream stream = Configuration.getResourceAsStream("version.properties");
             assertThat(stream).isNotNull();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -55,7 +55,7 @@ class ConfigurationTest {
         ClassLoader original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(new ClassLoader(null) {});
-            InputStream stream = Configuration.getResourceAsStream("information.properties");
+            InputStream stream = Configuration.getResourceAsStream("version.properties");
             assertThat(stream).isNotNull();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -199,7 +199,7 @@ class ConfigurationTest {
 
     @Test
     void shouldFindExistingResourceWithGetResourceAsStream() {
-        InputStream stream = Configuration.getResourceAsStream("information.properties");
+        InputStream stream = Configuration.getResourceAsStream("version.properties");
         assertThat(stream).isNotNull();
         try {
             stream.close();

@@ -27,7 +27,8 @@ import org.paramixel.core.Action;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.SkipException;
+import org.paramixel.core.exception.FailException;
+import org.paramixel.core.exception.SkipException;
 
 @DisplayName("Direct")
 class DirectTest {
@@ -40,9 +41,7 @@ class DirectTest {
             throw expectedException;
         });
 
-        Runner runner = Runner.builder().build();
-        runner.run(action);
-        Result result = action.getResult();
+        Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getThrowable()).isPresent();
@@ -53,12 +52,10 @@ class DirectTest {
     @DisplayName("catches FailException as failure")
     void catchesFailExceptionAsFailure() {
         Action action = Direct.of("test", context -> {
-            throw org.paramixel.core.FailException.of("expected failure");
+            throw FailException.of("expected failure");
         });
 
-        Runner runner = Runner.builder().build();
-        runner.run(action);
-        Result result = action.getResult();
+        Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -72,9 +69,7 @@ class DirectTest {
             throw SkipException.of("database not available");
         });
 
-        Runner runner = Runner.builder().build();
-        runner.run(action);
-        Result result = action.getResult();
+        Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -149,12 +144,12 @@ class DirectTest {
 
         Listener listener = new Listener() {
             @Override
-            public void actionThrowable(org.paramixel.core.Context context, Action action, Throwable throwable) {
+            public void actionThrowable(Result result, Throwable throwable) {
                 actionThrowableCalled.set(true);
             }
 
             @Override
-            public void afterAction(org.paramixel.core.Context context, Action action, Result result) {
+            public void afterAction(Result result) {
                 afterActionCalled.set(true);
             }
         };
@@ -172,27 +167,13 @@ class DirectTest {
     }
 
     @Test
-    @DisplayName("Error leaves result in staged state")
-    void errorLeavesResultInStagedState() {
-        Action action = Direct.of("test", context -> {
-            throw new OutOfMemoryError("simulated oom");
-        });
-
-        Runner runner = Runner.builder().build();
-
-        assertThatThrownBy(() -> runner.run(action)).isInstanceOf(OutOfMemoryError.class);
-
-        assertThat(action.getResult().getStatus().isStaged()).isTrue();
-    }
-
-    @Test
     @DisplayName("RuntimeException notifies listener actionThrowable")
     void runtimeExceptionNotifiesListenerActionThrowable() {
         AtomicReference<Throwable> capturedThrowable = new AtomicReference<>();
 
         Listener listener = new Listener() {
             @Override
-            public void actionThrowable(org.paramixel.core.Context context, Action action, Throwable throwable) {
+            public void actionThrowable(Result result, Throwable throwable) {
                 capturedThrowable.set(throwable);
             }
         };

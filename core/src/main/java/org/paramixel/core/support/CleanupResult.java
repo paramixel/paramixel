@@ -24,11 +24,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Describes the outcome of executing all cleanup tasks registered with a {@link Cleanup}.
+ * Describes the outcome of a {@link Cleanup} execution.
  *
- * <p>Instances are immutable and obtained exclusively via {@link Cleanup#run()}.
- * Each result captures the number of tasks executed and any exceptions thrown,
- * indexed by the original registration order.
+ * <p>The result preserves one slot per registered cleanup callback so callers can inspect success or failure by
+ * original registration index.
  */
 public final class CleanupResult {
 
@@ -43,18 +42,18 @@ public final class CleanupResult {
     }
 
     /**
-     * Returns the number of cleanup tasks that were executed.
+     * Returns the number of callbacks that were scheduled for execution.
      *
-     * @return The number of executed cleanup tasks.
+     * @return the number of registered callbacks
      */
     public int getExecutableCount() {
         return executableCount;
     }
 
     /**
-     * Returns whether any executable threw an exception during execution.
+     * Returns whether any callback produced an exception.
      *
-     * @return {@code true} if any executable threw an exception during execution.
+     * @return {@code true} when at least one callback failed
      */
     public boolean hasExceptions() {
         for (Throwable exception : exceptions) {
@@ -66,14 +65,11 @@ public final class CleanupResult {
     }
 
     /**
-     * Returns the exception thrown by the executable at the given index.
+     * Returns the exception captured for the callback at the supplied index.
      *
-     * <p>Indices correspond to the original registration order (i.e., the order
-     * in which executables were added to the runner).
-     *
-     * @param index The executable index, in registration order.
-     * @return An {@link Optional} containing the exception, or empty if the index
-     *         is out of bounds or the executable completed successfully.
+     * @param index the callback index
+     * @return the captured exception, or an empty {@link Optional} when the callback succeeded or the index is out of
+     *     range
      */
     public Optional<Throwable> getException(final int index) {
         if (index < 0 || index >= executableCount) {
@@ -83,13 +79,10 @@ public final class CleanupResult {
     }
 
     /**
-     * Returns whether the executable at the given index completed successfully.
+     * Returns whether the callback at the supplied index completed without an exception.
      *
-     * <p>Indices correspond to the original registration order (i.e., the order
-     * in which executables were added to the runner).
-     *
-     * @param index The executable index, in registration order.
-     * @return {@code true} if the executable completed without throwing an exception.
+     * @param index the callback index
+     * @return {@code true} when the callback succeeded; {@code false} when it failed or the index is out of range
      */
     public boolean isSuccess(final int index) {
         if (index < 0 || index >= executableCount) {
@@ -99,12 +92,9 @@ public final class CleanupResult {
     }
 
     /**
-     * Returns all exceptions thrown during execution, keyed by executable index.
+     * Returns every captured failure keyed by callback index.
      *
-     * <p>Keys correspond to the original registration order (i.e., the order
-     * in which executables were added to the runner).
-     *
-     * @return An unmodifiable map of executable index to exception for all failed executables; never null.
+     * @return an immutable map from callback index to captured throwable
      */
     public Map<Integer, Throwable> getExceptionsByIndex() {
         var failures = new HashMap<Integer, Throwable>();

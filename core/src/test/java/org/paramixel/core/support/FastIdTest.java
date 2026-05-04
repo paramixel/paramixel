@@ -98,9 +98,6 @@ public class FastIdTest {
         return result;
     }
 
-    /**
-     * Test generation performance
-     */
     /*
     static void testPerformance() {
         System.out.println("\nTesting performance...");

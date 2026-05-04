@@ -17,456 +17,81 @@
 package org.paramixel.core;
 
 import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 /**
- * Provides runtime state during action execution.
+ * Provides runtime services and scoped state to an executing {@link Action}.
  *
- * <p>Context is available to all actions during execution and provides access to:
- * <ul>
- *   <li>Configuration properties ({@link #getConfiguration()})</li>
- *   <li>Execution listener ({@link #getListener()})</li>
- *   <li>Thread pool for parallel execution ({@link #getExecutorService()})</li>
- *   <li>Parent context for hierarchy navigation ({@link #getParent()})</li>
- *   <li>Attachment storage for scoped data ({@link #setAttachment(Object)})</li>
- * </ul>
+ * <p>A {@code Context} exposes the active configuration, listener, executor service, and a local
+ * {@link Store}. Contexts may be arranged into a parent-child chain so nested actions can create
+ * child scopes while still navigating to ancestor stores explicitly.
  *
- * <p>Contexts form a tree structure mirroring the action tree. Each action receives its own
- * child context, allowing scoped state that is isolated from sibling actions. Parent contexts
- * are accessible via {@link #getParent()} or {@link #findContext(int)} for ancestor navigation.</p>
- *
- * <p><strong>Creation:</strong> Root contexts are created with {@link #of(Map, Listener, ExecutorService)}.
- * Child contexts are created with {@link #createChild()}, which inherits configuration,
- * listener, and executor service from the parent.</p>
- *
- * <p><strong>Thread Safety:</strong> Contexts are thread-safe for use within a single action's
- * execution. However, attachments are not synchronized across threads. When using parallel
- * execution, each action receives its own child context, ensuring isolation. Do not share
- * context instances across threads manually.</p>
- *
- * <p><strong>Lifecycle:</strong> A new context is created for each action execution. Child
- * actions receive child contexts with their parent set to the parent action's context.
- * Contexts are not reused between executions.</p>
- *
- * <p><strong>Attachment Scoping:</strong> Attachments set on a parent context are accessible
- * to child contexts via {@link #findAttachment(int)}. This allows for dependency injection
- * pattern where parent actions set up resources that child actions consume.</p>
- *
- * <p><strong>Usage Example:</strong></p>
- * <pre>{@code
- * Direct.of("child", ctx -> {
- *     // Access configuration
- *     String value = ctx.getConfiguration().get("my.key");
- *
- *     // Access parent attachment
- *     Optional<Attachment> db = ctx.findAttachment(1);
- *
- *     // Set child-specific attachment
- *     ctx.setAttachment("childData");
- *
- *     // Execute parallel tasks
- *     ExecutorService executor = ctx.getExecutorService();
- *     executor.submit(() -> doWork());
- * });
- * }</pre>
- *
- * @see Action
- * @see Listener
- * @see Attachment
- * @see Configuration
+ * @apiNote Use {@link #createChild()} when an action needs an isolated store while preserving the
+ *     same configuration, listener, and executor service.
  */
-public final class Context {
-
-    private final Context parent;
-    private Object attachment;
-    private final Map<String, String> configuration;
-    private final Listener listener;
-    private final ExecutorService executorService;
-
-    private Context(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
-        this(null, configuration, listener, executorService);
-    }
-
-    private Context(
-            Context parent, Map<String, String> configuration, Listener listener, ExecutorService executorService) {
-        this.parent = parent;
-        this.configuration =
-                configuration != null ? Map.copyOf(configuration) : Map.copyOf(Configuration.defaultProperties());
-        this.listener = listener;
-        this.executorService = executorService;
-    }
-
-    private Context(Context parent) {
-        this(parent, parent.configuration, parent.listener, parent.executorService);
-    }
+public interface Context {
 
     /**
-     * Creates a new root context with the specified configuration, listener, and executor service.
+     * Returns the effective configuration for the current run.
      *
-     * <p>A root context has no parent. It is typically created by the {@link Runner} to begin
-     * action execution. Use {@link #createChild()} to create child contexts from a root context.</p>
-     *
-     * <p>If {@code configuration} is {@code null}, {@link Configuration#defaultProperties()} is used.</p>
-     *
-     * @param configuration the configuration properties; may be {@code null} to use defaults
-     * @param listener the execution listener; must not be {@code null}
-     * @param executorService the executor service for parallel execution; must not be {@code null}
-     * @return a new root context
-     * @throws NullPointerException if {@code listener} or {@code executorService} is {@code null}
+     * @return the configuration properties visible to this context
      */
-    public static Context of(Map<String, String> configuration, Listener listener, ExecutorService executorService) {
-        Objects.requireNonNull(listener, "listener must not be null");
-        Objects.requireNonNull(executorService, "executorService must not be null");
-        return new Context(configuration, listener, executorService);
-    }
+    Map<String, String> getConfiguration();
 
     /**
-     * Creates a new child context that inherits configuration, listener, and executor service
-     * from this context.
+     * Returns the direct parent context.
      *
-     * <p>The child context's parent is set to this context, enabling hierarchy navigation
-     * via {@link #getParent()} and {@link #findContext(int)}.</p>
-     *
-     * <p>Child contexts provide isolated attachment storage while sharing configuration
-     * and executor resources with the parent.</p>
-     *
-     * @return a new child context with this context as its parent
+     * @return the direct parent context, or an empty {@link Optional} when this context is the
+     *     root context
      */
-    public Context createChild() {
-        return new Context(this);
-    }
+    Optional<Context> getParent();
 
     /**
-     * Returns the parent context for nested execution.
+     * Returns the local store for this context.
      *
-     * <p>The parent context is the context associated with this action's parent action.
-     * Parent contexts provide access to ancestor state, attachments, and configuration.
-     * The root context (context for the top-level action) has no parent.</p>
+     * <p>The returned store is scoped to this context only. Descendants may access ancestor stores
+     * by first navigating the context hierarchy with {@link #getParent()} or
+     * {@link #findAncestor(int)}.
      *
-     * <p>Parent contexts are useful for:
-     * <ul>
-     *   <li>Accessing ancestor attachments via {@link #findAttachment(int)}</li>
-     *   <li>Navigating the context hierarchy for debugging</li>
-     *   <li>Understanding execution scope</li>
-     * </ul>
-     *
-     * @return an {@link Optional} containing the parent context, or empty for the root context
-     * @see #findContext(int)
+     * @return the local store for this context
      */
-    public Optional<Context> getParent() {
-        return Optional.ofNullable(parent);
-    }
+    Store getStore();
 
     /**
-     * Returns the configuration properties for this execution.
+     * Returns the listener receiving run lifecycle callbacks.
      *
-     * <p>Configuration properties are loaded from multiple sources with later sources
-     * taking precedence:
-     * <ol>
-     *   <li>Default classpath properties file: {@code paramixel.properties}</li>
-     *   <li>JVM system properties</li>
-     *   <li>Runner-specific configuration (if provided)</li>
-     * </ol>
-     *
-     * <p>The returned map is immutable and thread-safe. Modifications to the map are not
-     * supported and will throw {@link UnsupportedOperationException}.</p>
-     *
-     * <p>Configuration properties are shared across all contexts in the same execution.
-     * All actions see the same configuration values.</p>
-     *
-     * <p><strong>Common Properties:</strong></p>
-     * <ul>
-     *   <li>{@code paramixel.parallelism} - Thread pool size for parallel execution</li>
-     * </ul>
-     *
-     * @return the configuration properties; never {@code null}, may be empty
-     * @see Configuration
-     * @see Configuration#RUNNER_PARALLELISM
+     * @return the active listener
      */
-    public Map<String, String> getConfiguration() {
-        return configuration;
-    }
+    Listener getListener();
 
     /**
-     * Returns the listener that receives execution notifications.
+     * Returns the executor service available to actions for asynchronous work.
      *
-     * <p>The listener receives callbacks during action execution, including:
-     * <ul>
-     *   <li>{@link Listener#runStarted(Runner, Action)} - Before execution begins</li>
-     *   <li>{@link Listener#beforeAction(Context, Action)} - Before each action executes</li>
-     *   <li>{@link Listener#afterAction(Context, Action, Result)} - After each action completes</li>
-     *   <li>{@link Listener#actionThrowable(Context, Action, Throwable)} - On unexpected exceptions</li>
-     *   <li>{@link Listener#runCompleted(Runner, Action)} - After execution completes</li>
-     * </ul>
-     *
-     * <p>Actions can invoke listener methods directly to trigger notifications at custom points.
-     * The returned listener is typically wrapped in {@link org.paramixel.core.listener.SafeListener}
-     * to prevent listener exceptions from interrupting execution. Note that {@link Error}
-     * subclasses are always rethrown, even by {@code SafeListener}.</p>
-     *
-     * <p>The listener is shared across all contexts in the same execution. All actions notify
-     * the same listener instance.</p>
-     *
-     * @return the listener; never {@code null}
-     * @see Listener
-     * @see org.paramixel.core.listener.SafeListener
+     * @return the executor service associated with the current run
      */
-    public Listener getListener() {
-        return listener;
-    }
+    ExecutorService getExecutorService();
 
     /**
-     * Returns the executor service for parallel execution.
+     * Finds the ancestor context reached by walking upward from this context.
      *
-     * <p>The executor service is used by {@link org.paramixel.core.action.Parallel} and other
-     * action types that support concurrent execution of child actions. Actions can also use
-     * this executor directly for custom parallel work.</p>
+     * <p>A {@code levelUp} of {@code 0} returns this context, {@code 1} returns the direct parent,
+     * and larger values continue upward through the ancestry chain.
      *
-     * <p>The executor is typically managed by the {@link Runner}. The thread pool size is
-     * controlled by the {@code paramixel.parallelism} configuration property, defaulting to
-     * {@code Runtime.getRuntime().availableProcessors()}.</p>
-     *
-     * <p><strong>Thread Safety:</strong> The executor service is thread-safe and can be used
-     * concurrently from multiple actions. Submit tasks via {@link java.util.concurrent.ExecutorService#submit(Runnable)}
-     * or {@link java.util.concurrent.ExecutorService#execute(Runnable)}.</p>
-     *
-     * <p><strong>Lifecycle:</strong> If the runner creates the executor (i.e., no custom executor
-     * was provided to {@link Runner.Builder#executorService(ExecutorService)}), the runner
-     * will shut it down after execution completes. If a custom executor is provided, its
-     * lifecycle is managed by the caller.</p>
-     *
-     * @return the executor service; never {@code null}
-     * @see org.paramixel.core.action.Parallel
-     * @see Configuration#RUNNER_PARALLELISM
-     * @see Runner.Builder#executorService(ExecutorService)
+     * @param levelUp the number of parent hops to traverse
+     * @return the ancestor context at the requested level, or an empty {@link Optional} when no
+     *     ancestor exists at that level
+     * @throws IllegalArgumentException if {@code levelUp} is negative
      */
-    public ExecutorService getExecutorService() {
-        return executorService;
-    }
+    Optional<Context> findAncestor(int levelUp);
 
     /**
-     * Finds this context or one of its ancestors by level.
+     * Creates a child context derived from this context.
      *
-     * <p>The {@code level} parameter specifies how many levels up the context hierarchy
-     * to navigate:
-     * <ul>
-     *   <li>{@code 0} - Returns this context</li>
-     *   <li>{@code 1} - Returns the parent context</li>
-     *   <li>{@code 2} - Returns the grandparent context</li>
-     *   <li>{@code 3} - Returns the great-grandparent context</li>
-     *   <li>etc.</li>
-     * </ul>
+     * <p>The child context shares the same configuration, listener, and executor service, but owns
+     * an independent local {@link Store}.
      *
-     * <p>This method is useful for navigating the context hierarchy to access ancestor state
-     * or attachments. For accessing ancestor attachments, consider using {@link #findAttachment(int)}
-     * which combines context navigation with attachment retrieval.</p>
-     *
-     * <p><strong>Usage Example:</strong></p>
-     * <pre>{@code
-     * // Access grandparent context
-     * Optional<Context> grandparent = ctx.findContext(2);
-     *
-     * // Check if root context (no parent)
-     * boolean isRoot = ctx.findContext(1).isEmpty();
-     * }</pre>
-     *
-     * @param level the number of levels up the hierarchy; must be non-negative
-     * @return an {@link Optional} containing the requested context
-     * @throws IllegalArgumentException if {@code level} is negative
-     * @throws java.util.NoSuchElementException if the ancestor at the given level does not exist
-     * @see #getParent()
-     * @see #findAttachment(int)
+     * @return a new child context whose parent is this context
      */
-    public Optional<Context> findContext(int level) {
-        if (level < 0) {
-            throw new IllegalArgumentException("level must not be negative: " + level);
-        }
-
-        Context current = this;
-        for (int i = 0; i < level; i++) {
-            Optional<Context> parentContext = current.getParent();
-            if (parentContext.isEmpty()) {
-                throw new NoSuchElementException("Context ancestor not found at level " + level);
-            }
-            current = parentContext.get();
-        }
-
-        return Optional.of(current);
-    }
-
-    /**
-     * Sets an attachment on this context, replacing any existing attachment.
-     *
-     * <p>Attachments provide a mechanism for storing typed data within a context's scope.
-     * Each context can hold at most one attachment at a time. Setting a new attachment
-     * replaces any existing attachment.</p>
-     *
-     * <p><strong>Scoping Rules:</strong></p>
-     * <ul>
-     *   <li>Attachments are scoped to their context</li>
-     *   <li>Child contexts can access parent attachments via {@link #findAttachment(int)}</li>
-     *   <li>Sibling contexts cannot access each other's attachments</li>
-     *   <li>Parent contexts cannot access child attachments</li>
-     * </ul>
-     *
-     * <p>Passing {@code null} clears the attachment, making it equivalent to calling
-     * {@link #removeAttachment()}. After clearing, {@link #getAttachment()} will return
-     * an empty {@link Optional}.</p>
-     *
-     * <p>This method returns {@code this} context for method chaining, enabling fluent
-     * attachment setup:</p>
-     * <pre>{@code
-     * ctx.setAttachment(dataSource)
-     *    .setAttachment(transaction)
-     *    .setAttachment(config);
-     * }</pre>
-     *
-     * <p><strong>Thread Safety:</strong> Attachment storage is not synchronized. In parallel
-     * execution, each action receives its own context, ensuring isolation. Do not modify
-     * attachments concurrently from multiple threads.</p>
-     *
-     * @param <T> the attachment type
-     * @param attachment the attachment to set; {@code null} clears the attachment
-     * @return this context for method chaining
-     * @see #getAttachment()
-     * @see #findAttachment(int)
-     * @see Attachment
-     */
-    public <T> Context setAttachment(T attachment) {
-        this.attachment = attachment;
-        return this;
-    }
-
-    /**
-     * Returns the current attachment wrapped as an {@link Attachment} view.
-     *
-     * <p>This method retrieves the attachment set on this context only. To access ancestor
-     * attachments, use {@link #findAttachment(int)}.</p>
-     *
-     * <p>The returned {@link Attachment} provides type-safe access to the underlying value:
-     * <ul>
-     *   <li>{@link Attachment#getType()} - Returns the runtime type</li>
-     *   <li>{@link Attachment#to(Class)} - Casts to a specific type</li>
-     * </ul>
-     *
-     * <p>If no attachment is present — either because none was set or because it was
-     * cleared via {@link #setAttachment(Object) setAttachment(null)} or
-     * {@link #removeAttachment()} — returns an empty {@link Optional}.</p>
-     *
-     * <p><strong>Usage Example:</strong></p>
-     * <pre>{@code
-     * ctx.setAttachment("myString");
-     * Optional<Attachment> attachment = ctx.getAttachment();
-     * if (attachment.isPresent()) {
-     *     String value = attachment.get().to(String.class).orElseThrow();
-     * }
-     * }</pre>
-     *
-     * @return an {@link Optional} containing the attachment wrapper, or empty if no attachment is present
-     * @see #setAttachment(Object)
-     * @see #findAttachment(int)
-     * @see Attachment
-     */
-    public Optional<Attachment> getAttachment() {
-        if (attachment == null) {
-            return Optional.empty();
-        }
-
-        return Optional.of(Attachment.of(attachment));
-    }
-
-    /**
-     * Removes and returns the current attachment wrapped as an {@link Attachment} view.
-     *
-     * <p>This method atomically removes the attachment and returns it in one operation.
-     * After removal, {@link #getAttachment()} will return an empty {@link Optional}.</p>
-     *
-     * <p>Removing attachments is useful for implementing one-time resource consumption patterns
-     * where you want to ensure an attachment is only accessed once:</p>
-     * <pre>{@code
-     * Optional<Attachment> resource = ctx.removeAttachment();
-     * if (resource.isPresent()) {
-     *     try {
-     *         // Use the resource
-     *         resource.get().to(Resource.class).ifPresent(this::consume);
-     *     } finally {
-     *         // Resource already removed, no cleanup needed
-     *     }
-     * }
-     * }</pre>
-     *
-     * <p>If no attachment is present — either because none was set or because it was
-     * cleared via {@link #setAttachment(Object) setAttachment(null)} or
-     * {@link #removeAttachment()} — returns an empty {@link Optional}.</p>
-     *
-     * @return an {@link Optional} containing the removed attachment wrapper, or empty if no attachment is present
-     * @see #getAttachment()
-     * @see #setAttachment(Object)
-     */
-    public Optional<Attachment> removeAttachment() {
-        if (attachment == null) {
-            return Optional.empty();
-        }
-
-        Object removed = attachment;
-        attachment = null;
-        return Optional.of(Attachment.of(removed));
-    }
-
-    /**
-     * Returns this context's attachment or an ancestor's attachment.
-     *
-     * <p>The {@code level} parameter specifies how many levels up the context hierarchy
-     * to navigate to find an attachment:
-     * <ul>
-     *   <li>{@code 0} - Returns this context's attachment (same as {@link #getAttachment()})</li>
-     *   <li>{@code 1} - Returns the parent context's attachment</li>
-     *   <li>{@code 2} - Returns the grandparent context's attachment</li>
-     *   <li>etc.</li>
-     * </ul>
-     *
-     * <p>This method is useful for implementing dependency injection patterns where parent
-     * actions set up resources that child actions consume. Child contexts can access parent
-     * attachments without needing to know the exact ancestor level.</p>
-     *
-     * <p><strong>Shadowing:</strong> If a child context sets its own attachment, it shadows
-     * the parent attachment for that context. Use {@code level > 0} to explicitly access
-     * ancestor attachments when shadowing is in effect.</p>
-     *
-     * <p><strong>Usage Example:</strong></p>
-     * <pre>{@code
-     * // Parent sets up database connection
-     * ctx.setAttachment(connection);
-     *
-     * // Child action accesses parent attachment
-     * Optional<Attachment> db = ctx.findAttachment(1);
-     * db.flatMap(a -> a.to(Connection.class)).ifPresent(conn -> {
-     *     // Use the connection
-     * });
-     * }</pre>
-     *
-     * @param level the number of levels up the hierarchy; must be non-negative
-     * @return an {@link Optional} containing the attachment wrapper, or empty if the requested context has no attachment
-     * @throws IllegalArgumentException if {@code level} is negative
-     * @throws java.util.NoSuchElementException if the ancestor at the given level does not exist
-     * @see #findContext(int)
-     * @see #getAttachment()
-     * @see Attachment
-     */
-    public Optional<Attachment> findAttachment(int level) {
-        return findContext(level).flatMap(Context::getAttachment);
-    }
-
-    /**
-     * Returns a concise string identifying whether this context is the root or a child context.
-     *
-     * @return a short diagnostic description of this context
-     */
-    @Override
-    public String toString() {
-        return "Context[" + (parent == null ? "root" : "child") + "]";
-    }
+    Context createChild();
 }

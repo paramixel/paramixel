@@ -24,32 +24,19 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * Collects and executes cleanup tasks in the specified order.
+ * Collects cleanup callbacks and executes them later in forward or reverse order.
  *
- * <p>Tasks are executed in the order determined by the {@link Mode} specified
- * at construction. Non-fatal exceptions thrown by tasks are collected in the
- * {@link CleanupResult} returned by {@link #run()}. {@link Error} subclasses
- * propagate immediately and abort the cleanup loop.</p>
- *
- * @see CleanupResult
- * @see Executable
- * @see Mode
+ * <p>This utility is intended for resource teardown flows where callers want to register cleanup work incrementally
+ * and then either inspect failures with {@link CleanupResult} or rethrow them with {@link #runAndThrow()}.
  */
 public class Cleanup {
 
     /**
-     * Execution order mode for cleanup tasks.
+     * Defines the execution order for registered cleanup callbacks.
      */
     public enum Mode {
-
-        /**
-         * Execute tasks in registration order (first-registered executes first).
-         */
         FORWARD,
 
-        /**
-         * Execute tasks in reverse registration order (last-registered executes first).
-         */
         REVERSE
     }
 
@@ -60,19 +47,19 @@ public class Cleanup {
     private boolean hasRun = false;
 
     /**
-     * Creates a new Cleanup with execution mode {@code Mode.FORWARD}.
+     * Creates a cleanup sequence that runs callbacks in registration order.
      *
-     * @return a new cleanup instance; never {@code null}
+     * @return a new cleanup sequence
      */
     public static Cleanup of() {
         return new Cleanup(Mode.FORWARD);
     }
 
     /**
-     * Creates a new Cleanup with the specified execution mode.
+     * Creates a cleanup sequence with the supplied execution mode.
      *
-     * @param mode The execution mode; must not be null.
-     * @return a new cleanup instance; never {@code null}
+     * @param mode the callback execution order
+     * @return a new cleanup sequence
      * @throws NullPointerException if {@code mode} is {@code null}
      */
     public static Cleanup of(final Mode mode) {
@@ -80,48 +67,38 @@ public class Cleanup {
         return new Cleanup(mode);
     }
 
-    /**
-     * Creates a new Cleanup with execution mode {@code Mode.FORWARD}
-     */
     private Cleanup() {
         this(Mode.FORWARD);
     }
 
-    /**
-     * Creates a new Cleanup with the specified execution mode.
-     *
-     * @param mode The execution mode; must not be null.
-     */
     private Cleanup(final Mode mode) {
         this.mode = mode;
     }
 
     /**
-     * Returns the number of registered cleanup tasks.
+     * Returns the number of registered cleanup callbacks.
      *
-     * @return The number of registered cleanup tasks.
+     * @return the number of registered callbacks
      */
     public int getCount() {
         return executables.size();
     }
 
     /**
-     * Returns whether this cleanup instance has already been executed.
+     * Returns whether this cleanup sequence has already been executed.
      *
-     * <p>Once {@link #run()} or {@link #runAndThrow()} has been called successfully, this
-     * method returns {@code true} until {@link #reset()} or {@link #clear()} is invoked.</p>
-     *
-     * @return {@code true} if cleanup has already run; otherwise {@code false}
+     * @return {@code true} when {@link #run()} or {@link #runAndThrow()} has already been called
      */
     public boolean hasRun() {
         return hasRun;
     }
 
     /**
-     * Registers a cleanup executable.
+     * Registers a cleanup callback.
      *
-     * @param executable The executable to register; must not be null.
-     * @return This cleanup.
+     * @param executable the callback to register
+     * @return this cleanup sequence
+     * @throws NullPointerException if {@code executable} is {@code null}
      */
     public Cleanup add(final Executable executable) {
         Objects.requireNonNull(executable, "executable must not be null");
@@ -130,10 +107,11 @@ public class Cleanup {
     }
 
     /**
-     * Registers multiple cleanup executables.
+     * Registers multiple cleanup callbacks.
      *
-     * @param executables The executables to register; must not be null.
-     * @return This cleanup.
+     * @param executables the callbacks to register
+     * @return this cleanup sequence
+     * @throws NullPointerException if {@code executables} is {@code null} or contains {@code null}
      */
     public Cleanup add(final Executable... executables) {
         Objects.requireNonNull(executables, "executables must not be null");
@@ -144,10 +122,11 @@ public class Cleanup {
     }
 
     /**
-     * Registers multiple cleanup executables from a list.
+     * Registers multiple cleanup callbacks from the supplied list.
      *
-     * @param executables The executables to register; must not be null.
-     * @return This cleanup.
+     * @param executables the callbacks to register
+     * @return this cleanup sequence
+     * @throws NullPointerException if {@code executables} is {@code null} or contains {@code null}
      */
     public Cleanup add(final List<? extends Executable> executables) {
         Objects.requireNonNull(executables, "executables must not be null");
@@ -158,11 +137,12 @@ public class Cleanup {
     }
 
     /**
-     * Registers a cleanup executable that executes only when the condition evaluates to {@code true}.
+     * Registers a callback that runs only when the supplied condition evaluates to {@code true} at execution time.
      *
-     * @param condition The condition supplier to evaluate; must not be null.
-     * @param executable The executable to execute if the condition is {@code true}; must not be null.
-     * @return This cleanup.
+     * @param condition the condition to evaluate during cleanup
+     * @param executable the callback to run when the condition passes
+     * @return this cleanup sequence
+     * @throws NullPointerException if {@code condition} or {@code executable} is {@code null}
      */
     public Cleanup addWhen(final Supplier<Boolean> condition, final Executable executable) {
         Objects.requireNonNull(condition, "condition must not be null");
@@ -175,11 +155,12 @@ public class Cleanup {
     }
 
     /**
-     * Registers a cleanup executable that executes only when the condition is {@code true}.
+     * Registers a callback that runs only when the supplied condition is {@code true}.
      *
-     * @param condition The condition to evaluate.
-     * @param executable The executable to execute if the condition is {@code true}; must not be null.
-     * @return This cleanup.
+     * @param condition the static condition to evaluate
+     * @param executable the callback to run when the condition passes
+     * @return this cleanup sequence
+     * @throws NullPointerException if {@code executable} is {@code null}
      */
     public Cleanup addWhen(final boolean condition, final Executable executable) {
         Objects.requireNonNull(executable, "executable must not be null");
@@ -191,12 +172,10 @@ public class Cleanup {
     }
 
     /**
-     * Registers an {@link AutoCloseable} to close during cleanup.
+     * Registers {@link AutoCloseable#close()} for the supplied resource when it is non-null.
      *
-     * <p>If {@code autoCloseable} is null, this method does nothing (null-safe).
-     *
-     * @param autoCloseable The {@code AutoCloseable} to close; may be null.
-     * @return This cleanup.
+     * @param autoCloseable the resource to close during cleanup
+     * @return this cleanup sequence
      */
     public Cleanup addCloseable(final AutoCloseable autoCloseable) {
         if (autoCloseable != null) {
@@ -206,25 +185,18 @@ public class Cleanup {
     }
 
     /**
-     * Returns a snapshot of the registered cleanup executables.
+     * Returns an immutable snapshot of the registered callbacks.
      *
-     * <p>The returned list is immutable and does not reflect later changes
-     * to this {@code Cleanup} instance's registered executables.</p>
-     *
-     * @return An immutable snapshot of registered cleanup executables; never null.
+     * @return the registered callbacks in registration order
      */
     public List<Executable> getExecutables() {
         return List.copyOf(executables);
     }
 
     /**
-     * Resets the execution state, allowing this Cleanup to be re-run with its
-     * currently registered tasks.
+     * Marks this cleanup sequence as not yet run without removing registered callbacks.
      *
-     * <p>Registered executables are preserved. Use {@link #clear()} to remove
-     * all executables and reset the execution state.</p>
-     *
-     * @return this cleanup instance
+     * @return this cleanup sequence
      */
     public Cleanup reset() {
         hasRun = false;
@@ -232,13 +204,9 @@ public class Cleanup {
     }
 
     /**
-     * Clears all registered executables and resets the execution state.
+     * Removes all registered callbacks and resets execution state.
      *
-     * <p>This method allows the same {@code Cleanup} instance to be reused from
-     * scratch after a prior run. All previously registered executables are removed
-     * and the run state is discarded.</p>
-     *
-     * @return this cleanup instance
+     * @return this cleanup sequence
      */
     public Cleanup clear() {
         executables.clear();
@@ -247,21 +215,13 @@ public class Cleanup {
     }
 
     /**
-     * Executes all registered cleanup tasks and collects any thrown exceptions.
+     * Executes all registered callbacks and captures any non-{@link Error} failures.
      *
-     * <p>Tasks execute in the order defined by the configured {@link Mode}. Every task is
-     * given a chance to run even if earlier tasks fail. Non-fatal exceptions are captured in
-     * the returned {@link CleanupResult} by task index.</p>
+     * <p>Callbacks run in the configured {@link Mode}. Every callback is attempted even when earlier callbacks fail.
      *
-     * <p>{@link Error} subclasses (such as {@link OutOfMemoryError}) are <strong>not caught</strong>
-     * and propagate immediately, aborting the cleanup loop. Remaining cleanup tasks will not run.</p>
-     *
-     * <p>This method may be called only once unless {@link #reset()} or {@link #clear()}
-     * is invoked.</p>
-     *
-     * @return the aggregated cleanup result
-     * @throws IllegalStateException if this cleanup has already run and has not been reset
-     * @throws Error if a cleanup task throws an {@link Error}; it propagates immediately
+     * @return the cleanup result describing per-callback failures
+     * @throws IllegalStateException if this cleanup sequence has already run
+     * @throws Error if a callback throws an {@link Error}
      */
     public CleanupResult run() {
         if (hasRun) {
@@ -302,13 +262,13 @@ public class Cleanup {
     }
 
     /**
-     * Executes all executables if not yet executed, then throws the first exception with all others suppressed.
+     * Executes all registered callbacks and rethrows the first non-{@link Error} failure.
      *
-     * <p>If multiple executables threw exceptions, the first exception encountered during
-     * execution (based on the mode) is thrown with all subsequent exceptions added via
-     * {@link Throwable#addSuppressed(Throwable)}.
+     * <p>Later failures are added to the first failure as suppressed exceptions in execution order.
      *
-     * @throws Throwable The first exception thrown by any executable, with all other exceptions suppressed.
+     * @throws Throwable the first captured callback failure, with later failures suppressed
+     * @throws IllegalStateException if this cleanup sequence has already run
+     * @throws Error if a callback throws an {@link Error}
      */
     public void runAndThrow() throws Throwable {
         CleanupResult result = run();
@@ -334,19 +294,14 @@ public class Cleanup {
     }
 
     /**
-     * A functional interface for cleanup executables that can throw checked exceptions.
+     * Represents a single cleanup callback.
      */
     public interface Executable {
 
         /**
-         * Executes the cleanup executable.
+         * Runs the cleanup callback.
          *
-         * <p>Non-fatal exceptions thrown by cleanup executables are collected in
-         * {@link CleanupResult}. {@link Error} subclasses propagate immediately
-         * and abort the cleanup loop.</p>
-         *
-         * @throws Throwable if the cleanup executable fails; non-fatal exceptions
-         *                   are collected, while {@link Error} propagates immediately
+         * @throws Throwable any failure raised by the callback
          */
         void run() throws Throwable;
     }
