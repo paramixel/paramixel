@@ -18,12 +18,14 @@ package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.action.Noop;
 import org.paramixel.core.action.RandomSequential;
 
 @DisplayName("RandomSequential")
@@ -186,5 +188,45 @@ class RandomSequentialTest {
         RandomSequential root = RandomSequential.of("root", 42L, List.of(Direct.of("child", context -> {})));
 
         assertThat(root.seed()).hasValue(42L);
+    }
+
+    @Test
+    @DisplayName("of(String, List) rejects null name")
+    void ofListRejectsNullName() {
+        assertThatThrownBy(() -> RandomSequential.of(null, List.of(Noop.of("child"))))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, Action...) rejects null name")
+    void ofVarargsRejectsNullName() {
+        assertThatThrownBy(() -> RandomSequential.of(null, Noop.of("child"))).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, Action...) rejects null array")
+    void ofVarargsRejectsNullArray() {
+        assertThatThrownBy(() -> RandomSequential.of("test", (Action[]) null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, long, Action...) rejects null name")
+    void ofSeededVarargsRejectsNullName() {
+        assertThatThrownBy(() -> RandomSequential.of(null, 1L, Noop.of("child")))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, long, Action...) rejects null array")
+    void ofSeededVarargsRejectsNullArray() {
+        assertThatThrownBy(() -> RandomSequential.of("test", 1L, (Action[]) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, long, List) rejects null list")
+    void ofSeedListRejectsNullList() {
+        assertThatThrownBy(() -> RandomSequential.of("test", 1L, (List<Action>) null))
+                .isInstanceOf(NullPointerException.class);
     }
 }

@@ -18,6 +18,7 @@ package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.DependentSequential;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.action.Noop;
 
 @DisplayName("DependentSequential")
 class DependentSequentialTest {
@@ -204,5 +206,38 @@ class DependentSequentialTest {
         Action root = DependentSequential.of("root", List.of(Direct.of("child", context -> {})));
 
         assertThat(root).isNotInstanceOf(org.paramixel.core.action.Sequential.class);
+    }
+
+    @Test
+    @DisplayName("of(String, Action...) rejects null name")
+    void ofVarargsRejectsNullName() {
+        assertThatThrownBy(() -> DependentSequential.of(null, Noop.of("child")))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, Action...) rejects blank name")
+    void ofVarargsRejectsBlankName() {
+        assertThatIllegalArgumentException().isThrownBy(() -> DependentSequential.of("", Noop.of("child")));
+    }
+
+    @Test
+    @DisplayName("of(String, Action...) rejects null array")
+    void ofVarargsRejectsNullArray() {
+        assertThatThrownBy(() -> DependentSequential.of("test", (Action[]) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, Action...) rejects empty array")
+    void ofVarargsRejectsEmptyArray() {
+        assertThatIllegalArgumentException().isThrownBy(() -> DependentSequential.of("test", new Action[0]));
+    }
+
+    @Test
+    @DisplayName("of(String, List) rejects null list")
+    void ofListRejectsNullList() {
+        assertThatThrownBy(() -> DependentSequential.of("test", (List<Action>) null))
+                .isInstanceOf(NullPointerException.class);
     }
 }

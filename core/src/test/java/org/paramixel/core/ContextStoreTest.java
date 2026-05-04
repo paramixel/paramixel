@@ -148,4 +148,29 @@ class ContextStoreTest {
         assertThat(child.getListener()).isSameAs(parent.getListener());
         assertThat(child.getExecutorService()).isSameAs(parent.getExecutorService());
     }
+
+    @Test
+    @DisplayName("DefaultContext with null configuration falls back to default properties")
+    void defaultContextWithNullConfigurationFallsBack() {
+        Context context = new DefaultContext(null, NOOP_LISTENER, executorService());
+
+        assertThat(context.getConfiguration()).containsKey(Configuration.RUNNER_PARALLELISM);
+    }
+
+    @Test
+    @DisplayName("DefaultContext toString returns root for root context")
+    void toStringReturnsRootForRootContext() {
+        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+
+        assertThat(root.toString()).isEqualTo("Context[root]");
+    }
+
+    @Test
+    @DisplayName("DefaultContext toString returns child for child context")
+    void toStringReturnsChildForChildContext() {
+        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        Context child = root.createChild();
+
+        assertThat(child.toString()).isEqualTo("Context[child]");
+    }
 }

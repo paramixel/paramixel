@@ -43,45 +43,55 @@
     </modules>
 
     <properties>
+        <!-- Dependency versions -->
+        <assertj-core.version>3.27.7</assertj-core.version>
+        <classgraph.version>4.8.184</classgraph.version>
+        <commons-compress.version>1.28.0</commons-compress.version>
+        <junit.version>6.0.3</junit.version>
+        <kafka-clients.version>4.2.0</kafka-clients.version>
+        <maven.version>3.9.15</maven.version>
+        <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
+        <mongodb-driver-sync.version>5.6.5</mongodb-driver-sync.version>
+        <palantir-java-format.version>2.90.0</palantir-java-format.version>
+        <pmd.version>7.22.0</pmd.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <spotbugs.version>4.9.4</spotbugs.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
+        <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
+        <testcontainers-mongodb.version>1.21.4</testcontainers-mongodb.version>
+        <testcontainers-nginx.version>1.21.4</testcontainers-nginx.version>
+        <!-- Plugin versions -->
+        <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
+        <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
+        <flatten-maven-plugin.version>1.7.3</flatten-maven-plugin.version>
+        <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
+        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <maven-dependency-plugin.version>3.10.0</maven-dependency-plugin.version>
+        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
+        <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
+        <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+        <maven-plugin-plugin.version>3.15.2</maven-plugin-plugin.version>
+        <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
+        <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
+        <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+        <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+        <maven-surefire-plugin.version>3.5.5</maven-surefire-plugin.version>
+        <spotbugs-maven-plugin.version>4.9.8.3</spotbugs-maven-plugin.version>
+        <spotless-maven-plugin.version>3.4.0</spotless-maven-plugin.version>
+        <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
+        <!-- Build settings -->
+        <jacoco.skip>false</jacoco.skip>
+        <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <maven.compiler.release>17</maven.compiler.release>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <pmd.skip>false</pmd.skip>
+        <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.testSourceEncoding>UTF-8</project.build.testSourceEncoding>
-        <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
-        <project.reporting.sourceEncoding>UTF-8</project.reporting.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <maven.deploy.skip>true</maven.deploy.skip>
-        <junit.platform.version>6.0.3</junit.platform.version>
-        <maven.plugin.api.version>3.9.15</maven.plugin.api.version>
-        <maven.plugin.annotations.version>3.15.2</maven.plugin.annotations.version>
-        <maven.core.version>3.9.15</maven.core.version>
-        <maven.artifact.version>3.9.15</maven.artifact.version>
-        <slf4j.version>2.0.17</slf4j.version>
-        <junit.version>6.0.3</junit.version>
-        <assertj.version>3.27.7</assertj.version>
-        <testcontainers.version>2.0.5</testcontainers.version>
-        <testcontainers.kafka.version>1.21.4</testcontainers.kafka.version>
-        <testcontainers.mongodb.version>1.21.4</testcontainers.mongodb.version>
-        <testcontainers.nginx.version>1.21.4</testcontainers.nginx.version>
-        <commons-compress.version>1.28.0</commons-compress.version>
-        <kafka-clients.version>4.2.0</kafka-clients.version>
-        <mongodb-driver.version>5.6.5</mongodb-driver.version>
-        <jacoco.version>0.8.14</jacoco.version>
-        <maven.resources.version>3.5.0</maven.resources.version>
-        <maven.shade.version>3.6.2</maven.shade.version>
-        <exec.maven.version>3.6.3</exec.maven.version>
-        <maven.javadoc.version>3.12.0</maven.javadoc.version>
-        <spotbugs.version>4.9.4</spotbugs.version>
-        <spotbugs.maven.plugin.version>4.9.8.3</spotbugs.maven.plugin.version>
+        <project.reporting.sourceEncoding>UTF-8</project.reporting.sourceEncoding>
         <spotbugs.skip>false</spotbugs.skip>
-        <pmd.version>7.22.0</pmd.version>
-        <pmd.maven.plugin.version>3.28.0</pmd.maven.plugin.version>
-        <pmd.skip>false</pmd.skip>
-        <jacoco.skip>false</jacoco.skip>
-        <maven.dependency.plugin.version>3.10.0</maven.dependency.plugin.version>
-        <classgraph.version>4.8.184</classgraph.version>
-        <palantir.java.format.version>2.90.0</palantir.java.format.version>
     </properties>
 
     <dependencyManagement>
@@ -89,17 +99,17 @@
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-engine</artifactId>
-                <version>${junit.platform.version}</version>
+                <version>${junit.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-launcher</artifactId>
-                <version>${junit.platform.version}</version>
+                <version>${junit.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-commons</artifactId>
-                <version>${junit.platform.version}</version>
+                <version>${junit.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
@@ -109,22 +119,22 @@
             <dependency>
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-plugin-api</artifactId>
-                <version>${maven.plugin.api.version}</version>
+                <version>${maven.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven.plugin-tools</groupId>
                 <artifactId>maven-plugin-annotations</artifactId>
-                <version>${maven.plugin.annotations.version}</version>
+                <version>${maven-plugin-annotations.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-core</artifactId>
-                <version>${maven.core.version}</version>
+                <version>${maven.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-artifact</artifactId>
-                <version>${maven.artifact.version}</version>
+                <version>${maven.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -134,7 +144,7 @@
             <dependency>
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
-                <version>${assertj.version}</version>
+                <version>${assertj-core.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
@@ -144,17 +154,17 @@
             <dependency>
                 <groupId>org.testcontainers</groupId>
                 <artifactId>kafka</artifactId>
-                <version>${testcontainers.kafka.version}</version>
+                <version>${testcontainers-kafka.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
                 <artifactId>mongodb</artifactId>
-                <version>${testcontainers.mongodb.version}</version>
+                <version>${testcontainers-mongodb.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.testcontainers</groupId>
                 <artifactId>nginx</artifactId>
-                <version>${testcontainers.nginx.version}</version>
+                <version>${testcontainers-nginx.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -169,7 +179,7 @@
             <dependency>
                 <groupId>org.mongodb</groupId>
                 <artifactId>mongodb-driver-sync</artifactId>
-                <version>${mongodb-driver.version}</version>
+                <version>${mongodb-driver-sync.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -190,7 +200,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.15.0</version>
+                    <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <source>${maven.compiler.source}</source>
                         <target>${maven.compiler.target}</target>
@@ -201,19 +211,19 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.5.5</version>
+                    <version>${maven-surefire-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
-                    <version>3.4.0</version>
+                    <version>${spotless-maven-plugin.version}</version>
                     <configuration>
                         <licenseHeader>
                             <file>${maven.multiModuleProjectDirectory}/assets/license-header.txt</file>
                         </licenseHeader>
                         <java>
                             <palantirJavaFormat>
-                                <version>${palantir.java.format.version}</version>
+                                <version>${palantir-java-format.version}</version>
                                 <style>PALANTIR</style>
                             </palantirJavaFormat>
                         </java>
@@ -230,7 +240,7 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>versions-maven-plugin</artifactId>
-                    <version>2.21.0</version>
+                    <version>${versions-maven-plugin.version}</version>
                     <configuration>
                         <rulesUri>file://${maven.multiModuleProjectDirectory}/versions-rules.xml</rulesUri>
                     </configuration>
@@ -238,7 +248,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>3.6.2</version>
+                    <version>${maven-enforcer-plugin.version}</version>
                     <executions>
                         <execution>
                             <id>enforce-maven</id>
@@ -261,32 +271,32 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-source-plugin</artifactId>
-                    <version>3.4.0</version>
+                    <version>${maven-source-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-gpg-plugin</artifactId>
-                    <version>3.2.8</version>
+                    <version>${maven-gpg-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-plugin-plugin</artifactId>
-                    <version>3.15.2</version>
+                    <version>${maven-plugin-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
                     <artifactId>central-publishing-maven-plugin</artifactId>
-                    <version>0.10.0</version>
+                    <version>${central-publishing-maven-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>flatten-maven-plugin</artifactId>
-                    <version>1.7.3</version>
+                    <version>${flatten-maven-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>${jacoco.version}</version>
+                    <version>${jacoco-maven-plugin.version}</version>
                     <configuration>
                         <skip>${jacoco.skip}</skip>
                     </configuration>
@@ -309,27 +319,27 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-resources-plugin</artifactId>
-                    <version>${maven.resources.version}</version>
+                    <version>${maven-resources-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>${maven.shade.version}</version>
+                    <version>${maven-shade-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
-                    <version>${exec.maven.version}</version>
+                    <version>${exec-maven-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>${maven.javadoc.version}</version>
+                    <version>${maven-javadoc-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>com.github.spotbugs</groupId>
                     <artifactId>spotbugs-maven-plugin</artifactId>
-                    <version>${spotbugs.maven.plugin.version}</version>
+                    <version>${spotbugs-maven-plugin.version}</version>
                     <configuration>
                         <effort>Max</effort>
                         <threshold>Low</threshold>
@@ -340,7 +350,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-pmd-plugin</artifactId>
-                    <version>${pmd.maven.plugin.version}</version>
+                    <version>${maven-pmd-plugin.version}</version>
                     <configuration>
                         <targetJdk>17</targetJdk>
                         <rulesets>
@@ -353,7 +363,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
-                    <version>${maven.dependency.plugin.version}</version>
+                    <version>${maven-dependency-plugin.version}</version>
                     <configuration>
                         <failOnWarning>false</failOnWarning>
                     </configuration>
@@ -364,7 +374,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.6.2</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -484,7 +493,6 @@
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>flatten-maven-plugin</artifactId>
-                        <version>1.7.3</version>
                         <configuration>
                             <updatePomFile>true</updatePomFile>
                             <flattenMode>ossrh</flattenMode>

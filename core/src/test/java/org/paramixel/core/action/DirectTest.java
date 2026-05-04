@@ -17,6 +17,7 @@
 package org.paramixel.core.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -187,5 +188,32 @@ class DirectTest {
         runner.run(action);
 
         assertThat(capturedThrowable).hasValue(expectedException);
+    }
+
+    @Test
+    @DisplayName("of rejects null name")
+    void ofRejectsNullName() {
+        assertThatThrownBy(() -> Direct.of(null, context -> {})).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of rejects blank name")
+    void ofRejectsBlankName() {
+        assertThatIllegalArgumentException().isThrownBy(() -> Direct.of("", context -> {}));
+        assertThatIllegalArgumentException().isThrownBy(() -> Direct.of("   ", context -> {}));
+    }
+
+    @Test
+    @DisplayName("of rejects null executable")
+    void ofRejectsNullExecutable() {
+        assertThatThrownBy(() -> Direct.of("test", null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("execute rejects null context")
+    void executeRejectsNullContext() {
+        Direct action = Direct.of("test", context -> {});
+
+        assertThatThrownBy(() -> action.execute(null)).isInstanceOf(NullPointerException.class);
     }
 }

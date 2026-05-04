@@ -182,4 +182,117 @@ class ResultTest {
 
         assertThat(result.toString()).isEqualTo("PASS | 123 ms");
     }
+
+    @Test
+    @DisplayName("setParent rejects null")
+    void setParentRejectsNull() {
+        DefaultResult result = new DefaultResult(Noop.of("test"));
+
+        assertThatThrownBy(() -> result.setParent(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("parent must not be null");
+    }
+
+    @Test
+    @DisplayName("addChild with non-DefaultResult does not set parent")
+    void addChildWithNonDefaultResultDoesNotSetParent() {
+        DefaultResult parentResult = new DefaultResult(Noop.of("parent"));
+        Result nonDefaultResult = new Result() {
+            @Override
+            public Status getStatus() {
+                return DefaultStatus.PASS;
+            }
+
+            @Override
+            public Duration getElapsedTime() {
+                return Duration.ZERO;
+            }
+
+            @Override
+            public Duration getCumulativeElapsedTime() {
+                return Duration.ZERO;
+            }
+
+            @Override
+            public Action getAction() {
+                return Noop.of("child");
+            }
+
+            @Override
+            public java.util.Optional<Result> getParent() {
+                return java.util.Optional.empty();
+            }
+
+            @Override
+            public java.util.List<Result> getChildren() {
+                return java.util.List.of();
+            }
+        };
+
+        parentResult.addChild(nonDefaultResult);
+
+        assertThat(parentResult.getChildren()).hasSize(1);
+        assertThat(nonDefaultResult.getParent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getCumulativeElapsedTime sums nested children")
+    void getCumulativeElapsedTimeSumsNestedChildren() {
+        Action parent = Noop.of("parent");
+        Action child1 = Noop.of("child1");
+        Action child2 = Noop.of("child2");
+
+        DefaultResult parentResult = new DefaultResult(parent);
+        DefaultResult childResult1 = new DefaultResult(child1);
+        childResult1.setStatus(DefaultStatus.PASS);
+        childResult1.setElapsedTime(Duration.ofMillis(100));
+        DefaultResult childResult2 = new DefaultResult(child2);
+        childResult2.setStatus(DefaultStatus.PASS);
+        childResult2.setElapsedTime(Duration.ofMillis(200));
+
+        parentResult.addChild(childResult1);
+        parentResult.addChild(childResult2);
+        parentResult.setStatus(DefaultStatus.PASS);
+        parentResult.setElapsedTime(Duration.ofMillis(50));
+
+        assertThat(parentResult.getCumulativeElapsedTime()).isEqualTo(Duration.ofMillis(300));
+    }
+
+    @Test
+    @DisplayName("getCumulativeElapsedTime returns own time when leaf")
+    void getCumulativeElapsedTimeReturnsOwnTimeWhenLeaf() {
+        DefaultResult result = new DefaultResult(Noop.of("test"));
+        result.setStatus(DefaultStatus.PASS);
+        result.setElapsedTime(Duration.ofMillis(42));
+
+        assertThat(result.getCumulativeElapsedTime()).isEqualTo(Duration.ofMillis(42));
+    }
+
+    @Test
+    @DisplayName("single arg constructor rejects null action")
+    void singleArgConstructorRejectsNullAction() {
+        assertThatThrownBy(() -> new DefaultResult(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
+    }
+
+    @Test
+    @DisplayName("setStatus rejects null")
+    void setStatusRejectsNull() {
+        DefaultResult result = new DefaultResult(Noop.of("test"));
+
+        assertThatThrownBy(() -> result.setStatus(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("status must not be null");
+    }
+
+    @Test
+    @DisplayName("setElapsedTime rejects null")
+    void setElapsedTimeRejectsNull() {
+        DefaultResult result = new DefaultResult(Noop.of("test"));
+
+        assertThatThrownBy(() -> result.setElapsedTime(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("elapsedTime must not be null");
+    }
 }

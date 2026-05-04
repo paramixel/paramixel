@@ -86,4 +86,56 @@ class ValueTest {
 
         assertThatThrownBy(() -> value.cast(null)).isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    @DisplayName("equals returns true for same instance")
+    void equalsReturnsTrueForSameInstance() {
+        Value value = Value.of("hello");
+
+        assertThat(value).isEqualTo(value);
+    }
+
+    @Test
+    @DisplayName("equals returns true for same content")
+    void equalsReturnsTrueForSameContent() {
+        Value value1 = Value.of("hello");
+        Value value2 = Value.of("hello");
+
+        assertThat(value1).isEqualTo(value2);
+    }
+
+    @Test
+    @DisplayName("equals returns false for different content")
+    void equalsReturnsFalseForDifferentContent() {
+        Value value1 = Value.of("hello");
+        Value value2 = Value.of("world");
+
+        assertThat(value1).isNotEqualTo(value2);
+    }
+
+    @Test
+    @DisplayName("equals returns false for non-Value type")
+    void equalsReturnsFalseForNonValueType() {
+        Value value = Value.of("hello");
+
+        assertThat(value).isNotEqualTo("hello");
+        assertThat(value).isNotEqualTo(null);
+    }
+
+    @Test
+    @DisplayName("hashCode is consistent with equals")
+    void hashCodeIsConsistentWithEquals() {
+        Value value1 = Value.of("hello");
+        Value value2 = Value.of("hello");
+
+        assertThat(value1.hashCode()).isEqualTo(value2.hashCode());
+    }
+
+    @Test
+    @DisplayName("toString delegates to wrapped object")
+    void toStringDelegatesToWrappedObject() {
+        Value value = Value.of("hello");
+
+        assertThat(value.toString()).isEqualTo("hello");
+    }
 }
