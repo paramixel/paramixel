@@ -106,7 +106,7 @@ if (result.getStatus().isPass()) {
 }
 ```
 
-`Runner.run(Action)` returns a `Result`. You can also inspect `action.getResult()` after execution.
+`Runner.run(Action)` returns a `Result` that you can inspect after execution.
 
 A `Runner` can execute multiple actions. Each `run()` call is independent:
 

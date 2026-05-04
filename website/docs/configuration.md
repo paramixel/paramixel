@@ -52,6 +52,37 @@ Notes:
 - This affects `Runner.runAndReturnExitCode(Action)`, `Runner.runAndReturnExitCode(Selector)`, and the Maven plugin.
 - In the Maven plugin, this corresponds to the `<failureOnSkip>` POM parameter or `-Dparamixel.failureOnSkip=true` system property.
 
+### `paramixel.report.enabled`
+
+Controls whether Paramixel writes a per-run plain-text summary file.
+
+```properties
+paramixel.report.enabled=true
+```
+
+Notes:
+
+- Default is `false`.
+- When `true`, Paramixel writes a summary tree file at the end of each run.
+- Console output remains unchanged.
+- The file contains the summary tree and footer only. It does not include per-action status lines or stack traces.
+- If the report file cannot be created, Paramixel prints a warning to `System.err` and continues the run.
+
+### `paramixel.report.directory`
+
+Controls the directory used for per-run summary files.
+
+```properties
+paramixel.report.directory=target/paramixel
+```
+
+Notes:
+
+- In the Maven plugin, the default is `${project.build.directory}/paramixel`.
+- When used via `Factory.defaultListener(configuration)`, the default is `target/paramixel` if the key is absent.
+- The directory is created on demand.
+- Each run writes a file named `paramixel_<yyyyMMdd-HHmmss>.log`.
+
 ### `paramixel.match.package`
 
 Regex pattern for filtering discovered action factories by package name.
@@ -151,6 +182,8 @@ Example:
 
 ```xml
 <configuration>
+    <reportEnabled>true</reportEnabled>
+    <reportDirectory>${project.build.directory}/paramixel</reportDirectory>
     <properties>
         <property>
             <key>paramixel.parallelism</key>
@@ -164,7 +197,9 @@ Plugin flags:
 
 ```bash
 ./mvnw test -Dparamixel.skipTests=true
-./mvnw test -Dparamixel.failIfNoTests=false
+./mvnw test -Dparamixel.failIfNoTests=true
+./mvnw test -Dparamixel.report.enabled=true
+./mvnw test -Dparamixel.report.directory=target/paramixel-report
 ```
 
 `paramixel.skipTests` and `paramixel.failIfNoTests` are Maven plugin parameters, not core `Configuration` keys.

@@ -146,7 +146,8 @@ class ParamixelMojoPropertyTest {
                 System.setProperty(Configuration.RUNNER_PARALLELISM, "6");
 
                 var mojo = new ParamixelMojo();
-                var configuration = invokeBuildConfiguration(mojo);
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
 
                 assertThat(configuration.get(Configuration.RUNNER_PARALLELISM)).isEqualTo("6");
             } finally {
@@ -177,6 +178,54 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
+        @DisplayName("report properties are included in built configuration")
+        void reportPropertiesShouldBeIncludedInConfiguration() throws Exception {
+            var originalReportEnabled = System.getProperty(Configuration.REPORT_ENABLED);
+            var originalReportDirectory = System.getProperty(Configuration.REPORT_DIRECTORY);
+            var mojo = new ParamixelMojo();
+            try {
+                System.clearProperty(Configuration.REPORT_ENABLED);
+                System.clearProperty(Configuration.REPORT_DIRECTORY);
+
+                setField(mojo, "reportEnabled", true);
+                setField(mojo, "reportDirectory", "target/custom-paramixel");
+
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+                assertThat(configuration.get(Configuration.REPORT_ENABLED)).isEqualTo("true");
+                assertThat(configuration.get(Configuration.REPORT_DIRECTORY)).isEqualTo("target/custom-paramixel");
+            } finally {
+                restoreSystemProperty(Configuration.REPORT_ENABLED, originalReportEnabled);
+                restoreSystemProperty(Configuration.REPORT_DIRECTORY, originalReportDirectory);
+            }
+        }
+
+        @Test
+        @DisplayName("system report properties should override mojo report configuration")
+        void systemReportPropertiesShouldOverrideMojoReportConfiguration() throws Exception {
+            var originalReportEnabled = System.getProperty(Configuration.REPORT_ENABLED);
+            var originalReportDirectory = System.getProperty(Configuration.REPORT_DIRECTORY);
+            var mojo = new ParamixelMojo();
+            try {
+                System.setProperty(Configuration.REPORT_ENABLED, "false");
+                System.setProperty(Configuration.REPORT_DIRECTORY, ".");
+
+                setField(mojo, "reportEnabled", true);
+                setField(mojo, "reportDirectory", "target/custom-paramixel");
+
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+                assertThat(configuration.get(Configuration.REPORT_ENABLED)).isEqualTo("false");
+                assertThat(configuration.get(Configuration.REPORT_DIRECTORY)).isEqualTo(".");
+            } finally {
+                restoreSystemProperty(Configuration.REPORT_ENABLED, originalReportEnabled);
+                restoreSystemProperty(Configuration.REPORT_DIRECTORY, originalReportDirectory);
+            }
+        }
+
+        @Test
         @DisplayName("missing Maven property key should throw descriptive exception")
         void missingMavenPropertyKeyShouldThrowDescriptiveException() throws Exception {
             var property = new Property();
@@ -184,7 +233,7 @@ class ParamixelMojoPropertyTest {
             var mojo = new ParamixelMojo();
             setField(mojo, "properties", List.of(property));
 
-            assertThatThrownBy(() -> invokeBuildConfiguration(mojo))
+            assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
                     .cause()
                     .isInstanceOf(org.apache.maven.plugin.MojoExecutionException.class)
                     .hasMessage("Paramixel property key must not be null");
@@ -198,18 +247,11 @@ class ParamixelMojoPropertyTest {
             var mojo = new ParamixelMojo();
             setField(mojo, "properties", List.of(property));
 
-            assertThatThrownBy(() -> invokeBuildConfiguration(mojo))
+            assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
                     .cause()
                     .isInstanceOf(org.apache.maven.plugin.MojoExecutionException.class)
                     .hasMessage("Paramixel property 'paramixel.custom' value must not be null");
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> invokeBuildConfiguration(final ParamixelMojo mojo) throws Exception {
-        Method method = ParamixelMojo.class.getDeclaredMethod("buildConfiguration");
-        method.setAccessible(true);
-        return (Map<String, String>) method.invoke(mojo);
     }
 
     @SuppressWarnings("unchecked")
@@ -224,5 +266,13 @@ class ParamixelMojoPropertyTest {
         Field field = ParamixelMojo.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(mojo, value);
+    }
+
+    private static void restoreSystemProperty(final String key, final String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
     }
 }

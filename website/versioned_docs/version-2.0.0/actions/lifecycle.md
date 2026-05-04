@@ -33,7 +33,7 @@ Important behavior from the current implementation:
 `before` and `after` share the same lifecycle child context.
 `main` runs in a child of that lifecycle context.
 
-That means data stored in `before` is typically read from `main` via `context.findAncestor(1).getStore()`.
+That means data stored in `before` is typically read from `main` via `context.findAncestor(1).orElseThrow().getStore()`.
 
 When `main` is skipped (because `before` failed or skipped), each skipped action and its descendants receive their own child contexts, mirroring the action tree. Listener callbacks interleave the same way as normal execution: parent `beforeAction`, then children, then parent `afterAction`.
 
@@ -47,6 +47,7 @@ Action suite = Lifecycle.of(
         }),
         Direct.of("main", context -> {
             boolean ready = context.findAncestor(1)
+                    .orElseThrow()
                     .getStore()
                     .get("ready")
                     .map(Value::get)

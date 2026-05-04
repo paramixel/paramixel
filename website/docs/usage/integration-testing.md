@@ -24,6 +24,7 @@ Action action = Lifecycle.of(
                 "tests",
                 Direct.of("check A", context -> {
                     Environment env = context.findAncestor(1)
+                            .orElseThrow()
                             .getStore()
                             .get("env")
                             .map(Value::get)
@@ -45,8 +46,8 @@ Action action = Lifecycle.of(
 
 See:
 
-- `examples/testcontainers/kafka/KafkaExample.java`
-- `examples/testcontainers/mongodb/MongoDBExample.java`
-- `examples/testcontainers/nginx/NginxExample.java`
+- `core-examples/src/main/java/examples/testcontainers/kafka/KafkaTest.java`
+- `core-examples/src/main/java/examples/testcontainers/mongodb/MongoDBTest.java`
+- `core-examples/src/main/java/examples/testcontainers/nginx/NginxTest.java`
 
 These examples use `Lifecycle`, `Store`, and `Cleanup` to manage Testcontainers resources.

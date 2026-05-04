@@ -74,4 +74,4 @@ cleanup.add(() -> stopOther()).run();
 
 A common pattern is to create resources in `Lifecycle.before` and release them in `Lifecycle.after` using `Cleanup`.
 
-See the Testcontainers examples under `examples/src/main/java/examples/testcontainers/`.
+See the Testcontainers examples under `core-examples/src/main/java/examples/testcontainers/`.

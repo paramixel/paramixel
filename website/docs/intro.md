@@ -15,7 +15,7 @@ Instead of describing tests with many framework-specific annotations, you build 
 - Tests are trees of `Action` objects.
 - Discovery is optional: `@Paramixel.ActionFactory` marks a `public static` no-arg factory method.
 - `Runner.run(action)` executes an action tree and returns a `Result`.
-- Read outcomes from the returned `Result` tree or from `action.getResult()` after execution.
+- Read outcomes from the returned `Result` tree after execution.
 - Runtime state is passed through `Context` and its `Store`.
 
 ## Minimal example
@@ -87,7 +87,7 @@ Core configuration is loaded from:
 2. JVM system properties
 3. programmatic `Runner.builder().configuration(...)` overrides, when used
 
-Built-in keys include `paramixel.parallelism`, `paramixel.match.package`, `paramixel.match.class`, and `paramixel.match.tag`.
+Built-in keys include `paramixel.parallelism`, `paramixel.failureOnSkip`, `paramixel.report.enabled`, `paramixel.report.directory`, `paramixel.match.package`, `paramixel.match.class`, and `paramixel.match.tag`.
 
 Use `@Paramixel.Tag` to tag action factories for selective discovery:
 

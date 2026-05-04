@@ -17,7 +17,7 @@ The Paramixel Maven plugin provides the `test` goal.
 ### `failIfNoTests`
 
 - property: `paramixel.failIfNoTests`
-- default: `true`
+- default: `false`
 
 ### `failureOnSkip`
 
@@ -25,6 +25,20 @@ The Paramixel Maven plugin provides the `test` goal.
 - default: `false`
 
 When `true`, skipped tests cause the build to fail (equivalent to exit code `1`). When `false` (default), skipped tests are treated as successful (exit code `0`).
+
+### `reportEnabled`
+
+- property: `paramixel.report.enabled`
+- default: `false`
+
+When `true`, the plugin writes a per-run plain-text summary file after execution completes.
+
+### `reportDirectory`
+
+- property: `paramixel.report.directory`
+- default: `${project.build.directory}/paramixel`
+
+Directory used for generated report files. Each run writes a file named `paramixel_<yyyyMMdd-HHmmss>.log`.
 
 ### `properties`
 
@@ -45,7 +59,9 @@ Custom key/value pairs merged into Paramixel runtime configuration.
         </execution>
     </executions>
     <configuration>
-        <failIfNoTests>false</failIfNoTests>
+        <failIfNoTests>true</failIfNoTests>
+        <reportEnabled>true</reportEnabled>
+        <reportDirectory>${project.build.directory}/paramixel</reportDirectory>
         <properties>
             <property>
                 <key>paramixel.parallelism</key>
@@ -62,7 +78,24 @@ Custom key/value pairs merged into Paramixel runtime configuration.
 ./mvnw test -Dparamixel.skipTests=true
 ./mvnw test -Dparamixel.failIfNoTests=false
 ./mvnw test -Dparamixel.failureOnSkip=true
+./mvnw test -Dparamixel.report.enabled=true
+./mvnw test -Dparamixel.report.directory=target/paramixel-report
 ./mvnw test -Dparamixel.parallelism=8
+```
+
+## Report files
+
+When report files are enabled:
+
+- the plugin creates the report directory on demand
+- console output still appears normally
+- the file contains the summary tree only, without ANSI color codes
+- file creation errors are reported as warnings and do not fail the test run
+
+Example output path:
+
+```text
+target/paramixel/paramixel_20260504-123456.log
 ```
 
 ## Discovery behavior
@@ -93,4 +126,4 @@ The plugin builds configuration in this order:
 
 ## Source layout note
 
-In this repository, Paramixel examples live under `examples/src/main/java` because the plugin discovers and runs action factories from compiled classes, not from JUnit's `src/test/java` convention.
+In this repository, Paramixel examples live under `core-examples/src/main/java` because the plugin discovers and runs action factories from compiled classes, not from JUnit's `src/test/java` convention.

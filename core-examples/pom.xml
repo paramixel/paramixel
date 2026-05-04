@@ -10,11 +10,11 @@
         <version>2.0.0-POST</version>
     </parent>
     
-    <artifactId>examples</artifactId>
+    <artifactId>core-examples</artifactId>
     <packaging>jar</packaging>
 
-    <name>Paramixel Examples</name>
-    <description>Paramixel Tests</description>
+    <name>Paramixel Core Examples</name>
+    <description>Paramixel core examples and integration tests</description>
 
     <properties>
         <maven.deploy.skip>true</maven.deploy.skip>

@@ -84,6 +84,14 @@ If you added the Paramixel Maven plugin, run:
 
 The plugin discovers `@Paramixel.ActionFactory` methods on the test classpath and executes the returned actions.
 
+To also write a per-run summary file:
+
+```bash
+./mvnw test -Dparamixel.report.enabled=true
+```
+
+By default the file is written under `target/paramixel/` with a name like `paramixel_20260504-123456.log`.
+
 ## Run directly from `main`
 
 ```java
@@ -106,7 +114,7 @@ if (result.getStatus().isPass()) {
 }
 ```
 
-`Runner.run(Action)` returns a `Result`. You can also inspect `action.getResult()` after execution.
+`Runner.run(Action)` returns a `Result` that you can inspect after execution.
 
 A `Runner` can execute multiple actions. Each `run()` call is independent:
 

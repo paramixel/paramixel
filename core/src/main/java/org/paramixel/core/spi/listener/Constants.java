@@ -28,5 +28,10 @@ public class Constants {
      */
     public static final String PARAMIXEL = "[" + AnsiColor.BOLD_BLUE_TEXT.format("PARAMIXEL") + "] ";
 
+    /**
+     * Plain-text prefix used for non-ANSI Paramixel output lines.
+     */
+    public static final String PARAMIXEL_PLAIN = "[PARAMIXEL] ";
+
     private Constants() {}
 }

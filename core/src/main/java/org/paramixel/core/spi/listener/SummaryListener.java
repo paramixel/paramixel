@@ -16,6 +16,7 @@
 
 package org.paramixel.core.spi.listener;
 
+import java.io.PrintStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -36,6 +37,10 @@ public class SummaryListener implements Listener {
 
     private final SummaryRenderer summaryRenderer;
 
+    private final PrintStream out;
+
+    private final boolean ansiEnabled;
+
     /**
      * Creates a summary listener that uses the supplied renderer.
      *
@@ -43,44 +48,74 @@ public class SummaryListener implements Listener {
      */
     public SummaryListener(final SummaryRenderer summaryRenderer) {
         this.summaryRenderer = Objects.requireNonNull(summaryRenderer, "summaryRenderer must not be null");
+        this.out = null;
+        this.ansiEnabled = true;
     }
 
-    private AnsiColor colorForStatus(Status status) {
-        if (status.isPass()) {
-            return AnsiColor.BOLD_GREEN_TEXT;
-        } else if (status.isFailure()) {
-            return AnsiColor.BOLD_RED_TEXT;
-        } else {
-            return AnsiColor.BOLD_ORANGE_TEXT;
+    /**
+     * Creates a summary listener that uses the supplied renderer and output destination.
+     *
+     * @param summaryRenderer the renderer used to print the action summary
+     * @param out the output stream used for summary lines
+     * @param ansiEnabled whether ANSI formatting should be used
+     */
+    public SummaryListener(final SummaryRenderer summaryRenderer, final PrintStream out, final boolean ansiEnabled) {
+        this.summaryRenderer = Objects.requireNonNull(summaryRenderer, "summaryRenderer must not be null");
+        this.out = Objects.requireNonNull(out, "out must not be null");
+        this.ansiEnabled = ansiEnabled;
+    }
+
+    private PrintStream out() {
+        return out == null ? System.out : out;
+    }
+
+    private String formatStatus(Status status) {
+        Objects.requireNonNull(status, "status must not be null");
+        if (!ansiEnabled) {
+            return resultDisplayName(status);
         }
+        if (status.isPass()) {
+            return AnsiColor.BOLD_GREEN_TEXT.format(status.getDisplayName());
+        } else if (status.isFailure()) {
+            return AnsiColor.BOLD_RED_TEXT.format(status.getDisplayName());
+        } else {
+            return AnsiColor.BOLD_ORANGE_TEXT.format(status.getDisplayName());
+        }
+    }
+
+    private static String resultDisplayName(Status status) {
+        return status.getDisplayName();
+    }
+
+    private String prefix() {
+        return ansiEnabled ? Constants.PARAMIXEL : Constants.PARAMIXEL_PLAIN;
     }
 
     @Override
     public void runStarted(Runner runner) {
         Objects.requireNonNull(runner, "runner must not be null");
-        System.out.println(Constants.PARAMIXEL + "Paramixel v" + Version.getVersion() + " starting...");
+        out().println(prefix() + "Paramixel v" + Version.getVersion() + " starting...");
     }
 
     @Override
     public void runCompleted(Runner runner, Result result) {
         Objects.requireNonNull(runner, "runner must not be null");
         Objects.requireNonNull(result, "result must not be null");
-        System.out.println(Constants.PARAMIXEL);
-        System.out.println(Constants.PARAMIXEL + "Paramixel v" + Version.getVersion());
+        out().println(prefix());
+        out().println(prefix() + "Paramixel v" + Version.getVersion());
 
         summaryRenderer.renderSummary(runner, result);
 
         long elapsedMillis = result.getElapsedTime().toMillis();
         String elapsedTimeString = formatElapsedTime(elapsedMillis);
 
-        System.out.println(Constants.PARAMIXEL);
-        System.out.println(Constants.PARAMIXEL + "Paramixel v" + Version.getVersion());
-        System.out.println(Constants.PARAMIXEL + "Status      : "
-                + colorForStatus(result.getStatus()).format(result.getStatus().getDisplayName()));
-        System.out.println(Constants.PARAMIXEL + "Finished at : "
+        out().println(prefix());
+        out().println(prefix() + "Paramixel v" + Version.getVersion());
+        out().println(prefix() + "Status      : " + formatStatus(result.getStatus()));
+        out().println(prefix() + "Finished at : "
                 + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        System.out.println(Constants.PARAMIXEL + "Total time  : " + elapsedTimeString);
-        System.out.println(Constants.PARAMIXEL);
+        out().println(prefix() + "Total time  : " + elapsedTimeString);
+        out().println(prefix());
     }
 
     private String formatElapsedTime(long milliseconds) {

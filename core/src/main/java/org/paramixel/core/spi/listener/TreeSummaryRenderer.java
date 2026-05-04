@@ -16,6 +16,7 @@
 
 package org.paramixel.core.spi.listener;
 
+import java.io.PrintStream;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -32,6 +33,33 @@ import org.paramixel.core.support.AnsiColor;
 public class TreeSummaryRenderer implements SummaryRenderer {
 
     private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+
+    private final PrintStream out;
+
+    private final boolean ansiEnabled;
+
+    /**
+     * Creates a tree summary renderer that writes to {@link System#out} with ANSI formatting enabled.
+     */
+    public TreeSummaryRenderer() {
+        this.out = null;
+        this.ansiEnabled = true;
+    }
+
+    /**
+     * Creates a tree summary renderer for the supplied destination.
+     *
+     * @param out the output stream used for rendered summary lines
+     * @param ansiEnabled whether ANSI formatting should be used
+     */
+    public TreeSummaryRenderer(final PrintStream out, final boolean ansiEnabled) {
+        this.out = Objects.requireNonNull(out, "out must not be null");
+        this.ansiEnabled = ansiEnabled;
+    }
+
+    private PrintStream out() {
+        return out == null ? System.out : out;
+    }
 
     @Override
     public void renderSummary(Runner runner, Result result) {
@@ -57,7 +85,7 @@ public class TreeSummaryRenderer implements SummaryRenderer {
 
         String connector = isLast ? "└── " : "├── ";
         String line = prefix + connector + status + " " + actionName + " (" + kind + ") " + timing + failureInfo;
-        System.out.println(Constants.PARAMIXEL + line);
+        out().println((ansiEnabled ? Constants.PARAMIXEL : Constants.PARAMIXEL_PLAIN) + line);
 
         List<Result> children = result.getChildren();
         if (!children.isEmpty()) {
@@ -70,6 +98,9 @@ public class TreeSummaryRenderer implements SummaryRenderer {
 
     private String formatStatus(Status status) {
         Objects.requireNonNull(status, "status must not be null");
+        if (!ansiEnabled) {
+            return status.isStaged() ? "STAGED" : status.isPass() ? "PASS" : status.isFailure() ? "FAIL" : "SKIP";
+        }
         if (status.isStaged()) {
             return AnsiColor.BOLD_GRAY_TEXT.format("STAGED");
         } else if (status.isPass()) {

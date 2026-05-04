@@ -27,7 +27,7 @@ Contexts form a parent/child chain that mirrors nested execution.
 - `findAncestor(1)` returns the parent
 - larger levels walk farther up the chain
 - `findAncestor(levelUp)` throws `IllegalArgumentException` for negative levels
-- `findAncestor(levelUp)` throws `NoSuchElementException` when that ancestor does not exist
+- `findAncestor(levelUp)` returns `Optional.empty()` when that ancestor does not exist
 
 ## Store
 
@@ -46,7 +46,7 @@ context.getStore().put("key", Value.of(someObject));
 context.getStore().get("key");
 
 // From an ancestor context
-context.findAncestor(1).getStore().get("key");
+context.findAncestor(1).orElseThrow().getStore().get("key");
 ```
 
 ### Store API
@@ -85,7 +85,7 @@ value.cast(MyClass.class)    // typed cast
 
 ## Example pattern
 
-From `examples/test/context/ContextHierarchyTest.java`, a `before` action stores data and descendants read it later:
+From `core-examples/src/main/java/examples/context/ContextHierarchyTest.java`, a `before` action stores data and descendants read it later:
 
 ```java
 Action action = Lifecycle.of(
@@ -95,6 +95,7 @@ Action action = Lifecycle.of(
         }),
         Direct.of("main", context -> {
             String value = context.findAncestor(1)
+                    .orElseThrow()
                     .getStore()
                     .get("data")
                     .map(Value::get)

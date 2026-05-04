@@ -24,6 +24,7 @@ Action action = Lifecycle.of(
                 "tests",
                 Direct.of("check A", context -> {
                     Environment env = context.findAncestor(1)
+                            .orElseThrow()
                             .getStore()
                             .get("env")
                             .map(Value::get)
