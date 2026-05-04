@@ -79,6 +79,16 @@ public class Configuration {
      */
     public static final String TAG_MATCH = "paramixel.match.tag";
 
+    /**
+     * Configuration key controlling whether per-run summary report files are written.
+     */
+    public static final String REPORT_ENABLED = "paramixel.report.enabled";
+
+    /**
+     * Configuration key controlling the directory used for per-run summary report files.
+     */
+    public static final String REPORT_DIRECTORY = "paramixel.report.directory";
+
     private Configuration() {
         // Intentionally empty
     }

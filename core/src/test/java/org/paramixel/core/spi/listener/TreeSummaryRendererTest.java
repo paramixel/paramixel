@@ -52,6 +52,15 @@ class TreeSummaryRendererTest {
         return output.toString(StandardCharsets.UTF_8);
     }
 
+    private String runAndCapturePlainOutput(Action action) {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener = new SummaryListener(new TreeSummaryRenderer(printStream, false), printStream, false);
+        Runner runner = Runner.builder().listener(listener).build();
+        runner.run(action);
+        return output.toString(StandardCharsets.UTF_8);
+    }
+
     @Test
     @DisplayName("hidden root UUID stripped, children rendered at top level")
     void hiddenRootUuidStrippedChildrenAtTopLevel() {
@@ -111,6 +120,16 @@ class TreeSummaryRendererTest {
         String output = runAndCaptureOutput(skipping);
 
         assertThat(output).contains(AnsiColor.BOLD_ORANGE_TEXT.format("SKIP"));
+    }
+
+    @Test
+    @DisplayName("plain output disables ANSI formatting")
+    void plainOutputDisablesAnsiFormatting() {
+        String output = runAndCapturePlainOutput(Noop.of("plain"));
+
+        assertThat(output).contains(Constants.PARAMIXEL_PLAIN);
+        assertThat(output).contains("PASS");
+        assertThat(output).doesNotContain("\u001B[");
     }
 
     @Test

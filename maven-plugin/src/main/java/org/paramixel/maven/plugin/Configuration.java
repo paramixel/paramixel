@@ -16,6 +16,11 @@
 
 package org.paramixel.maven.plugin;
 
+/**
+ * @deprecated Use {@link org.paramixel.core.Configuration} directly. Kept for compatibility
+ *     with existing plugin consumers until the next breaking release.
+ */
+@Deprecated(since = "2.0.0", forRemoval = true)
 public class Configuration {
 
     public static final String RUNNER_PARALLELISM = org.paramixel.core.Configuration.RUNNER_PARALLELISM;

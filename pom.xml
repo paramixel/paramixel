@@ -39,7 +39,7 @@
     <modules>
         <module>core</module>
         <module>maven-plugin</module>
-        <module>examples</module>
+        <module>core-examples</module>
     </modules>
 
     <properties>

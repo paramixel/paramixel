@@ -67,7 +67,7 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(property = "paramixel.skipTests", defaultValue = "false")
     private boolean skipTests;
 
-    @Parameter(property = "paramixel.failIfNoTests", defaultValue = "true")
+    @Parameter(property = "paramixel.failIfNoTests", defaultValue = "false")
     private boolean failIfNoTests;
 
     /**
@@ -75,6 +75,12 @@ public class ParamixelMojo extends AbstractMojo {
      */
     @Parameter(property = "paramixel.failureOnSkip", defaultValue = "false")
     private boolean failureOnSkip;
+
+    @Parameter(property = "paramixel.report.enabled", defaultValue = "false")
+    private boolean reportEnabled;
+
+    @Parameter(property = "paramixel.report.directory", defaultValue = "${project.build.directory}/paramixel")
+    private String reportDirectory;
 
     @Parameter
     private List<Property> properties;
@@ -105,7 +111,7 @@ public class ParamixelMojo extends AbstractMojo {
 
             Runner runner = Runner.builder()
                     .configuration(configuration)
-                    .listener(Factory.defaultListener())
+                    .listener(Factory.defaultListener(configuration))
                     .build();
 
             Action action = optionalAction.get();
@@ -122,13 +128,11 @@ public class ParamixelMojo extends AbstractMojo {
         }
     }
 
-    private Map<String, String> buildConfiguration() throws MojoExecutionException {
-        return buildConfiguration(Thread.currentThread().getContextClassLoader());
-    }
-
     private Map<String, String> buildConfiguration(ClassLoader classLoader) throws MojoExecutionException {
         Map<String, String> configuration =
                 new LinkedHashMap<>(withContextClassLoader(classLoader, Configuration::defaultProperties));
+        configuration.putIfAbsent(Configuration.REPORT_ENABLED, String.valueOf(reportEnabled));
+        configuration.putIfAbsent(Configuration.REPORT_DIRECTORY, reportDirectory);
 
         // POM <properties> override file/defaults but not system properties
         if (properties != null) {

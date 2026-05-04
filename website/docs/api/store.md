@@ -24,7 +24,7 @@ context.getStore().put("key", Value.of(myObject));
 context.getStore().get("key");
 
 // From ancestor context
-context.findAncestor(1).getStore().get("key");
+context.findAncestor(1).orElseThrow().getStore().get("key");
 ```
 
 ### Type-safe access
@@ -108,7 +108,7 @@ To read data stored by an ancestor:
 context.findAttachment(1).flatMap(a -> a.to(MyData.class))
 
 // After (2.0.0):
-context.findAncestor(1).getStore().get("key").map(Value::get).map(v -> (MyData) v)
+context.findAncestor(1).orElseThrow().getStore().get("key").map(Value::get).map(v -> (MyData) v)
 ```
 
 Each context has its own independent `Store`. Use `findAncestor(levelUp)` to navigate to an ancestor context, then call `getStore()` on it.

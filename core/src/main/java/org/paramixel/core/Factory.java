@@ -16,8 +16,11 @@
 
 package org.paramixel.core;
 
+import java.util.Map;
+import java.util.Objects;
 import org.paramixel.core.spi.DefaultRunner;
 import org.paramixel.core.spi.listener.CompositeListener;
+import org.paramixel.core.spi.listener.ReportListener;
 import org.paramixel.core.spi.listener.SafeListener;
 import org.paramixel.core.spi.listener.StatusListener;
 import org.paramixel.core.spi.listener.SummaryListener;
@@ -56,5 +59,29 @@ public class Factory {
     public static Listener defaultListener() {
         return new SafeListener(
                 new CompositeListener(new StatusListener(), new SummaryListener(new TreeSummaryRenderer())));
+    }
+
+    /**
+     * Creates the default listener chain used by Paramixel for the supplied configuration.
+     *
+     * <p>When report file logging is enabled, the returned chain includes a {@link ReportListener} in addition to the
+     * standard console listeners.
+     *
+     * @param configuration the effective Paramixel configuration
+     * @return the default listener
+     */
+    public static Listener defaultListener(final Map<String, String> configuration) {
+        Objects.requireNonNull(configuration, "configuration must not be null");
+
+        boolean reportEnabled = Boolean.parseBoolean(configuration.get(Configuration.REPORT_ENABLED));
+        if (!reportEnabled) {
+            return defaultListener();
+        }
+
+        String reportDirectory = configuration.getOrDefault(Configuration.REPORT_DIRECTORY, "target/paramixel");
+        return new SafeListener(new CompositeListener(
+                new StatusListener(),
+                new SummaryListener(new TreeSummaryRenderer()),
+                new ReportListener(reportDirectory)));
     }
 }

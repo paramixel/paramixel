@@ -62,7 +62,7 @@ cd paramixel
 
 - `core/` - Main library (public API + implementation)
 - `maven-plugin/` - Maven plugin for test execution
-- `examples/` - Test classes and examples using Paramixel's own framework
+- `core-examples/` - Test classes and examples using Paramixel's own framework
 - `assets/` - License header template and shared resources
 - `website/` - Docusaurus documentation site
 
@@ -124,7 +124,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 
 ### Writing Tests
 
-- Place tests in the `examples/` module under `src/main/java/`
+- Place tests in the `core-examples/` module under `src/main/java/`
 - Use the `@Paramixel.ActionFactory` annotation on static methods that return `Action` trees
 - Use descriptive test names and argument names
 - Test edge cases and error conditions

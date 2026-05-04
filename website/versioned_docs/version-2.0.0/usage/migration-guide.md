@@ -33,7 +33,7 @@ MyData data = context.getStore()
         .map(Value::get)
         .map(v -> (MyData) v)
         .orElseThrow();
-context.findAncestor(1).getStore()
+context.findAncestor(1).orElseThrow().getStore()
         .get("data")
         .map(Value::get)
         .map(v -> (MyData) v)
@@ -110,7 +110,7 @@ int exitCode = runner.runAndReturnExitCode(action);
 ### Result
 
 Before (1.x): `Result.of(status, elapsedTime)`, `Result.pass(...)`, `Result.fail(...)`, `Result.skip(...)`, `Result.staged()`.
-After (2.0.0): Access `Result` through `Runner.run(Action)` return value or `action.getResult()`. The `Result` interface provides:
+After (2.0.0): Access `Result` through the `Runner.run(Action)` return value. The `Result` interface provides:
 
 ```java
 Optional<Result> getParent()

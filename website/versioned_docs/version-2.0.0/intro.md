@@ -15,7 +15,7 @@ Instead of describing tests with many framework-specific annotations, you build 
 - Tests are trees of `Action` objects.
 - Discovery is optional: `@Paramixel.ActionFactory` marks a `public static` no-arg factory method.
 - `Runner.run(action)` executes an action tree and returns a `Result`.
-- Read outcomes from the returned `Result` tree or from `action.getResult()` after execution.
+- Read outcomes from the returned `Result` tree after execution.
 - Runtime state is passed through `Context` and its `Store`.
 
 ## Minimal example
