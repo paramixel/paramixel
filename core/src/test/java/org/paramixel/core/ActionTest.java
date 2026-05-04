@@ -32,11 +32,11 @@ class ActionTest {
     void createsNoopActionsThatCompleteWithoutDoingWork() {
         Action action = Noop.of("noop");
 
-        Runner.builder().build().run(action);
+        Result result = Runner.builder().build().run(action);
 
-        assertThat(action.getResult().getStatus().isPass()).isTrue();
-        assertThat(action.getResult().getStatus().getThrowable()).isEmpty();
-        assertThat(action.getResult()).isNotNull();
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().getThrowable()).isEmpty();
+        assertThat(result).isNotNull();
     }
 
     @Test

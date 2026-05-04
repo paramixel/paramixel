@@ -28,11 +28,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
-import org.paramixel.core.FailException;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.SkipException;
+import org.paramixel.core.exception.FailException;
+import org.paramixel.core.exception.SkipException;
 
 @DisplayName("Parallel")
 class ParallelTest {
@@ -44,14 +44,12 @@ class ParallelTest {
         Action second = Direct.of("second", context -> {});
         Action root = Parallel.of("root", List.of(first, second));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getChildren()).hasSize(2);
-        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
-        assertThat(root.getChildren().get(1).getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(0).getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -63,14 +61,11 @@ class ParallelTest {
         });
         Action root = Parallel.of("root", List.of(first, second));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isFailure()).isTrue();
-        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
-        assertThat(root.getChildren().get(1).getResult().getStatus().isFailure())
-                .isTrue();
+        assertThat(result.getChildren().get(0).getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isFailure()).isTrue();
     }
 
     @Test
@@ -82,13 +77,11 @@ class ParallelTest {
         });
         Action root = Parallel.of("root", List.of(first, second));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isSkip()).isTrue();
-        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
-        assertThat(root.getChildren().get(1).getResult().getStatus().isSkip()).isTrue();
+        assertThat(result.getChildren().get(0).getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
     }
 
     @Test
@@ -102,9 +95,7 @@ class ParallelTest {
         });
         Action root = Parallel.of("root", List.of(first, second));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isFailure()).isTrue();
     }
@@ -119,14 +110,14 @@ class ParallelTest {
 
         Listener listener = new Listener() {
             @Override
-            public void beforeAction(org.paramixel.core.Context context, Action action) {
-                events.add("before:" + action.getName());
+            public void beforeAction(Result result) {
+                events.add("before:" + result.getAction().getName());
             }
 
             @Override
-            public void afterAction(org.paramixel.core.Context context, Action action, Result result) {
-                events.add(
-                        "after:" + action.getName() + ":" + result.getStatus().getDisplayName());
+            public void afterAction(Result result) {
+                events.add("after:" + result.getAction().getName() + ":"
+                        + result.getStatus().getDisplayName());
             }
         };
 
@@ -148,8 +139,8 @@ class ParallelTest {
 
         Listener listener = new Listener() {
             @Override
-            public void afterAction(org.paramixel.core.Context context, Action action, Result result) {
-                if (action == root) {
+            public void afterAction(Result result) {
+                if (result.getAction() == root) {
                     afterActionCalled.set(true);
                     capturedResult.set(result);
                 }
@@ -241,10 +232,9 @@ class ParallelTest {
 
         Action root = Parallel.of("root", 1, List.of(a, b, c));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
+        Result result = Runner.builder().build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(maxConcurrent.get()).isLessThanOrEqualTo(1);
     }
 
@@ -271,15 +261,15 @@ class ParallelTest {
 
         Listener listener = new Listener() {
             @Override
-            public void beforeAction(org.paramixel.core.Context context, Action action) {
-                if (action == root) {
+            public void beforeAction(Result result) {
+                if (result.getAction() == root) {
                     beforeActionCalled.set(true);
                 }
             }
 
             @Override
-            public void afterAction(org.paramixel.core.Context context, Action action, Result result) {
-                if (action == root) {
+            public void afterAction(Result result) {
+                if (result.getAction() == root) {
                     afterActionCalled.set(true);
                     capturedResult.set(result);
                 }
@@ -415,16 +405,16 @@ class ParallelTest {
 
         Listener listener = new Listener() {
             @Override
-            public void beforeAction(org.paramixel.core.Context context, Action action) {
-                if (action == root) {
-                    listenerCalls.add("beforeAction:" + action.getName());
+            public void beforeAction(Result result) {
+                if (result.getAction() == root) {
+                    listenerCalls.add("beforeAction:" + result.getAction().getName());
                 }
             }
 
             @Override
-            public void afterAction(org.paramixel.core.Context context, Action action, Result result) {
-                if (action == root) {
-                    listenerCalls.add("afterAction:" + action.getName() + ":"
+            public void afterAction(Result result) {
+                if (result.getAction() == root) {
+                    listenerCalls.add("afterAction:" + result.getAction().getName() + ":"
                             + result.getStatus().getDisplayName());
                 }
             }

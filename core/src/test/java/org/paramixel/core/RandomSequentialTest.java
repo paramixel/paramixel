@@ -45,15 +45,13 @@ class RandomSequentialTest {
         Action third = Direct.of("third", context -> {});
         Action root = RandomSequential.of("root", List.of(first, second, third));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getChildren()).hasSize(3);
-        assertThat(root.getChildren().get(0).getResult().getStatus().isPass()).isTrue();
-        assertThat(root.getChildren().get(1).getResult().getStatus().isPass()).isTrue();
-        assertThat(root.getChildren().get(2).getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(0).getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(2).getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -72,22 +70,20 @@ class RandomSequentialTest {
         });
         Action root = RandomSequential.of("root", List.of(first, second, third));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(executions).hasSize(3);
         assertThat(root.getChildren()).hasSize(3);
-        assertThat(root.getChildren().get(0).getResult().getStatus())
+        assertThat(result.getChildren().get(0).getStatus())
                 .satisfiesAnyOf(
                         status -> assertThat(status.isPass()).isTrue(),
                         status -> assertThat(status.isFailure()).isTrue());
-        assertThat(root.getChildren().get(1).getResult().getStatus())
+        assertThat(result.getChildren().get(1).getStatus())
                 .satisfiesAnyOf(
                         status -> assertThat(status.isPass()).isTrue(),
                         status -> assertThat(status.isFailure()).isTrue());
-        assertThat(root.getChildren().get(2).getResult().getStatus())
+        assertThat(result.getChildren().get(2).getStatus())
                 .satisfiesAnyOf(
                         status -> assertThat(status.isPass()).isTrue(),
                         status -> assertThat(status.isFailure()).isTrue());
@@ -143,9 +139,7 @@ class RandomSequentialTest {
         Action child3 = Direct.of("child3", context -> {});
         Action root = RandomSequential.of("root", List.of(child1, child2, child3));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getChildren()).hasSize(3);
@@ -159,9 +153,7 @@ class RandomSequentialTest {
         Action third = Direct.of("third", context -> {});
         Action root = RandomSequential.of("root", List.of(first, second, third));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getParent()).isEmpty();

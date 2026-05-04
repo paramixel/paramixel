@@ -18,15 +18,16 @@ package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -41,6 +42,11 @@ import org.junit.jupiter.api.Timeout;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.action.Sequential;
+import org.paramixel.core.exception.ConfigurationException;
+import org.paramixel.core.exception.CycleDetectedException;
+import org.paramixel.core.exception.DeadlockDetected;
+import org.paramixel.core.spi.DefaultResult;
+import org.paramixel.core.spi.DefaultStatus;
 
 @DisplayName("DefaultRunner")
 class RunnerTest {
@@ -86,30 +92,33 @@ class RunnerTest {
                         parallelAction("parallel-0", sequentialExecutions, directExecutionCount),
                         parallelAction("parallel-1", sequentialExecutions, directExecutionCount)));
 
-        Runner.builder().build().run(root);
+        Result result = Runner.builder().build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
-        assertThat(root.getResult().getStatus().getThrowable()).isEmpty();
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(root.getChildren()).hasSize(2);
 
         for (int depth1Index = 0; depth1Index < root.getChildren().size(); depth1Index++) {
             Action depth1Action = root.getChildren().get(depth1Index);
-            assertThat(depth1Action.getResult().getStatus().isPass()).isTrue();
+            Result depth1Result = result.getChildren().get(depth1Index);
+            assertThat(depth1Result.getStatus().isPass()).isTrue();
             assertThat(depth1Action.getName()).isEqualTo("parallel-" + depth1Index);
             assertThat(depth1Action.getChildren()).hasSize(2);
 
             for (int depth2Index = 0; depth2Index < depth1Action.getChildren().size(); depth2Index++) {
                 Action depth2Action = depth1Action.getChildren().get(depth2Index);
+                Result depth2Result = depth1Result.getChildren().get(depth2Index);
                 String sequentialName = "parallel-" + depth1Index + "-sequential-" + depth2Index;
 
-                assertThat(depth2Action.getResult().getStatus().isPass()).isTrue();
+                assertThat(depth2Result.getStatus().isPass()).isTrue();
                 assertThat(depth2Action.getName()).isEqualTo(sequentialName);
                 assertThat(depth2Action.getChildren()).hasSize(4);
 
                 for (int leafIndex = 0; leafIndex < depth2Action.getChildren().size(); leafIndex++) {
                     Action leafAction = depth2Action.getChildren().get(leafIndex);
+                    Result leafResult = depth2Result.getChildren().get(leafIndex);
 
-                    assertThat(leafAction.getResult().getStatus().isPass()).isTrue();
+                    assertThat(leafResult.getStatus().isPass()).isTrue();
                     assertThat(leafAction.getName()).isEqualTo(sequentialName + "-direct-" + leafIndex);
                     assertThat(leafAction.getChildren()).isEmpty();
                 }
@@ -131,9 +140,9 @@ class RunnerTest {
     @DisplayName("root action has no parent")
     void rootActionHasNoParent() {
         Action root = Direct.of("root", context -> {});
-        Runner.builder().build().run(root);
+        Result result = Runner.builder().build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getParent()).isEmpty();
     }
 
@@ -144,9 +153,9 @@ class RunnerTest {
         Action right = Direct.of("right", context -> {});
         Action root = Sequential.of("root", List.of(left, right));
 
-        Runner.builder().build().run(root);
+        Result result = Runner.builder().build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getParent()).isEmpty();
         assertThat(root.getChildren()).hasSize(2);
 
@@ -161,9 +170,9 @@ class RunnerTest {
         Action right = Direct.of("right", context -> {});
         Action root = Parallel.of("root", List.of(left, right));
 
-        Runner.builder().build().run(root);
+        Result result = Runner.builder().build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getParent()).isEmpty();
         assertThat(root.getChildren()).hasSize(2);
 
@@ -180,9 +189,9 @@ class RunnerTest {
         Action child2 = Sequential.of("child2", List.of(right));
         Action root = Parallel.of("root", List.of(child1, child2));
 
-        Runner.builder().build().run(root);
+        Result result = Runner.builder().build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getParent()).isEmpty();
         assertThat(root.getChildren()).hasSize(2);
 
@@ -230,7 +239,7 @@ class RunnerTest {
     @DisplayName("reuses an already-safe listener without double wrapping")
     void reusesAnAlreadySafeListenerWithoutDoubleWrapping() {
         var delegate = new Listener() {};
-        var safeListener = org.paramixel.core.listener.SafeListener.of(delegate);
+        var safeListener = new org.paramixel.core.spi.listener.SafeListener(delegate);
         var observedListener = new java.util.concurrent.atomic.AtomicReference<Listener>();
         Action action = Direct.of("root", context -> observedListener.set(context.getListener()));
 
@@ -247,32 +256,35 @@ class RunnerTest {
                 Sequential.of("root", List.of(Direct.of("first", context -> {}), Direct.of("second", context -> {})));
         Listener listener = new Listener() {
             @Override
-            public void runStarted(Runner runner, Action action) {
-                events.add("runStarted:" + action.getClass().getSimpleName().charAt(0));
+            public void runStarted(Runner runner) {
+                events.add("runStarted");
             }
 
             @Override
-            public void runCompleted(Runner runner, Action action) {
-                events.add("runCompleted:" + action.getClass().getSimpleName().charAt(0));
+            public void runCompleted(Runner runner, Result result) {
+                events.add("runCompleted:"
+                        + result.getAction().getClass().getSimpleName().charAt(0));
             }
 
             @Override
-            public void beforeAction(Context context, Action action) {
-                events.add("before:" + action.getClass().getSimpleName().charAt(0));
+            public void beforeAction(Result result) {
+                events.add("before:"
+                        + result.getAction().getClass().getSimpleName().charAt(0));
             }
 
             @Override
-            public void afterAction(Context context, Action action, Result result) {
-                events.add("after:" + action.getClass().getSimpleName().charAt(0) + ":" + result.getStatus());
+            public void afterAction(Result result) {
+                events.add(
+                        "after:" + result.getAction().getClass().getSimpleName().charAt(0) + ":" + result.getStatus());
             }
         };
 
-        Runner.builder().listener(listener).build().run(root);
+        Result result = Runner.builder().listener(listener).build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(events)
                 .containsExactly(
-                        "runStarted:S",
+                        "runStarted",
                         "before:S",
                         "before:D",
                         "after:D:PASS",
@@ -283,15 +295,48 @@ class RunnerTest {
     }
 
     @Test
+    @DisplayName("rejects cyclic action graph before runStarted or execution")
+    void rejectsCyclicActionGraphBeforeRunStartedOrExecution() {
+        var events = new CopyOnWriteArrayList<String>();
+        var executionCount = new AtomicInteger();
+        Listener listener = new Listener() {
+            @Override
+            public void runStarted(Runner runner) {
+                events.add("runStarted");
+            }
+
+            @Override
+            public void runCompleted(Runner runner, Result result) {
+                events.add("runCompleted");
+            }
+        };
+        MutableAction root = new MutableAction("root", executionCount);
+        MutableAction child = new MutableAction("child", executionCount);
+        MutableAction grandchild = new MutableAction("grandchild", executionCount);
+        root.addGraphChild(child);
+        child.addGraphChild(grandchild);
+        grandchild.addGraphChild(child);
+
+        assertThatThrownBy(() -> Runner.builder().listener(listener).build().run(root))
+                .isInstanceOf(CycleDetectedException.class)
+                .hasMessageContaining("Cycle detected in action graph")
+                .hasMessageContaining("child[")
+                .hasMessageContaining("grandchild[");
+
+        assertThat(events).isEmpty();
+        assertThat(executionCount).hasValue(0);
+    }
+
+    @Test
     @DisplayName("allows child-bearing actions to expose children and parent links")
     void allowsCustomActionsToNavigateActionChildrenViaContext() {
         Action left = Direct.of("left", context -> {});
         Action right = Direct.of("right", context -> {});
         Action root = Sequential.of("root", List.of(left, right));
 
-        Runner.builder().build().run(root);
+        Result result = Runner.builder().build().run(root);
 
-        assertThat(root.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(root.getParent()).isEmpty();
         assertThat(root.getChildren()).containsExactly(left, right);
         assertThat(left.getParent()).contains(root);
@@ -330,9 +375,9 @@ class RunnerTest {
                         Direct.of("child 2", context -> executionCount.incrementAndGet()),
                         Direct.of("child 3", context -> executionCount.incrementAndGet())));
 
-        Runner.builder().build().run(action);
+        Result result = Runner.builder().build().run(action);
 
-        assertThat(action.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(executionCount).hasValue(3);
 
         executorService.shutdown();
@@ -351,9 +396,9 @@ class RunnerTest {
                 Direct.of("child 2", context -> executionCount.incrementAndGet()),
                 Direct.of("child 3", context -> executionCount.incrementAndGet()));
 
-        Runner.builder().build().run(action);
+        Result result = Runner.builder().build().run(action);
 
-        assertThat(action.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(executionCount).hasValue(3);
 
         executorService.shutdown();
@@ -405,9 +450,9 @@ class RunnerTest {
                                     context -> observedClassLoaders.add(
                                             Thread.currentThread().getContextClassLoader()))));
 
-            Runner.builder().build().run(action);
+            Result result = Runner.builder().build().run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
             assertThat(observedClassLoaders).hasSize(4).containsOnly(expectedClassLoader);
         } finally {
             Thread.currentThread().setContextClassLoader(originalClassLoader);
@@ -446,9 +491,12 @@ class RunnerTest {
                                     context -> outerThreadNames.add(
                                             Thread.currentThread().getName()))));
 
-            Runner.builder().executorService(runnerExecutorService).build().run(action);
+            Result result = Runner.builder()
+                    .executorService(runnerExecutorService)
+                    .build()
+                    .run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
             assertThat(outerThreadNames).allMatch(name -> name.contains("custom-runner"));
             assertThat(innerThreadNames).allMatch(name -> name.contains("paramixel-parallel"));
         } finally {
@@ -476,12 +524,12 @@ class RunnerTest {
                                         Direct.of("leaf-1-0", context -> executionCount.incrementAndGet()),
                                         Direct.of("leaf-1-1", context -> executionCount.incrementAndGet())))));
 
-        Runner.builder()
+        Result result = Runner.builder()
                 .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "2"))
                 .build()
                 .run(action);
 
-        assertThat(action.getResult().getStatus().isPass()).isTrue();
+        assertThat(result.getStatus().isPass()).isTrue();
         assertThat(executionCount).hasValue(4);
     }
 
@@ -506,9 +554,9 @@ class RunnerTest {
 
             Action outerParallel = Parallel.of("outer", List.copyOf(innerParallelActions));
 
-            Runner.builder().build().run(outerParallel);
+            Result result = Runner.builder().build().run(outerParallel);
 
-            assertThat(outerParallel.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
             assertThat(executionCount).hasValue(12);
         } finally {
             for (var executorService : innerExecutorServices) {
@@ -538,9 +586,9 @@ class RunnerTest {
 
             Action outerParallel = Parallel.of("outer", innerParallelActions);
 
-            Runner.builder().build().run(outerParallel);
+            Result result = Runner.builder().build().run(outerParallel);
 
-            assertThat(outerParallel.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
             assertThat(executionCount).hasValue(8);
         } finally {
             for (ExecutorService es : innerExecutorServices) {
@@ -588,6 +636,72 @@ class RunnerTest {
         });
     }
 
+    private static final class MutableAction implements Action {
+
+        private final String id = java.util.UUID.randomUUID().toString();
+        private final String name;
+        private final AtomicInteger executionCount;
+        private final List<Action> children = new ArrayList<>();
+        private Action parent;
+
+        private MutableAction(String name, AtomicInteger executionCount) {
+            this.name = name;
+            this.executionCount = executionCount;
+        }
+
+        private void addGraphChild(Action child) {
+            children.add(child);
+        }
+
+        @Override
+        public String getId() {
+            return id;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Optional<Action> getParent() {
+            return Optional.ofNullable(parent);
+        }
+
+        @Override
+        public void setParent(Action parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public void addChild(Action child) {
+            addGraphChild(child);
+            child.setParent(this);
+        }
+
+        @Override
+        public List<Action> getChildren() {
+            return List.copyOf(children);
+        }
+
+        @Override
+        public Result execute(Context context) {
+            executionCount.incrementAndGet();
+            DefaultResult result = new DefaultResult(this);
+            result.setStatus(DefaultStatus.PASS);
+            result.setElapsedTime(Duration.ZERO);
+            return result;
+        }
+
+        @Override
+        public Result skip(Context context) {
+            DefaultResult result = new DefaultResult(this);
+            result.setStatus(DefaultStatus.SKIP);
+            result.setElapsedTime(Duration.ZERO);
+            return result;
+        }
+    }
+
     @Nested
     @DisplayName("deadlock detection in run()")
     class DeadlockDetection {
@@ -604,14 +718,14 @@ class RunnerTest {
                             Direct.of("B2", ctx -> {})),
                     Direct.of("A2", ctx -> {}));
 
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> Runner.builder()
+            assertThatThrownBy(() -> Runner.builder()
                             .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                             .build()
                             .run(action))
-                    .withMessageContaining("thread-starvation deadlock")
-                    .withMessageContaining("3 levels")
-                    .withMessageContaining("1 thread");
+                    .isInstanceOf(DeadlockDetected.class)
+                    .hasMessageContaining("thread-starvation deadlock")
+                    .hasMessageContaining("3 levels")
+                    .hasMessageContaining("1 thread");
         }
 
         @Test
@@ -621,12 +735,12 @@ class RunnerTest {
             Action action = Parallel.of(
                     "outer", Parallel.of("inner", Direct.of("leaf-0", ctx -> {}), Direct.of("leaf-1", ctx -> {})));
 
-            Runner.builder()
+            Result result = Runner.builder()
                     .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                     .build()
                     .run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
         }
 
         @Test
@@ -641,12 +755,12 @@ class RunnerTest {
                             Direct.of("B2", ctx -> {})),
                     Direct.of("A2", ctx -> {}));
 
-            Runner.builder()
+            Result result = Runner.builder()
                     .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "2"))
                     .build()
                     .run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
         }
 
         @Test
@@ -665,12 +779,12 @@ class RunnerTest {
                                 Direct.of("B2", ctx -> {})),
                         Direct.of("A2", ctx -> {}));
 
-                Runner.builder()
+                Result result = Runner.builder()
                         .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                         .build()
                         .run(action);
 
-                assertThat(action.getResult().getStatus().isPass()).isTrue();
+                assertThat(result.getStatus().isPass()).isTrue();
             } finally {
                 innerEs1.shutdown();
                 innerEs2.shutdown();
@@ -684,12 +798,12 @@ class RunnerTest {
             Action action = Parallel.of(
                     "root", 1, Direct.of("a", ctx -> {}), Direct.of("b", ctx -> {}), Direct.of("c", ctx -> {}));
 
-            Runner.builder()
+            Result result = Runner.builder()
                     .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                     .build()
                     .run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
         }
 
         @Test
@@ -699,12 +813,12 @@ class RunnerTest {
             Action action = Parallel.of(
                     "A", Sequential.of("S", Parallel.of("B", Parallel.of("C", Direct.of("leaf", ctx -> {})))));
 
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> Runner.builder()
+            assertThatThrownBy(() -> Runner.builder()
                             .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                             .build()
                             .run(action))
-                    .withMessageContaining("thread-starvation deadlock");
+                    .isInstanceOf(DeadlockDetected.class)
+                    .hasMessageContaining("thread-starvation deadlock");
         }
 
         @Test
@@ -718,12 +832,12 @@ class RunnerTest {
                             "danger-A",
                             Parallel.of("danger-B", Parallel.of("danger-C", Direct.of("danger-leaf", ctx -> {})))));
 
-            assertThatIllegalStateException()
-                    .isThrownBy(() -> Runner.builder()
+            assertThatThrownBy(() -> Runner.builder()
                             .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                             .build()
                             .run(action))
-                    .withMessageContaining("4 levels");
+                    .isInstanceOf(DeadlockDetected.class)
+                    .hasMessageContaining("4 levels");
         }
 
         @Test
@@ -732,12 +846,12 @@ class RunnerTest {
         void acceptsNonParallelTree() {
             Action action = Sequential.of("root", Direct.of("a", ctx -> {}), Direct.of("b", ctx -> {}));
 
-            Runner.builder()
+            Result result = Runner.builder()
                     .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                     .build()
                     .run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
         }
 
         @Test
@@ -746,12 +860,12 @@ class RunnerTest {
         void acceptsSingleLeafAction() {
             Action action = Direct.of("leaf", ctx -> {});
 
-            Runner.builder()
+            Result result = Runner.builder()
                     .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                     .build()
                     .run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
         }
 
         @Test
@@ -766,12 +880,12 @@ class RunnerTest {
                         Parallel.of("inner1", es1, Direct.of("a", ctx -> {})),
                         Parallel.of("inner2", es2, Direct.of("b", ctx -> {})));
 
-                Runner.builder()
+                Result result = Runner.builder()
                         .configuration(Map.of(Configuration.RUNNER_PARALLELISM, "1"))
                         .build()
                         .run(action);
 
-                assertThat(action.getResult().getStatus().isPass()).isTrue();
+                assertThat(result.getStatus().isPass()).isTrue();
             } finally {
                 es1.shutdown();
                 es2.shutdown();
@@ -790,9 +904,9 @@ class RunnerTest {
                             Direct.of("B2", ctx -> {})),
                     Direct.of("A2", ctx -> {}));
 
-            Runner.builder().build().run(action);
+            Result result = Runner.builder().build().run(action);
 
-            assertThat(action.getResult().getStatus().isPass()).isTrue();
+            assertThat(result.getStatus().isPass()).isTrue();
         }
     }
 
@@ -806,13 +920,13 @@ class RunnerTest {
             Runner runner = Runner.builder().build();
 
             Action first = Direct.of("first", context -> {});
-            runner.run(first);
+            Result firstResult = runner.run(first);
 
             Action second = Direct.of("second", context -> {});
-            runner.run(second);
+            Result secondResult = runner.run(second);
 
-            assertThat(first.getResult().getStatus().isPass()).isTrue();
-            assertThat(second.getResult().getStatus().isPass()).isTrue();
+            assertThat(firstResult.getStatus().isPass()).isTrue();
+            assertThat(secondResult.getStatus().isPass()).isTrue();
         }
 
         @Test
@@ -821,14 +935,14 @@ class RunnerTest {
             Runner runner = Runner.builder().build();
 
             Action first = Direct.of("first", context -> {});
-            runner.run(first);
+            Result firstResult = runner.run(first);
 
             Action second =
                     Parallel.of("second", Direct.of("child-1", context -> {}), Direct.of("child-2", context -> {}));
-            runner.run(second);
+            Result secondResult = runner.run(second);
 
-            assertThat(first.getResult().getStatus().isPass()).isTrue();
-            assertThat(second.getResult().getStatus().isPass()).isTrue();
+            assertThat(firstResult.getStatus().isPass()).isTrue();
+            assertThat(secondResult.getStatus().isPass()).isTrue();
         }
 
         @Test
@@ -839,14 +953,14 @@ class RunnerTest {
                 Runner runner = Runner.builder().executorService(external).build();
 
                 Action first = Direct.of("first", context -> {});
-                runner.run(first);
+                Result firstResult = runner.run(first);
 
                 Action second = Direct.of("second", context -> {});
-                runner.run(second);
+                Result secondResult = runner.run(second);
 
                 assertThat(external.isShutdown()).isFalse();
-                assertThat(first.getResult().getStatus().isPass()).isTrue();
-                assertThat(second.getResult().getStatus().isPass()).isTrue();
+                assertThat(firstResult.getStatus().isPass()).isTrue();
+                assertThat(secondResult.getStatus().isPass()).isTrue();
             } finally {
                 external.shutdown();
             }

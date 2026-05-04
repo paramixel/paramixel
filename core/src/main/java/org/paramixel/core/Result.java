@@ -17,180 +17,59 @@
 package org.paramixel.core;
 
 import java.time.Duration;
-import java.util.Objects;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Describes the outcome of executing an {@link Action}.
  *
- * <p>Result is a lightweight object containing only status and timing information.
- * Navigate the {@link Action} tree to access hierarchy and names.</p>
- *
- * <p>Each action owns exactly one result, which transitions through the following lifecycle:
- * <ul>
- *   <li>{@link Status#isStaged()} - Before execution begins</li>
- *   <li>{@link Status#isPass()} - After successful execution</li>
- *   <li>{@link Status#isFailure()} - After failed execution (exception thrown or {@link FailException})</li>
- *   <li>{@link Status#isSkip()} - After skipped execution ({@link SkipException} or parent-level skip)</li>
- * </ul>
- *
- * <p>Results are immutable and thread-safe. Access the result via {@link Action#getResult()}.</p>
- *
- * <p><strong>Usage Example:</strong></p>
- * <pre>{@code
- * Action action = Direct.of("myAction", ctx -> {
- *     System.out.println("Executing");
- * });
- * runner.run(action);
- * Result result = action.getResult();
- * if (result.getStatus().isPass()) {
- *     System.out.println("Success in " + result.getElapsedTime().toMillis() + "ms");
- * }
- * }</pre>
+ * <p>A {@code Result} records the action that was executed, its final {@link Status}, elapsed time information, and
+ * any nested child results produced by composed actions.
  */
-public final class Result {
-
-    private final Status status;
-    private final Duration timing;
-
-    private Result(Status status, Duration timing) {
-        this.status = status;
-        this.timing = timing;
-    }
+public interface Result {
 
     /**
-     * Creates a result.
+     * Returns the parent result, if this result belongs to a nested action.
      *
-     * @param status the status; must not be {@code null}
-     * @param timing the timing; must not be {@code null}
-     * @return a new Result
-     * @throws NullPointerException if {@code status} or {@code timing} is {@code null}
+     * @return the parent result, or an empty {@link Optional} when this is the root result
      */
-    public static Result of(Status status, Duration timing) {
-        Objects.requireNonNull(status, "status must not be null");
-        Objects.requireNonNull(timing, "timing must not be null");
-        return new Result(status, timing);
-    }
+    Optional<Result> getParent();
 
     /**
-     * Creates a staged result.
+     * Returns the child results produced under this result.
      *
-     * @return a new Result with STAGED status and zero duration
+     * @return the child results in implementation-defined order
      */
-    public static Result staged() {
-        return new Result(Status.staged(), Duration.ZERO);
-    }
+    List<Result> getChildren();
 
     /**
-     * Creates a passing result.
+     * Returns the action associated with this result.
      *
-     * @param timing the elapsed time; must not be {@code null}
-     * @return a new Result with PASS status
-     * @throws NullPointerException if {@code timing} is {@code null}
+     * @return the executed action
      */
-    public static Result pass(Duration timing) {
-        Objects.requireNonNull(timing, "timing must not be null");
-        return new Result(Status.pass(), timing);
-    }
+    Action getAction();
 
     /**
-     * Creates a failing result.
+     * Returns the final status for this result.
      *
-     * @param timing the elapsed time; must not be {@code null}
-     * @param failure the failure throwable; must not be {@code null}
-     * @return a new Result with FAIL status
-     * @throws NullPointerException if {@code timing} or {@code failure} is {@code null}
+     * @return the execution status
      */
-    public static Result fail(Duration timing, Throwable failure) {
-        Objects.requireNonNull(timing, "timing must not be null");
-        Objects.requireNonNull(failure, "failure must not be null");
-        return new Result(Status.failure(failure), timing);
-    }
+    Status getStatus();
 
     /**
-     * Creates a failing result with a message.
+     * Returns the elapsed time recorded for this action.
      *
-     * @param timing the elapsed time; must not be {@code null}
-     * @param failureMessage the failure message
-     * @return a new Result with FAIL status
-     * @throws NullPointerException if {@code timing} is {@code null}
+     * @return the elapsed time for the action represented by this result
      */
-    public static Result fail(Duration timing, String failureMessage) {
-        Objects.requireNonNull(timing, "timing must not be null");
-        return new Result(Status.failure(failureMessage), timing);
-    }
+    Duration getElapsedTime();
 
     /**
-     * Creates a skipped result.
+     * Returns the cumulative elapsed time for descendant execution.
      *
-     * @param timing the elapsed time; must not be {@code null}
-     * @return a new Result with SKIP status
-     * @throws NullPointerException if {@code timing} is {@code null}
+     * <p>For leaf results this is typically the same as {@link #getElapsedTime()}. For composed results, the value may
+     * represent the aggregate of child execution times.
+     *
+     * @return the cumulative elapsed time represented by this result
      */
-    public static Result skip(Duration timing) {
-        Objects.requireNonNull(timing, "timing must not be null");
-        return new Result(Status.skip(), timing);
-    }
-
-    /**
-     * Creates a skipped result with a reason.
-     *
-     * @param timing the elapsed time; must not be {@code null}
-     * @param skipReason the reason for skipping
-     * @return a new Result with SKIP status
-     * @throws NullPointerException if {@code timing} is {@code null}
-     */
-    public static Result skip(Duration timing, String skipReason) {
-        Objects.requireNonNull(timing, "timing must not be null");
-        return new Result(Status.skip(skipReason), timing);
-    }
-
-    /**
-     * Returns the execution status.
-     *
-     * <p>The status indicates the outcome of the action execution:
-     * <ul>
-     *   <li>{@link Status#isStaged()} - Before execution starts (during {@link Listener#beforeAction})</li>
-     *   <li>{@link Status#isPass()} - After successful completion (no exceptions)</li>
-     *   <li>{@link Status#isFailure()} - After failure (exception thrown or {@link FailException})</li>
-     *   <li>{@link Status#isSkip()} - After skip ({@link SkipException} or parent-level skip)</li>
-     * </ul>
-     *
-     * <p>Status transitions are guaranteed: STAGED → PASS/FAIL/SKIP exactly once per execution.</p>
-     *
-     * @return the execution status; never {@code null}
-     * @see Status
-     * @see Listener#afterAction(Context, Action, Result)
-     */
-    public Status getStatus() {
-        return status;
-    }
-
-    /**
-     * Returns the elapsed time for this action's execution.
-     *
-     * <p>The duration is measured from the moment {@link Listener#beforeAction} is invoked
-     * until {@link Listener#afterAction} is invoked. This includes the execution of all child actions.</p>
-     *
-     * <p>For parent actions, the duration includes the total time spent executing all children,
-     * accounting for sequential or parallel execution patterns as defined by the action type.</p>
-     *
-     * <p>Timing precision is typically milliseconds, but the exact precision depends on the
-     * underlying system clock and the {@link Duration} implementation.</p>
-     *
-     * @return the elapsed execution time; never {@code null}, may be zero for instant actions
-     * @see Duration
-     */
-    public Duration getElapsedTime() {
-        return timing;
-    }
-
-    /**
-     * Returns a compact diagnostic representation of this result.
-     *
-     * @return a string containing the status display and elapsed time in milliseconds
-     */
-    @Override
-    public String toString() {
-        return status + " | " + timing.toMillis() + " ms";
-    }
+    Duration getCumulativeElapsedTime();
 }

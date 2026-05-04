@@ -25,8 +25,10 @@ import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.core.action.AbstractAction;
+import org.paramixel.core.action.BranchAction;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.spi.DefaultResult;
+import org.paramixel.core.spi.DefaultStatus;
 
 @DisplayName("Custom action workflows")
 class CustomActionWorkflowTest {
@@ -41,9 +43,7 @@ class CustomActionWorkflowTest {
         Action repeatTwice = RepeatEachChildAction.of("repeat-twice", 2, List.of(repeated));
         Action root = ReverseSequentialAction.of("reverse-sequential", List.of(first, repeatTwice, last));
 
-        Runner runner = Runner.builder().build();
-        runner.run(root);
-        Result result = root.getResult();
+        Result result = Runner.builder().build().run(root);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(executions).containsExactly("last", "repeated", "repeated", "first");
@@ -58,15 +58,11 @@ class CustomActionWorkflowTest {
         return Direct.of(name, context -> executions.add(name));
     }
 
-    private static final class ReverseSequentialAction extends AbstractAction {
-
-        private final List<Action> children;
+    private static final class ReverseSequentialAction extends BranchAction {
 
         private ReverseSequentialAction(String name, List<Action> children) {
-            super();
+            super(children);
             this.name = validateName(name);
-            this.children = copyChildren(children);
-            this.children.forEach(this::addChild);
         }
 
         static ReverseSequentialAction of(String name, List<Action> children) {
@@ -76,48 +72,44 @@ class CustomActionWorkflowTest {
         }
 
         @Override
-        public List<Action> getChildren() {
-            return children;
-        }
-
-        @Override
-        public void execute(Context context) {
+        public Result execute(Context context) {
             Objects.requireNonNull(context, "context must not be null");
-            this.result = Result.staged();
-            context.getListener().beforeAction(context, this);
+            DefaultResult result = new DefaultResult(this);
+            context.getListener().beforeAction(result);
             Instant start = Instant.now();
 
             List<Action> reversed = new ArrayList<>(children);
             Collections.reverse(reversed);
             for (Action child : reversed) {
-                child.execute(context.createChild());
-                if (child.getResult().getStatus().isFailure()) {
-                    this.result = Result.fail(
-                            durationSince(start),
-                            child.getResult().getStatus().getThrowable().orElse(null));
-                    context.getListener().afterAction(context, this, this.result);
-                    return;
+                Result childResult = child.execute(context.createChild());
+                result.addChild(childResult);
+                if (childResult.getStatus().isFailure()) {
+                    result.setStatus(new DefaultStatus(
+                            DefaultStatus.Kind.FAILURE,
+                            childResult.getStatus().getThrowable().orElse(null)));
+                    result.setElapsedTime(durationSince(start));
+                    context.getListener().afterAction(result);
+                    return result;
                 }
             }
-            this.result = Result.pass(durationSince(start));
-            context.getListener().afterAction(context, this, this.result);
+            result.setStatus(DefaultStatus.PASS);
+            result.setElapsedTime(durationSince(start));
+            context.getListener().afterAction(result);
+            return result;
         }
     }
 
-    private static final class RepeatEachChildAction extends AbstractAction {
+    private static final class RepeatEachChildAction extends BranchAction {
 
         private final int repetitions;
-        private final List<Action> children;
 
         private RepeatEachChildAction(String name, int repetitions, List<Action> children) {
-            super();
+            super(children);
             this.name = validateName(name);
             if (repetitions < 1) {
                 throw new IllegalArgumentException("repetitions must be positive");
             }
             this.repetitions = repetitions;
-            this.children = copyChildren(children);
-            this.children.forEach(this::addChild);
         }
 
         static RepeatEachChildAction of(String name, int repetitions, List<Action> children) {
@@ -127,31 +119,30 @@ class CustomActionWorkflowTest {
         }
 
         @Override
-        public List<Action> getChildren() {
-            return children;
-        }
-
-        @Override
-        public void execute(Context context) {
+        public Result execute(Context context) {
             Objects.requireNonNull(context, "context must not be null");
-            this.result = Result.staged();
-            context.getListener().beforeAction(context, this);
+            DefaultResult result = new DefaultResult(this);
+            context.getListener().beforeAction(result);
             Instant start = Instant.now();
 
             for (int i = 0; i < repetitions; i++) {
                 for (Action child : children) {
-                    child.execute(context.createChild());
-                    if (child.getResult().getStatus().isFailure()) {
-                        this.result = Result.fail(
-                                durationSince(start),
-                                child.getResult().getStatus().getThrowable().orElse(null));
-                        context.getListener().afterAction(context, this, this.result);
-                        return;
+                    Result childResult = child.execute(context.createChild());
+                    result.addChild(childResult);
+                    if (childResult.getStatus().isFailure()) {
+                        result.setStatus(new DefaultStatus(
+                                DefaultStatus.Kind.FAILURE,
+                                childResult.getStatus().getThrowable().orElse(null)));
+                        result.setElapsedTime(durationSince(start));
+                        context.getListener().afterAction(result);
+                        return result;
                     }
                 }
             }
-            this.result = Result.pass(durationSince(start));
-            context.getListener().afterAction(context, this, this.result);
+            result.setStatus(DefaultStatus.PASS);
+            result.setElapsedTime(durationSince(start));
+            context.getListener().afterAction(result);
+            return result;
         }
     }
 

@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ExecutorService;
@@ -28,6 +29,9 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.spi.DefaultContext;
+import org.paramixel.core.spi.DefaultResult;
+import org.paramixel.core.spi.DefaultStatus;
 
 @DisplayName("DefaultListener")
 class DefaultListenerTest {
@@ -35,19 +39,21 @@ class DefaultListenerTest {
     @Test
     @DisplayName("prints action kind before and after execution")
     void printsActionKindBeforeAndAfterExecution() {
-        Listener listener = Listener.defaultListener();
+        Listener listener = Factory.defaultListener();
         Direct.Executable executable = context -> {};
         Action action = Direct.of("direct", executable);
-        Context context = Context.of(Configuration.defaultProperties(), listener, directExecutorService());
-        Result result = Result.pass(java.time.Duration.ZERO);
+        Context context = new DefaultContext(Configuration.defaultProperties(), listener, directExecutorService());
+        DefaultResult result = new DefaultResult(action);
+        result.setStatus(DefaultStatus.PASS);
+        result.setElapsedTime(Duration.ZERO);
         var output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
 
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
 
-            listener.beforeAction(context, action);
-            listener.afterAction(context, action, result);
+            listener.beforeAction(result);
+            listener.afterAction(result);
         } finally {
             System.setOut(originalOut);
         }

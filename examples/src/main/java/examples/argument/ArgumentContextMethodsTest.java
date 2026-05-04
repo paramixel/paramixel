@@ -20,8 +20,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.Value;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Noop;
@@ -29,10 +30,10 @@ import org.paramixel.core.action.Sequential;
 
 public class ArgumentContextMethodsTest {
 
-    record TestAttachment(String argumentName) {}
+    record TestStoreValue(String argumentName) {}
 
     public static void main(String[] args) {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.ActionFactory
@@ -45,11 +46,21 @@ public class ArgumentContextMethodsTest {
     private static Action argumentAction(String argumentName) {
         Action body = Direct.of("assert-context", context -> {
             assertThat(context.getParent()).isPresent();
+            assertThat(context.findAncestor(2)
+                            .orElseThrow()
+                            .getStore()
+                            .get("argument")
+                            .orElseThrow()
+                            .cast(TestStoreValue.class)
+                            .argumentName())
+                    .isEqualTo(argumentName);
         });
 
         return Lifecycle.of(
                 argumentName,
-                Direct.of("before", context -> context.setAttachment(new TestAttachment(argumentName))),
+                Direct.of(
+                        "before",
+                        context -> context.getStore().put("argument", Value.of(new TestStoreValue(argumentName)))),
                 Sequential.of(argumentName + "-body", List.of(body)),
                 Noop.of("after"));
     }

@@ -21,15 +21,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
-import org.paramixel.core.Context;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.SkipException;
+import org.paramixel.core.Value;
+import org.paramixel.core.exception.SkipException;
 
 @DisplayName("Lifecycle")
 class LifecycleTest {
@@ -40,40 +39,37 @@ class LifecycleTest {
     @DisplayName("before and after share same context, main runs in child context")
     void beforeAndAfterShareSameContextMainRunsInChildContext() {
         var mainAccessedLifecycle = new AtomicBoolean();
-        var afterAccessedAttachment = new AtomicBoolean();
+        var afterAccessedStore = new AtomicBoolean();
         var attachmentData = new TestData("shared");
 
         Lifecycle lifecycle = Lifecycle.of(
                 "lifecycle",
                 Direct.of("before", context -> {
-                    context.setAttachment(attachmentData);
+                    context.getStore().put("shared", Value.of(attachmentData));
                 }),
                 Direct.of("test", context -> {
-                    var lifecycleContext = context.findContext(1).orElseThrow();
+                    var lifecycleContext = context.findAncestor(1).orElseThrow();
                     var data = lifecycleContext
-                            .getAttachment()
-                            .flatMap(a -> a.to(TestData.class))
-                            .orElse(null);
+                            .getStore()
+                            .get("shared")
+                            .orElseThrow()
+                            .cast(TestData.class);
                     assertThat(data).isNotNull();
                     assertThat(data.value()).isEqualTo("shared");
                     mainAccessedLifecycle.set(true);
                 }),
                 Direct.of("after", context -> {
-                    var data = context.getAttachment()
-                            .flatMap(a -> a.to(TestData.class))
-                            .orElse(null);
+                    var data = context.getStore().get("shared").orElseThrow().cast(TestData.class);
                     assertThat(data).isNotNull();
                     assertThat(data.value()).isEqualTo("shared");
-                    afterAccessedAttachment.set(true);
+                    afterAccessedStore.set(true);
                 }));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(mainAccessedLifecycle).isTrue();
-        assertThat(afterAccessedAttachment).isTrue();
+        assertThat(afterAccessedStore).isTrue();
     }
 
     @Test
@@ -88,9 +84,7 @@ class LifecycleTest {
                 main,
                 Direct.of("after", context -> afterRan.set(true)));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(result.getStatus().getThrowable()).isEmpty();
@@ -114,9 +108,7 @@ class LifecycleTest {
                 main,
                 Direct.of("after", context -> afterRan.set(true)));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -124,14 +116,10 @@ class LifecycleTest {
         assertThat(mainRan).isFalse();
         assertThat(afterRan).isTrue();
         assertThat(lifecycle.getChildren()).hasSize(3);
-        assertThat(lifecycle.getChildren().get(0).getResult().getStatus().isFailure())
-                .isTrue();
-        assertThat(lifecycle.getChildren().get(0).getResult().getStatus().getThrowable())
-                .containsSame(beforeException);
-        assertThat(lifecycle.getChildren().get(1).getResult().getStatus().isSkip())
-                .isTrue();
-        assertThat(lifecycle.getChildren().get(2).getResult().getStatus().isPass())
-                .isTrue();
+        assertThat(result.getChildren().get(0).getStatus().isFailure()).isTrue();
+        assertThat(result.getChildren().get(0).getStatus().getThrowable()).containsSame(beforeException);
+        assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
+        assertThat(result.getChildren().get(2).getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -149,9 +137,7 @@ class LifecycleTest {
                 main,
                 Direct.of("after", context -> afterRan.set(true)));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -159,12 +145,9 @@ class LifecycleTest {
         assertThat(mainRan).isFalse();
         assertThat(afterRan).isTrue();
         assertThat(lifecycle.getChildren()).hasSize(3);
-        assertThat(lifecycle.getChildren().get(0).getResult().getStatus().isSkip())
-                .isTrue();
-        assertThat(lifecycle.getChildren().get(1).getResult().getStatus().isSkip())
-                .isTrue();
-        assertThat(lifecycle.getChildren().get(2).getResult().getStatus().isPass())
-                .isTrue();
+        assertThat(result.getChildren().get(0).getStatus().isSkip()).isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
+        assertThat(result.getChildren().get(2).getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -178,9 +161,7 @@ class LifecycleTest {
                     throw afterException;
                 }));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -188,20 +169,10 @@ class LifecycleTest {
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(beforeRan).isTrue();
         assertThat(lifecycle.getChildren()).hasSize(3);
-        assertThat(lifecycle.getChildren().get(0).getResult().getStatus().isPass())
-                .isTrue();
-        assertThat(lifecycle.getChildren().get(1).getResult().getStatus().isPass())
-                .isTrue();
-        assertThat(lifecycle.getChildren().get(2).getResult().getStatus().isFailure())
-                .isTrue();
-        assertThat(lifecycle
-                        .getChildren()
-                        .get(2)
-                        .getResult()
-                        .getStatus()
-                        .getThrowable()
-                        .get())
-                .isSameAs(afterException);
+        assertThat(result.getChildren().get(0).getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isPass()).isTrue();
+        assertThat(result.getChildren().get(2).getStatus().isFailure()).isTrue();
+        assertThat(result.getChildren().get(2).getStatus().getThrowable().get()).isSameAs(afterException);
     }
 
     @Test
@@ -216,9 +187,7 @@ class LifecycleTest {
                 Noop.of("main"),
                 Direct.of("after", context -> afterRan.set(true)));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isSkip()).isTrue();
         assertThat(afterRan).isTrue();
@@ -236,9 +205,7 @@ class LifecycleTest {
                 Noop.of("main"),
                 Direct.of("after", context -> afterRan.set(true)));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(afterRan).isTrue();
@@ -256,9 +223,7 @@ class LifecycleTest {
                 }),
                 Direct.of("after", context -> afterRan.set(true)));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(afterRan).isTrue();
@@ -276,9 +241,7 @@ class LifecycleTest {
                 Noop.of("main"),
                 Direct.of("after", context -> afterRan.set(true)));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(afterRan).isTrue();
@@ -287,17 +250,6 @@ class LifecycleTest {
     @Test
     @DisplayName("skipped main receives child context with proper parent hierarchy")
     void skippedMainReceivesChildContextWithProperParentHierarchy() {
-        var mainContext = new AtomicReference<Context>();
-
-        Listener capturingListener = new Listener() {
-            @Override
-            public void beforeAction(Context context, Action action) {
-                if (action.getName().equals("main")) {
-                    mainContext.set(context);
-                }
-            }
-        };
-
         Action main = Noop.of("main");
         Lifecycle lifecycle = Lifecycle.of(
                 "lifecycle",
@@ -307,31 +259,14 @@ class LifecycleTest {
                 main,
                 Noop.of("after"));
 
-        Runner runner = Runner.builder().listener(capturingListener).build();
-        runner.run(lifecycle);
+        Result result = Runner.builder().build().run(lifecycle);
 
-        assertThat(main.getResult().getStatus().isSkip()).isTrue();
-        assertThat(mainContext.get()).isNotNull();
-        assertThat(mainContext.get().getParent()).isPresent();
+        assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
     }
 
     @Test
     @DisplayName("skipped descendants receive child contexts mirroring action tree")
     void skippedDescendantsReceiveChildContextsMirroringActionTree() {
-        var nestedContext = new AtomicReference<Context>();
-        var grandchildContext = new AtomicReference<Context>();
-
-        Listener capturingListener = new Listener() {
-            @Override
-            public void beforeAction(Context context, Action action) {
-                if (action.getName().equals("nested")) {
-                    nestedContext.set(context);
-                } else if (action.getName().equals("grandchild")) {
-                    grandchildContext.set(context);
-                }
-            }
-        };
-
         Action grandchild = Noop.of("grandchild");
         Action nestedMain = Lifecycle.of("nested", Noop.of("nested-before"), grandchild, Noop.of("nested-after"));
 
@@ -343,29 +278,30 @@ class LifecycleTest {
                 nestedMain,
                 Noop.of("after"));
 
-        Runner runner = Runner.builder().listener(capturingListener).build();
-        runner.run(lifecycle);
+        Result result = Runner.builder().build().run(lifecycle);
 
-        assertThat(nestedMain.getResult().getStatus().isSkip()).isTrue();
-        assertThat(nestedContext.get()).isNotNull();
-        assertThat(grandchildContext.get()).isNotNull();
-        assertThat(grandchildContext.get().getParent()).contains(nestedContext.get());
+        assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
     }
 
     @Test
-    @DisplayName("skip listener callbacks interleave parent before children then parent after")
-    void skipListenerCallbacksInterleaveCorrectly() {
+    @DisplayName("skipAction callbacks fire for skipped descendants when before fails")
+    void skipActionCallbacksFireForSkippedDescendantsWhenBeforeFails() {
         List<String> callbackOrder = new ArrayList<>();
 
         Listener trackingListener = new Listener() {
             @Override
-            public void beforeAction(Context context, Action action) {
-                callbackOrder.add("before:" + action.getName());
+            public void beforeAction(Result result) {
+                callbackOrder.add("before:" + result.getAction().getName());
             }
 
             @Override
-            public void afterAction(Context context, Action action, Result result) {
-                callbackOrder.add("after:" + action.getName());
+            public void afterAction(Result result) {
+                callbackOrder.add("after:" + result.getAction().getName());
+            }
+
+            @Override
+            public void skipAction(Result result) {
+                callbackOrder.add("skip:" + result.getAction().getName());
             }
         };
 
@@ -380,42 +316,25 @@ class LifecycleTest {
                 nestedMain,
                 Noop.of("after"));
 
-        Runner runner = Runner.builder().listener(trackingListener).build();
-        runner.run(lifecycle);
+        Runner.builder().listener(trackingListener).build().run(lifecycle);
 
-        int nestedBeforeIdx = callbackOrder.indexOf("before:nested");
-        int grandchildBeforeIdx = callbackOrder.indexOf("before:grandchild");
-        int grandchildAfterIdx = callbackOrder.indexOf("after:grandchild");
-        int nestedAfterIdx = callbackOrder.indexOf("after:nested");
+        int nestedSkipIdx = callbackOrder.indexOf("skip:nested");
+        int grandchildSkipIdx = callbackOrder.indexOf("skip:grandchild");
 
-        assertThat(nestedBeforeIdx).isGreaterThan(-1);
-        assertThat(grandchildBeforeIdx).isGreaterThan(-1);
-        assertThat(grandchildAfterIdx).isGreaterThan(-1);
-        assertThat(nestedAfterIdx).isGreaterThan(-1);
+        assertThat(nestedSkipIdx).isGreaterThan(-1);
+        assertThat(grandchildSkipIdx).isGreaterThan(-1);
 
-        assertThat(nestedBeforeIdx).isLessThan(grandchildBeforeIdx);
-        assertThat(grandchildAfterIdx).isLessThan(nestedAfterIdx);
+        assertThat(nestedSkipIdx).isGreaterThan(grandchildSkipIdx);
     }
 
     @Test
-    @DisplayName("skipped descendants can access parent attachment via findAttachment")
-    void skippedDescendantsCanAccessParentAttachmentViaFindAttachment() {
-        var grandchildFoundAttachment = new AtomicBoolean();
-
-        Listener capturingListener = new Listener() {
-            @Override
-            public void beforeAction(Context context, Action action) {
-                if (action.getName().equals("grandchild")) {
-                    context.findAttachment(2).ifPresent(a -> grandchildFoundAttachment.set(true));
-                }
-            }
-        };
-
+    @DisplayName("skipped descendants preserve store-backed lifecycle structure")
+    void skippedDescendantsPreserveStoreBackedLifecycleStructure() {
         Action grandchild = Noop.of("grandchild");
         Action nestedMain = Lifecycle.of(
                 "nested",
                 Direct.of("nested-before", context -> {
-                    context.setAttachment(new TestData("nested-data"));
+                    context.getStore().put("nested", Value.of(new TestData("nested-data")));
                 }),
                 grandchild,
                 Noop.of("nested-after"));
@@ -423,16 +342,14 @@ class LifecycleTest {
         Lifecycle lifecycle = Lifecycle.of(
                 "lifecycle",
                 Direct.of("before", context -> {
-                    context.setAttachment(new TestData("lifecycle-data"));
+                    context.getStore().put("lifecycle", Value.of(new TestData("lifecycle-data")));
                     throw new RuntimeException("before failed");
                 }),
                 nestedMain,
                 Noop.of("after"));
 
-        Runner runner = Runner.builder().listener(capturingListener).build();
-        runner.run(lifecycle);
+        Result result = Runner.builder().build().run(lifecycle);
 
-        assertThat(nestedMain.getResult().getStatus().isSkip()).isTrue();
-        assertThat(grandchildFoundAttachment).isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
     }
 }

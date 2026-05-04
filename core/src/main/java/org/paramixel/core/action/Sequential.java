@@ -16,41 +16,40 @@
 
 package org.paramixel.core.action;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
+import org.paramixel.core.spi.DefaultResult;
 import org.paramixel.core.support.Arguments;
 
 /**
- * A built-in action that executes child actions sequentially.
+ * Executes child actions sequentially in declaration order.
+ *
+ * <p>All children are executed regardless of earlier failures. Aggregate status is computed from the full child result
+ * list.
  */
-public class Sequential extends AbstractAction {
-
-    private final List<Action> children;
+public class Sequential extends BranchAction {
 
     /**
      * Creates a sequential action with the supplied children.
      *
-     * <p>Callers should normally use one of the public factory methods so validation and
-     * initialization happen before the instance is exposed.</p>
-     *
      * @param name the action name
-     * @param children the child actions to execute in order
+     * @param children the child actions
      */
     protected Sequential(String name, List<Action> children) {
-        super();
+        super(children);
         this.name = validateName(name);
-        this.children = validateChildren(children);
     }
 
     /**
      * Creates a sequential action.
      *
-     * @param name the action name; must not be {@code null}
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param children the child actions
      * @return a new sequential action
      */
     public static Sequential of(String name, List<Action> children) {
@@ -64,10 +63,10 @@ public class Sequential extends AbstractAction {
     }
 
     /**
-     * Creates a sequential action from varargs children.
+     * Creates a sequential action.
      *
-     * @param name the action name; must not be {@code null}
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param children the child actions
      * @return a new sequential action
      */
     public static Sequential of(String name, Action... children) {
@@ -82,37 +81,24 @@ public class Sequential extends AbstractAction {
     }
 
     /**
-     * Returns the child actions executed by this sequential action.
+     * Executes all children in order.
      *
-     * <p>The returned list is unmodifiable and reflects the execution order established
-     * at construction time.</p>
-     *
-     * @return the child actions
+     * @param context the execution context
+     * @return the aggregated execution result
      */
     @Override
-    public List<Action> getChildren() {
-        return children;
-    }
-
-    /**
-     * Executes all child actions from first to last.
-     *
-     * <p>Every child is executed, and the final result is computed from the aggregated
-     * child results using the standard composite status rules.</p>
-     *
-     * @param context the execution context for this action
-     * @throws NullPointerException if {@code context} is {@code null}
-     */
-    @Override
-    public void execute(Context context) {
+    public Result execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Result.staged();
-        context.getListener().beforeAction(context, this);
+        DefaultResult result = new DefaultResult(this);
+        context.getListener().beforeAction(result);
         Instant start = Instant.now();
         for (Action child : getChildren()) {
-            child.execute(context.createChild());
+            Result childResult = child.execute(context.createChild());
+            result.addChild(childResult);
         }
-        this.result = Result.of(computeStatus(), durationSince(start));
-        context.getListener().afterAction(context, this, this.result);
+        result.setStatus(computeStatus(result.getChildren()));
+        result.setElapsedTime(Duration.between(start, Instant.now()));
+        context.getListener().afterAction(result);
+        return result;
     }
 }

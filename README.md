@@ -13,32 +13,33 @@ Most Java test frameworks bake test structure into the framework itself. You des
 
 Annotations can't call methods. They can't branch. They can't compose. Every time a framework adds a new feature, it adds a new annotation — and you're stuck learning the framework's model instead of expressing your own.
 
-Paramixel treats tests as **composable trees built with code, not annotations.** Build test plans with plain Java — loops, conditionals, dynamic generation — using `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` actions that compose to any depth. Need something the built-in actions don't cover? Write a custom `Action` — either extend `AbstractAction` or implement `Action` directly, then implement `execute(Context)` and it composes like any other. Topology is explicit. After is guaranteed. Parallelism is per-node. The full power of Java is available at test definition time, because test plans are just code.
+Paramixel treats tests as **composable trees built with code, not annotations.** Build test plans with plain Java — loops, conditionals, dynamic generation — using `Sequential`, `Parallel`, `Lifecycle`, and `DependentSequential` actions that compose to any depth. Need something the built-in actions don't cover? Write a custom `Action` — either extend `AbstractAction` or implement `Action` directly, then implement `execute(Context)` and it composes like any other. Topology is explicit. After is guaranteed. Parallelism is per-node. The full power of Java is available at test definition time, because test plans are just code.
 
 Paramixel runs anywhere Java runs. Use the Maven plugin for CI/CD integration, or embed the programmatic API directly — no build tool lock-in, no custom runners, no special CI configuration. Need more control? Implement the `Runner` interface to customize execution semantics, integrate with external systems, or build your own test orchestration.
 
 **Key Benefits:**
-- **Tests are composable trees built with code, not annotations** — `Sequential`, `Parallel`, `Lifecycle`, and `StrictSequential` compose to arbitrary depth, making test topology explicit
+- **Tests are composable trees built with code, not annotations** — `Sequential`, `Parallel`, `Lifecycle`, and `DependentSequential` compose to arbitrary depth, making test topology explicit
 - **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) instead of declarative annotations
 - **Guaranteed after with `Lifecycle`** — cleanup always runs, even on failure or skip; after errors are attached as suppressed exceptions, following try-with-resources semantics
 - **Parallel execution at any depth** — embed `Parallel` nodes anywhere in the tree with per-node parallelism control
-- **Fail-fast or run-all semantics** — `StrictSequential` stops on first failure; `Sequential` runs all children regardless; choose the right behavior per group
+- **Fail-fast or run-all semantics** — `DependentSequential` stops on first failure; `Sequential` runs all children regardless; choose the right behavior per group
 - **Write custom actions** — either extend `AbstractAction` or implement `Action` directly, then implement `execute(Context)` to define your own execution semantics; custom actions compose alongside built-in actions with zero framework changes
 - **Single factory method produces the entire test plan** — one `@Paramixel.ActionFactory` method returns the full action tree; no per-method reflection at test time
 - **No test class instantiation** — only the static factory method is called; state flows through `Context` attachments, not instance fields
-- **Context attachments for state sharing** — each context can hold one typed object; navigate parent chain to share state across actions
-- **Result tree mirrors the action tree** — every result has children, parent, timing, and status; walk the tree for aggregated or granular reporting at any level
+- **Context Store for state sharing** — each context has a `Store` key-value map; use `findAncestor()` to navigate the parent chain and share state across actions
+- **Result tree mirrors the action tree** — `Runner.run()` returns a `Result`; walk the tree for aggregated or granular reporting at any level
 
 ## Documentation
 
 For the full documentation, visit: **https://paramixel.github.io/paramixel**
 
-The documentation site includes:
-- [Quick Start Guide](https://paramixel.github.io/paramixel/docs/quick-start)
-- [Usage Guide](https://paramixel.github.io/paramixel/docs/usage/action-composition)
-- [Configuration Reference](https://paramixel.github.io/paramixel/docs/configuration)
-- [API Reference](https://paramixel.github.io/paramixel/docs/api/intro)
-- [Architecture](https://paramixel.github.io/paramixel/docs/architecture)
+Use the version selector on the docs site to switch between versions.
+
+- **Latest** — current development docs
+- **2.0.0** — v2.0.0 stable docs
+- **1.0.2** — v1.0.2 stable docs
+
+See the [migration guide](https://paramixel.github.io/paramixel/docs/usage/migration-guide) when upgrading from 1.x.
 
 ## Quick Start
 
@@ -47,7 +48,7 @@ The documentation site includes:
 **Maven:**
 ```xml
 <properties>
-    <paramixel.version>YOUR_PARAMIXEL_VERSION</paramixel.version>
+    <paramixel.version>LATEST_VERSION</paramixel.version>
 </properties>
 
 <dependency>
@@ -75,7 +76,7 @@ The documentation site includes:
 </build>
 ```
 
-Use the latest published Paramixel release for `YOUR_PARAMIXEL_VERSION`.
+See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel) for the latest published version.
 
 ### Write Your First Test
 
@@ -105,6 +106,10 @@ public class MyTest {
 ```bash
 ./mvnw test
 ```
+
+## Contributing Notes
+
+- Javadoc conventions for the codebase are documented in `assets/javadoc-style-guide.md`.
 
 ## Build from Source
 

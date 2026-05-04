@@ -41,25 +41,20 @@ class BeforeFailureMainResultTest {
                 }),
                 Noop.of("noop"));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
         assertThat(result.getStatus().getMessage().get()).isEqualTo("before failed");
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(lifecycle.getChildren()).hasSize(3);
-        assertThat(lifecycle.getChildren().get(0).getResult().getStatus().isFailure())
-                .isTrue();
+        assertThat(result.getChildren().get(0).getStatus().isFailure()).isTrue();
         assertThat(lifecycle.getChildren().get(0)).isInstanceOf(Direct.class);
         assertThat(lifecycle.getChildren().get(0).getName()).isEqualTo("before");
-        assertThat(lifecycle.getChildren().get(1).getResult().getStatus().isSkip())
-                .isTrue();
+        assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
         assertThat(lifecycle.getChildren().get(1)).isInstanceOf(Direct.class);
         assertThat(lifecycle.getChildren().get(1).getName()).isEqualTo("main");
-        assertThat(lifecycle.getChildren().get(2).getResult().getStatus().isPass())
-                .isTrue();
+        assertThat(result.getChildren().get(2).getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -77,9 +72,7 @@ class BeforeFailureMainResultTest {
                 main,
                 Noop.of("after"));
 
-        Runner runner = Runner.builder().build();
-        runner.run(lifecycle);
-        Result result = lifecycle.getResult();
+        Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getStatus().isFailure()).isTrue();
         assertThat(result.getStatus().getMessage()).isPresent();
@@ -87,13 +80,12 @@ class BeforeFailureMainResultTest {
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(lifecycle.getChildren()).hasSize(3);
 
-        Result mainResult = main.getResult();
+        Result mainResult = result.getChildren().get(1);
         assertThat(mainResult.getStatus().isSkip()).isTrue();
-        assertThat(main).isSameAs(main);
         assertThat(main.getChildren()).hasSize(3);
 
-        assertThat(leaf1.getResult().getStatus().isSkip()).isTrue();
-        assertThat(leaf2.getResult().getStatus().isSkip()).isTrue();
-        assertThat(leaf3.getResult().getStatus().isSkip()).isTrue();
+        assertThat(mainResult.getChildren().get(0).getStatus().isSkip()).isTrue();
+        assertThat(mainResult.getChildren().get(1).getStatus().isSkip()).isTrue();
+        assertThat(mainResult.getChildren().get(2).getStatus().isSkip()).isTrue();
     }
 }

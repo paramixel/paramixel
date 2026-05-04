@@ -5,8 +5,8 @@ const darkCodeTheme = themes.dracula;
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Paramixel Test Engine',
-  tagline: 'An action-based test engine for Java 17+ with composable action trees, lifecycle management, and parallel execution.',
+  title: 'Paramixel Test Framework',
+  tagline: 'An action-based test framework for Java 17+ with composable action trees, lifecycle management, and parallel execution.',
   favicon: 'img/favicon.ico',
 
   url: 'https://paramixel.github.io',
@@ -34,6 +34,15 @@ const config = {
           routeBasePath: 'docs',
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl: 'https://github.com/paramixel/paramixel/tree/main/website/',
+          lastVersion: 'current',
+          versions: {
+            current: {
+              label: 'latest',
+            },
+            '2.0.0': {
+              banner: 'none',
+            },
+          },
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -64,6 +73,10 @@ const config = {
             sidebarId: 'docsSidebar',
             position: 'left',
             label: 'Documentation',
+          },
+          {
+            type: 'docsVersionDropdown',
+            position: 'left',
           },
           {
             href: 'https://github.com/paramixel/paramixel',

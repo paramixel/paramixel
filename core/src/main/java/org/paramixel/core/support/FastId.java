@@ -20,11 +20,10 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * High-performance unique ID generator producing 4-character strings from a-z and A-Z.
+ * Generates short pseudo-random-looking identifiers for Paramixel actions.
  *
- * <p>Uses a full-period Linear Congruential Generator (LCG) to permute the ID space,
- * ensuring uniqueness while producing unpredictable, well-distributed IDs.
- * Avoids IDs that match (case-insensitive): PASS, FAIL, SKIP, STAG
+ * <p>The generated identifiers use a four-character alphabetic encoding and avoid a small set of reserved words that
+ * would be confusing in console output.
  */
 public class FastId {
 
@@ -46,9 +45,9 @@ public class FastId {
     private FastId() {}
 
     /**
-     * Generates a unique 4-character ID from a-z and A-Z.
-     * Never returns IDs matching (case-insensitive): PASS, FAIL, SKIP, STAG
-     * @return a unique 4-character ID
+     * Generates the next identifier.
+     *
+     * @return a four-character identifier that is not in the reserved-word list
      */
     public static String generateId() {
         while (true) {
@@ -60,9 +59,6 @@ public class FastId {
         }
     }
 
-    /**
-     * Encodes a number as a base-52 string using the character set.
-     */
     private static String encode(long num) {
         char[] result = new char[4];
         for (int i = 3; i >= 0; i--) {
@@ -72,9 +68,6 @@ public class FastId {
         return new String(result);
     }
 
-    /**
-     * Checks if the ID contains any forbidden substrings (case-insensitive).
-     */
     private static boolean isForbidden(String id) {
         String lower = id.toLowerCase();
         for (String forbidden : FORBIDDEN) {

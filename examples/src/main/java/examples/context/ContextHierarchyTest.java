@@ -20,9 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
 import org.paramixel.core.Context;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.Value;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
 import org.paramixel.core.action.Noop;
@@ -30,10 +31,10 @@ import org.paramixel.core.action.Sequential;
 
 public class ContextHierarchyTest {
 
-    record TestAttachment(String value) {}
+    record TestStoreValue(String value) {}
 
     public static void main(String[] args) {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.ActionFactory
@@ -41,7 +42,9 @@ public class ContextHierarchyTest {
         Action arguments = Sequential.of("arguments", List.of(argumentAction("arg-0"), argumentAction("arg-1")));
         return Lifecycle.of(
                 "ContextHierarchyTest",
-                Direct.of("before", context -> context.setAttachment(new TestAttachment("suite-value"))),
+                Direct.of(
+                        "before",
+                        context -> context.getStore().put("suite", Value.of(new TestStoreValue("suite-value")))),
                 arguments,
                 Noop.of("after"));
     }
@@ -57,26 +60,28 @@ public class ContextHierarchyTest {
         });
 
         Action inspectStores = Direct.of("inspect-stores", context -> {
-            var argumentContext = context.findContext(2).orElseThrow();
+            var argumentContext = context.findAncestor(2).orElseThrow();
             assertThat(argumentContext
-                            .getAttachment()
-                            .flatMap(a -> a.to(TestAttachment.class))
+                            .getStore()
+                            .get("argument")
                             .orElseThrow()
+                            .cast(TestStoreValue.class)
                             .value())
                     .isEqualTo(name);
 
-            var suiteContext = context.findContext(5).orElseThrow();
+            var suiteContext = context.findAncestor(5).orElseThrow();
             assertThat(suiteContext
-                            .getAttachment()
-                            .flatMap(a -> a.to(TestAttachment.class))
+                            .getStore()
+                            .get("suite")
                             .orElseThrow()
+                            .cast(TestStoreValue.class)
                             .value())
                     .isEqualTo("suite-value");
         });
 
         return Lifecycle.of(
                 name,
-                Direct.of("before", context -> context.setAttachment(new TestAttachment(name))),
+                Direct.of("before", context -> context.getStore().put("argument", Value.of(new TestStoreValue(name)))),
                 Sequential.of(name + "-body", List.of(inspectParent, inspectStores)),
                 Noop.of("after"));
     }

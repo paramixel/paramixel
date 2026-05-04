@@ -16,304 +16,152 @@
 
 package org.paramixel.core;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.AbstractExecutorService;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.paramixel.core.action.Parallel;
-import org.paramixel.core.listener.SafeListener;
+import org.paramixel.core.spi.DefaultRunner;
 
 /**
- * Coordinates top-level execution of actions.
+ * Executes Paramixel actions.
  *
- * <p>A runner holds the configuration and listener used to execute {@link Action} instances.
- * Create instances with {@link #builder()} and invoke {@link #run(Action)} to execute a plan.</p>
+ * <p>A {@code Runner} is the main entry point for launching an {@link Action} tree. It holds the effective
+ * configuration and the {@link Listener} used for lifecycle notifications.
  *
- * <p><strong>Reusability:</strong> A runner can execute multiple actions. Each call to
- * {@link #run(Action)} creates fresh executor services (if none was supplied to the builder)
- * and shuts them down when the call completes. When an external {@link ExecutorService} is
- * supplied via {@link Builder#executorService(ExecutorService)}, the runner uses it for
- * top-level action execution but does not manage its lifecycle.</p>
- *
- * <p><strong>Concurrency:</strong> It is safe to call {@code run()} concurrently from
- * multiple threads on the same runner instance. Each invocation uses its own executor pools
- * and execution scope, so concurrent runs are fully independent.</p>
+ * @apiNote Use {@link #builder()} to customize configuration, listeners, or the executor service used during a run.
  */
-public final class Runner {
-
-    private static final ThreadLocal<ExecutionScope> EXECUTION_SCOPE = new ThreadLocal<>();
-    private static final String RUNNER_THREAD_NAME = "paramixel-runner";
-    private static final String PARALLEL_THREAD_NAME = "paramixel-parallel";
-
-    private final Listener listener;
-    private final Map<String, String> configuration;
-    private final ExecutorService externalExecutorService;
-
-    private Runner(Map<String, String> configuration, Listener listener, ExecutorService externalExecutorService) {
-        this.listener = Objects.requireNonNull(listener, "listener must not be null");
-        this.configuration =
-                configuration != null ? Map.copyOf(configuration) : Map.copyOf(Configuration.defaultProperties());
-        this.externalExecutorService = externalExecutorService;
-        resolveParallelism(this.configuration);
-    }
+public interface Runner {
 
     /**
-     * Creates a new builder for constructing {@link Runner} instances.
+     * Creates a new builder for constructing a {@link Runner}.
      *
      * @return a new runner builder
      */
-    public static Builder builder() {
+    static Builder builder() {
         return new Builder();
     }
 
     /**
-     * Returns the immutable configuration used by this runner.
+     * Returns the effective runner configuration.
      *
-     * @return the runner configuration
+     * @return the configuration properties used by this runner
      */
-    public Map<String, String> getConfiguration() {
-        return configuration;
-    }
+    Map<String, String> getConfiguration();
 
     /**
-     * Returns the listener that receives lifecycle callbacks for this runner.
+     * Returns the listener receiving run lifecycle callbacks.
      *
      * @return the runner listener
      */
-    public Listener getListener() {
-        return listener;
+    Listener getListener();
+
+    /**
+     * Executes the supplied action tree.
+     *
+     * @param action the root action to execute
+     * @return the result produced for the supplied action
+     */
+    Result run(Action action);
+
+    /**
+     * Resolves an action with the supplied selector and executes it when present.
+     *
+     * @param selector the selector used to locate an action
+     * @return the result of the resolved action, or an empty {@link Optional} when no matching action is found
+     */
+    default Optional<Result> run(Selector selector) {
+        Objects.requireNonNull(selector, "selector must not be null");
+        Optional<Action> optionalAction = Resolver.resolveActions(getConfiguration(), selector);
+        return optionalAction.map(this::run);
     }
 
     /**
-     * Executes the supplied action.
+     * Executes an action and converts the final outcome into a process-style exit code.
      *
-     * <p>The configured listener is notified before execution starts and after it completes. Owned
-     * executor services are created before execution and shut down after execution completes. If the
-     * runner was built with an external {@link ExecutorService}, it is used but not shut down.</p>
+     * <p>The returned value is {@code 0} for passing results. Skipped results also return {@code 0} unless
+     * {@link Configuration#FAILURE_ON_SKIP} is configured as {@code true}. All other outcomes return {@code 1}.
      *
-     * <p>This method may be called multiple times on the same runner instance. Each invocation
-     * creates fresh executor services (when none was supplied) and is independent of prior runs.</p>
-     *
-     * @param action the action to execute
-     * @throws NullPointerException if {@code action} is {@code null}
+     * @param action the root action to execute
+     * @return {@code 0} for success and {@code 1} for failure
      */
-    public void run(Action action) {
+    default int runAndReturnExitCode(Action action) {
         Objects.requireNonNull(action, "action must not be null");
-
-        Object executionDomain = new Object();
-        ExecutorService runnerExec;
-        boolean ownsRunnerExec;
-
-        if (externalExecutorService != null) {
-            runnerExec = externalExecutorService;
-            ownsRunnerExec = false;
-        } else {
-            runnerExec = createExecutorService(configuration, RUNNER_THREAD_NAME);
-            ownsRunnerExec = true;
+        Result result = run(action);
+        boolean failureOnSkip =
+                Boolean.parseBoolean(getConfiguration().getOrDefault(Configuration.FAILURE_ON_SKIP, "false"));
+        if (result.getStatus().isPass()) {
+            return 0;
         }
-
-        ExecutorService parallelExec = createExecutorService(configuration, PARALLEL_THREAD_NAME);
-        ExecutorService routingExec = new RoutingExecutorService(runnerExec, parallelExec, executionDomain);
-
-        Listener safeListener = listener instanceof SafeListener ? listener : SafeListener.of(listener);
-        safeListener.runStarted(this, action);
-
-        ExecutionScope previousScope = EXECUTION_SCOPE.get();
-        EXECUTION_SCOPE.set(new ExecutionScope(executionDomain, 0));
-
-        try {
-            validateNoDeadlock(action);
-
-            Context context = Context.of(configuration, safeListener, routingExec);
-            action.execute(context);
-            safeListener.runCompleted(this, action);
-        } finally {
-            restoreExecutionScope(previousScope);
-            if (ownsRunnerExec) {
-                shutdownExecutorService(runnerExec);
-            }
-            shutdownExecutorService(parallelExec);
+        if (result.getStatus().isSkip() && !failureOnSkip) {
+            return 0;
         }
+        return 1;
     }
-
-    private static int resolveParallelism(Map<String, String> configuration) {
-        String configuredParallelism = configuration.getOrDefault(
-                Configuration.RUNNER_PARALLELISM,
-                String.valueOf(Runtime.getRuntime().availableProcessors()));
-
-        final int parallelism;
-        try {
-            parallelism = Integer.parseInt(configuredParallelism);
-        } catch (NumberFormatException e) {
-            throw ConfigurationException.of(
-                    "Invalid configuration for '" + Configuration.RUNNER_PARALLELISM + "': expected integer but was '"
-                            + configuredParallelism + "'",
-                    e);
-        }
-
-        if (parallelism <= 0) {
-            throw ConfigurationException.of("Invalid configuration for '" + Configuration.RUNNER_PARALLELISM
-                    + "': expected positive integer but was '"
-                    + configuredParallelism + "'");
-        }
-
-        return parallelism;
-    }
-
-    private static ExecutorService createExecutorService(Map<String, String> configuration, String threadName) {
-        int parallelism = resolveParallelism(configuration);
-        AtomicInteger counter = new AtomicInteger(1);
-
-        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
-                parallelism, parallelism, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {
-                    Thread thread = new Thread(runnable, threadName + "-" + counter.getAndIncrement());
-                    thread.setDaemon(true);
-                    return thread;
-                });
-
-        threadPoolExecutor.prestartAllCoreThreads();
-        return threadPoolExecutor;
-    }
-
-    private static void shutdownExecutorService(ExecutorService executorService) {
-        executorService.shutdown();
-
-        try {
-            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                executorService.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executorService.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void validateNoDeadlock(Action action) {
-        int parallelism = resolveParallelism(configuration);
-        int maxDepth = maxParallelDepth(action, 0);
-        if (maxDepth > parallelism + 1) {
-            throw new IllegalStateException(
-                    "Potential thread-starvation deadlock detected: the action tree contains " + maxDepth
-                            + " levels of nested default-executor Parallel actions,"
-                            + " but the shared parallel executor pool has only " + parallelism + " thread(s)."
-                            + " Supply a dedicated ExecutorService to inner Parallel actions"
-                            + " via Parallel.of(name, executorService, children)"
-                            + " or increase paramixel.parallelism to at least " + (maxDepth - 1) + ".");
-        }
-    }
-
-    private static int maxParallelDepth(Action action, int currentDepth) {
-        if (action instanceof Parallel p && p.executorService().isEmpty()) {
-            currentDepth++;
-        } else if (action instanceof Parallel p && p.executorService().isPresent()) {
-            currentDepth = 0;
-        }
-        int max = currentDepth;
-        for (Action child : action.getChildren()) {
-            max = Math.max(max, maxParallelDepth(child, currentDepth));
-        }
-        return max;
-    }
-
-    private static void restoreExecutionScope(ExecutionScope previousScope) {
-        if (previousScope == null) {
-            EXECUTION_SCOPE.remove();
-        } else {
-            EXECUTION_SCOPE.set(previousScope);
-        }
-    }
-
-    private static final class RoutingExecutorService extends AbstractExecutorService {
-
-        private final ExecutorService runnerExecutorService;
-        private final ExecutorService parallelExecutorService;
-        private final Object executionDomain;
-
-        RoutingExecutorService(
-                ExecutorService runnerExecutorService,
-                ExecutorService parallelExecutorService,
-                Object executionDomain) {
-            this.runnerExecutorService = runnerExecutorService;
-            this.parallelExecutorService = parallelExecutorService;
-            this.executionDomain = executionDomain;
-        }
-
-        @Override
-        public void shutdown() {
-            runnerExecutorService.shutdown();
-            parallelExecutorService.shutdown();
-        }
-
-        @Override
-        public List<Runnable> shutdownNow() {
-            List<Runnable> runnables = new ArrayList<>(runnerExecutorService.shutdownNow());
-            runnables.addAll(parallelExecutorService.shutdownNow());
-            return runnables;
-        }
-
-        @Override
-        public boolean isShutdown() {
-            return runnerExecutorService.isShutdown() && parallelExecutorService.isShutdown();
-        }
-
-        @Override
-        public boolean isTerminated() {
-            return runnerExecutorService.isTerminated() && parallelExecutorService.isTerminated();
-        }
-
-        @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-            long deadline = System.nanoTime() + unit.toNanos(timeout);
-            boolean runnerTerminated = runnerExecutorService.awaitTermination(timeout, unit);
-            long remainingNanos = deadline - System.nanoTime();
-            if (remainingNanos <= 0) {
-                return runnerTerminated && parallelExecutorService.isTerminated();
-            }
-            boolean parallelTerminated = parallelExecutorService.awaitTermination(remainingNanos, TimeUnit.NANOSECONDS);
-            return runnerTerminated && parallelTerminated;
-        }
-
-        @Override
-        public void execute(Runnable command) {
-            ExecutionScope scope = EXECUTION_SCOPE.get();
-            boolean sameDomain = scope != null && scope.domain() == executionDomain;
-            int currentDepth = sameDomain ? scope.parallelDepth() : 0;
-            ExecutorService delegate = currentDepth == 0 ? runnerExecutorService : parallelExecutorService;
-            int childDepth = currentDepth + 1;
-
-            delegate.execute(() -> {
-                ExecutionScope previousScope = EXECUTION_SCOPE.get();
-                EXECUTION_SCOPE.set(new ExecutionScope(executionDomain, childDepth));
-                try {
-                    command.run();
-                } finally {
-                    restoreExecutionScope(previousScope);
-                }
-            });
-        }
-    }
-
-    private record ExecutionScope(Object domain, int parallelDepth) {}
 
     /**
-     * Builds {@link Runner} instances with optional custom components.
+     * Resolves and executes an action, then converts the outcome into a process-style exit code.
+     *
+     * <p>If the selector resolves no action, this method returns {@code 0}.
+     *
+     * @param selector the selector used to locate an action
+     * @return {@code 0} for success and {@code 1} for failure
      */
-    public static final class Builder {
+    default int runAndReturnExitCode(Selector selector) {
+        Objects.requireNonNull(selector, "selector must not be null");
+        Optional<Result> optionalResult = run(selector);
+        if (optionalResult.isEmpty()) {
+            return 0;
+        }
+        Result result = optionalResult.get();
+        boolean failureOnSkip =
+                Boolean.parseBoolean(getConfiguration().getOrDefault(Configuration.FAILURE_ON_SKIP, "false"));
+        if (result.getStatus().isPass()) {
+            return 0;
+        }
+        if (result.getStatus().isSkip() && !failureOnSkip) {
+            return 0;
+        }
+        return 1;
+    }
+
+    /**
+     * Executes an action and terminates the current JVM with the derived exit code.
+     *
+     * @param action the root action to execute
+     */
+    default void runAndExit(Action action) {
+        Objects.requireNonNull(action, "action must not be null");
+        System.exit(runAndReturnExitCode(action));
+    }
+
+    /**
+     * Resolves and executes an action, then terminates the current JVM with the derived exit code.
+     *
+     * @param selector the selector used to locate an action
+     */
+    default void runAndExit(Selector selector) {
+        Objects.requireNonNull(selector, "selector must not be null");
+        System.exit(runAndReturnExitCode(selector));
+    }
+
+    /**
+     * Fluent builder for {@link Runner} instances.
+     *
+     * <p>By default, the builder uses {@link Factory#defaultListener()} and the implementation's default
+     * configuration.
+     */
+    final class Builder {
 
         private Map<String, String> configuration;
-        private Listener listener = Listener.treeListener();
+        private Listener listener = Factory.defaultListener();
         private ExecutorService executorService;
 
+        private Builder() {}
+
         /**
-         * Sets the configuration properties for the runner being built.
+         * Sets the configuration map to use for the runner.
          *
-         * <p>The provided map is defensively copied.</p>
+         * <p>The supplied map is defensively copied.
          *
          * @param properties the configuration properties to use
          * @return this builder
@@ -325,7 +173,7 @@ public final class Runner {
         }
 
         /**
-         * Sets the listener for the runner being built.
+         * Sets the listener to receive lifecycle callbacks.
          *
          * @param listener the listener to use
          * @return this builder
@@ -337,12 +185,9 @@ public final class Runner {
         }
 
         /**
-         * Sets the executor service for the runner being built.
+         * Sets an external executor service for runner-managed work.
          *
-         * <p>When supplied, the built runner uses this executor service for top-level action execution
-         * and does not manage its lifecycle. The parallel executor used for nested parallel actions is
-         * always created and managed by the runner. Callers are responsible for shutting down their own
-         * executor service when it is no longer needed.</p>
+         * <p>When supplied, the runner reuses this executor service instead of creating its own primary executor.
          *
          * @param executorService the executor service to use
          * @return this builder
@@ -354,12 +199,12 @@ public final class Runner {
         }
 
         /**
-         * Builds a new {@link Runner} from the current builder state.
+         * Builds a new {@link Runner} instance.
          *
-         * @return a new runner instance
+         * @return a new runner
          */
         public Runner build() {
-            return new Runner(configuration, listener, executorService);
+            return new DefaultRunner(configuration, listener, executorService);
         }
     }
 }

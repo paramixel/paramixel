@@ -21,27 +21,20 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * Utility methods for validating method arguments.
- *
- * <p>Provides static checks that throw {@link IllegalArgumentException} (or
- * {@link NullPointerException}) when arguments violate constraints. Intended as
- * a fluent alternative to manual {@code if}/{@code throw} guards.
- *
- * @see java.util.Objects
+ * Shared argument-validation helpers for Paramixel internals and support APIs.
  */
 public class Arguments {
 
-    /** Suppresses default constructor for utility class. */
     private Arguments() {}
 
     /**
-     * Requires a string that is not {@code null} and not blank.
+     * Returns the supplied string when it is non-blank.
      *
-     * @param value The string to check; must not be null.
-     * @param message The exception message if the string is blank.
-     * @return The validated string; never null.
-     * @throws NullPointerException If {@code value} is null.
-     * @throws IllegalArgumentException If {@code value} is blank.
+     * @param value the string to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code value}
+     * @throws NullPointerException if {@code value} is {@code null}
+     * @throws IllegalArgumentException if {@code value} is blank
      */
     public static String requireNonBlank(String value, String message) {
         Objects.requireNonNull(value);
@@ -52,13 +45,13 @@ public class Arguments {
     }
 
     /**
-     * Requires a string that is not {@code null} and not blank.
+     * Returns the supplied string when it is non-blank.
      *
-     * @param value The string to check; must not be null.
-     * @param messageSupplier The supplier for the exception message if the string is blank; must not be null.
-     * @return The validated string; never null.
-     * @throws NullPointerException If {@code value} is null or {@code messageSupplier} is null.
-     * @throws IllegalArgumentException If {@code value} is blank.
+     * @param value the string to validate
+     * @param messageSupplier the exception message supplier to use when validation fails
+     * @return {@code value}
+     * @throws NullPointerException if {@code value} is {@code null}
+     * @throws IllegalArgumentException if {@code value} is blank
      */
     public static String requireNonBlank(String value, Supplier<String> messageSupplier) {
         Objects.requireNonNull(value);
@@ -69,13 +62,13 @@ public class Arguments {
     }
 
     /**
-     * Requires a string that is not {@code null} and not empty.
+     * Returns the supplied string when it is non-empty.
      *
-     * @param value The string to check; must not be null.
-     * @param message The exception message if the string is empty.
-     * @return The validated string; never null.
-     * @throws NullPointerException If {@code value} is null.
-     * @throws IllegalArgumentException If {@code value} is empty.
+     * @param value the string to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code value}
+     * @throws NullPointerException if {@code value} is {@code null}
+     * @throws IllegalArgumentException if {@code value} is empty
      */
     public static String requireNotEmpty(String value, String message) {
         Objects.requireNonNull(value);
@@ -86,12 +79,12 @@ public class Arguments {
     }
 
     /**
-     * Requires a positive integer value.
+     * Returns the supplied integer when it is positive.
      *
-     * @param value The value to check.
-     * @param message The exception message if the value is not positive.
-     * @return The validated value.
-     * @throws IllegalArgumentException If {@code value} is zero or negative.
+     * @param value the value to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code value}
+     * @throws IllegalArgumentException if {@code value} is not positive
      */
     public static int requirePositive(int value, String message) {
         if (value <= 0) {
@@ -101,12 +94,12 @@ public class Arguments {
     }
 
     /**
-     * Requires a non-negative long value.
+     * Returns the supplied long when it is non-negative.
      *
-     * @param value The value to check.
-     * @param message The exception message if the value is negative.
-     * @return The validated value.
-     * @throws IllegalArgumentException If {@code value} is negative.
+     * @param value the value to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code value}
+     * @throws IllegalArgumentException if {@code value} is negative
      */
     public static long requireNonNegative(long value, String message) {
         if (value < 0) {
@@ -116,11 +109,11 @@ public class Arguments {
     }
 
     /**
-     * Requires a condition to be true.
+     * Validates that the supplied condition is {@code true}.
      *
-     * @param condition The condition to check.
-     * @param message The exception message if the condition is false.
-     * @throws IllegalArgumentException If {@code condition} is false.
+     * @param condition the condition to validate
+     * @param message the exception message to use when validation fails
+     * @throws IllegalArgumentException if {@code condition} is {@code false}
      */
     public static void require(boolean condition, String message) {
         if (!condition) {
@@ -129,12 +122,12 @@ public class Arguments {
     }
 
     /**
-     * Requires a condition to be true.
+     * Validates that the supplied condition is {@code true}.
      *
-     * @param condition The condition to check.
-     * @param messageSupplier The supplier for the exception message if the condition is false; must not be null.
-     * @throws NullPointerException If {@code messageSupplier} is null.
-     * @throws IllegalArgumentException If {@code condition} is false.
+     * @param condition the condition to validate
+     * @param messageSupplier the exception message supplier to use when validation fails
+     * @throws NullPointerException if {@code messageSupplier} is {@code null}
+     * @throws IllegalArgumentException if {@code condition} is {@code false}
      */
     public static void require(boolean condition, Supplier<String> messageSupplier) {
         Objects.requireNonNull(messageSupplier, "messageSupplier must not be null");
@@ -144,13 +137,12 @@ public class Arguments {
     }
 
     /**
-     * Requires a collection that is not empty.
+     * Returns the supplied collection when it is non-empty.
      *
-     * @param <T> the element type of the collection
-     * @param collection the collection to check; must not be null
-     * @param message the exception message if the collection is empty
-     * @return the validated collection; never null
-     * @throws NullPointerException if {@code collection} is null
+     * @param <T> the collection element type
+     * @param collection the collection to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code collection}
      * @throws IllegalArgumentException if {@code collection} is empty
      */
     public static <T> Collection<T> requireNonEmpty(Collection<T> collection, String message) {
@@ -161,13 +153,13 @@ public class Arguments {
     }
 
     /**
-     * Requires a collection where no element is {@code null}.
+     * Returns the supplied collection when none of its elements are {@code null}.
      *
-     * @param <T> the element type of the collection
-     * @param collection the collection to check; must not be null
-     * @param message the exception message if any element is null
-     * @return the validated collection; never null
-     * @throws NullPointerException if {@code collection} is null or contains null elements
+     * @param <T> the collection element type
+     * @param collection the collection to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code collection}
+     * @throws NullPointerException if any element is {@code null}
      */
     public static <T> Collection<T> requireNoNullElements(Collection<T> collection, String message) {
         for (T element : collection) {
@@ -177,13 +169,13 @@ public class Arguments {
     }
 
     /**
-     * Requires an array where no element is {@code null}.
+     * Returns the supplied array when none of its elements are {@code null}.
      *
-     * @param <T> the element type of the array
-     * @param array the array to check; must not be null
-     * @param message the exception message if any element is null
-     * @return the validated array; never null
-     * @throws NullPointerException if {@code array} is null or contains null elements
+     * @param <T> the array element type
+     * @param array the array to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code array}
+     * @throws NullPointerException if any element is {@code null}
      */
     public static <T> T[] requireNoNullElements(T[] array, String message) {
         for (T element : array) {

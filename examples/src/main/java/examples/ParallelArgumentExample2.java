@@ -20,7 +20,7 @@ import examples.support.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import org.paramixel.core.Action;
-import org.paramixel.core.ConsoleRunner;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Lifecycle;
@@ -32,7 +32,7 @@ public class ParallelArgumentExample2 {
     private static final Logger LOGGER = Logger.createLogger(ParallelArgumentExample2.class);
 
     public static void main(String[] args) {
-        ConsoleRunner.runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(actionFactory());
     }
 
     @Paramixel.ActionFactory

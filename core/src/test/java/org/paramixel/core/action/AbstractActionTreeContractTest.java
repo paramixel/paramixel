@@ -19,6 +19,7 @@ package org.paramixel.core.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,6 +31,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
+import org.paramixel.core.Result;
+import org.paramixel.core.spi.DefaultResult;
+import org.paramixel.core.spi.DefaultStatus;
 
 @DisplayName("AbstractAction tree contract")
 class AbstractActionTreeContractTest {
@@ -37,7 +41,7 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("rejects null children")
     void rejectsNullChildren() {
-        CompositeAction parent = CompositeAction.of("parent", List.of(LeafAction.of("child")));
+        CompositeAction parent = CompositeAction.of("parent", List.of(TestLeafAction.of("child")));
 
         assertThatThrownBy(() -> parent.addChild(null)).isInstanceOf(NullPointerException.class);
     }
@@ -45,7 +49,7 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("rejects adding itself as a child")
     void rejectsAddingItselfAsAChild() {
-        LeafAction action = LeafAction.of("self");
+        CompositeAction action = CompositeAction.of("self", List.of(Direct.of("child", context -> {})));
 
         assertThatThrownBy(() -> action.addChild(action)).isInstanceOf(IllegalArgumentException.class);
     }
@@ -53,9 +57,9 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("rejects adding a child that already has a parent")
     void rejectsAddingChildThatAlreadyHasAParent() {
-        LeafAction child = LeafAction.of("child");
+        TestLeafAction child = TestLeafAction.of("child");
         CompositeAction firstParent = CompositeAction.of("firstParent", List.of(child));
-        LeafAction secondParent = LeafAction.of("secondParent");
+        CompositeAction secondParent = CompositeAction.of("secondParent", List.of(Direct.of("other", context -> {})));
 
         assertThat(firstParent.getChildren()).containsExactly(child);
         assertThatThrownBy(() -> secondParent.addChild(child)).isInstanceOf(IllegalStateException.class);
@@ -64,14 +68,14 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("validateChildren returns an unmodifiable list and assigns parents")
     void validateChildrenReturnsAnUnmodifiableListAndAssignsParents() {
-        LeafAction first = LeafAction.of("first");
-        LeafAction second = LeafAction.of("second");
+        TestLeafAction first = TestLeafAction.of("first");
+        TestLeafAction second = TestLeafAction.of("second");
         CompositeAction parent = CompositeAction.of("parent", List.of(first, second));
 
         assertThat(parent.getChildren()).containsExactly(first, second);
         assertThat(first.getParent()).contains(parent);
         assertThat(second.getParent()).contains(parent);
-        assertThatThrownBy(() -> parent.getChildren().add(LeafAction.of("third")))
+        assertThatThrownBy(() -> parent.getChildren().add(TestLeafAction.of("third")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
@@ -88,7 +92,7 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("rejects null parents")
     void rejectsNullParents() {
-        LeafAction child = LeafAction.of("child");
+        TestLeafAction child = TestLeafAction.of("child");
 
         assertThatThrownBy(() -> child.setParent(null)).isInstanceOf(NullPointerException.class);
     }
@@ -96,7 +100,7 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("rejects setting itself as its own parent")
     void rejectsSettingItselfAsItsOwnParent() {
-        LeafAction action = LeafAction.of("self");
+        TestLeafAction action = TestLeafAction.of("self");
 
         assertThatThrownBy(() -> action.setParent(action)).isInstanceOf(IllegalArgumentException.class);
     }
@@ -104,9 +108,9 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("rejects setting a second parent")
     void rejectsSettingASecondParent() {
-        LeafAction child = LeafAction.of("child");
-        LeafAction firstParent = LeafAction.of("firstParent");
-        LeafAction secondParent = LeafAction.of("secondParent");
+        TestLeafAction child = TestLeafAction.of("child");
+        TestLeafAction firstParent = TestLeafAction.of("firstParent");
+        TestLeafAction secondParent = TestLeafAction.of("secondParent");
 
         child.setParent(firstParent);
 
@@ -116,7 +120,7 @@ class AbstractActionTreeContractTest {
     @Test
     @DisplayName("concurrent setParent assigns exactly one parent")
     void concurrentSetParentAssignsExactlyOneParent() throws Exception {
-        LeafAction child = LeafAction.of("child");
+        TestLeafAction child = TestLeafAction.of("child");
         int threadCount = 8;
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(threadCount);
@@ -125,7 +129,7 @@ class AbstractActionTreeContractTest {
         AtomicReference<Action> winner = new AtomicReference<>();
 
         for (int i = 0; i < threadCount; i++) {
-            LeafAction parentCandidate = LeafAction.of("parent-" + i);
+            TestLeafAction parentCandidate = TestLeafAction.of("parent-" + i);
             new Thread(() -> {
                         try {
                             startLatch.await();
@@ -204,28 +208,27 @@ class AbstractActionTreeContractTest {
         }
 
         @Override
-        public org.paramixel.core.Result getResult() {
-            return org.paramixel.core.Result.staged();
+        public Result execute(Context context) {
+            DefaultResult result = new DefaultResult(this);
+            result.setStatus(DefaultStatus.PASS);
+            return result;
         }
 
         @Override
-        public void execute(Context context) {}
-
-        @Override
-        public void skip(Context context) {}
-
-        @Override
-        public void setResult(org.paramixel.core.Result result) {}
+        public Result skip(Context context) {
+            DefaultResult result = new DefaultResult(this);
+            result.setStatus(DefaultStatus.SKIP);
+            result.setElapsedTime(Duration.ZERO);
+            context.getListener().skipAction(result);
+            return result;
+        }
     }
 
-    private static final class CompositeAction extends AbstractAction {
-
-        private final List<Action> children;
+    private static final class CompositeAction extends BranchAction {
 
         private CompositeAction(String name, List<Action> children) {
-            super();
+            super(children);
             this.name = validateName(name);
-            this.children = validateChildren(children);
         }
 
         static CompositeAction of(String name, List<Action> children) {
@@ -235,28 +238,36 @@ class AbstractActionTreeContractTest {
         }
 
         @Override
-        public List<Action> getChildren() {
-            return children;
+        public Result execute(Context context) {
+            DefaultResult result = new DefaultResult(this);
+            context.getListener().beforeAction(result);
+            result.setStatus(DefaultStatus.PASS);
+            result.setElapsedTime(Duration.ZERO);
+            context.getListener().afterAction(result);
+            return result;
         }
-
-        @Override
-        public void execute(Context context) {}
     }
 
-    private static final class LeafAction extends AbstractAction {
+    private static final class TestLeafAction extends org.paramixel.core.action.LeafAction {
 
-        private LeafAction(String name) {
-            super();
+        private TestLeafAction(String name) {
             this.name = validateName(name);
         }
 
-        private static LeafAction of(String name) {
-            LeafAction instance = new LeafAction(name);
+        private static TestLeafAction of(String name) {
+            TestLeafAction instance = new TestLeafAction(name);
             instance.initialize();
             return instance;
         }
 
         @Override
-        public void execute(Context context) {}
+        public Result execute(Context context) {
+            DefaultResult result = new DefaultResult(this);
+            context.getListener().beforeAction(result);
+            result.setStatus(DefaultStatus.PASS);
+            result.setElapsedTime(Duration.ZERO);
+            context.getListener().afterAction(result);
+            return result;
+        }
     }
 }

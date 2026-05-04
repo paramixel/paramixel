@@ -16,6 +16,7 @@
 
 package org.paramixel.core.action;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,80 +28,66 @@ import java.util.concurrent.Semaphore;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
+import org.paramixel.core.spi.DefaultResult;
+import org.paramixel.core.spi.DefaultStatus;
 import org.paramixel.core.support.Arguments;
 
 /**
- * A built-in action that executes child actions concurrently.
+ * Executes child actions concurrently.
  *
- * <p>Child actions are submitted to an {@link ExecutorService} and their concurrent
- * execution is bounded by a {@link Semaphore}. When {@code parallelism} is set, at most
- * that many children execute concurrently; when no parallelism limit is set, all children
- * execute concurrently.</p>
- *
- * <p><strong>Nesting:</strong> When a {@code Parallel} action is nested inside another
- * {@code Parallel} action and both share the same {@link ExecutorService}, thread
- * starvation can occur if the executor does not have enough threads. To avoid this,
- * supply a dedicated {@link ExecutorService} to inner {@code Parallel} actions using
- * {@link #of(String, ExecutorService, List)} or
- * {@link #of(String, ExecutorService, Action...)}.</p>
+ * <p>Parallel execution uses either an explicitly supplied {@link ExecutorService} or the executor service from the
+ * current {@link Context}. A positive parallelism limit controls how many child actions may execute at once.
  */
-public class Parallel extends AbstractAction {
+public class Parallel extends BranchAction {
 
     private final int parallelism;
-    private final List<Action> children;
     private final ExecutorService executorService;
 
     /**
-     * Creates a parallel action that limits concurrency with an internal thread bound.
+     * Creates a parallel action that uses the context executor and the supplied parallelism limit.
      *
      * @param name the action name
-     * @param parallelism the maximum number of concurrently running children
-     * @param children the child actions to execute
+     * @param parallelism the maximum number of concurrently executing children
+     * @param children the child actions
      */
     protected Parallel(String name, int parallelism, List<Action> children) {
         this(name, parallelism, children, null);
     }
 
     /**
-     * Creates a parallel action that dispatches all work to a supplied executor service.
+     * Creates a parallel action that always uses the supplied executor service.
      *
      * @param name the action name
-     * @param executorService the executor service used for dispatch
-     * @param children the child actions to execute
+     * @param executorService the dedicated executor service
+     * @param children the child actions
      */
     protected Parallel(String name, ExecutorService executorService, List<Action> children) {
-        super();
+        super(children);
         this.name = validateName(name);
         this.parallelism = Integer.MAX_VALUE;
-        this.children = validateChildren(children);
         this.executorService = executorService;
     }
 
     /**
-     * Creates a parallel action with either an explicit parallelism bound or an explicit executor.
+     * Creates a parallel action with explicit executor selection and parallelism limit.
      *
      * @param name the action name
-     * @param parallelism the maximum concurrent child count
-     * @param children the child actions to execute
-     * @param executorService the explicit executor service to use, or {@code null}
+     * @param parallelism the maximum number of concurrently executing children
+     * @param children the child actions
+     * @param executorService the dedicated executor service, or {@code null} to use the context executor
      */
     protected Parallel(String name, int parallelism, List<Action> children, ExecutorService executorService) {
-        super();
+        super(children);
         this.name = validateName(name);
         this.parallelism = parallelism;
-        this.children = validateChildren(children);
         this.executorService = executorService;
     }
 
     /**
-     * Creates a parallel action that executes all children using the default execution strategy.
+     * Creates a parallel action with unbounded internal parallelism.
      *
-     * <p>Children are submitted to the executor provided by {@link Context#getExecutorService()}.
-     * When nesting {@code Parallel} actions, supply a dedicated {@link ExecutorService} to
-     * inner actions via {@link #of(String, ExecutorService, List)} to avoid thread starvation.</p>
-     *
-     * @param name the action name; must not be {@code null}
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param children the child actions
      * @return a new parallel action
      */
     public static Parallel of(String name, List<Action> children) {
@@ -114,15 +101,11 @@ public class Parallel extends AbstractAction {
     }
 
     /**
-     * Creates a parallel action that limits concurrent child execution.
+     * Creates a parallel action with an explicit parallelism limit.
      *
-     * <p>Children are submitted to the executor provided by {@link Context#getExecutorService()}.
-     * When nesting {@code Parallel} actions, supply a dedicated {@link ExecutorService} to
-     * inner actions via {@link #of(String, ExecutorService, List)} to avoid thread starvation.</p>
-     *
-     * @param name the action name; must not be {@code null}
-     * @param parallelism the maximum number of children to execute concurrently; must be positive
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param parallelism the maximum number of child actions running at once
+     * @param children the child actions
      * @return a new parallel action
      */
     public static Parallel of(String name, int parallelism, List<Action> children) {
@@ -137,14 +120,10 @@ public class Parallel extends AbstractAction {
     }
 
     /**
-     * Creates a parallel action from varargs children using the default execution strategy.
+     * Creates a parallel action with unbounded internal parallelism.
      *
-     * <p>Children are submitted to the executor provided by {@link Context#getExecutorService()}.
-     * When nesting {@code Parallel} actions, supply a dedicated {@link ExecutorService} to
-     * inner actions via {@link #of(String, ExecutorService, Action...)} to avoid thread starvation.</p>
-     *
-     * @param name the action name; must not be {@code null}
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param children the child actions
      * @return a new parallel action
      */
     public static Parallel of(String name, Action... children) {
@@ -159,15 +138,11 @@ public class Parallel extends AbstractAction {
     }
 
     /**
-     * Creates a parallel action from varargs children with a concurrency limit.
+     * Creates a parallel action with an explicit parallelism limit.
      *
-     * <p>Children are submitted to the executor provided by {@link Context#getExecutorService()}.
-     * When nesting {@code Parallel} actions, supply a dedicated {@link ExecutorService} to
-     * inner actions via {@link #of(String, ExecutorService, Action...)} to avoid thread starvation.</p>
-     *
-     * @param name the action name; must not be {@code null}
-     * @param parallelism the maximum number of children to execute concurrently; must be positive
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param parallelism the maximum number of child actions running at once
+     * @param children the child actions
      * @return a new parallel action
      */
     public static Parallel of(String name, int parallelism, Action... children) {
@@ -183,11 +158,11 @@ public class Parallel extends AbstractAction {
     }
 
     /**
-     * Creates a parallel action that dispatches child execution to the supplied executor service.
+     * Creates a parallel action that uses the supplied executor service.
      *
-     * @param name the action name; must not be {@code null}
-     * @param executorService the executor service to use; must not be {@code null}
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param executorService the executor service to use
+     * @param children the child actions
      * @return a new parallel action
      */
     public static Parallel of(String name, ExecutorService executorService, List<Action> children) {
@@ -202,11 +177,11 @@ public class Parallel extends AbstractAction {
     }
 
     /**
-     * Creates a parallel action from varargs children using the supplied executor service.
+     * Creates a parallel action that uses the supplied executor service.
      *
-     * @param name the action name; must not be {@code null}
-     * @param executorService the executor service to use; must not be {@code null}
-     * @param children the child actions; must not be {@code null} or empty
+     * @param name the action name
+     * @param executorService the executor service to use
+     * @param children the child actions
      * @return a new parallel action
      */
     public static Parallel of(String name, ExecutorService executorService, Action... children) {
@@ -222,63 +197,39 @@ public class Parallel extends AbstractAction {
     }
 
     /**
-     * Returns the configured concurrency limit.
+     * Returns the configured parallelism limit.
      *
-     * @return the maximum number of children that may run concurrently
+     * @return the maximum number of child tasks allowed to run concurrently
      */
     public int parallelism() {
         return parallelism;
     }
 
     /**
-     * Returns the executor service used for dispatch, if one was explicitly configured.
+     * Returns the explicitly configured executor service, if one exists.
      *
-     * @return the configured executor service, if present
+     * @return the configured executor service, or an empty {@link Optional} when the context executor will be used
      */
     public Optional<ExecutorService> executorService() {
         return Optional.ofNullable(executorService);
     }
 
     /**
-     * Returns the child actions executed by this parallel action.
+     * Executes child actions concurrently and aggregates their results.
      *
-     * <p>The returned list is unmodifiable and reflects the registration order established
-     * at construction time.</p>
-     *
-     * @return the child actions
+     * @param context the execution context
+     * @return the aggregated execution result
      */
     @Override
-    public List<Action> getChildren() {
-        return children;
-    }
-
-    /**
-     * Executes all child actions concurrently and aggregates their resulting statuses.
-     *
-     * <p>Each child runs with its own child {@link Context}. Concurrency is capped by the
-     * configured parallelism even if the underlying executor could schedule more tasks.</p>
-     *
-     * <p><strong>Interrupt handling:</strong> If the executing thread is interrupted during
-     * semaphore acquisition, the action transitions to a FAIL result with the
-     * {@link InterruptedException} as the cause, fires
-     * {@link org.paramixel.core.Listener#afterAction}, and then re-interrupts the thread
-     * before re-throwing a {@link RuntimeException} wrapping the cause. This ensures the
-     * lifecycle contract ({@code this.result} transitions to a terminal state and
-     * {@code afterAction} is always invoked) is honored even under interrupt conditions.</p>
-     *
-     * @param context the execution context for this action
-     * @throws NullPointerException if {@code context} is {@code null}
-     */
-    @Override
-    public void execute(Context context) {
+    public Result execute(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        this.result = Result.staged();
-        context.getListener().beforeAction(context, this);
+        DefaultResult result = new DefaultResult(this);
+        context.getListener().beforeAction(result);
         Instant start = Instant.now();
 
         ExecutorService es = (executorService != null) ? executorService : context.getExecutorService();
         Semaphore semaphore = new Semaphore(parallelism, true);
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        List<CompletableFuture<Result>> futures = new ArrayList<>();
 
         try {
             for (Action child : getChildren()) {
@@ -288,10 +239,10 @@ public class Parallel extends AbstractAction {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException(e);
                 }
-                futures.add(CompletableFuture.runAsync(
+                futures.add(CompletableFuture.supplyAsync(
                         () -> {
                             try {
-                                child.execute(context.createChild());
+                                return child.execute(context.createChild());
                             } finally {
                                 semaphore.release();
                             }
@@ -299,23 +250,28 @@ public class Parallel extends AbstractAction {
                         es));
             }
 
-            for (CompletableFuture<Void> f : futures) {
-                f.join();
+            for (CompletableFuture<Result> f : futures) {
+                Result childResult = f.join();
+                result.addChild(childResult);
             }
 
-            this.result = Result.of(computeStatus(), durationSince(start));
+            result.setStatus(computeStatus(result.getChildren()));
+            result.setElapsedTime(Duration.between(start, Instant.now()));
         } catch (RuntimeException e) {
             if (e.getCause() instanceof InterruptedException) {
-                this.result = Result.fail(durationSince(start), e.getCause());
-                context.getListener().afterAction(context, this, this.result);
+                result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getCause()));
+                result.setElapsedTime(Duration.between(start, Instant.now()));
+                context.getListener().afterAction(result);
                 Thread.currentThread().interrupt();
             } else {
-                this.result = Result.fail(durationSince(start), e);
-                context.getListener().afterAction(context, this, this.result);
+                result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e));
+                result.setElapsedTime(Duration.between(start, Instant.now()));
+                context.getListener().afterAction(result);
                 throw e;
             }
             throw e;
         }
-        context.getListener().afterAction(context, this, this.result);
+        context.getListener().afterAction(result);
+        return result;
     }
 }

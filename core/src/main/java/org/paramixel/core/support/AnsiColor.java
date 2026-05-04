@@ -19,7 +19,7 @@ package org.paramixel.core.support;
 import java.util.Objects;
 
 /**
- * ANSI escape codes for terminal colors.
+ * ANSI color and style escape sequences used by built-in console output.
  */
 public enum AnsiColor {
     RESET("\033[0m"),
@@ -49,19 +49,21 @@ public enum AnsiColor {
     }
 
     /**
-     * Returns the ANSI escape code.
+     * Returns the raw ANSI escape sequence for this color or style.
      *
-     * @return The code.
+     * @return the raw ANSI escape sequence
      */
     public String getCode() {
         return code;
     }
 
     /**
-     * Formats text with this color.
+     * Wraps the supplied text in this ANSI sequence and a trailing reset code.
      *
-     * @param text The text to format; must not be null or blank.
-     * @return The formatted text.
+     * @param text the text to format
+     * @return the formatted text
+     * @throws NullPointerException if {@code text} is {@code null}
+     * @throws IllegalArgumentException if {@code text} is blank
      */
     public String format(final String text) {
         Objects.requireNonNull(text, "text must not be null");

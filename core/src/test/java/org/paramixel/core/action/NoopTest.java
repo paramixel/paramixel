@@ -41,11 +41,11 @@ class NoopTest {
     void sameNoopNameCanBeUsedMultipleTimesInOneActionTree() {
         Lifecycle lifecycle = Lifecycle.of("lifecycle", Noop.of("noop"), Noop.of("noop"), Noop.of("noop"));
 
-        Runner.builder().build().run(lifecycle);
+        org.paramixel.core.Result result = Runner.builder().build().run(lifecycle);
 
-        assertThat(lifecycle.getResult().getStatus().isPass()).isTrue();
-        assertThat(lifecycle.getChildren())
-                .allSatisfy(action ->
-                        assertThat(action.getResult().getStatus().isPass()).isTrue());
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(result.getChildren())
+                .allSatisfy(childResult ->
+                        assertThat(childResult.getStatus().isPass()).isTrue());
     }
 }

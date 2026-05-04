@@ -41,5 +41,3 @@ website/.env.test.local
 website/build/
 website/node_modules/
 website/static/javadoc/
-website/versioned_docs/
-website/versioned_sidebars/

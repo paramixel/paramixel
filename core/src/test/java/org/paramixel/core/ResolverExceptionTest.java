@@ -22,10 +22,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.core.exception.ResolverException;
 
-/**
- * Tests for {@link ResolverException}.
- */
 @DisplayName("ResolverException")
 class ResolverExceptionTest {
 
