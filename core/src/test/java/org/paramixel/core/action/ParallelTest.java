@@ -440,4 +440,63 @@ class ParallelTest {
         assertThat(testThread.isAlive()).isFalse();
         assertThat(listenerCalls).containsExactly("beforeAction:root", "afterAction:root:FAIL");
     }
+
+    @Test
+    @DisplayName("of(name, ExecutorService, List) rejects null name")
+    void ofWithExecutorServiceAndListRejectsNullName() {
+        assertThatThrownBy(() -> Parallel.of(null, null, List.of(Noop.of("child"))))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(name, ExecutorService, List) rejects blank name")
+    void ofWithExecutorServiceAndListRejectsBlankName() {
+        assertThatThrownBy(() -> Parallel.of("", null, List.of(Noop.of("child"))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("of(name, ExecutorService, List) rejects empty list")
+    void ofWithExecutorServiceAndListRejectsEmptyList() {
+        java.util.concurrent.ExecutorService exec = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            assertThatThrownBy(() -> Parallel.of("test", exec, List.of())).isInstanceOf(IllegalArgumentException.class);
+        } finally {
+            exec.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("of(name, ExecutorService, List) rejects null element in list")
+    void ofWithExecutorServiceAndListRejectsNullElement() {
+        java.util.concurrent.ExecutorService exec = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            java.util.ArrayList<Action> list = new java.util.ArrayList<>();
+            list.add(null);
+            assertThatThrownBy(() -> Parallel.of("test", exec, list)).isInstanceOf(NullPointerException.class);
+        } finally {
+            exec.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("of(name, ExecutorService, Action...) rejects null varargs")
+    void ofWithExecutorServiceVarargsRejectsNullArray() {
+        assertThatThrownBy(() -> Parallel.of("test", (java.util.concurrent.ExecutorService) null, (Action[]) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(name, ExecutorService, Action...) rejects empty varargs")
+    void ofWithExecutorServiceVarargsRejectsEmptyArray() {
+        assertThatThrownBy(() -> Parallel.of("test", (java.util.concurrent.ExecutorService) null, new Action[0]))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of(name, ExecutorService, Action...) rejects null element in varargs")
+    void ofWithExecutorServiceVarargsRejectsNullElement() {
+        assertThatThrownBy(() -> Parallel.of("test", (java.util.concurrent.ExecutorService) null, (Action) null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }

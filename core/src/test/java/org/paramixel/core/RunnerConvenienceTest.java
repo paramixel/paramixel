@@ -170,4 +170,56 @@ class RunnerConvenienceTest {
             assertThat(exitCode).isEqualTo(1);
         }
     }
+
+    @Nested
+    @DisplayName("runAndReturnExitCode(Action) with failure-on-skip")
+    class RunAndReturnExitCodeActionFailureOnSkip {
+
+        @Test
+        @DisplayName("returns 1 for skipped action when FAILURE_ON_SKIP is true")
+        void returns1ForSkippedActionWhenFailureOnSkipIsTrue() {
+            Action action = Direct.of("skipped", context -> SkipException.skip());
+            Runner runner = Runner.builder()
+                    .configuration(Map.of(Configuration.FAILURE_ON_SKIP, "true"))
+                    .build();
+
+            int exitCode = runner.runAndReturnExitCode(action);
+
+            assertThat(exitCode).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("runAndReturnExitCode(Selector) with results")
+    class RunAndReturnExitCodeSelectorResults {
+
+        @Test
+        @DisplayName("returns 0 for passing resolved action")
+        void returns0ForPassingResolvedAction() {
+            var selector = Selector.builder().classMatch("ResolverSmokeFixture").build();
+
+            int exitCode = Factory.defaultRunner().runAndReturnExitCode(selector);
+
+            assertThat(exitCode).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("runAndExit")
+    class RunAndExit {
+
+        @Test
+        @DisplayName("runAndExit(Action) rejects null action")
+        void runAndExitActionRejectsNullAction() {
+            assertThatThrownBy(() -> Factory.defaultRunner().runAndExit((Action) null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+
+        @Test
+        @DisplayName("runAndExit(Selector) rejects null selector")
+        void runAndExitSelectorRejectsNullSelector() {
+            assertThatThrownBy(() -> Factory.defaultRunner().runAndExit((Selector) null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+    }
 }

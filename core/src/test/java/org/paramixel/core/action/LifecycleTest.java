@@ -17,6 +17,8 @@
 package org.paramixel.core.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -351,5 +353,41 @@ class LifecycleTest {
         Result result = Runner.builder().build().run(lifecycle);
 
         assertThat(result.getChildren().get(1).getStatus().isSkip()).isTrue();
+    }
+
+    @Test
+    @DisplayName("of rejects null name")
+    void ofRejectsNullName() {
+        Noop noop = Noop.of("child");
+        assertThatThrownBy(() -> Lifecycle.of(null, noop, noop, noop)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of rejects blank name")
+    void ofRejectsBlankName() {
+        Noop noop = Noop.of("child");
+        assertThatIllegalArgumentException().isThrownBy(() -> Lifecycle.of("", noop, noop, noop));
+        assertThatIllegalArgumentException().isThrownBy(() -> Lifecycle.of("   ", noop, noop, noop));
+    }
+
+    @Test
+    @DisplayName("of rejects null before action")
+    void ofRejectsNullBeforeAction() {
+        Noop noop = Noop.of("child");
+        assertThatThrownBy(() -> Lifecycle.of("test", null, noop, noop)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of rejects null primary action")
+    void ofRejectsNullPrimaryAction() {
+        Noop noop = Noop.of("child");
+        assertThatThrownBy(() -> Lifecycle.of("test", noop, null, noop)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of rejects null after action")
+    void ofRejectsNullAfterAction() {
+        Noop noop = Noop.of("child");
+        assertThatThrownBy(() -> Lifecycle.of("test", noop, noop, null)).isInstanceOf(NullPointerException.class);
     }
 }

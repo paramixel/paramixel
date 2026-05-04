@@ -17,6 +17,8 @@
 package org.paramixel.core.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,5 +49,26 @@ class NoopTest {
         assertThat(result.getChildren())
                 .allSatisfy(childResult ->
                         assertThat(childResult.getStatus().isPass()).isTrue());
+    }
+
+    @Test
+    @DisplayName("of rejects null name")
+    void ofRejectsNullName() {
+        assertThatThrownBy(() -> Noop.of(null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("of rejects blank name")
+    void ofRejectsBlankName() {
+        assertThatIllegalArgumentException().isThrownBy(() -> Noop.of(""));
+        assertThatIllegalArgumentException().isThrownBy(() -> Noop.of("   "));
+    }
+
+    @Test
+    @DisplayName("execute rejects null context")
+    void executeRejectsNullContext() {
+        Noop noop = Noop.of("test");
+
+        assertThatThrownBy(() -> noop.execute(null)).isInstanceOf(NullPointerException.class);
     }
 }

@@ -66,6 +66,22 @@ class AbstractActionTreeContractTest {
     }
 
     @Test
+    @DisplayName("validateName rejects null name")
+    void validateNameRejectsNullName() {
+        assertThatThrownBy(() -> CompositeAction.of(null, List.of(TestLeafAction.of("child"))))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("validateName rejects blank name")
+    void validateNameRejectsBlankName() {
+        assertThatThrownBy(() -> CompositeAction.of("", List.of(TestLeafAction.of("child"))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> CompositeAction.of("   ", List.of(TestLeafAction.of("child"))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @DisplayName("validateChildren returns an unmodifiable list and assigns parents")
     void validateChildrenReturnsAnUnmodifiableListAndAssignsParents() {
         TestLeafAction first = TestLeafAction.of("first");
@@ -115,6 +131,31 @@ class AbstractActionTreeContractTest {
         child.setParent(firstParent);
 
         assertThatThrownBy(() -> child.setParent(secondParent)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("addChild on LeafAction throws UnsupportedOperationException")
+    void addChildOnLeafActionThrowsUnsupportedOperationException() {
+        TestLeafAction leaf = TestLeafAction.of("leaf");
+
+        assertThatThrownBy(() -> leaf.addChild(Noop.of("other")))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessage("leaf action cannot have children");
+    }
+
+    @Test
+    @DisplayName("LeafAction skip rejects null context")
+    void leafActionSkipRejectsNullContext() {
+        TestLeafAction leaf = TestLeafAction.of("leaf");
+
+        assertThatThrownBy(() -> leaf.skip(null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("BranchAction computeStatus treats null child result as NPE")
+    void branchActionComputeStatusTreatsNullChildResultAsNPE() {
+        CompositeAction parent = CompositeAction.of("parent", List.of(Direct.of("child", context -> {})));
+        assertThatThrownBy(() -> parent.skip(null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test

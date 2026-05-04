@@ -870,4 +870,90 @@ class CleanupTest {
                 .isInstanceOf(OutOfMemoryError.class)
                 .hasMessage("simulated oom");
     }
+
+    @Test
+    @DisplayName("CleanupResult getException returns empty for negative index")
+    void cleanupResultGetExceptionReturnsEmptyForNegativeIndex() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {});
+        CleanupResult result = cleanup.run();
+
+        assertThat(result.getException(-1)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("CleanupResult getException returns empty for out-of-range index")
+    void cleanupResultGetExceptionReturnsEmptyForOutOfRangeIndex() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {});
+        CleanupResult result = cleanup.run();
+
+        assertThat(result.getException(100)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("CleanupResult isSuccess returns false for negative index")
+    void cleanupResultIsSuccessReturnsFalseForNegativeIndex() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {});
+        CleanupResult result = cleanup.run();
+
+        assertThat(result.isSuccess(-1)).isFalse();
+    }
+
+    @Test
+    @DisplayName("CleanupResult isSuccess returns false for out-of-range index")
+    void cleanupResultIsSuccessReturnsFalseForOutOfRangeIndex() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {});
+        CleanupResult result = cleanup.run();
+
+        assertThat(result.isSuccess(100)).isFalse();
+    }
+
+    @Test
+    @DisplayName("CleanupResult isSuccess returns false for index with exception")
+    void cleanupResultIsSuccessReturnsFalseForIndexWithException() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {
+            throw new RuntimeException("fail");
+        });
+        CleanupResult result = cleanup.run();
+
+        assertThat(result.isSuccess(0)).isFalse();
+    }
+
+    @Test
+    @DisplayName("CleanupResult getExceptionsByIndex returns all failures")
+    void cleanupResultGetExceptionsByIndexReturnsAllFailures() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
+                .add(() -> {
+                    throw new RuntimeException("first");
+                })
+                .add(() -> {})
+                .add(() -> {
+                    throw new RuntimeException("third");
+                });
+        CleanupResult result = cleanup.run();
+
+        var failures = result.getExceptionsByIndex();
+        assertThat(failures).hasSize(2);
+        assertThat(failures.get(0)).hasMessage("first");
+        assertThat(failures.get(2)).hasMessage("third");
+    }
+
+    @Test
+    @DisplayName("CleanupResult hasExceptions returns false when no exceptions")
+    void cleanupResultHasExceptionsReturnsFalseWhenNoExceptions() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {}).add(() -> {});
+        CleanupResult result = cleanup.run();
+
+        assertThat(result.hasExceptions()).isFalse();
+    }
+
+    @Test
+    @DisplayName("CleanupResult hasExceptions returns true when exceptions present")
+    void cleanupResultHasExceptionsReturnsTrueWhenExceptionsPresent() {
+        Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {
+            throw new RuntimeException("fail");
+        });
+        CleanupResult result = cleanup.run();
+
+        assertThat(result.hasExceptions()).isTrue();
+    }
 }
