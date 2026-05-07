@@ -8,7 +8,7 @@ slug: /
 
 Paramixel is a Java 17+ test framework built around executable `Action` trees.
 
-Instead of describing tests with many framework-specific annotations, you build them with plain Java using actions like `Sequential`, `Parallel`, `Lifecycle`, and `Direct`.
+Instead of describing tests with many framework-specific annotations, you build them with plain Java using actions like `Container`, `Parallel`, `Direct`, and `Noop`.
 
 ## Core ideas
 
@@ -23,17 +23,28 @@ Instead of describing tests with many framework-specific annotations, you build 
 ```java
 import org.paramixel.core.Action;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Sequential;
 
 public class MyTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        return Sequential.of(
-                "MyTest",
-                Direct.of("step 1", context -> {}),
-                Direct.of("step 2", context -> {}));
+        Action step1 = step1();
+        Action step2 = step2();
+
+        return Container.builder("MyTest")
+                .child(step1)
+                .child(step2)
+                .build();
+    }
+
+    private static Action step1() {
+        return Direct.builder("step 1").execute(context -> {}).build();
+    }
+
+    private static Action step2() {
+        return Direct.builder("step 2").execute(context -> {}).build();
     }
 }
 ```
@@ -71,12 +82,8 @@ Use the Paramixel Maven plugin. It discovers `@Paramixel.ActionFactory` methods 
 ## Built-in actions
 
 - `Direct` - run a callback
-- `Sequential` - run all children in order
-- `DependentSequential` - stop on first child failure; skip the rest
-- `RandomSequential` - run all children in shuffled order
-- `DependentRandomSequential` - shuffled fail-fast execution
+- `Container` - run ordered children with setup, teardown, and run policy options
 - `Parallel` - run children concurrently
-- `Lifecycle` - `before`, `main`, `after`
 - `Noop` - do nothing and pass
 
 ## Configuration
@@ -87,14 +94,17 @@ Core configuration is loaded from:
 2. JVM system properties
 3. programmatic `Runner.builder().configuration(...)` overrides, when used
 
-Built-in keys include `paramixel.parallelism`, `paramixel.failureOnSkip`, `paramixel.report.enabled`, `paramixel.report.directory`, `paramixel.match.package`, `paramixel.match.class`, and `paramixel.match.tag`.
+Built-in keys include `paramixel.parallelism`, `paramixel.failureOnSkip`, `paramixel.report.file`, `paramixel.report.format`, `paramixel.match.package`, `paramixel.match.class`, and `paramixel.match.tag`.
 
 Use `@Paramixel.Tag` to tag action factories for selective discovery:
 
 ```java
-@Paramixel.ActionFactory
-@Paramixel.Tag("smoke")
-public static Action smokeTests() { /* ... */ }
+public class SmokeTests {
+
+    @Paramixel.ActionFactory
+    @Paramixel.Tag("smoke")
+    public static Action actionFactory() { /* ... */ }
+}
 ```
 
 ## Next steps

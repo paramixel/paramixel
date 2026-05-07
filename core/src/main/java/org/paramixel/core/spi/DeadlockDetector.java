@@ -20,6 +20,7 @@ import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.exception.DeadlockDetected;
+import org.paramixel.core.support.Arguments;
 
 /**
  * Detects nested default-executor {@link Parallel} configurations that can starve the shared pool.
@@ -39,6 +40,7 @@ public final class DeadlockDetector {
      */
     public void validateNoDeadlock(Action root, int parallelism) {
         Objects.requireNonNull(root, "root must not be null");
+        Arguments.requirePositive(parallelism, "parallelism must be positive, was: " + parallelism);
 
         int maxDepth = maxParallelDepth(root, 0);
         if (maxDepth > parallelism + 1) {
@@ -47,7 +49,7 @@ public final class DeadlockDetector {
                             + " levels of nested default-executor Parallel actions,"
                             + " but the shared parallel executor pool has only " + parallelism + " thread(s)."
                             + " Supply a dedicated ExecutorService to inner Parallel actions"
-                            + " via Parallel.of(name, executorService, children)"
+                            + " via Parallel.builder(name).executorService(executorService).child(child).build()"
                             + " or increase paramixel.parallelism to at least " + (maxDepth - 1) + ".");
         }
     }

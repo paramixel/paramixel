@@ -28,6 +28,7 @@ import org.paramixel.core.Action;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
+import org.paramixel.core.action.Direct;
 
 @DisplayName("SafeListener")
 class SafeListenerTest {
@@ -126,9 +127,11 @@ class SafeListenerTest {
         };
 
         SafeListener safeListener = new SafeListener(throwingListener);
-        Action action = org.paramixel.core.action.Direct.of("test", context -> {
-            throw new RuntimeException("action failed");
-        });
+        Action action = Direct.builder("test")
+                .execute(context -> {
+                    throw new RuntimeException("action failed");
+                })
+                .build();
         Runner runner = Runner.builder().listener(safeListener).build();
 
         assertThatThrownBy(() -> runner.run(action)).isInstanceOf(OutOfMemoryError.class);
@@ -223,9 +226,11 @@ class SafeListenerTest {
         };
 
         SafeListener safeListener = new SafeListener(throwingListener);
-        Action action = org.paramixel.core.action.Direct.of("test", context -> {
-            throw new RuntimeException("action failed");
-        });
+        Action action = Direct.builder("test")
+                .execute(context -> {
+                    throw new RuntimeException("action failed");
+                })
+                .build();
         Runner runner = Runner.builder().listener(safeListener).build();
 
         Result runResult = runner.run(action);

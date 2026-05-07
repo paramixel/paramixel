@@ -5,16 +5,54 @@ description: Execute child actions concurrently.
 
 # Parallel
 
-## Factories
+`Parallel` executes child actions concurrently. In 3.x it is builder-only.
 
 ```java
-Parallel.of(String name, List<Action> children)
-Parallel.of(String name, int parallelism, List<Action> children)
-Parallel.of(String name, Action... children)
-Parallel.of(String name, int parallelism, Action... children)
-Parallel.of(String name, ExecutorService executorService, List<Action> children)
-Parallel.of(String name, ExecutorService executorService, Action... children)
+public class MyTest {
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action checkA = checkA();
+        Action checkB = checkB();
+
+        return Parallel.builder("checks")
+                .parallelism(4)
+                .child(checkA)
+                .child(checkB)
+                .build();
+    }
+
+    private static Action checkA() {
+        return Direct.builder("checkA").execute(context -> {}).build();
+    }
+
+    private static Action checkB() {
+        return Direct.builder("checkB").execute(context -> {}).build();
+    }
+}
 ```
+
+Optional settings:
+
+- `.contextMode(Action.ContextMode mode)` controls the parallel action's own context scope.
+- `.parallelism(int)` limits concurrent children.
+- `.executorService(ExecutorService)` uses a caller-owned executor.
+
+`Parallel` passes its effective context directly to children; each child applies its own `Action.ContextMode`.
+
+When shared context is used with parallel children, store map operations are thread-safe, but mutable values stored in the store must also be thread-safe.
+
+## Builder
+
+```java
+Parallel.builder(String name)
+        .parallelism(int parallelism) // optional
+        .executorService(ExecutorService executorService) // optional
+        .child(Action child)
+        .build()
+```
+
+Builders require a name up front, validate method arguments immediately, and are one-shot. The builder can combine `parallelism(...)` and `executorService(...)` for a node-local limit on a dedicated executor.
 
 ## Semantics
 
@@ -29,7 +67,7 @@ If no executor is supplied directly to the action, it uses `context.getExecutorS
 
 ## Custom executor ownership
 
-If you pass an `ExecutorService` to `Parallel.of(...)`, Paramixel uses it but does not manage its lifecycle for you.
+If you pass an `ExecutorService` to `Parallel.builder(...).executorService(...)`, Paramixel uses it but does not manage its lifecycle for you.
 
 ## Runner executor ownership
 
@@ -64,16 +102,40 @@ CycleDetectedException: Cycle detected in action graph: actionA[id1] -> actionB[
 
 ```java
 // This throws DeadlockDetected when paramixel.parallelism=1:
-Action danger = Parallel.of("A",
-        Parallel.of("B",
-                Parallel.of("C",
-                        Direct.of("leaf1", ctx -> {}),
-                        Direct.of("leaf2", ctx -> {}))));
+public class DangerTest {
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action leaf1 = leaf1();
+        Action leaf2 = leaf2();
+
+        Action parallelC = Parallel.builder("C")
+                .child(leaf1)
+                .child(leaf2)
+                .build();
+
+        Action parallelB = Parallel.builder("B")
+                .child(parallelC)
+                .build();
+
+        return Parallel.builder("A")
+                .child(parallelB)
+                .build();
+    }
+
+    private static Action leaf1() {
+        return Direct.builder("leaf1").execute(ctx -> {}).build();
+    }
+
+    private static Action leaf2() {
+        return Direct.builder("leaf2").execute(ctx -> {}).build();
+    }
+}
 
 Runner.builder()
     .configuration(Map.of("paramixel.parallelism", "1"))
     .build()
-    .run(danger); // throws DeadlockDetected
+    .run(DangerTest.actionFactory()); // throws DeadlockDetected
 ```
 
 ### The fix
@@ -83,12 +145,36 @@ There are two ways to resolve this:
 1. **Supply dedicated executors** to inner `Parallel` actions (preferred for fine-grained control):
 
 ```java
-ExecutorService innerEs = Executors.newFixedThreadPool(4);
-Action safe = Parallel.of("A",
-        Parallel.of("B", innerEs,
-                Parallel.of("C",
-                        Direct.of("leaf1", ctx -> {}),
-                        Direct.of("leaf2", ctx -> {}))));
+public class SafeTest {
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action leaf1 = leaf1();
+        Action leaf2 = leaf2();
+
+        Action parallelC = Parallel.builder("C")
+                .child(leaf1)
+                .child(leaf2)
+                .build();
+
+        Action parallelB = Parallel.builder("B")
+                .executorService(innerEs)
+                .child(parallelC)
+                .build();
+
+        return Parallel.builder("A")
+                .child(parallelB)
+                .build();
+    }
+
+    private static Action leaf1() {
+        return Direct.builder("leaf1").execute(ctx -> {}).build();
+    }
+
+    private static Action leaf2() {
+        return Direct.builder("leaf2").execute(ctx -> {}).build();
+    }
+}
 ```
 
 2. **Increase `paramixel.parallelism`** to match the nesting depth:
@@ -122,26 +208,117 @@ If the executing thread is interrupted during concurrency semaphore acquisition,
 ### Default executor
 
 ```java
-Action action = Parallel.of(
-        "tests",
-        Direct.of("a", context -> {}),
-        Direct.of("b", context -> {}));
+public class MyTest {
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action a = a();
+        Action b = b();
+
+        return Parallel.builder("tests")
+                .child(aAction)
+                .child(bAction)
+                .build();
+    }
+
+    private static Action a() {
+        return Direct.builder("a").execute(context -> {}).build();
+    }
+
+    private static Action b() {
+        return Direct.builder("b").execute(context -> {}).build();
+    }
+}
 ```
 
 ### Node-local concurrency limit
 
 ```java
-Action action = Parallel.of(
-        "tests",
-        2,
-        Direct.of("a", context -> {}),
-        Direct.of("b", context -> {}),
-        Direct.of("c", context -> {}));
+public class MyTest {
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action a = a();
+        Action b = b();
+        Action c = c();
+
+        return Parallel.builder("tests")
+                .parallelism(2)
+                .child(aAction)
+                .child(bAction)
+                .child(cAction)
+                .build();
+    }
+
+    private static Action a() {
+        return Direct.builder("a").execute(context -> {}).build();
+    }
+
+    private static Action b() {
+        return Direct.builder("b").execute(context -> {}).build();
+    }
+
+    private static Action c() {
+        return Direct.builder("c").execute(context -> {}).build();
+    }
+}
 ```
 
 ### Custom executor
 
 ```java
-ExecutorService executorService = Executors.newFixedThreadPool(4);
-Action action = Parallel.of("tests", executorService, children);
+public class MyTest {
+
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(4);
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action a = a();
+        Action b = b();
+
+        return Parallel.builder("tests")
+                .executorService(executorService)
+                .child(aAction)
+                .child(bAction)
+                .build();
+    }
+
+    private static Action a() {
+        return Direct.builder("a").execute(context -> {}).build();
+    }
+
+    private static Action b() {
+        return Direct.builder("b").execute(context -> {}).build();
+    }
+}
+```
+
+### Builder with custom executor and limit
+
+```java
+public class MyTest {
+
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(4);
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action a = a();
+        Action b = b();
+
+        return Parallel.builder("tests")
+                .executorService(executorService)
+                .parallelism(2)
+                .child(aAction)
+                .child(bAction)
+                .build();
+    }
+
+    private static Action a() {
+        return Direct.builder("a").execute(context -> {}).build();
+    }
+
+    private static Action b() {
+        return Direct.builder("b").execute(context -> {}).build();
+    }
+}
 ```

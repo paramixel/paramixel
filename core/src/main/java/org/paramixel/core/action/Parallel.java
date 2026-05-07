@@ -28,201 +28,135 @@ import java.util.concurrent.Semaphore;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
+import org.paramixel.core.Status;
 import org.paramixel.core.spi.DefaultResult;
 import org.paramixel.core.spi.DefaultStatus;
 import org.paramixel.core.support.Arguments;
 
 /**
  * Executes child actions concurrently.
- *
- * <p>Parallel execution uses either an explicitly supplied {@link ExecutorService} or the executor service from the
- * current {@link Context}. A positive parallelism limit controls how many child actions may execute at once.
  */
-public class Parallel extends BranchAction {
+public final class Parallel extends AbstractAction {
 
+    private final List<Action> children;
     private final int parallelism;
     private final ExecutorService executorService;
 
-    /**
-     * Creates a parallel action that uses the context executor and the supplied parallelism limit.
-     *
-     * @param name the action name
-     * @param parallelism the maximum number of concurrently executing children
-     * @param children the child actions
-     */
-    protected Parallel(String name, int parallelism, List<Action> children) {
-        this(name, parallelism, children, null);
-    }
-
-    /**
-     * Creates a parallel action that always uses the supplied executor service.
-     *
-     * @param name the action name
-     * @param executorService the dedicated executor service
-     * @param children the child actions
-     */
-    protected Parallel(String name, ExecutorService executorService, List<Action> children) {
-        super(children);
+    private Parallel(
+            String name,
+            int parallelism,
+            List<Action> children,
+            ExecutorService executorService,
+            Action.ContextMode contextMode) {
+        super(contextMode);
         this.name = validateName(name);
-        this.parallelism = Integer.MAX_VALUE;
-        this.executorService = executorService;
-    }
-
-    /**
-     * Creates a parallel action with explicit executor selection and parallelism limit.
-     *
-     * @param name the action name
-     * @param parallelism the maximum number of concurrently executing children
-     * @param children the child actions
-     * @param executorService the dedicated executor service, or {@code null} to use the context executor
-     */
-    protected Parallel(String name, int parallelism, List<Action> children, ExecutorService executorService) {
-        super(children);
-        this.name = validateName(name);
+        this.children = validateAndParentChildren(children);
         this.parallelism = parallelism;
         this.executorService = executorService;
     }
 
     /**
-     * Creates a parallel action with unbounded internal parallelism.
+     * Creates a new parallel action builder.
      *
      * @param name the action name
-     * @param children the child actions
-     * @return a new parallel action
+     * @return a new builder
      */
-    public static Parallel of(String name, List<Action> children) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Arguments.requireNonEmpty(children, "children must not be empty");
-        Arguments.requireNoNullElements(children, "children must not contain null elements");
-        Parallel instance = new Parallel(name, Integer.MAX_VALUE, children);
-        instance.initialize();
-        return instance;
+    public static Builder builder(String name) {
+        return new Builder(name);
     }
 
-    /**
-     * Creates a parallel action with an explicit parallelism limit.
-     *
-     * @param name the action name
-     * @param parallelism the maximum number of child actions running at once
-     * @param children the child actions
-     * @return a new parallel action
-     */
-    public static Parallel of(String name, int parallelism, List<Action> children) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Arguments.requirePositive(parallelism, "parallelism must be positive, was: " + parallelism);
-        Arguments.requireNonEmpty(children, "children must not be empty");
-        Arguments.requireNoNullElements(children, "children must not contain null elements");
-        Parallel instance = new Parallel(name, parallelism, children);
-        instance.initialize();
-        return instance;
+    @Override
+    public List<Action> getChildren() {
+        return children;
     }
 
-    /**
-     * Creates a parallel action with unbounded internal parallelism.
-     *
-     * @param name the action name
-     * @param children the child actions
-     * @return a new parallel action
-     */
-    public static Parallel of(String name, Action... children) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(children, "children must not be null");
-        Arguments.require(children.length > 0, "children must not be empty");
-        Arguments.requireNoNullElements(children, "children must not contain null elements");
-        Parallel instance = new Parallel(name, Integer.MAX_VALUE, List.of(children));
-        instance.initialize();
-        return instance;
+    @Override
+    public void addChild(Action child) {
+        Objects.requireNonNull(child, "child must not be null");
+        Arguments.require(child != this, "action must not add itself as a child");
+        child.setParent(this);
     }
 
-    /**
-     * Creates a parallel action with an explicit parallelism limit.
-     *
-     * @param name the action name
-     * @param parallelism the maximum number of child actions running at once
-     * @param children the child actions
-     * @return a new parallel action
-     */
-    public static Parallel of(String name, int parallelism, Action... children) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Arguments.requirePositive(parallelism, "parallelism must be positive, was: " + parallelism);
-        Objects.requireNonNull(children, "children must not be null");
-        Arguments.require(children.length > 0, "children must not be empty");
-        Arguments.requireNoNullElements(children, "children must not contain null elements");
-        Parallel instance = new Parallel(name, parallelism, List.of(children));
-        instance.initialize();
-        return instance;
-    }
-
-    /**
-     * Creates a parallel action that uses the supplied executor service.
-     *
-     * @param name the action name
-     * @param executorService the executor service to use
-     * @param children the child actions
-     * @return a new parallel action
-     */
-    public static Parallel of(String name, ExecutorService executorService, List<Action> children) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(executorService, "executorService must not be null");
-        Arguments.requireNonEmpty(children, "children must not be empty");
-        Arguments.requireNoNullElements(children, "children must not contain null elements");
-        Parallel instance = new Parallel(name, executorService, children);
-        instance.initialize();
-        return instance;
-    }
-
-    /**
-     * Creates a parallel action that uses the supplied executor service.
-     *
-     * @param name the action name
-     * @param executorService the executor service to use
-     * @param children the child actions
-     * @return a new parallel action
-     */
-    public static Parallel of(String name, ExecutorService executorService, Action... children) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(executorService, "executorService must not be null");
-        Objects.requireNonNull(children, "children must not be null");
-        Arguments.require(children.length > 0, "children must not be empty");
-        Arguments.requireNoNullElements(children, "children must not contain null elements");
-        Parallel instance = new Parallel(name, executorService, List.of(children));
-        instance.initialize();
-        return instance;
-    }
-
-    /**
-     * Returns the configured parallelism limit.
-     *
-     * @return the maximum number of child tasks allowed to run concurrently
-     */
     public int parallelism() {
         return parallelism;
     }
 
-    /**
-     * Returns the explicitly configured executor service, if one exists.
-     *
-     * @return the configured executor service, or an empty {@link Optional} when the context executor will be used
-     */
     public Optional<ExecutorService> executorService() {
         return Optional.ofNullable(executorService);
     }
 
-    /**
-     * Executes child actions concurrently and aggregates their results.
-     *
-     * @param context the execution context
-     * @return the aggregated execution result
-     */
     @Override
-    public Result execute(Context context) {
-        Objects.requireNonNull(context, "context must not be null");
+    protected Result skipSelf(Context context) {
+        DefaultResult result = new DefaultResult(this);
+        for (Action child : children) {
+            Result childResult = child.skip(context);
+            result.addChild(childResult);
+        }
+        result.setStatus(DefaultStatus.SKIP);
+        result.setRunDuration(Duration.ZERO);
+        context.getListener().skipAction(result);
+        return result;
+    }
+
+    /** Fluent builder for {@link Parallel}. */
+    public static final class Builder {
+
+        private final String name;
+        private final List<Action> children = new ArrayList<>();
+        private Action.ContextMode contextMode = Action.ContextMode.ISOLATED;
+        private int parallelism = Integer.MAX_VALUE;
+        private ExecutorService executorService;
+        private boolean built;
+
+        private Builder(String name) {
+            Objects.requireNonNull(name, "name must not be null");
+            Arguments.requireNonBlank(name, "name must not be blank");
+            this.name = name;
+        }
+
+        public Builder contextMode(Action.ContextMode contextMode) {
+            ensureNotBuilt();
+            this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
+            return this;
+        }
+
+        public Builder parallelism(int parallelism) {
+            ensureNotBuilt();
+            Arguments.requirePositive(parallelism, "parallelism must be positive, was: " + parallelism);
+            this.parallelism = parallelism;
+            return this;
+        }
+
+        public Builder executorService(ExecutorService executorService) {
+            ensureNotBuilt();
+            this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
+            return this;
+        }
+
+        public Builder child(Action child) {
+            ensureNotBuilt();
+            children.add(Objects.requireNonNull(child, "child must not be null"));
+            return this;
+        }
+
+        public Parallel build() {
+            ensureNotBuilt();
+            built = true;
+            Arguments.require(!children.isEmpty(), "children must not be empty");
+            Parallel instance = new Parallel(name, parallelism, List.copyOf(children), executorService, contextMode);
+            instance.initialize();
+            return instance;
+        }
+
+        private void ensureNotBuilt() {
+            if (built) {
+                throw new IllegalStateException("builder already built");
+            }
+        }
+    }
+
+    @Override
+    protected Result executeSelf(Context context) {
         DefaultResult result = new DefaultResult(this);
         context.getListener().beforeAction(result);
         Instant start = Instant.now();
@@ -232,7 +166,7 @@ public class Parallel extends BranchAction {
         List<CompletableFuture<Result>> futures = new ArrayList<>();
 
         try {
-            for (Action child : getChildren()) {
+            for (Action child : children) {
                 try {
                     semaphore.acquire();
                 } catch (InterruptedException e) {
@@ -242,7 +176,7 @@ public class Parallel extends BranchAction {
                 futures.add(CompletableFuture.supplyAsync(
                         () -> {
                             try {
-                                return child.execute(context.createChild());
+                                return child.execute(context);
                             } finally {
                                 semaphore.release();
                             }
@@ -251,21 +185,20 @@ public class Parallel extends BranchAction {
             }
 
             for (CompletableFuture<Result> f : futures) {
-                Result childResult = f.join();
-                result.addChild(childResult);
+                result.addChild(f.join());
             }
 
             result.setStatus(computeStatus(result.getChildren()));
-            result.setElapsedTime(Duration.between(start, Instant.now()));
+            result.setRunDuration(Duration.between(start, Instant.now()));
         } catch (RuntimeException e) {
             if (e.getCause() instanceof InterruptedException) {
                 result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getCause()));
-                result.setElapsedTime(Duration.between(start, Instant.now()));
+                result.setRunDuration(Duration.between(start, Instant.now()));
                 context.getListener().afterAction(result);
                 Thread.currentThread().interrupt();
             } else {
                 result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e));
-                result.setElapsedTime(Duration.between(start, Instant.now()));
+                result.setRunDuration(Duration.between(start, Instant.now()));
                 context.getListener().afterAction(result);
                 throw e;
             }
@@ -273,5 +206,32 @@ public class Parallel extends BranchAction {
         }
         context.getListener().afterAction(result);
         return result;
+    }
+
+    private Status computeStatus(List<Result> childResults) {
+        for (Result childResult : childResults) {
+            Objects.requireNonNull(childResult, "childResults must not contain null elements");
+            if (childResult.getStatus().isFailure()) {
+                return DefaultStatus.FAILURE;
+            }
+        }
+        for (Result childResult : childResults) {
+            if (childResult.getStatus().isSkip()) {
+                return DefaultStatus.SKIP;
+            }
+        }
+        return DefaultStatus.PASS;
+    }
+
+    private List<Action> validateAndParentChildren(List<Action> children) {
+        Objects.requireNonNull(children, "children must not be null");
+        Arguments.requireNonEmpty(children, "children must not be empty");
+        List<Action> validated = new ArrayList<>(children.size());
+        for (Action child : children) {
+            Objects.requireNonNull(child, "children must not contain null elements");
+            addChild(child);
+            validated.add(child);
+        }
+        return List.copyOf(validated);
     }
 }

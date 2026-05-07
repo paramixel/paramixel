@@ -70,8 +70,8 @@ cleanup.add(() -> stopOther()).run();
 
 `Error` subclasses (such as `OutOfMemoryError`, `StackOverflowError`, `ThreadDeath`) are **not caught** by cleanup tasks. If a cleanup task throws an `Error`, the cleanup loop aborts immediately and the error propagates. Remaining cleanup tasks will not run.
 
-## Relationship to `Lifecycle`
+## Relationship to `Container`
 
-A common pattern is to create resources in `Lifecycle.before` and release them in `Lifecycle.after` using `Cleanup`.
+A common pattern is to create resources in `Container.before(...)` and release them in `Container.after(...)` using `Cleanup`.
 
-See the Testcontainers examples under `core-examples/src/main/java/examples/testcontainers/`.
+See the Testcontainers examples under `examples/src/main/java/examples/testcontainers/`.

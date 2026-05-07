@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
+import org.paramixel.core.action.Parallel;
 import org.paramixel.core.exception.ConfigurationException;
 import org.paramixel.core.exception.ResolverException;
 
@@ -189,7 +190,7 @@ class ResolverTest {
             Optional<Action> result = Resolver.resolveActions(configuration);
 
             assertThat(result).isPresent();
-            assertThat(result.orElseThrow().getName()).isEqualTo("smoke-action");
+            assertThat(result.orElseThrow()).isInstanceOf(Parallel.class);
         }
 
         @Test
@@ -202,7 +203,7 @@ class ResolverTest {
             Optional<Action> result = Resolver.resolveActions(configuration);
 
             assertThat(result).isPresent();
-            assertThat(result.orElseThrow().getName()).isEqualTo("smoke-action");
+            assertThat(result.orElseThrow()).isInstanceOf(Parallel.class);
         }
 
         @Test
@@ -219,7 +220,7 @@ class ResolverTest {
             Optional<Action> result = Resolver.resolveActions(configuration, selector);
 
             assertThat(result).isPresent();
-            assertThat(result.orElseThrow().getName()).isEqualTo("multi-tag-action");
+            assertThat(result.orElseThrow()).isInstanceOf(Parallel.class);
         }
 
         @Test
@@ -243,7 +244,7 @@ class ResolverTest {
             Optional<Action> result = Resolver.resolveActions(selector);
 
             assertThat(result).isPresent();
-            assertThat(result.orElseThrow().getName()).isEqualTo("smoke-action");
+            assertThat(result.orElseThrow()).isInstanceOf(Parallel.class);
         }
 
         @Test
@@ -274,27 +275,27 @@ class ResolverTest {
     static class ParentFactory {
         @Paramixel.ActionFactory
         public static Action actionFactory() {
-            return Direct.of("parent-action", context -> {});
+            return Direct.builder("parent-action").execute(context -> {}).build();
         }
     }
 
     static class ChildOverridesWithoutFactory extends ParentFactory {
         public static Action actionFactory() {
-            return Direct.of("child-action", context -> {});
+            return Direct.builder("child-action").execute(context -> {}).build();
         }
     }
 
     static class ParentFactoryTwo {
         @Paramixel.ActionFactory
         public static Action parentAction() {
-            return Direct.of("parent-action", context -> {});
+            return Direct.builder("parent-action").execute(context -> {}).build();
         }
     }
 
     static class ChildDeclaresOwnFactory extends ParentFactoryTwo {
         @Paramixel.ActionFactory
         public static Action childAction() {
-            return Direct.of("child-action", context -> {});
+            return Direct.builder("child-action").execute(context -> {}).build();
         }
     }
 
@@ -302,7 +303,7 @@ class ResolverTest {
         @Paramixel.ActionFactory
         @Paramixel.Tag(" ")
         public static Action actionFactory() {
-            return Direct.of("blank-tag-action", context -> {});
+            return Direct.builder("blank-tag-action").execute(context -> {}).build();
         }
     }
 }

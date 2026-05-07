@@ -26,19 +26,19 @@ The Paramixel Maven plugin provides the `test` goal.
 
 When `true`, skipped tests cause the build to fail (equivalent to exit code `1`). When `false` (default), skipped tests are treated as successful (exit code `0`).
 
-### `reportEnabled`
+### `reportFile`
 
-- property: `paramixel.report.enabled`
-- default: `false`
+- property: `paramixel.report.file`
+- default: unset
 
-When `true`, the plugin writes a per-run plain-text summary file after execution completes.
+When set, the plugin writes a summary report to the configured file after execution completes.
 
-### `reportDirectory`
+### `reportFormat`
 
-- property: `paramixel.report.directory`
-- default: `${project.build.directory}/paramixel`
+- property: `paramixel.report.format`
+- default: inferred from `reportFile`
 
-Directory used for generated report files. Each run writes a file named `paramixel_<yyyyMMdd-HHmmss>.log`.
+Supported values are `text`, `json`, `xml`, and `html`. When omitted, `.log` and `.txt` infer `text`, `.json` infers `json`, `.xml` infers `xml`, and `.html` infers `html`.
 
 ### `properties`
 
@@ -60,8 +60,7 @@ Custom key/value pairs merged into Paramixel runtime configuration.
     </executions>
     <configuration>
         <failIfNoTests>true</failIfNoTests>
-        <reportEnabled>true</reportEnabled>
-        <reportDirectory>${project.build.directory}/paramixel</reportDirectory>
+        <reportFile>${project.build.directory}/paramixel/paramixel.json</reportFile>
         <properties>
             <property>
                 <key>paramixel.parallelism</key>
@@ -78,8 +77,8 @@ Custom key/value pairs merged into Paramixel runtime configuration.
 ./mvnw test -Dparamixel.skipTests=true
 ./mvnw test -Dparamixel.failIfNoTests=false
 ./mvnw test -Dparamixel.failureOnSkip=true
-./mvnw test -Dparamixel.report.enabled=true
-./mvnw test -Dparamixel.report.directory=target/paramixel-report
+./mvnw test -Dparamixel.report.file=target/paramixel/paramixel.json
+./mvnw test -Dparamixel.report.file=target/paramixel/report.out -Dparamixel.report.format=json
 ./mvnw test -Dparamixel.parallelism=8
 ```
 
@@ -87,15 +86,18 @@ Custom key/value pairs merged into Paramixel runtime configuration.
 
 When report files are enabled:
 
-- the plugin creates the report directory on demand
+- the plugin creates parent directories on demand
 - console output still appears normally
-- the file contains the summary tree only, without ANSI color codes
+- the configured file is overwritten on each run
+- the file contains the summary tree without ANSI color codes
 - file creation errors are reported as warnings and do not fail the test run
+- tilde (`~`) expansion is supported on Linux and macOS: `~` expands to the current user's home directory, `~/path` expands relative to the home directory, and `~user` expands to another user's home directory (if that user exists). On Windows, tilde expansion is a no-op and the path is used as-is.
 
-Example output path:
+Example output paths:
 
 ```text
-target/paramixel/paramixel_20260504-123456.log
+target/paramixel/paramixel.json
+~/reports/paramixel.html
 ```
 
 ## Discovery behavior
@@ -126,4 +128,4 @@ The plugin builds configuration in this order:
 
 ## Source layout note
 
-In this repository, Paramixel examples live under `core-examples/src/main/java` because the plugin discovers and runs action factories from compiled classes, not from JUnit's `src/test/java` convention.
+In this repository, Paramixel examples live under `examples/src/main/java` because the plugin discovers and runs action factories from compiled classes, not from JUnit's `src/test/java` convention.

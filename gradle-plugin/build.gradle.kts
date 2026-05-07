@@ -1,0 +1,75 @@
+plugins {
+    `java-gradle-plugin`
+    `maven-publish`
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withSourcesJar()
+    withJavadocJar()
+}
+
+dependencies {
+    implementation("org.paramixel:core:${project.version}")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
+    testImplementation("org.assertj:assertj-core:3.27.7")
+    testRuntimeOnly(gradleTestKit())
+}
+
+gradlePlugin {
+    plugins {
+        create("paramixel") {
+            id = "org.paramixel"
+            implementationClass = "org.paramixel.gradle.ParamixelPlugin"
+        }
+    }
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.encoding = "UTF-8"
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenPublication") {
+            from(components["java"])
+            artifactId = "gradle-plugin"
+            pom {
+                name.set("Paramixel Gradle Plugin")
+                description.set("Paramixel Gradle Plugin")
+                url.set("https://github.com/paramixel/paramixel")
+                licenses {
+                    license {
+                        name.set("Apache License, Version 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                        distribution.set("repo")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("dhoard")
+                        name.set("Douglas Hoard")
+                        email.set("doug.hoard@gmail.com")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:git://github.com/paramixel/paramixel.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/paramixel/paramixel.git")
+                    url.set("https://github.com/paramixel/paramixel")
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "local"
+            url = uri(layout.buildDirectory.dir("repo"))
+        }
+    }
+}

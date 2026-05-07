@@ -16,7 +16,7 @@ Paramixel has two main phases:
 - `org.paramixel.core.action` - built-in actions (`Direct`, `Sequential`, `DependentSequential`, `RandomSequential`, `DependentRandomSequential`, `Parallel`, `Lifecycle`, `Noop`)
 - `org.paramixel.core.exception` - exceptions (`FailException`, `SkipException`, `CycleDetectedException`, `DeadlockDetected`, `ConfigurationException`, `ResolverException`)
 - `org.paramixel.core.spi` - service provider interfaces and defaults (`DefaultResult`, `DefaultStatus`, `DefaultStore`, `DefaultContext`, `DefaultRunner`)
-- `org.paramixel.core.spi.listener` - built-in listener implementations (`SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`, `TableSummaryRenderer`)
+- `org.paramixel.core.spi.listener` - built-in listener implementations (`SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`)
 - `org.paramixel.core.support` - support utilities such as `Cleanup`
 - `org.paramixel.maven.plugin` - Maven integration
 

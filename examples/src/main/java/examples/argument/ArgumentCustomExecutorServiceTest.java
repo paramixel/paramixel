@@ -1,0 +1,128 @@
+/*
+ * Copyright (c) 2026-present Douglas Hoard
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package examples.argument;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.core.Action;
+import org.paramixel.core.Factory;
+import org.paramixel.core.Paramixel;
+import org.paramixel.core.action.Container;
+import org.paramixel.core.action.Direct;
+import org.paramixel.core.action.Noop;
+import org.paramixel.core.action.Parallel;
+
+public class ArgumentCustomExecutorServiceTest {
+
+    private static final AtomicInteger INVOCATION_COUNT = new AtomicInteger();
+    private static ExecutorService CUSTOM_EXECUTOR_SERVICE;
+
+    public static void main(String[] args) {
+        Factory.defaultRunner().runAndExit(actionFactory());
+    }
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        INVOCATION_COUNT.set(0);
+        CUSTOM_EXECUTOR_SERVICE = Executors.newFixedThreadPool(4);
+
+        Action first = first();
+        Action second = second();
+        Action third = third();
+        Action verify = verify();
+        Action shutdown = shutdown();
+
+        Action parallel = parallel(first, second, third);
+
+        Action main = main(parallel, verify);
+
+        Action before = before();
+
+        return Container.builder("ArgumentCustomExecutorServiceTest")
+                .before(before)
+                .child(main)
+                .after(shutdown)
+                .build();
+    }
+
+    private static Action first() {
+        return Direct.builder("arg-0")
+                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .build();
+    }
+
+    private static Action second() {
+        return Direct.builder("arg-1")
+                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .build();
+    }
+
+    private static Action third() {
+        return Direct.builder("arg-2")
+                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .build();
+    }
+
+    private static Action parallel(Action first, Action second, Action third) {
+        var parallelBuilder = Parallel.builder("parallel-arguments").executorService(CUSTOM_EXECUTOR_SERVICE);
+        parallelBuilder.child(first);
+        parallelBuilder.child(second);
+        parallelBuilder.child(third);
+        return parallelBuilder.build();
+    }
+
+    private static Action verify() {
+        return Direct.builder("verify")
+                .execute(context -> {
+                    assertThat(INVOCATION_COUNT.get()).isEqualTo(3);
+                    assertThat(CUSTOM_EXECUTOR_SERVICE.isShutdown()).isFalse();
+                })
+                .build();
+    }
+
+    private static Action main(Action parallel, Action verify) {
+        var mainBuilder = Container.builder("main")
+                .policy(Container.Policy.builder()
+                        .childMode(Container.ChildMode.INDEPENDENT)
+                        .build());
+        mainBuilder.child(parallel);
+        mainBuilder.child(verify);
+        return mainBuilder.build();
+    }
+
+    private static Action before() {
+        return Noop.of("before");
+    }
+
+    private static Action shutdown() {
+        return Direct.builder("shutdown")
+                .execute(context -> {
+                    CUSTOM_EXECUTOR_SERVICE.shutdown();
+                    try {
+                        assertThat(CUSTOM_EXECUTOR_SERVICE.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
+                                .isTrue();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Interrupted while waiting for executor shutdown", e);
+                    }
+                })
+                .build();
+    }
+}

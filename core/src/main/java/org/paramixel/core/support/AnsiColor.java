@@ -66,10 +66,7 @@ public enum AnsiColor {
      * @throws IllegalArgumentException if {@code text} is blank
      */
     public String format(final String text) {
-        Objects.requireNonNull(text, "text must not be null");
-        if (text.isBlank()) {
-            throw new IllegalArgumentException("text must not be blank");
-        }
+        Arguments.requireNonBlank(Objects.requireNonNull(text), "text must not be blank");
         return code + text + RESET.code;
     }
 }

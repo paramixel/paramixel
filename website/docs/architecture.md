@@ -13,10 +13,10 @@ Paramixel has two main phases:
 ## Main packages
 
 - `org.paramixel.core` - public API (`Action`, `Context`, `Result`, `Status`, `Runner`, `Store`, `Value`, `Factory`, `Version`, `Selector`, `Resolver`, `Listener`, `Configuration`)
-- `org.paramixel.core.action` - built-in actions (`Direct`, `Sequential`, `DependentSequential`, `RandomSequential`, `DependentRandomSequential`, `Parallel`, `Lifecycle`, `Noop`)
+- `org.paramixel.core.action` - built-in actions (`Direct`, `Noop`, `Container`, `Parallel`)
 - `org.paramixel.core.exception` - exceptions (`FailException`, `SkipException`, `CycleDetectedException`, `DeadlockDetected`, `ConfigurationException`, `ResolverException`)
 - `org.paramixel.core.spi` - service provider interfaces and defaults (`DefaultResult`, `DefaultStatus`, `DefaultStore`, `DefaultContext`, `DefaultRunner`)
-- `org.paramixel.core.spi.listener` - built-in listener implementations (`SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`, `TableSummaryRenderer`)
+- `org.paramixel.core.spi.listener` - built-in listener implementations (`SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`)
 - `org.paramixel.core.support` - support utilities such as `Cleanup`
 - `org.paramixel.maven.plugin` - Maven integration
 
@@ -56,7 +56,7 @@ Before execution, `DefaultRunner` runs two validators:
 
 - `Runner.run(Action)` returns a `Result`
 - Results form a tree that mirrors the action tree
-- Each `Result` has a `Status`, elapsed time, parent, and children
+- Each `Result` has a `Status`, run duration, parent, and children
 - `Context` provides `getStore()` for per-node state and `findAncestor()` for navigating the context hierarchy
 - `Parallel` uses a `RoutingExecutorService` that routes root-level work to the runner executor and nested parallel work to the parallel executor, preventing thread starvation for typical configurations
 - A `Runner` can be reused — calling `run()` multiple times on the same instance is safe. Each call creates fresh owned executor services (if no external executor was supplied) and shuts them down when the call completes. If an `ExecutorService` was provided via `Runner.builder().executorService(...)`, the runner uses it but does not shut it down.
@@ -66,27 +66,21 @@ Before execution, `DefaultRunner` runs two validators:
 ```
 Action (interface)
   └─ AbstractAction (abstract)
-       ├─ LeafAction (abstract) — no children
-       │    ├─ Direct — takes Executable callback
-       │    └─ Noop — always passes
-       └─ BranchAction (abstract) — has children
-            ├─ Sequential — runs all in order
-            ├─ DependentSequential — stops on first failure
-            ├─ RandomSequential — shuffled, runs all
-            ├─ DependentRandomSequential — shuffled, stops on first failure
-            ├─ Parallel — concurrent with semaphore
-            └─ Lifecycle — before/primary/after
+       ├─ Direct — takes Executable callback, no children
+       ├─ Noop — always passes, no children
+       ├─ Container — ordered composition with optional setup and teardown
+       └─ Parallel — concurrent with semaphore
 ```
 
-## Lifecycle model
+## Container model
 
-`Lifecycle` executes three child actions:
+`Container` executes three ordered regions:
 
 1. `before`
-2. `main`
+2. body children
 3. `after`
 
-`after` always runs, even if `before` fails or skips and even if `main` fails or skips. If `before` does not pass, `main` is skipped recursively.
+`after` always runs, even if `before` fails or skips and even if a body child fails or skips. If `before` does not pass, body children are skipped recursively. Body child ordering and fail-fast behavior are controlled by `Container.Policy`.
 
 ## Listener model
 

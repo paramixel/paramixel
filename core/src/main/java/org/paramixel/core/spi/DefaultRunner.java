@@ -117,7 +117,7 @@ public final class DefaultRunner implements Runner {
             Result executeResult = action.execute(context);
 
             rootResult.setStatus(executeResult.getStatus());
-            rootResult.setElapsedTime(executeResult.getElapsedTime());
+            rootResult.setRunDuration(executeResult.getRunDuration());
             for (Result child : executeResult.getChildren()) {
                 rootResult.addChild(child);
             }

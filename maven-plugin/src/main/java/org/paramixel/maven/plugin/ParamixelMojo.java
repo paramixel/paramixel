@@ -76,11 +76,16 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(property = "paramixel.failureOnSkip", defaultValue = "false")
     private boolean failureOnSkip;
 
-    @Parameter(property = "paramixel.report.enabled", defaultValue = "false")
-    private boolean reportEnabled;
+    @Parameter(property = "paramixel.report.file")
+    private String reportFile;
 
-    @Parameter(property = "paramixel.report.directory", defaultValue = "${project.build.directory}/paramixel")
-    private String reportDirectory;
+    /**
+     * The format for per-run summary report files.
+     *
+     * <p>Supported values are {@code text} (the default), {@code json}, and {@code xml}.
+     */
+    @Parameter(property = "paramixel.report.format")
+    private String reportFormat;
 
     @Parameter
     private List<Property> properties;
@@ -131,8 +136,8 @@ public class ParamixelMojo extends AbstractMojo {
     private Map<String, String> buildConfiguration(ClassLoader classLoader) throws MojoExecutionException {
         Map<String, String> configuration =
                 new LinkedHashMap<>(withContextClassLoader(classLoader, Configuration::defaultProperties));
-        configuration.putIfAbsent(Configuration.REPORT_ENABLED, String.valueOf(reportEnabled));
-        configuration.putIfAbsent(Configuration.REPORT_DIRECTORY, reportDirectory);
+        putIfNotBlank(configuration, Configuration.REPORT_FILE, reportFile);
+        putIfNotBlank(configuration, Configuration.REPORT_FORMAT, reportFormat);
 
         // POM <properties> override file/defaults but not system properties
         if (properties != null) {
@@ -165,6 +170,12 @@ public class ParamixelMojo extends AbstractMojo {
         });
 
         return configuration;
+    }
+
+    private static void putIfNotBlank(Map<String, String> configuration, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            configuration.putIfAbsent(key, value);
+        }
     }
 
     private static <T> T withContextClassLoader(ClassLoader classLoader, Supplier<T> supplier) {

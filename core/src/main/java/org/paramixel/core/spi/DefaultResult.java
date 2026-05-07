@@ -29,15 +29,15 @@ import org.paramixel.core.Status;
 /**
  * Default mutable {@link Result} implementation used while a run is in progress.
  *
- * <p>This SPI type stores the executed {@link Action}, aggregate child results, final {@link Status}, and elapsed
- * timing data. It is primarily intended for Paramixel internals and advanced integrations that need to construct
- * result trees manually.
+ * <p>This SPI type stores the executed {@link Action}, aggregate child results, final {@link Status}, and run duration
+ * data. It is primarily intended for Paramixel internals and advanced integrations that need to construct result trees
+ * manually.
  */
 public final class DefaultResult implements Result {
 
     private final Action action;
     private volatile Status status;
-    private volatile Duration elapsedTime;
+    private volatile Duration runDuration;
     private volatile Result parent;
     private final List<Result> children = new CopyOnWriteArrayList<>();
 
@@ -50,21 +50,21 @@ public final class DefaultResult implements Result {
     public DefaultResult(Action action) {
         this.action = Objects.requireNonNull(action, "action must not be null");
         this.status = DefaultStatus.STAGED;
-        this.elapsedTime = Duration.ZERO;
+        this.runDuration = Duration.ZERO;
     }
 
     /**
-     * Creates a result with explicit status and elapsed time values.
+     * Creates a result with explicit status and run duration values.
      *
      * @param action the action represented by this result
      * @param status the initial status
-     * @param elapsedTime the initial elapsed time
+     * @param runDuration the initial run duration
      * @throws NullPointerException if any argument is {@code null}
      */
-    public DefaultResult(Action action, Status status, Duration elapsedTime) {
+    public DefaultResult(Action action, Status status, Duration runDuration) {
         this.action = Objects.requireNonNull(action, "action must not be null");
         this.status = Objects.requireNonNull(status, "status must not be null");
-        this.elapsedTime = Objects.requireNonNull(elapsedTime, "elapsedTime must not be null");
+        this.runDuration = Objects.requireNonNull(runDuration, "runDuration must not be null");
     }
 
     /**
@@ -78,13 +78,13 @@ public final class DefaultResult implements Result {
     }
 
     /**
-     * Updates the elapsed time recorded for this result.
+     * Updates the run duration recorded for this result.
      *
-     * @param elapsedTime the elapsed time to record
-     * @throws NullPointerException if {@code elapsedTime} is {@code null}
+     * @param runDuration the run duration to record
+     * @throws NullPointerException if {@code runDuration} is {@code null}
      */
-    public void setElapsedTime(Duration elapsedTime) {
-        this.elapsedTime = Objects.requireNonNull(elapsedTime, "elapsedTime must not be null");
+    public void setRunDuration(Duration runDuration) {
+        this.runDuration = Objects.requireNonNull(runDuration, "runDuration must not be null");
     }
 
     /**
@@ -117,16 +117,8 @@ public final class DefaultResult implements Result {
     }
 
     @Override
-    public Duration getElapsedTime() {
-        return elapsedTime;
-    }
-
-    @Override
-    public Duration getCumulativeElapsedTime() {
-        if (children.isEmpty()) {
-            return elapsedTime;
-        }
-        return children.stream().map(Result::getCumulativeElapsedTime).reduce(Duration.ZERO, Duration::plus);
+    public Duration getRunDuration() {
+        return runDuration;
     }
 
     @Override
@@ -146,6 +138,6 @@ public final class DefaultResult implements Result {
 
     @Override
     public String toString() {
-        return status + " | " + elapsedTime.toMillis() + " ms";
+        return status + " | " + runDuration.toMillis() + " ms";
     }
 }

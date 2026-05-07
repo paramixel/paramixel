@@ -40,7 +40,9 @@ class DefaultRunnerValidationTest {
     void routingExecutorRejectsInvalidPublicMethodArguments() {
         AtomicReference<ExecutorService> executorRef = new AtomicReference<>();
         DefaultRunner runner = new DefaultRunner(Configuration.defaultProperties(), new Listener() {}, null);
-        Action action = Direct.of("capture", context -> executorRef.set(context.getExecutorService()));
+        Action action = Direct.builder("capture")
+                .execute(context -> executorRef.set(context.getExecutorService()))
+                .build();
 
         runner.run(action);
 
@@ -61,7 +63,9 @@ class DefaultRunnerValidationTest {
     void routingExecutorShutdownNowReturnsCombinedTasks() {
         AtomicReference<ExecutorService> executorRef = new AtomicReference<>();
         DefaultRunner runner = new DefaultRunner(Configuration.defaultProperties(), new Listener() {}, null);
-        Action action = Direct.of("capture", context -> executorRef.set(context.getExecutorService()));
+        Action action = Direct.builder("capture")
+                .execute(context -> executorRef.set(context.getExecutorService()))
+                .build();
 
         runner.run(action);
 
@@ -75,7 +79,9 @@ class DefaultRunnerValidationTest {
     void routingExecutorIsShutdownReturnsTrueAfterShutdown() {
         AtomicReference<ExecutorService> executorRef = new AtomicReference<>();
         DefaultRunner runner = new DefaultRunner(Configuration.defaultProperties(), new Listener() {}, null);
-        Action action = Direct.of("capture", context -> executorRef.set(context.getExecutorService()));
+        Action action = Direct.builder("capture")
+                .execute(context -> executorRef.set(context.getExecutorService()))
+                .build();
 
         runner.run(action);
 
@@ -89,7 +95,9 @@ class DefaultRunnerValidationTest {
     void routingExecutorIsTerminatedReturnsTrueAfterShutdownAndTermination() throws Exception {
         AtomicReference<ExecutorService> executorRef = new AtomicReference<>();
         DefaultRunner runner = new DefaultRunner(Configuration.defaultProperties(), new Listener() {}, null);
-        Action action = Direct.of("capture", context -> executorRef.set(context.getExecutorService()));
+        Action action = Direct.builder("capture")
+                .execute(context -> executorRef.set(context.getExecutorService()))
+                .build();
 
         runner.run(action);
 
@@ -135,7 +143,7 @@ class DefaultRunnerValidationTest {
     @DisplayName("DefaultRunner with null configuration falls back to default properties")
     void defaultRunnerWithNullConfigurationFallsBack() {
         DefaultRunner runner = new DefaultRunner(null, new Listener() {}, null);
-        Action action = Direct.of("test", context -> {});
+        Action action = Direct.builder("test").execute(context -> {}).build();
 
         assertThat(runner.run(action).getStatus().isPass()).isTrue();
         assertThat(runner.getConfiguration()).containsKey(Configuration.RUNNER_PARALLELISM);
@@ -148,7 +156,7 @@ class DefaultRunnerValidationTest {
         try {
             DefaultRunner runner =
                     new DefaultRunner(Configuration.defaultProperties(), new Listener() {}, externalExecutor);
-            Action action = Direct.of("test", context -> {});
+            Action action = Direct.builder("test").execute(context -> {}).build();
 
             assertThat(runner.run(action).getStatus().isPass()).isTrue();
         } finally {
@@ -162,7 +170,9 @@ class DefaultRunnerValidationTest {
     void routingExecutorAwaitTerminationWithValidTimeout() throws Exception {
         AtomicReference<ExecutorService> executorRef = new AtomicReference<>();
         DefaultRunner runner = new DefaultRunner(Configuration.defaultProperties(), new Listener() {}, null);
-        Action action = Direct.of("capture", context -> executorRef.set(context.getExecutorService()));
+        Action action = Direct.builder("capture")
+                .execute(context -> executorRef.set(context.getExecutorService()))
+                .build();
 
         runner.run(action);
 

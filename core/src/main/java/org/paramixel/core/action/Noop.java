@@ -18,17 +18,17 @@ package org.paramixel.core.action;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Objects;
+import java.util.List;
+import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.spi.DefaultResult;
 import org.paramixel.core.spi.DefaultStatus;
-import org.paramixel.core.support.Arguments;
 
 /**
- * A leaf action that always passes and performs no work.
+ * An action that always passes and performs no work.
  */
-public final class Noop extends LeafAction {
+public final class Noop extends AbstractAction {
 
     private Noop(String name) {
         this.name = validateName(name);
@@ -41,11 +41,28 @@ public final class Noop extends LeafAction {
      * @return a new no-op action
      */
     public static Noop of(String name) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
         Noop instance = new Noop(name);
         instance.initialize();
         return instance;
+    }
+
+    @Override
+    public List<Action> getChildren() {
+        return List.of();
+    }
+
+    @Override
+    public void addChild(Action child) {
+        throw new UnsupportedOperationException("noop action cannot have children");
+    }
+
+    @Override
+    protected Result skipSelf(Context context) {
+        DefaultResult result = new DefaultResult(this);
+        result.setStatus(DefaultStatus.SKIP);
+        result.setRunDuration(Duration.ZERO);
+        context.getListener().skipAction(result);
+        return result;
     }
 
     /**
@@ -55,13 +72,12 @@ public final class Noop extends LeafAction {
      * @return the execution result
      */
     @Override
-    public Result execute(Context context) {
-        Objects.requireNonNull(context, "context must not be null");
+    protected Result executeSelf(Context context) {
         DefaultResult result = new DefaultResult(this);
         context.getListener().beforeAction(result);
         Instant start = Instant.now();
         result.setStatus(DefaultStatus.PASS);
-        result.setElapsedTime(Duration.between(start, Instant.now()));
+        result.setRunDuration(Duration.between(start, Instant.now()));
         context.getListener().afterAction(result);
         return result;
     }

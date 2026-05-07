@@ -26,6 +26,7 @@ import org.paramixel.core.Runner;
 import org.paramixel.core.Status;
 import org.paramixel.core.Version;
 import org.paramixel.core.support.AnsiColor;
+import org.paramixel.core.support.ElapsedTimeFormatter;
 
 /**
  * Prints a run-level summary to the console after execution completes.
@@ -106,55 +107,15 @@ public class SummaryListener implements Listener {
 
         summaryRenderer.renderSummary(runner, result);
 
-        long elapsedMillis = result.getElapsedTime().toMillis();
-        String elapsedTimeString = formatElapsedTime(elapsedMillis);
+        long runDurationMillis = result.getRunDuration().toMillis();
+        String runDurationString = ElapsedTimeFormatter.formatElapsedTime(runDurationMillis);
 
         out().println(prefix());
         out().println(prefix() + "Paramixel v" + Version.getVersion());
         out().println(prefix() + "Status      : " + formatStatus(result.getStatus()));
         out().println(prefix() + "Finished at : "
                 + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        out().println(prefix() + "Total time  : " + elapsedTimeString);
+        out().println(prefix() + "Total time  : " + runDurationString);
         out().println(prefix());
-    }
-
-    private String formatElapsedTime(long milliseconds) {
-        String formatted = formatDuration(milliseconds);
-        String rawMilliseconds = milliseconds + "ms";
-
-        if (formatted.equals(rawMilliseconds)) {
-            return formatted;
-        }
-
-        return formatted + " (" + rawMilliseconds + ")";
-    }
-
-    private String formatDuration(long milliseconds) {
-        long hours = milliseconds / 3_600_000;
-        milliseconds %= 3_600_000;
-
-        long minutes = milliseconds / 60_000;
-        milliseconds %= 60_000;
-
-        long seconds = milliseconds / 1_000;
-        milliseconds %= 1_000;
-
-        StringBuilder result = new StringBuilder();
-
-        if (hours > 0) {
-            result.append(hours).append("h ");
-        }
-
-        if (minutes > 0 || hours > 0) {
-            result.append(minutes).append("m ");
-        }
-
-        if (seconds > 0 || minutes > 0 || hours > 0) {
-            result.append(seconds).append("s ");
-        }
-
-        result.append(milliseconds).append("ms");
-
-        return result.toString().trim();
     }
 }

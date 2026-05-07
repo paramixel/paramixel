@@ -21,11 +21,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Noop;
-import org.paramixel.core.action.Sequential;
 
 @DisplayName("Action")
 class ActionTest {
+
+    @Test
+    @DisplayName("setParent rejects setting action as its own parent")
+    void setParentRejectsSelfAsParent() {
+        Action action = Noop.of("self");
+        assertThatThrownBy(() -> action.setParent(action))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("action must not be its own parent");
+    }
 
     @Test
     @DisplayName("creates noop actions that complete without doing work")
@@ -44,7 +53,13 @@ class ActionTest {
     void returnsUnmodifiableChildrenAndLinksEachChildToItsParent() {
         Action first = Noop.of("first");
         Action second = Noop.of("second");
-        Action root = Sequential.of("root", first, second);
+        Action root = Container.builder("root")
+                .policy(Container.Policy.builder()
+                        .childMode(Container.ChildMode.INDEPENDENT)
+                        .build())
+                .child(first)
+                .child(second)
+                .build();
 
         assertThat(root.getChildren()).containsExactly(first, second);
         assertThat(first.getParent()).contains(root);

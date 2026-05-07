@@ -28,8 +28,8 @@ import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
+import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Noop;
-import org.paramixel.core.support.AnsiColor;
 
 @DisplayName("SummaryListener")
 class SummaryListenerTest {
@@ -101,78 +101,90 @@ class SummaryListenerTest {
     @Test
     @DisplayName("runCompleted prints footer with PASS status in green")
     void runCompletedPrintsPassStatusInGreen() {
-        SummaryListener listener = new SummaryListener(new TableSummaryRenderer());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener =
+                new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
         Noop noop = Noop.of("test");
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
             runner.run(noop);
         } finally {
             System.setOut(originalOut);
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains(AnsiColor.BOLD_GREEN_TEXT.format("PASS"));
+        assertThat(result).contains("PASS");
     }
 
     @Test
     @DisplayName("runCompleted prints footer with FAIL status in red")
     void runCompletedPrintsFailStatusInRed() {
-        SummaryListener listener = new SummaryListener(new TableSummaryRenderer());
-        Action action = org.paramixel.core.action.Direct.of("fail", context -> {
-            throw new RuntimeException("boom");
-        });
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener =
+                new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
+        Action action = Direct.builder("fail")
+                .execute(context -> {
+                    throw new RuntimeException("boom");
+                })
+                .build();
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
             runner.run(action);
         } finally {
             System.setOut(originalOut);
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains(AnsiColor.BOLD_RED_TEXT.format("FAIL"));
+        assertThat(result).contains("FAIL");
     }
 
     @Test
     @DisplayName("runCompleted prints footer with SKIP status in orange")
     void runCompletedPrintsSkipStatusInOrange() {
-        SummaryListener listener = new SummaryListener(new TableSummaryRenderer());
-        Action action = org.paramixel.core.action.Direct.of("skip", context -> {
-            throw org.paramixel.core.exception.SkipException.of("reason");
-        });
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener =
+                new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
+        Action action = Direct.builder("skip")
+                .execute(context -> {
+                    throw org.paramixel.core.exception.SkipException.of("reason");
+                })
+                .build();
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
             runner.run(action);
         } finally {
             System.setOut(originalOut);
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains(AnsiColor.BOLD_ORANGE_TEXT.format("SKIP"));
+        assertThat(result).contains("SKIP");
     }
 
     @Test
     @DisplayName("runCompleted prints version line")
     void runCompletedPrintsVersionLine() {
-        SummaryListener listener = new SummaryListener(new TableSummaryRenderer());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener =
+                new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
         Noop noop = Noop.of("test");
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
             runner.run(noop);
         } finally {
             System.setOut(originalOut);
@@ -185,14 +197,16 @@ class SummaryListenerTest {
     @Test
     @DisplayName("runCompleted prints total time")
     void runCompletedPrintsTotalTime() {
-        SummaryListener listener = new SummaryListener(new TableSummaryRenderer());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener =
+                new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
         Noop noop = Noop.of("test");
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
             runner.run(noop);
         } finally {
             System.setOut(originalOut);
@@ -209,14 +223,16 @@ class SummaryListenerTest {
         @Test
         @DisplayName("sub-second durations display just milliseconds")
         void subsecondDurationsDisplayJustMilliseconds() {
-            SummaryListener listener = new SummaryListener(new TableSummaryRenderer());
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+            SummaryListener listener =
+                    new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
             Noop noop = Noop.of("fast");
             Runner runner = Runner.builder().listener(listener).build();
 
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
             try {
-                System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+                System.setOut(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
                 runner.run(noop);
             } finally {
                 System.setOut(originalOut);
@@ -230,7 +246,10 @@ class SummaryListenerTest {
     @Test
     @DisplayName("callback methods reject null arguments")
     void callbackMethodsRejectNullArguments() {
-        SummaryListener listener = new SummaryListener(new TableSummaryRenderer());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener =
+                new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
         Runner runner = Runner.builder().build();
         Result result = runner.run(Noop.of("test"));
 

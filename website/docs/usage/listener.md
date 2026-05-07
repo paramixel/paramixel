@@ -18,7 +18,7 @@ default void skipAction(Result result)
 default void runCompleted(Runner runner, Result result)
 ```
 
-All callbacks receive a `Result` (which wraps `Action`, `Status`, and timing information), not `Context` + `Action` separately. Use `result.getAction()` to access the action, `result.getStatus()` for the status, and `result.getElapsedTime()` for timing.
+All callbacks receive a `Result` (which wraps `Action`, `Status`, and timing information), not `Context` + `Action` separately. Use `result.getAction()` to access the action, `result.getStatus()` for the status, and `result.getRunDuration()` for timing.
 
 The `skipAction(Result)` callback fires for every action that is skipped (either explicitly via `SkipException` or because a parent determined it should not run).
 

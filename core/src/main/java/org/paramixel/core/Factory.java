@@ -20,11 +20,14 @@ import java.util.Map;
 import java.util.Objects;
 import org.paramixel.core.spi.DefaultRunner;
 import org.paramixel.core.spi.listener.CompositeListener;
+import org.paramixel.core.spi.listener.HtmlReportListener;
+import org.paramixel.core.spi.listener.JsonReportListener;
 import org.paramixel.core.spi.listener.ReportListener;
 import org.paramixel.core.spi.listener.SafeListener;
 import org.paramixel.core.spi.listener.StatusListener;
 import org.paramixel.core.spi.listener.SummaryListener;
 import org.paramixel.core.spi.listener.TreeSummaryRenderer;
+import org.paramixel.core.spi.listener.XmlReportListener;
 
 /**
  * Provides convenience factories for commonly used Paramixel defaults.
@@ -64,8 +67,9 @@ public class Factory {
     /**
      * Creates the default listener chain used by Paramixel for the supplied configuration.
      *
-     * <p>When report file logging is enabled, the returned chain includes a {@link ReportListener} in addition to the
-     * standard console listeners.
+     * <p>When {@link Configuration#REPORT_FILE} is configured, the returned chain includes a report listener in addition
+     * to the standard console listeners. The report listener type is determined by the
+     * {@link Configuration#REPORT_FORMAT} configuration key when present, or inferred from the report file extension.
      *
      * @param configuration the effective Paramixel configuration
      * @return the default listener
@@ -73,15 +77,48 @@ public class Factory {
     public static Listener defaultListener(final Map<String, String> configuration) {
         Objects.requireNonNull(configuration, "configuration must not be null");
 
-        boolean reportEnabled = Boolean.parseBoolean(configuration.get(Configuration.REPORT_ENABLED));
-        if (!reportEnabled) {
+        String reportFile = configuration.get(Configuration.REPORT_FILE);
+        if (isBlank(reportFile)) {
             return defaultListener();
         }
 
-        String reportDirectory = configuration.getOrDefault(Configuration.REPORT_DIRECTORY, "target/paramixel");
+        String reportFormat = resolveReportFormat(configuration, reportFile);
+
+        Listener reportListener = createReportListener(reportFormat, reportFile);
         return new SafeListener(new CompositeListener(
-                new StatusListener(),
-                new SummaryListener(new TreeSummaryRenderer()),
-                new ReportListener(reportDirectory)));
+                new StatusListener(), new SummaryListener(new TreeSummaryRenderer()), reportListener));
+    }
+
+    private static String resolveReportFormat(final Map<String, String> configuration, final String reportFile) {
+        String explicitFormat = configuration.get(Configuration.REPORT_FORMAT);
+        if (!isBlank(explicitFormat)) {
+            return explicitFormat;
+        }
+
+        String lowerReportFile = reportFile.toLowerCase();
+        if (lowerReportFile.endsWith(".json")) {
+            return "json";
+        } else if (lowerReportFile.endsWith(".xml")) {
+            return "xml";
+        } else if (lowerReportFile.endsWith(".html")) {
+            return "html";
+        } else if (lowerReportFile.endsWith(".log") || lowerReportFile.endsWith(".txt")) {
+            return Configuration.REPORT_FORMAT_TEXT;
+        }
+        return Configuration.REPORT_FORMAT_TEXT;
+    }
+
+    private static boolean isBlank(final String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private static Listener createReportListener(String reportFormat, String reportFile) {
+        return switch (reportFormat.toLowerCase()) {
+            case Configuration.REPORT_FORMAT_TEXT -> new ReportListener(reportFile);
+            case "json" -> new JsonReportListener(reportFile);
+            case "xml" -> new XmlReportListener(reportFile);
+            case "html" -> new HtmlReportListener(reportFile);
+            default -> new ReportListener(reportFile);
+        };
     }
 }

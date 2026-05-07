@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.exception.ConfigurationException;
 import org.paramixel.core.exception.ResolverException;
+import org.paramixel.core.spi.listener.Constants;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -48,7 +49,7 @@ import org.paramixel.core.support.Arguments;
  */
 public final class Resolver {
 
-    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+    private static final String ROOT_NAME = Constants.ROOT_NAME;
 
     private Resolver() {}
 
@@ -271,11 +272,14 @@ public final class Resolver {
     }
 
     private static Optional<Action> collapse(List<Action> actions, int parallelism) {
-        return switch (actions.size()) {
-            case 0 -> Optional.empty();
-            case 1 -> Optional.of(actions.get(0));
-            default -> Optional.of(Parallel.of(HIDDEN_ROOT, parallelism, actions));
-        };
+        if (actions.isEmpty()) {
+            return Optional.empty();
+        }
+        var builder = Parallel.builder(ROOT_NAME).parallelism(parallelism);
+        for (Action action : actions) {
+            builder.child(action);
+        }
+        return Optional.of(builder.build());
     }
 
     private static Action resolveActionFromMethod(Method method) {

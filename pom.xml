@@ -6,7 +6,7 @@
 
     <groupId>org.paramixel</groupId>
     <artifactId>parent</artifactId>
-    <version>2.0.0-POST</version>
+    <version>3.0.0-STAGED</version>
     <packaging>pom</packaging>
 
     <name>Paramixel Parent</name>
@@ -39,10 +39,23 @@
     <modules>
         <module>core</module>
         <module>maven-plugin</module>
-        <module>core-examples</module>
+        <module>examples</module>
     </modules>
 
     <properties>
+        <!-- Build settings -->
+        <jacoco.skip>false</jacoco.skip>
+        <maven.compiler.release>17</maven.compiler.release>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <pmd.skip>false</pmd.skip>
+        <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.testSourceEncoding>UTF-8</project.build.testSourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <project.reporting.sourceEncoding>UTF-8</project.reporting.sourceEncoding>
+        <spotbugs.skip>false</spotbugs.skip>
         <!-- Dependency versions -->
         <assertj-core.version>3.27.7</assertj-core.version>
         <classgraph.version>4.8.184</classgraph.version>
@@ -69,6 +82,7 @@
         <maven-dependency-plugin.version>3.10.0</maven-dependency-plugin.version>
         <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
+        <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-plugin-plugin.version>3.15.2</maven-plugin-plugin.version>
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
@@ -79,19 +93,6 @@
         <spotbugs-maven-plugin.version>4.9.8.3</spotbugs-maven-plugin.version>
         <spotless-maven-plugin.version>3.4.0</spotless-maven-plugin.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
-        <!-- Build settings -->
-        <jacoco.skip>false</jacoco.skip>
-        <maven.compiler.release>17</maven.compiler.release>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <maven.deploy.skip>true</maven.deploy.skip>
-        <pmd.skip>false</pmd.skip>
-        <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.build.testSourceEncoding>UTF-8</project.build.testSourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <project.reporting.sourceEncoding>UTF-8</project.reporting.sourceEncoding>
-        <spotbugs.skip>false</spotbugs.skip>
     </properties>
 
     <dependencyManagement>
@@ -277,6 +278,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-gpg-plugin</artifactId>
                     <version>${maven-gpg-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven-jar-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

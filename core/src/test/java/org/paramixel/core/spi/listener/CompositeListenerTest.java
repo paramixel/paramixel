@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
+import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Noop;
 
 @DisplayName("CompositeListener")
@@ -181,9 +182,11 @@ class CompositeListenerTest {
 
         CompositeListener composite = new CompositeListener(first, second);
         Runner runner = Runner.builder().listener(composite).build();
-        runner.run(org.paramixel.core.action.Direct.of("fail", ctx -> {
-            throw new RuntimeException("boom");
-        }));
+        runner.run(Direct.builder("fail")
+                .execute(ctx -> {
+                    throw new RuntimeException("boom");
+                })
+                .build());
 
         assertThat(first.actionThrowableCount).isEqualTo(1);
         assertThat(second.actionThrowableCount).isEqualTo(1);

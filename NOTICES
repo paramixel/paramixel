@@ -25,7 +25,7 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - License: Apache License 2.0
 
 - Apache Maven (and related Maven components)
-  - Coordinates: org.apache.maven:* and org.apache.maven.resolver:*
+  - Coordinates: org.apache.maven:*, org.apache.maven.plugin-tools:*, and org.apache.maven.resolver:*
   - Website: https://maven.apache.org/
   - License: Apache License 2.0
 
@@ -33,6 +33,12 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - Coordinates: org.assertj:assertj-core
   - Website: https://assertj.github.io/doc/
   - License: Apache License 2.0
+
+- ClassGraph
+  - Coordinates: io.github.classgraph:classgraph
+  - Website: https://github.com/classgraph/classgraph
+  - License: MIT License
+  - Copyright: Copyright (c) 2022 Luke Hutchison
 
 - JUnit Platform / JUnit Jupiter (JUnit Project)
   - Coordinates: org.junit.platform:* and org.junit.jupiter:*
@@ -53,7 +59,34 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - Coordinates: org.testcontainers:*
   - Website: https://testcontainers.com/
   - License: MIT
-  - Copyright: (c) 2015-2019 Richard North
+  - Copyright: (c) 2015-2021 Richard North and other authors
+
+Direct Dependency Inventory (as declared in Gradle build files)
+
+- AssertJ
+  - Coordinates: org.assertj:assertj-core
+  - Website: https://assertj.github.io/doc/
+  - License: Apache License 2.0
+
+- Gradle API
+  - Coordinates: gradleApi()
+  - Website: https://gradle.org/
+  - License: Apache License 2.0
+
+- Gradle TestKit
+  - Coordinates: gradleTestKit()
+  - Website: https://gradle.org/
+  - License: Apache License 2.0
+
+- JUnit Platform / JUnit Jupiter (JUnit Project)
+  - Coordinates: org.junit.platform:* and org.junit.jupiter:*
+  - Website: https://junit.org/
+  - License: Eclipse Public License 2.0 (EPL-2.0)
+
+- Paramixel Core
+  - Coordinates: org.paramixel:core
+  - Website: https://github.com/paramixel/paramixel
+  - License: Apache License 2.0
 
 Note: Transitive dependencies pulled in by the above components may carry
 additional license obligations. When redistributing binaries, you must ensure

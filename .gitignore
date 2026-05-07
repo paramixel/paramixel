@@ -9,10 +9,12 @@
 **/.idea/*
 **/.vscode/*
 **/target/*
+**/.gradle/*
+**/build/*
+gradle-plugin/gradle.properties
 *.class
 *.ctxt
 *.ear
-*.jar
 *.log
 *.nar
 *.rar
@@ -25,6 +27,7 @@ __pycache__/
 agent/tmp/
 dependency-reduced-pom.xml
 hs_err_pid*
+java_pid*.hprof
 pom.xml.releaseBackup
 release.properties
 **/.flattened-pom.xml

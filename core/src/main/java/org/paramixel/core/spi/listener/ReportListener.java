@@ -26,24 +26,32 @@ import java.util.Objects;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
+import org.paramixel.core.Status;
+import org.paramixel.core.Version;
+import org.paramixel.core.support.Arguments;
+import org.paramixel.core.support.ElapsedTimeFormatter;
 
 /**
- * Writes a plain-text end-of-run summary report to a per-run file.
+ * Writes a plain-text end-of-run summary report to a configured file.
+ *
+ * <p>Report output does not include the {@code [PARAMIXEL]} prefix since the destination is a dedicated file rather
+ * than the console.
  */
 public class ReportListener implements Listener {
 
-    private static final DateTimeFormatter FILE_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final DateTimeFormatter REPORT_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final Path reportDirectory;
+    private final Path reportFile;
 
     /**
-     * Creates a report listener for the supplied directory.
+     * Creates a report listener for the supplied file.
      *
-     * @param reportDirectory the directory that will contain generated report files
+     * @param reportFile the file that will contain the generated report
      */
-    public ReportListener(final String reportDirectory) {
-        Objects.requireNonNull(reportDirectory, "reportDirectory must not be null");
-        this.reportDirectory = Path.of(reportDirectory);
+    public ReportListener(final String reportFile) {
+        Objects.requireNonNull(reportFile, "reportFile must not be null");
+        Arguments.requireNonBlank(reportFile, "reportFile must not be blank");
+        this.reportFile = TildePathExpander.expand(reportFile);
     }
 
     @Override
@@ -52,17 +60,41 @@ public class ReportListener implements Listener {
         Objects.requireNonNull(result, "result must not be null");
 
         try {
-            Files.createDirectories(reportDirectory);
-            Path reportFile =
-                    reportDirectory.resolve("paramixel_" + FILE_TIMESTAMP_FORMAT.format(LocalDateTime.now()) + ".log");
+            Path parent = reportFile.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
 
             try (PrintStream printStream = new PrintStream(Files.newOutputStream(reportFile))) {
-                SummaryListener summaryListener =
-                        new SummaryListener(new TreeSummaryRenderer(printStream, false), printStream, false);
-                summaryListener.runCompleted(runner, result);
+                printStream.println();
+                printStream.println("Paramixel v" + Version.getVersion());
+
+                new TreeSummaryRenderer(printStream, false, false).renderSummary(runner, result);
+
+                long runDurationMillis = result.getRunDuration().toMillis();
+                String runDurationString = ElapsedTimeFormatter.formatElapsedTime(runDurationMillis);
+
+                printStream.println();
+                printStream.println("Paramixel v" + Version.getVersion());
+                printStream.println("Status      : " + formatStatus(result.getStatus()));
+                printStream.println("Finished at : " + LocalDateTime.now().format(REPORT_TIMESTAMP_FORMAT));
+                printStream.println("Total time  : " + runDurationString);
+                printStream.println();
             }
         } catch (IOException e) {
             System.err.println(Constants.PARAMIXEL_PLAIN + "Unable to write report file: " + e.getMessage());
+        }
+    }
+
+    private static String formatStatus(Status status) {
+        if (status.isStaged()) {
+            return "STAGED";
+        } else if (status.isPass()) {
+            return "PASS";
+        } else if (status.isFailure()) {
+            return "FAIL";
+        } else {
+            return "SKIP";
         }
     }
 }

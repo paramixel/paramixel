@@ -39,22 +39,22 @@ class ResultTest {
         assertThat(result.getStatus().isPass()).isFalse();
         assertThat(result.getStatus().isFailure()).isFalse();
         assertThat(result.getStatus().isSkip()).isFalse();
-        assertThat(result.getElapsedTime()).isEqualTo(Duration.ZERO);
+        assertThat(result.getRunDuration()).isEqualTo(Duration.ZERO);
         assertThat(result.getStatus().getDisplayName()).isEqualTo("STAGED");
     }
 
     @Test
-    @DisplayName("creates passing result via status and elapsed time setters")
+    @DisplayName("creates passing result via status and run duration setters")
     void createsPassingResultViaSetters() {
         Action action = Noop.of("test");
         var timing = Duration.ofMillis(100);
 
         DefaultResult result = new DefaultResult(action);
         result.setStatus(DefaultStatus.PASS);
-        result.setElapsedTime(timing);
+        result.setRunDuration(timing);
 
         assertThat(result.getStatus().isPass()).isTrue();
-        assertThat(result.getElapsedTime()).isEqualTo(timing);
+        assertThat(result.getRunDuration()).isEqualTo(timing);
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(result.getStatus().getMessage()).isEmpty();
     }
@@ -68,10 +68,10 @@ class ResultTest {
 
         DefaultResult result = new DefaultResult(action);
         result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, failure));
-        result.setElapsedTime(timing);
+        result.setRunDuration(timing);
 
         assertThat(result.getStatus().isFailure()).isTrue();
-        assertThat(result.getElapsedTime()).isEqualTo(timing);
+        assertThat(result.getRunDuration()).isEqualTo(timing);
         assertThat(result.getStatus().getThrowable()).contains(failure);
         assertThat(result.getStatus().getMessage()).contains("test failure");
     }
@@ -84,10 +84,10 @@ class ResultTest {
 
         DefaultResult result = new DefaultResult(action);
         result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, "failure message"));
-        result.setElapsedTime(timing);
+        result.setRunDuration(timing);
 
         assertThat(result.getStatus().isFailure()).isTrue();
-        assertThat(result.getElapsedTime()).isEqualTo(timing);
+        assertThat(result.getRunDuration()).isEqualTo(timing);
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(result.getStatus().getMessage()).contains("failure message");
     }
@@ -100,10 +100,10 @@ class ResultTest {
 
         DefaultResult result = new DefaultResult(action);
         result.setStatus(DefaultStatus.SKIP);
-        result.setElapsedTime(timing);
+        result.setRunDuration(timing);
 
         assertThat(result.getStatus().isSkip()).isTrue();
-        assertThat(result.getElapsedTime()).isEqualTo(timing);
+        assertThat(result.getRunDuration()).isEqualTo(timing);
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(result.getStatus().getMessage()).isEmpty();
     }
@@ -116,10 +116,10 @@ class ResultTest {
 
         DefaultResult result = new DefaultResult(action);
         result.setStatus(new DefaultStatus(DefaultStatus.Kind.SKIP, "skipped for reason"));
-        result.setElapsedTime(timing);
+        result.setRunDuration(timing);
 
         assertThat(result.getStatus().isSkip()).isTrue();
-        assertThat(result.getElapsedTime()).isEqualTo(timing);
+        assertThat(result.getRunDuration()).isEqualTo(timing);
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(result.getStatus().getMessage()).contains("skipped for reason");
     }
@@ -134,7 +134,7 @@ class ResultTest {
         var result = new DefaultResult(action, status, timing);
 
         assertThat(result.getStatus()).isSameAs(status);
-        assertThat(result.getElapsedTime()).isEqualTo(timing);
+        assertThat(result.getRunDuration()).isEqualTo(timing);
         assertThat(result.getStatus().getThrowable()).isEmpty();
         assertThat(result.getStatus().getMessage()).isEmpty();
     }
@@ -151,14 +151,14 @@ class ResultTest {
     }
 
     @Test
-    @DisplayName("of factory rejects null timing")
-    void ofFactoryRejectsNullTiming() {
+    @DisplayName("of factory rejects null run duration")
+    void ofFactoryRejectsNullRunDuration() {
         Action action = Noop.of("test");
         var status = DefaultStatus.PASS;
 
         assertThatThrownBy(() -> new DefaultResult(action, status, null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("elapsedTime must not be null");
+                .hasMessage("runDuration must not be null");
     }
 
     @Test
@@ -178,7 +178,7 @@ class ResultTest {
         Action action = Noop.of("test");
         DefaultResult result = new DefaultResult(action);
         result.setStatus(DefaultStatus.PASS);
-        result.setElapsedTime(Duration.ofMillis(123));
+        result.setRunDuration(Duration.ofMillis(123));
 
         assertThat(result.toString()).isEqualTo("PASS | 123 ms");
     }
@@ -199,18 +199,13 @@ class ResultTest {
         DefaultResult parentResult = new DefaultResult(Noop.of("parent"));
         Result nonDefaultResult = new Result() {
             @Override
+            public Duration getRunDuration() {
+                return Duration.ZERO;
+            }
+
+            @Override
             public Status getStatus() {
                 return DefaultStatus.PASS;
-            }
-
-            @Override
-            public Duration getElapsedTime() {
-                return Duration.ZERO;
-            }
-
-            @Override
-            public Duration getCumulativeElapsedTime() {
-                return Duration.ZERO;
             }
 
             @Override
@@ -236,8 +231,8 @@ class ResultTest {
     }
 
     @Test
-    @DisplayName("getCumulativeElapsedTime sums nested children")
-    void getCumulativeElapsedTimeSumsNestedChildren() {
+    @DisplayName("getRunDuration returns own duration for composed result")
+    void getRunDurationReturnsOwnDurationForComposedResult() {
         Action parent = Noop.of("parent");
         Action child1 = Noop.of("child1");
         Action child2 = Noop.of("child2");
@@ -245,27 +240,27 @@ class ResultTest {
         DefaultResult parentResult = new DefaultResult(parent);
         DefaultResult childResult1 = new DefaultResult(child1);
         childResult1.setStatus(DefaultStatus.PASS);
-        childResult1.setElapsedTime(Duration.ofMillis(100));
+        childResult1.setRunDuration(Duration.ofMillis(100));
         DefaultResult childResult2 = new DefaultResult(child2);
         childResult2.setStatus(DefaultStatus.PASS);
-        childResult2.setElapsedTime(Duration.ofMillis(200));
+        childResult2.setRunDuration(Duration.ofMillis(200));
 
         parentResult.addChild(childResult1);
         parentResult.addChild(childResult2);
         parentResult.setStatus(DefaultStatus.PASS);
-        parentResult.setElapsedTime(Duration.ofMillis(50));
+        parentResult.setRunDuration(Duration.ofMillis(50));
 
-        assertThat(parentResult.getCumulativeElapsedTime()).isEqualTo(Duration.ofMillis(300));
+        assertThat(parentResult.getRunDuration()).isEqualTo(Duration.ofMillis(50));
     }
 
     @Test
-    @DisplayName("getCumulativeElapsedTime returns own time when leaf")
-    void getCumulativeElapsedTimeReturnsOwnTimeWhenLeaf() {
+    @DisplayName("getRunDuration returns own duration when leaf")
+    void getRunDurationReturnsOwnDurationWhenLeaf() {
         DefaultResult result = new DefaultResult(Noop.of("test"));
         result.setStatus(DefaultStatus.PASS);
-        result.setElapsedTime(Duration.ofMillis(42));
+        result.setRunDuration(Duration.ofMillis(42));
 
-        assertThat(result.getCumulativeElapsedTime()).isEqualTo(Duration.ofMillis(42));
+        assertThat(result.getRunDuration()).isEqualTo(Duration.ofMillis(42));
     }
 
     @Test
@@ -287,12 +282,12 @@ class ResultTest {
     }
 
     @Test
-    @DisplayName("setElapsedTime rejects null")
-    void setElapsedTimeRejectsNull() {
+    @DisplayName("setRunDuration rejects null")
+    void setRunDurationRejectsNull() {
         DefaultResult result = new DefaultResult(Noop.of("test"));
 
-        assertThatThrownBy(() -> result.setElapsedTime(null))
+        assertThatThrownBy(() -> result.setRunDuration(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("elapsedTime must not be null");
+                .hasMessage("runDuration must not be null");
     }
 }

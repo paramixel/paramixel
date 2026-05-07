@@ -67,3 +67,29 @@ jobs:
         run: |
           echo "Testing complete for: $RUNNER_DESCRIPTION"
           echo "Java version used: $JAVA_VERSION"
+
+  gradle-plugin-build:
+    name: Gradle Plugin Build (Java 17)
+    runs-on:
+      group: Default
+      labels: runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: corretto
+          cache: maven
+          cache-dependency-path: '**/pom.xml'
+
+      - name: Install Maven dependencies
+        run: ./mvnw -B clean install -Dparamixel.skipTests -pl core -am
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
+
+      - name: Build Gradle Plugin
+        run: chmod +x gradle-plugin/build.sh && JAVA_17_HOME=$JAVA_HOME ./gradle-plugin/build.sh
