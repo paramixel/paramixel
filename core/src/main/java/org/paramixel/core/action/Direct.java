@@ -18,7 +18,9 @@ package org.paramixel.core.action;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
+import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.exception.FailException;
@@ -34,29 +36,106 @@ import org.paramixel.core.support.Arguments;
  * Throwing {@link SkipException} marks the action as skipped, throwing {@link FailException} marks it as failed, and
  * any other non-{@link Error} throwable is reported to the listener and converted into a failure result.
  */
-public class Direct extends LeafAction {
+public class Direct extends AbstractAction {
 
     protected final Executable executable;
 
-    protected Direct(String name, Executable executable) {
+    protected Direct(String name, Executable executable, Action.ContextMode contextMode) {
+        super(contextMode);
         this.name = validateName(name);
-        this.executable = executable;
+        this.executable = Objects.requireNonNull(executable, "executable must not be null");
     }
 
     /**
-     * Creates a direct action.
+     * Creates a new builder for composing a direct action.
      *
      * @param name the action name
-     * @param executable the callback to execute
-     * @return a new direct action
+     * @return a new direct action builder
      */
-    public static Direct of(String name, Executable executable) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(executable, "executable must not be null");
-        Direct instance = new Direct(name, executable);
-        instance.initialize();
-        return instance;
+    public static Builder builder(String name) {
+        return new Builder(name);
+    }
+
+    @Override
+    public List<Action> getChildren() {
+        return List.of();
+    }
+
+    @Override
+    public void addChild(Action child) {
+        throw new UnsupportedOperationException("direct action cannot have children");
+    }
+
+    @Override
+    protected Result skipSelf(Context context) {
+        DefaultResult result = new DefaultResult(this);
+        result.setStatus(DefaultStatus.SKIP);
+        result.setRunDuration(Duration.ZERO);
+        context.getListener().skipAction(result);
+        return result;
+    }
+
+    /**
+     * Fluent builder for {@link Direct} actions.
+     */
+    public static final class Builder {
+
+        private final String name;
+        private Action.ContextMode contextMode = Action.ContextMode.ISOLATED;
+        private Executable executable;
+        private boolean built;
+
+        private Builder(String name) {
+            Objects.requireNonNull(name, "name must not be null");
+            Arguments.requireNonBlank(name, "name must not be blank");
+            this.name = name;
+        }
+
+        /**
+         * Sets the context mode for this action.
+         *
+         * @param contextMode the context mode
+         * @return this builder
+         */
+        public Builder contextMode(Action.ContextMode contextMode) {
+            ensureNotBuilt();
+            this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
+            return this;
+        }
+
+        /**
+         * Sets the callback to execute.
+         *
+         * @param executable the callback to execute
+         * @return this builder
+         */
+        public Builder execute(Executable executable) {
+            ensureNotBuilt();
+            this.executable = Objects.requireNonNull(executable, "executable must not be null");
+            return this;
+        }
+
+        /**
+         * Builds a new direct action.
+         *
+         * @return a new direct action
+         */
+        public Direct build() {
+            ensureNotBuilt();
+            built = true;
+            if (executable == null) {
+                throw new IllegalStateException("executable must be configured");
+            }
+            Direct instance = new Direct(name, executable, contextMode);
+            instance.initialize();
+            return instance;
+        }
+
+        private void ensureNotBuilt() {
+            if (built) {
+                throw new IllegalStateException("builder already built");
+            }
+        }
     }
 
     /**
@@ -66,27 +145,26 @@ public class Direct extends LeafAction {
      * @return the execution result
      */
     @Override
-    public Result execute(Context context) {
-        Objects.requireNonNull(context, "context must not be null");
+    protected Result executeSelf(Context context) {
         DefaultResult result = new DefaultResult(this);
         context.getListener().beforeAction(result);
         Instant start = Instant.now();
         try {
             executable.execute(context);
             result.setStatus(DefaultStatus.PASS);
-            result.setElapsedTime(Duration.between(start, Instant.now()));
+            result.setRunDuration(Duration.between(start, Instant.now()));
         } catch (SkipException e) {
             result.setStatus(new DefaultStatus(DefaultStatus.Kind.SKIP, e.getMessage()));
-            result.setElapsedTime(Duration.between(start, Instant.now()));
+            result.setRunDuration(Duration.between(start, Instant.now()));
         } catch (FailException e) {
             result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getMessage()));
-            result.setElapsedTime(Duration.between(start, Instant.now()));
+            result.setRunDuration(Duration.between(start, Instant.now()));
         } catch (Error e) {
             throw e;
         } catch (Throwable t) {
             context.getListener().actionThrowable(result, t);
             result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, t));
-            result.setElapsedTime(Duration.between(start, Instant.now()));
+            result.setRunDuration(Duration.between(start, Instant.now()));
         }
         context.getListener().afterAction(result);
         return result;

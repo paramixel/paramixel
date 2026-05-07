@@ -17,28 +17,21 @@ For most custom actions, extending `AbstractAction` is the simplest option becau
 
 - ID generation (4-character unique string) and name handling
 - parent tracking (atomic, one-time-only assignment with self-parent and re-assignment checks)
-- default `skip(Context)` behavior
-- shared child validation for composite actions
+- default `execute(Context)` and `skip(Context)` behavior
 
 ### Action hierarchy
 
 ```
 Action (interface)
   └─ AbstractAction (abstract)
-       ├─ LeafAction (abstract) — no children
-       │    ├─ Direct — takes Executable callback
-       │    └─ Noop — always passes
-       └─ BranchAction (abstract) — has children
-           ├─ Sequential
-           ├─ DependentSequential
-           ├─ RandomSequential
-           ├─ DependentRandomSequential
-           ├─ Parallel
-           └─ Lifecycle
+       ├─ Direct — takes Executable callback
+       ├─ Noop — always passes
+       ├─ Container
+       └─ Parallel
 ```
 
-- `LeafAction` provides `skip()` that returns a single skipped result
-- `BranchAction` provides `skip()` that recursively skips all children and `computeStatus(List<Result>)` for computing parent status from children
+- `Direct` and `Noop` provide `skip()` that returns a single skipped result and reject child actions
+- `Container` and `Parallel` provide `skip()` that recursively skips all children and compute aggregate status
 
 If you implement `Action` directly, your implementation must:
 

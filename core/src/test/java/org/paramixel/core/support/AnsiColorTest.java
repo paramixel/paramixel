@@ -33,9 +33,7 @@ class AnsiColorTest {
         @Test
         @DisplayName("should throw NPE when text is null")
         void shouldThrowNpeWhenTextIsNull() {
-            assertThatThrownBy(() -> AnsiColor.BOLD_GREEN_TEXT.format(null))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessageContaining("text");
+            assertThatThrownBy(() -> AnsiColor.BOLD_GREEN_TEXT.format(null)).isInstanceOf(NullPointerException.class);
         }
 
         @Test

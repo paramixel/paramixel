@@ -36,7 +36,7 @@ Notes:
 - `Configuration.defaultProperties()` sets it to `Runtime.getRuntime().availableProcessors()` when absent.
 - `Runner` uses this value to size its thread pools and to detect potential nested-parallel deadlocks.
 - `Resolver` uses this value as the parallelism for discovered `Parallel` roots.
-- Individual `Parallel` actions can also set an explicit per-node limit with `Parallel.of(name, parallelism, ...)`.
+- Individual `Parallel` actions can also set an explicit per-node limit with `Parallel.builder(name).parallelism(...)`.
 
 ### `paramixel.failureOnSkip`
 
@@ -52,36 +52,40 @@ Notes:
 - This affects `Runner.runAndReturnExitCode(Action)`, `Runner.runAndReturnExitCode(Selector)`, and the Maven plugin.
 - In the Maven plugin, this corresponds to the `<failureOnSkip>` POM parameter or `-Dparamixel.failureOnSkip=true` system property.
 
-### `paramixel.report.enabled`
+### `paramixel.report.file`
 
-Controls whether Paramixel writes a per-run plain-text summary file.
+Controls the file used for the summary report. When absent or blank, no report file is written.
 
 ```properties
-paramixel.report.enabled=true
+paramixel.report.file=target/paramixel/paramixel.json
 ```
 
 Notes:
 
-- Default is `false`.
-- When `true`, Paramixel writes a summary tree file at the end of each run.
+- The configured file is overwritten on each run.
+- Parent directories are created on demand.
 - Console output remains unchanged.
 - The file contains the summary tree and footer only. It does not include per-action status lines or stack traces.
 - If the report file cannot be created, Paramixel prints a warning to `System.err` and continues the run.
+- Tilde (`~`) expansion is supported on Linux and macOS: `~` expands to the current user's home directory, `~/path` expands relative to the home directory, and `~user` expands to another user's home directory (if that user exists). On Windows, tilde expansion is a no-op and the path is used as-is.
 
-### `paramixel.report.directory`
+### `paramixel.report.format`
 
-Controls the directory used for per-run summary files.
+Controls the summary report format when explicit control is needed.
 
 ```properties
-paramixel.report.directory=target/paramixel
+paramixel.report.file=target/paramixel/report.out
+paramixel.report.format=json
 ```
 
 Notes:
 
-- In the Maven plugin, the default is `${project.build.directory}/paramixel`.
-- When used via `Factory.defaultListener(configuration)`, the default is `target/paramixel` if the key is absent.
-- The directory is created on demand.
-- Each run writes a file named `paramixel_<yyyyMMdd-HHmmss>.log`.
+- Supported values are `text`, `json`, `xml`, and `html`.
+- Values are case-insensitive.
+- When absent or blank, the format is inferred from `paramixel.report.file`.
+- `.log` and `.txt` infer `text`; `.json` infers `json`; `.xml` infers `xml`; `.html` infers `html`.
+- Unknown or missing extensions default to `text`.
+- An explicit format wins over the file extension.
 
 ### `paramixel.match.package`
 
@@ -118,9 +122,13 @@ When set, only action factories annotated with a matching `@Paramixel.Tag` are i
 Prefer `Context#getConfiguration()`.
 
 ```java
-Direct.of("print config", context -> {
-    String value = context.getConfiguration().get("my.custom.property");
-});
+private static Action printConfig() {
+    return Direct.builder("print config")
+            .execute(context -> {
+                String value = context.getConfiguration().get("my.custom.property");
+            })
+            .build();
+}
 ```
 
 ## `paramixel.properties`
@@ -182,8 +190,7 @@ Example:
 
 ```xml
 <configuration>
-    <reportEnabled>true</reportEnabled>
-    <reportDirectory>${project.build.directory}/paramixel</reportDirectory>
+    <reportFile>${project.build.directory}/paramixel/paramixel.json</reportFile>
     <properties>
         <property>
             <key>paramixel.parallelism</key>
@@ -198,8 +205,8 @@ Plugin flags:
 ```bash
 ./mvnw test -Dparamixel.skipTests=true
 ./mvnw test -Dparamixel.failIfNoTests=true
-./mvnw test -Dparamixel.report.enabled=true
-./mvnw test -Dparamixel.report.directory=target/paramixel-report
+./mvnw test -Dparamixel.report.file=target/paramixel/paramixel.json
+./mvnw test -Dparamixel.report.file=target/paramixel/report.out -Dparamixel.report.format=json
 ```
 
 `paramixel.skipTests` and `paramixel.failIfNoTests` are Maven plugin parameters, not core `Configuration` keys.

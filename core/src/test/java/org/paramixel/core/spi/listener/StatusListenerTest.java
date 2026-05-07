@@ -27,15 +27,16 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
 import org.paramixel.core.Runner;
+import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Noop;
-import org.paramixel.core.action.Sequential;
+import org.paramixel.core.action.Parallel;
 import org.paramixel.core.support.AnsiColor;
 
 @DisplayName("StatusListener")
 class StatusListenerTest {
 
-    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+    private static final String ROOT_NAME = Constants.ROOT_NAME;
 
     @Test
     @DisplayName("constructor returns non-null instance")
@@ -70,25 +71,25 @@ class StatusListenerTest {
         }
 
         @Test
-        @DisplayName("suppresses output for hidden root action")
-        void suppressesOutputForHiddenRoot() {
+        @DisplayName("suppresses output for root action")
+        void suppressesOutputForRoot() {
             StatusListener listener = new StatusListener();
-            Action hiddenRoot = Direct.of(HIDDEN_ROOT, context -> {});
             Action child = Noop.of("child");
-            Sequential seq = Sequential.of(HIDDEN_ROOT, child);
+            Parallel parallel =
+                    Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
             try {
                 System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
-                runner.run(seq);
+                runner.run(parallel);
             } finally {
                 System.setOut(originalOut);
             }
 
             String result = output.toString(StandardCharsets.UTF_8);
-            assertThat(result).doesNotContain("TEST | " + HIDDEN_ROOT);
+            assertThat(result).doesNotContain("RUN  | " + ROOT_NAME);
         }
     }
 
@@ -120,9 +121,11 @@ class StatusListenerTest {
         @DisplayName("prints FAIL status with red color")
         void printsFailStatusWithRedColor() {
             StatusListener listener = new StatusListener();
-            Action action = Direct.of("failing-action", context -> {
-                throw new RuntimeException("fail");
-            });
+            Action action = Direct.builder("failing-action")
+                    .execute(context -> {
+                        throw new RuntimeException("fail");
+                    })
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -142,9 +145,11 @@ class StatusListenerTest {
         @DisplayName("prints SKIP status with orange color")
         void printsSkipStatusWithOrangeColor() {
             StatusListener listener = new StatusListener();
-            Action action = Direct.of("skipping-action", context -> {
-                throw org.paramixel.core.exception.SkipException.of("skipped");
-            });
+            Action action = Direct.builder("skipping-action")
+                    .execute(context -> {
+                        throw org.paramixel.core.exception.SkipException.of("skipped");
+                    })
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -161,23 +166,26 @@ class StatusListenerTest {
         }
 
         @Test
-        @DisplayName("suppresses output for hidden root in afterAction")
-        void suppressesOutputForHiddenRootInAfterAction() {
+        @DisplayName("suppresses output for root in afterAction")
+        void suppressesOutputForRootInAfterAction() {
             StatusListener listener = new StatusListener();
-            Sequential seq = Sequential.of(HIDDEN_ROOT, Noop.of("child"));
+            Parallel parallel = Parallel.builder(ROOT_NAME)
+                    .parallelism(1)
+                    .child(Noop.of("child"))
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
             try {
                 System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
-                runner.run(seq);
+                runner.run(parallel);
             } finally {
                 System.setOut(originalOut);
             }
 
             String result = output.toString(StandardCharsets.UTF_8);
-            assertThat(result).doesNotContain(HIDDEN_ROOT);
+            assertThat(result).doesNotContain(ROOT_NAME);
         }
     }
 
@@ -189,9 +197,11 @@ class StatusListenerTest {
         @DisplayName("prints EXCEPTION line to System.err")
         void printsExceptionLineToStderr() {
             StatusListener listener = new StatusListener();
-            Action action = Direct.of("error-action", context -> {
-                throw new RuntimeException("action error");
-            });
+            Action action = Direct.builder("error-action")
+                    .execute(context -> {
+                        throw new RuntimeException("action error");
+                    })
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream outputErr = new ByteArrayOutputStream();
@@ -211,13 +221,18 @@ class StatusListenerTest {
         }
 
         @Test
-        @DisplayName("suppresses output for hidden root in actionThrowable")
-        void suppressesOutputForHiddenRootInActionThrowable() {
+        @DisplayName("suppresses output for root in actionThrowable")
+        void suppressesOutputForRootInActionThrowable() {
             StatusListener listener = new StatusListener();
-            Action failingChild = Direct.of("child-fail", context -> {
-                throw new RuntimeException("child error");
-            });
-            Sequential seq = Sequential.of(HIDDEN_ROOT, failingChild);
+            Action failingChild = Direct.builder("child-fail")
+                    .execute(context -> {
+                        throw new RuntimeException("child error");
+                    })
+                    .build();
+            Parallel parallel = Parallel.builder(ROOT_NAME)
+                    .parallelism(1)
+                    .child(failingChild)
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream outputErr = new ByteArrayOutputStream();
@@ -225,14 +240,14 @@ class StatusListenerTest {
             PrintStream originalOut = System.out;
             try {
                 System.setErr(new PrintStream(outputErr, true, StandardCharsets.UTF_8));
-                runner.run(seq);
+                runner.run(parallel);
             } finally {
                 System.setErr(originalErr);
                 System.setOut(originalOut);
             }
 
             String errResult = outputErr.toString(StandardCharsets.UTF_8);
-            assertThat(errResult).doesNotContain(HIDDEN_ROOT);
+            assertThat(errResult).doesNotContain(ROOT_NAME);
         }
     }
 
@@ -264,14 +279,14 @@ class StatusListenerTest {
         @DisplayName("shows FQCN for non-core package action classes")
         void showsFQCNForNonCorePackageActionClasses() {
             StatusListener listener = new StatusListener();
-            Action customAction = Noop.of("custom");
+            Action custom = Noop.of("custom");
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
             try {
                 System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
-                runner.run(customAction);
+                runner.run(custom);
             } finally {
                 System.setOut(originalOut);
             }
@@ -281,18 +296,19 @@ class StatusListenerTest {
         }
 
         @Test
-        @DisplayName("id path excludes hidden root ancestors")
-        void idPathExcludesHiddenRootAncestors() {
+        @DisplayName("id path excludes root ancestors")
+        void idPathExcludesRootAncestors() {
             StatusListener listener = new StatusListener();
             Action child = Noop.of("visible-child");
-            Sequential seq = Sequential.of(HIDDEN_ROOT, child);
+            Parallel parallel =
+                    Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
             try {
                 System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
-                runner.run(seq);
+                runner.run(parallel);
             } finally {
                 System.setOut(originalOut);
             }
@@ -304,29 +320,30 @@ class StatusListenerTest {
                     .findFirst()
                     .orElse("");
             assertThat(childLine).contains(child.getId());
-            assertThat(childLine).doesNotContain(HIDDEN_ROOT);
+            assertThat(childLine).doesNotContain(ROOT_NAME);
         }
 
         @Test
-        @DisplayName("action path excludes hidden root ancestors")
-        void actionPathExcludesHiddenRootAncestors() {
+        @DisplayName("action path excludes root ancestors")
+        void actionPathExcludesRootAncestors() {
             StatusListener listener = new StatusListener();
             Action child = Noop.of("visible-child");
-            Sequential seq = Sequential.of(HIDDEN_ROOT, child);
+            Parallel parallel =
+                    Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             PrintStream originalOut = System.out;
             try {
                 System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
-                runner.run(seq);
+                runner.run(parallel);
             } finally {
                 System.setOut(originalOut);
             }
 
             String result = output.toString(StandardCharsets.UTF_8);
             assertThat(result).contains("visible-child");
-            assertThat(result).doesNotContain(HIDDEN_ROOT);
+            assertThat(result).doesNotContain(ROOT_NAME);
         }
 
         @Test
@@ -334,7 +351,12 @@ class StatusListenerTest {
         void nestedActionIdPathIncludesParentId() {
             StatusListener listener = new StatusListener();
             Action child = Noop.of("child");
-            Sequential parent = Sequential.of("parent", child);
+            Container parent = Container.builder("parent")
+                    .policy(Container.Policy.builder()
+                            .childMode(Container.ChildMode.INDEPENDENT)
+                            .build())
+                    .child(child)
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -359,7 +381,12 @@ class StatusListenerTest {
         void nestedActionPathIncludesParentName() {
             StatusListener listener = new StatusListener();
             Action child = Noop.of("child");
-            Sequential parent = Sequential.of("parent", child);
+            Container parent = Container.builder("parent")
+                    .policy(Container.Policy.builder()
+                            .childMode(Container.ChildMode.INDEPENDENT)
+                            .build())
+                    .child(child)
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -380,8 +407,18 @@ class StatusListenerTest {
         void deepNestingProducesFullHierarchicalPath() {
             StatusListener listener = new StatusListener();
             Action leaf = Noop.of("leaf");
-            Action mid = Sequential.of("mid", leaf);
-            Action top = Sequential.of("top", mid);
+            Action mid = Container.builder("mid")
+                    .policy(Container.Policy.builder()
+                            .childMode(Container.ChildMode.INDEPENDENT)
+                            .build())
+                    .child(leaf)
+                    .build();
+            Action top = Container.builder("top")
+                    .policy(Container.Policy.builder()
+                            .childMode(Container.ChildMode.INDEPENDENT)
+                            .build())
+                    .child(mid)
+                    .build();
             Runner runner = Runner.builder().listener(listener).build();
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();

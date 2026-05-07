@@ -16,6 +16,7 @@
 
 package org.paramixel.core.spi.listener;
 
+import org.paramixel.core.Version;
 import org.paramixel.core.support.AnsiColor;
 
 /**
@@ -32,6 +33,11 @@ public class Constants {
      * Plain-text prefix used for non-ANSI Paramixel output lines.
      */
     public static final String PARAMIXEL_PLAIN = "[PARAMIXEL] ";
+
+    /**
+     * Name used for the synthetic root action created by the resolver.
+     */
+    public static final String ROOT_NAME = "Paramixel v" + Version.getVersion();
 
     private Constants() {}
 }

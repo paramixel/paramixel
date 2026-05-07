@@ -35,6 +35,17 @@ import java.util.Optional;
 public interface Action {
 
     /**
+     * Controls how an action scopes the {@link Context} it receives from its parent.
+     */
+    enum ContextMode {
+        /** Execute with a fresh child context whose parent is the received context. */
+        ISOLATED,
+
+        /** Execute with the same context instance received from the parent action. */
+        SHARED
+    }
+
+    /**
      * Returns the identifier for this action.
      *
      * <p>Identifiers are typically used for reporting, selection, and correlating an {@link Action} with its
@@ -78,6 +89,13 @@ public interface Action {
      * @return the child actions in the order maintained by the implementation
      */
     List<Action> getChildren();
+
+    /**
+     * Returns this action's context scoping mode.
+     *
+     * @return the context mode used when this action executes or skips
+     */
+    ContextMode contextMode();
 
     /**
      * Executes this action using the supplied execution context.

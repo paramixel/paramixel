@@ -5,7 +5,7 @@ description: Quick reference for the public Paramixel API.
 
 # API Reference
 
-This page is a compact map of the v2.0.0 public API.
+This page is a compact map of the 3.x public API.
 
 ## Core types
 
@@ -58,6 +58,9 @@ interface Action {
     List<Action> getChildren();
     Result execute(Context context);
     Result skip(Context context);
+    ContextMode contextMode();
+
+    enum ContextMode { ISOLATED, SHARED }
 }
 ```
 
@@ -68,16 +71,10 @@ Action hierarchy:
 ```
 Action (interface)
   └─ AbstractAction (abstract)
-       ├─ LeafAction (abstract)
-       │    ├─ Direct
-       │    └─ Noop
-       └─ BranchAction (abstract)
-            ├─ Sequential
-            ├─ DependentSequential
-            ├─ RandomSequential
-            ├─ DependentRandomSequential
-            ├─ Parallel
-            └─ Lifecycle
+       ├─ Direct
+       ├─ Noop
+       ├─ Container
+       └─ Parallel
 ```
 
 ### `Context`
@@ -104,12 +101,11 @@ interface Result {
     List<Result> getChildren();
     Action getAction();
     Status getStatus();
-    Duration getElapsedTime();
-    Duration getCumulativeElapsedTime();
+    Duration getRunDuration();
 }
 ```
 
-Results form a tree that mirrors the action tree. `getCumulativeElapsedTime()` returns `getElapsedTime()` for leaf actions and the sum of children's cumulative elapsed times for branch actions.
+Results form a tree that mirrors the action tree. `getRunDuration()` returns the wall-clock time of the full execute or skip.
 
 ### `Status`
 
@@ -193,7 +189,7 @@ interface Listener {
 
 All callbacks receive `Result` (not `Context` + `Action`). Use `result.getAction()` to access the action.
 
-Built-in implementations in `org.paramixel.core.spi.listener`: `SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`, `TableSummaryRenderer`.
+Built-in implementations in `org.paramixel.core.spi.listener`: `SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`.
 
 ### `Selector`
 
@@ -291,11 +287,17 @@ All in `org.paramixel.core.action`:
 
 | Class | Extends | Description |
 |---|---|---|
-| `Direct` | `LeafAction` | Execute a callback |
-| `Noop` | `LeafAction` | Do nothing and pass |
-| `Sequential` | `BranchAction` | Run all children in order |
-| `DependentSequential` | `BranchAction` | Stop on first failure |
-| `RandomSequential` | `BranchAction` | Shuffled run-all |
-| `DependentRandomSequential` | `BranchAction` | Shuffled fail-fast |
-| `Parallel` | `BranchAction` | Concurrent execution |
-| `Lifecycle` | `BranchAction` | before/main/after |
+| `Direct` | `AbstractAction` | Execute a callback |
+| `Noop` | `AbstractAction` | Do nothing and pass |
+| `Container` | `AbstractAction` | Ordered composition with optional setup, teardown, and policy |
+| `Parallel` | `AbstractAction` | Concurrent execution |
+
+Executable and composition actions expose one-shot builders that require a name up front and validate method arguments immediately:
+
+```java
+Direct.builder(String name).execute(Direct.Executable executable).build();
+Container.builder(String name).before(Action before).child(Action child).after(Action after).build();
+Parallel.builder(String name).parallelism(int parallelism).executorService(ExecutorService executorService).child(Action child).build();
+```
+
+`Noop.of(...)` remains the compact factory for no-op actions.

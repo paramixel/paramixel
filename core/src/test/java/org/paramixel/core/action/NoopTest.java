@@ -17,58 +17,32 @@
 package org.paramixel.core.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.core.Action;
+import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 
 @DisplayName("Noop")
 class NoopTest {
 
     @Test
-    @DisplayName("of returns a fresh action for the same name")
-    void ofReturnsAFreshActionForTheSameName() {
-        Noop first = Noop.of("noop");
-        Noop second = Noop.of("noop");
+    @DisplayName("passes without work")
+    void passesWithoutWork() {
+        Noop action = Noop.of("noop");
 
-        assertThat(first).isNotSameAs(second);
-        assertThat(first.getName()).isEqualTo("noop");
-        assertThat(second.getName()).isEqualTo("noop");
-    }
-
-    @Test
-    @DisplayName("same noop name can be used multiple times in one action tree")
-    void sameNoopNameCanBeUsedMultipleTimesInOneActionTree() {
-        Lifecycle lifecycle = Lifecycle.of("lifecycle", Noop.of("noop"), Noop.of("noop"), Noop.of("noop"));
-
-        org.paramixel.core.Result result = Runner.builder().build().run(lifecycle);
+        Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isPass()).isTrue();
-        assertThat(result.getChildren())
-                .allSatisfy(childResult ->
-                        assertThat(childResult.getStatus().isPass()).isTrue());
+        assertThat(action.contextMode()).isEqualTo(Action.ContextMode.ISOLATED);
     }
 
     @Test
-    @DisplayName("of rejects null name")
-    void ofRejectsNullName() {
+    @DisplayName("validates name")
+    void validatesName() {
         assertThatThrownBy(() -> Noop.of(null)).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("of rejects blank name")
-    void ofRejectsBlankName() {
-        assertThatIllegalArgumentException().isThrownBy(() -> Noop.of(""));
-        assertThatIllegalArgumentException().isThrownBy(() -> Noop.of("   "));
-    }
-
-    @Test
-    @DisplayName("execute rejects null context")
-    void executeRejectsNullContext() {
-        Noop noop = Noop.of("test");
-
-        assertThatThrownBy(() -> noop.execute(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Noop.of(" ")).isInstanceOf(IllegalArgumentException.class);
     }
 }

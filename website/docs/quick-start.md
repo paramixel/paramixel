@@ -59,20 +59,33 @@ See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel)
 ```java
 import org.paramixel.core.Action;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Sequential;
 
 public class ExampleTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        return Sequential.of(
-                "ExampleTest",
-                Direct.of("first", context -> {}),
-                Direct.of("second", context -> {}));
+        Action first = first();
+        Action second = second();
+
+        return Container.builder("ExampleTest")
+                .child(first)
+                .child(second)
+                .build();
+    }
+
+    private static Action first() {
+        return Direct.builder("first").execute(context -> {}).build();
+    }
+
+    private static Action second() {
+        return Direct.builder("second").execute(context -> {}).build();
     }
 }
 ```
+
+Each action is created by a `private static` method, making it easy to navigate from the IDE outline. See [Action Composition: Action factory method pattern](usage/action-composition.md#action-factory-method-pattern) for more details.
 
 ## Run with Maven
 
@@ -87,10 +100,10 @@ The plugin discovers `@Paramixel.ActionFactory` methods on the test classpath an
 To also write a per-run summary file:
 
 ```bash
-./mvnw test -Dparamixel.report.enabled=true
+./mvnw test -Dparamixel.report.file=target/paramixel/paramixel.log
 ```
 
-By default the file is written under `target/paramixel/` with a name like `paramixel_20260504-123456.log`.
+The file extension controls the report format: `.log` and `.txt` write text, `.json` writes JSON, `.xml` writes XML, and `.html` writes a self-contained HTML report.
 
 ## Run directly from `main`
 
@@ -120,8 +133,8 @@ A `Runner` can execute multiple actions. Each `run()` call is independent:
 
 ```java
 Runner runner = Runner.builder().build();
-Result first  = runner.run(firstAction);
-Result second = runner.run(secondAction);
+Result first  = runner.run(first);
+Result second = runner.run(second);
 // Owned executors are created and shut down per run
 ```
 

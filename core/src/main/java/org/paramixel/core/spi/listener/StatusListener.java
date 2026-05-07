@@ -35,7 +35,7 @@ import org.paramixel.core.support.AnsiColor;
  */
 public class StatusListener implements Listener {
 
-    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+    private static final String ROOT_NAME = Constants.ROOT_NAME;
 
     private static final Object OUTPUT_LOCK = new Object();
 
@@ -47,7 +47,7 @@ public class StatusListener implements Listener {
     @Override
     public void beforeAction(Result result) {
         Objects.requireNonNull(result, "result must not be null");
-        if (HIDDEN_ROOT.equals(result.getAction().getName())) {
+        if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
         String output = Constants.PARAMIXEL + "RUN  | " + buildIdPath(result) + " | " + buildDisplayName(result);
@@ -59,7 +59,7 @@ public class StatusListener implements Listener {
     @Override
     public void afterAction(Result result) {
         Objects.requireNonNull(result, "result must not be null");
-        if (HIDDEN_ROOT.equals(result.getAction().getName())) {
+        if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
         String output = Constants.PARAMIXEL
@@ -69,7 +69,7 @@ public class StatusListener implements Listener {
                 + " | "
                 + buildDisplayName(result)
                 + " "
-                + formatTiming(result.getElapsedTime());
+                + formatTiming(result.getRunDuration());
         synchronized (OUTPUT_LOCK) {
             System.out.println(output);
         }
@@ -78,7 +78,7 @@ public class StatusListener implements Listener {
     @Override
     public void skipAction(Result result) {
         Objects.requireNonNull(result, "result must not be null");
-        if (HIDDEN_ROOT.equals(result.getAction().getName())) {
+        if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
         String output = Constants.PARAMIXEL
@@ -88,7 +88,7 @@ public class StatusListener implements Listener {
                 + " | "
                 + buildDisplayName(result)
                 + " "
-                + formatTiming(result.getElapsedTime());
+                + formatTiming(result.getRunDuration());
         synchronized (OUTPUT_LOCK) {
             System.out.println(output);
         }
@@ -98,7 +98,7 @@ public class StatusListener implements Listener {
     public void actionThrowable(Result result, Throwable throwable) {
         Objects.requireNonNull(result, "result must not be null");
         Objects.requireNonNull(throwable, "throwable must not be null");
-        if (HIDDEN_ROOT.equals(result.getAction().getName())) {
+        if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
         StringWriter sw = new StringWriter();
@@ -131,7 +131,7 @@ public class StatusListener implements Listener {
         Deque<String> names = new ArrayDeque<>();
         Action current = result.getAction();
         while (current != null) {
-            if (!HIDDEN_ROOT.equals(current.getName())) {
+            if (!ROOT_NAME.equals(current.getName())) {
                 names.addFirst(current.getName());
             }
             current = current.getParent().orElse(null);
@@ -143,7 +143,7 @@ public class StatusListener implements Listener {
         Deque<String> ids = new ArrayDeque<>();
         Action current = result.getAction();
         while (current != null) {
-            if (!HIDDEN_ROOT.equals(current.getName())) {
+            if (!ROOT_NAME.equals(current.getName())) {
                 ids.addFirst(current.getId());
             }
             current = current.getParent().orElse(null);

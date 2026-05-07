@@ -17,6 +17,7 @@
 package org.paramixel.core.spi.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -34,23 +35,70 @@ class ReportListenerTest {
     Path tempDir;
 
     @Test
-    @DisplayName("runCompleted writes plain text summary report file")
+    @DisplayName("constructor rejects null and blank reportFile")
+    void constructorRejectsNullAndBlankReportFile() {
+        assertThatThrownBy(() -> new ReportListener((String) null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("reportFile must not be null");
+        assertThatThrownBy(() -> new ReportListener(""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("reportFile must not be blank");
+        assertThatThrownBy(() -> new ReportListener("   "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("reportFile must not be blank");
+    }
+
+    @Test
+    @DisplayName("runCompleted writes plain text summary report file without prefix")
     void runCompletedWritesPlainTextSummaryReportFile() throws Exception {
+        Path reportFile = tempDir.resolve("paramixel.log");
         Runner runner = Runner.builder()
-                .listener(new ReportListener(tempDir.toString()))
+                .listener(new ReportListener(reportFile.toString()))
                 .build();
 
         runner.run(Noop.of("report-action"));
 
-        Path reportFile = Files.list(tempDir).findFirst().orElseThrow();
         String report = Files.readString(reportFile, StandardCharsets.UTF_8);
 
-        assertThat(reportFile.getFileName().toString()).matches("paramixel_\\d{8}-\\d{6}\\.log");
-        assertThat(report).contains(Constants.PARAMIXEL_PLAIN);
+        assertThat(reportFile).exists();
+        assertThat(report).doesNotContain("[PARAMIXEL]");
+        assertThat(report).doesNotContain("\u001B[");
+        assertThat(report).contains("Paramixel v");
         assertThat(report).contains("report-action");
         assertThat(report).contains("Status      : PASS");
-        assertThat(report).doesNotContain("\u001B[");
+        assertThat(report).contains("Finished at :");
+        assertThat(report).contains("Total time  :");
         assertThat(report).doesNotContain("RUN  |");
         assertThat(report).doesNotContain("EXCEPTION |");
+    }
+
+    @Test
+    @DisplayName("runCompleted creates parent directories for report file")
+    void runCompletedCreatesParentDirectoriesForReportFile() throws Exception {
+        Path reportFile = tempDir.resolve("reports/nested/paramixel.log");
+        Runner runner = Runner.builder()
+                .listener(new ReportListener(reportFile.toString()))
+                .build();
+
+        runner.run(Noop.of("nested-report-action"));
+
+        assertThat(reportFile).exists();
+        assertThat(Files.readString(reportFile, StandardCharsets.UTF_8)).contains("nested-report-action");
+    }
+
+    @Test
+    @DisplayName("runCompleted overwrites existing report file")
+    void runCompletedOverwritesExistingReportFile() throws Exception {
+        Path reportFile = tempDir.resolve("paramixel.log");
+        Files.writeString(reportFile, "old content", StandardCharsets.UTF_8);
+        Runner runner = Runner.builder()
+                .listener(new ReportListener(reportFile.toString()))
+                .build();
+
+        runner.run(Noop.of("overwrite-report-action"));
+
+        String report = Files.readString(reportFile, StandardCharsets.UTF_8);
+        assertThat(report).contains("overwrite-report-action");
+        assertThat(report).doesNotContain("old content");
     }
 }

@@ -21,10 +21,10 @@ Unexpected exceptions also trigger `Listener#actionThrowable(...)`.
 
 ## Composite actions
 
-- `Sequential` runs all children and computes status afterward
-- `DependentSequential` stops at first failure and skips remaining children
+- `Container` with `ChildMode.INDEPENDENT` runs all body children and computes status afterward
+- `Container` with `ChildMode.DEPENDENT` stops body execution at the first failure or skip and skips remaining body children
 - `Parallel` waits for all children and computes status from them. If the executing thread is interrupted during semaphore acquisition, `Parallel` sets a `FAIL` result, fires `afterAction`, and re-throws a `RuntimeException` wrapping the `InterruptedException`
-- `Lifecycle` may skip `main` if `before` fails or skips, but still runs `after`
+- `Container` skips body children if `before(...)` fails or skips, but still runs `after(...)`
 
 ## Skipped action context
 

@@ -23,8 +23,8 @@ import java.util.Optional;
 /**
  * Describes the outcome of executing an {@link Action}.
  *
- * <p>A {@code Result} records the action that was executed, its final {@link Status}, elapsed time information, and
- * any nested child results produced by composed actions.
+ * <p>A {@code Result} records the action that was executed, its final {@link Status}, run duration, and any nested
+ * child results produced by composed actions.
  */
 public interface Result {
 
@@ -57,19 +57,11 @@ public interface Result {
     Status getStatus();
 
     /**
-     * Returns the elapsed time recorded for this action.
+     * Returns the run duration for this action.
      *
-     * @return the elapsed time for the action represented by this result
+     * <p>This is the wall-clock time of the full execute or skip.
+     *
+     * @return the run duration for the action represented by this result
      */
-    Duration getElapsedTime();
-
-    /**
-     * Returns the cumulative elapsed time for descendant execution.
-     *
-     * <p>For leaf results this is typically the same as {@link #getElapsedTime()}. For composed results, the value may
-     * represent the aggregate of child execution times.
-     *
-     * @return the cumulative elapsed time represented by this result
-     */
-    Duration getCumulativeElapsedTime();
+    Duration getRunDuration();
 }

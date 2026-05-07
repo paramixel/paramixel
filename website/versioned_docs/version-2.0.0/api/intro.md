@@ -193,7 +193,7 @@ interface Listener {
 
 All callbacks receive `Result` (not `Context` + `Action`). Use `result.getAction()` to access the action.
 
-Built-in implementations in `org.paramixel.core.spi.listener`: `SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`, `TableSummaryRenderer`.
+Built-in implementations in `org.paramixel.core.spi.listener`: `SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`.
 
 ### `Selector`
 

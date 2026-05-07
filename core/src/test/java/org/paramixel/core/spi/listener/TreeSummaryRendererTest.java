@@ -26,15 +26,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
 import org.paramixel.core.Runner;
+import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Noop;
-import org.paramixel.core.action.Sequential;
+import org.paramixel.core.action.Parallel;
 import org.paramixel.core.support.AnsiColor;
 
 @DisplayName("TreeSummaryRenderer")
 class TreeSummaryRendererTest {
 
-    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
+    private static final String ROOT_NAME = Constants.ROOT_NAME;
 
     private String runAndCaptureOutput(Action action) {
         SummaryListener listener = new SummaryListener(new TreeSummaryRenderer());
@@ -62,13 +63,14 @@ class TreeSummaryRendererTest {
     }
 
     @Test
-    @DisplayName("hidden root UUID stripped, children rendered at top level")
-    void hiddenRootUuidStrippedChildrenAtTopLevel() {
+    @DisplayName("root node name appears in output")
+    void rootNodeNameAppearsInOutput() {
         Action child = Noop.of("visible-child");
-        Sequential seq = Sequential.of(HIDDEN_ROOT, child);
-        String output = runAndCaptureOutput(seq);
+        Parallel parallel =
+                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        String output = runAndCaptureOutput(parallel);
 
-        assertThat(output).doesNotContain(HIDDEN_ROOT);
+        assertThat(output).contains(ROOT_NAME);
         assertThat(output).contains("visible-child");
     }
 
@@ -103,9 +105,11 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("FAIL status rendered with bold red")
     void failStatusRenderedWithBoldRed() {
-        Action failing = Direct.of("failing", context -> {
-            throw new RuntimeException("error");
-        });
+        Action failing = Direct.builder("failing")
+                .execute(context -> {
+                    throw new RuntimeException("error");
+                })
+                .build();
         String output = runAndCaptureOutput(failing);
 
         assertThat(output).contains(AnsiColor.BOLD_RED_TEXT.format("FAIL"));
@@ -114,9 +118,11 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("SKIP status rendered with bold orange")
     void skipStatusRenderedWithBoldOrange() {
-        Action skipping = Direct.of("skipper", context -> {
-            throw org.paramixel.core.exception.SkipException.of("reason");
-        });
+        Action skipping = Direct.builder("skipper")
+                .execute(context -> {
+                    throw org.paramixel.core.exception.SkipException.of("reason");
+                })
+                .build();
         String output = runAndCaptureOutput(skipping);
 
         assertThat(output).contains(AnsiColor.BOLD_ORANGE_TEXT.format("SKIP"));
@@ -135,9 +141,11 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("failure info with throwable shows exception class and message")
     void failureInfoWithThrowable() {
-        Action failing = Direct.of("fail-action", context -> {
-            throw new IllegalStateException("bad state");
-        });
+        Action failing = Direct.builder("fail-action")
+                .execute(context -> {
+                    throw new IllegalStateException("bad state");
+                })
+                .build();
         String output = runAndCaptureOutput(failing);
 
         assertThat(output).contains("IllegalStateException");
@@ -177,7 +185,13 @@ class TreeSummaryRendererTest {
     void twoChildrenRenderedWithTreeConnectors() {
         Action child1 = Noop.of("child-1");
         Action child2 = Noop.of("child-2");
-        Sequential seq = Sequential.of("parent", child1, child2);
+        Container seq = Container.builder("parent")
+                .policy(Container.Policy.builder()
+                        .childMode(Container.ChildMode.INDEPENDENT)
+                        .build())
+                .child(child1)
+                .child(child2)
+                .build();
         String output = runAndCaptureOutput(seq);
 
         assertThat(output).contains("child-1");

@@ -29,7 +29,7 @@ Current behavior:
 - `defaultListener()` combines status output with table summary output
 - `treeListener()` combines status output with tree summary output
 
-These are implemented with classes in `org.paramixel.core.listener`, including `CompositeListener`, `StatusListener`, `SummaryListener`, `TableSummaryRenderer`, and `TreeSummaryRenderer`.
+These are implemented with classes in `org.paramixel.core.listener`, including `CompositeListener`, `StatusListener`, `SummaryListener`, and `TreeSummaryRenderer`.
 
 ## Safe listener wrapper
 

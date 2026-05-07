@@ -30,8 +30,7 @@ import org.paramixel.core.support.FastId;
 /**
  * Base implementation for {@link Action} types.
  *
- * <p>This class provides generated identifiers, name validation, and parent tracking shared by both leaf and branch
- * actions.
+ * <p>This class provides generated identifiers, name validation, and parent tracking shared by all action types.
  *
  * @implSpec Parent assignment is one-time only. After a parent has been set, later attempts to replace it fail.
  */
@@ -39,13 +38,24 @@ public abstract class AbstractAction implements Action {
 
     protected final String id;
     protected String name;
+    private final ContextMode contextMode;
     private final AtomicReference<Action> parent = new AtomicReference<>();
 
     /**
      * Creates an action with a generated stable identifier.
      */
     protected AbstractAction() {
+        this(ContextMode.ISOLATED);
+    }
+
+    /**
+     * Creates an action with a generated stable identifier and context mode.
+     *
+     * @param contextMode the context mode applied when this action executes or skips
+     */
+    protected AbstractAction(ContextMode contextMode) {
         this.id = FastId.generateId();
+        this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
     }
 
     /**
@@ -99,20 +109,9 @@ public abstract class AbstractAction implements Action {
         return Optional.ofNullable(parent.get());
     }
 
-    /**
-     * Records the supplied action as a child by assigning this action as that child's parent.
-     *
-     * @param child the child action to attach
-     * @throws NullPointerException if {@code child} is {@code null}
-     * @throws IllegalArgumentException if {@code child} is this action
-     */
     @Override
-    public void addChild(Action child) {
-        Objects.requireNonNull(child, "child must not be null");
-        if (child == this) {
-            throw new IllegalArgumentException("action must not add itself as a child");
-        }
-        child.setParent(this);
+    public final ContextMode contextMode() {
+        return contextMode;
     }
 
     /**
@@ -126,9 +125,7 @@ public abstract class AbstractAction implements Action {
     @Override
     public void setParent(Action parent) {
         Objects.requireNonNull(parent, "parent must not be null");
-        if (parent == this) {
-            throw new IllegalArgumentException("action must not be its own parent");
-        }
+        Arguments.require(parent != this, "action must not be its own parent");
         if (!this.parent.compareAndSet(null, parent)) {
             throw new IllegalStateException("child already has a parent");
         }
@@ -141,7 +138,10 @@ public abstract class AbstractAction implements Action {
      * @return the execution result
      */
     @Override
-    public abstract Result execute(Context context);
+    public final Result execute(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        return executeSelf(contextForSelf(context));
+    }
 
     /**
      * Produces a skipped result for this action.
@@ -150,7 +150,36 @@ public abstract class AbstractAction implements Action {
      * @return the skipped result
      */
     @Override
-    public abstract Result skip(Context context);
+    public final Result skip(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        return skipSelf(contextForSelf(context));
+    }
+
+    /**
+     * Executes this action using its effective context.
+     *
+     * @param context the effective context after applying this action's context mode
+     * @return the execution result
+     */
+    protected abstract Result executeSelf(Context context);
+
+    /**
+     * Produces a skipped result using this action's effective context.
+     *
+     * @param context the effective context after applying this action's context mode
+     * @return the skipped result
+     */
+    protected abstract Result skipSelf(Context context);
+
+    /**
+     * Applies this action's context mode to the received parent context.
+     *
+     * @param context the context received from the parent action or runner
+     * @return this action's effective execution context
+     */
+    protected final Context contextForSelf(Context context) {
+        return contextMode == ContextMode.ISOLATED ? context.createChild() : context;
+    }
 
     /**
      * Returns the elapsed duration since the supplied instant.

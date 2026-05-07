@@ -41,11 +41,11 @@ class DefaultListenerTest {
     void printsActionKindBeforeAndAfterExecution() {
         Listener listener = Factory.defaultListener();
         Direct.Executable executable = context -> {};
-        Action action = Direct.of("direct", executable);
+        Action action = Direct.builder("direct").execute(executable).build();
         Context context = new DefaultContext(Configuration.defaultProperties(), listener, directExecutorService());
         DefaultResult result = new DefaultResult(action);
         result.setStatus(DefaultStatus.PASS);
-        result.setElapsedTime(Duration.ZERO);
+        result.setRunDuration(Duration.ZERO);
         var output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
 

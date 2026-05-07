@@ -1,11 +1,11 @@
 ---
 title: Migration Guide
-description: Migrate from Paramixel 1.x to 2.0.0.
+description: Migrate from Paramixel 1.x to newer releases.
 ---
 
 # Migration Guide
 
-This guide covers the breaking changes between Paramixel 1.x and 2.0.0 and how to update your code.
+This legacy guide covers the breaking changes between Paramixel 1.x and 2.0.0. For 3.x, use [Migration 1.x to 3.x](migration-1-to-3) or [Migration 2.x to 3.x](migration-2-to-3).
 
 ## Attachment → Store + Value
 
@@ -43,7 +43,7 @@ context.getStore().remove("data");
 
 The `Store` API provides `putIfAbsent`, `compute`, `merge`, `forEach`, and other `ConcurrentMap`-like methods. Each context has its own independent `Store`.
 
-## StrictSequential → DependentSequential
+## Strict Sequential Actions
 
 ### Before (1.x)
 
@@ -55,11 +55,10 @@ Action action = StrictSequential.of("suite", ...);
 ### After (2.0.0)
 
 ```java
-import org.paramixel.core.action.DependentSequential;
-Action action = DependentSequential.of("suite", ...);
+// In 2.0.0, use the dependent sequential action.
 ```
 
-Same semantics, new name. `StrictRandomSequential` → `DependentRandomSequential` follows the same pattern.
+In 3.x, use `Container` with its default dependent policy. Strict random execution maps to `Container.Policy` with `OrderMode.SHUFFLED`.
 
 ## Listener API
 
@@ -117,8 +116,7 @@ Optional<Result> getParent()
 List<Result> getChildren()
 Action getAction()
 Status getStatus()
-Duration getElapsedTime()
-Duration getCumulativeElapsedTime()
+Duration getRunDuration()
 ```
 
 ### Status
@@ -220,3 +218,22 @@ public static Action smokeTests() { /* ... */ }
 ```
 
 Filter by tag using `Selector.builder().tagMatch("smoke")` or the `paramixel.match.tag` configuration key.
+
+## 2.x to 3.0.0
+
+### Result timing API
+
+`getElapsedTime()` and `getCumulativeElapsedTime()` have been replaced by a single `getRunDuration()` method. `DefaultResult.setElapsedTime()` has been replaced by `setRunDuration()`.
+
+| 2.x | 3.0.0 |
+|---|---|
+| `Result.getElapsedTime()` | `Result.getRunDuration()` |
+| `Result.getCumulativeElapsedTime()` | `Result.getRunDuration()` |
+| `DefaultResult.setElapsedTime(Duration)` | `DefaultResult.setRunDuration(Duration)` |
+| `DefaultResult(Action, Status, Duration elapsedTime)` | `DefaultResult(Action, Status, Duration runDuration)` |
+
+`getRunDuration()` returns the wall-clock time of the full execute or skip. For leaf results this is the same as the old `getElapsedTime()`. For composed results, this returns the parent's own wall-clock duration, which inherently includes all child execution time. The old `getCumulativeElapsedTime()` summed children's times separately for composed results, which was misleading — consumers who need aggregated child timing should compute it from the result tree.
+
+### JSON and XML report format
+
+The JSON report field `"elapsedTime"` has been renamed to `"runDuration"` and the `"cumulativeTime"` field has been removed. The XML report attribute `elapsedTime` has been renamed to `runDuration` and the `cumulativeTime` attribute has been removed. The HTML report's embedded JSON uses `runDuration` consistently with the standalone JSON and XML reports.

@@ -17,15 +17,29 @@ A factory method must be:
 - annotated with `@Paramixel.ActionFactory`
 - return an `Action`
 
-Each class hierarchy may have **at most one** `@ActionFactory` method. If more than one is found, discovery throws `ResolverException`. To combine multiple actions, return a `Sequential` or `Parallel` root from a single factory:
+Each class hierarchy may have **at most one** `@ActionFactory` method. If more than one is found, discovery throws `ResolverException`. To combine multiple actions, return a `Container` or `Parallel` root from a single factory:
 
 ```java
-@Paramixel.ActionFactory
-public static Action allTests() {
-    return Sequential.of("MyTests",
-        Direct.of("testCreate", ctx -> { /* ... */ }),
-        Direct.of("testRead",   ctx -> { /* ... */ })
-    );
+public class MyTests {
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action testCreate = testCreate();
+        Action testRead = testRead();
+
+        return Container.builder("MyTests")
+                .child(testCreate)
+                .child(testRead)
+                .build();
+    }
+
+    private static Action testCreate() {
+        return Direct.builder("testCreate").execute(ctx -> { /* ... */ }).build();
+    }
+
+    private static Action testRead() {
+        return Direct.builder("testRead").execute(ctx -> { /* ... */ }).build();
+    }
 }
 ```
 
@@ -38,13 +52,27 @@ Add `@Paramixel.Disabled` to exclude a factory from discovery.
 Use `@Paramixel.Tag` to tag factories for selective discovery:
 
 ```java
-@Paramixel.ActionFactory
-@Paramixel.Tag("smoke")
-public static Action smokeTests() {
-    return Sequential.of("SmokeTests",
-        Direct.of("testLogin", ctx -> { /* ... */ }),
-        Direct.of("testDashboard", ctx -> { /* ... */ })
-    );
+public class SmokeTests {
+
+    @Paramixel.ActionFactory
+    @Paramixel.Tag("smoke")
+    public static Action actionFactory() {
+        Action testLogin = testLogin();
+        Action testDashboard = testDashboard();
+
+        return Container.builder("SmokeTests")
+                .child(testLogin)
+                .child(testDashboard)
+                .build();
+    }
+
+    private static Action testLogin() {
+        return Direct.builder("testLogin").execute(ctx -> { /* ... */ }).build();
+    }
+
+    private static Action testDashboard() {
+        return Direct.builder("testDashboard").execute(ctx -> { /* ... */ }).build();
+    }
 }
 ```
 

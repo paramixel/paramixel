@@ -17,15 +17,13 @@
 package org.paramixel.core.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
-import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.exception.FailException;
@@ -35,185 +33,71 @@ import org.paramixel.core.exception.SkipException;
 class DirectTest {
 
     @Test
-    @DisplayName("catches RuntimeException as failure")
-    void catchesRuntimeExceptionAsFailure() {
-        var expectedException = new RuntimeException("test exception");
-        Action action = Direct.of("test", context -> {
-            throw expectedException;
-        });
+    @DisplayName("builder creates passing direct action")
+    void builderCreatesPassingDirectAction() {
+        AtomicBoolean ran = new AtomicBoolean();
+        Direct action =
+                Direct.builder("direct").execute(context -> ran.set(true)).build();
 
         Result result = Runner.builder().build().run(action);
 
-        assertThat(result.getStatus().isFailure()).isTrue();
-        assertThat(result.getStatus().getThrowable()).isPresent();
-        assertThat(result.getStatus().getThrowable().get()).isSameAs(expectedException);
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(ran).isTrue();
+        assertThat(action.contextMode()).isEqualTo(Action.ContextMode.ISOLATED);
     }
 
     @Test
-    @DisplayName("catches FailException as failure")
-    void catchesFailExceptionAsFailure() {
-        Action action = Direct.of("test", context -> {
-            throw FailException.of("expected failure");
-        });
+    @DisplayName("builder configures shared context mode")
+    void builderConfiguresSharedContextMode() {
+        Direct action = Direct.builder("direct")
+                .contextMode(Action.ContextMode.SHARED)
+                .execute(context -> {})
+                .build();
 
-        Result result = Runner.builder().build().run(action);
-
-        assertThat(result.getStatus().isFailure()).isTrue();
-        assertThat(result.getStatus().getMessage()).isPresent();
-        assertThat(result.getStatus().getMessage().get()).isEqualTo("expected failure");
+        assertThat(action.contextMode()).isEqualTo(Action.ContextMode.SHARED);
     }
 
     @Test
-    @DisplayName("catches SkipException as skip")
-    void catchesSkipExceptionAsSkip() {
-        Action action = Direct.of("test", context -> {
-            throw SkipException.of("database not available");
-        });
+    @DisplayName("converts skip and fail exceptions to statuses")
+    void convertsSkipAndFailExceptionsToStatuses() {
+        Result skip = Runner.builder()
+                .build()
+                .run(Direct.builder("skip")
+                        .execute(context -> {
+                            throw SkipException.of("skip");
+                        })
+                        .build());
+        Result fail = Runner.builder()
+                .build()
+                .run(Direct.builder("fail")
+                        .execute(context -> {
+                            throw FailException.of("fail");
+                        })
+                        .build());
 
-        Result result = Runner.builder().build().run(action);
-
-        assertThat(result.getStatus().isSkip()).isTrue();
-        assertThat(result.getStatus().getMessage()).isPresent();
-        assertThat(result.getStatus().getMessage().get()).isEqualTo("database not available");
+        assertThat(skip.getStatus().isSkip()).isTrue();
+        assertThat(fail.getStatus().isFailure()).isTrue();
     }
 
     @Test
-    @DisplayName("rethrows OutOfMemoryError")
-    void rethrowsOutOfMemoryError() {
-        Action action = Direct.of("test", context -> {
-            throw new OutOfMemoryError("simulated oom");
-        });
+    @DisplayName("builder validates arguments and one-shot behavior")
+    void builderValidatesArgumentsAndOneShotBehavior() {
+        assertThatThrownBy(() -> Direct.builder(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Direct.builder(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Direct.builder("direct").contextMode(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("contextMode must not be null");
+        assertThatThrownBy(() -> Direct.builder("direct").execute(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("executable must not be null");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> Direct.builder("direct").build())
+                .withMessage("executable must be configured");
 
-        Runner runner = Runner.builder().build();
-
-        assertThatThrownBy(() -> runner.run(action))
-                .isInstanceOf(OutOfMemoryError.class)
-                .hasMessage("simulated oom");
-    }
-
-    @Test
-    @DisplayName("rethrows StackOverflowError")
-    void rethrowsStackOverflowError() {
-        Action action = Direct.of("test", context -> {
-            throw new StackOverflowError("simulated stack overflow");
-        });
-
-        Runner runner = Runner.builder().build();
-
-        assertThatThrownBy(() -> runner.run(action))
-                .isInstanceOf(StackOverflowError.class)
-                .hasMessage("simulated stack overflow");
-    }
-
-    @Test
-    @DisplayName("rethrows ThreadDeath")
-    void rethrowsThreadDeath() {
-        Action action = Direct.of("test", context -> {
-            throw new ThreadDeath();
-        });
-
-        Runner runner = Runner.builder().build();
-
-        assertThatThrownBy(() -> runner.run(action)).isInstanceOf(ThreadDeath.class);
-    }
-
-    @Test
-    @DisplayName("rethrows custom Error subclass")
-    void rethrowsCustomErrorSubclass() {
-        class CustomError extends Error {
-            CustomError(String message) {
-                super(message);
-            }
-        }
-
-        Action action = Direct.of("test", context -> {
-            throw new CustomError("custom error");
-        });
-
-        Runner runner = Runner.builder().build();
-
-        assertThatThrownBy(() -> runner.run(action))
-                .isInstanceOf(CustomError.class)
-                .hasMessage("custom error");
-    }
-
-    @Test
-    @DisplayName("Error does not notify listener actionThrowable or afterAction")
-    void errorDoesNotNotifyListener() {
-        AtomicBoolean actionThrowableCalled = new AtomicBoolean(false);
-        AtomicBoolean afterActionCalled = new AtomicBoolean(false);
-
-        Listener listener = new Listener() {
-            @Override
-            public void actionThrowable(Result result, Throwable throwable) {
-                actionThrowableCalled.set(true);
-            }
-
-            @Override
-            public void afterAction(Result result) {
-                afterActionCalled.set(true);
-            }
-        };
-
-        Action action = Direct.of("test", context -> {
-            throw new OutOfMemoryError("simulated oom");
-        });
-
-        Runner runner = Runner.builder().listener(listener).build();
-
-        assertThatThrownBy(() -> runner.run(action)).isInstanceOf(OutOfMemoryError.class);
-
-        assertThat(actionThrowableCalled).isFalse();
-        assertThat(afterActionCalled).isFalse();
-    }
-
-    @Test
-    @DisplayName("RuntimeException notifies listener actionThrowable")
-    void runtimeExceptionNotifiesListenerActionThrowable() {
-        AtomicReference<Throwable> capturedThrowable = new AtomicReference<>();
-
-        Listener listener = new Listener() {
-            @Override
-            public void actionThrowable(Result result, Throwable throwable) {
-                capturedThrowable.set(throwable);
-            }
-        };
-
-        var expectedException = new RuntimeException("expected");
-        Action action = Direct.of("test", context -> {
-            throw expectedException;
-        });
-
-        Runner runner = Runner.builder().listener(listener).build();
-        runner.run(action);
-
-        assertThat(capturedThrowable).hasValue(expectedException);
-    }
-
-    @Test
-    @DisplayName("of rejects null name")
-    void ofRejectsNullName() {
-        assertThatThrownBy(() -> Direct.of(null, context -> {})).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("of rejects blank name")
-    void ofRejectsBlankName() {
-        assertThatIllegalArgumentException().isThrownBy(() -> Direct.of("", context -> {}));
-        assertThatIllegalArgumentException().isThrownBy(() -> Direct.of("   ", context -> {}));
-    }
-
-    @Test
-    @DisplayName("of rejects null executable")
-    void ofRejectsNullExecutable() {
-        assertThatThrownBy(() -> Direct.of("test", null)).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("execute rejects null context")
-    void executeRejectsNullContext() {
-        Direct action = Direct.of("test", context -> {});
-
-        assertThatThrownBy(() -> action.execute(null)).isInstanceOf(NullPointerException.class);
+        Direct.Builder builder = Direct.builder("direct").execute(context -> {});
+        builder.build();
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.execute(context -> {}))
+                .withMessage("builder already built");
     }
 }

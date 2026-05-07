@@ -80,14 +80,21 @@ public class Configuration {
     public static final String TAG_MATCH = "paramixel.match.tag";
 
     /**
-     * Configuration key controlling whether per-run summary report files are written.
+     * Configuration key controlling the file used for the summary report.
      */
-    public static final String REPORT_ENABLED = "paramixel.report.enabled";
+    public static final String REPORT_FILE = "paramixel.report.file";
 
     /**
-     * Configuration key controlling the directory used for per-run summary report files.
+     * Configuration key controlling the output format of per-run summary report files.
+     *
+     * <p>Supported values are {@code text} (the default), {@code json}, {@code xml}, and {@code html}.
      */
-    public static final String REPORT_DIRECTORY = "paramixel.report.directory";
+    public static final String REPORT_FORMAT = "paramixel.report.format";
+
+    /**
+     * The default report format when none is specified.
+     */
+    public static final String REPORT_FORMAT_TEXT = "text";
 
     private Configuration() {
         // Intentionally empty

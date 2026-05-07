@@ -12,12 +12,8 @@ const sidebars = {
       items: [
         'actions/direct',
         'actions/noop',
-        'actions/sequential',
-        'actions/dependent-sequential',
-        'actions/random-sequential',
-        'actions/dependent-random-sequential',
+        'actions/container',
         'actions/parallel',
-        'actions/lifecycle',
       ],
     },
     {
@@ -35,6 +31,8 @@ const sidebars = {
         'usage/discovery',
         'usage/spi',
         'usage/migration-guide',
+        'usage/migration-1-to-3',
+        'usage/migration-2-to-3',
       ],
     },
     'configuration',

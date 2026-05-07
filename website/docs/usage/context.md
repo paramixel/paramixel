@@ -7,6 +7,32 @@ description: Runtime state, hierarchy, and store.
 
 Every action receives a `Context` during execution.
 
+## Action Context Mode
+
+Each action owns its context scoping policy:
+
+```java
+Action.ContextMode.ISOLATED
+Action.ContextMode.SHARED
+```
+
+`ISOLATED` means the action executes with `context.createChild()`.
+
+`SHARED` means the action executes with the same context it received from its parent.
+
+Parent actions pass their effective context directly to children; children decide whether to isolate or share.
+
+Use shared mode when sibling actions intentionally share workflow state:
+
+```java
+private static Action setup() {
+    return Direct.builder("setup")
+            .contextMode(Action.ContextMode.SHARED)
+            .execute(context -> context.getStore().put("token", Value.of("abc")))
+            .build();
+}
+```
+
 ## Methods
 
 ```java
@@ -20,7 +46,7 @@ Optional<Context> findAncestor(int levelUp)
 
 ## Hierarchy
 
-Contexts form a parent/child chain that mirrors nested execution.
+Contexts form a parent/child chain based on action context modes. With `ISOLATED`, an action creates a child context. With `SHARED`, it reuses the received context.
 
 - `getParent()` returns the immediate parent context
 - `findAncestor(0)` returns the current context
@@ -85,24 +111,48 @@ value.cast(MyClass.class)    // typed cast
 
 ## Example pattern
 
-From `core-examples/src/main/java/examples/context/ContextHierarchyTest.java`, a `before` action stores data and descendants read it later:
+From `examples/src/main/java/examples/context/ContextHierarchyTest.java`, a `before` action stores data and descendants read it later:
 
 ```java
-Action action = Lifecycle.of(
-        "test",
-        Direct.of("before", context -> {
-            context.getStore().put("data", Value.of("suite-value"));
-        }),
-        Direct.of("main", context -> {
-            String value = context.findAncestor(1)
-                    .orElseThrow()
-                    .getStore()
-                    .get("data")
-                    .map(Value::get)
-                    .map(v -> (String) v)
-                    .orElseThrow();
-        }),
-        Noop.of("after"));
+public class ContextHierarchyTest {
+
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        Action before = before();
+        Action main = main();
+        Action after = after();
+
+        return Container.builder("test")
+                .before(before)
+                .child(main)
+                .after(after)
+                .build();
+    }
+
+    private static Action before() {
+        return Direct.builder("before")
+                .contextMode(Action.ContextMode.SHARED)
+                .execute(context -> context.getStore().put("data", Value.of("suite-value")))
+                .build();
+    }
+
+    private static Action main() {
+        return Direct.builder("main")
+                .execute(context -> {
+                    String value = context.findAncestor(1)
+                            .orElseThrow()
+                            .getStore()
+                            .get("data")
+                            .orElseThrow()
+                            .cast(String.class);
+                })
+                .build();
+    }
+
+    private static Action after() {
+        return Noop.of("after");
+    }
+}
 ```
 
 ## Configuration access

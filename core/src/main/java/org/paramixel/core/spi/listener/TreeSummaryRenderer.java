@@ -32,11 +32,11 @@ import org.paramixel.core.support.AnsiColor;
  */
 public class TreeSummaryRenderer implements SummaryRenderer {
 
-    private static final String HIDDEN_ROOT = "7e5c6b4c-1428-3fee-abd4-24a245687061";
-
     private final PrintStream out;
 
     private final boolean ansiEnabled;
+
+    private final boolean prefixEnabled;
 
     /**
      * Creates a tree summary renderer that writes to {@link System#out} with ANSI formatting enabled.
@@ -44,6 +44,7 @@ public class TreeSummaryRenderer implements SummaryRenderer {
     public TreeSummaryRenderer() {
         this.out = null;
         this.ansiEnabled = true;
+        this.prefixEnabled = true;
     }
 
     /**
@@ -53,8 +54,20 @@ public class TreeSummaryRenderer implements SummaryRenderer {
      * @param ansiEnabled whether ANSI formatting should be used
      */
     public TreeSummaryRenderer(final PrintStream out, final boolean ansiEnabled) {
+        this(out, ansiEnabled, true);
+    }
+
+    /**
+     * Creates a tree summary renderer for the supplied destination.
+     *
+     * @param out the output stream used for rendered summary lines
+     * @param ansiEnabled whether ANSI formatting should be used
+     * @param prefixEnabled whether the {@code [PARAMIXEL]} prefix should be prepended to each line
+     */
+    public TreeSummaryRenderer(final PrintStream out, final boolean ansiEnabled, final boolean prefixEnabled) {
         this.out = Objects.requireNonNull(out, "out must not be null");
         this.ansiEnabled = ansiEnabled;
+        this.prefixEnabled = prefixEnabled;
     }
 
     private PrintStream out() {
@@ -65,31 +78,24 @@ public class TreeSummaryRenderer implements SummaryRenderer {
     public void renderSummary(Runner runner, Result result) {
         Objects.requireNonNull(runner, "runner must not be null");
         Objects.requireNonNull(result, "result must not be null");
-        List<Result> topResults;
-        if (HIDDEN_ROOT.equals(result.getAction().getName())) {
-            topResults = result.getChildren();
-        } else {
-            topResults = List.of(result);
-        }
-        for (int i = 0; i < topResults.size(); i++) {
-            renderTree(topResults.get(i), "", i == topResults.size() - 1);
-        }
+        renderTree(result, "", true);
     }
 
     private void renderTree(Result result, String prefix, boolean isLast) {
         String status = formatStatus(result.getStatus());
         String actionName = result.getAction().getName();
         String kind = formatKind(result.getAction());
-        String timing = formatTiming(result.getElapsedTime());
+        String timing = formatTiming(result.getRunDuration());
         String failureInfo = formatFailureInfo(result.getStatus());
 
-        String connector = isLast ? "└── " : "├── ";
+        String connector = isLast ? "└─ " : "├─ ";
         String line = prefix + connector + status + " " + actionName + " (" + kind + ") " + timing + failureInfo;
-        out().println((ansiEnabled ? Constants.PARAMIXEL : Constants.PARAMIXEL_PLAIN) + line);
+        String linePrefix = prefixEnabled ? (ansiEnabled ? Constants.PARAMIXEL : Constants.PARAMIXEL_PLAIN) : "";
+        out().println(linePrefix + line);
 
         List<Result> children = result.getChildren();
         if (!children.isEmpty()) {
-            String childPrefix = prefix + (isLast ? "    " : "│   ");
+            String childPrefix = prefix + (isLast ? "   " : "│  ");
             for (int i = 0; i < children.size(); i++) {
                 renderTree(children.get(i), childPrefix, i == children.size() - 1);
             }
