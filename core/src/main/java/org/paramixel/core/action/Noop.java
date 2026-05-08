@@ -18,8 +18,6 @@ package org.paramixel.core.action;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.spi.DefaultResult;
@@ -44,16 +42,6 @@ public final class Noop extends AbstractAction {
         Noop instance = new Noop(name);
         instance.initialize();
         return instance;
-    }
-
-    @Override
-    public List<Action> getChildren() {
-        return List.of();
-    }
-
-    @Override
-    public void addChild(Action child) {
-        throw new UnsupportedOperationException("noop action cannot have children");
     }
 
     @Override

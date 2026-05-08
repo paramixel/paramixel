@@ -18,7 +18,9 @@ package org.paramixel.core;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import org.paramixel.core.spi.DefaultResult;
 
 /**
  * Describes the outcome of executing an {@link Action}.
@@ -27,6 +29,57 @@ import java.util.Optional;
  * child results produced by composed actions.
  */
 public interface Result {
+
+    /**
+     * Creates a staged result for the supplied action.
+     *
+     * @param action the action represented by the result
+     * @return a staged result
+     */
+    static Result staged(Action action) {
+        return builder(action).status(Status.staged()).build();
+    }
+
+    /**
+     * Creates a passing result for the supplied action.
+     *
+     * @param action the action represented by the result
+     * @return a passing result
+     */
+    static Result pass(Action action) {
+        return builder(action).status(Status.pass()).build();
+    }
+
+    /**
+     * Creates a skipped result for the supplied action.
+     *
+     * @param action the action represented by the result
+     * @return a skipped result
+     */
+    static Result skip(Action action) {
+        return builder(action).status(Status.skip()).build();
+    }
+
+    /**
+     * Creates a failed result for the supplied action and throwable.
+     *
+     * @param action the action represented by the result
+     * @param throwable the failure throwable
+     * @return a failed result
+     */
+    static Result failure(Action action, Throwable throwable) {
+        return builder(action).status(Status.failure(throwable)).build();
+    }
+
+    /**
+     * Creates a result builder for the supplied action.
+     *
+     * @param action the action represented by the result
+     * @return a result builder
+     */
+    static Builder builder(Action action) {
+        return new Builder(action);
+    }
 
     /**
      * Returns the parent result, if this result belongs to a nested action.
@@ -64,4 +117,70 @@ public interface Result {
      * @return the run duration for the action represented by this result
      */
     Duration getRunDuration();
+
+    /**
+     * Builder for simple public {@link Result} construction.
+     */
+    final class Builder {
+
+        private final DefaultResult result;
+        private boolean built;
+
+        private Builder(Action action) {
+            result = new DefaultResult(action);
+        }
+
+        /**
+         * Sets the result status.
+         *
+         * @param status the status
+         * @return this builder
+         */
+        public Builder status(Status status) {
+            ensureNotBuilt();
+            result.setStatus(Objects.requireNonNull(status, "status must not be null"));
+            return this;
+        }
+
+        /**
+         * Sets the result run duration.
+         *
+         * @param runDuration the run duration
+         * @return this builder
+         */
+        public Builder runDuration(Duration runDuration) {
+            ensureNotBuilt();
+            result.setRunDuration(Objects.requireNonNull(runDuration, "runDuration must not be null"));
+            return this;
+        }
+
+        /**
+         * Adds a child result.
+         *
+         * @param child the child result
+         * @return this builder
+         */
+        public Builder child(Result child) {
+            ensureNotBuilt();
+            result.addChild(Objects.requireNonNull(child, "child must not be null"));
+            return this;
+        }
+
+        /**
+         * Builds the result.
+         *
+         * @return the result
+         */
+        public Result build() {
+            ensureNotBuilt();
+            built = true;
+            return result;
+        }
+
+        private void ensureNotBuilt() {
+            if (built) {
+                throw new IllegalStateException("builder already built");
+            }
+        }
+    }
 }

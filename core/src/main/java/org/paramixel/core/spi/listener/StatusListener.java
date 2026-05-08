@@ -26,6 +26,7 @@ import org.paramixel.core.Action;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
+import org.paramixel.core.spi.ActionHierarchy;
 import org.paramixel.core.support.AnsiColor;
 
 /**
@@ -128,11 +129,23 @@ public class StatusListener implements Listener {
     }
 
     private static String buildActionPath(Result result) {
+        var indexedPath = ActionHierarchy.pathOf(result.getAction());
+        if (indexedPath.isPresent()) {
+            Deque<String> indexedNames = new ArrayDeque<>();
+            for (Action action : indexedPath.orElseThrow()) {
+                if (!ROOT_NAME.equals(action.getName())) {
+                    indexedNames.addLast(action.getName());
+                }
+            }
+            return String.join(" / ", indexedNames);
+        }
+
         Deque<String> names = new ArrayDeque<>();
-        Action current = result.getAction();
+        Result current = result;
         while (current != null) {
-            if (!ROOT_NAME.equals(current.getName())) {
-                names.addFirst(current.getName());
+            Action action = current.getAction();
+            if (!ROOT_NAME.equals(action.getName())) {
+                names.addFirst(action.getName());
             }
             current = current.getParent().orElse(null);
         }
@@ -140,11 +153,23 @@ public class StatusListener implements Listener {
     }
 
     private static String buildIdPath(Result result) {
+        var indexedPath = ActionHierarchy.pathOf(result.getAction());
+        if (indexedPath.isPresent()) {
+            Deque<String> indexedIds = new ArrayDeque<>();
+            for (Action action : indexedPath.orElseThrow()) {
+                if (!ROOT_NAME.equals(action.getName())) {
+                    indexedIds.addLast(action.getId());
+                }
+            }
+            return String.join("-", indexedIds);
+        }
+
         Deque<String> ids = new ArrayDeque<>();
-        Action current = result.getAction();
+        Result current = result;
         while (current != null) {
-            if (!ROOT_NAME.equals(current.getName())) {
-                ids.addFirst(current.getId());
+            Action action = current.getAction();
+            if (!ROOT_NAME.equals(action.getName())) {
+                ids.addFirst(action.getId());
             }
             current = current.getParent().orElse(null);
         }

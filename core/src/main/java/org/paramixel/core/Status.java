@@ -16,7 +16,9 @@
 
 package org.paramixel.core;
 
+import java.util.Objects;
 import java.util.Optional;
+import org.paramixel.core.spi.DefaultStatus;
 
 /**
  * Represents the execution state of a {@link Result}.
@@ -25,6 +27,74 @@ import java.util.Optional;
  * and throwable data provide additional context for reporting and diagnostics.
  */
 public interface Status {
+
+    /**
+     * Creates a staged status.
+     *
+     * @return a staged status
+     */
+    static Status staged() {
+        return DefaultStatus.STAGED;
+    }
+
+    /**
+     * Creates a passing status.
+     *
+     * @return a passing status
+     */
+    static Status pass() {
+        return DefaultStatus.PASS;
+    }
+
+    /**
+     * Creates a skipped status.
+     *
+     * @return a skipped status
+     */
+    static Status skip() {
+        return DefaultStatus.SKIP;
+    }
+
+    /**
+     * Creates a skipped status with a message.
+     *
+     * @param message the skip message
+     * @return a skipped status
+     */
+    static Status skip(String message) {
+        return new DefaultStatus(DefaultStatus.Kind.SKIP, Objects.requireNonNull(message, "message must not be null"));
+    }
+
+    /**
+     * Creates a failure status.
+     *
+     * @return a failure status
+     */
+    static Status failure() {
+        return DefaultStatus.FAILURE;
+    }
+
+    /**
+     * Creates a failure status with a throwable.
+     *
+     * @param throwable the failure throwable
+     * @return a failure status
+     */
+    static Status failure(Throwable throwable) {
+        return new DefaultStatus(
+                DefaultStatus.Kind.FAILURE, Objects.requireNonNull(throwable, "throwable must not be null"));
+    }
+
+    /**
+     * Creates a failure status with a message.
+     *
+     * @param message the failure message
+     * @return a failure status
+     */
+    static Status failure(String message) {
+        return new DefaultStatus(
+                DefaultStatus.Kind.FAILURE, Objects.requireNonNull(message, "message must not be null"));
+    }
 
     /**
      * Returns whether the associated action has been staged but not yet completed.

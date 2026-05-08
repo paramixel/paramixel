@@ -84,6 +84,7 @@ public final class Selector {
         private String packageRegex;
         private String classRegex;
         private String tagRegex;
+        private boolean built;
 
         private Builder() {}
 
@@ -99,6 +100,7 @@ public final class Selector {
          * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
          */
         public Builder packageMatch(String regex) {
+            ensureNotBuilt();
             this.packageRegex = normalizeRegex(regex, "packageMatch");
             return this;
         }
@@ -114,6 +116,7 @@ public final class Selector {
          * @throws NullPointerException if {@code clazz} is {@code null}
          */
         public Builder packageOf(Class<?> clazz) {
+            ensureNotBuilt();
             Objects.requireNonNull(clazz, "clazz must not be null");
             this.packageRegex = "^" + Pattern.quote(clazz.getPackageName()) + "(\\..*)?$";
             return this;
@@ -131,6 +134,7 @@ public final class Selector {
          * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
          */
         public Builder classMatch(String regex) {
+            ensureNotBuilt();
             this.classRegex = normalizeRegex(regex, "classMatch");
             return this;
         }
@@ -146,6 +150,7 @@ public final class Selector {
          * @throws NullPointerException if {@code clazz} is {@code null}
          */
         public Builder classOf(Class<?> clazz) {
+            ensureNotBuilt();
             Objects.requireNonNull(clazz, "clazz must not be null");
             this.classRegex = "^" + Pattern.quote(clazz.getName()) + "$";
             return this;
@@ -163,6 +168,7 @@ public final class Selector {
          * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
          */
         public Builder tagMatch(String regex) {
+            ensureNotBuilt();
             this.tagRegex = normalizeRegex(regex, "tagMatch");
             return this;
         }
@@ -174,6 +180,8 @@ public final class Selector {
          * @throws IllegalStateException if both package and class match criteria are configured
          */
         public Selector build() {
+            ensureNotBuilt();
+            built = true;
             if (packageRegex != null && classRegex != null) {
                 throw new IllegalStateException(
                         "Selector may define only one location match: packageMatch or classMatch");
@@ -189,6 +197,12 @@ public final class Selector {
             }
             Pattern tagPattern = tagRegex != null ? compilePattern(tagRegex, "tagMatch") : null;
             return new Selector(locationMode, locationPattern, tagPattern);
+        }
+
+        private void ensureNotBuilt() {
+            if (built) {
+                throw new IllegalStateException("builder already built");
+            }
         }
 
         private static String normalizeRegex(String regex, String methodName) {

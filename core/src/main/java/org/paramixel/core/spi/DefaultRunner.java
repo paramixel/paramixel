@@ -108,7 +108,7 @@ public final class DefaultRunner implements Runner {
         ExecutionScope previousScope = EXECUTION_SCOPE.get();
         EXECUTION_SCOPE.set(new ExecutionScope(executionDomain, 0));
 
-        try {
+        try (ActionHierarchy.Scope ignored = ActionHierarchy.install(action)) {
             new CycleLoopDetector().validateNoCycles(action);
             new DeadlockDetector().validateNoDeadlock(action, resolveParallelism(configuration));
             safeListener.runStarted(this);

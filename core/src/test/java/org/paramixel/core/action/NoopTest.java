@@ -36,7 +36,7 @@ class NoopTest {
         Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isPass()).isTrue();
-        assertThat(action.contextMode()).isEqualTo(Action.ContextMode.ISOLATED);
+        assertThat(action.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
     }
 
     @Test

@@ -44,8 +44,8 @@ class ParallelTest {
         Result result = Runner.builder().build().run(parallel);
 
         assertThat(result.getStatus().isPass()).isTrue();
-        assertThat(parallel.parallelism()).isEqualTo(2);
-        assertThat(parallel.contextMode()).isEqualTo(Action.ContextMode.ISOLATED);
+        assertThat(parallel.getParallelism()).isEqualTo(2);
+        assertThat(parallel.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
     }
 
     @Test
@@ -104,15 +104,6 @@ class ParallelTest {
                         .build());
 
         assertThat(result.getStatus().isPass()).isTrue();
-    }
-
-    @Test
-    @DisplayName("addChild rejects self as child")
-    void addChildRejectsSelfAsChild() {
-        Parallel parallel = Parallel.builder("parallel").child(Noop.of("child")).build();
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> parallel.addChild(parallel))
-                .withMessage("action must not add itself as a child");
     }
 
     private static Action incrementer(String name) {

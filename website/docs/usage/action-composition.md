@@ -258,6 +258,33 @@ public class MyTest {
 - `OrderMode.DECLARED` runs body children in builder order.
 - `OrderMode.SHUFFLED` shuffles body children, optionally with `seed(...)`.
 
+## Argument testing pattern
+
+When running the same test logic against multiple inputs, use a builder with a loop to add children dynamically:
+
+```java
+var builder = Container.builder("suite")
+        .policy(Container.Policy.builder()
+                .childMode(Container.ChildMode.INDEPENDENT)
+                .build());
+for (String argument : arguments()) {
+    builder.child(argument(argument));
+}
+return builder.build();
+```
+
+For concurrent argument execution, use `Parallel` instead:
+
+```java
+var builder = Parallel.builder("suite").parallelism(4);
+for (String argument : arguments()) {
+    builder.child(argument(argument));
+}
+return builder.build();
+```
+
+See [Argument Testing](argument-testing.md) for the full pattern with per-argument lifecycle, context sharing, and type examples.
+
 ## Action factory method pattern
 
 For readability and IDE navigability, create each action using a `private static` method. This pattern makes the test structure visible in the IDE outline and allows direct click-to-navigate for each action.

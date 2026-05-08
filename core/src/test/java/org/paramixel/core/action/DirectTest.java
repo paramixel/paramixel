@@ -43,7 +43,7 @@ class DirectTest {
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(ran).isTrue();
-        assertThat(action.contextMode()).isEqualTo(Action.ContextMode.ISOLATED);
+        assertThat(action.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
     }
 
     @Test
@@ -54,7 +54,7 @@ class DirectTest {
                 .execute(context -> {})
                 .build();
 
-        assertThat(action.contextMode()).isEqualTo(Action.ContextMode.SHARED);
+        assertThat(action.getContextMode()).isEqualTo(Action.ContextMode.SHARED);
     }
 
     @Test

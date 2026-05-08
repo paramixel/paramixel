@@ -140,6 +140,28 @@ class ResultTest {
     }
 
     @Test
+    @DisplayName("builder rejects mutation after build")
+    void builderRejectsMutationAfterBuild() {
+        Result.Builder builder = Result.builder(Noop.of("parent"));
+        Result child = Result.pass(Noop.of("child"));
+
+        builder.build();
+
+        assertThatThrownBy(() -> builder.status(Status.pass()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("builder already built");
+        assertThatThrownBy(() -> builder.runDuration(Duration.ZERO))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("builder already built");
+        assertThatThrownBy(() -> builder.child(child))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("builder already built");
+        assertThatThrownBy(builder::build)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("builder already built");
+    }
+
+    @Test
     @DisplayName("of factory rejects null status")
     void ofFactoryRejectsNullStatus() {
         Action action = Noop.of("test");

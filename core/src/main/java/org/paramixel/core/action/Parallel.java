@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import org.paramixel.core.Action;
+import org.paramixel.core.CompositeAction;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
@@ -36,7 +37,7 @@ import org.paramixel.core.support.Arguments;
 /**
  * Executes child actions concurrently.
  */
-public final class Parallel extends AbstractAction {
+public final class Parallel extends AbstractAction implements CompositeAction {
 
     private final List<Action> children;
     private final int parallelism;
@@ -50,7 +51,7 @@ public final class Parallel extends AbstractAction {
             Action.ContextMode contextMode) {
         super(contextMode);
         this.name = validateName(name);
-        this.children = validateAndParentChildren(children);
+        this.children = validateChildren(children);
         this.parallelism = parallelism;
         this.executorService = executorService;
     }
@@ -70,18 +71,11 @@ public final class Parallel extends AbstractAction {
         return children;
     }
 
-    @Override
-    public void addChild(Action child) {
-        Objects.requireNonNull(child, "child must not be null");
-        Arguments.require(child != this, "action must not add itself as a child");
-        child.setParent(this);
-    }
-
-    public int parallelism() {
+    public int getParallelism() {
         return parallelism;
     }
 
-    public Optional<ExecutorService> executorService() {
+    public Optional<ExecutorService> getExecutorService() {
         return Optional.ofNullable(executorService);
     }
 
@@ -223,13 +217,13 @@ public final class Parallel extends AbstractAction {
         return DefaultStatus.PASS;
     }
 
-    private List<Action> validateAndParentChildren(List<Action> children) {
+    private List<Action> validateChildren(List<Action> children) {
         Objects.requireNonNull(children, "children must not be null");
         Arguments.requireNonEmpty(children, "children must not be empty");
         List<Action> validated = new ArrayList<>(children.size());
         for (Action child : children) {
             Objects.requireNonNull(child, "children must not contain null elements");
-            addChild(child);
+            Arguments.require(child != this, "action must not add itself as a child");
             validated.add(child);
         }
         return List.copyOf(validated);

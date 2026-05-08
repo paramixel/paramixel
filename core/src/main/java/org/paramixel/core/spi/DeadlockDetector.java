@@ -18,6 +18,7 @@ package org.paramixel.core.spi;
 
 import java.util.Objects;
 import org.paramixel.core.Action;
+import org.paramixel.core.CompositeAction;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.exception.DeadlockDetected;
 import org.paramixel.core.support.Arguments;
@@ -55,14 +56,16 @@ public final class DeadlockDetector {
     }
 
     private int maxParallelDepth(Action action, int currentDepth) {
-        if (action instanceof Parallel p && p.executorService().isEmpty()) {
+        if (action instanceof Parallel p && p.getExecutorService().isEmpty()) {
             currentDepth++;
-        } else if (action instanceof Parallel p && p.executorService().isPresent()) {
+        } else if (action instanceof Parallel p && p.getExecutorService().isPresent()) {
             currentDepth = 0;
         }
         int max = currentDepth;
-        for (Action child : action.getChildren()) {
-            max = Math.max(max, maxParallelDepth(child, currentDepth));
+        if (action instanceof CompositeAction compositeAction) {
+            for (Action child : compositeAction.getChildren()) {
+                max = Math.max(max, maxParallelDepth(child, currentDepth));
+            }
         }
         return max;
     }

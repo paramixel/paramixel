@@ -183,6 +183,33 @@ class SelectorTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("only one location match");
         }
+
+        @Test
+        @DisplayName("rejects mutation after build")
+        void rejectsMutationAfterBuild() {
+            Selector.Builder builder = Selector.builder();
+
+            builder.build();
+
+            assertThatThrownBy(() -> builder.packageMatch("org"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(() -> builder.packageOf(SelectorTest.class))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(() -> builder.classMatch("SelectorTest"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(() -> builder.classOf(SelectorTest.class))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(() -> builder.tagMatch("smoke"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(builder::build)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+        }
     }
 
     @Nested

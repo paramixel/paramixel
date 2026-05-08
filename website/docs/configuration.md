@@ -210,3 +210,34 @@ Plugin flags:
 ```
 
 `paramixel.skipTests` and `paramixel.failIfNoTests` are Maven plugin parameters, not core `Configuration` keys.
+
+## Gradle plugin configuration
+
+The Gradle plugin exposes first-class DSL properties for common configuration keys.
+
+Precedence in the plugin is:
+
+1. `Configuration.defaultProperties()`
+2. DSL extension / task properties (only when `Property.isPresent()` is true)
+3. system properties whose keys start with `paramixel.`
+
+Example:
+
+```kotlin
+paramixel {
+    parallelism.set(4)
+    matchTag.set("smoke")
+    reportFile.set(layout.buildDirectory.file("paramixel/paramixel.json").map { it.asFile.absolutePath })
+    reportFormat.set("json")
+}
+```
+
+CLI flags:
+
+```bash
+./gradlew paramixelTest -Pparamixel.parallelism=8
+./gradlew paramixelTest -Pparamixel.match.tag=smoke
+./gradlew paramixelTest -Pparamixel.report.file=build/paramixel/paramixel.json
+```
+
+See [Gradle Plugin](usage/gradle-plugin.md) for the full DSL property reference.

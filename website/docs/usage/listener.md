@@ -32,6 +32,34 @@ Factory.defaultListener()
 
 There is no separate `treeListener()` — `Factory.defaultListener()` is the standard entry point.
 
+### Configuration-aware factory
+
+```java
+Factory.defaultListener(Map<String, String> configuration)
+```
+
+When `paramixel.report.file` is present in the configuration, this overload automatically includes the appropriate report listener (`ReportListener`, `JsonReportListener`, `XmlReportListener`, or `HtmlReportListener`) in the listener chain.
+
+## Report listeners
+
+Paramixel includes four report listeners that write per-run summary files:
+
+| Listener | Format | Description |
+|---|---|---|
+| `ReportListener` | Text | Plain-text tree summary |
+| `JsonReportListener` | JSON | Structured JSON with `name`, `kind`, `status`, `runDuration`, `message`, `exception`, `children` |
+| `XmlReportListener` | XML | Element-based XML report |
+| `HtmlReportListener` | HTML | Self-contained interactive HTML with tree view, search, and expand/collapse |
+
+All report listeners accept a file path in their constructor:
+
+```java
+new JsonReportListener("target/paramixel/report.json")
+new HtmlReportListener("target/paramixel/report.html")
+```
+
+See [Reporting](reporting.md) for full configuration details.
+
 ## Safe listener wrapper
 
 `org.paramixel.core.spi.listener.SafeListener` wraps another listener and catches listener-thrown exceptions so they do not break execution. `Error` subclasses (such as `OutOfMemoryError` and `StackOverflowError`) are rethrown immediately rather than caught and logged.

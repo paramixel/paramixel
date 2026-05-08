@@ -19,7 +19,7 @@ Add the Paramixel core dependency:
 
 ```xml
 <properties>
-    <paramixel.version>2.0.0</paramixel.version>
+    <paramixel.version>3.0.0</paramixel.version>
 </properties>
 
 <dependencies>

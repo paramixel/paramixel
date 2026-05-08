@@ -19,8 +19,6 @@ package org.paramixel.core.action;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
@@ -30,16 +28,14 @@ import org.paramixel.core.support.FastId;
 /**
  * Base implementation for {@link Action} types.
  *
- * <p>This class provides generated identifiers, name validation, and parent tracking shared by all action types.
- *
- * @implSpec Parent assignment is one-time only. After a parent has been set, later attempts to replace it fail.
+ * <p>This class provides generated identifiers, name validation, context scoping, and execute/skip null checks shared by
+ * framework-provided action types.
  */
 public abstract class AbstractAction implements Action {
 
     protected final String id;
     protected String name;
     private final ContextMode contextMode;
-    private final AtomicReference<Action> parent = new AtomicReference<>();
 
     /**
      * Creates an action with a generated stable identifier.
@@ -99,36 +95,9 @@ public abstract class AbstractAction implements Action {
         return name;
     }
 
-    /**
-     * Returns the parent action, if one has been assigned.
-     *
-     * @return the parent action, or an empty {@link Optional} when this action is a root
-     */
     @Override
-    public final Optional<Action> getParent() {
-        return Optional.ofNullable(parent.get());
-    }
-
-    @Override
-    public final ContextMode contextMode() {
+    public final ContextMode getContextMode() {
         return contextMode;
-    }
-
-    /**
-     * Sets the parent for this action.
-     *
-     * @param parent the parent action
-     * @throws NullPointerException if {@code parent} is {@code null}
-     * @throws IllegalArgumentException if {@code parent} is this action
-     * @throws IllegalStateException if this action already has a parent
-     */
-    @Override
-    public void setParent(Action parent) {
-        Objects.requireNonNull(parent, "parent must not be null");
-        Arguments.require(parent != this, "action must not be its own parent");
-        if (!this.parent.compareAndSet(null, parent)) {
-            throw new IllegalStateException("child already has a parent");
-        }
     }
 
     /**
