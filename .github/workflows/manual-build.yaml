@@ -192,7 +192,6 @@ jobs:
       - name: Build Gradle Plugin
         run: |
           export JAVA_17_HOME="$JAVA_HOME"
-          ./mvnw -B clean install -pl core -DskipTests
           cd gradle-plugin
           ./build.sh
         env:

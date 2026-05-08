@@ -64,7 +64,7 @@ echo "test" | gpg --batch --clearsign >/dev/null
 ## Usage
 
 ```bash
-./release.sh --version <VERSION> [options]
+./release.sh --version <VERSION> --gradle-plugin-dir gradle-plugin [options]
 ```
 
 ### Options
@@ -73,7 +73,7 @@ echo "test" | gpg --batch --clearsign >/dev/null
 |---|---|
 | `--version <version>` | Release version, e.g. `2.1.0` or `1.0.0-alpha` |
 | `--next-version <version>` | Next development version. Defaults to `<version>-POST` |
-| `--gradle-plugin-dir <dir>` | Gradle plugin directory. Defaults to `gradle-plugin` |
+| `--gradle-plugin-dir <dir>` | Directory containing `gradlew` for the Gradle plugin |
 | `--dry-run` | Validate only; no deploy, commits, tags, or pushes. **Default** |
 | `--deploy` | Publish release artifacts and push git refs |
 | `--yes`, `-y` | Skip deploy confirmation prompt |
@@ -84,7 +84,7 @@ echo "test" | gpg --batch --clearsign >/dev/null
 Validate everything without making any changes. The script will run all builds, create a temporary release branch, and then clean up automatically:
 
 ```bash
-./release.sh --version 2.1.0
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin
 ```
 
 If the dry run fails, tracked changes are reset and the temporary release branch is deleted.
@@ -94,13 +94,13 @@ If the dry run fails, tracked changes are reset and the temporary release branch
 Publish artifacts to Maven Central, create the release branch and tag, and update `main`:
 
 ```bash
-./release.sh --version 2.1.0 --deploy
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy
 ```
 
 You will be prompted to type the version number to confirm. Use `-y` to skip confirmation:
 
 ```bash
-./release.sh --version 2.1.0 --deploy -y
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy -y
 ```
 
 ### Custom Next Version
@@ -108,7 +108,7 @@ You will be prompted to type the version number to confirm. Use `-y` to skip con
 By default, the post-release development version is `<VERSION>-POST`. Override with `--next-version`:
 
 ```bash
-./release.sh --version 2.1.0 --deploy --next-version 2.2.0-SNAPSHOT
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy --next-version 2.2.0-SNAPSHOT
 ```
 
 ## What Happens During a Release
