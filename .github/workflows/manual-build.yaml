@@ -45,7 +45,7 @@ jobs:
           javac -version
 
       - name: Build and Test
-        run: ./mvnw -B clean verify -Dspotbugs.skip=true -Dpmd.skip=true
+        run: ./build.sh maven --skip-static-analysis
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -97,7 +97,7 @@ jobs:
           javac -version
 
       - name: Build and Test
-        run: ./mvnw -B clean verify
+        run: ./build.sh maven
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -149,7 +149,7 @@ jobs:
           javac -version
 
       - name: Build and Test
-        run: ./mvnw -B clean verify
+        run: ./build.sh maven
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -192,9 +192,7 @@ jobs:
       - name: Build Gradle Plugin
         run: |
           export JAVA_17_HOME="$JAVA_HOME"
-          ./mvnw -B clean install -pl core -DskipTests
-          cd gradle-plugin
-          ./build.sh
+          ./build.sh gradle-plugin
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 

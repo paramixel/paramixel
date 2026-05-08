@@ -18,6 +18,8 @@ package org.paramixel.gradle;
 
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.provider.Provider;
+import org.gradle.api.provider.ProviderFactory;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 
@@ -51,6 +53,8 @@ public class ParamixelPlugin implements Plugin<Project> {
         ParamixelExtension extension =
                 project.getExtensions().create(EXTENSION_NAME, ParamixelExtension.class, project.getObjects());
 
+        ProviderFactory providers = project.getProviders();
+
         project.getTasks().register(TASK_NAME, ParamixelTestTask.class, task -> {
             task.setGroup("verification");
             task.setDescription("Discovers and executes Paramixel action trees");
@@ -61,17 +65,42 @@ public class ParamixelPlugin implements Plugin<Project> {
             task.getTestClasspath().from(testSourceSet.getRuntimeClasspath());
             task.dependsOn(project.getTasks().named("testClasses"));
 
-            task.getSkipTests().convention(extension.getSkipTests());
-            task.getFailIfNoTests().convention(extension.getFailIfNoTests());
-            task.getFailureOnSkip().convention(extension.getFailureOnSkip());
-            task.getParallelism().convention(extension.getParallelism());
-            task.getMatchPackage().convention(extension.getMatchPackage());
-            task.getMatchClass().convention(extension.getMatchClass());
-            task.getMatchTag().convention(extension.getMatchTag());
-            task.getReportFile().convention(extension.getReportFile());
-            task.getReportFormat().convention(extension.getReportFormat());
+            task.getSkipTests().convention(
+                    booleanProvider(providers, "paramixel.skipTests").orElse(extension.getSkipTests()));
+            task.getFailIfNoTests().convention(
+                    booleanProvider(providers, "paramixel.failIfNoTests").orElse(extension.getFailIfNoTests()));
+            task.getFailureOnSkip().convention(
+                    booleanProvider(providers, "paramixel.failureOnSkip").orElse(extension.getFailureOnSkip()));
+            task.getParallelism().convention(
+                    integerProvider(providers, "paramixel.parallelism").orElse(extension.getParallelism()));
+            task.getMatchPackage().convention(
+                    stringProvider(providers, "paramixel.match.package").orElse(extension.getMatchPackage()));
+            task.getMatchClass().convention(
+                    stringProvider(providers, "paramixel.match.class").orElse(extension.getMatchClass()));
+            task.getMatchTag().convention(
+                    stringProvider(providers, "paramixel.match.tag").orElse(extension.getMatchTag()));
+            task.getReportFile().convention(
+                    stringProvider(providers, "paramixel.report.file").orElse(extension.getReportFile()));
+            task.getReportFormat().convention(
+                    stringProvider(providers, "paramixel.report.format").orElse(extension.getReportFormat()));
         });
 
         project.getTasks().named("check", check -> check.dependsOn(TASK_NAME));
+    }
+
+    private static Provider<Boolean> booleanProvider(ProviderFactory providers, String key) {
+        return providers.systemProperty(key)
+                .map(Boolean::parseBoolean)
+                .orElse(providers.gradleProperty(key).map(Boolean::parseBoolean));
+    }
+
+    private static Provider<Integer> integerProvider(ProviderFactory providers, String key) {
+        return providers.systemProperty(key)
+                .map(Integer::parseInt)
+                .orElse(providers.gradleProperty(key).map(Integer::parseInt));
+    }
+
+    private static Provider<String> stringProvider(ProviderFactory providers, String key) {
+        return providers.systemProperty(key).orElse(providers.gradleProperty(key));
     }
 }

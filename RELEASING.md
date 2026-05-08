@@ -73,7 +73,7 @@ echo "test" | gpg --batch --clearsign >/dev/null
 |---|---|
 | `--version <version>` | Release version, e.g. `2.1.0` or `1.0.0-alpha` |
 | `--next-version <version>` | Next development version. Defaults to `<version>-POST` |
-| `--gradle-plugin-dir <dir>` | Gradle plugin directory. Defaults to `gradle-plugin` |
+| `--gradle-plugin-dir <dir>` | Directory containing `gradlew` for the Gradle plugin. Defaults to `gradle-plugin` |
 | `--dry-run` | Validate only; no deploy, commits, tags, or pushes. **Default** |
 | `--deploy` | Publish release artifacts and push git refs |
 | `--yes`, `-y` | Skip deploy confirmation prompt |
@@ -126,9 +126,9 @@ By default, the post-release development version is `<VERSION>-POST`. Override w
 Runs the full Maven build on all three Java versions to ensure compatibility:
 
 ```bash
-JAVA_HOME=$JAVA_25_HOME ./mvnw -B clean verify -Dspotbugs.skip=true -Dpmd.skip=true
-JAVA_HOME=$JAVA_21_HOME ./mvnw -B clean verify
-JAVA_HOME=$JAVA_17_HOME ./mvnw -B clean verify
+JAVA_HOME=$JAVA_25_HOME ./build.sh maven --skip-static-analysis
+JAVA_HOME=$JAVA_21_HOME ./build.sh maven
+JAVA_HOME=$JAVA_17_HOME ./build.sh maven
 ```
 
 ### 3. Release Branch Creation

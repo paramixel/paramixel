@@ -109,7 +109,36 @@ class ParamixelPluginFunctionalTest {
         var result = GradleRunner.create()
                 .withProjectDir(projectDir.toFile())
                 .withPluginClasspath()
-                .withArguments("paramixelTest", "--stacktrace")
+                .withArguments("paramixelTest", "--stacktrace", "-Dparamixel.failIfNoTests=true")
+                .buildAndFail();
+
+        assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.FAILED);
+    }
+
+    @Test
+    @DisplayName("configuration precedence order honors project properties over extension")
+    void projectPropertyPrecedenceOrder() throws IOException {
+        writeBuildFile("plugins { id('org.paramixel') }\nparamixel { failIfNoTests = false }");
+
+        var result = GradleRunner.create()
+                .withProjectDir(projectDir.toFile())
+                .withPluginClasspath()
+                .withArguments("paramixelTest", "--stacktrace", "-Pparamixel.failIfNoTests=true")
+                .buildAndFail();
+
+        assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.FAILED);
+    }
+
+    @Test
+    @DisplayName("system properties override project properties")
+    void systemPropertyOverridesProjectProperty() throws IOException {
+        writeBuildFile("plugins { id('org.paramixel') }\nparamixel { failIfNoTests = true }");
+
+        var result = GradleRunner.create()
+                .withProjectDir(projectDir.toFile())
+                .withPluginClasspath()
+                .withArguments(
+                        "paramixelTest", "--stacktrace", "-Pparamixel.failIfNoTests=true", "-Dparamixel.failIfNoTests=false")
                 .build();
 
         assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
