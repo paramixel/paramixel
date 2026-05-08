@@ -73,6 +73,7 @@ build_plugin() {
         fail "JAVA_17_HOME directory does not exist: ${JAVA_17_HOME}"
     fi
 
+    ./mvnw clean install -pl core -DskipTests
     cd "${SCRIPT_DIR}"
     JAVA_HOME="${JAVA_17_HOME}" ./gradlew clean build --no-daemon
 }
