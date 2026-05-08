@@ -7,41 +7,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build and Test (Java ${{ matrix.java-version }})
+  build-java-25:
+    name: Build and Test (Java 25)
     runs-on:
       group: Default
       labels: runner
 
-    strategy:
-      matrix:
-        java-version: [17, 21, 25]
-        include:
-          - java-version: 17
-            description: "Java 17 Compatibility Test"
-            runner-description: "Java 17 Compatibility Test"
-          - java-version: 21
-            description: "Java 21 Compatibility Test"
-            runner-description: "Java 21 Compatibility Test"
-          - java-version: 25
-            description: "Java 25 Compatibility Test"
-            runner-description: "Java 25 Compatibility Test"
-
     env:
-      JAVA_VERSION: ${{ matrix.java-version }}
-      RUNNER_DESCRIPTION: ${{ matrix.runner-description }}
+      JAVA_VERSION: 25
+      RUNNER_DESCRIPTION: "Java 25 Compatibility Test"
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up JDK ${{ matrix.java-version }}
+      - name: Set up JDK 25
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java-version }}
+          java-version: 25
           distribution: corretto
-          cache: maven
-          cache-dependency-path: '**/pom.xml'
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: maven-local-repo-${{ runner.os }}-java25-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-local-repo-${{ runner.os }}-java25-
+
+      - name: Clean Maven Wrapper Distributions
+        run: rm -rf ~/.m2/wrapper/dists/
 
       - name: Verify Java Runtime
         run: |
@@ -50,12 +45,7 @@ jobs:
           javac -version
 
       - name: Build and Test
-        run: |
-          if [ "$JAVA_VERSION" = "25" ]; then
-            ./mvnw -B clean verify -Dspotbugs.skip=true -Dpmd.skip=true
-          else
-            ./mvnw -B clean verify
-          fi
+        run: ./mvnw -B clean verify -Dspotbugs.skip=true -Dpmd.skip=true
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -68,11 +58,68 @@ jobs:
           echo "Testing complete for: $RUNNER_DESCRIPTION"
           echo "Java version used: $JAVA_VERSION"
 
-  gradle-plugin-build:
-    name: Gradle Plugin Build (Java 17)
+  build-java-21:
+    name: Build and Test (Java 21)
     runs-on:
       group: Default
       labels: runner
+    needs: build-java-25
+
+    env:
+      JAVA_VERSION: 21
+      RUNNER_DESCRIPTION: "Java 21 Compatibility Test"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: corretto
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: maven-local-repo-${{ runner.os }}-java21-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-local-repo-${{ runner.os }}-java21-
+
+      - name: Clean Maven Wrapper Distributions
+        run: rm -rf ~/.m2/wrapper/dists/
+
+      - name: Verify Java Runtime
+        run: |
+          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
+          java -version
+          javac -version
+
+      - name: Build and Test
+        run: ./mvnw -B clean verify
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
+
+      - name: Verify Compatibility
+        run: |
+          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
+
+      - name: Verify Threading Mode
+        run: |
+          echo "Testing complete for: $RUNNER_DESCRIPTION"
+          echo "Java version used: $JAVA_VERSION"
+
+  build-java-17:
+    name: Build and Test (Java 17)
+    runs-on:
+      group: Default
+      labels: runner
+    needs: build-java-21
+
+    env:
+      JAVA_VERSION: 17
+      RUNNER_DESCRIPTION: "Java 17 Compatibility Test"
 
     steps:
       - name: Checkout code
@@ -83,13 +130,79 @@ jobs:
         with:
           java-version: 17
           distribution: corretto
-          cache: maven
-          cache-dependency-path: '**/pom.xml'
 
-      - name: Install Maven dependencies
-        run: ./mvnw -B clean install -Dparamixel.skipTests -pl core -am
+      - name: Cache Maven local repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: maven-local-repo-${{ runner.os }}-java17-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-local-repo-${{ runner.os }}-java17-
+
+      - name: Clean Maven Wrapper Distributions
+        run: rm -rf ~/.m2/wrapper/dists/
+
+      - name: Verify Java Runtime
+        run: |
+          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
+          java -version
+          javac -version
+
+      - name: Build and Test
+        run: ./mvnw -B clean verify
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
+      - name: Verify Compatibility
+        run: |
+          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
+
+      - name: Verify Threading Mode
+        run: |
+          echo "Testing complete for: $RUNNER_DESCRIPTION"
+          echo "Java version used: $JAVA_VERSION"
+
+  build-gradle-plugin:
+    name: Build Gradle Plugin
+    runs-on:
+      group: Default
+      labels: runner
+    needs: build-java-17
+
+    env:
+      JAVA_VERSION: 17
+      RUNNER_DESCRIPTION: "Gradle Plugin Build"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: corretto
+
+      - name: Verify Java Runtime
+        run: |
+          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
+          java -version
+          javac -version
+
       - name: Build Gradle Plugin
-        run: chmod +x gradle-plugin/build.sh && JAVA_17_HOME=$JAVA_HOME ./gradle-plugin/build.sh
+        run: |
+          export JAVA_17_HOME="$JAVA_HOME"
+          ./mvnw -B clean install -pl core -DskipTests
+          cd gradle-plugin
+          ./build.sh
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
+
+      - name: Verify Compatibility
+        run: |
+          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
+
+      - name: Verify Threading Mode
+        run: |
+          echo "Testing complete for: $RUNNER_DESCRIPTION"
+          echo "Java version used: $JAVA_VERSION"

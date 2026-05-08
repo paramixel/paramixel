@@ -47,7 +47,17 @@ jobs:
         with:
           java-version: '21'
           distribution: 'corretto'
-          cache: 'maven'
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: maven-local-repo-${{ runner.os }}-java21-docs-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-local-repo-${{ runner.os }}-java21-docs-
+
+      - name: Clean Maven Wrapper Distributions
+        run: rm -rf ~/.m2/wrapper/dists/
 
       - name: Install Docusaurus dependencies
         working-directory: website

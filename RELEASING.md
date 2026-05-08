@@ -1,146 +1,163 @@
 # Releasing Paramixel
 
-This repository publishes artifacts to Maven Central using GitHub Actions and the Maven `release` profile.
+This repository publishes artifacts to Maven Central using the `release.sh` script.
 
 ## Prerequisites
 
-### GitHub Secrets Configuration
+### Java Installations
 
-The following secrets must be configured in your repository settings (Settings → Secrets and variables → Actions):
-
-1. **GPG_PRIVATE_KEY** - The GPG private key for signing artifacts
-2. **GPG_PASSPHRASE** - The passphrase for your GPG private key
-3. **CENTRAL_USERNAME** - Your Sonatype Central username
-4. **CENTRAL_TOKEN** - Your Sonatype Central token
-
-### Creating a Dedicated GPG Key for Releases
-
-It's recommended to use a dedicated GPG key for automated releases:
+The release script verifies builds against three Java versions. Set the following environment variables:
 
 ```bash
-# 1. Generate a new GPG key specifically for Paramixel releases
+export JAVA_17_HOME=/path/to/jdk17
+export JAVA_21_HOME=/path/to/jdk21
+export JAVA_25_HOME=/path/to/jdk25
+```
+
+Each must point to a JDK installation with a working `bin/java` executable.
+
+### Maven Central Credentials
+
+Deploy mode requires a Maven `settings.xml` file at `~/.m2/settings.xml` with your Sonatype Central credentials:
+
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>central</id>
+      <username>YOUR_CENTRAL_USERNAME</username>
+      <password>YOUR_CENTRAL_TOKEN</password>
+    </server>
+  </servers>
+</settings>
+```
+
+### GPG Signing Key
+
+Deploy mode requires a local GPG signing key. Maven Central requires that all published artifacts are signed and that the signing key is published to public key servers.
+
+```bash
+# Generate a dedicated GPG key for releases (if you don't have one)
 gpg --full-generate-key
+# RSA 4096, 2-year expiry recommended
 
-# Select the following options:
-# - Type: (1) RSA and RSA (default)
-# - Key size: 4096 bits
-# - Expiry: 2 years (recommended for automation keys)
-# - Real name: Paramixel Release Bot
-# - Email: your-email@example.com
-# - Comment: Automated releases for Paramixel project
-
-# 2. List the key to get the Key ID
+# List your key to get the Key ID
 gpg --list-secret-keys --keyid-format=long
+# Look for: sec   rsa4096/XXXXXXXXXXXXXXXX
 
-# Look for output like:
-# sec   rsa4096/XXXXXXXXXXXXXXXX 2024-01-01 [SC] [expires: 2026-01-01]
-# Note the XXXXXXXXXXXXXXXX part - this is your Key ID
-
-# 3. Export the private key
-gpg --export-secret-keys -a XXXXXXXXXXXXXXXX > paramixel-release-private.asc
-
-# 4. Export the public key (for publishing to key servers)
-gpg --export -a XXXXXXXXXXXXXXXX > paramixel-release-public.asc
-
-# 5. Publish the public key to key servers (required for Maven Central)
+# Publish the public key to key servers (required for Maven Central)
 gpg --keyserver keyserver.ubuntu.com --send-keys XXXXXXXXXXXXXXXX
 gpg --keyserver keys.openpgp.org --send-keys XXXXXXXXXXXXXXXX
 gpg --keyserver pgp.mit.edu --send-keys XXXXXXXXXXXXXXXX
 
-# 6. Copy the ENTIRE contents of paramixel-release-private.asc 
-#    (including -----BEGIN/END----- lines) to the GPG_PRIVATE_KEY secret
-
-# 7. IMPORTANT: Securely delete the key files
-shred -vfz paramixel-release-*.asc
-# Or on systems without shred:
-# rm -P paramixel-release-*.asc  # macOS
-# rm paramixel-release-*.asc     # Windows/other (less secure)
+# Verify signing works
+echo "test" | gpg --batch --clearsign >/dev/null
 ```
 
-### Repository Requirements
+### Repository State
 
-- Releases must be triggered from the `main` branch
-- You must have write permissions to the repository
-- The repository uses self-hosted runners (group: Default, labels: runner)
-- Environment protection rules are configured for the `release` environment
+- You must be on the `main` branch
+- The working tree must be clean (no uncommitted changes)
+- `main` must be synced with the remote (no ahead/behind commits)
+- No existing release branch or tag for the target version
 
-### Setting up Environment Protection
+## Usage
 
-1. Go to Settings → Environments
-2. Create a new environment called `release`
-3. Configure protection rules:
-   - Required reviewers: 1-2 maintainers
-   - Restrict to `main` branch only
-   - Optional: Add the same secrets at the environment level for extra security
+```bash
+./release.sh --version <VERSION> --gradle-plugin-dir gradle-plugin [options]
+```
 
-## Release Process
+### Options
 
-### Triggering a Release
+| Option | Description |
+|---|---|
+| `--version <version>` | Release version, e.g. `2.1.0` or `1.0.0-alpha` |
+| `--next-version <version>` | Next development version. Defaults to `<version>-POST` |
+| `--gradle-plugin-dir <dir>` | Directory containing `gradlew` for the Gradle plugin |
+| `--dry-run` | Validate only; no deploy, commits, tags, or pushes. **Default** |
+| `--deploy` | Publish release artifacts and push git refs |
+| `--yes`, `-y` | Skip deploy confirmation prompt |
+| `--help`, `-h` | Show help |
 
-1. Go to the **Actions** tab in your GitHub repository
-2. Select the **Release** workflow from the left sidebar
-3. Click **Run workflow** button
-4. Enter the release version (e.g., `1.0.0` or `1.0.0-alpha-2`)
-5. Click the green **Run workflow** button
-6. If environment protection is enabled, approve the release when prompted
+### Dry Run (Default)
 
-### Automated Release Steps
+Validate everything without making any changes. The script will run all builds, create a temporary release branch, and then clean up automatically:
 
-The workflow performs the following steps automatically:
+```bash
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin
+```
 
-1. **Validation Phase**
-   - Validates all required secrets are configured
-   - Validates version format (MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-label)
-   - Verifies no existing release branch or tag exists
-   - Confirms execution from `main` branch
-   - Performs security checks on the runner environment
+If the dry run fails, tracked changes are reset and the temporary release branch is deleted.
 
-2. **Build and Test Phase**
-   - Runs full test suite on Java 17, 21, and 25
-   - Executes SpotBugs and PMD analysis (except Java 25)
-   - Verifies all tests pass before proceeding
+### Deploy
 
-3. **Release Execution Phase**
-   - Creates release branch `release/<VERSION>`
-   - Sets project version to `<VERSION>`
-   - Builds and signs artifacts with GPG
-   - Deploys to Maven Central with automatic publishing
-   - Commits release changes with sign-off
-   - Creates annotated tag `v<VERSION>`
-   - Pushes release branch
+Publish artifacts to Maven Central, create the release branch and tag, and update `main`:
 
-4. **Post-Release Phase**
-   - Switches back to `main` branch
-   - Sets version to `<VERSION>-POST`
-   - Commits post-release changes
-   - Pushes updated `main` branch
-   - Pushes release tag
+```bash
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy
+```
 
-5. **GitHub Release Creation**
-   - Creates a minimal GitHub Release with Maven coordinates
-   - Can be edited later to add detailed release notes
+You will be prompted to type the version number to confirm. Use `-y` to skip confirmation:
 
-6. **SLSA Provenance Generation**
-   - Generates supply chain security attestations
-   - Creates cryptographically signed provenance
+```bash
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy -y
+```
 
-## Security Features
+### Custom Next Version
 
-The release workflow implements enhanced security measures:
+By default, the post-release development version is `<VERSION>-POST`. Override with `--next-version`:
 
-- **Secure Secret Handling**: Secrets are never written to disk on self-hosted runners
-- **RAM Disk Usage**: Temporary files stored in RAM (`/dev/shm`) when available
-- **Comprehensive Cleanup**: All sensitive data is securely removed after use
-- **Audit Logging**: Release attempts are logged for security monitoring
-- **Environment Protection**: Requires approval for production releases
-- **SLSA Provenance**: Supply chain security attestations
+```bash
+./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy --next-version 2.2.0-SNAPSHOT
+```
 
-## Monitoring the Release
+## What Happens During a Release
 
-1. Watch the workflow progress in the Actions tab
-2. Each job shows detailed logs for troubleshooting
-3. The workflow will fail fast on any errors
-4. Maven Central artifacts appear within 30 minutes of successful deployment
+### 1. Validation
+
+- Checks required environment variables (`JAVA_17_HOME`, `JAVA_21_HOME`, `JAVA_25_HOME`)
+- Verifies the working tree is clean and the current branch is `main`
+- Fetches from remote and confirms `main` is synced (no ahead/behind)
+- Confirms no existing local or remote release branch or tag
+- In deploy mode: validates `~/.m2/settings.xml` exists and GPG signing works
+
+### 2. Pre-release Build Verification
+
+Runs the full Maven build on all three Java versions to ensure compatibility:
+
+```bash
+JAVA_HOME=$JAVA_25_HOME ./mvnw -B clean verify -Dspotbugs.skip=true -Dpmd.skip=true
+JAVA_HOME=$JAVA_21_HOME ./mvnw -B clean verify
+JAVA_HOME=$JAVA_17_HOME ./mvnw -B clean verify
+```
+
+### 3. Release Branch Creation
+
+- Creates branch `release/<VERSION>`
+- Sets project version to `<VERSION>` via `mvn versions:set`
+
+### 4. Release Branch Verification
+
+- Re-runs the full Maven build on all three Java versions
+- Installs signed release artifacts locally with Java 17 (`-Prelease clean install`)
+- Builds the Gradle plugin with the release version
+
+### 5. Deploy (deploy mode only)
+
+- Commits release changes with sign-off: `Release <VERSION>`
+- Creates annotated tag `v<VERSION>`
+- Pre-flight checks push permissions for the release branch and tag
+- Deploys signed artifacts to Maven Central with Java 17 (`-Prelease clean deploy`)
+- Pushes release branch and tag to remote
+
+### 6. Post-release (deploy mode only)
+
+- Switches back to `main`
+- Sets next development version (`<VERSION>-POST` or custom `--next-version`)
+- Verifies the next development build with Java 17
+- Syncs the Gradle plugin version to the next development version
+- Commits with sign-off: `Prepare for development`
+- Pushes `main` to remote
 
 ## Conventions
 
@@ -154,54 +171,49 @@ The release workflow implements enhanced security measures:
 
 ### Common Issues
 
-1. **Secret validation fails**
-   - Ensure all required secrets are properly configured
-   - Check that secrets don't contain extra whitespace
-
-2. **Version already exists**
-   - Check for existing branches/tags with: `git tag -l` and `git branch -a`
-   - Remove old tags if needed: `git push origin :refs/tags/vX.Y.Z`
-
-3. **GPG signing fails**
+1. **"GPG signing failed"**
    - Verify your GPG key is valid: `gpg --list-secret-keys`
    - Check the key hasn't expired
-   - Ensure the passphrase is correct
+   - Ensure the passphrase is correct (GPG agent may be caching it)
+   - Test manually: `echo "test" | gpg --batch --clearsign`
 
-4. **Central deployment fails**
+2. **"Maven settings not found: ~/.m2/settings.xml"**
+   - Create or update `~/.m2/settings.xml` with your Sonatype Central credentials
+   - Ensure the `<server>` `<id>` matches the `distributionManagement` repository ID in the POM
+
+3. **"main is not synced with origin/main"**
+   - Pull or push to sync: `git pull` or `git push`
+   - Check for diverged branches
+
+4. **"Local tag already exists: vX.Y.Z"**
+   - Check existing tags: `git tag -l`
+   - Delete if stale: `git tag -d vX.Y.Z`
+
+5. **"Remote tag already exists: vX.Y.Z"**
+   - Delete remote tag: `git push origin :refs/tags/vX.Y.Z`
+   - Only do this if the previous release was incomplete or failed
+
+6. **Central deployment fails**
    - Verify your Sonatype credentials at https://central.sonatype.com
-   - Check that your account has publishing permissions
    - Ensure the GPG public key is published to key servers
+   - Check that your account has publishing permissions
 
-5. **Self-hosted runner issues**
-   - Check that `/dev/shm` is available for RAM disk operations
-   - Verify runner has sufficient permissions
-   - Ensure runner environment is clean
+### Error Recovery
 
-### Manual Cleanup (if needed)
+In **dry-run** mode, the script automatically cleans up on failure by resetting tracked changes, restoring the original branch, and deleting the temporary release branch.
 
-If a release fails and leaves the environment in an inconsistent state:
+In **deploy** mode, the script leaves local state intact for inspection and recovery if a failure occurs after commits are made. You may need to manually:
 
 ```bash
-# On the self-hosted runner:
-# Kill GPG agents
-gpgconf --kill all
+# Undo the last commit (if not yet pushed)
+git reset --hard HEAD~1
 
-# Clear any remaining sensitive files
-find /tmp /dev/shm -name "*gpg*" -o -name "*settings*.xml" | xargs -r shred -vfz
+# Delete a local tag
+git tag -d vX.Y.Z
 
-# Clear Maven cache if needed
-rm -rf ~/.m2/repository/org/paramixel/*-SNAPSHOT
+# Delete a local release branch
+git branch -D release/X.Y.Z
 ```
-
-### Support
-
-For issues with the release process:
-- Check the workflow logs in the Actions tab
-- Review the audit logs in `/tmp/release-audit-*.log` on the runner
-
-For Sonatype Central issues:
-- Contact: central-support@sonatype.com
-- Status page: https://status.maven.org
 
 ---
 
