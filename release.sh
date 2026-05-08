@@ -206,17 +206,21 @@ require_no_existing_release_refs() {
   local release_branch="$2"
   local tag_name="$3"
 
-  git rev-parse -q --verify "refs/heads/${release_branch}" >/dev/null 2>&1 &&
+  if git rev-parse -q --verify "refs/heads/${release_branch}" >/dev/null 2>&1; then
     fail "Local release branch already exists: ${release_branch}"
+  fi
 
-  git rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null 2>&1 &&
+  if git rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null 2>&1; then
     fail "Local tag already exists: ${tag_name}"
+  fi
 
-  git ls-remote --exit-code --heads "${remote}" "refs/heads/${release_branch}" >/dev/null 2>&1 &&
+  if git ls-remote --exit-code --heads "${remote}" "refs/heads/${release_branch}" >/dev/null 2>&1; then
     fail "Remote release branch already exists: ${release_branch}"
+  fi
 
-  git ls-remote --exit-code --tags "${remote}" "refs/tags/${tag_name}" >/dev/null 2>&1 &&
+  if git ls-remote --exit-code --tags "${remote}" "refs/tags/${tag_name}" >/dev/null 2>&1; then
     fail "Remote tag already exists: ${tag_name}"
+  fi
 }
 
 confirm_deploy() {
