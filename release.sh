@@ -5,13 +5,14 @@ set +x
 readonly VERSION_PATTERN='^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?$'
 readonly BASE_BRANCH='main'
 readonly DEFAULT_NEXT_SUFFIX='POST'
+readonly DEFAULT_GRADLE_PLUGIN_DIR='gradle-plugin'
 readonly SETTINGS_FILE="${HOME}/.m2/settings.xml"
 
 VERSION=""
 NEXT_VERSION=""
 MODE="dry-run"
 YES="false"
-GRADLE_PLUGIN_DIR=""
+GRADLE_PLUGIN_DIR="${DEFAULT_GRADLE_PLUGIN_DIR}"
 
 ORIGINAL_BRANCH=""
 CREATED_RELEASE_BRANCH="false"
@@ -19,12 +20,12 @@ CREATED_RELEASE_BRANCH="false"
 usage() {
   cat >&2 <<EOF
 Usage:
-  ./release.sh --version <version> --gradle-plugin-dir <dir> [options]
+  ./release.sh --version <version> [options]
 
 Options:
   --version <version>          Release version, e.g. 2.1.0
   --next-version <version>     Next version. Defaults to <version>-POST
-  --gradle-plugin-dir <dir>    Directory containing gradlew
+  --gradle-plugin-dir <dir>    Gradle plugin directory. Default: ${DEFAULT_GRADLE_PLUGIN_DIR}
   --dry-run                    Validate only. Default.
   --deploy                     Publish release.
   --yes, -y                    Skip deploy confirmation.
@@ -42,6 +43,13 @@ log() { echo "[INFO] $*"; }
 fail() {
   echo "[ERROR] $*" >&2
   exit 1
+}
+
+require_arg_value() {
+  local option="$1"
+  local value="${2:-}"
+
+  [[ -n "${value}" && "${value}" != --* ]] || fail "${option} requires a value"
 }
 
 cleanup_on_error() {
@@ -76,14 +84,17 @@ parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --version)
+        require_arg_value "$1" "${2:-}"
         VERSION="${2:-}"
         shift 2
         ;;
       --next-version)
+        require_arg_value "$1" "${2:-}"
         NEXT_VERSION="${2:-}"
         shift 2
         ;;
       --gradle-plugin-dir)
+        require_arg_value "$1" "${2:-}"
         GRADLE_PLUGIN_DIR="${2:-}"
         shift 2
         ;;
@@ -110,7 +121,6 @@ parse_args() {
   done
 
   [[ -n "${VERSION}" ]] || fail "--version is required"
-  [[ -n "${GRADLE_PLUGIN_DIR}" ]] || fail "--gradle-plugin-dir is required"
 
   if [[ -z "${NEXT_VERSION}" ]]; then
     NEXT_VERSION="${VERSION}-${DEFAULT_NEXT_SUFFIX}"
@@ -149,6 +159,7 @@ require_main_branch() {
 require_gradle_plugin_dir() {
   [[ -d "${GRADLE_PLUGIN_DIR}" ]] || fail "--gradle-plugin-dir is not a directory: ${GRADLE_PLUGIN_DIR}"
   [[ -x "${GRADLE_PLUGIN_DIR}/gradlew" ]] || fail "gradlew not executable: ${GRADLE_PLUGIN_DIR}/gradlew"
+  [[ -x "${GRADLE_PLUGIN_DIR}/build.sh" ]] || fail "build.sh not executable: ${GRADLE_PLUGIN_DIR}/build.sh"
 }
 
 require_settings_xml() {
@@ -401,4 +412,3 @@ main() {
 }
 
 main "$@"
-

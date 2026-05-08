@@ -60,16 +60,16 @@ echo "test" | gpg --batch --clearsign >/dev/null
 
 ```bash
 # Dry run (default) - validate only, no changes made
-./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin
+./release.sh --version 2.1.0
 
 # Deploy - publish to Maven Central and push release refs
-./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy
+./release.sh --version 2.1.0 --deploy
 ```
 
 You will be prompted to type the version number to confirm the deploy. Use `-y` to skip confirmation:
 
 ```bash
-./release.sh --version 2.1.0 --gradle-plugin-dir gradle-plugin --deploy -y
+./release.sh --version 2.1.0 --deploy -y
 ```
 
 ## Options
@@ -78,7 +78,7 @@ You will be prompted to type the version number to confirm the deploy. Use `-y` 
 |---|---|
 | `--version <version>` | Release version, e.g. `2.1.0` or `1.0.0-alpha` |
 | `--next-version <version>` | Next development version. Defaults to `<version>-POST` |
-| `--gradle-plugin-dir <dir>` | Directory containing `gradlew` for the Gradle plugin |
+| `--gradle-plugin-dir <dir>` | Gradle plugin directory. Defaults to `gradle-plugin` |
 | `--dry-run` | Validate only; no deploy, commits, tags, or pushes. **Default** |
 | `--deploy` | Publish release artifacts and push git refs |
 | `--yes`, `-y` | Skip deploy confirmation prompt |
