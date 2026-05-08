@@ -159,7 +159,7 @@ require_main_branch() {
 require_gradle_plugin_dir() {
   [[ -d "${GRADLE_PLUGIN_DIR}" ]] || fail "--gradle-plugin-dir is not a directory: ${GRADLE_PLUGIN_DIR}"
   [[ -x "${GRADLE_PLUGIN_DIR}/gradlew" ]] || fail "gradlew not executable: ${GRADLE_PLUGIN_DIR}/gradlew"
-  [[ -x "${GRADLE_PLUGIN_DIR}/build.sh" ]] || fail "build.sh not executable: ${GRADLE_PLUGIN_DIR}/build.sh"
+  [[ -x "./build.sh" ]] || fail "build.sh not executable: ./build.sh"
 }
 
 require_settings_xml() {
@@ -256,6 +256,15 @@ run_gradle() {
     PATH="${java_home}/bin:${PATH}" \
     ./gradlew "$@"
   )
+}
+
+run_build_script_java_17() {
+  local target="$1"
+  shift
+
+  JAVA_HOME="${JAVA_17_HOME}" \
+  PATH="${JAVA_17_HOME}/bin:${PATH}" \
+  ./build.sh "${target}" --gradle-plugin-dir "${GRADLE_PLUGIN_DIR}" "$@"
 }
 
 set_project_version() {
@@ -364,7 +373,7 @@ main() {
   verify_java_17
   install_release_artifacts_java_17
   log "Building Gradle plugin with version ${VERSION}"
-  JAVA_HOME="${JAVA_17_HOME}" "${GRADLE_PLUGIN_DIR}/build.sh"
+  run_build_script_java_17 gradle-plugin
 
   if [[ "${MODE}" == "dry-run" ]]; then
     log "Dry run complete. No deploy, commits, tags, or pushes were made."
@@ -403,7 +412,7 @@ main() {
   verify_java_17
 
   log "Syncing Gradle plugin version to ${NEXT_VERSION}"
-  JAVA_HOME="${JAVA_17_HOME}" "${GRADLE_PLUGIN_DIR}/build.sh" --sync-version
+  run_build_script_java_17 sync-gradle-version
 
   git add -A
   git commit -s -m "Prepare for development"

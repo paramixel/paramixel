@@ -116,8 +116,10 @@ public class MyTest {
 ```bash
 git clone https://github.com/paramixel/paramixel.git
 cd paramixel
-./mvnw clean install
+JAVA_17_HOME=/path/to/jdk17 ./build.sh
 ```
+
+`./build.sh` builds the Maven project with the current Java runtime, then builds the Gradle plugin with `JAVA_17_HOME`.
 
 ## License
 
