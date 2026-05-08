@@ -37,6 +37,7 @@ const sidebars = {
     },
     'configuration',
     'architecture',
+    'releasing',
     {
       type: 'category',
       label: 'API Reference',
