@@ -52,13 +52,9 @@ final class Factory {
 interface Action {
     String getId();
     String getName();
-    Optional<Action> getParent();
-    void setParent(Action parent);
-    void addChild(Action child);
-    List<Action> getChildren();
+    ContextMode getContextMode();
     Result execute(Context context);
     Result skip(Context context);
-    ContextMode contextMode();
 
     enum ContextMode { ISOLATED, SHARED }
 }
@@ -66,15 +62,30 @@ interface Action {
 
 `getId()` returns a randomly generated 4-character string (a–z, A–Z) that uniquely identifies the action instance.
 
+`ISOLATED` creates a child context for the action. `SHARED` reuses the parent context — use this when sibling actions intentionally share workflow state (e.g. `before`/`after` lifecycle phases).
+
+### `CompositeAction`
+
+```java
+interface CompositeAction extends Action {
+    List<Action> getChildren();
+}
+```
+
+Implemented by `Container` and `Parallel`. Exposes the read-only child hierarchy.
+
 Action hierarchy:
 
 ```
 Action (interface)
-  └─ AbstractAction (abstract)
+  ├─ CompositeAction (interface, extends Action)
+  │    ├─ Container
+  │    └─ Parallel
+  └─ AbstractAction (abstract, implements Action)
        ├─ Direct
        ├─ Noop
-       ├─ Container
-       └─ Parallel
+       ├─ Container (also implements CompositeAction)
+       └─ Parallel (also implements CompositeAction)
 ```
 
 ### `Context`
@@ -97,15 +108,28 @@ interface Context {
 
 ```java
 interface Result {
+    static Result staged(Action action);
+    static Result pass(Action action);
+    static Result skip(Action action);
+    static Result failure(Action action, Throwable throwable);
+    static Result.Builder builder(Action action);
+
     Optional<Result> getParent();
     List<Result> getChildren();
     Action getAction();
     Status getStatus();
     Duration getRunDuration();
+
+    final class Builder {
+        Builder status(Status status);
+        Builder runDuration(Duration runDuration);
+        Builder child(Result child);
+        Result build();
+    }
 }
 ```
 
-Results form a tree that mirrors the action tree. `getRunDuration()` returns the wall-clock time of the full execute or skip.
+Results form a tree that mirrors the action tree. `getRunDuration()` returns the wall-clock time of the full execute or skip. Use `Result.builder(Action)` for custom result construction.
 
 ### `Status`
 

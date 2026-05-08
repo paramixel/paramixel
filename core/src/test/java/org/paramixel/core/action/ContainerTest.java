@@ -17,7 +17,6 @@
 package org.paramixel.core.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -39,9 +38,9 @@ class ContainerTest {
         Container container =
                 Container.builder("container").child(Noop.of("child")).build();
 
-        assertThat(container.contextMode()).isEqualTo(Action.ContextMode.ISOLATED);
-        assertThat(container.policy().childMode()).isEqualTo(Container.ChildMode.DEPENDENT);
-        assertThat(container.policy().orderMode()).isEqualTo(Container.OrderMode.DECLARED);
+        assertThat(container.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
+        assertThat(container.getPolicy().childMode()).isEqualTo(Container.ChildMode.DEPENDENT);
+        assertThat(container.getPolicy().orderMode()).isEqualTo(Container.OrderMode.DECLARED);
     }
 
     @Test
@@ -159,16 +158,6 @@ class ContainerTest {
                 .run(Container.builder("container").child(writer).child(reader).build());
 
         assertThat(result.getStatus().isPass()).isTrue();
-    }
-
-    @Test
-    @DisplayName("addChild rejects self as child")
-    void addChildRejectsSelfAsChild() {
-        Container container =
-                Container.builder("container").child(Noop.of("child")).build();
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> container.addChild(container))
-                .withMessage("action must not add itself as a child");
     }
 
     private static Direct direct(String name, Direct.Executable executable) {

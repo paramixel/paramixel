@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import org.paramixel.core.Action;
+import org.paramixel.core.CompositeAction;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
@@ -36,7 +37,7 @@ import org.paramixel.core.support.Arguments;
 /**
  * Ordered composition action with optional setup and cleanup actions.
  */
-public final class Container extends AbstractAction {
+public final class Container extends AbstractAction implements CompositeAction {
 
     /** Controls whether body children continue after an earlier child fails or skips. */
     public enum ChildMode {
@@ -146,7 +147,7 @@ public final class Container extends AbstractAction {
         this.name = validateName(name);
         this.before = before;
         this.bodyChildren = List.copyOf(bodyChildren);
-        this.allChildren = validateAndParentChildren(allChildren(before, bodyChildren, after));
+        this.allChildren = validateChildren(allChildren(before, bodyChildren, after));
         this.after = after;
         this.policy = policy;
     }
@@ -166,26 +167,19 @@ public final class Container extends AbstractAction {
         return allChildren;
     }
 
-    @Override
-    public void addChild(Action child) {
-        Objects.requireNonNull(child, "child must not be null");
-        Arguments.require(child != this, "action must not add itself as a child");
-        child.setParent(this);
-    }
-
-    public Optional<Action> before() {
+    public Optional<Action> getBefore() {
         return Optional.ofNullable(before);
     }
 
-    public List<Action> children() {
+    public List<Action> getBodyChildren() {
         return bodyChildren;
     }
 
-    public Optional<Action> after() {
+    public Optional<Action> getAfter() {
         return Optional.ofNullable(after);
     }
 
-    public Policy policy() {
+    public Policy getPolicy() {
         return policy;
     }
 
@@ -347,13 +341,13 @@ public final class Container extends AbstractAction {
         return DefaultStatus.PASS;
     }
 
-    private List<Action> validateAndParentChildren(List<Action> children) {
+    private List<Action> validateChildren(List<Action> children) {
         Objects.requireNonNull(children, "children must not be null");
         Arguments.requireNonEmpty(children, "children must not be empty");
         List<Action> validated = new ArrayList<>(children.size());
         for (Action child : children) {
             Objects.requireNonNull(child, "children must not contain null elements");
-            addChild(child);
+            Arguments.require(child != this, "action must not add itself as a child");
             validated.add(child);
         }
         return List.copyOf(validated);

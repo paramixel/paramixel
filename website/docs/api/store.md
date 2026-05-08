@@ -112,3 +112,32 @@ context.findAncestor(1).orElseThrow().getStore().get("key").map(Value::get).map(
 ```
 
 Each context has its own independent `Store`. Use `findAncestor(levelUp)` to navigate to an ancestor context, then call `getStore()` on it.
+
+## Advanced operations
+
+### Atomic compute
+
+```java
+context.getStore().compute("counter", (key, value) ->
+        Value.of(value.cast(Integer.class) + 1));
+```
+
+### Conditional put
+
+```java
+context.getStore().putIfAbsent("key", Value.of("default"));
+```
+
+### Merge
+
+```java
+context.getStore().merge("key", Value.of(newValue), (oldVal, newVal) -> newVal);
+```
+
+### Conditional remove and replace
+
+```java
+context.getStore().remove("key", expectedValue);  // returns boolean
+context.getStore().replace("key", oldValue, newValue);  // returns boolean
+context.getStore().replace("key", Value.of(updated));  // returns Optional<Value>
+```

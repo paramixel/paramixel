@@ -31,6 +31,32 @@ import org.paramixel.core.exception.SkipException;
 class RunnerConvenienceTest {
 
     @Nested
+    @DisplayName("builder")
+    class BuilderTests {
+
+        @Test
+        @DisplayName("rejects mutation after build")
+        void rejectsMutationAfterBuild() {
+            Runner.Builder builder = Runner.builder();
+
+            builder.build();
+
+            assertThatThrownBy(() -> builder.configuration(Map.of()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(() -> builder.listener(new Listener() {}))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(() -> builder.executorService(null))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+            assertThatThrownBy(builder::build)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("builder already built");
+        }
+    }
+
+    @Nested
     @DisplayName("run(Selector)")
     class RunSelector {
 

@@ -155,6 +155,7 @@ public interface Runner {
         private Map<String, String> configuration;
         private Listener listener = Factory.defaultListener();
         private ExecutorService executorService;
+        private boolean built;
 
         private Builder() {}
 
@@ -168,6 +169,7 @@ public interface Runner {
          * @throws NullPointerException if {@code properties} is {@code null}
          */
         public Builder configuration(Map<String, String> properties) {
+            ensureNotBuilt();
             this.configuration = Map.copyOf(Objects.requireNonNull(properties, "configuration must not be null"));
             return this;
         }
@@ -180,6 +182,7 @@ public interface Runner {
          * @throws NullPointerException if {@code listener} is {@code null}
          */
         public Builder listener(Listener listener) {
+            ensureNotBuilt();
             this.listener = Objects.requireNonNull(listener, "listener must not be null");
             return this;
         }
@@ -194,6 +197,7 @@ public interface Runner {
          * @throws NullPointerException if {@code executorService} is {@code null}
          */
         public Builder executorService(ExecutorService executorService) {
+            ensureNotBuilt();
             this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
             return this;
         }
@@ -204,7 +208,15 @@ public interface Runner {
          * @return a new runner
          */
         public Runner build() {
+            ensureNotBuilt();
+            built = true;
             return new DefaultRunner(configuration, listener, executorService);
+        }
+
+        private void ensureNotBuilt() {
+            if (built) {
+                throw new IllegalStateException("builder already built");
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.paramixel.core.Action;
+import org.paramixel.core.CompositeAction;
 import org.paramixel.core.exception.CycleDetectedException;
 
 /**
@@ -63,8 +64,11 @@ public final class CycleLoopDetector {
         path.addLast(action);
 
         try {
-            for (Action child : action.getChildren()) {
-                visit(Objects.requireNonNull(child, () -> "action '" + action.getName() + "' returned a null child"));
+            if (action instanceof CompositeAction compositeAction) {
+                for (Action child : compositeAction.getChildren()) {
+                    visit(Objects.requireNonNull(
+                            child, () -> "action '" + action.getName() + "' returned a null child"));
+                }
             }
         } finally {
             path.removeLast();

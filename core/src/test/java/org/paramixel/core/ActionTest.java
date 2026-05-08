@@ -19,6 +19,8 @@ package org.paramixel.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Container;
@@ -26,15 +28,6 @@ import org.paramixel.core.action.Noop;
 
 @DisplayName("Action")
 class ActionTest {
-
-    @Test
-    @DisplayName("setParent rejects setting action as its own parent")
-    void setParentRejectsSelfAsParent() {
-        Action action = Noop.of("self");
-        assertThatThrownBy(() -> action.setParent(action))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("action must not be its own parent");
-    }
 
     @Test
     @DisplayName("creates noop actions that complete without doing work")
@@ -49,11 +42,41 @@ class ActionTest {
     }
 
     @Test
-    @DisplayName("returns unmodifiable children and links each child to its parent")
-    void returnsUnmodifiableChildrenAndLinksEachChildToItsParent() {
+    @DisplayName("runs custom action implementation")
+    void runsCustomActionImplementation() {
+        CustomAction action = new CustomAction();
+
+        Result result = Runner.builder().build().run(action);
+
+        assertThat(action.executed()).isTrue();
+        assertThat(action.skipped()).isFalse();
+        assertThat(result.getAction()).isSameAs(action);
+        assertThat(result.getStatus().isPass()).isTrue();
+    }
+
+    @Test
+    @DisplayName("runs custom composite action implementation with children")
+    void runsCustomCompositeActionImplementationWithChildren() {
+        CustomAction first = new CustomAction("first-child-id", "first child");
+        CustomAction second = new CustomAction("second-child-id", "second child");
+        CompositeCustomAction action = new CompositeCustomAction(first, second);
+
+        Result result = Runner.builder().build().run(action);
+
+        assertThat(action.executed()).isTrue();
+        assertThat(first.executed()).isTrue();
+        assertThat(second.executed()).isTrue();
+        assertThat(result.getAction()).isSameAs(action);
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(result.getChildren()).extracting(Result::getAction).containsExactly(first, second);
+    }
+
+    @Test
+    @DisplayName("composite action returns unmodifiable children")
+    void compositeActionReturnsUnmodifiableChildren() {
         Action first = Noop.of("first");
         Action second = Noop.of("second");
-        Action root = Container.builder("root")
+        CompositeAction root = Container.builder("root")
                 .policy(Container.Policy.builder()
                         .childMode(Container.ChildMode.INDEPENDENT)
                         .build())
@@ -62,8 +85,111 @@ class ActionTest {
                 .build();
 
         assertThat(root.getChildren()).containsExactly(first, second);
-        assertThat(first.getParent()).contains(root);
-        assertThat(second.getParent()).contains(root);
         assertThatThrownBy(() -> root.getChildren().remove(0)).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    private static final class CustomAction implements Action {
+
+        private final String id;
+        private final String name;
+        private final AtomicBoolean executed = new AtomicBoolean();
+        private final AtomicBoolean skipped = new AtomicBoolean();
+
+        private CustomAction() {
+            this("custom-action-id", "custom action");
+        }
+
+        private CustomAction(String id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        @Override
+        public String getId() {
+            return id;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public ContextMode getContextMode() {
+            return ContextMode.ISOLATED;
+        }
+
+        @Override
+        public Result execute(Context context) {
+            executed.set(true);
+            return Result.pass(this);
+        }
+
+        @Override
+        public Result skip(Context context) {
+            skipped.set(true);
+            return Result.skip(this);
+        }
+
+        boolean executed() {
+            return executed.get();
+        }
+
+        boolean skipped() {
+            return skipped.get();
+        }
+    }
+
+    private static final class CompositeCustomAction implements CompositeAction {
+
+        private final List<Action> children;
+        private final AtomicBoolean executed = new AtomicBoolean();
+
+        private CompositeCustomAction(Action... children) {
+            this.children = List.of(children);
+        }
+
+        @Override
+        public String getId() {
+            return "custom-composite-action-id";
+        }
+
+        @Override
+        public String getName() {
+            return "custom composite action";
+        }
+
+        @Override
+        public List<Action> getChildren() {
+            return children;
+        }
+
+        @Override
+        public ContextMode getContextMode() {
+            return ContextMode.ISOLATED;
+        }
+
+        @Override
+        public Result execute(Context context) {
+            executed.set(true);
+            Result.Builder result = Result.builder(this).status(Status.pass());
+            for (Action child : children) {
+                result.child(child.execute(context));
+            }
+            return result.build();
+        }
+
+        @Override
+        public Result skip(Context context) {
+            Result.Builder result = Result.builder(this).status(Status.skip());
+            for (Action child : children) {
+                result.child(child.skip(context));
+            }
+            return result.build();
+        }
+
+        boolean executed() {
+            return executed.get();
+        }
     }
 }

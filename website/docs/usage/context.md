@@ -33,6 +33,49 @@ private static Action setup() {
 }
 ```
 
+### SHARED vs ISOLATED
+
+With `ISOLATED` (default), each action gets its own child context with an independent store. Sibling actions cannot see each other's store data directly.
+
+With `SHARED`, the action reuses the context it received from its parent. This means lifecycle phases (`before`, body children, `after`) all operate on the same store:
+
+```java
+// All three actions use SHARED to read/write the same store
+Action before = Direct.builder("before")
+        .contextMode(Action.ContextMode.SHARED)
+        .execute(context -> context.getStore().put("shared-key", Value.of("hello")))
+        .build();
+
+Action writeChild = Direct.builder("write-child")
+        .contextMode(Action.ContextMode.SHARED)
+        .execute(context -> context.getStore().put("child-key", Value.of("world")))
+        .build();
+
+Action readChild = Direct.builder("read-child")
+        .contextMode(Action.ContextMode.SHARED)
+        .execute(context -> {
+            // Both keys are visible because all actions share the same context
+            String shared = context.getStore().get("shared-key").orElseThrow().cast(String.class);
+            String child = context.getStore().get("child-key").orElseThrow().cast(String.class);
+        })
+        .build();
+```
+
+### Ancestor navigation for isolated contexts
+
+When actions use `ISOLATED` mode, use `findAncestor()` to navigate up the context chain and access data from an ancestor's store:
+
+```java
+// A deeply nested action reads data stored by a SHARED before action
+// at the argument-container level (2 levels up)
+String value = context.findAncestor(2)
+        .orElseThrow()
+        .getStore()
+        .get("arg-key")
+        .orElseThrow()
+        .cast(String.class);
+```
+
 ## Methods
 
 ```java

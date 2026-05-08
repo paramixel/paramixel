@@ -18,7 +18,6 @@ package org.paramixel.core.action;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Context;
@@ -54,16 +53,6 @@ public class Direct extends AbstractAction {
      */
     public static Builder builder(String name) {
         return new Builder(name);
-    }
-
-    @Override
-    public List<Action> getChildren() {
-        return List.of();
-    }
-
-    @Override
-    public void addChild(Action child) {
-        throw new UnsupportedOperationException("direct action cannot have children");
     }
 
     @Override

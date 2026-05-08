@@ -16,21 +16,18 @@
 
 package org.paramixel.core;
 
-import java.util.List;
-import java.util.Optional;
-
 /**
- * Represents a node in a Paramixel action tree.
+ * Represents a Paramixel action.
  *
  * <p>An {@code Action} is the fundamental execution unit handled by a {@link Runner}. Actions may be composed into
- * parent-child hierarchies to model sequential, parallel, or otherwise structured execution.
+ * parent-child hierarchies by implementations such as {@link CompositeAction} to model sequential, parallel, or
+ * otherwise structured execution.
  *
  * <p>The action instance itself defines execution behavior, while {@link Result} captures the outcome of a specific
  * execution.
  *
  * @implSpec Implementations should return a stable identifier from {@link #getId()} for the lifetime of the action
- *     instance and should keep parent-child relationships internally consistent when {@link #setParent(Action)} and
- *     {@link #addChild(Action)} are used.
+ *     instance.
  */
 public interface Action {
 
@@ -38,6 +35,7 @@ public interface Action {
      * Controls how an action scopes the {@link Context} it receives from its parent.
      */
     enum ContextMode {
+
         /** Execute with a fresh child context whose parent is the received context. */
         ISOLATED,
 
@@ -63,39 +61,11 @@ public interface Action {
     String getName();
 
     /**
-     * Returns the parent action, if this action is attached to another action.
-     *
-     * @return the parent action, or an empty {@link Optional} when this action is a root action
-     */
-    Optional<Action> getParent();
-
-    /**
-     * Sets the parent action for this action.
-     *
-     * @param parent the new parent action
-     */
-    void setParent(Action parent);
-
-    /**
-     * Adds a child action to this action.
-     *
-     * @param child the child action to add
-     */
-    void addChild(Action child);
-
-    /**
-     * Returns the child actions owned by this action.
-     *
-     * @return the child actions in the order maintained by the implementation
-     */
-    List<Action> getChildren();
-
-    /**
      * Returns this action's context scoping mode.
      *
      * @return the context mode used when this action executes or skips
      */
-    ContextMode contextMode();
+    ContextMode getContextMode();
 
     /**
      * Executes this action using the supplied execution context.

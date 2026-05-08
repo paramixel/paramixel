@@ -145,6 +145,37 @@ for (TestEnvironment environment : environments) {
 return parallelBuilder.build();
 ```
 
+## Cleanup utility pattern
+
+When an integration test creates multiple resources that must be released in order, use `Cleanup`:
+
+```java
+private static Action after(KafkaTestEnvironment environment, Network network) {
+    return Direct.builder("after")
+            .contextMode(Action.ContextMode.SHARED)
+            .execute(context -> {
+                Cleanup.of(Cleanup.Mode.FORWARD)
+                        .addCloseable(environment)
+                        .addCloseable(network)
+                        .runAndThrow();
+            })
+            .build();
+}
+```
+
+`Cleanup` collects `AutoCloseable` resources and runs them in forward or reverse order. `runAndThrow()` rethrows the first failure as the primary exception with later failures attached as suppressed exceptions. `Error` subclasses (such as `OutOfMemoryError`) abort the cleanup loop immediately.
+
+### Conditional cleanup
+
+Use `addWhen` for resources that may or may not need cleanup:
+
+```java
+Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
+cleanup.addCloseable(database);
+cleanup.addWhen(useCache, cache::invalidate);
+cleanup.runAndThrow();
+```
+
 ## Real examples
 
 See:
