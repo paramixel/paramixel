@@ -24,6 +24,12 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <p>The generated identifiers use a four-character alphabetic encoding and avoid a small set of reserved words that
  * would be confusing in console output.
+ *
+ * <p>Internally, a full-period linear congruential generator (LCG) traverses all {@code 52⁴ = 7,311,616} possible
+ * identifiers exactly once before cycling. Of those, 64 case-insensitive variants of four reserved words
+ * ({@code "stag"}, {@code "pass"}, {@code "fail"}, {@code "skip"}) are filtered out. The probability of a retry is
+ * {@code 64 / 7,311,616 ≈ 0.000875%}, or roughly one retry per 114,000 generated identifiers. For any realistic test
+ * suite, at most one retry ever occurs. Identifiers cannot repeat within a JVM lifecycle.
  */
 public class FastId {
 
@@ -69,7 +75,7 @@ public class FastId {
     }
 
     private static boolean isForbidden(String id) {
-        String lower = id.toLowerCase();
+        String lower = id.toLowerCase(java.util.Locale.ROOT);
         for (String forbidden : FORBIDDEN) {
             if (lower.equals(forbidden)) {
                 return true;

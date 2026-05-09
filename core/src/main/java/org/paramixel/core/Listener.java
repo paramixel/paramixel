@@ -22,10 +22,15 @@ package org.paramixel.core;
  * <p>A {@code Listener} can observe the overall run as well as individual action execution events. All methods provide
  * default no-op implementations so callers may override only the callbacks they need.
  *
+ * <p>Listeners that hold resources (such as open file handles) should override {@link #close()} to release them.
+ * Callers that supply a custom listener to {@link Runner.Builder#listener(Listener)} are responsible for ensuring the
+ * listener's resources are released — either by wrapping the runner in try-with-resources or by closing the listener
+ * directly.
+ *
  * @implSpec Listener implementations should avoid throwing exceptions. The default runner wraps listeners in a safe
  *     adapter when needed so non-{@link Error} throwables are reported instead of aborting the run.
  */
-public interface Listener {
+public interface Listener extends AutoCloseable {
 
     /**
      * Invoked once before the runner starts executing the requested action tree.
@@ -70,4 +75,13 @@ public interface Listener {
      * @param result the root result for the completed run
      */
     default void runCompleted(Runner runner, Result result) {}
+
+    /**
+     * Releases resources held by this listener.
+     *
+     * <p>The default implementation does nothing. Listeners that hold resources should override this method to
+     * release them.
+     */
+    @Override
+    default void close() {}
 }

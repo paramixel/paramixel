@@ -53,7 +53,7 @@ This is internal to the SPI. Prefer using the interface methods (`isPass()`, `is
 Status instances are created internally by the framework during action execution. You do not typically create them yourself. The SPI provides factory constructors for custom action implementations:
 
 ```java
-// In org.paramixel.core.spi.DefaultStatus:
+// In org.paramixel.core.internal.DefaultStatus:
 DefaultStatus(Kind kind)
 DefaultStatus(Kind kind, String message)
 DefaultStatus(Kind kind, Throwable throwable)

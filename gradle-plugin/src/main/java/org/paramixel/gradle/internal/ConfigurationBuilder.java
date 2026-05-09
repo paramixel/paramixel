@@ -24,13 +24,13 @@ import org.paramixel.core.Configuration;
 /**
  * Builds the effective Paramixel configuration map for a Gradle task execution.
  *
- * <p>Configuration precedence (matches the Maven plugin):
+ * <p>Configuration precedence:
  *
  * <ol>
- *   <li>{@link Configuration#defaultProperties()} &mdash; classpath {@code paramixel.properties} + system properties +
- *       built-in defaults
+ *   <li>Classpath {@code paramixel.properties} + built-in defaults
  *   <li>Extension/DSL properties &mdash; overlay only when {@link Property#isPresent()}
- *   <li>System properties starting with {@code paramixel.*} &mdash; always win
+ *   <li>Explicit Gradle provider properties ({@code -Dparamixel.*} and {@code -Pparamixel.*}) &mdash; mapped to task
+ *       properties by the plugin and therefore overlay extension properties
  * </ol>
  */
 public final class ConfigurationBuilder {
@@ -38,12 +38,13 @@ public final class ConfigurationBuilder {
     private ConfigurationBuilder() {}
 
     /**
-     * Builds the effective Paramixel configuration map by merging classpath defaults, extension
-     * properties, and system properties.
+     * Builds the effective Paramixel configuration map by merging classpath defaults and task properties.
      *
-     * <p>The method temporarily sets the given classloader as the thread context classloader so
-     * that {@link Configuration#defaultProperties()} can find {@code paramixel.properties} on the
-     * test classpath, then restores the original classloader in a {@code finally} block.</p>
+     * <p>The method passes the given classloader directly to {@link Configuration#classpathProperties(ClassLoader)} so
+     * that {@code paramixel.properties} can be loaded from the test classpath without mutating thread context state. The
+     * Gradle plugin maps explicit
+     * {@code -Dparamixel.*} and {@code -Pparamixel.*} values to task properties before this method is called; this method
+     * intentionally does not scan global JVM system properties.</p>
      *
      * @param classLoader the classloader that provides test-classpath resources
      * @param parallelism the runner parallelism property, or unset to use the framework default
@@ -52,7 +53,6 @@ public final class ConfigurationBuilder {
      * @param matchClass the class-name regex filter, or unset to include all classes
      * @param matchTag the tag regex filter, or unset to include all tags
      * @param reportFile the report file, or unset to disable report output
-     * @param reportFormat the report format, or unset to infer from the report file
      * @return the effective configuration map with precedence applied
      */
     public static Map<String, String> buildConfiguration(
@@ -62,46 +62,30 @@ public final class ConfigurationBuilder {
             Property<String> matchPackage,
             Property<String> matchClass,
             Property<String> matchTag,
-            Property<String> reportFile,
-            Property<String> reportFormat) {
+            Property<String> reportFile) {
+        Map<String, String> config = new LinkedHashMap<>(Configuration.classpathProperties(classLoader));
+        config.putIfAbsent(
+                Configuration.RUNNER_PARALLELISM, String.valueOf(Runtime.getRuntime().availableProcessors()));
 
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(classLoader);
-            Map<String, String> config = new LinkedHashMap<>(Configuration.defaultProperties());
-
-            if (parallelism.isPresent()) {
-                config.put(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism.get()));
-            }
-            if (failureOnSkip.isPresent()) {
-                config.put(Configuration.FAILURE_ON_SKIP, String.valueOf(failureOnSkip.get()));
-            }
-            if (matchPackage.isPresent()) {
-                config.put(Configuration.PACKAGE_MATCH, matchPackage.get());
-            }
-            if (matchClass.isPresent()) {
-                config.put(Configuration.CLASS_MATCH, matchClass.get());
-            }
-            if (matchTag.isPresent()) {
-                config.put(Configuration.TAG_MATCH, matchTag.get());
-            }
-            if (reportFile.isPresent() && !reportFile.get().isBlank()) {
-                config.put(Configuration.REPORT_FILE, reportFile.get());
-            }
-            if (reportFormat.isPresent() && !reportFormat.get().isBlank()) {
-                config.put(Configuration.REPORT_FORMAT, reportFormat.get());
-            }
-
-            System.getProperties().forEach((key, value) -> {
-                String k = String.valueOf(key);
-                if (k.startsWith("paramixel.")) {
-                    config.put(k, String.valueOf(value));
-                }
-            });
-
-            return config;
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
+        if (parallelism.isPresent()) {
+            config.put(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism.get()));
         }
+        if (failureOnSkip.isPresent()) {
+            config.put(Configuration.FAILURE_ON_SKIP, String.valueOf(failureOnSkip.get()));
+        }
+        if (matchPackage.isPresent()) {
+            config.put(Configuration.PACKAGE_MATCH, matchPackage.get());
+        }
+        if (matchClass.isPresent()) {
+            config.put(Configuration.CLASS_MATCH, matchClass.get());
+        }
+        if (matchTag.isPresent()) {
+            config.put(Configuration.TAG_MATCH, matchTag.get());
+        }
+        if (reportFile.isPresent() && !reportFile.get().isBlank()) {
+            config.put(Configuration.REPORT_FILE, reportFile.get());
+        }
+
+        return config;
     }
 }

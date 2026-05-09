@@ -18,7 +18,7 @@ package org.paramixel.core;
 
 import java.util.Objects;
 import java.util.Optional;
-import org.paramixel.core.spi.DefaultStatus;
+import org.paramixel.core.internal.DefaultStatus;
 
 /**
  * Represents the execution state of a {@link Result}.

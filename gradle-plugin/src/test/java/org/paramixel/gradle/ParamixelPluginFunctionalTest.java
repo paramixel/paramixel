@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Stream;
 import org.gradle.testkit.runner.GradleRunner;
 import org.gradle.testkit.runner.TaskOutcome;
 import org.gradle.testkit.runner.UnexpectedBuildFailure;
@@ -28,6 +30,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 @DisplayName("ParamixelPlugin functional tests")
 class ParamixelPluginFunctionalTest {
@@ -46,6 +50,20 @@ class ParamixelPluginFunctionalTest {
     @DisplayName("plugin applies successfully and task is registered")
     void pluginAppliesSuccessfully() throws IOException {
         writeBuildFile("plugins { id('org.paramixel') }\nparamixel { failIfNoTests = false }");
+
+        var result = GradleRunner.create()
+                .withProjectDir(projectDir.toFile())
+                .withPluginClasspath()
+                .withArguments("paramixelTest", "--stacktrace")
+                .build();
+
+        assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("no tests found passes by default")
+    void noTestsFoundPassesByDefault() throws IOException {
+        writeBuildFile("plugins { id('org.paramixel') }");
 
         var result = GradleRunner.create()
                 .withProjectDir(projectDir.toFile())
@@ -101,50 +119,104 @@ class ParamixelPluginFunctionalTest {
         assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
     }
 
-    @Test
-    @DisplayName("configuration precedence order honors system properties over extension")
-    void configurationPrecedenceOrder() throws IOException {
-        writeBuildFile("plugins { id('org.paramixel') }\nparamixel { failIfNoTests = false }");
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("configurationPrecedenceScenarios")
+    @DisplayName("configuration precedence order")
+    void configurationPrecedenceOrder(ConfigurationPrecedenceScenario scenario) throws IOException {
+        writeBuildFile(
+                "plugins { id('org.paramixel') }\nparamixel { failIfNoTests = " + scenario.extensionValue() + " }");
 
-        var result = GradleRunner.create()
+        var runner = GradleRunner.create()
                 .withProjectDir(projectDir.toFile())
                 .withPluginClasspath()
-                .withArguments("paramixelTest", "--stacktrace", "-Dparamixel.failIfNoTests=true")
-                .buildAndFail();
+                .withArguments(scenario.arguments());
+        var result = scenario.expectFailure() ? runner.buildAndFail() : runner.build();
 
-        assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.FAILED);
+        assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(scenario.expectedOutcome());
     }
 
     @Test
-    @DisplayName("configuration precedence order honors project properties over extension")
-    void projectPropertyPrecedenceOrder() throws IOException {
-        writeBuildFile("plugins { id('org.paramixel') }\nparamixel { failIfNoTests = false }");
+    @DisplayName("discovers and executes @Paramixel.ActionFactory test sources")
+    void discoversAndExecutesActionFactoryTestSources() throws IOException {
+        writeBuildFile("plugins {\n"
+                + "  id('java')\n"
+                + "  id('org.paramixel')\n"
+                + "}\n"
+                + "repositories { mavenCentral(); mavenLocal() }\n"
+                + "dependencies { implementation 'org.paramixel:core:+'\n"
+                + "  implementation 'org.assertj:assertj-core:3.27.3'\n"
+                + "}\n"
+                + "paramixel { failIfNoTests = false }");
+
+        Path sourceDir = projectDir.resolve("src/main/java/com/example");
+        Files.createDirectories(sourceDir);
+        Files.writeString(sourceDir.resolve("SampleTest.java"),
+                "package com.example;\n"
+                + "\n"
+                + "import org.paramixel.core.Action;\n"
+                + "import org.paramixel.core.Paramixel;\n"
+                + "import org.paramixel.core.action.Direct;\n"
+                + "\n"
+                + "public class SampleTest {\n"
+                + "\n"
+                + "    @Paramixel.ActionFactory\n"
+                + "    public static Action actionFactory() {\n"
+                + "        return Direct.builder(\"sample-test\")\n"
+                + "                .execute(context -> {})\n"
+                + "                .build();\n"
+                + "    }\n"
+                + "}\n");
 
         var result = GradleRunner.create()
                 .withProjectDir(projectDir.toFile())
                 .withPluginClasspath()
-                .withArguments("paramixelTest", "--stacktrace", "-Pparamixel.failIfNoTests=true")
-                .buildAndFail();
-
-        assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.FAILED);
-    }
-
-    @Test
-    @DisplayName("system properties override project properties")
-    void systemPropertyOverridesProjectProperty() throws IOException {
-        writeBuildFile("plugins { id('org.paramixel') }\nparamixel { failIfNoTests = true }");
-
-        var result = GradleRunner.create()
-                .withProjectDir(projectDir.toFile())
-                .withPluginClasspath()
-                .withArguments(
-                        "paramixelTest", "--stacktrace", "-Pparamixel.failIfNoTests=true", "-Dparamixel.failIfNoTests=false")
+                .withArguments("paramixelTest", "--stacktrace")
                 .build();
 
         assertThat(result.task(":paramixelTest").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
+        assertThat(result.getOutput()).contains("sample-test");
     }
 
     private void writeBuildFile(String content) throws IOException {
         Files.writeString(buildFile, content);
+    }
+
+    private static Stream<ConfigurationPrecedenceScenario> configurationPrecedenceScenarios() {
+        return Stream.of(
+                new ConfigurationPrecedenceScenario(
+                        "system properties override extension",
+                        false,
+                        List.of("paramixelTest", "--stacktrace", "-Dparamixel.failIfNoTests=true"),
+                        true,
+                        TaskOutcome.FAILED),
+                new ConfigurationPrecedenceScenario(
+                        "project properties override extension",
+                        false,
+                        List.of("paramixelTest", "--stacktrace", "-Pparamixel.failIfNoTests=true"),
+                        true,
+                        TaskOutcome.FAILED),
+                new ConfigurationPrecedenceScenario(
+                        "system properties override project properties",
+                        true,
+                        List.of(
+                                "paramixelTest",
+                                "--stacktrace",
+                                "-Pparamixel.failIfNoTests=true",
+                                "-Dparamixel.failIfNoTests=false"),
+                        false,
+                        TaskOutcome.SUCCESS));
+    }
+
+    private record ConfigurationPrecedenceScenario(
+            String name,
+            boolean extensionValue,
+            List<String> arguments,
+            boolean expectFailure,
+            TaskOutcome expectedOutcome) {
+
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 }

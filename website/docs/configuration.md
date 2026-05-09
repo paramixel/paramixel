@@ -69,23 +69,15 @@ Notes:
 - If the report file cannot be created, Paramixel prints a warning to `System.err` and continues the run.
 - Tilde (`~`) expansion is supported on Linux and macOS: `~` expands to the current user's home directory, `~/path` expands relative to the home directory, and `~user` expands to another user's home directory (if that user exists). On Windows, tilde expansion is a no-op and the path is used as-is.
 
-### `paramixel.report.format`
+Report format is inferred from the file extension:
 
-Controls the summary report format when explicit control is needed.
+- `.log` and `.txt` infer `text`
+- `.json` infers `json`
+- `.xml` infers `xml`
+- `.html` infers `html`
+- unknown or missing extensions default to `text`
 
-```properties
-paramixel.report.file=target/paramixel/report.out
-paramixel.report.format=json
-```
-
-Notes:
-
-- Supported values are `text`, `json`, `xml`, and `html`.
-- Values are case-insensitive.
-- When absent or blank, the format is inferred from `paramixel.report.file`.
-- `.log` and `.txt` infer `text`; `.json` infers `json`; `.xml` infers `xml`; `.html` infers `html`.
-- Unknown or missing extensions default to `text`.
-- An explicit format wins over the file extension.
+Deprecated compatibility: `paramixel.report.format` is still accepted when present and nonblank, but emits a warning. Prefer selecting the format with the `paramixel.report.file` extension.
 
 ### `paramixel.match.package`
 
@@ -206,7 +198,6 @@ Plugin flags:
 ./mvnw test -Dparamixel.skipTests=true
 ./mvnw test -Dparamixel.failIfNoTests=true
 ./mvnw test -Dparamixel.report.file=target/paramixel/paramixel.json
-./mvnw test -Dparamixel.report.file=target/paramixel/report.out -Dparamixel.report.format=json
 ```
 
 `paramixel.skipTests` and `paramixel.failIfNoTests` are Maven plugin parameters, not core `Configuration` keys.
@@ -217,9 +208,9 @@ The Gradle plugin exposes first-class DSL properties for common configuration ke
 
 Precedence in the plugin is:
 
-1. `Configuration.defaultProperties()`
+1. classpath `paramixel.properties` plus built-in defaults
 2. DSL extension / task properties (only when `Property.isPresent()` is true)
-3. system properties whose keys start with `paramixel.`
+3. explicit Gradle provider properties (`-Dparamixel.*` over `-Pparamixel.*`)
 
 Example:
 
@@ -228,7 +219,6 @@ paramixel {
     parallelism.set(4)
     matchTag.set("smoke")
     reportFile.set(layout.buildDirectory.file("paramixel/paramixel.json").map { it.asFile.absolutePath })
-    reportFormat.set("json")
 }
 ```
 

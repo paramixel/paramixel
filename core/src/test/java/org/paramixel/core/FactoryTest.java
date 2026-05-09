@@ -23,13 +23,13 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.core.spi.DefaultRunner;
-import org.paramixel.core.spi.listener.CompositeListener;
-import org.paramixel.core.spi.listener.HtmlReportListener;
-import org.paramixel.core.spi.listener.JsonReportListener;
-import org.paramixel.core.spi.listener.ReportListener;
-import org.paramixel.core.spi.listener.SafeListener;
-import org.paramixel.core.spi.listener.XmlReportListener;
+import org.paramixel.core.internal.DefaultRunner;
+import org.paramixel.core.internal.listener.CompositeListener;
+import org.paramixel.core.internal.listener.HtmlReportListener;
+import org.paramixel.core.internal.listener.JsonReportListener;
+import org.paramixel.core.internal.listener.ReportListener;
+import org.paramixel.core.internal.listener.SafeListener;
+import org.paramixel.core.internal.listener.XmlReportListener;
 
 @DisplayName("Factory")
 class FactoryTest {
@@ -69,54 +69,6 @@ class FactoryTest {
     }
 
     @Test
-    @DisplayName("defaultListener(configuration) includes ReportListener for text format")
-    void defaultListenerWithTextFormatIncludesReportListener() throws Exception {
-        Listener listener = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/custom-report/report.out",
-                Configuration.REPORT_FORMAT, "text"));
-
-        assertThat(listener).isInstanceOf(SafeListener.class);
-        assertThat(extractListeners(listener)).hasSize(3);
-        assertThat(extractListeners(listener)).anyMatch(ReportListener.class::isInstance);
-    }
-
-    @Test
-    @DisplayName("defaultListener(configuration) includes JsonReportListener for json format")
-    void defaultListenerWithJsonFormatIncludesJsonReportListener() throws Exception {
-        Listener listener = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/json-report/report.out",
-                Configuration.REPORT_FORMAT, "json"));
-
-        assertThat(listener).isInstanceOf(SafeListener.class);
-        assertThat(extractListeners(listener)).hasSize(3);
-        assertThat(extractListeners(listener)).anyMatch(JsonReportListener.class::isInstance);
-    }
-
-    @Test
-    @DisplayName("defaultListener(configuration) includes XmlReportListener for xml format")
-    void defaultListenerWithXmlFormatIncludesXmlReportListener() throws Exception {
-        Listener listener = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/xml-report/report.out",
-                Configuration.REPORT_FORMAT, "xml"));
-
-        assertThat(listener).isInstanceOf(SafeListener.class);
-        assertThat(extractListeners(listener)).hasSize(3);
-        assertThat(extractListeners(listener)).anyMatch(XmlReportListener.class::isInstance);
-    }
-
-    @Test
-    @DisplayName("defaultListener(configuration) includes HtmlReportListener for html format")
-    void defaultListenerWithHtmlFormatIncludesHtmlReportListener() throws Exception {
-        Listener listener = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/html-report/report.out",
-                Configuration.REPORT_FORMAT, "html"));
-
-        assertThat(listener).isInstanceOf(SafeListener.class);
-        assertThat(extractListeners(listener)).hasSize(3);
-        assertThat(extractListeners(listener)).anyMatch(HtmlReportListener.class::isInstance);
-    }
-
-    @Test
     @DisplayName("defaultListener(configuration) defaults to text format when format not specified")
     void defaultListenerDefaultsToTextFormat() throws Exception {
         Listener listener =
@@ -125,46 +77,6 @@ class FactoryTest {
         assertThat(listener).isInstanceOf(SafeListener.class);
         assertThat(extractListeners(listener)).hasSize(3);
         assertThat(extractListeners(listener)).anyMatch(ReportListener.class::isInstance);
-    }
-
-    @Test
-    @DisplayName("defaultListener(configuration) defaults to text format for unknown format")
-    void defaultListenerDefaultsToTextForUnknownFormat() throws Exception {
-        Listener listener = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/bad-report/report.out",
-                Configuration.REPORT_FORMAT, "yaml"));
-
-        assertThat(listener).isInstanceOf(SafeListener.class);
-        assertThat(extractListeners(listener)).hasSize(3);
-        assertThat(extractListeners(listener)).anyMatch(ReportListener.class::isInstance);
-    }
-
-    @Test
-    @DisplayName("defaultListener(configuration) accepts case-insensitive format values")
-    void defaultListenerAcceptsCaseInsensitiveFormat() throws Exception {
-        Listener upperJson = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/report.out",
-                Configuration.REPORT_FORMAT, "JSON"));
-
-        assertThat(extractListeners(upperJson)).anyMatch(JsonReportListener.class::isInstance);
-
-        Listener mixedXml = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/report.out",
-                Configuration.REPORT_FORMAT, "Xml"));
-
-        assertThat(extractListeners(mixedXml)).anyMatch(XmlReportListener.class::isInstance);
-
-        Listener upperText = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/report.out",
-                Configuration.REPORT_FORMAT, "TEXT"));
-
-        assertThat(extractListeners(upperText)).anyMatch(ReportListener.class::isInstance);
-
-        Listener mixedHtml = Factory.defaultListener(Map.of(
-                Configuration.REPORT_FILE, "target/report.out",
-                Configuration.REPORT_FORMAT, "Html"));
-
-        assertThat(extractListeners(mixedHtml)).anyMatch(HtmlReportListener.class::isInstance);
     }
 
     @Test
@@ -196,17 +108,19 @@ class FactoryTest {
     }
 
     @Test
-    @DisplayName("defaultListener(configuration) lets explicit format override file extension")
-    void defaultListenerLetsExplicitFormatOverrideFileExtension() throws Exception {
+    @DisplayName("defaultListener(configuration) honors deprecated explicit format")
+    @SuppressWarnings("removal")
+    void defaultListenerHonorsDeprecatedExplicitFormat() throws Exception {
         Listener listener = Factory.defaultListener(
-                Map.of(Configuration.REPORT_FILE, "target/report.xml", Configuration.REPORT_FORMAT, "json"));
+                Map.of(Configuration.REPORT_FILE, "target/report.out", Configuration.REPORT_FORMAT, "json"));
 
         assertThat(extractListeners(listener)).anyMatch(JsonReportListener.class::isInstance);
     }
 
     @Test
-    @DisplayName("defaultListener(configuration) infers format when explicit format is blank")
-    void defaultListenerInfersFormatWhenExplicitFormatIsBlank() throws Exception {
+    @DisplayName("defaultListener(configuration) infers format when deprecated explicit format is blank")
+    @SuppressWarnings("removal")
+    void defaultListenerInfersFormatWhenDeprecatedExplicitFormatIsBlank() throws Exception {
         Listener listener = Factory.defaultListener(
                 Map.of(Configuration.REPORT_FILE, "target/report.xml", Configuration.REPORT_FORMAT, " "));
 

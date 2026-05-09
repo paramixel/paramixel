@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
-import org.paramixel.core.spi.DefaultRunner;
+import org.paramixel.core.internal.DefaultRunner;
 
 /**
  * Executes Paramixel actions.
@@ -28,9 +28,12 @@ import org.paramixel.core.spi.DefaultRunner;
  * <p>A {@code Runner} is the main entry point for launching an {@link Action} tree. It holds the effective
  * configuration and the {@link Listener} used for lifecycle notifications.
  *
+ * <p>Runners implement {@link AutoCloseable}. When used in try-with-resources, {@link #close()} cascades to the
+ * listener, releasing any resources it holds.
+ *
  * @apiNote Use {@link #builder()} to customize configuration, listeners, or the executor service used during a run.
  */
-public interface Runner {
+public interface Runner extends AutoCloseable {
 
     /**
      * Creates a new builder for constructing a {@link Runner}.
@@ -143,6 +146,15 @@ public interface Runner {
         Objects.requireNonNull(selector, "selector must not be null");
         System.exit(runAndReturnExitCode(selector));
     }
+
+    /**
+     * Releases resources held by this runner and its listener.
+     *
+     * <p>The default implementation does nothing. The default runner implementation cascades {@code close()} to
+     * its listener so that listeners holding resources are cleaned up when the runner is used in try-with-resources.
+     */
+    @Override
+    default void close() {}
 
     /**
      * Fluent builder for {@link Runner} instances.

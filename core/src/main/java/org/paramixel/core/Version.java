@@ -19,14 +19,21 @@ package org.paramixel.core;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import org.paramixel.core.internal.ResourceLoader;
 
 /**
  * Exposes the Paramixel version.
  *
  * <p>The current implementation loads version information from the classpath resource
- * {@code version.properties} when the class is initialized.
+ * {@code version.properties} when the class is initialized. If the resource is missing or
+ * unreadable, the version falls back to {@link #UNKNOWN}.
  */
 public final class Version {
+
+    /**
+     * Fallback version returned when the version resource is missing or unreadable.
+     */
+    public static final String UNKNOWN = "UNKNOWN";
 
     private static final String RESOURCE_NAME = "version.properties";
 
@@ -39,43 +46,27 @@ public final class Version {
     /**
      * Returns the Paramixel version.
      *
-     * @return the version string
-     * @throws IllegalStateException if the version resource or required property is missing or unreadable
+     * @return the version string, or {@link #UNKNOWN} if the version resource is missing or unreadable
      */
     public static String getVersion() {
         return VERSION;
     }
 
     private static String loadVersion() {
-        InputStream inputStream = getResourceAsStream(RESOURCE_NAME);
+        InputStream inputStream = ResourceLoader.getResourceAsStream(RESOURCE_NAME);
         if (inputStream == null) {
-            throw new IllegalStateException("missing classpath resource: " + RESOURCE_NAME);
+            return UNKNOWN;
         }
         Properties properties = new Properties();
         try (inputStream) {
             properties.load(inputStream);
         } catch (IOException e) {
-            throw new IllegalStateException("failed to load classpath resource: " + RESOURCE_NAME, e);
+            return UNKNOWN;
         }
         String version = properties.getProperty(VERSION_PROPERTY);
         if (version == null || version.isBlank()) {
-            throw new IllegalStateException("missing property: " + VERSION_PROPERTY);
+            return UNKNOWN;
         }
         return version;
-    }
-
-    static InputStream getResourceAsStream(String name) {
-        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-        if (contextClassLoader != null) {
-            InputStream stream = contextClassLoader.getResourceAsStream(name);
-            if (stream != null) {
-                return stream;
-            }
-        }
-        ClassLoader definingClassLoader = Version.class.getClassLoader();
-        if (definingClassLoader != null) {
-            return definingClassLoader.getResourceAsStream(name);
-        }
-        return ClassLoader.getSystemResourceAsStream(name);
     }
 }

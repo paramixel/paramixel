@@ -177,10 +177,8 @@ sync_gradle_version() {
 
     log "Syncing version ${version} to ${gradle_properties}"
 
-    cat > "${gradle_properties}" <<EOF
-version=${version}
-group=org.paramixel
-EOF
+    cp "${gradle_properties}.template" "${gradle_properties}"
+    sed -i "s/@version@/${version}/g" "${gradle_properties}"
 }
 
 build_maven() {
@@ -208,7 +206,7 @@ build_gradle_plugin() {
     install_gradle_plugin_prerequisites
 
     log "Building Gradle plugin with Java 17"
-    run_gradle_java_17 clean build --no-daemon
+    run_gradle_java_17 clean build publishToMavenLocal --no-daemon
 }
 
 main() {

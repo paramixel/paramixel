@@ -59,6 +59,14 @@ jobs:
       - name: Clean Maven Wrapper Distributions
         run: rm -rf ~/.m2/wrapper/dists/
 
+      - name: Verify package-lock.json is current
+        working-directory: website
+        run: npm install --package-lock-only --dry-run
+
+      - name: Audit Docusaurus dependencies
+        working-directory: website
+        run: npm audit --audit-level=moderate
+
       - name: Install Docusaurus dependencies
         working-directory: website
         run: npm ci
@@ -72,8 +80,23 @@ jobs:
 
       - name: Copy Javadoc to static
         run: |
-          mkdir -p website/static/javadoc
-          cp -r core/target/reports/apidocs/* website/static/javadoc/
+          set -euo pipefail
+
+          JAVADOC_SOURCE="core/target/reports/apidocs"
+          JAVADOC_DESTINATION="website/static/javadoc"
+
+          if [[ ! -d "$JAVADOC_SOURCE" ]]; then
+            echo "Javadoc source directory does not exist: $JAVADOC_SOURCE" >&2
+            exit 1
+          fi
+
+          if [[ -z "$(find "$JAVADOC_SOURCE" -mindepth 1 -print -quit)" ]]; then
+            echo "Javadoc source directory is empty: $JAVADOC_SOURCE" >&2
+            exit 1
+          fi
+
+          mkdir -p "$JAVADOC_DESTINATION"
+          cp -R "$JAVADOC_SOURCE"/. "$JAVADOC_DESTINATION"/
 
       - name: Build Docusaurus
         working-directory: website
@@ -119,6 +142,14 @@ jobs:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: 'website/package-lock.json'
+
+      - name: Verify package-lock.json is current
+        working-directory: website
+        run: npm install --package-lock-only --dry-run
+
+      - name: Audit Docusaurus dependencies
+        working-directory: website
+        run: npm audit --audit-level=moderate
 
       - name: Install dependencies
         working-directory: website

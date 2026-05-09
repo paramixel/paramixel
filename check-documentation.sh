@@ -47,19 +47,19 @@ check_dependencies() {
         fail "jq is not installed. Please install jq."
     fi
 
-    if ! command -v gawk &>/dev/null; then
-        fail "gawk is not installed. Please install gawk."
+    if ! command -v awk &>/dev/null; then
+        fail "awk is not installed. Please install awk."
     fi
 }
 
 resolve_doc_id() {
     local file="$1"
     local frontmatter_id
-    frontmatter_id=$(gawk '
+    frontmatter_id=$(awk '
         /^---$/ { in_fm = (in_fm ? 0 : 1); next }
         in_fm && /^id:/ {
-            match($0, /^id:[[:space:]]*(.+)$/, arr)
-            if (RSTART > 0) print arr[1]
+            sub(/^id:[[:space:]]*/, "")
+            print
             exit
         }
     ' "$file" 2>/dev/null)
@@ -157,14 +157,14 @@ validate_frontmatter() {
 
         relative_path="${file#${DOCS_DIR}/}"
 
-        if ! gawk '/^---$/{fm=(fm?0:1);next}fm&&/^title:/{t=1}fm&&/^description:/{d=1}END{exit(t&&d?0:1)}' "$file" 2>/dev/null; then
-            if ! gawk 'BEGIN{fm=0} /^---$/{fm=(fm?0:1);next} fm && /^title:/ {t=1} fm && /^description:/ {d=1} END {exit (t && d ? 0 : 1)}' "$file" 2>/dev/null; then
+        if ! awk '/^---$/{fm=(fm?0:1);next}fm&&/^title:/{t=1}fm&&/^description:/{d=1}END{exit(t&&d?0:1)}' "$file" 2>/dev/null; then
+            if ! awk 'BEGIN{fm=0} /^---$/{fm=(fm?0:1);next} fm && /^title:/ {t=1} fm && /^description:/ {d=1} END {exit (t && d ? 0 : 1)}' "$file" 2>/dev/null; then
                 warn "$relative_path: missing 'title' or 'description' in frontmatter"
                 ((issues++)) || true
             fi
         fi
 
-        has_custom_id=$(gawk '
+        has_custom_id=$(awk '
             /^---$/ { in_fm = (in_fm ? 0 : 1); next }
             in_fm && /^id:/ { print "yes"; exit }
         ' "$file" 2>/dev/null)

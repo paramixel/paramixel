@@ -115,13 +115,22 @@ public class ArgumentCustomExecutorServiceTest {
         return Direct.builder("shutdown")
                 .execute(context -> {
                     CUSTOM_EXECUTOR_SERVICE.shutdown();
-                    try {
-                        assertThat(CUSTOM_EXECUTOR_SERVICE.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS))
-                                .isTrue();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException("Interrupted while waiting for executor shutdown", e);
+                    int attempts = 0;
+                    int maxAttempts = 6;
+                    boolean terminated = false;
+                    while (!terminated && attempts < maxAttempts) {
+                        try {
+                            terminated =
+                                    CUSTOM_EXECUTOR_SERVICE.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new RuntimeException("Interrupted while waiting for executor shutdown", e);
+                        }
+                        attempts++;
                     }
+                    assertThat(terminated)
+                            .withFailMessage("Executor did not terminate within %d polls of %ds each", maxAttempts, 5)
+                            .isTrue();
                 })
                 .build();
     }

@@ -81,8 +81,6 @@ public class ParamixelPlugin implements Plugin<Project> {
                     stringProvider(providers, "paramixel.match.tag").orElse(extension.getMatchTag()));
             task.getReportFile().convention(
                     stringProvider(providers, "paramixel.report.file").orElse(extension.getReportFile()));
-            task.getReportFormat().convention(
-                    stringProvider(providers, "paramixel.report.format").orElse(extension.getReportFormat()));
         });
 
         project.getTasks().named("check", check -> check.dependsOn(TASK_NAME));

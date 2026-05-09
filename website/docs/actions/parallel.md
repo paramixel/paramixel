@@ -90,7 +90,7 @@ When `Runner.builder().executorService(myPool)` is used:
 
 ### Cycle detection
 
-`CycleLoopDetector` walks the action graph and rejects parent-child cycles. If a cycle is detected, it throws `CycleDetectedException`:
+`CycleDetector` walks the action graph and rejects parent-child cycles. If a cycle is detected, it throws `CycleDetectedException`:
 
 ```
 CycleDetectedException: Cycle detected in action graph: actionA[id1] -> actionB[id2] -> actionA[id1]

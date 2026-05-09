@@ -62,7 +62,7 @@ See [Reporting](reporting.md) for full configuration details.
 
 ## Safe listener wrapper
 
-`org.paramixel.core.spi.listener.SafeListener` wraps another listener and catches listener-thrown exceptions so they do not break execution. `Error` subclasses (such as `OutOfMemoryError` and `StackOverflowError`) are rethrown immediately rather than caught and logged.
+`org.paramixel.core.internal.listener.SafeListener` wraps another listener and catches listener-thrown exceptions so they do not break execution. `Error` subclasses (such as `OutOfMemoryError` and `StackOverflowError`) are rethrown immediately rather than caught and logged.
 
 ## Custom listener example
 

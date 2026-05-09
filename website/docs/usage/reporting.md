@@ -9,11 +9,10 @@ Paramixel can write per-run summary reports to a file in several formats.
 
 ## Configuration
 
-Set the report file path and (optionally) the format:
+Set the report file path. The report format is inferred from the file extension:
 
 ```properties
 paramixel.report.file=target/paramixel/paramixel.json
-paramixel.report.format=json
 ```
 
 Or via system properties:
@@ -23,7 +22,7 @@ Or via system properties:
 ./gradlew paramixelTest -Pparamixel.report.file=build/paramixel/paramixel.json
 ```
 
-When `paramixel.report.format` is absent, the format is inferred from the file extension:
+The format is inferred from the file extension:
 
 | Extension | Format |
 |---|---|
@@ -33,7 +32,7 @@ When `paramixel.report.format` is absent, the format is inferred from the file e
 | `.html` | `html` |
 | other / missing | `text` (default) |
 
-An explicit format wins over the file extension.
+Deprecated compatibility: `paramixel.report.format` is still accepted when present and nonblank, but emits a warning. Prefer selecting the format with the report file extension.
 
 ## Supported formats
 
@@ -101,10 +100,10 @@ Result result = runner.run(action);
 Add report listeners directly to a custom listener chain:
 
 ```java
-import org.paramixel.core.spi.listener.JsonReportListener;
-import org.paramixel.core.spi.listener.HtmlReportListener;
-import org.paramixel.core.spi.listener.XmlReportListener;
-import org.paramixel.core.spi.listener.ReportListener;
+import org.paramixel.core.internal.listener.JsonReportListener;
+import org.paramixel.core.internal.listener.HtmlReportListener;
+import org.paramixel.core.internal.listener.XmlReportListener;
+import org.paramixel.core.internal.listener.ReportListener;
 
 Listener listener = new CompositeListener(
         new StatusListener(),
@@ -127,20 +126,10 @@ You can write multiple report formats simultaneously by adding several report li
 </configuration>
 ```
 
-Or with an explicit format:
-
-```xml
-<configuration>
-    <reportFile>${project.build.directory}/paramixel/report.out</reportFile>
-    <reportFormat>json</reportFormat>
-</configuration>
-```
-
 CLI:
 
 ```bash
 ./mvnw test -Dparamixel.report.file=target/paramixel/paramixel.html
-./mvnw test -Dparamixel.report.file=target/paramixel/report.out -Dparamixel.report.format=json
 ```
 
 ## Gradle plugin
@@ -148,7 +137,6 @@ CLI:
 ```kotlin
 paramixel {
     reportFile.set(layout.buildDirectory.file("paramixel/paramixel.json").map { it.asFile.absolutePath })
-    reportFormat.set("json")
 }
 ```
 

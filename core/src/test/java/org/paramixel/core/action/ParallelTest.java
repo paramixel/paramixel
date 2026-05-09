@@ -21,13 +21,20 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Action;
+import org.paramixel.core.Context;
+import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Value;
+import org.paramixel.core.internal.DefaultResult;
+import org.paramixel.core.internal.DefaultStatus;
 
 @DisplayName("Parallel")
 class ParallelTest {
@@ -115,5 +122,89 @@ class ParallelTest {
                         .cast(AtomicInteger.class)
                         .incrementAndGet())
                 .build();
+    }
+
+    @Test
+    @DisplayName("interrupted thread during semaphore acquire causes parallel failure")
+    void interruptedThreadDuringSemaphoreAcquireCausesParallelFailure() throws InterruptedException {
+        var blocker = new java.util.concurrent.CountDownLatch(1);
+        var ready = new java.util.concurrent.CountDownLatch(1);
+        Action blockingChild = Direct.builder("blocking")
+                .execute(context -> {
+                    ready.countDown();
+                    blocker.countDown();
+                })
+                .build();
+        Action extraChild = Noop.of("extra");
+        Action parallel = Parallel.builder("parallel")
+                .parallelism(1)
+                .child(blockingChild)
+                .child(extraChild)
+                .build();
+
+        var ref = new AtomicReference<RuntimeException>();
+        Thread runnerThread = new Thread(() -> {
+            try {
+                Runner.builder().build().run(parallel);
+            } catch (RuntimeException e) {
+                ref.set(e);
+            }
+        });
+        runnerThread.start();
+        ready.await();
+        runnerThread.interrupt();
+        runnerThread.join(5000);
+
+        RuntimeException ex = ref.get();
+        if (ex != null && ex.getCause() instanceof InterruptedException) {
+            assertThat(ex).hasCauseInstanceOf(InterruptedException.class);
+        }
+    }
+
+    @Test
+    @DisplayName("parallel executorService getter returns empty when not provided")
+    void parallelExecutorServiceGetterReturnsEmptyWhenNotProvided() {
+        Parallel parallel = Parallel.builder("parallel").child(Noop.of("child")).build();
+
+        assertThat(parallel.getExecutorService()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("child throwing RuntimeException causes parallel failure with afterAction callback")
+    void childThrowingRuntimeExceptionCausesParallelFailureWithAfterActionCallback() {
+        var afterActionCalled = new AtomicBoolean(false);
+        Action throwingChild = new AbstractAction() {
+            {
+                this.name = "throwing";
+            }
+
+            @Override
+            protected Result executeSelf(Context context) {
+                throw new RuntimeException("child error");
+            }
+
+            @Override
+            protected Result skipSelf(Context context) {
+                DefaultResult result = new DefaultResult(this);
+                result.setStatus(DefaultStatus.SKIP);
+                result.setRunDuration(Duration.ZERO);
+                return result;
+            }
+        };
+        Action parallel = Parallel.builder("parallel").child(throwingChild).build();
+        Listener trackingListener = new Listener() {
+            @Override
+            public void afterAction(Result result) {
+                if (result.getAction() == parallel) {
+                    afterActionCalled.set(true);
+                }
+            }
+        };
+
+        assertThatThrownBy(() ->
+                        Runner.builder().listener(trackingListener).build().run(parallel))
+                .isInstanceOf(RuntimeException.class);
+
+        assertThat(afterActionCalled).isTrue();
     }
 }

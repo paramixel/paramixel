@@ -20,8 +20,8 @@ import java.time.Duration;
 import java.time.Instant;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
-import org.paramixel.core.spi.DefaultResult;
-import org.paramixel.core.spi.DefaultStatus;
+import org.paramixel.core.internal.DefaultResult;
+import org.paramixel.core.internal.DefaultStatus;
 
 /**
  * An action that always passes and performs no work.

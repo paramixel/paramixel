@@ -38,7 +38,7 @@ The `skipAction(Result)` listener callback fires for every skipped action.
 
 ### Cycle detection
 
-`CycleLoopDetector` detects parent-child cycles in the action graph. If a cycle is found, it throws `CycleDetectedException`:
+`CycleDetector` detects parent-child cycles in the action graph. If a cycle is found, it throws `CycleDetectedException`:
 
 ```
 CycleDetectedException: Cycle detected in action graph: actionA[id1] -> actionB[id2] -> actionA[id1]

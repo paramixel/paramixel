@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.m2/repository
-          key: maven-local-repo-${{ runner.os }}-java25-${{ hashFiles('**/pom.xml') }}
+          key: maven-local-repo-${{ runner.os }}-java25-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-25.txt') }}
           restore-keys: |
             maven-local-repo-${{ runner.os }}-java25-
 
@@ -45,6 +45,9 @@ jobs:
           echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
           java -version
           javac -version
+
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
 
       - name: Build and Test
         run: ./build.sh maven --skip-static-analysis
@@ -85,7 +88,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.m2/repository
-          key: maven-local-repo-${{ runner.os }}-java21-${{ hashFiles('**/pom.xml') }}
+          key: maven-local-repo-${{ runner.os }}-java21-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-21.txt') }}
           restore-keys: |
             maven-local-repo-${{ runner.os }}-java21-
 
@@ -97,6 +100,9 @@ jobs:
           echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
           java -version
           javac -version
+
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
 
       - name: Build and Test
         run: ./build.sh maven
@@ -137,7 +143,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.m2/repository
-          key: maven-local-repo-${{ runner.os }}-java17-${{ hashFiles('**/pom.xml') }}
+          key: maven-local-repo-${{ runner.os }}-java17-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-17.txt') }}
           restore-keys: |
             maven-local-repo-${{ runner.os }}-java17-
 
@@ -149,6 +155,9 @@ jobs:
           echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
           java -version
           javac -version
+
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
 
       - name: Build and Test
         run: ./build.sh maven
@@ -185,11 +194,25 @@ jobs:
           java-version: 17
           distribution: corretto
 
+      - name: Cache Maven local repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: maven-local-repo-${{ runner.os }}-gradle-plugin-java17-${{ hashFiles('**/pom.xml', 'gradle-plugin/**/*.gradle*') }}
+          restore-keys: |
+            maven-local-repo-${{ runner.os }}-gradle-plugin-java17-
+
+      - name: Clean Maven Wrapper Distributions
+        run: rm -rf ~/.m2/wrapper/dists/
+
       - name: Verify Java Runtime
         run: |
           echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
           java -version
           javac -version
+
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
 
       - name: Build Gradle Plugin
         run: |

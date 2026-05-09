@@ -24,6 +24,10 @@ public final class NetworkFactory {
 
     public static Network createNetwork() {
         Network network = Network.newNetwork();
+        // Eagerly allocate the Docker network by calling getId().
+        // This ensures the network is fully materialized before any
+        // container references it, preventing race conditions during
+        // parallel container startup.
         network.getId();
         return network;
     }

@@ -117,15 +117,6 @@ public abstract class ParamixelTestTask extends DefaultTask {
     public abstract Property<String> getReportFile();
 
     /**
-     * Returns the output format for the summary report.
-     *
-     * @return the report-format property, or an unset property to infer from the report file
-     */
-    @Input
-    @org.gradle.api.tasks.Optional
-    public abstract Property<String> getReportFormat();
-
-    /**
      * Returns the test runtime classpath used to discover and execute action factories.
      *
      * @return the test classpath file collection
@@ -162,8 +153,7 @@ public abstract class ParamixelTestTask extends DefaultTask {
                     getMatchPackage(),
                     getMatchClass(),
                     getMatchTag(),
-                    getReportFile(),
-                    getReportFormat());
+                    getReportFile());
 
             Optional<Action> optionalAction = Resolver.resolveActions(configuration);
 
@@ -175,21 +165,22 @@ public abstract class ParamixelTestTask extends DefaultTask {
                 return;
             }
 
-            Runner runner = Runner.builder()
+            try (Runner runner = Runner.builder()
                     .configuration(configuration)
                     .listener(Factory.defaultListener(configuration))
-                    .build();
+                    .build()) {
 
-            Result result = runner.run(optionalAction.get());
+                Result result = runner.run(optionalAction.get());
 
-            if (result.getStatus().isFailure()
-                    || (result.getStatus().isSkip() && getFailureOnSkip().get())) {
-                throw new GradleException("There are test failures");
+                if (result.getStatus().isFailure()
+                        || (result.getStatus().isSkip() && getFailureOnSkip().get())) {
+                    throw new GradleException("TESTS FAILED");
+                }
             }
         } catch (GradleException e) {
             throw e;
         } catch (Exception e) {
-            throw new GradleException("Failed to execute Paramixel specs", e);
+            throw new GradleException("Failed to execute Paramixel tests", e);
         } finally {
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
