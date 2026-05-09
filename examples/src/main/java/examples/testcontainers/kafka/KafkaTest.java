@@ -116,6 +116,7 @@ public class KafkaTest {
 
                     try (KafkaProducer<String, String> producer = createKafkaProducer(testEnvironment)) {
                         producer.send(new ProducerRecord<>(TOPIC, message)).get();
+                        producer.flush();
                     }
 
                     LOGGER.info("[%s] message [%s] produced", testEnvironment.name(), message);
@@ -135,18 +136,31 @@ public class KafkaTest {
                     LOGGER.info("[%s] expected message [%s]", testEnvironment.name(), message);
 
                     boolean messageMatched = false;
+                    int attempts = 0;
+                    int maxAttempts = 5;
+                    Duration pollTimeout = Duration.ofSeconds(2);
+
                     try (KafkaConsumer<String, String> consumer = createKafkaConsumer(testEnvironment)) {
                         consumer.subscribe(Collections.singletonList(TOPIC));
 
-                        var consumerRecords = consumer.poll(Duration.ofMillis(10_000));
-                        for (ConsumerRecord<String, String> consumerRecord : consumerRecords) {
-                            LOGGER.info("[%s] consumed message [%s]", testEnvironment.name(), consumerRecord.value());
-                            assertThat(consumerRecord.value()).isEqualTo(message);
-                            messageMatched = true;
+                        while (!messageMatched && attempts < maxAttempts) {
+                            var consumerRecords = consumer.poll(pollTimeout);
+                            for (ConsumerRecord<String, String> consumerRecord : consumerRecords) {
+                                LOGGER.info(
+                                        "[%s] consumed message [%s]", testEnvironment.name(), consumerRecord.value());
+                                assertThat(consumerRecord.value()).isEqualTo(message);
+                                messageMatched = true;
+                            }
+                            attempts++;
                         }
 
-                        assertThat(messageMatched).isTrue();
-                        assertThat(consumer.poll(Duration.ofMillis(2_000)).isEmpty())
+                        assertThat(messageMatched)
+                                .withFailMessage(
+                                        "Expected message not received within %d polls of %ds each",
+                                        maxAttempts, pollTimeout.toSeconds())
+                                .isTrue();
+
+                        assertThat(consumer.poll(Duration.ofMillis(500)).isEmpty())
                                 .isTrue();
                     }
                 })

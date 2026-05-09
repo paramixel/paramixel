@@ -23,8 +23,8 @@ import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Noop;
-import org.paramixel.core.spi.DefaultResult;
-import org.paramixel.core.spi.DefaultStatus;
+import org.paramixel.core.internal.DefaultResult;
+import org.paramixel.core.internal.DefaultStatus;
 
 @DisplayName("Result")
 class ResultTest {

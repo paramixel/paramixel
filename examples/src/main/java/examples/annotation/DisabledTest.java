@@ -16,6 +16,9 @@
 
 package examples.annotation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.paramixel.core.Action;
 import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
@@ -24,27 +27,43 @@ import org.paramixel.core.action.Direct;
 
 public class DisabledTest {
 
-    private static final Runnable FAILING_ACTION = () -> {
-        throw new AssertionError("Disabled action must not execute");
-    };
+    private static final AtomicBoolean factoryInvoked = new AtomicBoolean();
 
     public static void main(String[] args) {
-        Factory.defaultRunner().runAndExit(actionFactory());
+        Factory.defaultRunner().runAndExit(disabledVerificationFactory());
+    }
+
+    @Paramixel.ActionFactory
+    public static Action disabledVerificationFactory() {
+        return Direct.builder("DisabledVerification")
+                .execute(context -> assertThat(factoryInvoked.get())
+                        .as("@Paramixel.Disabled must prevent the action factory from being invoked")
+                        .isFalse())
+                .build();
     }
 
     @Paramixel.Disabled("covered by resolver skip behavior")
     @Paramixel.ActionFactory
     public static Action actionFactory() {
+        factoryInvoked.set(true);
+
         Action before = Direct.builder("before")
-                .execute(context -> FAILING_ACTION.run())
+                .execute(context -> {
+                    throw new AssertionError("Disabled action must not execute");
+                })
                 .build();
 
         Action child = Direct.builder("disabled-leaf")
-                .execute(context -> FAILING_ACTION.run())
+                .execute(context -> {
+                    throw new AssertionError("Disabled action must not execute");
+                })
                 .build();
 
-        Action after =
-                Direct.builder("after").execute(context -> FAILING_ACTION.run()).build();
+        Action after = Direct.builder("after")
+                .execute(context -> {
+                    throw new AssertionError("Disabled action must not execute");
+                })
+                .build();
 
         return Container.builder("DisabledTest")
                 .before(before)

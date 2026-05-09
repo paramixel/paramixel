@@ -31,14 +31,14 @@ When `true`, skipped tests cause the build to fail (equivalent to exit code `1`)
 - property: `paramixel.report.file`
 - default: unset
 
-When set, the plugin writes a summary report to the configured file after execution completes.
+When set, the plugin writes a summary report to the configured file after execution completes. Report format is inferred from the file extension.
 
-### `reportFormat`
+### `reportFormat` (deprecated)
 
 - property: `paramixel.report.format`
 - default: inferred from `reportFile`
 
-Supported values are `text`, `json`, `xml`, and `html`. When omitted, `.log` and `.txt` infer `text`, `.json` infers `json`, `.xml` infers `xml`, and `.html` infers `html`.
+This parameter is accepted for backward compatibility and emits a warning when used. Prefer selecting the format with the `reportFile` extension (`.txt`, `.log`, `.json`, `.xml`, or `.html`).
 
 ### `properties`
 
@@ -78,7 +78,6 @@ Custom key/value pairs merged into Paramixel runtime configuration.
 ./mvnw test -Dparamixel.failIfNoTests=false
 ./mvnw test -Dparamixel.failureOnSkip=true
 ./mvnw test -Dparamixel.report.file=target/paramixel/paramixel.json
-./mvnw test -Dparamixel.report.file=target/paramixel/report.out -Dparamixel.report.format=json
 ./mvnw test -Dparamixel.parallelism=8
 ```
 
@@ -90,6 +89,7 @@ When report files are enabled:
 - console output still appears normally
 - the configured file is overwritten on each run
 - the file contains the summary tree without ANSI color codes
+- report format is inferred from the file extension (`.json`, `.xml`, `.html`, `.log`, `.txt`; unknown defaults to text)
 - file creation errors are reported as warnings and do not fail the test run
 - tilde (`~`) expansion is supported on Linux and macOS: `~` expands to the current user's home directory, `~/path` expands relative to the home directory, and `~user` expands to another user's home directory (if that user exists). On Windows, tilde expansion is a no-op and the path is used as-is.
 

@@ -30,8 +30,8 @@ import org.paramixel.core.CompositeAction;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
-import org.paramixel.core.spi.DefaultResult;
-import org.paramixel.core.spi.DefaultStatus;
+import org.paramixel.core.internal.DefaultResult;
+import org.paramixel.core.internal.DefaultStatus;
 import org.paramixel.core.support.Arguments;
 
 /**

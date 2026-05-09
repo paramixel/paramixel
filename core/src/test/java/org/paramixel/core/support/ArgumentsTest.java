@@ -99,6 +99,13 @@ class ArgumentsTest {
             });
             assertThat(evaluated[0]).isFalse();
         }
+
+        @Test
+        @DisplayName("rejects null message supplier")
+        void rejectsNullMessageSupplier() {
+            assertThatThrownBy(() -> Arguments.requireNonBlank("", (java.util.function.Supplier<String>) null))
+                    .isInstanceOf(NullPointerException.class);
+        }
     }
 
     @Nested
@@ -243,6 +250,13 @@ class ArgumentsTest {
         }
 
         @Test
+        @DisplayName("rejects null collection")
+        void rejectsNullCollection() {
+            assertThatThrownBy(() -> Arguments.requireNonEmpty(null, "must not be empty"))
+                    .isInstanceOf(NullPointerException.class);
+        }
+
+        @Test
         @DisplayName("rejects empty collection")
         void rejectsEmptyCollection() {
             assertThatThrownBy(() -> Arguments.requireNonEmpty(Collections.emptyList(), "must not be empty"))
@@ -260,6 +274,13 @@ class ArgumentsTest {
         void returnsCollectionWithNoNullElements() {
             List<String> list = List.of("a", "b");
             assertThat(Arguments.requireNoNullElements(list, "no nulls")).isSameAs(list);
+        }
+
+        @Test
+        @DisplayName("rejects null collection")
+        void rejectsNullCollection() {
+            assertThatThrownBy(() -> Arguments.requireNoNullElements((java.util.Collection<String>) null, "no nulls"))
+                    .isInstanceOf(NullPointerException.class);
         }
 
         @Test

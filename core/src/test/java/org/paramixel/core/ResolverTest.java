@@ -174,6 +174,14 @@ class ResolverTest {
                     .isInstanceOf(ResolverException.class)
                     .hasMessageContaining("more than one @Paramixel.ActionFactory method");
         }
+
+        @Test
+        @DisplayName("error from factory method is re-thrown directly, not wrapped")
+        void errorFromFactoryMethodIsReThrownDirectlyNotWrapped() {
+            assertThatThrownBy(() -> Resolver.resolveActionFromClass(ErrorThrowingFactory.class))
+                    .isInstanceOf(TestError.class)
+                    .hasMessage("factory error");
+        }
     }
 
     @Nested
@@ -304,6 +312,19 @@ class ResolverTest {
         @Paramixel.Tag(" ")
         public static Action actionFactory() {
             return Direct.builder("blank-tag-action").execute(context -> {}).build();
+        }
+    }
+
+    static class ErrorThrowingFactory {
+        @Paramixel.ActionFactory
+        public static Action actionFactory() {
+            throw new TestError("factory error");
+        }
+    }
+
+    static class TestError extends Error {
+        TestError(String message) {
+            super(message);
         }
     }
 }

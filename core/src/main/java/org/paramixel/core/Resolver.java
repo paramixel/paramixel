@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 import org.paramixel.core.action.Parallel;
 import org.paramixel.core.exception.ConfigurationException;
 import org.paramixel.core.exception.ResolverException;
-import org.paramixel.core.spi.listener.Constants;
+import org.paramixel.core.internal.listener.Constants;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -306,6 +306,9 @@ public final class Resolver {
             return (Action) result;
         } catch (ReflectiveOperationException e) {
             Throwable cause = e instanceof InvocationTargetException && e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof Error error) {
+                throw error;
+            }
             throw ResolverException.of("Failed to invoke @Paramixel.ActionFactory method on " + location, cause);
         }
     }

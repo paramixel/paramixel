@@ -38,7 +38,6 @@ public abstract class ParamixelExtension {
     private final Property<String> matchClass;
     private final Property<String> matchTag;
     private final Property<String> reportFile;
-    private final Property<String> reportFormat;
 
     /**
      * Creates the extension with Gradle-injected property defaults.
@@ -48,14 +47,13 @@ public abstract class ParamixelExtension {
     @Inject
     public ParamixelExtension(ObjectFactory objects) {
         skipTests = objects.property(Boolean.class).convention(false);
-        failIfNoTests = objects.property(Boolean.class).convention(true);
+        failIfNoTests = objects.property(Boolean.class).convention(false);
         failureOnSkip = objects.property(Boolean.class).convention(false);
         parallelism = objects.property(Integer.class);
         matchPackage = objects.property(String.class);
         matchClass = objects.property(String.class);
         matchTag = objects.property(String.class);
         reportFile = objects.property(String.class);
-        reportFormat = objects.property(String.class);
     }
 
     /**
@@ -72,7 +70,7 @@ public abstract class ParamixelExtension {
     /**
      * Returns whether the build should fail when no action factories are discovered.
      *
-     * <p>Defaults to {@code true}.</p>
+     * <p>Defaults to {@code false}.</p>
      *
      * @return the fail-if-no-tests property
      */
@@ -148,15 +146,4 @@ public abstract class ParamixelExtension {
         return reportFile;
     }
 
-    /**
-     * Returns the output format for the summary report.
-     *
-     * <p>Unset by default; when absent, the format is inferred from {@link #getReportFile()}.
-     * Supported values are {@code text}, {@code json}, {@code xml}, and {@code html}.</p>
-     *
-     * @return the report-format property
-     */
-    public Property<String> getReportFormat() {
-        return reportFormat;
-    }
 }

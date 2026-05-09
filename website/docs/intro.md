@@ -94,7 +94,7 @@ Core configuration is loaded from:
 2. JVM system properties
 3. programmatic `Runner.builder().configuration(...)` overrides, when used
 
-Built-in keys include `paramixel.parallelism`, `paramixel.failureOnSkip`, `paramixel.report.file`, `paramixel.report.format`, `paramixel.match.package`, `paramixel.match.class`, and `paramixel.match.tag`.
+Built-in keys include `paramixel.parallelism`, `paramixel.failureOnSkip`, `paramixel.report.file`, `paramixel.match.package`, `paramixel.match.class`, and `paramixel.match.tag`.
 
 Use `@Paramixel.Tag` to tag action factories for selective discovery:
 

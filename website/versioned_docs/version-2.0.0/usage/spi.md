@@ -54,7 +54,7 @@ In both cases, custom actions implement `execute(Context)`. Use direct `Action` 
 
 When implementing custom composite actions, be aware that `DefaultRunner` validates the action tree before execution:
 
-- `CycleLoopDetector` rejects parent-child cycles — throws `CycleDetectedException`
+- `CycleDetector` rejects parent-child cycles — throws `CycleDetectedException`
 - `DeadlockDetector` rejects nested `Parallel` configurations that would cause thread starvation — throws `DeadlockDetected`
 
 Custom actions that introduce cycles or deeply nested parallel structures will be caught by these validators.

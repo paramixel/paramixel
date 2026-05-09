@@ -32,7 +32,7 @@ const sidebars = {
         'usage/gradle-plugin',
         'usage/integration-testing',
         'usage/discovery',
-        'usage/spi',
+        
         'usage/migration-guide',
         'usage/migration-1-to-3',
         'usage/migration-2-to-3',

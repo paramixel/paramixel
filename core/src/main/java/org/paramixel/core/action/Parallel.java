@@ -30,8 +30,8 @@ import org.paramixel.core.CompositeAction;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
-import org.paramixel.core.spi.DefaultResult;
-import org.paramixel.core.spi.DefaultStatus;
+import org.paramixel.core.internal.DefaultResult;
+import org.paramixel.core.internal.DefaultStatus;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -184,22 +184,22 @@ public final class Parallel extends AbstractAction implements CompositeAction {
 
             result.setStatus(computeStatus(result.getChildren()));
             result.setRunDuration(Duration.between(start, Instant.now()));
+            context.getListener().afterAction(result);
+            return result;
         } catch (RuntimeException e) {
-            if (e.getCause() instanceof InterruptedException) {
+            boolean interrupted = e.getCause() instanceof InterruptedException;
+            if (interrupted) {
                 result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getCause()));
-                result.setRunDuration(Duration.between(start, Instant.now()));
-                context.getListener().afterAction(result);
-                Thread.currentThread().interrupt();
             } else {
                 result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e));
-                result.setRunDuration(Duration.between(start, Instant.now()));
-                context.getListener().afterAction(result);
-                throw e;
+            }
+            result.setRunDuration(Duration.between(start, Instant.now()));
+            context.getListener().afterAction(result);
+            if (interrupted) {
+                Thread.currentThread().interrupt();
             }
             throw e;
         }
-        context.getListener().afterAction(result);
-        return result;
     }
 
     private Status computeStatus(List<Result> childResults) {

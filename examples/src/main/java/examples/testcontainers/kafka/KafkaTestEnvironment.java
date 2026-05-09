@@ -26,11 +26,13 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.ListTopicsOptions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.errors.TopicExistsException;
+import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.kafka.KafkaContainer;
@@ -40,9 +42,11 @@ public class KafkaTestEnvironment implements AutoCloseable {
 
     private static final Duration INITIALIZE_TIMEOUT = Duration.ofMinutes(3);
 
-    private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(8);
+    private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(5);
 
-    private static final Duration PROBE_INTERVAL = Duration.ofMillis(500);
+    private static final Duration BROKER_READINESS_TIMEOUT = Duration.ofSeconds(60);
+
+    private static final int ADMIN_TIMEOUT_SECONDS = 8;
 
     private final String dockerImageName;
 
@@ -59,12 +63,11 @@ public class KafkaTestEnvironment implements AutoCloseable {
         return argumentName;
     }
 
-    public void initialize(final Network network) throws Exception {
+    public void initialize(final Network network) {
+        boolean success = false;
         boolean interrupted = false;
 
         try {
-            final long deadlineNanos = System.nanoTime() + INITIALIZE_TIMEOUT.toNanos();
-
             final DockerImageName image =
                     DockerImageName.parse(dockerImageName).asCompatibleSubstituteFor("apache/kafka");
 
@@ -72,139 +75,109 @@ public class KafkaTestEnvironment implements AutoCloseable {
                     .withNetwork(network)
                     .withStartupAttempts(1)
                     .withLogConsumer(new ContainerLogConsumer(getClass().getName(), argumentName))
-                    .waitingFor(Wait.forLogMessage(".*[Kk]afka.*[Ss]erver.*started.*\\n", 1)
-                            .withStartupTimeout(INITIALIZE_TIMEOUT));
+                    .waitingFor(Wait.forLogMessage(".*Transitioning from RECOVERY to RUNNING.*", 1)
+                            .withStartupTimeout(INITIALIZE_TIMEOUT))
+                    .withReuse(false);
 
             try {
                 kafkaContainer.start();
+                waitForBrokerReadiness();
             } catch (Exception e) {
                 captureLogsOnFailure(e);
-                stopQuietly();
+                if (e.getCause() instanceof InterruptedException) {
+                    interrupted = true;
+                }
                 throw e;
             }
 
-            long remainingNanos = deadlineNanos - System.nanoTime();
-
-            if (remainingNanos <= 0) {
-                stopQuietly();
-                throw new IllegalStateException("Kafka container started, but the overall initialize timeout of "
-                        + INITIALIZE_TIMEOUT + " was already exhausted.");
-            }
-
-            try {
-                awaitKafkaReady(kafkaContainer.getBootstrapServers(), Duration.ofNanos(remainingNanos));
-            } catch (Exception e) {
-                captureLogsOnFailure(e);
-                stopQuietly();
-                throw e;
-            }
-
-        } catch (InterruptedException e) {
-            interrupted = true;
-            stopQuietly();
-            throw e;
+            success = true;
         } finally {
-            // Restore the interrupt flag if it was cleared anywhere in the try block.
+            if (!success) {
+                stopQuietly();
+            }
             if (interrupted) {
                 Thread.currentThread().interrupt();
             }
         }
     }
 
-    private void awaitKafkaReady(final String bootstrapServers, final Duration timeout) throws Exception {
-        final long deadlineNanos = System.nanoTime() + timeout.toNanos();
+    public String getBootstrapServers() {
+        return kafkaContainer.getBootstrapServers();
+    }
 
-        // toMillis() is available in Java 8. toSeconds() is Java 9+.
-        final long probeTimeoutMs = PROBE_TIMEOUT.toMillis();
+    public boolean isRunning() {
+        return kafkaContainer != null && kafkaContainer.isRunning();
+    }
 
-        // Safe narrowing: ListTopicsOptions.timeoutMs() takes an int.
-        // In practice PROBE_TIMEOUT is well under Integer.MAX_VALUE ms (~24 days),
-        // but the clamp makes the contract explicit.
+    public void createTopic(final String topic) throws ExecutionException, InterruptedException {
+        var properties = new Properties();
+        properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
+        properties.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, String.valueOf(PROBE_TIMEOUT.toMillis()));
+        properties.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, String.valueOf(PROBE_TIMEOUT.toMillis()));
+
+        try (var adminClient = AdminClient.create(properties)) {
+            adminClient
+                    .createTopics(Collections.singletonList(new NewTopic(topic, 1, (short) 1)))
+                    .all()
+                    .get(ADMIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new IllegalStateException("Timed out creating topic: " + topic, e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof TopicExistsException
+                    || (cause != null && cause.getCause() instanceof TopicExistsException)) {
+                return;
+            }
+
+            throw e;
+        }
+    }
+
+    public void close() {
+        stopQuietly();
+    }
+
+    private void waitForBrokerReadiness() {
+        var properties = new Properties();
+        properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
+        properties.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, String.valueOf(PROBE_TIMEOUT.toMillis()));
+        properties.put("default.api.timeout.ms", String.valueOf(PROBE_TIMEOUT.toMillis()));
+        properties.put("reconnect.backoff.ms", "1000");
+        properties.put("reconnect.backoff.max.ms", "2000");
+        properties.put("retries", "5");
+
         var listTopicsOptions = new ListTopicsOptions()
-                .timeoutMs((int) Math.min(probeTimeoutMs, Integer.MAX_VALUE))
+                .timeoutMs((int) PROBE_TIMEOUT.toMillis())
                 .listInternal(true);
 
+        var deadlineNanos = System.nanoTime() + BROKER_READINESS_TIMEOUT.toNanos();
+        var attempt = 0;
+        var maxBackoffMs = 2000L;
         Exception lastException = null;
 
         while (System.nanoTime() < deadlineNanos) {
-            // Fresh AdminClient per probe — no stale internal backoff state.
-            var props = buildAdminClientProperties(bootstrapServers, probeTimeoutMs);
-            try (var adminClient = AdminClient.create(props)) {
-
-                // describeCluster: proves the broker can answer metadata requests.
-                adminClient.describeCluster().nodes().get(probeTimeoutMs, TimeUnit.MILLISECONDS);
-
-                // listTopics: flushes out "partially ready" broker states.
-                adminClient.listTopics(listTopicsOptions).names().get(probeTimeoutMs, TimeUnit.MILLISECONDS);
-
-                return; // Broker is ready.
-
-            } catch (InterruptedException ie) {
+            try (var adminClient = AdminClient.create(properties)) {
+                adminClient.describeCluster().nodes().get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                adminClient.listTopics(listTopicsOptions).names().get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+                return;
+            } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw ie;
+                throw new ContainerLaunchException("Interrupted while waiting for Kafka broker readiness", e);
             } catch (Exception e) {
                 lastException = e;
-            }
-
-            // Back off  setUp next probe — but honour the deadline.
-            long remainingNanos = deadlineNanos - System.nanoTime();
-            if (remainingNanos <= 0) {
-                break;
-            }
-
-            long sleepMs = Math.min(PROBE_INTERVAL.toMillis(), remainingNanos / 1_000_000L);
-            if (sleepMs > 0) {
+                long delay = Math.min(100L * (1L << attempt), maxBackoffMs);
                 try {
-                    Thread.sleep(sleepMs);
-                } catch (InterruptedException ie) {
+                    Thread.sleep(delay);
+                } catch (InterruptedException ee) {
                     Thread.currentThread().interrupt();
-                    throw ie;
+                    throw new ContainerLaunchException("Interrupted while waiting for Kafka broker readiness", ee);
                 }
+                attempt++;
             }
         }
 
-        var message = "Kafka did not become ready within " + timeout + " (bootstrap.servers=" + bootstrapServers + ")";
-
-        throw lastException != null
-                ? new IllegalStateException(message, lastException)
-                : new IllegalStateException(message);
-    }
-
-    private static Properties buildAdminClientProperties(final String bootstrapServers, final long probeTimeoutMs) {
-        var props = new Properties();
-        props.put("bootstrap.servers", bootstrapServers);
-
-        // Hard deadline for any single Kafka request.
-        props.put("request.timeout.ms", Long.toString(probeTimeoutMs));
-        props.put("default.api.timeout.ms", Long.toString(probeTimeoutMs));
-
-        // Disable metadata caching so each fresh AdminClient always fetches
-        // current broker state rather than serving a stale "unavailable" entry.
-        props.put("metadata.max.age.ms", Long.toString(probeTimeoutMs));
-
-        // Close idle connections quickly so failed probes don't leave sockets open.
-        props.put("connections.max.idle.ms", Long.toString(probeTimeoutMs + 1000L));
-
-        // Prevent internal exponential backoff from growing beyond one probe cycle.
-        props.put("reconnect.backoff.ms", "100");
-        props.put("reconnect.backoff.max.ms", Long.toString(probeTimeoutMs / 2));
-
-        // All retry logic is ours — disable internal retries to avoid double-waiting.
-        props.put("retries", "0");
-
-        return props;
-    }
-
-    private void captureLogsOnFailure(final Exception originalCause) {
-        if (kafkaContainer == null) {
-            return;
-        }
-        try {
-            System.err.printf(
-                    "Kafka container logs (cause: %s):%n%s%n", originalCause.getMessage(), kafkaContainer.getLogs());
-        } catch (Exception ignored) {
-            // Intentionally empty
-        }
+        throw new ContainerLaunchException(
+                "Kafka broker failed to become ready within " + BROKER_READINESS_TIMEOUT, lastException);
     }
 
     private void stopQuietly() {
@@ -218,34 +191,15 @@ public class KafkaTestEnvironment implements AutoCloseable {
         }
     }
 
-    public boolean isRunning() {
-        return kafkaContainer != null && kafkaContainer.isRunning();
-    }
-
-    public String getBootstrapServers() {
-        return kafkaContainer.getBootstrapServers();
-    }
-
-    public void close() {
-        stopQuietly();
-    }
-
-    public void createTopic(final String topic) throws ExecutionException, InterruptedException {
-        var p = new Properties();
-        p.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
-
-        try (var admin = AdminClient.create(p)) {
-            admin.createTopics(Collections.singletonList(new NewTopic(topic, 1, (short) 1)))
-                    .all()
-                    .get();
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof TopicExistsException
-                    || (cause != null && cause.getCause() instanceof TopicExistsException)) {
-                return;
-            }
-
-            throw e;
+    private void captureLogsOnFailure(final Exception originalCause) {
+        if (kafkaContainer == null) {
+            return;
+        }
+        try {
+            System.err.printf(
+                    "Kafka container logs (cause: %s):%n%s%n", originalCause.getMessage(), kafkaContainer.getLogs());
+        } catch (Exception ignored) {
+            // Intentionally empty
         }
     }
 

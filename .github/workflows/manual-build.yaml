@@ -44,6 +44,9 @@ jobs:
           java -version
           javac -version
 
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
+
       - name: Build and Test
         run: ./build.sh maven --skip-static-analysis
         env:
@@ -96,6 +99,9 @@ jobs:
           java -version
           javac -version
 
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
+
       - name: Build and Test
         run: ./build.sh maven
         env:
@@ -147,6 +153,9 @@ jobs:
           echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
           java -version
           javac -version
+
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
 
       - name: Build and Test
         run: ./build.sh maven

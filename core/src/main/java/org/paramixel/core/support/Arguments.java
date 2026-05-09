@@ -51,10 +51,12 @@ public class Arguments {
      * @param messageSupplier the exception message supplier to use when validation fails
      * @return {@code value}
      * @throws NullPointerException if {@code value} is {@code null}
+     * @throws NullPointerException if {@code messageSupplier} is {@code null}
      * @throws IllegalArgumentException if {@code value} is blank
      */
     public static String requireNonBlank(String value, Supplier<String> messageSupplier) {
         Objects.requireNonNull(value);
+        Objects.requireNonNull(messageSupplier);
         if (value.isBlank()) {
             throw new IllegalArgumentException(messageSupplier.get());
         }
@@ -143,9 +145,11 @@ public class Arguments {
      * @param collection the collection to validate
      * @param message the exception message to use when validation fails
      * @return {@code collection}
+     * @throws NullPointerException if {@code collection} is {@code null}
      * @throws IllegalArgumentException if {@code collection} is empty
      */
     public static <T> Collection<T> requireNonEmpty(Collection<T> collection, String message) {
+        Objects.requireNonNull(collection);
         if (collection.isEmpty()) {
             throw new IllegalArgumentException(message);
         }
@@ -159,9 +163,11 @@ public class Arguments {
      * @param collection the collection to validate
      * @param message the exception message to use when validation fails
      * @return {@code collection}
+     * @throws NullPointerException if {@code collection} is {@code null}
      * @throws NullPointerException if any element is {@code null}
      */
     public static <T> Collection<T> requireNoNullElements(Collection<T> collection, String message) {
+        Objects.requireNonNull(collection);
         for (T element : collection) {
             Objects.requireNonNull(element, message);
         }

@@ -178,75 +178,81 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
-        @DisplayName("report properties are included in built configuration")
-        void reportPropertiesShouldBeIncludedInConfiguration() throws Exception {
+        @DisplayName("report file is included in built configuration")
+        void reportFileShouldBeIncludedInConfiguration() throws Exception {
             var originalReportFile = System.getProperty(Configuration.REPORT_FILE);
-            var originalReportFormat = System.getProperty(Configuration.REPORT_FORMAT);
             var mojo = new ParamixelMojo();
             try {
                 System.clearProperty(Configuration.REPORT_FILE);
-                System.clearProperty(Configuration.REPORT_FORMAT);
 
                 setField(mojo, "reportFile", "target/custom-paramixel/paramixel.json");
+
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+                assertThat(configuration.get(Configuration.REPORT_FILE))
+                        .isEqualTo("target/custom-paramixel/paramixel.json");
+            } finally {
+                restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
+            }
+        }
+
+        @Test
+        @DisplayName("deprecated report format is included in built configuration")
+        @SuppressWarnings("removal")
+        void deprecatedReportFormatShouldBeIncludedInConfiguration() throws Exception {
+            var originalReportFormat = System.getProperty(Configuration.REPORT_FORMAT);
+            var mojo = new ParamixelMojo();
+            try {
+                System.clearProperty(Configuration.REPORT_FORMAT);
+
                 setField(mojo, "reportFormat", "json");
 
                 var configuration =
                         invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
 
-                assertThat(configuration.get(Configuration.REPORT_FILE))
-                        .isEqualTo("target/custom-paramixel/paramixel.json");
                 assertThat(configuration.get(Configuration.REPORT_FORMAT)).isEqualTo("json");
             } finally {
-                restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
                 restoreSystemProperty(Configuration.REPORT_FORMAT, originalReportFormat);
             }
         }
 
         @Test
-        @DisplayName("report format should be absent when not explicitly configured")
-        void reportFormatShouldBeAbsentWhenNotExplicitlyConfigured() throws Exception {
+        @DisplayName("system report file should override mojo report configuration")
+        void systemReportFileShouldOverrideMojoReportConfiguration() throws Exception {
             var originalReportFile = System.getProperty(Configuration.REPORT_FILE);
-            var originalReportFormat = System.getProperty(Configuration.REPORT_FORMAT);
-            var mojo = new ParamixelMojo();
-            try {
-                System.clearProperty(Configuration.REPORT_FILE);
-                System.clearProperty(Configuration.REPORT_FORMAT);
-
-                setField(mojo, "reportFile", "target/custom-paramixel/paramixel.json");
-
-                var configuration =
-                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
-
-                assertThat(configuration.get(Configuration.REPORT_FILE))
-                        .isEqualTo("target/custom-paramixel/paramixel.json");
-                assertThat(configuration).doesNotContainKey(Configuration.REPORT_FORMAT);
-            } finally {
-                restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
-                restoreSystemProperty(Configuration.REPORT_FORMAT, originalReportFormat);
-            }
-        }
-
-        @Test
-        @DisplayName("system report properties should override mojo report configuration")
-        void systemReportPropertiesShouldOverrideMojoReportConfiguration() throws Exception {
-            var originalReportFile = System.getProperty(Configuration.REPORT_FILE);
-            var originalReportFormat = System.getProperty(Configuration.REPORT_FORMAT);
             var mojo = new ParamixelMojo();
             try {
                 System.setProperty(Configuration.REPORT_FILE, "target/system-paramixel/paramixel.xml");
-                System.setProperty(Configuration.REPORT_FORMAT, "xml");
 
                 setField(mojo, "reportFile", "target/custom-paramixel/paramixel.json");
-                setField(mojo, "reportFormat", "json");
 
                 var configuration =
                         invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
 
                 assertThat(configuration.get(Configuration.REPORT_FILE))
                         .isEqualTo("target/system-paramixel/paramixel.xml");
-                assertThat(configuration.get(Configuration.REPORT_FORMAT)).isEqualTo("xml");
             } finally {
                 restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
+            }
+        }
+
+        @Test
+        @DisplayName("system report format should override deprecated mojo report format")
+        @SuppressWarnings("removal")
+        void systemReportFormatShouldOverrideDeprecatedMojoReportFormat() throws Exception {
+            var originalReportFormat = System.getProperty(Configuration.REPORT_FORMAT);
+            var mojo = new ParamixelMojo();
+            try {
+                System.setProperty(Configuration.REPORT_FORMAT, "xml");
+
+                setField(mojo, "reportFormat", "json");
+
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+                assertThat(configuration.get(Configuration.REPORT_FORMAT)).isEqualTo("xml");
+            } finally {
                 restoreSystemProperty(Configuration.REPORT_FORMAT, originalReportFormat);
             }
         }

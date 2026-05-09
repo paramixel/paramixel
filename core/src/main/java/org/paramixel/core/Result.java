@@ -20,7 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.paramixel.core.spi.DefaultResult;
+import org.paramixel.core.internal.DefaultResult;
 
 /**
  * Describes the outcome of executing an {@link Action}.

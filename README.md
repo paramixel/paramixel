@@ -9,25 +9,19 @@ An action-based test framework for Java 17+ with composable action trees, lifecy
 
 ## Why Paramixel?
 
-Most Java test frameworks bake test structure into the framework itself. You describe your tests with annotations — what runs, in what order, with what setup — but only in ways the framework anticipated. Need a loop that generates tests dynamically? A conditional that skips a group based on runtime state? Parallelism at one branch but sequential execution at another? You're working around the framework, not with it.
-
-Annotations can't call methods. They can't branch. They can't compose. Every time a framework adds a new feature, it adds a new annotation — and you're stuck learning the framework's model instead of expressing your own.
-
-Paramixel treats tests as **composable trees built with code, not annotations.** Build test plans with plain Java — loops, conditionals, dynamic generation — using `Sequential`, `Parallel`, `Lifecycle`, and `DependentSequential` actions that compose to any depth. Need something the built-in actions don't cover? Write a custom `Action` — either extend `AbstractAction` or implement `Action` directly, then implement `execute(Context)` and it composes like any other. Topology is explicit. After is guaranteed. Parallelism is per-node. The full power of Java is available at test definition time, because test plans are just code.
-
-Paramixel runs anywhere Java runs. Use the Maven plugin for CI/CD integration, or embed the programmatic API directly — no build tool lock-in, no custom runners, no special CI configuration. Need more control? Implement the `Runner` interface to customize execution semantics, integrate with external systems, or build your own test orchestration.
+Annotation-based frameworks force you to express test logic through declarations that can't branch, loop, or compose. Paramixel replaces annotations with plain Java — test plans are built as composable code, giving you the full power of the language at definition time.
 
 **Key Benefits:**
-- **Tests are composable trees built with code, not annotations** — `Sequential`, `Parallel`, `Lifecycle`, and `DependentSequential` compose to arbitrary depth, making test topology explicit
+- **Composable action trees built with code** — setup/teardown, sequential and parallel children compose to arbitrary depth, making test topology explicit
 - **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) instead of declarative annotations
-- **Guaranteed after with `Lifecycle`** — cleanup always runs, even on failure or skip; after errors are attached as suppressed exceptions, following try-with-resources semantics
-- **Parallel execution at any depth** — embed `Parallel` nodes anywhere in the tree with per-node parallelism control
-- **Fail-fast or run-all semantics** — `DependentSequential` stops on first failure; `Sequential` runs all children regardless; choose the right behavior per group
-- **Write custom actions** — either extend `AbstractAction` or implement `Action` directly, then implement `execute(Context)` to define your own execution semantics; custom actions compose alongside built-in actions with zero framework changes
-- **Single factory method produces the entire test plan** — one `@Paramixel.ActionFactory` method returns the full action tree; no per-method reflection at test time
-- **No test class instantiation** — only the static factory method is called; state flows through `Context` attachments, not instance fields
-- **Context Store for state sharing** — each context has a `Store` key-value map; use `findAncestor()` to navigate the parent chain and share state across actions
-- **Result tree mirrors the action tree** — `Runner.run()` returns a `Result`; walk the tree for aggregated or granular reporting at any level
+- **Guaranteed teardown** — cleanup always runs on every node, even on failure or skip; teardown errors are attached as suppressed exceptions, following try-with-resources semantics
+- **Parallel execution at any depth** — embed parallel children anywhere in the tree with per-node parallelism control
+- **Fail-fast or run-all semantics** — choose per-node whether children stop on first failure or run all regardless
+- **Write custom actions** — implement your own execution semantics; custom actions compose alongside built-in primitives with zero framework changes
+- **Single factory method produces the entire test plan** — one static method returns the full action tree; no per-method reflection at test time
+- **No test class instantiation** — only the static factory method is called; state flows through a key-value store, not instance fields
+- **Key-value store for state sharing** — each node has an isolated store; navigate parent chains to share state across actions
+- **Result tree mirrors the action tree** — walk the result tree for aggregated or granular reporting at any level
 
 ## Documentation
 
@@ -36,10 +30,9 @@ For the full documentation, visit: **https://paramixel.github.io/paramixel**
 Use the version selector on the docs site to switch between versions.
 
 - **Latest** — current development docs
+- **3.0.0** — v3.0.0 stable docs
 - **2.0.0** — v2.0.0 stable docs
 - **1.0.2** — v1.0.2 stable docs
-
-See the [migration guide](https://paramixel.github.io/paramixel/docs/usage/migration-guide) when upgrading from 1.x.
 
 ## Quick Start
 
@@ -48,7 +41,7 @@ See the [migration guide](https://paramixel.github.io/paramixel/docs/usage/migra
 **Maven:**
 ```xml
 <properties>
-    <paramixel.version>LATEST_VERSION</paramixel.version>
+    <paramixel.version>3.0.0</paramixel.version>
 </properties>
 
 <dependency>
@@ -83,20 +76,28 @@ See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel)
 ```java
 import org.paramixel.core.Action;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Sequential;
 
 public class MyTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        return Sequential.of("MyTest",
-            Direct.of("first test", context -> {
-                // test something
-            }),
-            Direct.of("second test", context -> {
-                // test something else
-            }));
+        Action first = Direct.builder("first test")
+                .execute(context -> {
+                    // test something
+                })
+                .build();
+        Action second = Direct.builder("second test")
+                .execute(context -> {
+                    // test something else
+                })
+                .build();
+
+        return Container.builder("MyTest")
+                .child(first)
+                .child(second)
+                .build();
     }
 }
 ```

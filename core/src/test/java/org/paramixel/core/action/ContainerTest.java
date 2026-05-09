@@ -160,6 +160,78 @@ class ContainerTest {
         assertThat(result.getStatus().isPass()).isTrue();
     }
 
+    @Test
+    @DisplayName("shuffled order with fixed seed is deterministic")
+    void shuffledOrderWithFixedSeedIsDeterministic() {
+        List<String> order1 = new ArrayList<>();
+        List<String> order2 = new ArrayList<>();
+        Container.Policy policy = Container.Policy.builder()
+                .orderMode(Container.OrderMode.SHUFFLED)
+                .seed(12345L)
+                .build();
+
+        for (int run = 0; run < 2; run++) {
+            List<String> target = (run == 0) ? order1 : order2;
+            Action a = direct("alpha", context -> target.add("alpha"));
+            Action b = direct("beta", context -> target.add("beta"));
+            Action c = direct("gamma", context -> target.add("gamma"));
+            Action d = direct("delta", context -> target.add("delta"));
+            Action e = direct("epsilon", context -> target.add("epsilon"));
+
+            Runner.builder()
+                    .build()
+                    .run(Container.builder("container")
+                            .policy(Container.Policy.builder()
+                                    .orderMode(Container.OrderMode.SHUFFLED)
+                                    .seed(12345L)
+                                    .build())
+                            .child(a)
+                            .child(b)
+                            .child(c)
+                            .child(d)
+                            .child(e)
+                            .build());
+        }
+
+        assertThat(order1).containsExactlyInAnyOrder("alpha", "beta", "gamma", "delta", "epsilon");
+        assertThat(order1).isEqualTo(order2);
+    }
+
+    @Test
+    @DisplayName("shuffled order differs from declared order")
+    void shuffledOrderDiffersFromDeclaredOrder() {
+        List<String> declaredOrder = new ArrayList<>();
+        List<String> shuffledOrder = new ArrayList<>();
+
+        for (int i = 0; i < 10; i++) {
+            declaredOrder.add("child-" + i);
+        }
+
+        for (int i = 0; i < 10; i++) {
+            String name = "child-" + i;
+            shuffledOrder.add(name);
+        }
+
+        Container.Policy shuffledPolicy = Container.Policy.builder()
+                .orderMode(Container.OrderMode.SHUFFLED)
+                .seed(99L)
+                .build();
+
+        List<String> actualShuffled = new ArrayList<>();
+        var children = new ArrayList<Action>();
+        for (int i = 0; i < 10; i++) {
+            String name = "child-" + i;
+            children.add(direct(name, context -> actualShuffled.add(name)));
+        }
+
+        var builder = Container.builder("container").policy(shuffledPolicy);
+        children.forEach(builder::child);
+        Runner.builder().build().run(builder.build());
+
+        assertThat(actualShuffled).containsExactlyInAnyOrderElementsOf(declaredOrder);
+        assertThat(actualShuffled).isNotEqualTo(declaredOrder);
+    }
+
     private static Direct direct(String name, Direct.Executable executable) {
         return Direct.builder(name).execute(executable).build();
     }

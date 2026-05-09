@@ -19,6 +19,8 @@ package org.paramixel.maven.plugin;
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -42,6 +44,10 @@ import org.paramixel.core.Factory;
 import org.paramixel.core.Resolver;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
+import org.paramixel.core.exception.ConfigurationException;
+import org.paramixel.core.exception.ResolverException;
+import org.paramixel.core.internal.TildePathExpander;
+import org.paramixel.core.support.AnsiColor;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -80,10 +86,12 @@ public class ParamixelMojo extends AbstractMojo {
     private String reportFile;
 
     /**
-     * The format for per-run summary report files.
+     * The explicit format for per-run summary report files.
      *
-     * <p>Supported values are {@code text} (the default), {@code json}, and {@code xml}.
+     * @deprecated Report format is inferred from {@code reportFile}. Use a report file extension
+     *     such as {@code .txt}, {@code .json}, {@code .xml}, or {@code .html} instead.
      */
+    @Deprecated(since = "3.0.0", forRemoval = true)
     @Parameter(property = "paramixel.report.format")
     private String reportFormat;
 
@@ -92,10 +100,12 @@ public class ParamixelMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        if (skipTests || Boolean.getBoolean("paramixel.skipTests")) {
+        if (skipTests) {
             getLog().info("Tests are skipped.");
             return;
         }
+
+        Objects.requireNonNull(project, "MavenProject must not be null");
 
         final var originalClassLoader = Thread.currentThread().getContextClassLoader();
 
@@ -107,27 +117,32 @@ public class ParamixelMojo extends AbstractMojo {
 
             if (optionalAction.isEmpty()) {
                 if (failIfNoTests) {
-                    throw new MojoFailureException("No tests found and failIfNoTests is true");
+                    throw new MojoExecutionException("No tests found and failIfNoTests is true");
                 }
 
                 getLog().info("No Paramixel tests found.");
                 return;
             }
 
-            Runner runner = Runner.builder()
+            try (Runner runner = Runner.builder()
                     .configuration(configuration)
                     .listener(Factory.defaultListener(configuration))
-                    .build();
+                    .build()) {
 
-            Action action = optionalAction.get();
-            Result result = runner.run(action);
-            if (result.getStatus().isFailure() || (result.getStatus().isSkip() && failureOnSkip)) {
-                throw new MojoFailureException("There are test failures");
+                Action action = optionalAction.get();
+                Result result = runner.run(action);
+                if (result.getStatus().isFailure() || (result.getStatus().isSkip() && failureOnSkip)) {
+                    throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
+                }
             }
+        } catch (ConfigurationException e) {
+            throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);
+        } catch (ResolverException e) {
+            throw new MojoExecutionException("Failed to resolve Paramixel actions: " + e.getMessage(), e);
         } catch (MojoFailureException e) {
             throw e;
         } catch (Exception e) {
-            throw new MojoExecutionException("Failed to execute Paramixel specs", e);
+            throw new MojoExecutionException("Failed to execute Paramixel tests", e);
         } finally {
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
@@ -137,10 +152,23 @@ public class ParamixelMojo extends AbstractMojo {
         Map<String, String> configuration =
                 new LinkedHashMap<>(withContextClassLoader(classLoader, Configuration::defaultProperties));
         putIfNotBlank(configuration, Configuration.REPORT_FILE, reportFile);
-        putIfNotBlank(configuration, Configuration.REPORT_FORMAT, reportFormat);
+        putDeprecatedReportFormatIfNotBlank(configuration, reportFormat);
+
+        if (reportFile != null && !reportFile.isBlank() && project != null) {
+            final var build = project.getBuild();
+            if (build != null) {
+                Path reportPath = TildePathExpander.expand(reportFile);
+                Path targetPath = Paths.get(build.getDirectory());
+                if (!reportPath.normalize().startsWith(targetPath.normalize())) {
+                    getLog().warn("Report file path '" + reportFile + "' resolves outside target directory '"
+                            + build.getDirectory() + "'");
+                }
+            }
+        }
 
         // POM <properties> override file/defaults but not system properties
         if (properties != null) {
+            Set<String> seenKeys = new LinkedHashSet<>();
             for (Property property : properties) {
                 String key = property.getKey();
                 String value = property.getValue();
@@ -157,24 +185,45 @@ public class ParamixelMojo extends AbstractMojo {
                     throw new MojoExecutionException("Paramixel property '" + key + "' value must not be null");
                 }
 
+                if (!seenKeys.add(key)) {
+                    getLog().warn("Duplicate Paramixel property key '" + key + "' — later value overrides earlier");
+                }
+
                 configuration.put(key, value);
             }
         }
 
         // System properties always win (matches JUnit Platform precedence)
-        System.getProperties().forEach((key, value) -> {
-            String k = String.valueOf(key);
+        var systemProps = System.getProperties().entrySet().stream().toList();
+        for (var entry : systemProps) {
+            String k = String.valueOf(entry.getKey());
             if (k.startsWith("paramixel.")) {
-                configuration.put(k, String.valueOf(value));
+                configuration.put(k, String.valueOf(entry.getValue()));
             }
-        });
+        }
+
+        warnIfDeprecatedReportFormatConfigured(configuration);
 
         return configuration;
     }
 
+    @SuppressWarnings("removal")
+    private void putDeprecatedReportFormatIfNotBlank(Map<String, String> configuration, String value) {
+        putIfNotBlank(configuration, Configuration.REPORT_FORMAT, value);
+    }
+
+    @SuppressWarnings("removal")
+    private void warnIfDeprecatedReportFormatConfigured(Map<String, String> configuration) {
+        if (configuration.containsKey(Configuration.REPORT_FORMAT)
+                && !configuration.get(Configuration.REPORT_FORMAT).isBlank()) {
+            getLog().warn("'paramixel.report.format' is deprecated and will be removed in a future release. "
+                    + "Use a report file extension such as .txt, .json, .xml, or .html instead.");
+        }
+    }
+
     private static void putIfNotBlank(Map<String, String> configuration, String key, String value) {
         if (value != null && !value.isBlank()) {
-            configuration.putIfAbsent(key, value);
+            configuration.put(key, value);
         }
     }
 
@@ -194,23 +243,24 @@ public class ParamixelMojo extends AbstractMojo {
 
     private URLClassLoader buildTestClassLoader() throws MojoExecutionException {
         final List<URL> classpathUrls = buildTestClasspathUrls();
-
-        URL[] urls = classpathUrls.stream()
-                .map(path -> {
-                    try {
-                        return new File(path.toURI()).toURI().toURL();
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                })
-                .toArray(URL[]::new);
-
+        final URL[] urls = new URL[classpathUrls.size()];
+        for (int i = 0; i < classpathUrls.size(); i++) {
+            try {
+                urls[i] = new File(classpathUrls.get(i).toURI()).toURI().toURL();
+            } catch (Exception e) {
+                throw new MojoExecutionException("Failed to convert classpath URL: " + classpathUrls.get(i), e);
+            }
+        }
         return new URLClassLoader(urls, getClass().getClassLoader());
     }
 
     private List<URL> buildTestClasspathUrls() throws MojoExecutionException {
-        final File testClassesDir = new File(project.getBuild().getTestOutputDirectory());
-        final File classesDir = new File(project.getBuild().getOutputDirectory());
+        final var build = project.getBuild();
+        if (build == null) {
+            throw new MojoExecutionException("Project build information is not available");
+        }
+        final File testClassesDir = new File(build.getTestOutputDirectory());
+        final File classesDir = new File(build.getOutputDirectory());
         final Set<URL> classpathUrls = new LinkedHashSet<>();
 
         try {
@@ -222,11 +272,16 @@ public class ParamixelMojo extends AbstractMojo {
                 classpathUrls.add(classesDir.toURI().toURL());
             }
 
-            for (var artifact : project.getArtifacts()) {
-                File artifactFile = artifact.getFile();
-                if (artifactFile != null) {
-                    classpathUrls.add(artifactFile.toURI().toURL());
+            final var artifacts = project.getArtifacts();
+            if (artifacts != null) {
+                for (var artifact : artifacts) {
+                    File artifactFile = artifact.getFile();
+                    if (artifactFile != null) {
+                        classpathUrls.add(artifactFile.toURI().toURL());
+                    }
                 }
+            } else {
+                getLog().warn("Project artifacts are not available; classpath may be incomplete");
             }
 
         } catch (Exception e) {
@@ -263,6 +318,19 @@ public class ParamixelMojo extends AbstractMojo {
         public void setValue(String value) {
             Objects.requireNonNull(value, "value must not be null");
             this.value = value;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Property)) return false;
+            Property property = (Property) o;
+            return Objects.equals(key, property.key);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(key);
         }
     }
 }

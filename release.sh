@@ -123,7 +123,7 @@ parse_args() {
   [[ -n "${VERSION}" ]] || fail "--version is required"
 
   if [[ -z "${NEXT_VERSION}" ]]; then
-    NEXT_VERSION="${VERSION}-${DEFAULT_NEXT_SUFFIX}"
+    NEXT_VERSION="${VERSION%-POST}-${DEFAULT_NEXT_SUFFIX}"
   fi
 }
 
@@ -307,11 +307,9 @@ deploy_release_java_17() {
 preflight_push_release_refs() {
   local remote="$1"
   local release_branch="$2"
-  local tag_name="$3"
 
-  log "Checking push permissions for release branch and tag"
+  log "Checking push permissions for release branch"
   git push --dry-run "${remote}" "HEAD:refs/heads/${release_branch}"
-  git push --dry-run "${remote}" "refs/tags/${tag_name}:refs/tags/${tag_name}"
 }
 
 main() {
@@ -325,6 +323,10 @@ main() {
   [[ "${VERSION}" =~ ${VERSION_PATTERN} ]] || fail "Invalid --version: ${VERSION}"
   [[ "${NEXT_VERSION}" =~ ${VERSION_PATTERN} ]] || fail "Invalid --next-version: ${NEXT_VERSION}"
   [[ "${VERSION}" != "${NEXT_VERSION}" ]] || fail "--next-version must differ from --version"
+
+  if [[ "${VERSION,,}" =~ -post$ ]]; then
+    fail "Release --version must not end with -POST (case insensitive). Got: ${VERSION}"
+  fi
 
   require_command git
   require_command awk
@@ -375,6 +377,8 @@ main() {
   log "Building Gradle plugin with version ${VERSION}"
   run_build_script_java_17 gradle-plugin
 
+  preflight_push_release_refs "${remote}" "${release_branch}"
+
   if [[ "${MODE}" == "dry-run" ]]; then
     log "Dry run complete. No deploy, commits, tags, or pushes were made."
 
@@ -392,15 +396,10 @@ main() {
   log "Creating local tag ${tag_name}"
   git tag -a "${tag_name}" -m "Release ${VERSION}"
 
-  preflight_push_release_refs "${remote}" "${release_branch}" "${tag_name}"
-
   deploy_release_java_17
 
-  log "Pushing release branch ${release_branch}"
-  git push "${remote}" "${release_branch}"
-
-  log "Pushing tag ${tag_name}"
-  git push "${remote}" "${tag_name}"
+  log "Pushing release branch and tag"
+  git push --atomic "${remote}" "${release_branch}" "${tag_name}"
 
   log "Switching back to ${BASE_BRANCH}"
   git checkout "${BASE_BRANCH}"

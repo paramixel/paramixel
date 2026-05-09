@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.core.spi.DefaultContext;
+import org.paramixel.core.internal.DefaultContext;
 
 @DisplayName("Context Store")
 class ContextStoreTest {

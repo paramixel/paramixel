@@ -193,7 +193,7 @@ import org.paramixel.core.exception.SkipException;
 
 New exceptions in `org.paramixel.core.exception`:
 
-- `CycleDetectedException` — thrown by `CycleLoopDetector`
+- `CycleDetectedException` — thrown by `CycleDetector`
 - `DeadlockDetected` — thrown by `DeadlockDetector`
 
 ## Factory class

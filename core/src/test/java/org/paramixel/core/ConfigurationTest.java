@@ -19,11 +19,17 @@ package org.paramixel.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.InputStream;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ConfigurationTest {
+
+    @TempDir
+    Path tempDir;
 
     @Test
     void shouldLoadClasspathProperties() {
@@ -36,36 +42,6 @@ class ConfigurationTest {
         Map<String, String> props = Configuration.classpathProperties();
         assertThat(props).isNotNull();
         assertThat(props).isEmpty();
-    }
-
-    @Test
-    void shouldFindExistingResourceWithNullContextClassLoader() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(null);
-            InputStream stream = Configuration.getResourceAsStream("version.properties");
-            assertThat(stream).isNotNull();
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
-        }
-    }
-
-    @Test
-    void shouldFallBackToDefiningClassLoaderWhenContextClassLoaderCannotFindResource() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(new ClassLoader(null) {});
-            InputStream stream = Configuration.getResourceAsStream("version.properties");
-            assertThat(stream).isNotNull();
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
-        }
-    }
-
-    @Test
-    void shouldReturnNullStreamForNonexistentResource() {
-        InputStream stream = Configuration.getResourceAsStream("nonexistent resource name");
-        assertThat(stream).isNull();
     }
 
     @Test
@@ -99,6 +75,28 @@ class ConfigurationTest {
             Thread.currentThread().setContextClassLoader(null);
             Map<String, String> props = Configuration.classpathProperties();
             assertThat(props).isNotNull();
+        } finally {
+            Thread.currentThread().setContextClassLoader(original);
+        }
+    }
+
+    @Test
+    void shouldLoadClasspathPropertiesFromExplicitClassLoaderWithoutUsingContextClassLoader() throws Exception {
+        Path explicitClasspath = tempDir.resolve("explicit");
+        Files.createDirectories(explicitClasspath);
+        Files.writeString(
+                explicitClasspath.resolve(Configuration.CONFIG_FILE_NAME), Configuration.TAG_MATCH + "=explicit");
+
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        ClassLoader emptyContextClassLoader = new ClassLoader(null) {};
+        try (URLClassLoader explicitClassLoader =
+                new URLClassLoader(new java.net.URL[] {explicitClasspath.toUri().toURL()}, null)) {
+            Thread.currentThread().setContextClassLoader(emptyContextClassLoader);
+
+            Map<String, String> props = Configuration.classpathProperties(explicitClassLoader);
+
+            assertThat(props).containsEntry(Configuration.TAG_MATCH, "explicit");
+            assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(emptyContextClassLoader);
         } finally {
             Thread.currentThread().setContextClassLoader(original);
         }
@@ -195,15 +193,5 @@ class ConfigurationTest {
         assertThat(first).isEqualTo(second);
         assertThat(first).isNotSameAs(second);
         assertThat(first.get(Configuration.RUNNER_PARALLELISM)).isEqualTo(second.get(Configuration.RUNNER_PARALLELISM));
-    }
-
-    @Test
-    void shouldFindExistingResourceWithGetResourceAsStream() {
-        InputStream stream = Configuration.getResourceAsStream("version.properties");
-        assertThat(stream).isNotNull();
-        try {
-            stream.close();
-        } catch (Exception ignored) {
-        }
     }
 }

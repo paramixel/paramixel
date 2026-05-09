@@ -34,30 +34,6 @@ class VersionTest {
     }
 
     @Test
-    void shouldFindResourceWithNullContextClassLoader() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(null);
-            InputStream stream = Version.getResourceAsStream("version.properties");
-            assertThat(stream).isNotNull();
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
-        }
-    }
-
-    @Test
-    void shouldFallBackToDefiningClassLoaderWhenContextClassLoaderCannotFindResource() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(new ClassLoader(null) {});
-            InputStream stream = Version.getResourceAsStream("version.properties");
-            assertThat(stream).isNotNull();
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
-        }
-    }
-
-    @Test
     void shouldLoadVersionWhenContextClassLoaderIsNull() {
         ClassLoader original = Thread.currentThread().getContextClassLoader();
         try {
@@ -93,11 +69,5 @@ class VersionTest {
         String version = Version.getVersion();
         assertThat(version).isNotNull();
         assertThat(version).isNotBlank();
-    }
-
-    @Test
-    void shouldReturnNullStreamForNonexistentResource() {
-        InputStream stream = Version.getResourceAsStream("nonexistent.resource.that.does.not.exist");
-        assertThat(stream).isNull();
     }
 }

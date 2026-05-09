@@ -1,0 +1,3 @@
+version=@version@
+group=org.paramixel
+org.gradle.jvmargs=-Xmx2g

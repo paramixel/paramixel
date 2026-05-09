@@ -15,8 +15,8 @@ Paramixel has two main phases:
 - `org.paramixel.core` - public API (`Action`, `Context`, `Result`, `Status`, `Runner`, `Store`, `Value`, `Factory`, `Version`, `Selector`, `Resolver`, `Listener`, `Configuration`)
 - `org.paramixel.core.action` - built-in actions (`Direct`, `Noop`, `Container`, `Parallel`)
 - `org.paramixel.core.exception` - exceptions (`FailException`, `SkipException`, `CycleDetectedException`, `DeadlockDetected`, `ConfigurationException`, `ResolverException`)
-- `org.paramixel.core.spi` - service provider interfaces and defaults (`DefaultResult`, `DefaultStatus`, `DefaultStore`, `DefaultContext`, `DefaultRunner`)
-- `org.paramixel.core.spi.listener` - built-in listener implementations (`SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`)
+- `org.paramixel.core.internal` - internal implementation classes and defaults (`DefaultResult`, `DefaultStatus`, `DefaultStore`, `DefaultContext`, `DefaultRunner`)
+- `org.paramixel.core.internal.listener` - built-in listener implementations (`SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`)
 - `org.paramixel.core.support` - support utilities such as `Cleanup`
 - `org.paramixel.maven.plugin` - Maven integration
 
@@ -49,7 +49,7 @@ Discovered actions are always combined as a `Parallel` root.
 
 Before execution, `DefaultRunner` runs two validators:
 
-1. **`CycleLoopDetector`** - detects parent-child cycles in the action graph; throws `CycleDetectedException`
+1. **`CycleDetector`** - detects parent-child cycles in the action graph; throws `CycleDetectedException`
 2. **`DeadlockDetector`** - detects nested `Parallel` configurations that would cause thread starvation; throws `DeadlockDetected`
 
 ### Runtime execution
@@ -59,7 +59,7 @@ Before execution, `DefaultRunner` runs two validators:
 - Each `Result` has a `Status`, run duration, parent, and children
 - `Context` provides `getStore()` for per-node state and `findAncestor()` for navigating the context hierarchy
 - `Parallel` uses a `RoutingExecutorService` that routes root-level work to the runner executor and nested parallel work to the parallel executor, preventing thread starvation for typical configurations
-- A `Runner` can be reused — calling `run()` multiple times on the same instance is safe. Each call creates fresh owned executor services (if no external executor was supplied) and shuts them down when the call completes. If an `ExecutorService` was provided via `Runner.builder().executorService(...)`, the runner uses it but does not shut it down.
+- `Runner` instances are not thread-safe and not reusable across multiple `run()` calls. Each invocation of `run(Action)` is `synchronized` to enforce single-thread access. Each call creates fresh owned executor services (if no external executor was supplied) and shuts them down when the call completes. If an `ExecutorService` was provided via `Runner.builder().executorService(...)`, the runner uses it but does not shut it down. Create a fresh `Runner` instance for each execution boundary.
 
 ## Action hierarchy
 

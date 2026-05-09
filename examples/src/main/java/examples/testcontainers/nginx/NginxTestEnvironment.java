@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.NginxContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 public class NginxTestEnvironment implements AutoCloseable {
@@ -48,7 +49,9 @@ public class NginxTestEnvironment implements AutoCloseable {
                 .withNetwork(network)
                 .withStartupAttempts(3)
                 .withLogConsumer(new ContainerLogConsumer(getClass().getName(), argumentName))
-                .withStartupTimeout(Duration.ofSeconds(30));
+                .withStartupTimeout(Duration.ofSeconds(30))
+                .waitingFor(Wait.forListeningPort())
+                .withReuse(false);
 
         try {
             nginxContainer.start();
