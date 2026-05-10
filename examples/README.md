@@ -41,7 +41,7 @@ public class __ParamixelRunner__ {
 
 Key details:
 
-- **Scope**: `Selector.packageOf()` selects only the immediate package, not sub-packages. For example, running `examples.annotation.__ParamixelRunner__` executes `DisabledTest` only — not `CriticalTaggedTest` or `SmokeTaggedTest` in `examples.annotation.tags`.
+- **Scope**: `Selector.packageOf()` selects all classes in the specified package and its subpackages. For example, running `examples.annotation.__ParamixelRunner__` executes `DisabledTest` in `examples.annotation` as well as `CriticalTaggedTest` and `SmokeTaggedTest` in `examples.annotation.tags`.
 - **PMD violations**: The `__ParamixelRunner__` name intentionally violates PMD's `ClassNamingConventions` rule. These are tooling entry points, not application classes.
 - **`examples.support`** has no runner because it contains only utility classes, not test classes.
 

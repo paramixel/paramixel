@@ -121,25 +121,6 @@ Prefer links to:
 
 Do not over-link every sentence.
 
-### `@apiNote`
-Use for caller-oriented guidance.
-
-Examples:
-- recommended usage pattern
-- important default behavior
-- advice about child contexts, selectors, or configuration precedence
-
-### `@implSpec`
-Use for behavioral guarantees that implementations must follow.
-
-Examples:
-- parent assignment rules
-- aggregate status precedence
-- listener expectations for custom implementations
-
-### `@implNote`
-Use for implementation-specific details that are useful to maintainers but not part of the public contract.
-
 ---
 
 ## Nullability and Optional Guidance
