@@ -10,16 +10,11 @@ Apply the plugin and configure the `paramixel` extension:
 
 ```groovy
 plugins {
-    id 'org.paramixel' version 'LATEST_VERSION'
-}
-
-paramixel {
-    failIfNoTests = false
-    parallelism = 4
+    id 'org.paramixel' version 'PARAMIXEL_VERSION'
 }
 ```
 
-Run tests:
+### Run Tests
 
 ```bash
 ./gradlew paramixelTest
@@ -52,52 +47,35 @@ System properties starting with `paramixel.` always override DSL configuration a
 ./gradlew paramixelTest -Dparamixel.parallelism=8
 ```
 
-## Building from Source
+## Build from Source
 
 ### Prerequisites
 
-- JDK 17+ installed on your machine
-- `JAVA_17_HOME` environment variable pointing to your JDK 17 installation directory
+- **JAVA_17_HOME** environment variable pointing to a JDK 17 installation directory
+- **Gradle 8.x.x+**
+- **Core module** built and installed to the local Maven repository
 
-### Build the Maven project and Gradle plugin
+### Build
 
-From the project root:
-
-```bash
-JAVA_17_HOME=/path/to/jdk17 ./build.sh
-```
-
-This builds the Maven project with the current Java runtime, then builds the Gradle plugin using the JDK at `JAVA_17_HOME`.
-
-### Build only the Gradle plugin
-
-From the project root:
+From the `gradle-plugin/` directory:
 
 ```bash
-JAVA_17_HOME=/path/to/jdk17 ./build.sh gradle-plugin
+JAVA_HOME="$JAVA_17_HOME" ./gradlew clean build
 ```
-
-The root build script will:
-
-1. **Sync the version** from the parent POM to `gradle-plugin/gradle.properties`, ensuring the Gradle plugin version matches the core version
-2. **Install Maven prerequisites** required by the Gradle plugin to the local Maven repository
-3. **Run `gradle-plugin/gradlew clean build`** using the JDK at `JAVA_17_HOME`
-
-If `JAVA_17_HOME` is not set, the script exits with an error message.
 
 ### Dependency Resolution
 
-The Gradle plugin resolves `org.paramixel:core` from **Maven Central first**, then **Maven Local**. For local development, `./build.sh gradle-plugin` populates Maven Local with the required local artifacts. Published releases resolve directly from Maven Central without a local install.
+The Gradle plugin resolves `org.paramixel:core` from **Maven Central first**, then **Maven Local**. For local development, build and install the core module to Maven Local from the project root:
+
+```bash
+./mvnw clean install -DskipTests -Dparamixel.skipTests
+```
+
+Published releases resolve directly from Maven Central without a local install.
 
 ### Version Sync
 
-`build.sh` syncs the project version from the parent POM to `gradle.properties` before every build. This keeps the Gradle plugin version aligned with the core module version.
-
-The `sync-gradle-version` target syncs the version without building — this is used by the release workflow during the automated release process:
-
-```bash
-./build.sh sync-gradle-version
-```
+The plugin version in `gradle.properties` must match the core module version. Update it manually before building.
 
 ---
 

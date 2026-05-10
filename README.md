@@ -30,18 +30,15 @@ For the full documentation, visit: **https://paramixel.github.io/paramixel**
 Use the version selector on the docs site to switch between versions.
 
 - **Latest** — current development docs
-- **3.0.1** — v3.0.1 stable docs
-- **2.0.0** — v2.0.0 stable docs
-- **1.0.2** — v1.0.2 stable docs
+- **3.y.z** — stable docs for the 3.x line
 
 ## Quick Start
 
 ### Add Dependency
 
-**Maven:**
 ```xml
 <properties>
-    <paramixel.version>3.0.0</paramixel.version>
+    <paramixel.version>PARAMIXEL_VERSION</paramixel.version>
 </properties>
 
 <dependency>
@@ -49,7 +46,13 @@ Use the version selector on the docs site to switch between versions.
     <artifactId>core</artifactId>
     <version>${paramixel.version}</version>
 </dependency>
+```
 
+See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel) for the latest published version.
+
+### Configure the Maven Plugin
+
+```xml
 <build>
     <plugins>
         <plugin>
@@ -69,58 +72,103 @@ Use the version selector on the docs site to switch between versions.
 </build>
 ```
 
-See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel) for the latest published version.
-
 ### Write Your First Test
 
 ```java
 import org.paramixel.core.Action;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 
 public class MyTest {
 
+    public static void main(String[] args) {
+        Factory.defaultRunner().runAndExit(actionFactory());
+    }
+
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        Action first = Direct.builder("first test")
-                .execute(context -> {
-                    // test something
-                })
+        return Container.builder(MyTest.class.getName())
+                .child(Container.builder("test1")
+                        .before(setUp())
+                        .child(test1())
+                        .after(tearDown())
+                        .build())
+                .child(Container.builder("test2")
+                        .before(setUp())
+                        .child(test2())
+                        .after(tearDown())
+                        .build())
                 .build();
-        Action second = Direct.builder("second test")
-                .execute(context -> {
-                    // test something else
-                })
-                .build();
+    }
 
-        return Container.builder("MyTest")
-                .child(first)
-                .child(second)
+    private static Action setUp() {
+        return Direct.builder("setUp")
+                .execute(context -> { /* setup */ })
+                .build();
+    }
+
+    private static Action test1() {
+        return Direct.builder("test1")
+                .execute(context -> { /* test something */ })
+                .build();
+    }
+
+    private static Action test2() {
+        return Direct.builder("test2")
+                .execute(context -> { /* test something else */ })
+                .build();
+    }
+
+    private static Action tearDown() {
+        return Direct.builder("tearDown")
+                .execute(context -> { /* teardown */ })
                 .build();
     }
 }
 ```
 
-## Run Tests
+> **Note:** Action trees are built with `private static` methods so each action is easily discoverable from the IDE outline or structure view.
+
+### Other Examples
+
+See the [`examples/`](examples/src/main/java/examples/) module for more examples, including [Testcontainers](https://github.com/testcontainers/testcontainers-java), lifecycle, parallel execution, argument testing, store operations, and tag-based selection.
+
+### Run with Maven
 
 ```bash
+# Run all tests
 ./mvnw test
+
+# Skip Paramixel tests
+./mvnw test -Dparamixel.skipTests
 ```
 
-## Contributing Notes
+### Run from the Console
 
-- Javadoc conventions for the codebase are documented in `assets/javadoc-style-guide.md`.
+Each test class has a `main` method and can be run directly from an IDE or console.
+
+You can create a `__ParamixelRunner__` in a package to run all tests in that package and its subpackages from a single entry point. See [`__ParamixelRunner__.java`](examples/src/main/java/examples/__ParamixelRunner__.java) for an example.
 
 ## Build from Source
+
+### Prerequisites
+
+- **Java 17+**
+- **Maven 3.9+**
+
+### Build
 
 ```bash
 git clone https://github.com/paramixel/paramixel.git
 cd paramixel
-JAVA_17_HOME=/path/to/jdk17 ./build.sh
+./mvnw clean install
 ```
 
-`./build.sh` builds the Maven project with the current Java runtime, then builds the Gradle plugin with `JAVA_17_HOME`.
+## Contributing Notes
+
+- Javadoc conventions for the codebase are documented in [`JAVADOCS.md`](JAVADOCS.md).
 
 ## License
 
