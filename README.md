@@ -38,7 +38,7 @@ Use the version selector on the docs site to switch between versions.
 
 ```xml
 <properties>
-    <paramixel.version>PARAMIXEL_VERSION</paramixel.version>
+    <paramixel.version><PARAMIXEL_VERSION></paramixel.version>
 </properties>
 
 <dependency>
