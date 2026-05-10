@@ -6,7 +6,7 @@
 
     <groupId>org.paramixel</groupId>
     <artifactId>parent</artifactId>
-    <version>3.0.0-POST</version>
+    <version>3.0.1</version>
     <packaging>pom</packaging>
 
     <name>Paramixel Parent</name>
@@ -35,6 +35,14 @@
         <developerConnection>scm:git:ssh://git@github.com/paramixel/paramixel.git</developerConnection>
         <url>https://github.com/paramixel/paramixel</url>
     </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://central.sonatype.com/api/v1/maven/upload</url>
+        </repository>
+    </distributionManagement>
 
     <modules>
         <module>core</module>
@@ -536,19 +544,28 @@
                         </executions>
                     </plugin>
                      <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
+                         <groupId>org.apache.maven.plugins</groupId>
+                         <artifactId>maven-gpg-plugin</artifactId>
+                         <executions>
+                             <execution>
+                                 <id>sign-artifacts</id>
+                                 <phase>verify</phase>
+                                 <goals>
+                                     <goal>sign</goal>
+                                 </goals>
+                             </execution>
+                         </executions>
+                     </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <inherited>false</inherited>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                        </configuration>
                     </plugin>
-                </plugins>
+                 </plugins>
             </build>
         </profile>
     </profiles>

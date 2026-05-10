@@ -30,7 +30,7 @@ For the full documentation, visit: **https://paramixel.github.io/paramixel**
 Use the version selector on the docs site to switch between versions.
 
 - **Latest** — current development docs
-- **3.0.0** — v3.0.0 stable docs
+- **3.0.1** — v3.0.1 stable docs
 - **2.0.0** — v2.0.0 stable docs
 - **1.0.2** — v1.0.2 stable docs
 
