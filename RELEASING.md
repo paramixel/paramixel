@@ -1,24 +1,12 @@
 # Releasing Paramixel
 
-This repository publishes artifacts to Maven Central using the `release.sh` script.
+This repository publishes artifacts to Maven Central and the Gradle Plugin Portal through a manual release process with CI validation.
 
 ## Prerequisites
 
-### Java Installations
-
-The release script verifies builds against three Java versions. Set the following environment variables:
-
-```bash
-export JAVA_17_HOME=/path/to/jdk17
-export JAVA_21_HOME=/path/to/jdk21
-export JAVA_25_HOME=/path/to/jdk25
-```
-
-Each must point to a JDK installation with a working `bin/java` executable.
-
 ### Maven Central Credentials
 
-Deploy mode requires a Maven `settings.xml` file at `~/.m2/settings.xml` with your Sonatype Central credentials:
+A Maven `settings.xml` file at `~/.m2/settings.xml` with your Sonatype Central credentials:
 
 ```xml
 <settings>
@@ -34,7 +22,7 @@ Deploy mode requires a Maven `settings.xml` file at `~/.m2/settings.xml` with yo
 
 ### GPG Signing Key
 
-Deploy mode requires a local GPG signing key. Maven Central requires that all published artifacts are signed and that the signing key is published to public key servers.
+Maven Central requires all published artifacts to be signed and the signing key published to public key servers.
 
 ```bash
 # Generate a dedicated GPG key for releases (if you don't have one)
@@ -54,110 +42,14 @@ gpg --keyserver pgp.mit.edu --send-keys XXXXXXXXXXXXXXXX
 echo "test" | gpg --batch --clearsign >/dev/null
 ```
 
-### Repository State
+### Gradle Plugin Portal Credentials
 
-- You must be on the `main` branch
-- The working tree must be clean (no uncommitted changes)
-- `main` must be synced with the remote (no ahead/behind commits)
-- No existing release branch or tag for the target version
-
-## Usage
+Publishing the Gradle plugin requires credentials for the Gradle Plugin Portal. Set the following environment variables or Gradle properties:
 
 ```bash
-./release.sh --version <VERSION> [options]
+export GRADLE_PUBLISH_KEY=YOUR_KEY
+export GRADLE_PUBLISH_SECRET=YOUR_SECRET
 ```
-
-### Options
-
-| Option | Description |
-|---|---|
-| `--version <version>` | Release version, e.g. `2.1.0` or `1.0.0-alpha` |
-| `--next-version <version>` | Next development version. Defaults to `<version>-POST` |
-| `--gradle-plugin-dir <dir>` | Directory containing `gradlew` for the Gradle plugin. Defaults to `gradle-plugin` |
-| `--dry-run` | Validate only; no deploy, commits, tags, or pushes. **Default** |
-| `--deploy` | Publish release artifacts and push git refs |
-| `--yes`, `-y` | Skip deploy confirmation prompt |
-| `--help`, `-h` | Show help |
-
-### Dry Run (Default)
-
-Validate everything without making any changes. The script will run all builds, create a temporary release branch, and then clean up automatically:
-
-```bash
-./release.sh --version 2.1.0
-```
-
-If the dry run fails, tracked changes are reset and the temporary release branch is deleted.
-
-### Deploy
-
-Publish artifacts to Maven Central, create the release branch and tag, and update `main`:
-
-```bash
-./release.sh --version 2.1.0 --deploy
-```
-
-You will be prompted to type the version number to confirm. Use `-y` to skip confirmation:
-
-```bash
-./release.sh --version 2.1.0 --deploy -y
-```
-
-### Custom Next Version
-
-By default, the post-release development version is `<VERSION>-POST`. Override with `--next-version`:
-
-```bash
-./release.sh --version 2.1.0 --deploy --next-version 2.2.0-SNAPSHOT
-```
-
-## What Happens During a Release
-
-### 1. Validation
-
-- Checks required environment variables (`JAVA_17_HOME`, `JAVA_21_HOME`, `JAVA_25_HOME`)
-- Verifies the working tree is clean and the current branch is `main`
-- Fetches from remote and confirms `main` is synced (no ahead/behind)
-- Confirms no existing local or remote release branch or tag
-- In deploy mode: validates `~/.m2/settings.xml` exists and GPG signing works
-
-### 2. Pre-release Build Verification
-
-Runs the full Maven build on all three Java versions to ensure compatibility:
-
-```bash
-JAVA_HOME=$JAVA_25_HOME ./build.sh maven --skip-static-analysis
-JAVA_HOME=$JAVA_21_HOME ./build.sh maven
-JAVA_HOME=$JAVA_17_HOME ./build.sh maven
-```
-
-### 3. Release Branch Creation
-
-- Creates branch `release/<VERSION>`
-- Sets project version to `<VERSION>` via `mvn versions:set`
-
-### 4. Release Branch Verification
-
-- Re-runs the full Maven build on all three Java versions
-- Installs signed release artifacts locally with Java 17 (`-Prelease clean install`)
-- Builds the Gradle plugin with the release version
-
-### 5. Deploy (deploy mode only)
-
-- Commits release changes with sign-off: `Release <VERSION>`
-- Creates annotated tag `v<VERSION>`
-- Pre-flight checks push permissions for the release branch and tag
-- Deploys signed artifacts to Maven Central with Java 17 (`-Prelease clean deploy`)
-- Pushes release branch and tag to remote
-
-### 6. Post-release (deploy mode only)
-
-- Switches back to `main`
-- Sets next development version (`<VERSION>-POST` or custom `--next-version`)
-- Verifies the next development build with Java 17
-- Syncs the Gradle plugin version to the next development version
-- Commits with sign-off: `Prepare for development`
-- Pushes `main` to remote
 
 ## Conventions
 
@@ -166,6 +58,93 @@ JAVA_HOME=$JAVA_17_HOME ./build.sh maven
 - Post-release development version: `<VERSION>-POST`
 - Accepted version format: `MAJOR.MINOR.PATCH` or `MAJOR.MINOR.PATCH-label`
 - The release version must not already end in `-POST`
+
+## Release Process
+
+### Step 1 — Prepare the release branch
+
+From `main`, create the release branch and set the version:
+
+```bash
+git checkout main
+git pull
+
+git checkout -b release/2.1.0
+
+./mvnw versions:set \
+  -DnewVersion=2.1.0 \
+  -DprocessAllModules \
+  -DgenerateBackupPoms=false
+
+./mvnw spotless:apply
+
+git add -A
+git commit -s -m "Release 2.1.0"
+
+git push -u origin release/2.1.0
+```
+
+### Step 2 — Wait for CI to pass
+
+CI runs automatically on the release branch. Wait for all jobs to pass before proceeding.
+
+**If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch, fix `main`, and start over.
+
+### Step 3 — Deploy to Maven Central
+
+Once CI is green, deploy the release artifacts:
+
+```bash
+# Make sure you are on the release branch
+git checkout release/2.1.0
+
+./mvnw -Prelease clean deploy
+```
+
+### Step 4 — Tag the release
+
+After a successful deploy, create and push the tag:
+
+```bash
+git tag -a v2.1.0 -m "Release 2.1.0"
+git push origin v2.1.0
+```
+
+### Step 5 — Bump main to the next development version
+
+```bash
+git checkout main
+
+./mvnw versions:set \
+  -DnewVersion=2.1.0-POST \
+  -DprocessAllModules \
+  -DgenerateBackupPoms=false
+
+./mvnw spotless:apply
+
+# Sync the Gradle plugin version
+./build.sh sync-gradle-version
+
+git add -A
+git commit -s -m "Prepare for development"
+
+git push
+```
+
+### Step 6 — Publish the Gradle plugin
+
+Publish the Gradle plugin to the Gradle Plugin Portal:
+
+```bash
+JAVA_17_HOME=/path/to/jdk17 ./build.sh gradle-plugin
+
+cd gradle-plugin
+GRADLE_PUBLISH_KEY=YOUR_KEY \
+GRADLE_PUBLISH_SECRET=YOUR_SECRET \
+JAVA_HOME="$JAVA_17_HOME" \
+  ./gradlew publishPlugins --no-daemon
+cd ..
+```
 
 ## Troubleshooting
 
@@ -200,20 +179,10 @@ JAVA_HOME=$JAVA_17_HOME ./build.sh maven
 
 ### Error Recovery
 
-In **dry-run** mode, the script automatically cleans up on failure by resetting tracked changes, restoring the original branch, and deleting the temporary release branch.
-
-In **deploy** mode, the script leaves local state intact for inspection and recovery if a failure occurs after commits are made. You may need to manually:
-
-```bash
-# Undo the last commit (if not yet pushed)
-git reset --hard HEAD~1
-
-# Delete a local tag
-git tag -d vX.Y.Z
-
-# Delete a local release branch
-git branch -D release/X.Y.Z
-```
+- **CI fails on the release branch:** Fix on the branch or delete it and start over. No tag or deploy has happened yet.
+- **Maven Central deploy fails:** Do not push the tag. Fix the issue and retry the deploy.
+- **Tag pushed but deploy failed:** Delete the remote tag (`git push origin :refs/tags/vX.Y.Z`), fix the issue, redeploy, then re-tag.
+- **Post-release bump failed on main:** Manually set the version, commit, and push.
 
 ---
 
