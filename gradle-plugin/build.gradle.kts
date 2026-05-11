@@ -19,7 +19,7 @@ dependencies {
 }
 
 gradlePlugin {
-    plugins {
+plugins {
         create("paramixel") {
             id = "org.paramixel"
             implementationClass = "org.paramixel.gradle.ParamixelPlugin"
@@ -33,6 +33,12 @@ tasks.test {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
+}
+
+tasks.withType<Javadoc>().configureEach {
+    options.encoding = "UTF-8"
+    (options as org.gradle.external.javadoc.CoreJavadocOptions).addBooleanOption("Xdoclint:all", true)
+    (options as org.gradle.external.javadoc.CoreJavadocOptions).addBooleanOption("Werror", true)
 }
 
 publishing {
