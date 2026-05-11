@@ -2,6 +2,8 @@
 
 This repository publishes artifacts to Maven Central and the Gradle Plugin Portal through a manual release process with CI validation.
 
+The release process is automated by `scripts/release.sh`. Run `./scripts/release.sh --help` for usage.
+
 ## Prerequisites
 
 ### Maven Central Credentials
@@ -61,49 +63,29 @@ export GRADLE_PUBLISH_SECRET=YOUR_SECRET
 
 ## Release Process
 
-### Step 1 — Prepare the release branch
-
-From `main`, create the release branch and set the version:
+### Phase 1 — Prepare the release branch
 
 ```bash
-git checkout main
-git pull
-
-git checkout -b release/<PARAMIXEL_VERSION>
-
-./mvnw versions:set \
-  -DnewVersion=<PARAMIXEL_VERSION> \
-  -DprocessAllModules \
-  -DgenerateBackupPoms=false
-
-./mvnw spotless:apply
-
-git add -A
-git commit -s -m "Release <PARAMIXEL_VERSION>"
-
-git push -u origin release/<PARAMIXEL_VERSION>
+./scripts/release.sh phase1 <VERSION>
 ```
 
-### Step 2 — Wait for CI to pass
-
-CI runs automatically on the release branch. Wait for all jobs to pass before proceeding.
+Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets the version across all modules, applies spotless formatting, commits, and pushes the branch. Prints CI wait instructions on completion.
 
 **If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch, fix `main`, and start over.
 
-### Step 3 — Deploy to Maven Central
-
-Once CI is green, deploy the release artifacts:
+### Phase 2 — Deploy to Maven Central
 
 ```bash
-# Make sure you are on the release branch
-git checkout release/<PARAMIXEL_VERSION>
-
-./mvnw -Prelease clean deploy
+./scripts/release.sh phase2 <VERSION>
 ```
 
-This uploads the artifact bundle to Sonatype Central. Sonatype validates the bundle on upload, but does **not** publish it yet. The deployment remains in a pending state until you explicitly publish it in the next step.
+Checks out the release branch and runs `./mvnw -Prelease clean deploy`. This uploads the artifact bundle to Sonatype Central. Sonatype validates the bundle on upload, but does **not** publish it yet. The deployment remains in a pending state until you explicitly publish it in the next phase.
 
-### Step 4 — Verify and publish to Maven Central
+### Phase 3 — Verify and publish to Maven Central
+
+```bash
+./scripts/release.sh phase3
+```
 
 > **Maven Central releases are immutable and cannot be undone or overwritten.** Before proceeding, verify the deployment at [Sonatype Central](https://central.sonatype.com):
 >
@@ -111,47 +93,30 @@ This uploads the artifact bundle to Sonatype Central. Sonatype validates the bun
 > - Confirm the artifacts (JAR, sources, javadoc, POM) are present and valid
 > - Confirm GPG signatures are present
 
-Once verified, publish the deployment:
+Prompts for confirmation, then runs `./mvnw -Prelease central-publishing:publish` to publish the deployment.
+
+### Phase 4 — Tag the release
 
 ```bash
-./mvnw -Prelease central-publishing:publish
+./scripts/release.sh phase4 <VERSION>
 ```
 
-### Step 5 — Tag the release
+Creates an annotated tag `v<VERSION>` and pushes it to origin.
 
-After a successful publish, create and push the tag:
+### Phase 5 — Bump main to the next development version
 
 ```bash
-git tag -a v<PARAMIXEL_VERSION> -m "Release <PARAMIXEL_VERSION>"
-git push origin v<PARAMIXEL_VERSION>
+./scripts/release.sh phase5 <VERSION>
 ```
 
-### Step 6 — Bump main to the next development version
+Checks out `main`, pulls latest, sets the version to `<VERSION>-POST` across all modules, applies spotless formatting, runs `./mvnw clean install`, commits, and pushes.
+
+### Phase 6 — Publish the Gradle plugin
+
+This phase is not yet automated. Publish the Gradle plugin to the Gradle Plugin Portal manually:
 
 ```bash
-git checkout main
-
-./mvnw versions:set \
-  -DnewVersion=<PARAMIXEL_VERSION>-POST \
-  -DprocessAllModules \
-  -DgenerateBackupPoms=false
-
-./mvnw spotless:apply
-
-./mvnw clean install
-
-git add -A
-git commit -s -m "Prepare for development"
-
-git push
-```
-
-### Step 7 — Publish the Gradle plugin
-
-Publish the Gradle plugin to the Gradle Plugin Portal:
-
-```bash
-JAVA_17_HOME=/path/to/jdk17 ./build.sh gradle-plugin
+JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh gradle-plugin
 
 cd gradle-plugin
 GRADLE_PUBLISH_KEY=YOUR_KEY \

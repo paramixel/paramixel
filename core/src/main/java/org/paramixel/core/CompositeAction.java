@@ -29,7 +29,7 @@ public interface CompositeAction extends Action {
     /**
      * Returns the child actions owned by this action.
      *
-     * @return the child actions in the order maintained by the implementation
+     * @return the immutable child actions in declaration order
      */
     List<Action> getChildren();
 }

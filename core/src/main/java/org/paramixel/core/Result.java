@@ -135,6 +135,8 @@ public interface Result {
          *
          * @param status the status
          * @return this builder
+         * @throws NullPointerException if {@code status} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder status(Status status) {
             ensureNotBuilt();
@@ -147,6 +149,8 @@ public interface Result {
          *
          * @param runDuration the run duration
          * @return this builder
+         * @throws NullPointerException if {@code runDuration} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder runDuration(Duration runDuration) {
             ensureNotBuilt();
@@ -159,6 +163,8 @@ public interface Result {
          *
          * @param child the child result
          * @return this builder
+         * @throws NullPointerException if {@code child} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder child(Result child) {
             ensureNotBuilt();
@@ -170,6 +176,7 @@ public interface Result {
          * Builds the result.
          *
          * @return the result
+         * @throws IllegalStateException if this builder has already been built
          */
         public Result build() {
             ensureNotBuilt();

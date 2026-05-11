@@ -11,7 +11,7 @@ java {
 }
 
 dependencies {
-    implementation("org.paramixel:core:3.0.1")
+    implementation("org.paramixel:core:3.0.1-POST")
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.0.3")
     testImplementation("org.assertj:assertj-core:3.27.7")
@@ -19,7 +19,7 @@ dependencies {
 }
 
 gradlePlugin {
-    plugins {
+plugins {
         create("paramixel") {
             id = "org.paramixel"
             implementationClass = "org.paramixel.gradle.ParamixelPlugin"
@@ -33,6 +33,12 @@ tasks.test {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
+}
+
+tasks.withType<Javadoc>().configureEach {
+    options.encoding = "UTF-8"
+    (options as org.gradle.external.javadoc.CoreJavadocOptions).addBooleanOption("Xdoclint:all", true)
+    (options as org.gradle.external.javadoc.CoreJavadocOptions).addBooleanOption("Werror", true)
 }
 
 publishing {

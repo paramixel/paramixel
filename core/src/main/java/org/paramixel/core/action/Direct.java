@@ -37,8 +37,18 @@ import org.paramixel.core.support.Arguments;
  */
 public class Direct extends AbstractAction {
 
+    /** The callback executed when this action runs. */
     protected final Executable executable;
 
+    /**
+     * Creates a direct action with the supplied name, callback, and context mode.
+     *
+     * @param name the action name
+     * @param executable the callback to execute
+     * @param contextMode the context mode applied when this action executes or skips
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
     protected Direct(String name, Executable executable, Action.ContextMode contextMode) {
         super(contextMode);
         this.name = validateName(name);

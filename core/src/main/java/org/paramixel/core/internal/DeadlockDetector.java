@@ -32,6 +32,11 @@ import org.paramixel.core.support.Arguments;
 public final class DeadlockDetector {
 
     /**
+     * Creates a new deadlock detector.
+     */
+    public DeadlockDetector() {}
+
+    /**
      * Validates that the supplied action tree does not exceed the available shared parallelism depth.
      *
      * @param root the root action to validate

@@ -68,7 +68,7 @@ public class Configuration {
      * Configuration key controlling fully qualified class-name based discovery filtering.
      *
      * <p>The value is interpreted as a Java regular expression and matched with {@link java.util.regex.Pattern#matcher}
-     * {@code .find()} semantics against package names discovered by {@link Resolver}.
+     * {@code .find()} semantics against fully qualified class names discovered by {@link Resolver}.
      */
     public static final String CLASS_MATCH = "paramixel.match.class";
 
