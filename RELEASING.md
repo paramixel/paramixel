@@ -2,6 +2,8 @@
 
 This repository publishes artifacts to Maven Central and the Gradle Plugin Portal through a manual release process with CI validation.
 
+The release process is automated by `scripts/release.sh`. Run `./scripts/release.sh --help` for usage.
+
 ## Prerequisites
 
 ### Maven Central Credentials
@@ -61,82 +63,60 @@ export GRADLE_PUBLISH_SECRET=YOUR_SECRET
 
 ## Release Process
 
-### Step 1 — Prepare the release branch
-
-From `main`, create the release branch and set the version:
+### Phase 1 — Prepare the release branch
 
 ```bash
-git checkout main
-git pull
-
-git checkout -b release/2.1.0
-
-./mvnw versions:set \
-  -DnewVersion=2.1.0 \
-  -DprocessAllModules \
-  -DgenerateBackupPoms=false
-
-./mvnw spotless:apply
-
-git add -A
-git commit -s -m "Release 2.1.0"
-
-git push -u origin release/2.1.0
+./scripts/release.sh phase1 <VERSION>
 ```
 
-### Step 2 — Wait for CI to pass
-
-CI runs automatically on the release branch. Wait for all jobs to pass before proceeding.
+Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets the version across all modules, applies spotless formatting, commits, and pushes the branch. Prints CI wait instructions on completion.
 
 **If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch, fix `main`, and start over.
 
-### Step 3 — Deploy to Maven Central
-
-Once CI is green, deploy the release artifacts:
+### Phase 2 — Deploy to Maven Central
 
 ```bash
-# Make sure you are on the release branch
-git checkout release/2.1.0
-
-./mvnw -Prelease clean deploy
+./scripts/release.sh phase2 <VERSION>
 ```
 
-### Step 4 — Tag the release
+Checks out the release branch and runs `./mvnw -Prelease clean deploy`. This uploads the artifact bundle to Sonatype Central. Sonatype validates the bundle on upload, but does **not** publish it yet. The deployment remains in a pending state until you explicitly publish it in the next phase.
 
-After a successful deploy, create and push the tag:
+### Phase 3 — Verify and publish to Maven Central
 
 ```bash
-git tag -a v2.1.0 -m "Release 2.1.0"
-git push origin v2.1.0
+./scripts/release.sh phase3
 ```
 
-### Step 5 — Bump main to the next development version
+> **Maven Central releases are immutable and cannot be undone or overwritten.** Before proceeding, verify the deployment at [Sonatype Central](https://central.sonatype.com):
+>
+> - Confirm the version number is correct
+> - Confirm the artifacts (JAR, sources, javadoc, POM) are present and valid
+> - Confirm GPG signatures are present
+
+Prompts for confirmation, then runs `./mvnw -Prelease central-publishing:publish` to publish the deployment.
+
+### Phase 4 — Tag the release
 
 ```bash
-git checkout main
-
-./mvnw versions:set \
-  -DnewVersion=2.1.0-POST \
-  -DprocessAllModules \
-  -DgenerateBackupPoms=false
-
-./mvnw spotless:apply
-
-# Sync the Gradle plugin version
-./build.sh sync-gradle-version
-
-git add -A
-git commit -s -m "Prepare for development"
-
-git push
+./scripts/release.sh phase4 <VERSION>
 ```
 
-### Step 6 — Publish the Gradle plugin
+Creates an annotated tag `v<VERSION>` and pushes it to origin.
 
-Publish the Gradle plugin to the Gradle Plugin Portal:
+### Phase 5 — Bump main to the next development version
 
 ```bash
-JAVA_17_HOME=/path/to/jdk17 ./build.sh gradle-plugin
+./scripts/release.sh phase5 <VERSION>
+```
+
+Checks out `main`, pulls latest, sets the version to `<VERSION>-POST` across all modules, applies spotless formatting, runs `./mvnw clean install`, commits, and pushes.
+
+### Phase 6 — Publish the Gradle plugin
+
+This phase is not yet automated. Publish the Gradle plugin to the Gradle Plugin Portal manually:
+
+```bash
+JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh gradle-plugin
 
 cd gradle-plugin
 GRADLE_PUBLISH_KEY=YOUR_KEY \
@@ -181,6 +161,8 @@ cd ..
 
 - **CI fails on the release branch:** Fix on the branch or delete it and start over. No tag or deploy has happened yet.
 - **Maven Central deploy fails:** Do not push the tag. Fix the issue and retry the deploy.
+- **Deploy succeeded but publish not yet done:** Retry `./mvnw -Prelease central-publishing:publish`, or drop the deployment with `./mvnw -Prelease central-publishing:drop` to start over.
+- **Publish failed after partial completion:** Check the deployment status at https://central.sonatype.com. If it's still in a publishable state, retry `./mvnw -Prelease central-publishing:publish`.
 - **Tag pushed but deploy failed:** Delete the remote tag (`git push origin :refs/tags/vX.Y.Z`), fix the issue, redeploy, then re-tag.
 - **Post-release bump failed on main:** Manually set the version, commit, and push.
 

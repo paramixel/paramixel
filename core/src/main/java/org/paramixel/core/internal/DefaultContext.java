@@ -53,6 +53,15 @@ public final class DefaultContext implements Context {
         this.store = new DefaultStore();
     }
 
+    /**
+     * Creates a root context with the supplied configuration, listener, and executor service.
+     *
+     * @param configuration the configuration properties, or {@code null} to load
+     *     {@link Configuration#defaultProperties()}
+     * @param listener the listener receiving lifecycle callbacks
+     * @param executorService the executor service available to actions
+     * @throws NullPointerException if {@code listener} or {@code executorService} is {@code null}
+     */
     public DefaultContext(
             final Map<String, String> configuration, final Listener listener, final ExecutorService executorService) {
         this(null, configuration, listener, executorService);

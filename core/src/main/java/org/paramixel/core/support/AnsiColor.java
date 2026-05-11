@@ -22,24 +22,34 @@ import java.util.Objects;
  * ANSI color and style escape sequences used by built-in console output.
  */
 public enum AnsiColor {
+    /** Reset all ANSI formatting. */
     RESET("\033[0m"),
 
+    /** Bold blue text. */
     BOLD_BLUE_TEXT("\033[1;34m"),
 
+    /** Bold green text. */
     BOLD_GREEN_TEXT("\033[1;32m"),
 
+    /** Bold red text. */
     BOLD_RED_TEXT("\033[1;31m"),
 
+    /** Bold orange text. */
     BOLD_ORANGE_TEXT("\033[1;33m"),
 
+    /** Bold gray text. */
     BOLD_GRAY_TEXT("\033[1;90m"),
 
+    /** Bold white text. */
     BOLD_WHITE_TEXT("\033[1;37m"),
 
+    /** Green text. */
     GREEN_TEXT("\033[32m"),
 
+    /** Red text. */
     RED_TEXT("\033[31m"),
 
+    /** Orange text. */
     ORANGE_TEXT("\033[33m");
 
     private final String code;

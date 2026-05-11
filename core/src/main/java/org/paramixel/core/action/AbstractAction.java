@@ -33,8 +33,12 @@ import org.paramixel.core.support.FastId;
  */
 public abstract class AbstractAction implements Action {
 
+    /** The generated stable identifier for this action. */
     protected final String id;
+
+    /** The display name for this action. */
     protected String name;
+
     private final ContextMode contextMode;
 
     /**
@@ -95,6 +99,11 @@ public abstract class AbstractAction implements Action {
         return name;
     }
 
+    /**
+     * Returns this action's context scoping mode.
+     *
+     * @return the context mode used when this action executes or skips
+     */
     @Override
     public final ContextMode getContextMode() {
         return contextMode;

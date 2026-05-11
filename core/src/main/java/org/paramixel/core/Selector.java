@@ -98,6 +98,7 @@ public final class Selector {
          * @return this builder
          * @throws NullPointerException if {@code regex} is {@code null}
          * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder packageMatch(String regex) {
             ensureNotBuilt();
@@ -114,6 +115,7 @@ public final class Selector {
          * @param clazz the class whose package should be matched
          * @return this builder
          * @throws NullPointerException if {@code clazz} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder packageOf(Class<?> clazz) {
             ensureNotBuilt();
@@ -132,6 +134,7 @@ public final class Selector {
          * @return this builder
          * @throws NullPointerException if {@code regex} is {@code null}
          * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder classMatch(String regex) {
             ensureNotBuilt();
@@ -148,6 +151,7 @@ public final class Selector {
          * @param clazz the class to match
          * @return this builder
          * @throws NullPointerException if {@code clazz} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder classOf(Class<?> clazz) {
             ensureNotBuilt();
@@ -166,6 +170,7 @@ public final class Selector {
          * @return this builder
          * @throws NullPointerException if {@code regex} is {@code null}
          * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder tagMatch(String regex) {
             ensureNotBuilt();

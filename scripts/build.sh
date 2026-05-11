@@ -18,6 +18,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
+readonly PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly DEFAULT_GRADLE_PLUGIN_DIR="gradle-plugin"
 
 TARGET="all"
@@ -26,22 +27,22 @@ GRADLE_PLUGIN_DIR="${DEFAULT_GRADLE_PLUGIN_DIR}"
 
 usage() {
     cat <<'EOF'
-Usage: ./build.sh [TARGET] [OPTIONS]
+Usage: ./scripts/build.sh [TARGET] [OPTIONS]
 
 Build Paramixel from the project root.
 
 Targets:
   all                    Build the Maven project, then build the Gradle plugin.
-                         This is the default target.
+                          This is the default target.
   maven                  Build and test the Maven project with the current Java.
   gradle-plugin          Sync the Gradle plugin version, install Maven
-                         prerequisites locally, and build the Gradle plugin.
+                          prerequisites locally, and build the Gradle plugin.
   sync-gradle-version    Sync the Gradle plugin version from the parent POM
-                         without building.
+                          without building.
 
 Options:
   --skip-static-analysis       Skip SpotBugs and PMD during the Maven build.
-                               Intended for Java 25 compatibility builds.
+                                Intended for Java 25 compatibility builds.
   --gradle-plugin-dir <dir>    Gradle plugin directory. Default: gradle-plugin
   -h, --help                   Show this help text.
 
@@ -50,11 +51,11 @@ Prerequisites:
   - gradle-plugin and all require JAVA_17_HOME to point to a JDK 17 directory.
 
 Examples:
-  ./build.sh
-  ./build.sh maven
-  ./build.sh maven --skip-static-analysis
-  JAVA_17_HOME=/path/to/jdk17 ./build.sh gradle-plugin
-  ./build.sh sync-gradle-version
+  ./scripts/build.sh
+  ./scripts/build.sh maven
+  ./scripts/build.sh maven --skip-static-analysis
+  JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh gradle-plugin
+  ./scripts/build.sh sync-gradle-version
 EOF
 }
 
@@ -106,14 +107,14 @@ parse_args() {
 }
 
 require_project_root() {
-    [[ -x "${SCRIPT_DIR}/mvnw" ]] || fail "mvnw not found or not executable: ${SCRIPT_DIR}/mvnw"
+    [[ -x "${PROJECT_DIR}/mvnw" ]] || fail "mvnw not found or not executable: ${PROJECT_DIR}/mvnw"
 }
 
 gradle_plugin_path() {
     if [[ "${GRADLE_PLUGIN_DIR}" = /* ]]; then
         echo "${GRADLE_PLUGIN_DIR}"
     else
-        echo "${SCRIPT_DIR}/${GRADLE_PLUGIN_DIR}"
+        echo "${PROJECT_DIR}/${GRADLE_PLUGIN_DIR}"
     fi
 }
 
@@ -140,12 +141,12 @@ require_java_17_home() {
 }
 
 run_maven_current_java() {
-    (cd "${SCRIPT_DIR}" && ./mvnw -B "$@")
+    (cd "${PROJECT_DIR}" && ./mvnw -B "$@")
 }
 
 run_maven_java_17() {
     (
-        cd "${SCRIPT_DIR}"
+        cd "${PROJECT_DIR}"
         JAVA_HOME="${JAVA_17_HOME}" \
             PATH="${JAVA_17_HOME}/bin:${PATH}" \
             ./mvnw -B "$@"
@@ -162,7 +163,7 @@ run_gradle_java_17() {
 }
 
 get_project_version() {
-    (cd "${SCRIPT_DIR}" && ./mvnw help:evaluate \
+    (cd "${PROJECT_DIR}" && ./mvnw help:evaluate \
         -Dexpression=project.version \
         -q \
         -DforceStdout)
@@ -170,19 +171,21 @@ get_project_version() {
 
 sync_gradle_version() {
     local version
-    local gradle_properties
-    gradle_properties="$(gradle_plugin_path)/gradle.properties"
+    local plugin_dir
+    plugin_dir="$(gradle_plugin_path)"
+    local gradle_properties="${plugin_dir}/gradle.properties"
+    local build_gradle_kts="${plugin_dir}/build.gradle.kts"
 
     version="$(get_project_version)" || fail "Failed to extract version from parent POM"
 
-    log "Syncing version ${version} to ${gradle_properties}"
+    log "Syncing version ${version} to ${gradle_properties} and ${build_gradle_kts}"
 
-    cp "${gradle_properties}.template" "${gradle_properties}"
-    sed -i "s/@version@/${version}/g" "${gradle_properties}"
+    sed -i "s/^version=.*/version=${version}/" "${gradle_properties}"
+    sed -i "s/org\.paramixel:core:[0-9][0-9a-zA-Z._-]*/org.paramixel:core:${version}/" "${build_gradle_kts}"
 }
 
 build_maven() {
-    local args=(clean verify)
+    local args=(clean install)
 
     if [[ "${SKIP_STATIC_ANALYSIS}" == "true" ]]; then
         args+=(-Dspotbugs.skip=true -Dpmd.skip=true)

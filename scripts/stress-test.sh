@@ -16,10 +16,26 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+readonly PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+readonly MVNW="${PROJECT_DIR}/mvnw"
+
 readonly LOG_FILE="stress-test.log"
 
 usage() {
-    echo "Usage: ./stress-test.sh <number-of-iterations>" >&2
+    cat <<'EOF'
+Usage: ./scripts/stress-test.sh <number-of-iterations>
+
+Run Paramixel tests multiple times to check for flaky tests.
+
+Arguments:
+  <number-of-iterations>    Number of times to run the test suite.
+
+Examples:
+  ./scripts/stress-test.sh 5
+  ./scripts/stress-test.sh 10
+EOF
 }
 
 log() {
@@ -41,7 +57,7 @@ main() {
 
     iterations="$1"
 
-    [[ -f mvnw ]] || fail "mvnw not found in current directory"
+    [[ -x "${MVNW}" ]] || fail "mvnw not found or not executable: ${MVNW}"
 
     if [[ ! "${iterations}" =~ ^[1-9][0-9]*$ ]]; then
         fail "Invalid iterations '${iterations}'. Must be a positive integer."
@@ -55,7 +71,7 @@ main() {
     log "Building project (initial build)..."
     local build_start
     build_start="${SECONDS}"
-    if ! ./mvnw -B clean install -Dparamixel.skipTests |& tee -a "${LOG_FILE}"; then
+    if ! (cd "${PROJECT_DIR}" && ./mvnw -B clean install -Dparamixel.skipTests) |& tee -a "${LOG_FILE}"; then
         fail "Initial build failed. See ${LOG_FILE} for details."
     fi
     local build_elapsed
@@ -70,7 +86,7 @@ main() {
         start_time="${SECONDS}"
         log "Iteration ${iteration}/${iterations} started"
 
-        if ! ./mvnw -B test -pl examples |& tee -a "${LOG_FILE}"; then
+        if ! (cd "${PROJECT_DIR}" && ./mvnw -B test -pl examples) |& tee -a "${LOG_FILE}"; then
             end_time="${SECONDS}"
             elapsed_time=$((end_time - start_time))
             fail "Iteration ${iteration}/${iterations} failed after ${elapsed_time}s. See ${LOG_FILE} for details."

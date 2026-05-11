@@ -23,8 +23,18 @@ package org.paramixel.maven.plugin;
 @Deprecated(since = "2.0.0", forRemoval = true)
 public class Configuration {
 
+    /**
+     * Configuration key controlling runner parallelism.
+     *
+     * @see org.paramixel.core.Configuration#RUNNER_PARALLELISM
+     */
     public static final String RUNNER_PARALLELISM = org.paramixel.core.Configuration.RUNNER_PARALLELISM;
 
+    /**
+     * Configuration key controlling whether skipped results should produce a failing exit code.
+     *
+     * @see org.paramixel.core.Configuration#FAILURE_ON_SKIP
+     */
     public static final String FAILURE_ON_SKIP = org.paramixel.core.Configuration.FAILURE_ON_SKIP;
 
     private Configuration() {

@@ -142,7 +142,7 @@ class ParamixelPluginFunctionalTest {
                 + "  id('java')\n"
                 + "  id('org.paramixel')\n"
                 + "}\n"
-                + "repositories { mavenCentral(); mavenLocal() }\n"
+                + "repositories { mavenLocal(); mavenCentral() }\n"
                 + "dependencies { implementation 'org.paramixel:core:+'\n"
                 + "  implementation 'org.assertj:assertj-core:3.27.3'\n"
                 + "}\n"
@@ -166,6 +166,9 @@ class ParamixelPluginFunctionalTest {
                 + "                .build();\n"
                 + "    }\n"
                 + "}\n");
+
+        Files.writeString(projectDir.resolve("gradle.properties"),
+                "org.gradle.jvmargs=-Xmx2g\n");
 
         var result = GradleRunner.create()
                 .withProjectDir(projectDir.toFile())

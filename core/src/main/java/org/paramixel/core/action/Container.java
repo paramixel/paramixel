@@ -35,7 +35,18 @@ import org.paramixel.core.internal.DefaultStatus;
 import org.paramixel.core.support.Arguments;
 
 /**
- * Ordered composition action with optional setup and cleanup actions.
+ * Executes child actions in order with optional setup and cleanup actions.
+ *
+ * <p>A {@code Container} runs an optional {@code before} action first, then the body children, and finally an
+ * optional {@code after} action. The {@code after} action always runs regardless of earlier outcomes.
+ *
+ * <p>Body child execution is governed by {@link ChildMode} and {@link OrderMode}. When
+ * {@link ChildMode#DEPENDENT}, the container stops after the first failed or skipped body child and skips the
+ * remaining body children. When {@link ChildMode#INDEPENDENT}, every body child runs regardless of earlier
+ * failures or skips.
+ *
+ * <p>The container status is computed from child results: failure takes precedence over skip, and skip takes
+ * precedence over pass.
  */
 public final class Container extends AbstractAction implements CompositeAction {
 
@@ -55,13 +66,22 @@ public final class Container extends AbstractAction implements CompositeAction {
         /** Run body children in builder declaration order. */
         DECLARED,
 
-        /** Shuffle body children before execution. */
+        /** Shuffle body children before execution using the policy seed. */
         SHUFFLED
     }
 
-    /** Execution policy for body children. */
+    /**
+     * Execution policy governing body child behavior and ordering.
+     *
+     * @param childMode whether body children continue after failures or skips
+     * @param orderMode the execution order for body children
+     * @param seed the seed used when {@code orderMode} is {@link OrderMode#SHUFFLED}
+     */
     public record Policy(ChildMode childMode, OrderMode orderMode, long seed) {
 
+        /**
+         * Compact constructor that rejects null arguments.
+         */
         public Policy {
             Objects.requireNonNull(childMode, "childMode must not be null");
             Objects.requireNonNull(orderMode, "orderMode must not be null");
@@ -96,24 +116,60 @@ public final class Container extends AbstractAction implements CompositeAction {
             private Long seed = null;
             private boolean built;
 
+            /**
+             * Creates a policy builder with default values.
+             */
+            private Builder() {}
+
+            /**
+             * Sets whether body children continue after failures or skips.
+             *
+             * @param childMode the child mode
+             * @return this builder
+             * @throws NullPointerException if {@code childMode} is {@code null}
+             * @throws IllegalStateException if this builder has already been built
+             */
             public Builder childMode(ChildMode childMode) {
                 ensureNotBuilt();
                 this.childMode = Objects.requireNonNull(childMode, "childMode must not be null");
                 return this;
             }
 
+            /**
+             * Sets the execution order for body children.
+             *
+             * @param orderMode the order mode
+             * @return this builder
+             * @throws NullPointerException if {@code orderMode} is {@code null}
+             * @throws IllegalStateException if this builder has already been built
+             */
             public Builder orderMode(OrderMode orderMode) {
                 ensureNotBuilt();
                 this.orderMode = Objects.requireNonNull(orderMode, "orderMode must not be null");
                 return this;
             }
 
+            /**
+             * Sets the seed used when {@link OrderMode#SHUFFLED} is selected.
+             *
+             * @param seed the shuffle seed
+             * @return this builder
+             * @throws IllegalStateException if this builder has already been built
+             */
             public Builder seed(long seed) {
                 ensureNotBuilt();
                 this.seed = seed;
                 return this;
             }
 
+            /**
+             * Builds an immutable policy from the configured criteria.
+             *
+             * <p>When no seed is supplied, a random seed is generated.
+             *
+             * @return a new policy
+             * @throws IllegalStateException if this builder has already been built
+             */
             public Policy build() {
                 ensureNotBuilt();
                 built = true;
@@ -162,23 +218,50 @@ public final class Container extends AbstractAction implements CompositeAction {
         return new Builder(name);
     }
 
+    /**
+     * Returns the before-action, if one is configured.
+     *
+     * @return the before-action, or an empty {@link Optional} when no before-action is configured
+     */
+    public Optional<Action> getBefore() {
+        return Optional.ofNullable(before);
+    }
+
+    /**
+     * Returns all child actions in this container, including the before-action, body children, and after-action.
+     *
+     * @return the immutable child list in before, body, after order
+     */
     @Override
     public List<Action> getChildren() {
         return allChildren;
     }
 
-    public Optional<Action> getBefore() {
-        return Optional.ofNullable(before);
-    }
-
+    /**
+     * Returns the body child actions in the order they will be executed.
+     *
+     * <p>The returned list does not include the before-action or after-action.
+     *
+     * @return the immutable body child list
+     */
     public List<Action> getBodyChildren() {
         return bodyChildren;
     }
 
+    /**
+     * Returns the after-action, if one is configured.
+     *
+     * @return the after-action, or an empty {@link Optional} when no after-action is configured
+     */
     public Optional<Action> getAfter() {
         return Optional.ofNullable(after);
     }
 
+    /**
+     * Returns the execution policy governing body child behavior.
+     *
+     * @return the container policy
+     */
     public Policy getPolicy() {
         return policy;
     }
@@ -207,42 +290,94 @@ public final class Container extends AbstractAction implements CompositeAction {
         private Action after;
         private boolean built;
 
+        /**
+         * Creates a builder for a container with the supplied name.
+         */
         private Builder(String name) {
             Objects.requireNonNull(name, "name must not be null");
             Arguments.requireNonBlank(name, "name must not be blank");
             this.name = name;
         }
 
+        /**
+         * Sets the context mode for this container.
+         *
+         * @param contextMode the context mode applied when this action executes or skips
+         * @return this builder
+         * @throws NullPointerException if {@code contextMode} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder contextMode(Action.ContextMode contextMode) {
             ensureNotBuilt();
             this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
             return this;
         }
 
+        /**
+         * Sets the execution policy governing body child behavior.
+         *
+         * @param policy the policy for this container
+         * @return this builder
+         * @throws NullPointerException if {@code policy} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder policy(Policy policy) {
             ensureNotBuilt();
             this.policy = Objects.requireNonNull(policy, "policy must not be null");
             return this;
         }
 
+        /**
+         * Sets the before-action that runs before body children.
+         *
+         * @param before the action to run before body children
+         * @return this builder
+         * @throws NullPointerException if {@code before} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder before(Action before) {
             ensureNotBuilt();
             this.before = Objects.requireNonNull(before, "before must not be null");
             return this;
         }
 
+        /**
+         * Adds a body child action.
+         *
+         * @param child the body child action to add
+         * @return this builder
+         * @throws NullPointerException if {@code child} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder child(Action child) {
             ensureNotBuilt();
             children.add(Objects.requireNonNull(child, "child must not be null"));
             return this;
         }
 
+        /**
+         * Sets the after-action that runs after body children.
+         *
+         * <p>The after-action always runs regardless of earlier outcomes.
+         *
+         * @param after the action to run after body children
+         * @return this builder
+         * @throws NullPointerException if {@code after} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder after(Action after) {
             ensureNotBuilt();
             this.after = Objects.requireNonNull(after, "after must not be null");
             return this;
         }
 
+        /**
+         * Builds an immutable container from the configured criteria.
+         *
+         * @return a new container
+         * @throws IllegalStateException if this builder has already been built, or if no before, child, or after
+         *     action is configured
+         */
         public Container build() {
             ensureNotBuilt();
             built = true;

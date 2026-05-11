@@ -43,9 +43,12 @@ import org.paramixel.gradle.internal.ConfigurationBuilder;
  * <p>The task builds a {@link URLClassLoader} from the test runtime classpath, resolves action
  * factories via {@link Resolver}, executes them with a {@link Runner}, and fails the build when the
  * root action result is {@code FAIL} (or {@code SKIP} when {@code failureOnSkip} is
- * {@code true}).</p>
+ * {@code true}).
  */
 public abstract class ParamixelTestTask extends DefaultTask {
+
+    /** Creates a Paramixel test task. */
+    public ParamixelTestTask() {}
 
     /**
      * Returns whether Paramixel test execution is skipped entirely.

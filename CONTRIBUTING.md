@@ -35,7 +35,7 @@ We welcome feature suggestions! Please create an issue with:
 3. Make your changes
 4. Run tests to ensure all tests pass:
    ```bash
-   JAVA_17_HOME=/path/to/jdk17 ./build.sh
+   JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh
    ```
 5. Commit your changes with a clear commit message
 6. Push to your fork and submit a pull request
@@ -56,10 +56,10 @@ git clone https://github.com/paramixel/paramixel.git
 cd paramixel
 
 # Build Maven project and Gradle plugin
-JAVA_17_HOME=/path/to/jdk17 ./build.sh
+JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh
 
 # Build Maven project only
-./build.sh maven
+./scripts/build.sh maven
 ```
 
 ### Project Structure

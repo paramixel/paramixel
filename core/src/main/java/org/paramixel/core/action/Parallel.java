@@ -36,6 +36,13 @@ import org.paramixel.core.support.Arguments;
 
 /**
  * Executes child actions concurrently.
+ *
+ * <p>Child actions are submitted to an executor service and their concurrency is limited by a semaphore initialized
+ * to the configured parallelism. When no explicit executor service is supplied, the context executor service is used.
+ *
+ * <p>All child actions are always submitted for execution regardless of individual outcomes. The parallel status is
+ * computed from child results after all children complete: failure takes precedence over skip, and skip takes
+ * precedence over pass.
  */
 public final class Parallel extends AbstractAction implements CompositeAction {
 
@@ -66,15 +73,30 @@ public final class Parallel extends AbstractAction implements CompositeAction {
         return new Builder(name);
     }
 
+    /**
+     * Returns all child actions in this parallel composition.
+     *
+     * @return the immutable child list in builder declaration order
+     */
     @Override
     public List<Action> getChildren() {
         return children;
     }
 
+    /**
+     * Returns the maximum number of child actions that may execute concurrently.
+     *
+     * @return the parallelism limit
+     */
     public int getParallelism() {
         return parallelism;
     }
 
+    /**
+     * Returns the dedicated executor service, or an empty {@link Optional} when the context executor will be used.
+     *
+     * @return the configured executor service, or an empty {@link Optional} when none was supplied
+     */
     public Optional<ExecutorService> getExecutorService() {
         return Optional.ofNullable(executorService);
     }
@@ -108,12 +130,28 @@ public final class Parallel extends AbstractAction implements CompositeAction {
             this.name = name;
         }
 
+        /**
+         * Sets the context mode for this parallel action.
+         *
+         * @param contextMode the context mode applied when this action executes or skips
+         * @return this builder
+         * @throws NullPointerException if {@code contextMode} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder contextMode(Action.ContextMode contextMode) {
             ensureNotBuilt();
             this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
             return this;
         }
 
+        /**
+         * Sets the maximum number of child actions that may execute concurrently.
+         *
+         * @param parallelism the concurrency limit, must be positive
+         * @return this builder
+         * @throws IllegalArgumentException if {@code parallelism} is not positive
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder parallelism(int parallelism) {
             ensureNotBuilt();
             Arguments.requirePositive(parallelism, "parallelism must be positive, was: " + parallelism);
@@ -121,18 +159,42 @@ public final class Parallel extends AbstractAction implements CompositeAction {
             return this;
         }
 
+        /**
+         * Sets a dedicated executor service for this parallel action.
+         *
+         * <p>When supplied, this executor service is used instead of the context executor service.
+         *
+         * @param executorService the executor service to use
+         * @return this builder
+         * @throws NullPointerException if {@code executorService} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder executorService(ExecutorService executorService) {
             ensureNotBuilt();
             this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
             return this;
         }
 
+        /**
+         * Adds a child action.
+         *
+         * @param child the child action to add
+         * @return this builder
+         * @throws NullPointerException if {@code child} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
+         */
         public Builder child(Action child) {
             ensureNotBuilt();
             children.add(Objects.requireNonNull(child, "child must not be null"));
             return this;
         }
 
+        /**
+         * Builds an immutable parallel action from the configured criteria.
+         *
+         * @return a new parallel action
+         * @throws IllegalStateException if this builder has already been built, or if no children are configured
+         */
         public Parallel build() {
             ensureNotBuilt();
             built = true;

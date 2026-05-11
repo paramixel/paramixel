@@ -27,9 +27,12 @@ import org.gradle.api.tasks.SourceSetContainer;
  * Gradle plugin that discovers and executes Paramixel action trees during the verification phase.
  *
  * <p>Applies the {@code java} plugin, registers the {@code paramixel} DSL extension, and creates
- * a {@code paramixelTest} task wired to the test runtime classpath.</p>
+ * a {@code paramixelTest} task wired to the test runtime classpath.
  */
 public class ParamixelPlugin implements Plugin<Project> {
+
+    /** Creates a Paramixel plugin instance. */
+    public ParamixelPlugin() {}
 
     /**
      * The Gradle plugin identifier used in {@code plugins { id(...) }} blocks.

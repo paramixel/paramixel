@@ -35,8 +35,10 @@ public class Cleanup {
      * Defines the execution order for registered cleanup callbacks.
      */
     public enum Mode {
+        /** Execute callbacks in the order they were registered. */
         FORWARD,
 
+        /** Execute callbacks in reverse registration order. */
         REVERSE
     }
 

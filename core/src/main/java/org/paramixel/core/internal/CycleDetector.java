@@ -40,6 +40,11 @@ public final class CycleDetector {
     private final Deque<Action> path = new ArrayDeque<>();
 
     /**
+     * Creates a new cycle detector.
+     */
+    public CycleDetector() {}
+
+    /**
      * Validates that the supplied root action and all descendants form an acyclic graph.
      *
      * @param root the root action to validate

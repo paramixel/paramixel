@@ -130,7 +130,10 @@ public interface Runner extends AutoCloseable {
     /**
      * Executes an action and terminates the current JVM with the derived exit code.
      *
+     * <p>This method never returns normally. It always calls {@link System#exit(int)}.
+     *
      * @param action the root action to execute
+     * @see System#exit(int)
      */
     default void runAndExit(Action action) {
         Objects.requireNonNull(action, "action must not be null");
@@ -140,7 +143,10 @@ public interface Runner extends AutoCloseable {
     /**
      * Resolves and executes an action, then terminates the current JVM with the derived exit code.
      *
+     * <p>This method never returns normally. It always calls {@link System#exit(int)}.
+     *
      * @param selector the selector used to locate an action
+     * @see System#exit(int)
      */
     default void runAndExit(Selector selector) {
         Objects.requireNonNull(selector, "selector must not be null");
@@ -179,6 +185,7 @@ public interface Runner extends AutoCloseable {
          * @param properties the configuration properties to use
          * @return this builder
          * @throws NullPointerException if {@code properties} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder configuration(Map<String, String> properties) {
             ensureNotBuilt();
@@ -192,6 +199,7 @@ public interface Runner extends AutoCloseable {
          * @param listener the listener to use
          * @return this builder
          * @throws NullPointerException if {@code listener} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder listener(Listener listener) {
             ensureNotBuilt();
@@ -207,6 +215,7 @@ public interface Runner extends AutoCloseable {
          * @param executorService the executor service to use
          * @return this builder
          * @throws NullPointerException if {@code executorService} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder executorService(ExecutorService executorService) {
             ensureNotBuilt();
@@ -218,6 +227,7 @@ public interface Runner extends AutoCloseable {
          * Builds a new {@link Runner} instance.
          *
          * @return a new runner
+         * @throws IllegalStateException if this builder has already been built
          */
         public Runner build() {
             ensureNotBuilt();

@@ -55,10 +55,10 @@ import org.paramixel.core.support.Arguments;
  *
  * <p>The mojo resolves action factories from the test classpath using {@link Resolver},
  * executes them with a {@link Runner}, and fails the build when the root action result
- * is {@code FAIL} (or {@code SKIP} when {@code failureOnSkip} is {@code true}).</p>
+ * is {@code FAIL} (or {@code SKIP} when {@code failureOnSkip} is {@code true}).
  *
  * <p>The action tree is executed exactly once. The result is returned
- * directly from the runner, avoiding redundant re-execution.</p>
+ * directly from the runner, avoiding redundant re-execution.
  */
 @Mojo(
         name = "test",
@@ -67,12 +67,18 @@ import org.paramixel.core.support.Arguments;
         threadSafe = true)
 public class ParamixelMojo extends AbstractMojo {
 
+    /** Creates a Paramixel mojo. */
+    public ParamixelMojo() {}
+
+    /** The Maven project being built. */
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
 
+    /** When {@code true}, skip Paramixel test execution entirely. */
     @Parameter(property = "paramixel.skipTests", defaultValue = "false")
     private boolean skipTests;
 
+    /** When {@code true}, fail the build when no action factories are discovered. */
     @Parameter(property = "paramixel.failIfNoTests", defaultValue = "false")
     private boolean failIfNoTests;
 
@@ -82,6 +88,7 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(property = "paramixel.failureOnSkip", defaultValue = "false")
     private boolean failureOnSkip;
 
+    /** The file path for the per-run summary report. */
     @Parameter(property = "paramixel.report.file")
     private String reportFile;
 
@@ -95,6 +102,7 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(property = "paramixel.report.format")
     private String reportFormat;
 
+    /** Additional Paramixel configuration properties declared in the POM. */
     @Parameter
     private List<Property> properties;
 
@@ -291,18 +299,34 @@ public class ParamixelMojo extends AbstractMojo {
         return new ArrayList<>(classpathUrls);
     }
 
+    /**
+     * Represents a key-value Paramixel configuration property declared in the POM.
+     */
     public static class Property {
 
         private String key;
 
         private String value;
 
+        /** Creates a property instance. */
         public Property() {}
 
+        /**
+         * Returns the configuration property key.
+         *
+         * @return the property key
+         */
         public String getKey() {
             return key;
         }
 
+        /**
+         * Sets the configuration property key.
+         *
+         * @param key the property key
+         * @throws NullPointerException if {@code key} is {@code null}
+         * @throws IllegalArgumentException if {@code key} is blank
+         */
         public void setKey(String key) {
             Objects.requireNonNull(key, "key must not be null");
 
@@ -311,10 +335,21 @@ public class ParamixelMojo extends AbstractMojo {
             this.key = key;
         }
 
+        /**
+         * Returns the configuration property value.
+         *
+         * @return the property value
+         */
         public String getValue() {
             return value;
         }
 
+        /**
+         * Sets the configuration property value.
+         *
+         * @param value the property value
+         * @throws NullPointerException if {@code value} is {@code null}
+         */
         public void setValue(String value) {
             Objects.requireNonNull(value, "value must not be null");
             this.value = value;

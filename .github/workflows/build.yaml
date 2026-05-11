@@ -50,7 +50,7 @@ jobs:
         run: ./mvnw spotless:check
 
       - name: Build and Test
-        run: ./build.sh maven --skip-static-analysis
+        run: ./scripts/build.sh maven --skip-static-analysis
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -105,7 +105,7 @@ jobs:
         run: ./mvnw spotless:check
 
       - name: Build and Test
-        run: ./build.sh maven
+        run: ./scripts/build.sh maven
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -160,7 +160,7 @@ jobs:
         run: ./mvnw spotless:check
 
       - name: Build and Test
-        run: ./build.sh maven
+        run: ./scripts/build.sh maven
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 

@@ -10,7 +10,7 @@ Apply the plugin and configure the `paramixel` extension:
 
 ```groovy
 plugins {
-    id 'org.paramixel' version 'PARAMIXEL_VERSION'
+    id 'org.paramixel' version '<PARAMIXEL_VERSION>'
 }
 ```
 
