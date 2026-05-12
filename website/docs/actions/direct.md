@@ -26,7 +26,7 @@ private static Action step() {
 }
 ```
 
-Throw `SkipException` to skip or `FailException` to fail intentionally. Other non-`Error` throwables are reported and converted to failures.
+Throw `SkipException` to skip or `FailException` to fail intentionally. Unexpected throwables are reported and converted to failures, except unrecoverable errors.
 
 `Direct` is the simplest built-in action.
 
@@ -76,7 +76,8 @@ public class MyTest {
 - `throw SkipException.skip(...)` -> `SKIP`
 - `throw FailException.fail(...)` -> `FAIL`
 - any other thrown exception -> listener gets `actionThrowable(...)`, then result becomes `FAIL`
-- `throw Error` -> propagates immediately (not caught, no result set)
+- `throw OutOfMemoryError` or `StackOverflowError` -> propagates immediately
+- other `Error` subclasses -> listener gets `actionThrowable(...)`, then result becomes `FAIL`
 
 ## Exceptions
 

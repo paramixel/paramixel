@@ -51,7 +51,14 @@ public final class Selector {
         return new Builder();
     }
 
-    boolean matchesLocation(Class<?> clazz) {
+    /**
+     * Tests whether the supplied class matches this selector's location criterion.
+     *
+     * @param clazz the class to test
+     * @return {@code true} if the class matches or no location criterion is configured
+     * @throws NullPointerException if {@code clazz} is {@code null}
+     */
+    public boolean matchesLocation(Class<?> clazz) {
         Objects.requireNonNull(clazz, "clazz must not be null");
         if (locationPattern == null) {
             return true;
@@ -64,7 +71,12 @@ public final class Selector {
         return locationPattern.matcher(candidate).find();
     }
 
-    Pattern getTagPattern() {
+    /**
+     * Returns the tag-match pattern configured for this selector.
+     *
+     * @return the tag pattern, or {@code null} when no tag criterion is configured
+     */
+    public Pattern getTagPattern() {
         return tagPattern;
     }
 
@@ -86,7 +98,9 @@ public final class Selector {
         private String tagRegex;
         private boolean built;
 
-        private Builder() {}
+        private Builder() {
+            // Intentionally empty
+        }
 
         /**
          * Sets the package-match expression used during discovery.

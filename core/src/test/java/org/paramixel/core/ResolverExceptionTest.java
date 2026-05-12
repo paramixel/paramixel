@@ -71,4 +71,19 @@ class ResolverExceptionTest {
         var cause = new IOException("test cause");
         assertThatThrownBy(() -> ResolverException.of(null, cause)).isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    @DisplayName("of(String) rejects blank message")
+    void ofRejectsBlankMessage() {
+        assertThatThrownBy(() -> ResolverException.of("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ResolverException.of("   ")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("of(String, Throwable) rejects blank message")
+    void ofRejectsBlankMessageWithCause() {
+        var cause = new IOException("test cause");
+        assertThatThrownBy(() -> ResolverException.of("", cause)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ResolverException.of("   ", cause)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

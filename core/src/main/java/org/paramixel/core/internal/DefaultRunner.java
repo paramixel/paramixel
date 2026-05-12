@@ -16,26 +16,16 @@
 
 package org.paramixel.core.internal;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletionException;
 import org.paramixel.core.Action;
 import org.paramixel.core.Configuration;
-import org.paramixel.core.Context;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.exception.ConfigurationException;
 import org.paramixel.core.internal.listener.SafeListener;
-import org.paramixel.core.support.Arguments;
 
 /**
  * Default {@link Runner} implementation used for standard Paramixel execution.
@@ -46,38 +36,34 @@ import org.paramixel.core.support.Arguments;
  * <p>{@code DefaultRunner} instances are not thread-safe and not reusable across multiple {@link #run(Action)}
  * calls. Each invocation of {@link #run(Action)} is {@code synchronized} to enforce single-thread access.
  * Create a fresh instance for each execution boundary.
+ *
+ * <p>Concurrent execution across different runner instances is not supported. The framework uses shared global state
+ * for action hierarchy indexing during execution; concurrent runs would corrupt this state and produce incorrect
+ * reporting output.
  */
 public final class DefaultRunner implements Runner {
-    private static final String RUNNER_THREAD_NAME = "paramixel-runner";
-    private static final String PARALLEL_THREAD_NAME = "paramixel-parallel";
-
     private final Listener listener;
-    private final Map<String, String> configuration;
-    private final ExecutorService externalExecutorService;
+    private final DefaultConfiguration configuration;
 
     /**
-     * Creates a runner with the supplied configuration, listener, and optional external executor service.
+     * Creates a runner with the supplied configuration and listener.
      *
      * @param configuration the configuration map to use, or {@code null} to load
      *     {@link Configuration#defaultProperties()}
      * @param listener the listener to receive lifecycle callbacks
-     * @param externalExecutorService the executor service to reuse for runner-managed work, or {@code null} to create
-     *     internal executors
      * @throws NullPointerException if {@code listener} is {@code null}
-     * @throws ConfigurationException if {@code configuration} contains an invalid runner parallelism value
+     * @throws ConfigurationException if {@code configuration} contains an invalid runner
+     *     parallelism value
      */
-    public DefaultRunner(
-            Map<String, String> configuration, Listener listener, ExecutorService externalExecutorService) {
+    public DefaultRunner(Map<String, String> configuration, Listener listener) {
         this.listener = Objects.requireNonNull(listener, "listener must not be null");
-        this.configuration =
-                configuration != null ? Map.copyOf(configuration) : Map.copyOf(Configuration.defaultProperties());
-        this.externalExecutorService = externalExecutorService;
-        resolveParallelism(this.configuration);
+        this.configuration = new DefaultConfiguration(configuration);
+        this.configuration.resolveParallelism();
     }
 
     @Override
     public Map<String, String> getConfiguration() {
-        return configuration;
+        return configuration.asMap();
     }
 
     @Override
@@ -85,179 +71,51 @@ public final class DefaultRunner implements Runner {
         return listener;
     }
 
+    /**
+     * Cascades {@code close()} to the listener so that listeners holding resources are cleaned up when the runner is
+     * used in try-with-resources.
+     */
     @Override
     public void close() {
         listener.close();
     }
 
+    /**
+     * This method is {@code synchronized} to enforce single-thread access. Before execution, the action graph is
+     * validated for cycles and thread-starvation deadlocks.
+     */
     @Override
     public synchronized Result run(Action action) {
         Objects.requireNonNull(action, "action must not be null");
 
-        ExecutorService runnerExec;
-        boolean ownsRunnerExec;
-
-        if (externalExecutorService != null) {
-            runnerExec = externalExecutorService;
-            ownsRunnerExec = false;
-        } else {
-            runnerExec = createExecutorService(configuration, RUNNER_THREAD_NAME);
-            ownsRunnerExec = true;
-        }
-
-        ExecutorService parallelExec = createExecutorService(configuration, PARALLEL_THREAD_NAME);
-        ExecutorService routingExec = new RoutingExecutorService(runnerExec, parallelExec);
-
         Listener safeListener = listener instanceof SafeListener ? listener : new SafeListener(listener);
 
-        DefaultResult rootResult = new DefaultResult(action);
+        var rootResult = new DefaultResult(action);
 
-        try (ActionHierarchy.Scope ignored = ActionHierarchy.install(action)) {
+        try (ActionHierarchy.Scope ignored = ActionHierarchy.install(action);
+                var scheduler = new DefaultAsyncScheduler(configuration)) {
             new CycleDetector().validateNoCycles(action);
-            new DeadlockDetector().validateNoDeadlock(action, resolveParallelism(configuration));
             safeListener.runStarted(this);
 
-            Context context = new DefaultContext(configuration, safeListener, routingExec);
-            Result executeResult = action.execute(context);
+            var context = new DefaultContext(configuration, safeListener, scheduler);
+            Result executeResult = scheduler.runAsync(action, context).join();
 
-            rootResult.setStatus(executeResult.getStatus());
-            rootResult.setRunDuration(executeResult.getRunDuration());
+            rootResult.complete(executeResult.getStatus(), executeResult.getRunDuration());
             for (Result child : executeResult.getChildren()) {
                 rootResult.addChild(child);
             }
 
             safeListener.runCompleted(this, rootResult);
-        } finally {
-            if (ownsRunnerExec) {
-                shutdownExecutorService(runnerExec);
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
             }
-            shutdownExecutorService(parallelExec);
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw e;
         }
         return rootResult;
-    }
-
-    /**
-     * Resolves the effective runner parallelism from configuration.
-     *
-     * @param configuration the configuration to inspect
-     * @return the positive parallelism value
-     * @throws ConfigurationException if the configured value is missing, non-numeric, or not positive
-     */
-    private static int resolveParallelism(Map<String, String> configuration) {
-        String configuredParallelism = configuration.getOrDefault(
-                Configuration.RUNNER_PARALLELISM,
-                String.valueOf(Runtime.getRuntime().availableProcessors()));
-
-        final int parallelism;
-        try {
-            parallelism = Integer.parseInt(configuredParallelism);
-        } catch (NumberFormatException e) {
-            throw ConfigurationException.of(
-                    "Invalid configuration for '" + Configuration.RUNNER_PARALLELISM + "': expected integer but was '"
-                            + configuredParallelism + "'",
-                    e);
-        }
-
-        if (parallelism <= 0) {
-            throw ConfigurationException.of("Invalid configuration for '" + Configuration.RUNNER_PARALLELISM
-                    + "': expected positive integer but was '"
-                    + configuredParallelism + "'");
-        }
-
-        return parallelism;
-    }
-
-    private static ExecutorService createExecutorService(Map<String, String> configuration, String threadName) {
-        int parallelism = resolveParallelism(configuration);
-        AtomicInteger counter = new AtomicInteger(1);
-
-        ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
-                parallelism, parallelism, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), runnable -> {
-                    Thread thread = new Thread(runnable, threadName + "-" + counter.getAndIncrement());
-                    thread.setDaemon(true);
-                    return thread;
-                });
-
-        threadPoolExecutor.prestartAllCoreThreads();
-        return threadPoolExecutor;
-    }
-
-    private static void shutdownExecutorService(ExecutorService executorService) {
-        executorService.shutdown();
-
-        try {
-            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                executorService.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executorService.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static final class RoutingExecutorService extends AbstractExecutorService {
-
-        private final ExecutorService runnerExecutorService;
-        private final ExecutorService parallelExecutorService;
-        private final ConcurrentHashMap<Thread, Integer> threadDepth = new ConcurrentHashMap<>();
-
-        RoutingExecutorService(ExecutorService runnerExecutorService, ExecutorService parallelExecutorService) {
-            this.runnerExecutorService = runnerExecutorService;
-            this.parallelExecutorService = parallelExecutorService;
-        }
-
-        @Override
-        public void shutdown() {
-            runnerExecutorService.shutdown();
-            parallelExecutorService.shutdown();
-        }
-
-        @Override
-        public List<Runnable> shutdownNow() {
-            List<Runnable> runnables = new ArrayList<>(runnerExecutorService.shutdownNow());
-            runnables.addAll(parallelExecutorService.shutdownNow());
-            return runnables;
-        }
-
-        @Override
-        public boolean isShutdown() {
-            return runnerExecutorService.isShutdown() && parallelExecutorService.isShutdown();
-        }
-
-        @Override
-        public boolean isTerminated() {
-            return runnerExecutorService.isTerminated() && parallelExecutorService.isTerminated();
-        }
-
-        @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-            Arguments.requireNonNegative(timeout, "timeout must be non-negative");
-            Objects.requireNonNull(unit, "unit must not be null");
-            long deadline = System.nanoTime() + unit.toNanos(timeout);
-            boolean runnerTerminated = runnerExecutorService.awaitTermination(timeout, unit);
-            long remainingNanos = deadline - System.nanoTime();
-            if (remainingNanos <= 0) {
-                return runnerTerminated && parallelExecutorService.isTerminated();
-            }
-            boolean parallelTerminated = parallelExecutorService.awaitTermination(remainingNanos, TimeUnit.NANOSECONDS);
-            return runnerTerminated && parallelTerminated;
-        }
-
-        @Override
-        public void execute(Runnable command) {
-            Objects.requireNonNull(command, "command must not be null");
-            int currentDepth = threadDepth.getOrDefault(Thread.currentThread(), 0);
-            ExecutorService delegate = currentDepth == 0 ? runnerExecutorService : parallelExecutorService;
-            int childDepth = currentDepth + 1;
-
-            delegate.execute(() -> {
-                threadDepth.put(Thread.currentThread(), childDepth);
-                try {
-                    command.run();
-                } finally {
-                    threadDepth.remove(Thread.currentThread());
-                }
-            });
-        }
     }
 }

@@ -7,12 +7,14 @@ description: Paramixel configuration sources and built-in keys.
 
 ## Core configuration sources
 
-`org.paramixel.core.Configuration` exposes three entry points:
+`org.paramixel.core.Configuration` exposes these entry points:
 
 ```java
 Map<String, String> classpath = Configuration.classpathProperties();
+Map<String, String> classpathWithLoader = Configuration.classpathProperties(classLoader);
 Map<String, String> system = Configuration.systemProperties();
 Map<String, String> defaults = Configuration.defaultProperties();
+Map<String, String> defaultsWithLoader = Configuration.defaultProperties(classLoader);
 ```
 
 All three methods return unmodifiable maps. Attempts to modify the returned map (such as `put`, `remove`, or `clear`) throw `UnsupportedOperationException`.
@@ -25,7 +27,7 @@ All three methods return unmodifiable maps. Attempts to modify the returned map 
 
 ### `paramixel.parallelism`
 
-Controls default runner parallelism. This key is used by both `Runner` (for thread pool sizing) and `Resolver` (for the parallelism of discovered `Parallel` roots).
+Controls default scheduler parallelism. This key is used by both `Runner` (for default worker concurrency) and `Resolver` (for the parallelism of discovered `Parallel` roots).
 
 ```properties
 paramixel.parallelism=8
@@ -34,7 +36,7 @@ paramixel.parallelism=8
 Notes:
 
 - `Configuration.defaultProperties()` sets it to `Runtime.getRuntime().availableProcessors()` when absent.
-- `Runner` uses this value to size its thread pools and to detect potential nested-parallel deadlocks.
+- `Runner` uses this value to configure default scheduler worker concurrency.
 - `Resolver` uses this value as the parallelism for discovered `Parallel` roots.
 - Individual `Parallel` actions can also set an explicit per-node limit with `Parallel.builder(name).parallelism(...)`.
 
@@ -49,8 +51,9 @@ paramixel.failureOnSkip=true
 Notes:
 
 - Default is `false`. When `false`, SKIP produces exit code `0` (same as PASS). When `true`, SKIP produces exit code `1` (same as FAIL).
-- This affects `Runner.runAndReturnExitCode(Action)`, `Runner.runAndReturnExitCode(Selector)`, and the Maven plugin.
+- This affects `Runner.runAndReturnExitCode(Action)`, `Runner.runAndReturnExitCode(Selector)`, the Maven plugin, and the Gradle plugin.
 - In the Maven plugin, this corresponds to the `<failureOnSkip>` POM parameter or `-Dparamixel.failureOnSkip=true` system property.
+- In the Gradle plugin, this corresponds to `failureOnSkip.set(true)`, `-Pparamixel.failureOnSkip=true`, or `-Dparamixel.failureOnSkip=true`.
 
 ### `paramixel.report.file`
 
@@ -170,13 +173,15 @@ Overloads that do not accept a configuration map use `Configuration.defaultPrope
 
 The plugin accepts `<properties>` entries and also reads system properties.
 
-Precedence in the plugin is:
+Effective precedence in the plugin is:
 
-1. `Configuration.defaultProperties()`
+1. test-classpath `paramixel.properties` and built-in defaults
 2. plugin `<properties>`
-3. system properties whose keys start with `paramixel.`
+3. `-Dparamixel.*` system properties
 
-The plugin passes configuration to discovery so that `paramixel.parallelism` controls both thread pool sizing and discovered action parallelism.
+System properties win over POM `<properties>` when both set the same key.
+
+The plugin passes configuration to discovery so that `paramixel.parallelism` controls both default scheduler worker concurrency and discovered action parallelism.
 
 Example:
 

@@ -18,17 +18,17 @@ package org.paramixel.core;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Provides runtime services and scoped state to an executing {@link Action}.
  *
- * <p>A {@code Context} exposes the active configuration, listener, executor service, and a local
+ * <p>A {@link Context} exposes the active configuration, listener, scheduler, and a local
  * {@link Store}. Contexts may be arranged into a parent-child chain so nested actions can create
  * child scopes while still navigating to ancestor stores explicitly.
  *
  * @apiNote Use {@link #createChild()} when an action needs an isolated store while preserving the
- *     same configuration, listener, and executor service.
+ *     same configuration, listener, and scheduler.
  */
 public interface Context {
 
@@ -66,11 +66,12 @@ public interface Context {
     Listener getListener();
 
     /**
-     * Returns the executor service available to actions for asynchronous work.
+     * Schedules an action asynchronously through Paramixel's scheduler.
      *
-     * @return the executor service associated with the current run
+     * @param action the action to schedule
+     * @return a future completed with the action result
      */
-    ExecutorService getExecutorService();
+    CompletableFuture<Result> runAsync(Action action);
 
     /**
      * Finds the ancestor context reached by walking upward from this context.
@@ -88,7 +89,7 @@ public interface Context {
     /**
      * Creates a child context derived from this context.
      *
-     * <p>The child context shares the same configuration, listener, and executor service, but owns
+     * <p>The child context shares the same configuration, listener, and scheduler, but owns
      * an independent local {@link Store}.
      *
      * @return a new child context whose parent is this context

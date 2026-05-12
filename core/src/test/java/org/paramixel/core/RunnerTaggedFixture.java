@@ -20,7 +20,9 @@ import org.paramixel.core.action.Noop;
 
 public final class RunnerTaggedFixture {
 
-    private RunnerTaggedFixture() {}
+    private RunnerTaggedFixture() {
+        // Intentionally empty
+    }
 
     @Paramixel.ActionFactory
     @Paramixel.Tag("smoke")

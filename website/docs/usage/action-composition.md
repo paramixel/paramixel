@@ -329,9 +329,9 @@ public class KafkaTest {
     private static final String ENVIRONMENT = "environment";
 
     @Paramixel.ActionFactory
-    public static Action actionFactory() {
+    public static Action actionFactory() throws Throwable {
         var parallelBuilder = Parallel.builder("KafkaExample");
-        for (KafkaTestEnvironment environment : createTestEnvironments()) {
+        for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
             Action argumentContainer = argument(environment);
             parallelBuilder.child(argumentContainer);
         }

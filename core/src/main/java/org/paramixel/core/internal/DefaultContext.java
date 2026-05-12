@@ -19,10 +19,13 @@ package org.paramixel.core.internal;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.CompletableFuture;
+import org.paramixel.core.Action;
+import org.paramixel.core.AsyncScheduler;
 import org.paramixel.core.Configuration;
 import org.paramixel.core.Context;
 import org.paramixel.core.Listener;
+import org.paramixel.core.Result;
 import org.paramixel.core.Store;
 import org.paramixel.core.support.Arguments;
 
@@ -30,41 +33,71 @@ import org.paramixel.core.support.Arguments;
  * Default {@link Context} implementation used by Paramixel runners.
  *
  * <p>Each context owns an independent local {@link Store} while sharing configuration, listener,
- * and executor service state with its ancestry chain.
+ * and scheduler state with its ancestry chain.
  */
 public final class DefaultContext implements Context {
 
     private final Context parent;
     private final Map<String, String> configuration;
     private final Listener listener;
-    private final ExecutorService executorService;
+    private final AsyncScheduler scheduler;
     private final Store store;
 
     private DefaultContext(
             final Context parent,
             final Map<String, String> configuration,
             final Listener listener,
-            final ExecutorService executorService) {
+            final AsyncScheduler scheduler) {
+        this(parent, configuration, listener, scheduler, new DefaultStore());
+    }
+
+    private DefaultContext(
+            final Context parent,
+            final Map<String, String> configuration,
+            final Listener listener,
+            final AsyncScheduler scheduler,
+            final Store store) {
         this.parent = parent;
-        this.configuration =
-                configuration != null ? Map.copyOf(configuration) : Map.copyOf(Configuration.defaultProperties());
+        this.configuration = Objects.requireNonNull(configuration, "configuration must not be null");
         this.listener = Objects.requireNonNull(listener, "listener must not be null");
-        this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
-        this.store = new DefaultStore();
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler must not be null");
+        this.store = Objects.requireNonNull(store, "store must not be null");
     }
 
     /**
-     * Creates a root context with the supplied configuration, listener, and executor service.
+     * Creates a root context with the supplied configuration, listener, and scheduler.
+     *
+     * @param configuration the configuration
+     * @param listener the listener receiving lifecycle callbacks
+     * @param scheduler the scheduler available to actions
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public DefaultContext(
+            final DefaultConfiguration configuration, final Listener listener, final AsyncScheduler scheduler) {
+        this(
+                null,
+                Objects.requireNonNull(configuration, "configuration must not be null")
+                        .asMap(),
+                listener,
+                scheduler);
+    }
+
+    /**
+     * Creates a root context with the supplied configuration map, listener, and scheduler.
      *
      * @param configuration the configuration properties, or {@code null} to load
      *     {@link Configuration#defaultProperties()}
      * @param listener the listener receiving lifecycle callbacks
-     * @param executorService the executor service available to actions
-     * @throws NullPointerException if {@code listener} or {@code executorService} is {@code null}
+     * @param scheduler the scheduler available to actions
+     * @throws NullPointerException if {@code listener} or {@code scheduler} is {@code null}
      */
     public DefaultContext(
-            final Map<String, String> configuration, final Listener listener, final ExecutorService executorService) {
-        this(null, configuration, listener, executorService);
+            final Map<String, String> configuration, final Listener listener, final AsyncScheduler scheduler) {
+        this(
+                null,
+                configuration != null ? Map.copyOf(configuration) : Map.copyOf(Configuration.defaultProperties()),
+                listener,
+                scheduler);
     }
 
     private DefaultContext(final Context parent) {
@@ -72,7 +105,11 @@ public final class DefaultContext implements Context {
                 Objects.requireNonNull(parent, "parent must not be null"),
                 parent.getConfiguration(),
                 parent.getListener(),
-                parent.getExecutorService());
+                ((DefaultContext) parent).scheduler);
+    }
+
+    DefaultContext withScheduler(final AsyncScheduler scheduler) {
+        return new DefaultContext(parent, configuration, listener, scheduler, store);
     }
 
     @Override
@@ -105,11 +142,6 @@ public final class DefaultContext implements Context {
     }
 
     @Override
-    public ExecutorService getExecutorService() {
-        return executorService;
-    }
-
-    @Override
     public Store getStore() {
         return store;
     }
@@ -117,6 +149,12 @@ public final class DefaultContext implements Context {
     @Override
     public Context createChild() {
         return new DefaultContext(this);
+    }
+
+    @Override
+    public CompletableFuture<Result> runAsync(final Action action) {
+        Objects.requireNonNull(action, "action must not be null");
+        return scheduler.runAsync(action, this);
     }
 
     @Override

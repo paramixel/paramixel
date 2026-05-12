@@ -182,34 +182,32 @@ The ancestor level depends on the nesting depth:
 - `findAncestor(1)` — immediate parent
 - `findAncestor(2)` — grandparent
 
-## Custom executor service
+## Custom scheduler
 
-For parallel arguments that need a dedicated thread pool:
+For parallel arguments that need custom scheduling semantics, provide an `AsyncScheduler` to the `Parallel` node:
 
 ```java
+private static final AsyncScheduler scheduler = (action, context) -> {
+    try {
+        return CompletableFuture.completedFuture(action.execute(context));
+    } catch (Throwable throwable) {
+        return CompletableFuture.failedFuture(throwable);
+    }
+};
+
 @Paramixel.ActionFactory
 public static Action actionFactory() {
-    ExecutorService customExecutor = Executors.newFixedThreadPool(4);
-    Cleanup cleanup = Cleanup.of();
-    cleanup.add(customExecutor::shutdown);
-
     var builder = Parallel.builder("CustomExecutorTest")
-            .executorService(customExecutor);
+            .scheduler(scheduler);
     for (String arg : arguments()) {
         builder.child(argument(arg));
     }
 
-    Action parallel = builder.build();
-    return Container.builder("suite")
-            .child(parallel)
-            .after(Direct.builder("cleanup")
-                    .execute(context -> cleanup.runAndThrow())
-                    .build())
-            .build();
+    return builder.build();
 }
 ```
 
-Paramixel does not shut down user-provided executors — you are responsible for their lifecycle.
+The scheduler applies to the `Parallel` subtree. Nested `context.runAsync(...)` calls from inside those argument actions use the same scheduler.
 
 ## Full example with Testcontainers
 

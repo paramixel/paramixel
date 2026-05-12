@@ -19,10 +19,8 @@ package org.paramixel.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.List;
-import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.internal.DefaultContext;
@@ -32,47 +30,17 @@ class ContextStoreTest {
 
     private static final Listener NOOP_LISTENER = new Listener() {};
 
-    private static ExecutorService executorService() {
-        return new AbstractExecutorService() {
-            private boolean shutdown;
+    private static final AsyncScheduler SCHEDULER =
+            (action, context) -> CompletableFuture.completedFuture(action.execute(context));
 
-            @Override
-            public void shutdown() {
-                shutdown = true;
-            }
-
-            @Override
-            public List<Runnable> shutdownNow() {
-                shutdown = true;
-                return List.of();
-            }
-
-            @Override
-            public boolean isShutdown() {
-                return shutdown;
-            }
-
-            @Override
-            public boolean isTerminated() {
-                return shutdown;
-            }
-
-            @Override
-            public boolean awaitTermination(final long timeout, final TimeUnit unit) {
-                return shutdown;
-            }
-
-            @Override
-            public void execute(final Runnable command) {
-                command.run();
-            }
-        };
+    private static DefaultContext context() {
+        return new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, SCHEDULER);
     }
 
     @Test
     @DisplayName("getParent returns direct parent")
     void getParentReturnsDirectParent() {
-        Context parent = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var parent = context();
         Context child = parent.createChild();
 
         assertThat(child.getParent()).contains(parent);
@@ -81,7 +49,7 @@ class ContextStoreTest {
     @Test
     @DisplayName("getParent on root returns empty")
     void getParentOnRootReturnsEmpty() {
-        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var root = context();
 
         assertThat(root.getParent()).isEmpty();
     }
@@ -89,7 +57,7 @@ class ContextStoreTest {
     @Test
     @DisplayName("findAncestor returns requested context")
     void findAncestorReturnsRequestedContext() {
-        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var root = context();
         Context child = root.createChild();
         Context grandchild = child.createChild();
 
@@ -101,7 +69,7 @@ class ContextStoreTest {
     @Test
     @DisplayName("findAncestor rejects negative levels")
     void findAncestorRejectsNegativeLevels() {
-        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var root = context();
 
         assertThatThrownBy(() -> root.findAncestor(-1))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -111,7 +79,7 @@ class ContextStoreTest {
     @Test
     @DisplayName("findAncestor returns empty when level does not exist")
     void findAncestorReturnsEmptyWhenLevelDoesNotExist() {
-        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var root = context();
         Context child = root.createChild();
 
         assertThat(child.findAncestor(2)).isEmpty();
@@ -120,7 +88,7 @@ class ContextStoreTest {
     @Test
     @DisplayName("createChild creates isolated local store")
     void createChildCreatesIsolatedLocalStore() {
-        Context parent = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var parent = context();
         Context child = parent.createChild();
         parent.getStore().put("shared", Value.of("parent"));
         child.getStore().put("shared", Value.of("child"));
@@ -141,18 +109,57 @@ class ContextStoreTest {
     @Test
     @DisplayName("createChild preserves runner services")
     void createChildPreservesRunnerServices() {
-        Context parent = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var parent = context();
         Context child = parent.createChild();
 
         assertThat(child.getConfiguration()).isEqualTo(parent.getConfiguration());
         assertThat(child.getListener()).isSameAs(parent.getListener());
-        assertThat(child.getExecutorService()).isSameAs(parent.getExecutorService());
     }
 
     @Test
-    @DisplayName("DefaultContext with null configuration falls back to default properties")
+    @DisplayName("runAsync rejects null action")
+    void runAsyncRejectsNullAction() {
+        var ctx = context();
+
+        assertThatThrownBy(() -> ctx.runAsync(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
+    }
+
+    @Test
+    void defaultContextRejectsNullListener() {
+        assertThatThrownBy(() -> new DefaultContext(Configuration.defaultProperties(), null, SCHEDULER))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("listener must not be null");
+    }
+
+    @Test
+    @DisplayName("DefaultContext rejects null scheduler")
+    void defaultContextRejectsNullScheduler() {
+        assertThatThrownBy(() -> new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("scheduler must not be null");
+    }
+
+    @Test
+    @DisplayName("DefaultContext Map constructor rejects null listener")
+    void defaultContextMapConstructorRejectsNullListener() {
+        assertThatThrownBy(() -> new DefaultContext((Map<String, String>) null, null, SCHEDULER))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("listener must not be null");
+    }
+
+    @Test
+    @DisplayName("DefaultContext Map constructor rejects null scheduler")
+    void defaultContextMapConstructorRejectsNullScheduler() {
+        assertThatThrownBy(() -> new DefaultContext((Map<String, String>) null, NOOP_LISTENER, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("scheduler must not be null");
+    }
+
+    @Test
     void defaultContextWithNullConfigurationFallsBack() {
-        Context context = new DefaultContext(null, NOOP_LISTENER, executorService());
+        var context = new DefaultContext((Map<String, String>) null, NOOP_LISTENER, SCHEDULER);
 
         assertThat(context.getConfiguration()).containsKey(Configuration.RUNNER_PARALLELISM);
     }
@@ -160,7 +167,7 @@ class ContextStoreTest {
     @Test
     @DisplayName("DefaultContext toString returns root for root context")
     void toStringReturnsRootForRootContext() {
-        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var root = context();
 
         assertThat(root.toString()).isEqualTo("Context[root]");
     }
@@ -168,7 +175,7 @@ class ContextStoreTest {
     @Test
     @DisplayName("DefaultContext toString returns child for child context")
     void toStringReturnsChildForChildContext() {
-        Context root = new DefaultContext(Configuration.defaultProperties(), NOOP_LISTENER, executorService());
+        var root = context();
         Context child = root.createChild();
 
         assertThat(child.toString()).isEqualTo("Context[child]");

@@ -37,7 +37,7 @@ import org.paramixel.core.support.Arguments;
 /**
  * Executes child actions in order with optional setup and cleanup actions.
  *
- * <p>A {@code Container} runs an optional {@code before} action first, then the body children, and finally an
+ * <p>A {@link Container} runs an optional {@code before} action first, then the body children, and finally an
  * optional {@code after} action. The {@code after} action always runs regardless of earlier outcomes.
  *
  * <p>Body child execution is governed by {@link ChildMode} and {@link OrderMode}. When
@@ -50,23 +50,35 @@ import org.paramixel.core.support.Arguments;
  */
 public final class Container extends AbstractAction implements CompositeAction {
 
-    /** Controls whether body children continue after an earlier child fails or skips. */
+    /**
+     * Controls whether body children continue after an earlier child fails or skips.
+     */
     public enum ChildMode {
 
-        /** Run every body child regardless of earlier failures or skips. */
+        /**
+         * Run every body child regardless of earlier failures or skips.
+         */
         INDEPENDENT,
 
-        /** Stop after the first failed or skipped body child and skip the remaining body children. */
+        /**
+         * Stop after the first failed or skipped body child and skip the remaining body children.
+         */
         DEPENDENT
     }
 
-    /** Controls the order used for body child execution. */
+    /**
+     * Controls the order used for body child execution.
+     */
     public enum OrderMode {
 
-        /** Run body children in builder declaration order. */
+        /**
+         * Run body children in builder declaration order.
+         */
         DECLARED,
 
-        /** Shuffle body children before execution using the policy seed. */
+        /**
+         * Shuffle body children before execution using the policy seed.
+         */
         SHUFFLED
     }
 
@@ -81,6 +93,8 @@ public final class Container extends AbstractAction implements CompositeAction {
 
         /**
          * Compact constructor that rejects null arguments.
+         *
+         * @throws NullPointerException if any argument is null
          */
         public Policy {
             Objects.requireNonNull(childMode, "childMode must not be null");
@@ -108,7 +122,9 @@ public final class Container extends AbstractAction implements CompositeAction {
             return new Builder();
         }
 
-        /** Fluent builder for {@link Policy}. */
+        /**
+         * Fluent builder for {@link Policy}.
+         */
         public static final class Builder {
 
             private ChildMode childMode = ChildMode.DEPENDENT;
@@ -119,7 +135,9 @@ public final class Container extends AbstractAction implements CompositeAction {
             /**
              * Creates a policy builder with default values.
              */
-            private Builder() {}
+            private Builder() {
+                // Intentionally empty
+            }
 
             /**
              * Sets whether body children continue after failures or skips.
@@ -191,6 +209,7 @@ public final class Container extends AbstractAction implements CompositeAction {
     private final List<Action> allChildren;
     private final Action after;
     private final Policy policy;
+    private final Random random;
 
     private Container(
             String name,
@@ -206,6 +225,7 @@ public final class Container extends AbstractAction implements CompositeAction {
         this.allChildren = validateChildren(allChildren(before, bodyChildren, after));
         this.after = after;
         this.policy = policy;
+        this.random = new Random(policy.seed());
     }
 
     /**
@@ -267,19 +287,24 @@ public final class Container extends AbstractAction implements CompositeAction {
     }
 
     @Override
-    protected Result skipSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
+    public Result skip(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
         for (Action child : allChildren) {
             Result childResult = child.skip(context);
             result.addChild(childResult);
         }
-        result.setStatus(DefaultStatus.SKIP);
-        result.setRunDuration(Duration.ZERO);
+        result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
         return result;
     }
 
-    /** Fluent builder for {@link Container}. */
+    /**
+     * Fluent builder for {@link Container}.
+     */
     public static final class Builder {
 
         private final String name;
@@ -384,7 +409,7 @@ public final class Container extends AbstractAction implements CompositeAction {
             if (before == null && children.isEmpty() && after == null) {
                 throw new IllegalStateException("container must contain before, child, or after action");
             }
-            Container instance = new Container(name, before, List.copyOf(children), after, policy, contextMode);
+            var instance = new Container(name, before, List.copyOf(children), after, policy, contextMode);
             instance.initialize();
             return instance;
         }
@@ -397,20 +422,26 @@ public final class Container extends AbstractAction implements CompositeAction {
     }
 
     @Override
-    protected Result executeSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
-        context.getListener().beforeAction(result);
+    public Result execute(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
+        var listener = context.getListener();
+        listener.beforeAction(result);
         Instant start = Instant.now();
 
-        List<Result> statusResults = new ArrayList<>();
+        var statusResults = new ArrayList<Result>();
         Status computedStatus = DefaultStatus.PASS;
 
         if (before != null) {
             Result beforeResult = before.execute(context);
             result.addChild(beforeResult);
             statusResults.add(beforeResult);
-            if (beforeResult.getStatus().isFailure() || beforeResult.getStatus().isSkip()) {
-                computedStatus = beforeResult.getStatus();
+            var beforeStatus = beforeResult.getStatus();
+            if (beforeStatus.isFailure() || beforeStatus.isSkip()) {
+                computedStatus = beforeStatus;
             }
         }
 
@@ -421,9 +452,8 @@ public final class Container extends AbstractAction implements CompositeAction {
                 Result childResult = child.execute(context);
                 result.addChild(childResult);
                 statusResults.add(childResult);
-                if (policy.childMode() == ChildMode.DEPENDENT
-                        && (childResult.getStatus().isFailure()
-                                || childResult.getStatus().isSkip())) {
+                var childStatus = childResult.getStatus();
+                if (policy.childMode() == ChildMode.DEPENDENT && (childStatus.isFailure() || childStatus.isSkip())) {
                     for (Action remaining : orderedChildren.subList(index + 1, orderedChildren.size())) {
                         Result skipResult = remaining.skip(context);
                         result.addChild(skipResult);
@@ -446,31 +476,41 @@ public final class Container extends AbstractAction implements CompositeAction {
             statusResults.add(afterResult);
         }
 
-        result.setStatus(computeContainerStatus(statusResults));
-        result.setRunDuration(Duration.between(start, Instant.now()));
-        context.getListener().afterAction(result);
+        result.complete(computeContainerStatus(statusResults), Duration.between(start, Instant.now()));
+        listener.afterAction(result);
         return result;
     }
 
     private List<Action> orderedChildren() {
         if (policy.orderMode() == OrderMode.SHUFFLED) {
-            List<Action> ordered = new ArrayList<>(bodyChildren);
-            Collections.shuffle(ordered, new Random(policy.seed()));
+            var ordered = new ArrayList<>(bodyChildren);
+            Collections.shuffle(ordered, random);
             return ordered;
         }
         return bodyChildren;
     }
 
+    /**
+     * Returns body children in the order selected for this execution.
+     *
+     * @return the ordered body children
+     */
+    public List<Action> orderedBodyChildren() {
+        return orderedChildren();
+    }
+
     private Status computeContainerStatus(List<Result> results) {
         for (Result childResult : results) {
             Objects.requireNonNull(childResult, "childResults must not contain null elements");
-            if (childResult.getStatus().isFailure()) {
-                return childResult.getStatus();
+            var status = childResult.getStatus();
+            if (status.isFailure()) {
+                return status;
             }
         }
         for (Result childResult : results) {
-            if (childResult.getStatus().isSkip()) {
-                return childResult.getStatus();
+            var status = childResult.getStatus();
+            if (status.isSkip()) {
+                return status;
             }
         }
         return DefaultStatus.PASS;
@@ -479,7 +519,7 @@ public final class Container extends AbstractAction implements CompositeAction {
     private List<Action> validateChildren(List<Action> children) {
         Objects.requireNonNull(children, "children must not be null");
         Arguments.requireNonEmpty(children, "children must not be empty");
-        List<Action> validated = new ArrayList<>(children.size());
+        var validated = new ArrayList<Action>(children.size());
         for (Action child : children) {
             Objects.requireNonNull(child, "children must not contain null elements");
             Arguments.require(child != this, "action must not add itself as a child");
@@ -490,7 +530,7 @@ public final class Container extends AbstractAction implements CompositeAction {
 
     private static List<Action> allChildren(Action before, List<Action> children, Action after) {
         Objects.requireNonNull(children, "children must not be null");
-        List<Action> all = new ArrayList<>();
+        var all = new ArrayList<Action>();
         if (before != null) {
             all.add(before);
         }

@@ -17,6 +17,7 @@
 package org.paramixel.core.internal.listener;
 
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -25,7 +26,6 @@ import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Status;
 import org.paramixel.core.Version;
-import org.paramixel.core.support.AnsiColor;
 import org.paramixel.core.support.ElapsedTimeFormatter;
 
 /**
@@ -38,7 +38,7 @@ public class SummaryListener implements Listener {
 
     private final SummaryRenderer summaryRenderer;
 
-    private final PrintStream out;
+    private final PrintWriter out;
 
     private final boolean ansiEnabled;
 
@@ -57,65 +57,72 @@ public class SummaryListener implements Listener {
      * Creates a summary listener that uses the supplied renderer and output destination.
      *
      * @param summaryRenderer the renderer used to print the action summary
-     * @param out the output stream used for summary lines
+     * @param out the output writer used for summary lines
      * @param ansiEnabled whether ANSI formatting should be used
      */
-    public SummaryListener(final SummaryRenderer summaryRenderer, final PrintStream out, final boolean ansiEnabled) {
+    public SummaryListener(final SummaryRenderer summaryRenderer, final PrintWriter out, final boolean ansiEnabled) {
         this.summaryRenderer = Objects.requireNonNull(summaryRenderer, "summaryRenderer must not be null");
         this.out = Objects.requireNonNull(out, "out must not be null");
         this.ansiEnabled = ansiEnabled;
     }
 
-    private PrintStream out() {
-        return out == null ? System.out : out;
+    /**
+     * Creates a summary listener that uses the supplied renderer and output destination.
+     *
+     * @param summaryRenderer the renderer used to print the action summary
+     * @param out the output stream used for summary lines
+     * @param ansiEnabled whether ANSI formatting should be used
+     */
+    public SummaryListener(final SummaryRenderer summaryRenderer, final PrintStream out, final boolean ansiEnabled) {
+        this.summaryRenderer = Objects.requireNonNull(summaryRenderer, "summaryRenderer must not be null");
+        this.out = new PrintWriter(Objects.requireNonNull(out, "out must not be null"), true);
+        this.ansiEnabled = ansiEnabled;
+    }
+
+    private PrintWriter getWriter() {
+        return out == null ? new PrintWriter(System.out, true) : out;
     }
 
     private String formatStatus(Status status) {
         Objects.requireNonNull(status, "status must not be null");
-        if (!ansiEnabled) {
-            return resultDisplayName(status);
-        }
-        if (status.isPass()) {
-            return AnsiColor.BOLD_GREEN_TEXT.format(status.getDisplayName());
-        } else if (status.isFailure()) {
-            return AnsiColor.BOLD_RED_TEXT.format(status.getDisplayName());
-        } else {
-            return AnsiColor.BOLD_ORANGE_TEXT.format(status.getDisplayName());
-        }
+        return ansiEnabled ? Listeners.formatAnsiStatus(status) : Listeners.formatStatus(status);
     }
 
-    private static String resultDisplayName(Status status) {
-        return status.getDisplayName();
-    }
-
-    private String prefix() {
-        return ansiEnabled ? Constants.PARAMIXEL : Constants.PARAMIXEL_PLAN;
+    private String getPrefix() {
+        return ansiEnabled ? Constants.PARAMIXEL_ANSI : Constants.PARAMIXEL_PLAIN;
     }
 
     @Override
     public void runStarted(Runner runner) {
         Objects.requireNonNull(runner, "runner must not be null");
-        out().println(prefix() + "Paramixel v" + Version.getVersion() + " starting...");
+        var writer = getWriter();
+        var prefix = getPrefix();
+        var version = Version.getVersion();
+        writer.println(prefix + "Paramixel v" + version + " starting...");
     }
 
     @Override
     public void runCompleted(Runner runner, Result result) {
         Objects.requireNonNull(runner, "runner must not be null");
         Objects.requireNonNull(result, "result must not be null");
-        out().println(prefix());
-        out().println(prefix() + "Paramixel v" + Version.getVersion());
+        var writer = getWriter();
+        var prefix = getPrefix();
+        var version = Version.getVersion();
+        writer.println(prefix);
+        writer.println(prefix + "Paramixel v" + version);
 
         summaryRenderer.renderSummary(runner, result);
 
         long runDurationMillis = result.getRunDuration().toMillis();
         String runDurationString = ElapsedTimeFormatter.formatElapsedTime(runDurationMillis);
 
-        out().println(prefix());
-        out().println(prefix() + "Paramixel v" + Version.getVersion());
-        out().println(prefix() + "Status      : " + formatStatus(result.getStatus()));
-        out().println(prefix() + "Finished at : "
+        writer.println(prefix);
+        writer.println(prefix + "Paramixel v" + version);
+        writer.println(prefix);
+        writer.println(prefix + "Status      : " + formatStatus(result.getStatus()));
+        writer.println(prefix + "Finished at : "
                 + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        out().println(prefix() + "Total time  : " + runDurationString);
-        out().println(prefix());
+        writer.println(prefix + "Total time  : " + runDurationString);
+        writer.println(prefix);
     }
 }

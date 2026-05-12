@@ -22,9 +22,9 @@ public class KafkaTest {
     private static final String ENVIRONMENT = "environment";
 
     @Paramixel.ActionFactory
-    public static Action actionFactory() {
+    public static Action actionFactory() throws Throwable {
         var parallelBuilder = Parallel.builder("KafkaExample");
-        for (KafkaTestEnvironment environment : createTestEnvironments()) {
+        for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
             Action argumentContainer = argument(environment);
             parallelBuilder.child(argumentContainer);
         }
@@ -163,7 +163,7 @@ private static Action after(KafkaTestEnvironment environment, Network network) {
 }
 ```
 
-`Cleanup` collects `AutoCloseable` resources and runs them in forward or reverse order. `runAndThrow()` rethrows the first failure as the primary exception with later failures attached as suppressed exceptions. `Error` subclasses (such as `OutOfMemoryError`) abort the cleanup loop immediately.
+`Cleanup` collects `AutoCloseable` resources and runs them in forward or reverse order. `runAndThrow()` rethrows the first failure as the primary exception with later failures attached as suppressed exceptions. `OutOfMemoryError` and `StackOverflowError` abort the cleanup loop immediately.
 
 ### Conditional cleanup
 

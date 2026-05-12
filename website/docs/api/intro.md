@@ -12,27 +12,28 @@ This page is a compact map of the 3.x public API.
 ### `Runner`
 
 ```java
-interface Runner {
+interface Runner extends AutoCloseable {
     static Builder builder();
 
     Map<String, String> getConfiguration();
     Listener getListener();
     Result run(Action action);
+    Optional<Result> run(Selector selector);
     int runAndReturnExitCode(Action action);
     int runAndReturnExitCode(Selector selector);
     void runAndExit(Action action);
     void runAndExit(Selector selector);
+    void close();
 
     final class Builder {
         Builder configuration(Map<String, String> properties);
         Builder listener(Listener listener);
-        Builder executorService(ExecutorService executorService);
         Runner build();
     }
 }
 ```
 
-`Runner.run(Action)` returns a `Result`. A `Runner` can be reused — calling `run()` multiple times is safe and each call is independent. Owned executor services are created and shut down per invocation. External executors supplied via `executorService(...)` are not managed by the runner.
+`Runner.run(Action)` returns a `Result`. Use a single runner for one execution boundary, preferably with try-with-resources when report listeners may hold resources. Concurrent execution of the same or overlapping action trees is not supported.
 
 ### `Factory`
 
@@ -40,11 +41,13 @@ interface Runner {
 final class Factory {
     static Runner defaultRunner();
     static Listener defaultListener();
+    static Listener defaultListener(Map<String, String> configuration);
 }
 ```
 
 - `defaultRunner()` creates a `DefaultRunner` with default configuration and default listener
 - `defaultListener()` returns `SafeListener` wrapping `CompositeListener(StatusListener, SummaryListener(TreeSummaryRenderer))`
+- `defaultListener(configuration)` also includes a report listener when `paramixel.report.file` is configured
 
 ### `Action`
 
@@ -62,7 +65,15 @@ interface Action {
 
 `getId()` returns a randomly generated 4-character string (a–z, A–Z) that uniquely identifies the action instance.
 
-`ISOLATED` creates a child context for the action. `SHARED` reuses the parent context — use this when sibling actions intentionally share workflow state (e.g. `before`/`after` lifecycle phases).
+`ISOLATED` creates a child context for the action. `SHARED` reuses the parent context — use this when sibling actions intentionally share workflow state (e.g. `before`/`after` lifecycle phases). Built-in actions honor `ContextMode`; custom action implementations are responsible for applying their own context scoping in `execute(Context)` and `skip(Context)`.
+
+### `AbstractAction`
+
+`AbstractAction` is a convenience base class for custom actions. It provides generated identifiers, name validation helpers, context mode storage, and final accessors for `getId()`, `getName()`, and `getContextMode()`.
+
+`AbstractAction` does not wrap execution. Subclasses implement `execute(Context)` and `skip(Context)` directly, including any null checks, listener callbacks, result construction, and `ContextMode` behavior they require.
+
+Built-in actions are final framework primitives and are not intended for subclassing. Implement `Action` directly, or extend `AbstractAction`, when you need custom action behavior.
 
 ### `CompositeAction`
 
@@ -96,13 +107,23 @@ interface Context {
     Optional<Context> getParent();
     Store getStore();
     Listener getListener();
-    ExecutorService getExecutorService();
+    CompletableFuture<Result> runAsync(Action action);
     Optional<Context> findAncestor(int levelUp);
     Context createChild();
 }
 ```
 
-`findAncestor(levelUp)` returns the current/ancestor context wrapped in `Optional`, but it throws if `levelUp` is negative or the ancestor does not exist.
+`runAsync(action)` schedules an action through the effective scheduler for the current context. `findAncestor(levelUp)` returns the current/ancestor context wrapped in `Optional`; it throws if `levelUp` is negative and returns `Optional.empty()` if the ancestor does not exist.
+
+### `AsyncScheduler`
+
+```java
+interface AsyncScheduler {
+    CompletableFuture<Result> runAsync(Action action, Context context);
+}
+```
+
+Advanced SPI for custom `Parallel` subtree scheduling. Implementations must complete the returned future with the scheduled action result or complete it exceptionally.
 
 ### `Result`
 
@@ -135,6 +156,14 @@ Results form a tree that mirrors the action tree. `getRunDuration()` returns the
 
 ```java
 interface Status {
+    static Status staged();
+    static Status pass();
+    static Status skip();
+    static Status skip(String message);
+    static Status failure();
+    static Status failure(Throwable throwable);
+    static Status failure(String message);
+
     boolean isStaged();
     boolean isPass();
     boolean isFailure();
@@ -145,7 +174,7 @@ interface Status {
 }
 ```
 
-Display names: `STAGED`, `PASS`, `FAIL`, `SKIP`. Use `isFailure()` (not `isFail()`).
+Display names: `STAGED`, `PASS`, `FAIL`, `SKIP`. Use `isFailure()` (not `isFail()`). The static factory methods are public API for custom action implementations.
 
 ### `Store`
 
@@ -251,15 +280,20 @@ Four overloads. No `ClassLoader`, `Predicate`, or `Composition` parameters. Disc
 
 ```java
 final class Configuration {
+    static final String CONFIG_FILE_NAME = "paramixel.properties";
     static final String RUNNER_PARALLELISM = "paramixel.parallelism";
     static final String FAILURE_ON_SKIP = "paramixel.failureOnSkip";
     static final String PACKAGE_MATCH = "paramixel.match.package";
     static final String CLASS_MATCH = "paramixel.match.class";
     static final String TAG_MATCH = "paramixel.match.tag";
+    static final String REPORT_FILE = "paramixel.report.file";
+    static final String REPORT_FORMAT = "paramixel.report.format"; // deprecated
 
     static Map<String, String> classpathProperties();
+    static Map<String, String> classpathProperties(ClassLoader classLoader);
     static Map<String, String> systemProperties();
     static Map<String, String> defaultProperties();
+    static Map<String, String> defaultProperties(ClassLoader classLoader);
 }
 ```
 
@@ -301,7 +335,6 @@ All in `org.paramixel.core.exception`:
 | `FailException` | Signal action failure |
 | `SkipException` | Signal action skip |
 | `CycleDetectedException` | Action graph contains a parent-child cycle |
-| `DeadlockDetected` | Potential thread-starvation deadlock detected |
 | `ConfigurationException` | Invalid configuration |
 | `ResolverException` | Action discovery/resolution failure |
 
@@ -311,17 +344,17 @@ All in `org.paramixel.core.action`:
 
 | Class | Extends | Description |
 |---|---|---|
-| `Direct` | `AbstractAction` | Execute a callback |
-| `Noop` | `AbstractAction` | Do nothing and pass |
-| `Container` | `AbstractAction` | Ordered composition with optional setup, teardown, and policy |
-| `Parallel` | `AbstractAction` | Concurrent execution |
+| `Direct` | `AbstractAction` | Final action that executes a callback |
+| `Noop` | `AbstractAction` | Final action that does nothing and passes |
+| `Container` | `AbstractAction` | Final action for ordered composition with optional setup, teardown, and policy |
+| `Parallel` | `AbstractAction` | Final action for concurrent execution |
 
 Executable and composition actions expose one-shot builders that require a name up front and validate method arguments immediately:
 
 ```java
 Direct.builder(String name).execute(Direct.Executable executable).build();
 Container.builder(String name).before(Action before).child(Action child).after(Action after).build();
-Parallel.builder(String name).parallelism(int parallelism).executorService(ExecutorService executorService).child(Action child).build();
+Parallel.builder(String name).parallelism(int parallelism).scheduler(AsyncScheduler scheduler).child(Action child).build();
 ```
 
 `Noop.of(...)` remains the compact factory for no-op actions.

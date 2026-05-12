@@ -194,7 +194,12 @@ import org.paramixel.core.exception.SkipException;
 New exceptions in `org.paramixel.core.exception`:
 
 - `CycleDetectedException` — thrown by `CycleDetector`
-- `DeadlockDetected` — thrown by `DeadlockDetector`
+
+## Scheduler API changes
+
+The current unreleased API removes raw executor service customization from `Runner`, `Parallel`, and `Context`.
+
+Use `Context.runAsync(action)` when an action needs to schedule additional work. Use `Parallel.builder(name).scheduler(asyncScheduler)` only when a `Parallel` subtree needs custom scheduling semantics.
 
 ## Factory class
 

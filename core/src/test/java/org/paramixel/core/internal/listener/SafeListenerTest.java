@@ -25,6 +25,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.opentest4j.AssertionFailedError;
 import org.paramixel.core.Action;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
@@ -173,8 +174,8 @@ class SafeListenerTest {
     }
 
     @Test
-    @DisplayName("rethrows custom Error subclass")
-    void rethrowsCustomErrorSubclass() {
+    @DisplayName("suppresses custom Error subclass and allows run to continue")
+    void suppressesCustomErrorSubclass() {
         class CustomError extends Error {
             CustomError(String message) {
                 super(message);
@@ -192,9 +193,9 @@ class SafeListenerTest {
         org.paramixel.core.action.Noop noop = org.paramixel.core.action.Noop.of("test");
         Runner runner = Runner.builder().listener(safeListener).build();
 
-        assertThatThrownBy(() -> runner.run(noop))
-                .isInstanceOf(CustomError.class)
-                .hasMessage("custom error");
+        Result runResult = runner.run(noop);
+
+        assertThat(runResult.getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -276,8 +277,8 @@ class SafeListenerTest {
     }
 
     @Test
-    @DisplayName("rethrows ThreadDeath")
-    void rethrowsThreadDeath() {
+    @DisplayName("suppresses ThreadDeath and allows run to continue")
+    void suppressesThreadDeath() {
         Listener throwingListener = new Listener() {
             @Override
             public void beforeAction(Result result) {
@@ -289,7 +290,9 @@ class SafeListenerTest {
         org.paramixel.core.action.Noop noop = org.paramixel.core.action.Noop.of("test");
         Runner runner = Runner.builder().listener(safeListener).build();
 
-        assertThatThrownBy(() -> runner.run(noop)).isInstanceOf(ThreadDeath.class);
+        Result runResult = runner.run(noop);
+
+        assertThat(runResult.getStatus().isPass()).isTrue();
     }
 
     @Test
@@ -400,6 +403,25 @@ class SafeListenerTest {
 
         String errOutput = errContent.toString(StandardCharsets.UTF_8);
         assertThat(errOutput).contains("Listener.runCompleted threw exception: report write failed");
+    }
+
+    @Test
+    @DisplayName("suppresses AssertionError from listener and allows run to continue")
+    void suppressesAssertionErrorFromListener() {
+        Listener throwingListener = new Listener() {
+            @Override
+            public void afterAction(Result result) {
+                throw new AssertionFailedError("expected true but was false");
+            }
+        };
+
+        SafeListener safeListener = new SafeListener(throwingListener);
+        org.paramixel.core.action.Noop noop = org.paramixel.core.action.Noop.of("test");
+        Runner runner = Runner.builder().listener(safeListener).build();
+
+        Result runResult = runner.run(noop);
+
+        assertThat(runResult.getStatus().isPass()).isTrue();
     }
 
     @Test

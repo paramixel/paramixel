@@ -47,8 +47,12 @@ import org.paramixel.gradle.internal.ConfigurationBuilder;
  */
 public abstract class ParamixelTestTask extends DefaultTask {
 
-    /** Creates a Paramixel test task. */
-    public ParamixelTestTask() {}
+    /**
+     * Creates a Paramixel test task.
+     */
+    public ParamixelTestTask() {
+        // Intentionally empty
+    }
 
     /**
      * Returns whether Paramixel test execution is skipped entirely.
@@ -149,10 +153,12 @@ public abstract class ParamixelTestTask extends DefaultTask {
         try (URLClassLoader testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
 
+            var failureOnSkip = getFailureOnSkip();
+
             Map<String, String> configuration = ConfigurationBuilder.buildConfiguration(
                     testClassLoader,
                     getParallelism(),
-                    getFailureOnSkip(),
+                    failureOnSkip,
                     getMatchPackage(),
                     getMatchClass(),
                     getMatchTag(),
@@ -175,8 +181,8 @@ public abstract class ParamixelTestTask extends DefaultTask {
 
                 Result result = runner.run(optionalAction.get());
 
-                if (result.getStatus().isFailure()
-                        || (result.getStatus().isSkip() && getFailureOnSkip().get())) {
+                var status = result.getStatus();
+                if (status.isFailure() || (status.isSkip() && failureOnSkip.get())) {
                     throw new GradleException("TESTS FAILED");
                 }
             }
@@ -190,7 +196,7 @@ public abstract class ParamixelTestTask extends DefaultTask {
     }
 
     private URLClassLoader buildTestClassLoader() throws Exception {
-        List<URL> urls = new ArrayList<>();
+        var urls = new ArrayList<URL>();
         for (File file : getTestClasspath().getFiles()) {
             urls.add(file.toURI().toURL());
         }

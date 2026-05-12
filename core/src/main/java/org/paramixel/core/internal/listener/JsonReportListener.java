@@ -17,20 +17,11 @@
 package org.paramixel.core.internal.listener;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Objects;
-import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.Status;
 import org.paramixel.core.Version;
-import org.paramixel.core.internal.TildePathExpander;
-import org.paramixel.core.support.Arguments;
 
 /**
  * Writes a JSON end-of-run summary report to a configured file.
@@ -40,9 +31,7 @@ import org.paramixel.core.support.Arguments;
  * fields. Time values are expressed as whole milliseconds. Exception values are formatted as
  * {@code ExceptionClass: message}.
  */
-public class JsonReportListener implements Listener {
-
-    private final Path reportFile;
+public class JsonReportListener extends AbstractReportFileListener {
 
     /**
      * Creates a JSON report listener for the supplied file.
@@ -50,34 +39,29 @@ public class JsonReportListener implements Listener {
      * @param reportFile the file that will contain the generated report
      */
     public JsonReportListener(final String reportFile) {
-        Objects.requireNonNull(reportFile, "reportFile must not be null");
-        Arguments.requireNonBlank(reportFile, "reportFile must not be blank");
-        this.reportFile = TildePathExpander.expand(reportFile);
+        super(reportFile);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public void runCompleted(Runner runner, Result result) {
-        Objects.requireNonNull(runner, "runner must not be null");
-        Objects.requireNonNull(result, "result must not be null");
+    protected void writeReport(Writer writer, Runner runner, Result result) throws IOException {
+        writer.write("{\n");
+        writer.write("  \"version\": \"");
+        writer.write(Listeners.escapeJson(Version.getVersion()));
+        writer.write("\",\n");
+        writer.write("  \"result\": ");
+        writeResult(writer, result, 1);
+        writer.write("\n}\n");
+    }
 
-        try {
-            Path parent = reportFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-
-            try (Writer writer = Files.newBufferedWriter(reportFile, StandardCharsets.UTF_8)) {
-                writer.write("{\n");
-                writer.write("  \"version\": \"");
-                writer.write(escapeJson(Version.getVersion()));
-                writer.write("\",\n");
-                writer.write("  \"result\": ");
-                writeResult(writer, result, 1);
-                writer.write("\n}\n");
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to write JSON report file: " + reportFile, e);
-        }
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected String formatName() {
+        return "JSON";
     }
 
     private void writeResult(Writer writer, Result result, int indent) throws IOException {
@@ -86,16 +70,18 @@ public class JsonReportListener implements Listener {
 
         writer.write(pad + "{\n");
 
+        var action = result.getAction();
         writer.write(padInner + "\"name\": \"");
-        writer.write(escapeJson(result.getAction().getName()));
+        writer.write(Listeners.escapeJson(action.getName()));
         writer.write("\",\n");
 
         writer.write(padInner + "\"kind\": \"");
-        writer.write(escapeJson(formatKind(result)));
+        writer.write(Listeners.escapeJson(Listeners.formatKind(action)));
         writer.write("\",\n");
 
+        var status = result.getStatus();
         writer.write(padInner + "\"status\": \"");
-        writer.write(formatStatus(result.getStatus()));
+        writer.write(Listeners.formatStatus(status));
         writer.write("\",\n");
 
         writer.write(padInner + "\"runDuration\": ");
@@ -103,11 +89,11 @@ public class JsonReportListener implements Listener {
         writer.write(",\n");
 
         writer.write(padInner + "\"message\": ");
-        writeNullableString(writer, result.getStatus().getMessage().orElse(null));
+        writeNullableString(writer, status.getMessage().orElse(null));
         writer.write(",\n");
 
         writer.write(padInner + "\"exception\": ");
-        writeNullableString(writer, formatException(result.getStatus()));
+        writeNullableString(writer, Listeners.formatException(status));
         writer.write(",\n");
 
         List<Result> children = result.getChildren();
@@ -136,63 +122,8 @@ public class JsonReportListener implements Listener {
             writer.write("null");
         } else {
             writer.write("\"");
-            writer.write(escapeJson(value));
+            writer.write(Listeners.escapeJson(value));
             writer.write("\"");
         }
-    }
-
-    private static String formatStatus(Status status) {
-        if (status.isStaged()) {
-            return "STAGED";
-        } else if (status.isPass()) {
-            return "PASS";
-        } else if (status.isFailure()) {
-            return "FAIL";
-        } else {
-            return "SKIP";
-        }
-    }
-
-    private static String formatKind(Result result) {
-        Class<?> actionClass = result.getAction().getClass();
-        if ("org.paramixel.core.action".equals(actionClass.getPackageName())) {
-            return actionClass.getSimpleName();
-        }
-        return actionClass.getName();
-    }
-
-    private static String formatException(Status status) {
-        if (status.isFailure()) {
-            return status.getThrowable()
-                    .map(f -> f.getClass().getSimpleName() + ": " + f.getMessage())
-                    .or(() -> status.getMessage())
-                    .orElse(null);
-        }
-        return null;
-    }
-
-    private static String escapeJson(String value) {
-        if (value == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder(value.length());
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
-                    if (c < ' ') {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-                }
-            }
-        }
-        return sb.toString();
     }
 }

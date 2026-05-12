@@ -22,12 +22,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.paramixel.core.internal.UnrecoverableErrors;
 
 /**
  * Collects cleanup callbacks and executes them later in forward or reverse order.
  *
  * <p>This utility is intended for resource teardown flows where callers want to register cleanup work incrementally
  * and then either inspect failures with {@link CleanupResult} or rethrow them with {@link #runAndThrow()}.
+ *
+ * <p>This class is <strong>not thread-safe</strong>. Instances must not be shared across threads
+ * or accessed concurrently. Typical usage confines a {@code Cleanup} instance to a single
+ * lifecycle method pair such as {@code before}/{@code after}.
  */
 public class Cleanup {
 
@@ -35,10 +40,14 @@ public class Cleanup {
      * Defines the execution order for registered cleanup callbacks.
      */
     public enum Mode {
-        /** Execute callbacks in the order they were registered. */
+        /**
+         * Execute callbacks in the order they were registered.
+         */
         FORWARD,
 
-        /** Execute callbacks in reverse registration order. */
+        /**
+         * Execute callbacks in reverse registration order.
+         */
         REVERSE
     }
 
@@ -217,13 +226,15 @@ public class Cleanup {
     }
 
     /**
-     * Executes all registered callbacks and captures any non-{@link Error} failures.
+     * Executes all registered callbacks and captures any failures that are not
+     * {@link OutOfMemoryError} or {@link StackOverflowError}.
      *
      * <p>Callbacks run in the configured {@link Mode}. Every callback is attempted even when earlier callbacks fail.
      *
      * @return the cleanup result describing per-callback failures
      * @throws IllegalStateException if this cleanup sequence has already run
-     * @throws Error if a callback throws an {@link Error}
+     * @throws OutOfMemoryError if a callback throws an {@code OutOfMemoryError}
+     * @throws StackOverflowError if a callback throws a {@code StackOverflowError}
      */
     public CleanupResult run() {
         if (hasRun) {
@@ -238,9 +249,8 @@ public class Cleanup {
         for (int index : indices) {
             try {
                 executables.get(index).run();
-            } catch (Error e) {
-                throw e;
             } catch (Throwable e) {
+                UnrecoverableErrors.rethrowIfUnrecoverable(e);
                 exceptions[index] = e;
             }
         }
@@ -264,13 +274,15 @@ public class Cleanup {
     }
 
     /**
-     * Executes all registered callbacks and rethrows the first non-{@link Error} failure.
+     * Executes all registered callbacks and rethrows the first failure that is not
+     * an {@link OutOfMemoryError} or {@link StackOverflowError}.
      *
      * <p>Later failures are added to the first failure as suppressed exceptions in execution order.
      *
      * @throws Throwable the first captured callback failure, with later failures suppressed
      * @throws IllegalStateException if this cleanup sequence has already run
-     * @throws Error if a callback throws an {@link Error}
+     * @throws OutOfMemoryError if a callback throws an {@code OutOfMemoryError}
+     * @throws StackOverflowError if a callback throws a {@code StackOverflowError}
      */
     public void runAndThrow() throws Throwable {
         CleanupResult result = run();

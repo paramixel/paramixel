@@ -18,13 +18,15 @@ package org.paramixel.core.action;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
+import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.internal.DefaultResult;
 import org.paramixel.core.internal.DefaultStatus;
 
 /**
- * An action that always passes and performs no work.
+ * An action that always passes and performs no work. Useful as a placeholder or fixture in action hierarchies.
  */
 public final class Noop extends AbstractAction {
 
@@ -39,16 +41,19 @@ public final class Noop extends AbstractAction {
      * @return a new no-op action
      */
     public static Noop of(String name) {
-        Noop instance = new Noop(name);
+        var instance = new Noop(name);
         instance.initialize();
         return instance;
     }
 
     @Override
-    protected Result skipSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
-        result.setStatus(DefaultStatus.SKIP);
-        result.setRunDuration(Duration.ZERO);
+    public Result skip(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
+        result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
         return result;
     }
@@ -60,13 +65,17 @@ public final class Noop extends AbstractAction {
      * @return the execution result
      */
     @Override
-    protected Result executeSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
-        context.getListener().beforeAction(result);
+    public Result execute(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
+        var listener = context.getListener();
+        listener.beforeAction(result);
         Instant start = Instant.now();
-        result.setStatus(DefaultStatus.PASS);
-        result.setRunDuration(Duration.between(start, Instant.now()));
-        context.getListener().afterAction(result);
+        result.complete(DefaultStatus.PASS, Duration.between(start, Instant.now()));
+        listener.afterAction(result);
         return result;
     }
 }

@@ -20,7 +20,9 @@ import org.paramixel.core.action.Noop;
 
 public final class ResolverMultiTagFixture {
 
-    private ResolverMultiTagFixture() {}
+    private ResolverMultiTagFixture() {
+        // Intentionally empty
+    }
 
     @Paramixel.ActionFactory
     @Paramixel.Tag("smoke-fast")

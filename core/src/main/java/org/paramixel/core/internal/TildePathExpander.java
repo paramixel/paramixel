@@ -22,6 +22,7 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -44,13 +45,15 @@ import org.paramixel.core.support.Arguments;
  */
 public class TildePathExpander {
 
-    private static final String OS_NAME = System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT);
+    private static final String OS_NAME = System.getProperty("os.name").toLowerCase(Locale.ROOT);
     private static final boolean IS_WINDOWS = OS_NAME.contains("win");
     private static final boolean IS_MAC = OS_NAME.contains("mac");
     private static final long PROCESS_TIMEOUT_SECONDS = 5;
     private static final Pattern USER_PATTERN = Pattern.compile("^~([^/]+)(/.*)?$");
 
-    private TildePathExpander() {}
+    private TildePathExpander() {
+        // Intentionally empty
+    }
 
     /**
      * Expands a tilde-prefixed path to an absolute path.
@@ -130,7 +133,7 @@ public class TildePathExpander {
                 return null;
             }
 
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
 
                 String line = reader.readLine();
 
@@ -176,7 +179,7 @@ public class TildePathExpander {
                 return null;
             }
 
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
 
                 String line = reader.readLine();
 

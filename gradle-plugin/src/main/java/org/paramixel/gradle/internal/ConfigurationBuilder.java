@@ -35,7 +35,9 @@ import org.paramixel.core.Configuration;
  */
 public final class ConfigurationBuilder {
 
-    private ConfigurationBuilder() {}
+    private ConfigurationBuilder() {
+        // Intentionally empty
+    }
 
     /**
      * Builds the effective Paramixel configuration map by merging classpath defaults and task properties.
@@ -63,29 +65,32 @@ public final class ConfigurationBuilder {
             Property<String> matchClass,
             Property<String> matchTag,
             Property<String> reportFile) {
-        Map<String, String> config = new LinkedHashMap<>(Configuration.classpathProperties(classLoader));
-        config.putIfAbsent(
+        var configuration = new LinkedHashMap<String, String>(Configuration.classpathProperties(classLoader));
+        configuration.putIfAbsent(
                 Configuration.RUNNER_PARALLELISM, String.valueOf(Runtime.getRuntime().availableProcessors()));
 
         if (parallelism.isPresent()) {
-            config.put(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism.get()));
+            configuration.put(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism.get()));
         }
         if (failureOnSkip.isPresent()) {
-            config.put(Configuration.FAILURE_ON_SKIP, String.valueOf(failureOnSkip.get()));
+            configuration.put(Configuration.FAILURE_ON_SKIP, String.valueOf(failureOnSkip.get()));
         }
         if (matchPackage.isPresent()) {
-            config.put(Configuration.PACKAGE_MATCH, matchPackage.get());
+            configuration.put(Configuration.PACKAGE_MATCH, matchPackage.get());
         }
         if (matchClass.isPresent()) {
-            config.put(Configuration.CLASS_MATCH, matchClass.get());
+            configuration.put(Configuration.CLASS_MATCH, matchClass.get());
         }
         if (matchTag.isPresent()) {
-            config.put(Configuration.TAG_MATCH, matchTag.get());
+            configuration.put(Configuration.TAG_MATCH, matchTag.get());
         }
-        if (reportFile.isPresent() && !reportFile.get().isBlank()) {
-            config.put(Configuration.REPORT_FILE, reportFile.get());
+        if (reportFile.isPresent()) {
+            var reportFilePath = reportFile.get();
+            if (!reportFilePath.isBlank()) {
+                configuration.put(Configuration.REPORT_FILE, reportFilePath);
+            }
         }
 
-        return config;
+        return configuration;
     }
 }

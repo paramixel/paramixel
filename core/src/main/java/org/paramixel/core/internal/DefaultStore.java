@@ -42,7 +42,9 @@ public final class DefaultStore implements Store {
     /**
      * Creates a new empty store.
      */
-    public DefaultStore() {}
+    public DefaultStore() {
+        // Intentionally empty
+    }
 
     private final ConcurrentMap<String, Value> delegate = new ConcurrentHashMap<>();
 

@@ -20,7 +20,9 @@ import org.paramixel.core.action.Noop;
 
 public final class ResolverSmokeFixture {
 
-    private ResolverSmokeFixture() {}
+    private ResolverSmokeFixture() {
+        // Intentionally empty
+    }
 
     @Paramixel.ActionFactory
     @Paramixel.Tag("smoke")

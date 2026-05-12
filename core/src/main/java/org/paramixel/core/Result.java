@@ -25,13 +25,13 @@ import org.paramixel.core.internal.DefaultResult;
 /**
  * Describes the outcome of executing an {@link Action}.
  *
- * <p>A {@code Result} records the action that was executed, its final {@link Status}, run duration, and any nested
+ * <p>A {@link Result} records the action that was executed, its final {@link Status}, run duration, and any nested
  * child results produced by composed actions.
  */
 public interface Result {
 
     /**
-     * Creates a staged result for the supplied action.
+     * Produces a result indicating that the action has not yet been executed.
      *
      * @param action the action represented by the result
      * @return a staged result
@@ -41,7 +41,7 @@ public interface Result {
     }
 
     /**
-     * Creates a passing result for the supplied action.
+     * Produces a result indicating that the action completed successfully.
      *
      * @param action the action represented by the result
      * @return a passing result
@@ -51,7 +51,7 @@ public interface Result {
     }
 
     /**
-     * Creates a skipped result for the supplied action.
+     * Produces a result indicating that the action was skipped.
      *
      * @param action the action represented by the result
      * @return a skipped result
@@ -61,7 +61,7 @@ public interface Result {
     }
 
     /**
-     * Creates a failed result for the supplied action and throwable.
+     * Produces a result indicating that the action failed with the supplied throwable.
      *
      * @param action the action represented by the result
      * @param throwable the failure throwable
@@ -91,7 +91,10 @@ public interface Result {
     /**
      * Returns the child results produced under this result.
      *
-     * @return the child results in implementation-defined order
+     * <p>For container actions, children are in declaration order. For parallel actions, children are in completion
+     * order. The returned list is immutable.
+     *
+     * @return the child results
      */
     List<Result> getChildren();
 
@@ -119,7 +122,7 @@ public interface Result {
     Duration getRunDuration();
 
     /**
-     * Builder for simple public {@link Result} construction.
+     * Builds a {@link Result} with explicit status, duration, and children.
      */
     final class Builder {
 
@@ -127,7 +130,7 @@ public interface Result {
         private boolean built;
 
         private Builder(Action action) {
-            result = new DefaultResult(action);
+            result = new DefaultResult(Objects.requireNonNull(action, "action must not be null"));
         }
 
         /**

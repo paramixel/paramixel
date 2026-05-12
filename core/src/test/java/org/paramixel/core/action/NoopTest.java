@@ -45,4 +45,24 @@ class NoopTest {
         assertThatThrownBy(() -> Noop.of(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> Noop.of(" ")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("execute rejects null context")
+    void executeRejectsNullContext() {
+        Noop action = Noop.of("noop");
+
+        assertThatThrownBy(() -> action.execute(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("context must not be null");
+    }
+
+    @Test
+    @DisplayName("skip rejects null context")
+    void skipRejectsNullContext() {
+        Noop action = Noop.of("noop");
+
+        assertThatThrownBy(() -> action.skip(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("context must not be null");
+    }
 }

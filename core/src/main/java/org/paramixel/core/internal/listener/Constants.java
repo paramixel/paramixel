@@ -25,19 +25,27 @@ import org.paramixel.core.support.AnsiColor;
 public class Constants {
 
     /**
-     * Colored prefix used for built-in Paramixel console output lines.
+     * Colored prefix used for ANSI-enabled Paramixel console output lines.
      */
-    public static final String PARAMIXEL = "[" + AnsiColor.BOLD_BLUE_TEXT.format("PARAMIXEL") + "] ";
+    public static final String PARAMIXEL_ANSI = "[" + AnsiColor.BOLD_BLUE_TEXT.format("PARAMIXEL") + "] ";
 
     /**
      * Plain-text prefix used for non-ANSI Paramixel output lines.
      */
-    public static final String PARAMIXEL_PLAN = "[PARAMIXEL] ";
+    public static final String PARAMIXEL_PLAIN = "[PARAMIXEL] ";
+
+    /**
+     * Package prefix for built-in action types. Actions in this package or any of its subpackages are displayed by
+     * simple class name rather than fully qualified name in console output and reports.
+     */
+    public static final String ACTION_PACKAGE_PREFIX = "org.paramixel.core.action";
 
     /**
      * Name used for the synthetic root action created by the resolver.
      */
     public static final String ROOT_NAME = "Paramixel v" + Version.getVersion();
 
-    private Constants() {}
+    private Constants() {
+        // Intentionally empty
+    }
 }

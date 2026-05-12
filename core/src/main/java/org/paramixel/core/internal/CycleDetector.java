@@ -20,7 +20,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.IdentityHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -42,7 +41,9 @@ public final class CycleDetector {
     /**
      * Creates a new cycle detector.
      */
-    public CycleDetector() {}
+    public CycleDetector() {
+        // Intentionally empty
+    }
 
     /**
      * Validates that the supplied root action and all descendants form an acyclic graph.
@@ -83,7 +84,7 @@ public final class CycleDetector {
     }
 
     private String buildCycleMessage(Action repeatedAction) {
-        List<Action> cycle = new ArrayList<>();
+        var cycle = new ArrayList<Action>();
         boolean collecting = false;
         for (Action action : path) {
             if (action == repeatedAction) {

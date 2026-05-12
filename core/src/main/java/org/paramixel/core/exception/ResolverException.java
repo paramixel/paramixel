@@ -17,6 +17,7 @@
 package org.paramixel.core.exception;
 
 import java.util.Objects;
+import org.paramixel.core.support.Arguments;
 
 /**
  * Indicates that action discovery or action-factory resolution failed.
@@ -40,9 +41,11 @@ public final class ResolverException extends RuntimeException {
      * @param message the exception message
      * @return a new resolver exception
      * @throws NullPointerException if {@code message} is {@code null}
+     * @throws IllegalArgumentException if {@code message} is blank
      */
     public static ResolverException of(String message) {
         Objects.requireNonNull(message, "message must not be null");
+        Arguments.requireNonBlank(message, "message must not be blank");
         return new ResolverException(message);
     }
 
@@ -53,9 +56,11 @@ public final class ResolverException extends RuntimeException {
      * @param cause the underlying cause
      * @return a new resolver exception
      * @throws NullPointerException if {@code message} or {@code cause} is {@code null}
+     * @throws IllegalArgumentException if {@code message} is blank
      */
     public static ResolverException of(String message, Throwable cause) {
         Objects.requireNonNull(message, "message must not be null");
+        Arguments.requireNonBlank(message, "message must not be blank");
         Objects.requireNonNull(cause, "cause must not be null");
         return new ResolverException(message, cause);
     }

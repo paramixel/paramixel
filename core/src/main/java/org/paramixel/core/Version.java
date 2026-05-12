@@ -41,7 +41,9 @@ public final class Version {
 
     private static final String VERSION = loadVersion();
 
-    private Version() {}
+    private Version() {
+        // Intentionally empty
+    }
 
     /**
      * Returns the Paramixel version.
@@ -57,7 +59,7 @@ public final class Version {
         if (inputStream == null) {
             return UNKNOWN;
         }
-        Properties properties = new Properties();
+        var properties = new Properties();
         try (inputStream) {
             properties.load(inputStream);
         } catch (IOException e) {

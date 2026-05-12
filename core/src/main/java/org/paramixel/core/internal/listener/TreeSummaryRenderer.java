@@ -17,13 +17,13 @@
 package org.paramixel.core.internal.listener;
 
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Status;
-import org.paramixel.core.support.AnsiColor;
 
 /**
  * Renders a tree-style summary that preserves action nesting.
@@ -32,7 +32,7 @@ import org.paramixel.core.support.AnsiColor;
  */
 public class TreeSummaryRenderer implements SummaryRenderer {
 
-    private final PrintStream out;
+    private final PrintWriter out;
 
     private final boolean ansiEnabled;
 
@@ -45,6 +45,29 @@ public class TreeSummaryRenderer implements SummaryRenderer {
         this.out = null;
         this.ansiEnabled = true;
         this.prefixEnabled = true;
+    }
+
+    /**
+     * Creates a tree summary renderer for the supplied destination.
+     *
+     * @param out the output writer used for rendered summary lines
+     * @param ansiEnabled whether ANSI formatting should be used
+     */
+    public TreeSummaryRenderer(final PrintWriter out, final boolean ansiEnabled) {
+        this(out, ansiEnabled, true);
+    }
+
+    /**
+     * Creates a tree summary renderer for the supplied destination.
+     *
+     * @param out the output writer used for rendered summary lines
+     * @param ansiEnabled whether ANSI formatting should be used
+     * @param prefixEnabled whether the {@code [PARAMIXEL]} prefix should be prepended to each line
+     */
+    public TreeSummaryRenderer(final PrintWriter out, final boolean ansiEnabled, final boolean prefixEnabled) {
+        this.out = Objects.requireNonNull(out, "out must not be null");
+        this.ansiEnabled = ansiEnabled;
+        this.prefixEnabled = prefixEnabled;
     }
 
     /**
@@ -65,67 +88,59 @@ public class TreeSummaryRenderer implements SummaryRenderer {
      * @param prefixEnabled whether the {@code [PARAMIXEL]} prefix should be prepended to each line
      */
     public TreeSummaryRenderer(final PrintStream out, final boolean ansiEnabled, final boolean prefixEnabled) {
-        this.out = Objects.requireNonNull(out, "out must not be null");
+        this.out = new PrintWriter(Objects.requireNonNull(out, "out must not be null"), true);
         this.ansiEnabled = ansiEnabled;
         this.prefixEnabled = prefixEnabled;
     }
 
-    private PrintStream out() {
-        return out == null ? System.out : out;
+    private PrintWriter out() {
+        return out == null ? new PrintWriter(System.out, true) : out;
     }
 
     @Override
     public void renderSummary(Runner runner, Result result) {
         Objects.requireNonNull(runner, "runner must not be null");
         Objects.requireNonNull(result, "result must not be null");
-        renderTree(result, "", true);
+        String linePrefix = prefixEnabled ? (ansiEnabled ? Constants.PARAMIXEL_ANSI : Constants.PARAMIXEL_PLAIN) : "";
+        renderTree(result, "", true, linePrefix);
     }
 
-    private void renderTree(Result result, String prefix, boolean isLast) {
+    private void renderTree(Result result, String prefix, boolean isLast, String linePrefix) {
         String status = formatStatus(result.getStatus());
         String actionName = result.getAction().getName();
-        String kind = formatKind(result.getAction());
+        String kind = Listeners.formatKind(result.getAction());
         String timing = formatTiming(result.getRunDuration());
         String failureInfo = formatFailureInfo(result.getStatus());
 
         String connector = isLast ? "└─ " : "├─ ";
         String line = prefix + connector + status + " " + actionName + " (" + kind + ") " + timing + failureInfo;
-        String linePrefix = prefixEnabled ? (ansiEnabled ? Constants.PARAMIXEL : Constants.PARAMIXEL_PLAN) : "";
-        out().println(linePrefix + line);
+        var writer = out();
+        writer.println(linePrefix + line);
 
         List<Result> children = result.getChildren();
         if (!children.isEmpty()) {
             String childPrefix = prefix + (isLast ? "   " : "│  ");
             for (int i = 0; i < children.size(); i++) {
-                renderTree(children.get(i), childPrefix, i == children.size() - 1);
+                renderTree(children.get(i), childPrefix, i == children.size() - 1, linePrefix);
             }
         }
     }
 
     private String formatStatus(Status status) {
         Objects.requireNonNull(status, "status must not be null");
-        if (!ansiEnabled) {
-            return status.isStaged() ? "STAGED" : status.isPass() ? "PASS" : status.isFailure() ? "FAIL" : "SKIP";
-        }
-        if (status.isStaged()) {
-            return AnsiColor.BOLD_GRAY_TEXT.format("STAGED");
-        } else if (status.isPass()) {
-            return AnsiColor.BOLD_GREEN_TEXT.format("PASS");
-        } else if (status.isFailure()) {
-            return AnsiColor.BOLD_RED_TEXT.format("FAIL");
-        } else {
-            return AnsiColor.BOLD_ORANGE_TEXT.format("SKIP");
-        }
+        return ansiEnabled ? Listeners.formatAnsiStatus(status) : Listeners.formatStatus(status);
     }
 
     private String formatFailureInfo(Status status) {
         if (status.isFailure()) {
             return status.getThrowable()
-                    .map(f -> " → " + f.getClass().getSimpleName() + ": " + f.getMessage())
-                    .or(() -> status.getMessage().map(m -> " → " + m))
+                    .map(f -> " → " + f.getClass().getName() + ": " + Listeners.sanitizeMessage(f.getMessage()))
+                    .or(() -> status.getMessage().map(m -> " → " + Listeners.sanitizeMessage(m)))
                     .orElse("");
         } else if (status.isSkip()) {
-            return status.getMessage().map(reason -> " → " + reason).orElse("");
+            return status.getMessage()
+                    .map(reason -> " → " + Listeners.sanitizeMessage(reason))
+                    .orElse("");
         } else {
             return "";
         }
@@ -134,13 +149,5 @@ public class TreeSummaryRenderer implements SummaryRenderer {
     private String formatTiming(Duration timing) {
         Objects.requireNonNull(timing, "timing must not be null");
         return timing.toMillis() + " ms";
-    }
-
-    private String formatKind(org.paramixel.core.Action action) {
-        Class<?> actionClass = action.getClass();
-        if ("org.paramixel.core.action".equals(actionClass.getPackageName())) {
-            return actionClass.getSimpleName();
-        }
-        return actionClass.getName();
     }
 }

@@ -19,19 +19,22 @@ package org.paramixel.core;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
 import org.paramixel.core.internal.DefaultRunner;
 
 /**
  * Executes Paramixel actions.
  *
- * <p>A {@code Runner} is the main entry point for launching an {@link Action} tree. It holds the effective
+ * <p>A {@link Runner} is the main entry point for launching an {@link Action} tree. It holds the effective
  * configuration and the {@link Listener} used for lifecycle notifications.
  *
  * <p>Runners implement {@link AutoCloseable}. When used in try-with-resources, {@link #close()} cascades to the
  * listener, releasing any resources it holds.
  *
- * @apiNote Use {@link #builder()} to customize configuration, listeners, or the executor service used during a run.
+ * <p>Action tree execution is not designed for concurrent use across runner instances. Each action tree should be
+ * executed by a single runner at a time; concurrent invocation of {@link #run(Action)} across different runner
+ * instances operating on the same or overlapping action trees is not supported.
+ *
+ * @apiNote Use {@link #builder()} to customize configuration or listeners used during a run.
  */
 public interface Runner extends AutoCloseable {
 
@@ -92,10 +95,11 @@ public interface Runner extends AutoCloseable {
         Result result = run(action);
         boolean failureOnSkip =
                 Boolean.parseBoolean(getConfiguration().getOrDefault(Configuration.FAILURE_ON_SKIP, "false"));
-        if (result.getStatus().isPass()) {
+        var status = result.getStatus();
+        if (status.isPass()) {
             return 0;
         }
-        if (result.getStatus().isSkip() && !failureOnSkip) {
+        if (status.isSkip() && !failureOnSkip) {
             return 0;
         }
         return 1;
@@ -118,10 +122,11 @@ public interface Runner extends AutoCloseable {
         Result result = optionalResult.get();
         boolean failureOnSkip =
                 Boolean.parseBoolean(getConfiguration().getOrDefault(Configuration.FAILURE_ON_SKIP, "false"));
-        if (result.getStatus().isPass()) {
+        var status = result.getStatus();
+        if (status.isPass()) {
             return 0;
         }
-        if (result.getStatus().isSkip() && !failureOnSkip) {
+        if (status.isSkip() && !failureOnSkip) {
             return 0;
         }
         return 1;
@@ -160,7 +165,9 @@ public interface Runner extends AutoCloseable {
      * its listener so that listeners holding resources are cleaned up when the runner is used in try-with-resources.
      */
     @Override
-    default void close() {}
+    default void close() {
+        // Intentionally empty
+    }
 
     /**
      * Fluent builder for {@link Runner} instances.
@@ -172,10 +179,11 @@ public interface Runner extends AutoCloseable {
 
         private Map<String, String> configuration;
         private Listener listener = Factory.defaultListener();
-        private ExecutorService executorService;
         private boolean built;
 
-        private Builder() {}
+        private Builder() {
+            // Intentionally empty
+        }
 
         /**
          * Sets the configuration map to use for the runner.
@@ -208,22 +216,6 @@ public interface Runner extends AutoCloseable {
         }
 
         /**
-         * Sets an external executor service for runner-managed work.
-         *
-         * <p>When supplied, the runner reuses this executor service instead of creating its own primary executor.
-         *
-         * @param executorService the executor service to use
-         * @return this builder
-         * @throws NullPointerException if {@code executorService} is {@code null}
-         * @throws IllegalStateException if this builder has already been built
-         */
-        public Builder executorService(ExecutorService executorService) {
-            ensureNotBuilt();
-            this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
-            return this;
-        }
-
-        /**
          * Builds a new {@link Runner} instance.
          *
          * @return a new runner
@@ -232,7 +224,7 @@ public interface Runner extends AutoCloseable {
         public Runner build() {
             ensureNotBuilt();
             built = true;
-            return new DefaultRunner(configuration, listener, executorService);
+            return new DefaultRunner(configuration, listener);
         }
 
         private void ensureNotBuilt() {

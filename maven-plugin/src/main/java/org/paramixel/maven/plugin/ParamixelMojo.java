@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.Supplier;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -67,18 +65,28 @@ import org.paramixel.core.support.Arguments;
         threadSafe = true)
 public class ParamixelMojo extends AbstractMojo {
 
-    /** Creates a Paramixel mojo. */
-    public ParamixelMojo() {}
+    /**
+     * Creates a Paramixel mojo.
+     */
+    public ParamixelMojo() {
+        // Intentionally empty
+    }
 
-    /** The Maven project being built. */
+    /**
+     * The Maven project being built.
+     */
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
 
-    /** When {@code true}, skip Paramixel test execution entirely. */
+    /**
+     * When {@code true}, skip Paramixel test execution entirely.
+     */
     @Parameter(property = "paramixel.skipTests", defaultValue = "false")
     private boolean skipTests;
 
-    /** When {@code true}, fail the build when no action factories are discovered. */
+    /**
+     * When {@code true}, fail the build when no action factories are discovered.
+     */
     @Parameter(property = "paramixel.failIfNoTests", defaultValue = "false")
     private boolean failIfNoTests;
 
@@ -88,7 +96,9 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(property = "paramixel.failureOnSkip", defaultValue = "false")
     private boolean failureOnSkip;
 
-    /** The file path for the per-run summary report. */
+    /**
+     * The file path for the per-run summary report.
+     */
     @Parameter(property = "paramixel.report.file")
     private String reportFile;
 
@@ -102,7 +112,9 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter(property = "paramixel.report.format")
     private String reportFormat;
 
-    /** Additional Paramixel configuration properties declared in the POM. */
+    /**
+     * Additional Paramixel configuration properties declared in the POM.
+     */
     @Parameter
     private List<Property> properties;
 
@@ -139,7 +151,8 @@ public class ParamixelMojo extends AbstractMojo {
 
                 Action action = optionalAction.get();
                 Result result = runner.run(action);
-                if (result.getStatus().isFailure() || (result.getStatus().isSkip() && failureOnSkip)) {
+                var status = result.getStatus();
+                if (status.isFailure() || (status.isSkip() && failureOnSkip)) {
                     throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                 }
             }
@@ -157,8 +170,7 @@ public class ParamixelMojo extends AbstractMojo {
     }
 
     private Map<String, String> buildConfiguration(ClassLoader classLoader) throws MojoExecutionException {
-        Map<String, String> configuration =
-                new LinkedHashMap<>(withContextClassLoader(classLoader, Configuration::defaultProperties));
+        var configuration = new LinkedHashMap<String, String>(Configuration.defaultProperties(classLoader));
         putIfNotBlank(configuration, Configuration.REPORT_FILE, reportFile);
         putDeprecatedReportFormatIfNotBlank(configuration, reportFormat);
 
@@ -176,7 +188,7 @@ public class ParamixelMojo extends AbstractMojo {
 
         // POM <properties> override file/defaults but not system properties
         if (properties != null) {
-            Set<String> seenKeys = new LinkedHashSet<>();
+            var seenKeys = new LinkedHashSet<String>();
             for (Property property : properties) {
                 String key = property.getKey();
                 String value = property.getValue();
@@ -235,28 +247,15 @@ public class ParamixelMojo extends AbstractMojo {
         }
     }
 
-    private static <T> T withContextClassLoader(ClassLoader classLoader, Supplier<T> supplier) {
-        Objects.requireNonNull(classLoader, "classLoader must not be null");
-        Objects.requireNonNull(supplier, "supplier must not be null");
-
-        Thread currentThread = Thread.currentThread();
-        ClassLoader originalClassLoader = currentThread.getContextClassLoader();
-        currentThread.setContextClassLoader(classLoader);
-        try {
-            return supplier.get();
-        } finally {
-            currentThread.setContextClassLoader(originalClassLoader);
-        }
-    }
-
     private URLClassLoader buildTestClassLoader() throws MojoExecutionException {
         final List<URL> classpathUrls = buildTestClasspathUrls();
-        final URL[] urls = new URL[classpathUrls.size()];
+        final var urls = new URL[classpathUrls.size()];
         for (int i = 0; i < classpathUrls.size(); i++) {
+            var classpathUrl = classpathUrls.get(i);
             try {
-                urls[i] = new File(classpathUrls.get(i).toURI()).toURI().toURL();
+                urls[i] = new File(classpathUrl.toURI()).toURI().toURL();
             } catch (Exception e) {
-                throw new MojoExecutionException("Failed to convert classpath URL: " + classpathUrls.get(i), e);
+                throw new MojoExecutionException("Failed to convert classpath URL: " + classpathUrl, e);
             }
         }
         return new URLClassLoader(urls, getClass().getClassLoader());
@@ -267,9 +266,9 @@ public class ParamixelMojo extends AbstractMojo {
         if (build == null) {
             throw new MojoExecutionException("Project build information is not available");
         }
-        final File testClassesDir = new File(build.getTestOutputDirectory());
-        final File classesDir = new File(build.getOutputDirectory());
-        final Set<URL> classpathUrls = new LinkedHashSet<>();
+        final var testClassesDir = new File(build.getTestOutputDirectory());
+        final var classesDir = new File(build.getOutputDirectory());
+        final var classpathUrls = new LinkedHashSet<URL>();
 
         try {
             if (testClassesDir.exists()) {
@@ -308,8 +307,12 @@ public class ParamixelMojo extends AbstractMojo {
 
         private String value;
 
-        /** Creates a property instance. */
-        public Property() {}
+        /**
+         * Creates a property instance.
+         */
+        public Property() {
+            // Intentionally empty
+        }
 
         /**
          * Returns the configuration property key.

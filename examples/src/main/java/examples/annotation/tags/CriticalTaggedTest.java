@@ -22,7 +22,9 @@ import org.paramixel.core.action.Noop;
 
 public final class CriticalTaggedTest {
 
-    private CriticalTaggedTest() {}
+    private CriticalTaggedTest() {
+        // Intentionally empty
+    }
 
     @Paramixel.ActionFactory
     @Paramixel.Tag("smoke-fast")

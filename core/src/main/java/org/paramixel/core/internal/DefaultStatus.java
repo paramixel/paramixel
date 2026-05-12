@@ -38,16 +38,24 @@ public final class DefaultStatus implements Status {
      */
     public enum Kind {
 
-        /** Action has been staged but not yet executed. Display name: "STAGED". */
+        /**
+         * Action has been staged but not yet executed. Display name: "STAGED".
+         */
         STAGED,
 
-        /** Action completed successfully. Display name: "PASS". */
+        /**
+         * Action completed successfully. Display name: "PASS".
+         */
         PASS,
 
-        /** Action completed with a failure. Display name: "FAIL" (intentionally truncated for readability). */
+        /**
+         * Action completed with a failure. Display name: "FAIL" (intentionally truncated for readability).
+         */
         FAILURE,
 
-        /** Action was skipped. Display name: "SKIP". */
+        /**
+         * Action was skipped. Display name: "SKIP".
+         */
         SKIP
     }
 
@@ -189,5 +197,23 @@ public final class DefaultStatus implements Status {
     @Override
     public String toString() {
         return getDisplayName();
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) {
+            return true;
+        }
+        if (!(object instanceof DefaultStatus other)) {
+            return false;
+        }
+        return kind == other.kind
+                && Objects.equals(message, other.message)
+                && Objects.equals(throwable, other.throwable);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(kind, message, throwable);
     }
 }

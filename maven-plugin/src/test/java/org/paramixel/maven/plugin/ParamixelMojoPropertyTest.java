@@ -169,7 +169,7 @@ class ParamixelMojoPropertyTest {
 
             var mojo = new ParamixelMojo();
 
-            try (URLClassLoader classLoader = new URLClassLoader(
+            try (var classLoader = new URLClassLoader(
                     new URL[] {tempDir.toUri().toURL()}, getClass().getClassLoader())) {
                 var configuration = invokeBuildConfiguration(mojo, classLoader);
 

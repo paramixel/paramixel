@@ -28,6 +28,7 @@ const sidebars = {
         'usage/listener',
         'usage/reporting',
         'usage/cleanup',
+        'usage/retry',
         'usage/maven-plugin',
         'usage/gradle-plugin',
         'usage/integration-testing',

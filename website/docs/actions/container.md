@@ -49,7 +49,7 @@ Defaults:
 
 `OrderMode.DECLARED` uses builder order.
 
-`OrderMode.SHUFFLED` shuffles body children before execution. `seed(long)` makes the shuffle deterministic and requires `SHUFFLED`.
+`OrderMode.SHUFFLED` shuffles body children before execution. `seed(long)` makes the shuffle deterministic when `SHUFFLED` is used; the seed is accepted but has no effect for `DECLARED` ordering.
 
 ## Example with static action methods
 

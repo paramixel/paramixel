@@ -20,7 +20,9 @@ import org.paramixel.core.Selector;
 
 public final class TaggedSelectorExample {
 
-    private TaggedSelectorExample() {}
+    private TaggedSelectorExample() {
+        // Intentionally empty
+    }
 
     public static Selector smokeSelector() {
         return Selector.builder()

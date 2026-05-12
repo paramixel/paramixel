@@ -14,7 +14,7 @@ Annotation-based frameworks force you to express test logic through declarations
 **Key Benefits:**
 - **Composable action trees built with code** — setup/teardown, sequential and parallel children compose to arbitrary depth, making test topology explicit
 - **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) instead of declarative annotations
-- **Guaranteed teardown** — cleanup always runs on every node, even on failure or skip; teardown errors are attached as suppressed exceptions, following try-with-resources semantics
+- **Explicit teardown** — configured `after` actions run even when setup or body actions fail or skip; `Cleanup.runAndThrow()` can aggregate teardown failures with suppressed exceptions
 - **Parallel execution at any depth** — embed parallel children anywhere in the tree with per-node parallelism control
 - **Fail-fast or run-all semantics** — choose per-node whether children stop on first failure or run all regardless
 - **Write custom actions** — implement your own execution semantics; custom actions compose alongside built-in primitives with zero framework changes
@@ -147,7 +147,7 @@ See the [`examples/`](examples/src/main/java/examples/) module for more examples
 
 ### Run from the Console
 
-Each test class has a `main` method and can be run directly from an IDE or console.
+Most test classes have a `main` method and can be run directly from an IDE or console.
 
 You can create a `__ParamixelRunner__` in a package to run all tests in that package and its subpackages from a single entry point. See [`__ParamixelRunner__.java`](examples/src/main/java/examples/__ParamixelRunner__.java) for an example.
 

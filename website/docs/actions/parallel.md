@@ -35,8 +35,8 @@ public class MyTest {
 Optional settings:
 
 - `.contextMode(Action.ContextMode mode)` controls the parallel action's own context scope.
-- `.parallelism(int)` limits concurrent children.
-- `.executorService(ExecutorService)` uses a caller-owned executor.
+- `.parallelism(int)` limits concurrent direct children for this `Parallel` node.
+- `.scheduler(AsyncScheduler)` executes this `Parallel` subtree with a custom scheduler.
 
 `Parallel` passes its effective context directly to children; each child applies its own `Action.ContextMode`.
 
@@ -46,45 +46,64 @@ When shared context is used with parallel children, store map operations are thr
 
 ```java
 Parallel.builder(String name)
+        .contextMode(Action.ContextMode mode) // optional
         .parallelism(int parallelism) // optional
-        .executorService(ExecutorService executorService) // optional
+        .scheduler(AsyncScheduler scheduler) // optional
         .child(Action child)
         .build()
 ```
 
-Builders require a name up front, validate method arguments immediately, and are one-shot. The builder can combine `parallelism(...)` and `executorService(...)` for a node-local limit on a dedicated executor.
+Builders require a name up front, validate method arguments immediately, and are one-shot.
 
 ## Semantics
 
-- children are submitted concurrently
-- the action waits for all children to finish
+- children are scheduled concurrently
+- the action waits for all admitted children to finish
 - parent status is computed from child results
-- when `parallelism` is provided, a semaphore limits concurrent children inside this node
+- `Parallel.parallelism` limits concurrent direct children inside this node
+- `paramixel.parallelism` limits global worker concurrency for the default scheduler
 
-`Parallel` uses an `ExecutorService`.
+Nested `Parallel` trees do not require deadlock workarounds. The default scheduler owns worker execution and can continue other ready work while a `Parallel` has queued direct children.
 
-If no executor is supplied directly to the action, it uses `context.getExecutorService()`.
+## Custom Scheduler
 
-## Custom executor ownership
+`Parallel.builder(...).scheduler(...)` is an advanced extension point. It replaces the scheduler for that `Parallel` subtree only.
 
-If you pass an `ExecutorService` to `Parallel.builder(...).executorService(...)`, Paramixel uses it but does not manage its lifecycle for you.
+The custom scheduler receives each direct child admitted by the `Parallel` node. Any descendant call to `Context.runAsync(...)` also uses the custom scheduler while executing inside that subtree.
 
-## Runner executor ownership
+Custom schedulers must return a `CompletableFuture<Result>` and must complete that future with the scheduled action's result or complete it exceptionally.
 
-When no `ExecutorService` is supplied to `Runner.builder()`, each `run()` call creates two thread pools:
+```java
+public final class MyScheduler implements AsyncScheduler {
 
-1. **Runner pool** — used for top-level `Parallel` tasks (threads named `paramixel-runner-N`)
-2. **Parallel pool** — used for nested `Parallel` tasks using the default executor (threads named `paramixel-parallel-N`)
+    @Override
+    public CompletableFuture<Result> runAsync(Action action, Context context) {
+        try {
+            return CompletableFuture.completedFuture(action.execute(context));
+        } catch (Throwable throwable) {
+            return CompletableFuture.failedFuture(throwable);
+        }
+    }
+}
+```
 
-Both pools are shut down when `run()` completes. A `Runner` can be called multiple times; each call gets fresh pools.
+Use it from a `Parallel` builder:
 
-When `Runner.builder().executorService(myPool)` is used:
+```java
+private static final AsyncScheduler scheduler = new MyScheduler();
 
-- `myPool` is used for top-level action dispatch
-- The parallel pool is still created and managed per `run()` call
-- `myPool` is **never** shut down by the runner — you control its lifecycle
+@Paramixel.ActionFactory
+public static Action actionFactory() {
+    return Parallel.builder("tests")
+            .scheduler(scheduler)
+            .parallelism(2)
+            .child(a())
+            .child(b())
+            .build();
+}
+```
 
-## Pre-execution validation
+## Pre-execution Validation
 
 `DefaultRunner` validates the action tree for structural problems before execution begins.
 
@@ -96,128 +115,18 @@ When `Runner.builder().executorService(myPool)` is used:
 CycleDetectedException: Cycle detected in action graph: actionA[id1] -> actionB[id2] -> actionA[id1]
 ```
 
-### Deadlock detection
-
-`DeadlockDetector` detects nested `Parallel` configurations that would cause thread starvation.
-
-```java
-// This throws DeadlockDetected when paramixel.parallelism=1:
-public class DangerTest {
-
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        Action leaf1 = leaf1();
-        Action leaf2 = leaf2();
-
-        Action parallelC = Parallel.builder("C")
-                .child(leaf1)
-                .child(leaf2)
-                .build();
-
-        Action parallelB = Parallel.builder("B")
-                .child(parallelC)
-                .build();
-
-        return Parallel.builder("A")
-                .child(parallelB)
-                .build();
-    }
-
-    private static Action leaf1() {
-        return Direct.builder("leaf1").execute(ctx -> {}).build();
-    }
-
-    private static Action leaf2() {
-        return Direct.builder("leaf2").execute(ctx -> {}).build();
-    }
-}
-
-Runner.builder()
-    .configuration(Map.of("paramixel.parallelism", "1"))
-    .build()
-    .run(DangerTest.actionFactory()); // throws DeadlockDetected
-```
-
-### The fix
-
-There are two ways to resolve this:
-
-1. **Supply dedicated executors** to inner `Parallel` actions (preferred for fine-grained control):
-
-```java
-public class SafeTest {
-
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        Action leaf1 = leaf1();
-        Action leaf2 = leaf2();
-
-        Action parallelC = Parallel.builder("C")
-                .child(leaf1)
-                .child(leaf2)
-                .build();
-
-        Action parallelB = Parallel.builder("B")
-                .executorService(innerEs)
-                .child(parallelC)
-                .build();
-
-        return Parallel.builder("A")
-                .child(parallelB)
-                .build();
-    }
-
-    private static Action leaf1() {
-        return Direct.builder("leaf1").execute(ctx -> {}).build();
-    }
-
-    private static Action leaf2() {
-        return Direct.builder("leaf2").execute(ctx -> {}).build();
-    }
-}
-```
-
-2. **Increase `paramixel.parallelism`** to match the nesting depth:
-
-```java
-Runner.builder()
-    .configuration(Map.of("paramixel.parallelism", "2"))
-    .build()
-    .run(danger); // safe with 2 threads
-```
-
-### When detection resets
-
-Detection resets the depth counter at any `Parallel` node that has a custom `ExecutorService`, because custom executors provide their own thread pool and do not contend for shared pool threads.
-
-## RoutingExecutorService
-
-Internally, `DefaultRunner` uses a `RoutingExecutorService` that routes submitted tasks between two delegate executor services based on execution depth:
-
-- Depth 0 (root level) → runner executor service
-- Depth > 0 (nested parallel) → parallel executor service
-
-This prevents thread starvation in typical nested `Parallel` configurations without requiring users to supply custom executors.
-
-## Interrupt handling
-
-If the executing thread is interrupted during concurrency semaphore acquisition, the `Parallel` action transitions to a `FAIL` result with the `InterruptedException` as the cause, fires `afterAction`, and then re-interrupts the thread before re-throwing a `RuntimeException` wrapping the cause. This ensures the lifecycle contract (result transitions to a terminal state and `afterAction` is always invoked) is honored even under interrupt conditions.
-
 ## Examples
 
-### Default executor
+### Default scheduler
 
 ```java
 public class MyTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        Action a = a();
-        Action b = b();
-
         return Parallel.builder("tests")
-                .child(aAction)
-                .child(bAction)
+                .child(a())
+                .child(b())
                 .build();
     }
 
@@ -238,15 +147,11 @@ public class MyTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
-        Action a = a();
-        Action b = b();
-        Action c = c();
-
         return Parallel.builder("tests")
                 .parallelism(2)
-                .child(aAction)
-                .child(bAction)
-                .child(cAction)
+                .child(a())
+                .child(b())
+                .child(c())
                 .build();
     }
 
@@ -260,65 +165,6 @@ public class MyTest {
 
     private static Action c() {
         return Direct.builder("c").execute(context -> {}).build();
-    }
-}
-```
-
-### Custom executor
-
-```java
-public class MyTest {
-
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(4);
-
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        Action a = a();
-        Action b = b();
-
-        return Parallel.builder("tests")
-                .executorService(executorService)
-                .child(aAction)
-                .child(bAction)
-                .build();
-    }
-
-    private static Action a() {
-        return Direct.builder("a").execute(context -> {}).build();
-    }
-
-    private static Action b() {
-        return Direct.builder("b").execute(context -> {}).build();
-    }
-}
-```
-
-### Builder with custom executor and limit
-
-```java
-public class MyTest {
-
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(4);
-
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        Action a = a();
-        Action b = b();
-
-        return Parallel.builder("tests")
-                .executorService(executorService)
-                .parallelism(2)
-                .child(aAction)
-                .child(bAction)
-                .build();
-    }
-
-    private static Action a() {
-        return Direct.builder("a").execute(context -> {}).build();
-    }
-
-    private static Action b() {
-        return Direct.builder("b").execute(context -> {}).build();
     }
 }
 ```

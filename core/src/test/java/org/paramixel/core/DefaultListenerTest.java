@@ -22,10 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Direct;
@@ -42,7 +39,11 @@ class DefaultListenerTest {
         Listener listener = Factory.defaultListener();
         Direct.Executable executable = context -> {};
         Action action = Direct.builder("direct").execute(executable).build();
-        Context context = new DefaultContext(Configuration.defaultProperties(), listener, directExecutorService());
+        Context context = new DefaultContext(
+                Configuration.defaultProperties(),
+                listener,
+                (scheduledAction, scheduledContext) ->
+                        CompletableFuture.completedFuture(scheduledAction.execute(scheduledContext)));
         DefaultResult result = new DefaultResult(action);
         result.setStatus(DefaultStatus.PASS);
         result.setRunDuration(Duration.ZERO);
@@ -59,42 +60,5 @@ class DefaultListenerTest {
         }
 
         assertThat(output.toString(StandardCharsets.UTF_8)).contains("direct").contains("PASS");
-    }
-
-    private static ExecutorService directExecutorService() {
-        return new AbstractExecutorService() {
-            private boolean shutdown;
-
-            @Override
-            public void shutdown() {
-                shutdown = true;
-            }
-
-            @Override
-            public List<Runnable> shutdownNow() {
-                shutdown = true;
-                return List.of();
-            }
-
-            @Override
-            public boolean isShutdown() {
-                return shutdown;
-            }
-
-            @Override
-            public boolean isTerminated() {
-                return shutdown;
-            }
-
-            @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit) {
-                return shutdown;
-            }
-
-            @Override
-            public void execute(Runnable command) {
-                command.run();
-            }
-        };
     }
 }

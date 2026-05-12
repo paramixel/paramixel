@@ -17,20 +17,11 @@
 package org.paramixel.core.internal.listener;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Objects;
-import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.Status;
 import org.paramixel.core.Version;
-import org.paramixel.core.internal.TildePathExpander;
-import org.paramixel.core.support.Arguments;
 
 /**
  * Writes a self-contained HTML end-of-run summary report to a configured file.
@@ -39,14 +30,14 @@ import org.paramixel.core.support.Arguments;
  * to the viewer as a JavaScript object with a {@code version} field and a {@code results} array containing the root
  * result. Time values are expressed as whole milliseconds.
  */
-public class HtmlReportListener implements Listener {
+public class HtmlReportListener extends AbstractReportFileListener {
 
     private static final String TEMPLATE_PREFIX = """
             <!DOCTYPE html>
-            <html lang=\"en\">
+            <html lang="en">
             <head>
-            <meta charset=\"UTF-8\">
-            <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Paramixel Report</title>
             <style>
             *{margin:0;padding:0;box-sizing:border-box}
@@ -89,19 +80,19 @@ public class HtmlReportListener implements Listener {
             </style>
             </head>
             <body>
-            <div class=\"header\">
+            <div class="header">
               <h1>Paramixel Report</h1>
-              <div class=\"version\" id=\"version\"></div>
+              <div class="version" id="version"></div>
             </div>
-            <div class=\"summary\" id=\"summary\"></div>
-            <div class=\"toolbar\">
-              <input type=\"text\" id=\"search\" placeholder=\"Filter actions by name...\" autocomplete=\"off\">
-              <button onclick=\"expandAll()\">Expand All</button>
-              <button onclick=\"collapseAll()\">Collapse All</button>
-              <button onclick=\"expandFailures()\">Expand Failures</button>
-              <span class=\"stat\" id=\"filterStat\"></span>
+            <div class="summary" id="summary"></div>
+            <div class="toolbar">
+              <input type="text" id="search" placeholder="Filter actions by name..." autocomplete="off">
+              <button onclick="expandAll()">Expand All</button>
+              <button onclick="collapseAll()">Collapse All</button>
+              <button onclick="expandFailures()">Expand Failures</button>
+              <span class="stat" id="filterStat"></span>
             </div>
-            <div class=\"tree-container\" id=\"tree\"></div>
+            <div class="tree-container" id="tree"></div>
             <script>
             const DATA = """;
 
@@ -123,12 +114,12 @@ public class HtmlReportListener implements Listener {
 
             function esc(s) {
               if (!s) return '';
-              return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');
+              return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             }
 
             function statusBadge(st) {
               const cls = st === 'PASS' ? 'badge-pass' : st === 'FAIL' ? 'badge-fail' : st === 'SKIP' ? 'badge-skip' : 'badge-pass';
-              return '<span class=\"badge ' + cls + '\">' + st + '</span>';
+              return '<span class="badge ' + cls + '">' + st + '</span>';
             }
 
             function countAll(nodes) {
@@ -147,10 +138,10 @@ public class HtmlReportListener implements Listener {
               const s = countAll(DATA.results);
               document.getElementById('version').textContent = 'Version: ' + (DATA.version || 'N/A');
               document.getElementById('summary').innerHTML =
-                '<div class=\"summary-card\"><div class=\"label label-black\">Actions Passed</div><div class=\"value pass\">' + s.pass + '</div></div>' +
-                '<div class=\"summary-card\"><div class=\"label label-black\">Actions Failed</div><div class=\"value fail\">' + s.fail + '</div></div>' +
-                '<div class=\"summary-card\"><div class=\"label label-black\">Actions Skipped</div><div class=\"value skip\">' + s.skip + '</div></div>' +
-                '<div class=\"summary-card\"><div class=\"label\">Total Time</div><div class=\"value\">' + fmt(s.totalTime) + '</div></div>';
+                '<div class="summary-card"><div class="label label-black">Actions Passed</div><div class="value pass">' + s.pass + '</div></div>' +
+                '<div class="summary-card"><div class="label label-black">Actions Failed</div><div class="value fail">' + s.fail + '</div></div>' +
+                '<div class="summary-card"><div class="label label-black">Actions Skipped</div><div class="value skip">' + s.skip + '</div></div>' +
+                '<div class="summary-card"><div class="label">Total Time</div><div class="value">' + fmt(s.totalTime) + '</div></div>';
             }
 
             function matches(node, q) {
@@ -168,17 +159,17 @@ public class HtmlReportListener implements Listener {
               const exp = q !== '' || isRoot;
               let ch = '';
               if (has) {
-                ch = '<div class=\"children' + (exp ? '' : ' collapsed') + '\" id=\"ch-' + node._id + '\">';
+                ch = '<div class="children' + (exp ? '' : ' collapsed') + '" id="ch-' + node._id + '">';
                 node.children.forEach(c => { ch += renderNode(c, false, q); });
                 ch += '</div>';
               }
-              return '<div class=\"tree-node' + (isRoot ? ' root' : '') + '\" data-id=\"' + node._id + '\">' +
-                '<div class=\"node-header\" onclick=\"tog(this)\">' +
-                '<span class=\"toggle ' + (exp ? 'expanded ' : '') + (has ? '' : 'leaf') + '\">&#9654;</span>' +
-                '<span class=\"node-name' + (has ? ' suite-name' : '') + '\">' + esc(node.name) + '</span>' +
+              return '<div class="tree-node' + (isRoot ? ' root' : '') + '" data-id="' + node._id + '">' +
+                '<div class="node-header" onclick="tog(this)">' +
+                '<span class="toggle ' + (exp ? 'expanded ' : '') + (has ? '' : 'leaf') + '">&#9654;</span>' +
+                '<span class="node-name' + (has ? ' suite-name' : '') + '">' + esc(node.name) + '</span>' +
                 statusBadge(node.status) +
-                '<span class=\"badge kind-badge\">' + esc(node.kind) + '</span>' +
-                '<span class=\"time-badge\">' + fmt(node.runDuration) + '</span>' +
+                '<span class="badge kind-badge">' + esc(node.kind) + '</span>' +
+                '<span class="time-badge">' + fmt(node.runDuration) + '</span>' +
                 '</div>' + ch + '</div>';
             }
 
@@ -221,7 +212,7 @@ public class HtmlReportListener implements Listener {
               function walk(nodes) {
                 nodes.forEach(n => {
                   if (n.status === 'FAIL') {
-                    var el = document.querySelector('.tree-node[data-id=\"' + n._id + '\"]');
+                    var el = document.querySelector('.tree-node[data-id="' + n._id + '"]');
                     while (el) {
                       var header = el.querySelector(':scope > .node-header');
                       var toggle = header ? header.querySelector('.toggle:not(.leaf)') : null;
@@ -250,45 +241,38 @@ public class HtmlReportListener implements Listener {
             </html>
             """;
 
-    private final Path reportFile;
-
     /**
      * Creates an HTML report listener for the supplied file.
      *
      * @param reportFile the file that will contain the generated report
      */
     public HtmlReportListener(final String reportFile) {
-        Objects.requireNonNull(reportFile, "reportFile must not be null");
-        Arguments.requireNonBlank(reportFile, "reportFile must not be blank");
-        this.reportFile = TildePathExpander.expand(reportFile);
+        super(reportFile);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public void runCompleted(Runner runner, Result result) {
-        Objects.requireNonNull(runner, "runner must not be null");
-        Objects.requireNonNull(result, "result must not be null");
+    protected void writeReport(Writer writer, Runner runner, Result result) throws IOException {
+        writer.write(TEMPLATE_PREFIX);
+        writer.write(" ");
+        writeReportData(writer, result);
+        writer.write(TEMPLATE_SUFFIX);
+    }
 
-        try {
-            Path parent = reportFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-
-            try (Writer writer = Files.newBufferedWriter(reportFile, StandardCharsets.UTF_8)) {
-                writer.write(TEMPLATE_PREFIX);
-                writer.write(" ");
-                writeReportData(writer, result);
-                writer.write(TEMPLATE_SUFFIX);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to write HTML report file: " + reportFile, e);
-        }
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected String formatName() {
+        return "HTML";
     }
 
     private void writeReportData(Writer writer, Result result) throws IOException {
         writer.write("{\n");
         writer.write("  \"version\": \"");
-        writer.write(escapeJson(Version.getVersion()));
+        writer.write(Listeners.escapeJson(Version.getVersion()));
         writer.write("\",\n");
         writer.write("  \"results\": [\n");
         writeResult(writer, result, 2);
@@ -302,16 +286,18 @@ public class HtmlReportListener implements Listener {
 
         writer.write(pad + "{\n");
 
+        var action = result.getAction();
         writer.write(padInner + "\"name\": \"");
-        writer.write(escapeJson(result.getAction().getName()));
+        writer.write(Listeners.escapeJson(action.getName()));
         writer.write("\",\n");
 
         writer.write(padInner + "\"kind\": \"");
-        writer.write(escapeJson(formatKind(result)));
+        writer.write(Listeners.escapeJson(Listeners.formatKind(action)));
         writer.write("\",\n");
 
+        var status = result.getStatus();
         writer.write(padInner + "\"status\": \"");
-        writer.write(formatStatus(result.getStatus()));
+        writer.write(Listeners.formatStatus(status));
         writer.write("\",\n");
 
         writer.write(padInner + "\"runDuration\": ");
@@ -319,11 +305,11 @@ public class HtmlReportListener implements Listener {
         writer.write(",\n");
 
         writer.write(padInner + "\"message\": ");
-        writeNullableString(writer, result.getStatus().getMessage().orElse(null));
+        writeNullableString(writer, status.getMessage().orElse(null));
         writer.write(",\n");
 
         writer.write(padInner + "\"exception\": ");
-        writeNullableString(writer, formatException(result.getStatus()));
+        writeNullableString(writer, Listeners.formatException(status));
         writer.write(",\n");
 
         List<Result> children = result.getChildren();
@@ -352,63 +338,8 @@ public class HtmlReportListener implements Listener {
             writer.write("null");
         } else {
             writer.write("\"");
-            writer.write(escapeJson(value));
+            writer.write(Listeners.escapeJson(value));
             writer.write("\"");
         }
-    }
-
-    private static String formatStatus(Status status) {
-        if (status.isStaged()) {
-            return "STAGED";
-        } else if (status.isPass()) {
-            return "PASS";
-        } else if (status.isFailure()) {
-            return "FAIL";
-        } else {
-            return "SKIP";
-        }
-    }
-
-    private static String formatKind(Result result) {
-        Class<?> actionClass = result.getAction().getClass();
-        if ("org.paramixel.core.action".equals(actionClass.getPackageName())) {
-            return actionClass.getSimpleName();
-        }
-        return actionClass.getName();
-    }
-
-    private static String formatException(Status status) {
-        if (status.isFailure()) {
-            return status.getThrowable()
-                    .map(f -> f.getClass().getSimpleName() + ": " + f.getMessage())
-                    .or(() -> status.getMessage())
-                    .orElse(null);
-        }
-        return null;
-    }
-
-    private static String escapeJson(String value) {
-        if (value == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder(value.length());
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
-                    if (c < ' ') {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-                }
-            }
-        }
-        return sb.toString();
     }
 }

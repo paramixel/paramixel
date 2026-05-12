@@ -25,7 +25,7 @@ import org.paramixel.core.support.Arguments;
  * <p>This exception is used for invalid property values, unreadable configuration resources, and similar
  * configuration-related failures.
  */
-public class ConfigurationException extends RuntimeException {
+public final class ConfigurationException extends RuntimeException {
 
     private ConfigurationException(final String message) {
         super(message);

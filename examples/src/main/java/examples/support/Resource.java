@@ -25,13 +25,15 @@ import java.util.List;
 
 public class Resource {
 
-    private Resource() {}
+    private Resource() {
+        // Intentionally empty
+    }
 
     public static List<String> load(Class<?> clazz, String relativeResourceName) throws IOException {
         String packagePath = clazz.getPackage().getName().replace('.', '/');
 
         try (InputStream in = getInputStream(relativeResourceName, packagePath);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                var reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
 
             return reader.lines()
                     .map(String::trim)
