@@ -27,7 +27,7 @@ import java.util.concurrent.CompletableFuture;
  * {@link Store}. Contexts may be arranged into a parent-child chain so nested actions can create
  * child scopes while still navigating to ancestor stores explicitly.
  *
- * @apiNote Use {@link #createChild()} when an action needs an isolated store while preserving the
+ * <p>Use {@link #createChild()} when an action needs an isolated store while preserving the
  *     same configuration, listener, and scheduler.
  */
 public interface Context {

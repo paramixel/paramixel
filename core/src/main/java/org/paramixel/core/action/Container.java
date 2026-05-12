@@ -94,6 +94,9 @@ public final class Container extends AbstractAction implements CompositeAction {
         /**
          * Compact constructor that rejects null arguments.
          *
+         * @param childMode whether body children continue after failures or skips
+         * @param orderMode the execution order for body children
+         * @param seed the seed used when {@code orderMode} is {@link OrderMode#SHUFFLED}
          * @throws NullPointerException if any argument is null
          */
         public Policy {

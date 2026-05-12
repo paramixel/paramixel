@@ -27,7 +27,7 @@ package org.paramixel.core;
  * listener's resources are released — either by wrapping the runner in try-with-resources or by closing the listener
  * directly.
  *
- * @implSpec Listener implementations should avoid throwing exceptions. The default runner wraps listeners in a safe
+ * <p>Listener implementations should avoid throwing exceptions. The default runner wraps listeners in a safe
  *     adapter when needed so non-{@link Error} throwables are reported instead of aborting the run.
  */
 public interface Listener extends AutoCloseable {

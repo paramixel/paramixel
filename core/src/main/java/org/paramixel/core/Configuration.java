@@ -28,7 +28,7 @@ import org.paramixel.core.internal.DefaultConfiguration;
  *
  * <p>Public API.
  *
- * @apiNote {@link #defaultProperties()} loads classpath properties first, overlays JVM system properties, and then
+ * <p>{@link #defaultProperties()} loads classpath properties first, overlays JVM system properties, and then
  *     applies built-in defaults for any remaining unset keys.
  */
 public class Configuration {

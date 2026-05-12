@@ -26,7 +26,7 @@ package org.paramixel.core;
  * <p>The action instance itself defines execution behavior, while {@link Result} captures the outcome of a specific
  * execution.
  *
- * @implSpec Implementations should return a stable identifier from {@link #getId()} for the lifetime of the action
+ * <p>Implementations should return a stable identifier from {@link #getId()} for the lifetime of the action
  *     instance.
  */
 public interface Action {

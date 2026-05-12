@@ -34,7 +34,7 @@ import org.paramixel.core.internal.DefaultRunner;
  * executed by a single runner at a time; concurrent invocation of {@link #run(Action)} across different runner
  * instances operating on the same or overlapping action trees is not supported.
  *
- * @apiNote Use {@link #builder()} to customize configuration or listeners used during a run.
+ * <p>Use {@link #builder()} to customize configuration or listeners used during a run.
  */
 public interface Runner extends AutoCloseable {
 
