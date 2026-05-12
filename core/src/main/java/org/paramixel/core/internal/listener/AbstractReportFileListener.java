@@ -31,7 +31,7 @@ import org.paramixel.core.support.Arguments;
 
 /**
  * Base class for file-based report listeners that handles directory creation, writer creation, and error wrapping.
- * Subclasses implement {@link #writeReport} to produce report content and {@link #formatName} to identify the
+ * Subclasses implement {@code writeReport} to produce report content and {@code formatName} to identify the
  * report format in error messages.
  */
 abstract class AbstractReportFileListener implements Listener {
@@ -45,7 +45,7 @@ abstract class AbstractReportFileListener implements Listener {
     }
 
     /**
-     * Creates parent directories, opens a UTF-8 buffered writer, delegates to {@link #writeReport}, and wraps
+     * Creates parent directories, opens a UTF-8 buffered writer, delegates to {@code writeReport}, and wraps
      * {@link java.io.IOException} in {@link java.io.UncheckedIOException} on failure.
      */
     @Override

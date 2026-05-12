@@ -30,7 +30,7 @@ import java.util.function.Function;
  * Paramixel-specific API surface that uses {@link String} keys and {@link Value} values
  * throughout.
  *
- * @implSpec Implementations must be thread-safe and must reject {@code null} keys and
+ * <p>Implementations must be thread-safe and must reject {@code null} keys and
  *     {@code null} values.
  */
 public interface Store {
