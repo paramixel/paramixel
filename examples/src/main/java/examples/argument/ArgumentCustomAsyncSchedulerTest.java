@@ -18,21 +18,23 @@ package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.core.Action;
+import org.paramixel.core.AsyncScheduler;
+import org.paramixel.core.Context;
 import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.Result;
 import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Noop;
 import org.paramixel.core.action.Parallel;
 
-public class ArgumentCustomExecutorServiceTest {
+public class ArgumentCustomAsyncSchedulerTest {
 
+    private static final TrackingScheduler SCHEDULER = new TrackingScheduler();
     private static final AtomicInteger INVOCATION_COUNT = new AtomicInteger();
-    private static ExecutorService CUSTOM_EXECUTOR_SERVICE;
 
     public static void main(String[] args) {
         Factory.defaultRunner().runAndExit(actionFactory());
@@ -40,14 +42,13 @@ public class ArgumentCustomExecutorServiceTest {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
+        SCHEDULER.reset();
         INVOCATION_COUNT.set(0);
-        CUSTOM_EXECUTOR_SERVICE = Executors.newFixedThreadPool(4);
 
         Action first = first();
         Action second = second();
         Action third = third();
         Action verify = verify();
-        Action shutdown = shutdown();
 
         Action parallel = parallel(first, second, third);
 
@@ -55,10 +56,9 @@ public class ArgumentCustomExecutorServiceTest {
 
         Action before = before();
 
-        return Container.builder("ArgumentCustomExecutorServiceTest")
+        return Container.builder("ArgumentCustomAsyncSchedulerTest")
                 .before(before)
                 .child(main)
-                .after(shutdown)
                 .build();
     }
 
@@ -70,7 +70,10 @@ public class ArgumentCustomExecutorServiceTest {
 
     private static Action second() {
         return Direct.builder("arg-1")
-                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .execute(context -> {
+                    context.runAsync(Noop.of("nested-async")).join();
+                    INVOCATION_COUNT.incrementAndGet();
+                })
                 .build();
     }
 
@@ -81,18 +84,19 @@ public class ArgumentCustomExecutorServiceTest {
     }
 
     private static Action parallel(Action first, Action second, Action third) {
-        var parallelBuilder = Parallel.builder("parallel-arguments").executorService(CUSTOM_EXECUTOR_SERVICE);
-        parallelBuilder.child(first);
-        parallelBuilder.child(second);
-        parallelBuilder.child(third);
-        return parallelBuilder.build();
+        return Parallel.builder("parallel-arguments")
+                .scheduler(SCHEDULER)
+                .child(first)
+                .child(second)
+                .child(third)
+                .build();
     }
 
     private static Action verify() {
         return Direct.builder("verify")
                 .execute(context -> {
                     assertThat(INVOCATION_COUNT.get()).isEqualTo(3);
-                    assertThat(CUSTOM_EXECUTOR_SERVICE.isShutdown()).isFalse();
+                    assertThat(SCHEDULER.scheduled()).isEqualTo(4);
                 })
                 .build();
     }
@@ -111,27 +115,26 @@ public class ArgumentCustomExecutorServiceTest {
         return Noop.of("before");
     }
 
-    private static Action shutdown() {
-        return Direct.builder("shutdown")
-                .execute(context -> {
-                    CUSTOM_EXECUTOR_SERVICE.shutdown();
-                    int attempts = 0;
-                    int maxAttempts = 6;
-                    boolean terminated = false;
-                    while (!terminated && attempts < maxAttempts) {
-                        try {
-                            terminated =
-                                    CUSTOM_EXECUTOR_SERVICE.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            throw new RuntimeException("Interrupted while waiting for executor shutdown", e);
-                        }
-                        attempts++;
-                    }
-                    assertThat(terminated)
-                            .withFailMessage("Executor did not terminate within %d polls of %ds each", maxAttempts, 5)
-                            .isTrue();
-                })
-                .build();
+    private static final class TrackingScheduler implements AsyncScheduler {
+
+        private final AtomicInteger scheduled = new AtomicInteger();
+
+        @Override
+        public CompletableFuture<Result> runAsync(Action action, Context context) {
+            scheduled.incrementAndGet();
+            try {
+                return CompletableFuture.completedFuture(action.execute(context));
+            } catch (Throwable throwable) {
+                return CompletableFuture.failedFuture(throwable);
+            }
+        }
+
+        private int scheduled() {
+            return scheduled.get();
+        }
+
+        private void reset() {
+            scheduled.set(0);
+        }
     }
 }

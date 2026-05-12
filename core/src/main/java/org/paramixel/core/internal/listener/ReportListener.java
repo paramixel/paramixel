@@ -17,20 +17,13 @@
 package org.paramixel.core.internal.listener;
 
 import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Objects;
-import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.Status;
 import org.paramixel.core.Version;
-import org.paramixel.core.internal.TildePathExpander;
-import org.paramixel.core.support.Arguments;
 import org.paramixel.core.support.ElapsedTimeFormatter;
 
 /**
@@ -39,11 +32,9 @@ import org.paramixel.core.support.ElapsedTimeFormatter;
  * <p>Report output does not include the {@code [PARAMIXEL]} prefix since the destination is a dedicated file rather
  * than the console.
  */
-public class ReportListener implements Listener {
+public class ReportListener extends AbstractReportFileListener {
 
     private static final DateTimeFormatter REPORT_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-    private final Path reportFile;
 
     /**
      * Creates a report listener for the supplied file.
@@ -51,52 +42,38 @@ public class ReportListener implements Listener {
      * @param reportFile the file that will contain the generated report
      */
     public ReportListener(final String reportFile) {
-        Objects.requireNonNull(reportFile, "reportFile must not be null");
-        Arguments.requireNonBlank(reportFile, "reportFile must not be blank");
-        this.reportFile = TildePathExpander.expand(reportFile);
+        super(reportFile);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public void runCompleted(Runner runner, Result result) {
-        Objects.requireNonNull(runner, "runner must not be null");
-        Objects.requireNonNull(result, "result must not be null");
+    protected void writeReport(Writer writer, Runner runner, Result result) throws IOException {
+        var printWriter = new PrintWriter(writer, true);
 
-        try {
-            Path parent = reportFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
+        printWriter.println();
+        var version = Version.getVersion();
+        printWriter.println("Paramixel v" + version);
 
-            try (PrintStream printStream = new PrintStream(Files.newOutputStream(reportFile))) {
-                printStream.println();
-                printStream.println("Paramixel v" + Version.getVersion());
+        new TreeSummaryRenderer(printWriter, false, false).renderSummary(runner, result);
 
-                new TreeSummaryRenderer(printStream, false, false).renderSummary(runner, result);
+        long runDurationMillis = result.getRunDuration().toMillis();
+        String runDurationString = ElapsedTimeFormatter.formatElapsedTime(runDurationMillis);
 
-                long runDurationMillis = result.getRunDuration().toMillis();
-                String runDurationString = ElapsedTimeFormatter.formatElapsedTime(runDurationMillis);
-
-                printStream.println();
-                printStream.println("Paramixel v" + Version.getVersion());
-                printStream.println("Status      : " + formatStatus(result.getStatus()));
-                printStream.println("Finished at : " + LocalDateTime.now().format(REPORT_TIMESTAMP_FORMAT));
-                printStream.println("Total time  : " + runDurationString);
-                printStream.println();
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to write report file: " + reportFile, e);
-        }
+        printWriter.println();
+        printWriter.println("Paramixel v" + version);
+        printWriter.println("Status      : " + Listeners.formatStatus(result.getStatus()));
+        printWriter.println("Finished at : " + LocalDateTime.now().format(REPORT_TIMESTAMP_FORMAT));
+        printWriter.println("Total time  : " + runDurationString);
+        printWriter.println();
     }
 
-    private static String formatStatus(Status status) {
-        if (status.isStaged()) {
-            return "STAGED";
-        } else if (status.isPass()) {
-            return "PASS";
-        } else if (status.isFailure()) {
-            return "FAIL";
-        } else {
-            return "SKIP";
-        }
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected String formatName() {
+        return "";
     }
 }

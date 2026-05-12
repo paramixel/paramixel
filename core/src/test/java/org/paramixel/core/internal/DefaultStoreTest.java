@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Store;
@@ -152,18 +153,30 @@ class DefaultStoreTest {
         assertThatThrownBy(() -> store.replaceAll(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("function must not be null");
+        assertThatThrownBy(() -> store.putIfAbsent(null, Value.of("value")))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.putIfAbsent("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("value must not be null");
+        assertThatThrownBy(() -> store.remove(null, Value.of("value")))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.remove("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("value must not be null");
         assertThatThrownBy(() -> store.replace("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("value must not be null");
+        assertThatThrownBy(() -> store.replace(null, Value.of("value")))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.computeIfAbsent("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("mappingFunction must not be null");
+        assertThatThrownBy(() -> store.computeIfAbsent(null, k -> Value.of("value")))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.computeIfPresent("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("remappingFunction must not be null");
@@ -173,6 +186,9 @@ class DefaultStoreTest {
         assertThatThrownBy(() -> store.merge("key", Value.of("x"), null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("remappingFunction must not be null");
+        assertThatThrownBy(() -> store.merge(null, Value.of("x"), (v1, v2) -> v1))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("key must not be null");
     }
 
     @Test
@@ -634,7 +650,7 @@ class DefaultStoreTest {
         store.put("a", Value.of(1));
         store.put("b", Value.of(2));
 
-        java.util.concurrent.atomic.AtomicInteger count = new java.util.concurrent.atomic.AtomicInteger(0);
+        AtomicInteger count = new AtomicInteger(0);
         store.forEach((k, v) -> count.incrementAndGet());
 
         assertThat(count.get()).isEqualTo(2);

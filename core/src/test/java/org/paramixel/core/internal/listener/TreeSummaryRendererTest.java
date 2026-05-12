@@ -38,10 +38,10 @@ class TreeSummaryRendererTest {
     private static final String ROOT_NAME = Constants.ROOT_NAME;
 
     private String runAndCaptureOutput(Action action) {
-        SummaryListener listener = new SummaryListener(new TreeSummaryRenderer());
+        var listener = new SummaryListener(new TreeSummaryRenderer());
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        var output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
@@ -54,9 +54,9 @@ class TreeSummaryRendererTest {
     }
 
     private String runAndCapturePlainOutput(Action action) {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
-        SummaryListener listener = new SummaryListener(new TreeSummaryRenderer(printStream, false), printStream, false);
+        var output = new ByteArrayOutputStream();
+        var printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        var listener = new SummaryListener(new TreeSummaryRenderer(printStream, false), printStream, false);
         Runner runner = Runner.builder().listener(listener).build();
         runner.run(action);
         return output.toString(StandardCharsets.UTF_8);
@@ -133,13 +133,13 @@ class TreeSummaryRendererTest {
     void plainOutputDisablesAnsiFormatting() {
         String output = runAndCapturePlainOutput(Noop.of("plain"));
 
-        assertThat(output).contains(Constants.PARAMIXEL_PLAN);
+        assertThat(output).contains(Constants.PARAMIXEL_PLAIN);
         assertThat(output).contains("PASS");
         assertThat(output).doesNotContain("\u001B[");
     }
 
     @Test
-    @DisplayName("failure info with throwable shows exception class and message")
+    @DisplayName("failure info with throwable shows fully qualified exception class and message")
     void failureInfoWithThrowable() {
         Action failing = Direct.builder("fail-action")
                 .execute(context -> {
@@ -148,8 +148,36 @@ class TreeSummaryRendererTest {
                 .build();
         String output = runAndCaptureOutput(failing);
 
-        assertThat(output).contains("IllegalStateException");
+        assertThat(output).contains("java.lang.IllegalStateException");
         assertThat(output).contains("bad state");
+    }
+
+    @Test
+    @DisplayName("failure info with multi-line message renders on single line")
+    void failureInfoWithMultiLineMessageRendersOnSingleLine() {
+        Action failing = Direct.builder("multiline-fail")
+                .execute(context -> {
+                    throw new RuntimeException("\nline2\nline3");
+                })
+                .build();
+        String output = runAndCaptureOutput(failing);
+
+        assertThat(output).contains("java.lang.RuntimeException");
+        assertThat(output).contains("line2 line3");
+        assertThat(output).doesNotContain("RuntimeException:\n");
+    }
+
+    @Test
+    @DisplayName("failure info shows fully qualified exception class name")
+    void failureInfoShowsFullyQualifiedExceptionClassName() {
+        Action failing = Direct.builder("fqcn-fail")
+                .execute(context -> {
+                    throw new IllegalStateException("fqcn test");
+                })
+                .build();
+        String output = runAndCaptureOutput(failing);
+
+        assertThat(output).contains("java.lang.IllegalStateException: fqcn test");
     }
 
     @Test
@@ -202,7 +230,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("renderSummary rejects null arguments")
     void renderSummaryRejectsNullArguments() {
-        TreeSummaryRenderer renderer = new TreeSummaryRenderer();
+        var renderer = new TreeSummaryRenderer();
         Runner runner = Runner.builder().build();
         var result = runner.run(Noop.of("test"));
 

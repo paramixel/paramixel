@@ -19,7 +19,7 @@ Add the Paramixel core dependency:
 
 ```xml
 <properties>
-    <paramixel.version>3.0.0</paramixel.version>
+    <paramixel.version><PARAMIXEL_VERSION></paramixel.version>
 </properties>
 
 <dependencies>
@@ -108,11 +108,11 @@ The file extension controls the report format: `.log` and `.txt` write text, `.j
 ## Run directly from `main`
 
 ```java
+import org.paramixel.core.Factory;
 import org.paramixel.core.Runner;
 
 public static void main(String[] args) {
-    Runner runner = Runner.builder().build();
-    Result result = runner.run(actionFactory());
+    Runner runner = Factory.defaultRunner();
     System.exit(runner.runAndReturnExitCode(actionFactory()));
 }
 ```
@@ -127,22 +127,10 @@ if (result.getStatus().isPass()) {
 }
 ```
 
-`Runner.run(Action)` returns a `Result` that you can inspect after execution.
-
-A `Runner` can execute multiple actions. Each `run()` call is independent:
+`Runner.run(Action)` returns a `Result` that you can inspect after execution. Use a fresh runner for each execution boundary:
 
 ```java
-Runner runner = Runner.builder().build();
-Result first  = runner.run(first);
-Result second = runner.run(second);
-// Owned executors are created and shut down per run
-```
-
-When you provide your own `ExecutorService`, the runner uses it but does not manage its lifecycle:
-
-```java
-ExecutorService myPool = Executors.newFixedThreadPool(4);
-Runner runner = Runner.builder().executorService(myPool).build();
-Result result = runner.run(action);
-myPool.shutdown(); // you are responsible for shutting down
+try (Runner runner = Runner.builder().build()) {
+    Result result = runner.run(action);
+}
 ```

@@ -13,7 +13,15 @@ In your `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("org.paramixel") version "3.0.0"
+    id("org.paramixel") version "<PARAMIXEL_VERSION>"
+}
+```
+
+Add `core` to the project's test classpath so test sources can compile against the Paramixel API:
+
+```kotlin
+dependencies {
+    testImplementation("org.paramixel:core:<PARAMIXEL_VERSION>")
 }
 ```
 
@@ -105,10 +113,10 @@ The plugin builds configuration in this order:
 The task builds a test classpath from `testSourceSet.runtimeClasspath` and calls:
 
 ```java
-Resolver.resolveActions(configuration, selector)
+Resolver.resolveActions(configuration)
 ```
 
-Discovered factories are always combined as a `Parallel` root.
+Filtering is supplied through configuration keys such as `paramixel.match.package`, `paramixel.match.class`, and `paramixel.match.tag`. Discovered factories are always combined as a `Parallel` root.
 
 ## Differences from the Maven plugin
 

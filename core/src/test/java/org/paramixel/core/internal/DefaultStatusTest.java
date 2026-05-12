@@ -265,4 +265,83 @@ class DefaultStatusTest {
             assertThat(status.toString()).isEqualTo(status.getDisplayName());
         }
     }
+
+    @Nested
+    @DisplayName("equals and hashCode")
+    class EqualsAndHashCode {
+
+        @Test
+        @DisplayName("equal when kind, message, and throwable match")
+        void equalWhenAllFieldsMatch() {
+            RuntimeException exception = new RuntimeException("error");
+            DefaultStatus a = new DefaultStatus(DefaultStatus.Kind.FAILURE, "msg", exception);
+            DefaultStatus b = new DefaultStatus(DefaultStatus.Kind.FAILURE, "msg", exception);
+            assertThat(a).isEqualTo(b);
+            assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        }
+
+        @Test
+        @DisplayName("not equal when kinds differ")
+        void notEqualWhenKindsDiffer() {
+            DefaultStatus a = new DefaultStatus(DefaultStatus.Kind.PASS);
+            DefaultStatus b = new DefaultStatus(DefaultStatus.Kind.FAILURE);
+            assertThat(a).isNotEqualTo(b);
+        }
+
+        @Test
+        @DisplayName("not equal when messages differ")
+        void notEqualWhenMessagesDiffer() {
+            DefaultStatus a = new DefaultStatus(DefaultStatus.Kind.FAILURE, "msg1");
+            DefaultStatus b = new DefaultStatus(DefaultStatus.Kind.FAILURE, "msg2");
+            assertThat(a).isNotEqualTo(b);
+        }
+
+        @Test
+        @DisplayName("not equal when throwables differ")
+        void notEqualWhenThrowablesDiffer() {
+            DefaultStatus a = new DefaultStatus(DefaultStatus.Kind.FAILURE, new RuntimeException("x"));
+            DefaultStatus b = new DefaultStatus(DefaultStatus.Kind.FAILURE, new RuntimeException("x"));
+            assertThat(a).isNotEqualTo(b);
+        }
+
+        @Test
+        @DisplayName("reflexive")
+        void reflexive() {
+            DefaultStatus status = new DefaultStatus(DefaultStatus.Kind.PASS);
+            assertThat(status).isEqualTo(status);
+        }
+
+        @Test
+        @DisplayName("not equal to null")
+        void notEqualToNull() {
+            DefaultStatus status = new DefaultStatus(DefaultStatus.Kind.PASS);
+            assertThat(status).isNotEqualTo(null);
+        }
+
+        @Test
+        @DisplayName("not equal to different type")
+        void notEqualToDifferentType() {
+            DefaultStatus status = new DefaultStatus(DefaultStatus.Kind.PASS);
+            assertThat(status).isNotEqualTo("PASS");
+        }
+
+        @Test
+        @DisplayName("singleton equals new instance with same kind and null detail")
+        void singletonEqualsNewInstanceWithSameKindAndNullDetail() {
+            assertThat(new DefaultStatus(DefaultStatus.Kind.PASS)).isEqualTo(DefaultStatus.PASS);
+            assertThat(new DefaultStatus(DefaultStatus.Kind.FAILURE)).isEqualTo(DefaultStatus.FAILURE);
+            assertThat(new DefaultStatus(DefaultStatus.Kind.SKIP)).isEqualTo(DefaultStatus.SKIP);
+            assertThat(new DefaultStatus(DefaultStatus.Kind.STAGED)).isEqualTo(DefaultStatus.STAGED);
+        }
+
+        @Test
+        @DisplayName("same status with same throwable is equal")
+        void sameStatusWithSameThrowableIsEqual() {
+            RuntimeException exception = new RuntimeException("error");
+            DefaultStatus a = new DefaultStatus(DefaultStatus.Kind.FAILURE, exception);
+            DefaultStatus b = new DefaultStatus(DefaultStatus.Kind.FAILURE, exception);
+            assertThat(a).isEqualTo(b);
+            assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        }
+    }
 }

@@ -26,6 +26,7 @@ import org.paramixel.core.exception.FailException;
 import org.paramixel.core.exception.SkipException;
 import org.paramixel.core.internal.DefaultResult;
 import org.paramixel.core.internal.DefaultStatus;
+import org.paramixel.core.internal.UnrecoverableErrors;
 import org.paramixel.core.support.Arguments;
 
 /**
@@ -33,11 +34,14 @@ import org.paramixel.core.support.Arguments;
  *
  * <p>{@code Direct} is the simplest executable action type. The supplied {@link Executable} determines the outcome.
  * Throwing {@link SkipException} marks the action as skipped, throwing {@link FailException} marks it as failed, and
- * any other non-{@link Error} throwable is reported to the listener and converted into a failure result.
+ * any other throwable that is not an {@link OutOfMemoryError} or {@link StackOverflowError} is reported to the
+ * listener and converted into a failure result. Unrecoverable errors are rethrown immediately.
  */
-public class Direct extends AbstractAction {
+public final class Direct extends AbstractAction {
 
-    /** The callback executed when this action runs. */
+    /**
+     * The callback executed when this action runs.
+     */
     protected final Executable executable;
 
     /**
@@ -49,7 +53,7 @@ public class Direct extends AbstractAction {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    protected Direct(String name, Executable executable, Action.ContextMode contextMode) {
+    private Direct(String name, Executable executable, Action.ContextMode contextMode) {
         super(contextMode);
         this.name = validateName(name);
         this.executable = Objects.requireNonNull(executable, "executable must not be null");
@@ -66,10 +70,13 @@ public class Direct extends AbstractAction {
     }
 
     @Override
-    protected Result skipSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
-        result.setStatus(DefaultStatus.SKIP);
-        result.setRunDuration(Duration.ZERO);
+    public final Result skip(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
+        result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
         return result;
     }
@@ -95,6 +102,8 @@ public class Direct extends AbstractAction {
          *
          * @param contextMode the context mode
          * @return this builder
+         * @throws NullPointerException if {@code contextMode} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder contextMode(Action.ContextMode contextMode) {
             ensureNotBuilt();
@@ -107,6 +116,8 @@ public class Direct extends AbstractAction {
          *
          * @param executable the callback to execute
          * @return this builder
+         * @throws NullPointerException if {@code executable} is {@code null}
+         * @throws IllegalStateException if this builder has already been built
          */
         public Builder execute(Executable executable) {
             ensureNotBuilt();
@@ -118,6 +129,7 @@ public class Direct extends AbstractAction {
          * Builds a new direct action.
          *
          * @return a new direct action
+         * @throws IllegalStateException if no executable has been set or if this builder has already been built
          */
         public Direct build() {
             ensureNotBuilt();
@@ -125,7 +137,7 @@ public class Direct extends AbstractAction {
             if (executable == null) {
                 throw new IllegalStateException("executable must be configured");
             }
-            Direct instance = new Direct(name, executable, contextMode);
+            var instance = new Direct(name, executable, contextMode);
             instance.initialize();
             return instance;
         }
@@ -138,34 +150,37 @@ public class Direct extends AbstractAction {
     }
 
     /**
-     * Executes the configured callback.
+     * Invokes the configured {@link Executable} callback and maps the outcome to a pass, skip, or failure status.
      *
      * @param context the execution context
      * @return the execution result
      */
     @Override
-    protected Result executeSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
-        context.getListener().beforeAction(result);
+    public final Result execute(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
+        var listener = context.getListener();
+        listener.beforeAction(result);
         Instant start = Instant.now();
         try {
             executable.execute(context);
-            result.setStatus(DefaultStatus.PASS);
-            result.setRunDuration(Duration.between(start, Instant.now()));
+            result.complete(DefaultStatus.PASS, Duration.between(start, Instant.now()));
         } catch (SkipException e) {
-            result.setStatus(new DefaultStatus(DefaultStatus.Kind.SKIP, e.getMessage()));
-            result.setRunDuration(Duration.between(start, Instant.now()));
+            result.complete(
+                    new DefaultStatus(DefaultStatus.Kind.SKIP, e.getMessage()), Duration.between(start, Instant.now()));
         } catch (FailException e) {
-            result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getMessage()));
-            result.setRunDuration(Duration.between(start, Instant.now()));
-        } catch (Error e) {
-            throw e;
+            result.complete(
+                    new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getMessage()),
+                    Duration.between(start, Instant.now()));
         } catch (Throwable t) {
-            context.getListener().actionThrowable(result, t);
-            result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, t));
-            result.setRunDuration(Duration.between(start, Instant.now()));
+            UnrecoverableErrors.rethrowIfUnrecoverable(t);
+            listener.actionThrowable(result, t);
+            result.complete(new DefaultStatus(DefaultStatus.Kind.FAILURE, t), Duration.between(start, Instant.now()));
         }
-        context.getListener().afterAction(result);
+        listener.afterAction(result);
         return result;
     }
 

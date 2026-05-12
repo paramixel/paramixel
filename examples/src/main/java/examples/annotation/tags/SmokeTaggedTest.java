@@ -22,7 +22,9 @@ import org.paramixel.core.action.Noop;
 
 public final class SmokeTaggedTest {
 
-    private SmokeTaggedTest() {}
+    private SmokeTaggedTest() {
+        // Intentionally empty
+    }
 
     @Paramixel.ActionFactory
     @Paramixel.Tag("smoke")

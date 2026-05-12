@@ -19,7 +19,7 @@ package org.paramixel.core;
 /**
  * Receives lifecycle callbacks during action execution.
  *
- * <p>A {@code Listener} can observe the overall run as well as individual action execution events. All methods provide
+ * <p>A {@link Listener} can observe the overall run as well as individual action execution events. All methods provide
  * default no-op implementations so callers may override only the callbacks they need.
  *
  * <p>Listeners that hold resources (such as open file handles) should override {@link #close()} to release them.
@@ -37,14 +37,18 @@ public interface Listener extends AutoCloseable {
      *
      * @param runner the active runner
      */
-    default void runStarted(Runner runner) {}
+    default void runStarted(Runner runner) {
+        // Intentionally empty
+    }
 
     /**
      * Invoked immediately before an action begins execution.
      *
      * @param result the mutable or in-progress result associated with the action about to execute
      */
-    default void beforeAction(Result result) {}
+    default void beforeAction(Result result) {
+        // Intentionally empty
+    }
 
     /**
      * Invoked when action execution throws an exception or error condition that is being reported.
@@ -52,21 +56,27 @@ public interface Listener extends AutoCloseable {
      * @param result the result associated with the failing action
      * @param throwable the reported throwable
      */
-    default void actionThrowable(Result result, Throwable throwable) {}
+    default void actionThrowable(Result result, Throwable throwable) {
+        // Intentionally empty
+    }
 
     /**
      * Invoked after an action finishes execution.
      *
      * @param result the completed result for the action
      */
-    default void afterAction(Result result) {}
+    default void afterAction(Result result) {
+        // Intentionally empty
+    }
 
     /**
      * Invoked when an action is skipped rather than executed.
      *
      * @param result the result representing the skipped action
      */
-    default void skipAction(Result result) {}
+    default void skipAction(Result result) {
+        // Intentionally empty
+    }
 
     /**
      * Invoked once after the run completes.
@@ -74,7 +84,9 @@ public interface Listener extends AutoCloseable {
      * @param runner the active runner
      * @param result the root result for the completed run
      */
-    default void runCompleted(Runner runner, Result result) {}
+    default void runCompleted(Runner runner, Result result) {
+        // Intentionally empty
+    }
 
     /**
      * Releases resources held by this listener.
@@ -83,5 +95,7 @@ public interface Listener extends AutoCloseable {
      * release them.
      */
     @Override
-    default void close() {}
+    default void close() {
+        // Intentionally empty
+    }
 }

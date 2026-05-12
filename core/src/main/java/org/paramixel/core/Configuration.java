@@ -16,20 +16,17 @@
 
 package org.paramixel.core;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collections;
 import java.util.Map;
-import java.util.Properties;
-import java.util.TreeMap;
-import org.paramixel.core.exception.ConfigurationException;
-import org.paramixel.core.internal.ResourceLoader;
+import org.paramixel.core.internal.DefaultConfiguration;
 
 /**
- * Loads and merges Paramixel configuration properties.
+ * Provides the effective configuration for a Paramixel run by layering classpath defaults, system properties, and
+ * caller-supplied overrides.
  *
  * <p>This utility exposes configuration from classpath resources and JVM system properties, and applies framework
  * defaults when needed.
+ *
+ * <p>Public API.
  *
  * @apiNote {@link #defaultProperties()} loads classpath properties first, overlays JVM system properties, and then
  *     applies built-in defaults for any remaining unset keys.
@@ -82,6 +79,9 @@ public class Configuration {
 
     /**
      * Configuration key controlling the file used for the summary report.
+     *
+     * <p>Expected file extensions: {@code .txt}, {@code .json}, {@code .xml}, {@code .html}. When unset, no report
+     * is written. Consumed by listeners in {@link Factory#defaultListener(Map)}.
      */
     public static final String REPORT_FILE = "paramixel.report.file";
 
@@ -102,12 +102,10 @@ public class Configuration {
      * Loads properties from {@value #CONFIG_FILE_NAME} on the classpath.
      *
      * @return an unmodifiable map containing only classpath-provided properties
-     * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws org.paramixel.core.exception.ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Map<String, String> classpathProperties() {
-        TreeMap<String, String> map = new TreeMap<>();
-        loadClasspathProperties(map, null);
-        return Collections.unmodifiableMap(map);
+        return DefaultConfiguration.classpathProperties();
     }
 
     /**
@@ -116,45 +114,22 @@ public class Configuration {
      * @param classLoader the preferred classloader, or {@code null} to use the default fallback
      *     strategy
      * @return an unmodifiable map containing only classpath-provided properties
-     * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws org.paramixel.core.exception.ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Map<String, String> classpathProperties(ClassLoader classLoader) {
-        TreeMap<String, String> map = new TreeMap<>();
-        loadClasspathProperties(map, classLoader);
-        return Collections.unmodifiableMap(map);
+        return DefaultConfiguration.classpathProperties(classLoader);
     }
 
     /**
      * Returns system properties augmented with Paramixel defaults.
      *
+     * <p>System properties override classpath defaults in the configuration layering used by
+     * {@link #defaultProperties()}.
+     *
      * @return an unmodifiable map containing JVM system properties and any missing framework defaults
      */
     public static Map<String, String> systemProperties() {
-        TreeMap<String, String> map = systemPropertiesRaw();
-        configureDefaults(map);
-        return Collections.unmodifiableMap(map);
-    }
-
-    private static TreeMap<String, String> systemPropertiesRaw() {
-        TreeMap<String, String> map = new TreeMap<>();
-        System.getProperties().forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
-        return map;
-    }
-
-    private static void loadClasspathProperties(TreeMap<String, String> map, ClassLoader classLoader) {
-        InputStream inputStream = classLoader == null
-                ? ResourceLoader.getResourceAsStream(CONFIG_FILE_NAME)
-                : ResourceLoader.getResourceAsStream(CONFIG_FILE_NAME, classLoader);
-        if (inputStream == null) {
-            return;
-        }
-        Properties properties = new Properties();
-        try (inputStream) {
-            properties.load(inputStream);
-        } catch (IOException e) {
-            throw ConfigurationException.of("failed to load default properties resource: " + CONFIG_FILE_NAME, e);
-        }
-        properties.forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
+        return DefaultConfiguration.systemProperties();
     }
 
     /**
@@ -164,14 +139,10 @@ public class Configuration {
      * supplemented with built-in defaults for any missing keys.
      *
      * @return an unmodifiable map containing the effective default configuration
-     * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws org.paramixel.core.exception.ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Map<String, String> defaultProperties() {
-        TreeMap<String, String> map = new TreeMap<>();
-        loadClasspathProperties(map, null);
-        map.putAll(systemPropertiesRaw());
-        configureDefaults(map);
-        return Collections.unmodifiableMap(map);
+        return DefaultConfiguration.defaultProperties();
     }
 
     /**
@@ -184,17 +155,9 @@ public class Configuration {
      * @param classLoader the preferred classloader, or {@code null} to use the default fallback
      *     strategy
      * @return an unmodifiable map containing the effective default configuration
-     * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws org.paramixel.core.exception.ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Map<String, String> defaultProperties(ClassLoader classLoader) {
-        TreeMap<String, String> map = new TreeMap<>();
-        loadClasspathProperties(map, classLoader);
-        map.putAll(systemPropertiesRaw());
-        configureDefaults(map);
-        return Collections.unmodifiableMap(map);
-    }
-
-    private static void configureDefaults(TreeMap<String, String> map) {
-        map.putIfAbsent(RUNNER_PARALLELISM, String.valueOf(Runtime.getRuntime().availableProcessors()));
+        return DefaultConfiguration.defaultProperties(classLoader);
     }
 }

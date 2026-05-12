@@ -12,12 +12,12 @@ Paramixel has two main phases:
 
 ## Main packages
 
-- `org.paramixel.core` - public API (`Action`, `Context`, `Result`, `Status`, `Runner`, `Store`, `Value`, `Factory`, `Version`, `Selector`, `Resolver`, `Listener`, `Configuration`)
+- `org.paramixel.core` - public API (`Action`, `AsyncScheduler`, `Context`, `Result`, `Status`, `Runner`, `Store`, `Value`, `Factory`, `Version`, `Selector`, `Resolver`, `Listener`, `Configuration`)
 - `org.paramixel.core.action` - built-in actions (`Direct`, `Noop`, `Container`, `Parallel`)
-- `org.paramixel.core.exception` - exceptions (`FailException`, `SkipException`, `CycleDetectedException`, `DeadlockDetected`, `ConfigurationException`, `ResolverException`)
+- `org.paramixel.core.exception` - exceptions (`FailException`, `SkipException`, `CycleDetectedException`, `ConfigurationException`, `ResolverException`)
 - `org.paramixel.core.internal` - internal implementation classes and defaults (`DefaultResult`, `DefaultStatus`, `DefaultStore`, `DefaultContext`, `DefaultRunner`)
 - `org.paramixel.core.internal.listener` - built-in listener implementations (`SafeListener`, `CompositeListener`, `StatusListener`, `SummaryListener`, `TreeSummaryRenderer`)
-- `org.paramixel.core.support` - support utilities such as `Cleanup`
+- `org.paramixel.core.support` - support utilities such as `Cleanup` and `Retry`
 - `org.paramixel.maven.plugin` - Maven integration
 
 ## Discovery
@@ -47,10 +47,9 @@ Discovered actions are always combined as a `Parallel` root.
 
 ### Pre-execution validation
 
-Before execution, `DefaultRunner` runs two validators:
+Before execution, `DefaultRunner` validates the action tree structure:
 
 1. **`CycleDetector`** - detects parent-child cycles in the action graph; throws `CycleDetectedException`
-2. **`DeadlockDetector`** - detects nested `Parallel` configurations that would cause thread starvation; throws `DeadlockDetected`
 
 ### Runtime execution
 
@@ -58,10 +57,13 @@ Before execution, `DefaultRunner` runs two validators:
 - Results form a tree that mirrors the action tree
 - Each `Result` has a `Status`, run duration, parent, and children
 - `Context` provides `getStore()` for per-node state and `findAncestor()` for navigating the context hierarchy
-- `Parallel` uses a `RoutingExecutorService` that routes root-level work to the runner executor and nested parallel work to the parallel executor, preventing thread starvation for typical configurations
-- `Runner` instances are not thread-safe and not reusable across multiple `run()` calls. Each invocation of `run(Action)` is `synchronized` to enforce single-thread access. Each call creates fresh owned executor services (if no external executor was supplied) and shuts them down when the call completes. If an `ExecutorService` was provided via `Runner.builder().executorService(...)`, the runner uses it but does not shut it down. Create a fresh `Runner` instance for each execution boundary.
+- `Context.runAsync(...)` schedules additional actions through the effective scheduler for the current context
+- `Parallel` uses the effective scheduler and can set a subtree-local scheduler with `Parallel.builder(...).scheduler(...)`
+- `Runner` instances are not designed for concurrent use across action trees. A runner can execute multiple actions sequentially; each `run(Action)` call is independent.
 
 ## Action hierarchy
+
+Context scoping is action-owned behavior. Built-in actions honor their configured `Action.ContextMode`; custom action implementations must apply any isolation or sharing semantics themselves. Built-in actions are final framework primitives; implement `Action` directly, or extend `AbstractAction`, for custom behavior.
 
 ```
 Action (interface)
@@ -69,7 +71,7 @@ Action (interface)
        ├─ Direct — takes Executable callback, no children
        ├─ Noop — always passes, no children
        ├─ Container — ordered composition with optional setup and teardown
-       └─ Parallel — concurrent with semaphore
+       └─ Parallel — concurrent children with an optional direct-child limit
 ```
 
 ## Container model
@@ -100,6 +102,6 @@ The default listener is created through `Factory.defaultListener()`.
 The Maven plugin:
 
 - builds a test classloader from test output, main output, and test classpath entries
-- resolves actions with `Resolver.resolveActions(configuration, selector)`
+- resolves actions with `Resolver.resolveActions(configuration)`
 - executes them with `Runner`
 - fails the build when the root action result is `FAIL`

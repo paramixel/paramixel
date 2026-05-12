@@ -20,14 +20,11 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Objects;
 import org.paramixel.core.Action;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
-import org.paramixel.core.Status;
 import org.paramixel.core.internal.ActionHierarchy;
-import org.paramixel.core.support.AnsiColor;
 
 /**
  * Prints per-action status updates to the console.
@@ -40,10 +37,27 @@ public class StatusListener implements Listener {
 
     private static final Object OUTPUT_LOCK = new Object();
 
+    private final boolean ansiEnabled;
+
+    /**
+     * Creates a console status listener with ANSI formatting enabled.
+     */
+    public StatusListener() {
+        this(true);
+    }
+
     /**
      * Creates a console status listener.
+     *
+     * @param ansiEnabled whether ANSI formatting should be used
      */
-    public StatusListener() {}
+    public StatusListener(boolean ansiEnabled) {
+        this.ansiEnabled = ansiEnabled;
+    }
+
+    private String getPrefix() {
+        return ansiEnabled ? Constants.PARAMIXEL_ANSI : Constants.PARAMIXEL_PLAIN;
+    }
 
     @Override
     public void beforeAction(Result result) {
@@ -51,7 +65,7 @@ public class StatusListener implements Listener {
         if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
-        String output = Constants.PARAMIXEL + "RUN  | " + buildIdPath(result) + " | " + buildDisplayName(result);
+        String output = getPrefix() + "RUN  | " + buildIdPath(result) + " | " + buildDisplayName(result);
         synchronized (OUTPUT_LOCK) {
             System.out.println(output);
         }
@@ -63,8 +77,8 @@ public class StatusListener implements Listener {
         if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
-        String output = Constants.PARAMIXEL
-                + formatStatus(result.getStatus())
+        String output = getPrefix()
+                + Listeners.formatAnsiStatus(result.getStatus())
                 + " | "
                 + buildIdPath(result)
                 + " | "
@@ -82,8 +96,8 @@ public class StatusListener implements Listener {
         if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
-        String output = Constants.PARAMIXEL
-                + formatStatus(result.getStatus())
+        String output = getPrefix()
+                + Listeners.formatAnsiStatus(result.getStatus())
                 + " | "
                 + buildIdPath(result)
                 + " | "
@@ -102,12 +116,11 @@ public class StatusListener implements Listener {
         if (ROOT_NAME.equals(result.getAction().getName())) {
             return;
         }
-        StringWriter sw = new StringWriter();
+        var sw = new StringWriter();
         throwable.printStackTrace(new PrintWriter(sw));
         String trace = sw.toString();
         synchronized (OUTPUT_LOCK) {
-            System.err.println(
-                    Constants.PARAMIXEL + "EXCEPTION | " + buildIdPath(result) + " | " + buildDisplayName(result));
+            System.err.println(getPrefix() + "EXCEPTION | " + buildIdPath(result) + " | " + buildDisplayName(result));
             System.err.print(trace);
         }
     }
@@ -116,10 +129,10 @@ public class StatusListener implements Listener {
         Objects.requireNonNull(result, "result must not be null");
         Action action = result.getAction();
         Class<?> actionClass = action.getClass();
-        String name = action.getClass().getName();
+        String name = actionClass.getName();
         String kind;
 
-        if (actionClass.getPackageName().startsWith("org.paramixel.core.action")) {
+        if (actionClass.getPackageName().startsWith(Constants.ACTION_PACKAGE_PREFIX)) {
             kind = actionClass.getSimpleName();
         } else {
             kind = name;
@@ -131,7 +144,7 @@ public class StatusListener implements Listener {
     private static String buildActionPath(Result result) {
         var indexedPath = ActionHierarchy.pathOf(result.getAction());
         if (indexedPath.isPresent()) {
-            Deque<String> indexedNames = new ArrayDeque<>();
+            var indexedNames = new ArrayDeque<String>();
             for (Action action : indexedPath.orElseThrow()) {
                 if (!ROOT_NAME.equals(action.getName())) {
                     indexedNames.addLast(action.getName());
@@ -140,7 +153,7 @@ public class StatusListener implements Listener {
             return String.join(" / ", indexedNames);
         }
 
-        Deque<String> names = new ArrayDeque<>();
+        var names = new ArrayDeque<String>();
         Result current = result;
         while (current != null) {
             Action action = current.getAction();
@@ -155,7 +168,7 @@ public class StatusListener implements Listener {
     private static String buildIdPath(Result result) {
         var indexedPath = ActionHierarchy.pathOf(result.getAction());
         if (indexedPath.isPresent()) {
-            Deque<String> indexedIds = new ArrayDeque<>();
+            var indexedIds = new ArrayDeque<String>();
             for (Action action : indexedPath.orElseThrow()) {
                 if (!ROOT_NAME.equals(action.getName())) {
                     indexedIds.addLast(action.getId());
@@ -164,7 +177,7 @@ public class StatusListener implements Listener {
             return String.join("-", indexedIds);
         }
 
-        Deque<String> ids = new ArrayDeque<>();
+        var ids = new ArrayDeque<String>();
         Result current = result;
         while (current != null) {
             Action action = current.getAction();
@@ -174,19 +187,6 @@ public class StatusListener implements Listener {
             current = current.getParent().orElse(null);
         }
         return String.join("-", ids);
-    }
-
-    private static String formatStatus(Status status) {
-        Objects.requireNonNull(status, "status must not be null");
-        if (status.isPass()) {
-            return AnsiColor.BOLD_GREEN_TEXT.format("PASS");
-        } else if (status.isFailure()) {
-            return AnsiColor.BOLD_RED_TEXT.format("FAIL");
-        } else if (status.isSkip()) {
-            return AnsiColor.BOLD_ORANGE_TEXT.format("SKIP");
-        } else {
-            return AnsiColor.BOLD_GRAY_TEXT.format("STAGED");
-        }
     }
 
     private static String formatTiming(Duration timing) {

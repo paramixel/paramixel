@@ -14,6 +14,14 @@ plugins {
 }
 ```
 
+Add `core` to the consuming project's test classpath:
+
+```groovy
+dependencies {
+    testImplementation 'org.paramixel:core:<PARAMIXEL_VERSION>'
+}
+```
+
 ### Run Tests
 
 ```bash
@@ -31,20 +39,22 @@ Or as part of the full verification lifecycle:
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `skipTests` | `Boolean` | `false` | Skip Paramixel test execution entirely |
-| `failIfNoTests` | `Boolean` | `true` | Fail the build when no action factories are discovered |
+| `failIfNoTests` | `Boolean` | `false` | Fail the build when no action factories are discovered |
 | `failureOnSkip` | `Boolean` | `false` | Treat skipped results as failures |
 | `parallelism` | `Integer` | *unset* | Runner parallelism level; falls back to the framework default when absent |
 | `matchPackage` | `String` | *unset* | Regex filter for package names; all packages are included when absent |
 | `matchClass` | `String` | *unset* | Regex filter for fully-qualified class names; all classes are included when absent |
 | `matchTag` | `String` | *unset* | Regex filter for tags; all tags are included when absent |
+| `reportFile` | `String` | *unset* | File path for the summary report; no report is written when absent |
 
 ## System Properties
 
-System properties starting with `paramixel.` always override DSL configuration and classpath defaults, matching the precedence of the Maven plugin.
+The plugin maps supported `paramixel.*` system properties and Gradle properties to task inputs. For those keys, `-Dparamixel.*` takes precedence over `-Pparamixel.*`, which takes precedence over DSL defaults.
 
 ```bash
 ./gradlew paramixelTest -Dparamixel.skipTests=true
 ./gradlew paramixelTest -Dparamixel.parallelism=8
+./gradlew paramixelTest -Pparamixel.report.file=build/paramixel/paramixel.json
 ```
 
 ## Build from Source
@@ -65,7 +75,7 @@ JAVA_HOME="$JAVA_17_HOME" ./gradlew clean build
 
 ### Dependency Resolution
 
-The Gradle plugin resolves `org.paramixel:core` from **Maven Central first**, then **Maven Local**. For local development, build and install the core module to Maven Local from the project root:
+The Gradle plugin resolves `org.paramixel:core` from **Maven Local first**, then **Maven Central**. For local development, build and install the core module to Maven Local from the project root:
 
 ```bash
 ./mvnw clean install -DskipTests -Dparamixel.skipTests

@@ -47,9 +47,6 @@ class RunnerConvenienceTest {
             assertThatThrownBy(() -> builder.listener(new Listener() {}))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("builder already built");
-            assertThatThrownBy(() -> builder.executorService(null))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("builder already built");
             assertThatThrownBy(builder::build)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("builder already built");

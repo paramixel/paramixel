@@ -22,15 +22,40 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.opentest4j.AssertionFailedError;
 import org.paramixel.core.Action;
+import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Value;
 
 @DisplayName("Container")
 class ContainerTest {
+
+    @Test
+    @DisplayName("execute rejects null context")
+    void executeRejectsNullContext() {
+        Container container =
+                Container.builder("container").child(Noop.of("child")).build();
+
+        assertThatThrownBy(() -> container.execute(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("context must not be null");
+    }
+
+    @Test
+    @DisplayName("skip rejects null context")
+    void skipRejectsNullContext() {
+        Container container =
+                Container.builder("container").child(Noop.of("child")).build();
+
+        assertThatThrownBy(() -> container.skip(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("context must not be null");
+    }
 
     @Test
     @DisplayName("builder uses dependent declared policy by default")
@@ -57,6 +82,12 @@ class ContainerTest {
         assertThatThrownBy(() -> Container.builder("container").child(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("child must not be null");
+        assertThatThrownBy(() -> Container.builder("container").before(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("before must not be null");
+        assertThatThrownBy(() -> Container.builder("container").after(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("after must not be null");
         assertThatIllegalStateException()
                 .isThrownBy(() -> Container.builder("empty").build())
                 .withMessage("container must contain before, child, or after action");
@@ -71,6 +102,78 @@ class ContainerTest {
                 .build();
 
         assertThat(policy.seed()).isEqualTo(42L);
+    }
+
+    @Test
+    @DisplayName("policy compact constructor rejects null childMode")
+    void policyCompactConstructorRejectsNullChildMode() {
+        assertThatThrownBy(() -> new Container.Policy(null, Container.OrderMode.DECLARED, 0L))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("childMode must not be null");
+    }
+
+    @Test
+    @DisplayName("policy compact constructor rejects null orderMode")
+    void policyCompactConstructorRejectsNullOrderMode() {
+        assertThatThrownBy(() -> new Container.Policy(Container.ChildMode.DEPENDENT, null, 0L))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("orderMode must not be null");
+    }
+
+    @Test
+    @DisplayName("policy builder rejects null childMode")
+    void policyBuilderRejectsNullChildMode() {
+        assertThatThrownBy(() -> Container.Policy.builder().childMode(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("childMode must not be null");
+    }
+
+    @Test
+    @DisplayName("policy builder rejects null orderMode")
+    void policyBuilderRejectsNullOrderMode() {
+        assertThatThrownBy(() -> Container.Policy.builder().orderMode(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("orderMode must not be null");
+    }
+
+    @Test
+    @DisplayName("policy builder rejects mutation after build")
+    void policyBuilderRejectsMutationAfterBuild() {
+        Container.Policy.Builder builder = Container.Policy.builder();
+        builder.build();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.childMode(Container.ChildMode.INDEPENDENT))
+                .withMessage("builder already built");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.orderMode(Container.OrderMode.SHUFFLED))
+                .withMessage("builder already built");
+        assertThatIllegalStateException().isThrownBy(() -> builder.seed(1L)).withMessage("builder already built");
+        assertThatIllegalStateException().isThrownBy(builder::build).withMessage("builder already built");
+    }
+
+    @Test
+    @DisplayName("builder rejects mutation after build")
+    void builderRejectsMutationAfterBuild() {
+        Container.Builder builder = Container.builder("container").child(Noop.of("child"));
+        builder.build();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.contextMode(Action.ContextMode.SHARED))
+                .withMessage("builder already built");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.policy(Container.Policy.defaults()))
+                .withMessage("builder already built");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.before(Noop.of("before")))
+                .withMessage("builder already built");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.child(Noop.of("child2")))
+                .withMessage("builder already built");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> builder.after(Noop.of("after")))
+                .withMessage("builder already built");
+        assertThatIllegalStateException().isThrownBy(builder::build).withMessage("builder already built");
     }
 
     @Test
@@ -234,5 +337,55 @@ class ContainerTest {
 
     private static Direct direct(String name, Direct.Executable executable) {
         return Direct.builder(name).execute(executable).build();
+    }
+
+    @Test
+    @DisplayName("AssertionError in child is captured and after-action still runs")
+    void assertionErrorInChildIsCapturedAndAfterActionStillRuns() {
+        AtomicBoolean afterActionCalled = new AtomicBoolean(false);
+        Action throwingChild = Direct.builder("throwing")
+                .execute(context -> {
+                    throw new AssertionFailedError("expected true");
+                })
+                .build();
+        Action afterAction = Direct.builder("after").execute(context -> {}).build();
+        Container container = Container.builder("container")
+                .child(throwingChild)
+                .after(afterAction)
+                .build();
+        Listener trackingListener = new Listener() {
+            @Override
+            public void afterAction(Result result) {
+                if (result.getAction() == container) {
+                    afterActionCalled.set(true);
+                }
+            }
+        };
+
+        Result result = Runner.builder().listener(trackingListener).build().run(container);
+
+        assertThat(result.getStatus().isFailure()).isTrue();
+        assertThat(afterActionCalled).isTrue();
+        assertThat(result.getChildren()).hasSize(2);
+        assertThat(result.getChildren().get(0).getStatus().isFailure()).isTrue();
+    }
+
+    @Test
+    @DisplayName("OutOfMemoryError in child propagates and skips after-action")
+    void outOfMemoryErrorInChildPropagatesAndSkipsAfterAction() {
+        Action throwingChild = Direct.builder("throwing")
+                .execute(context -> {
+                    throw new OutOfMemoryError("simulated oom");
+                })
+                .build();
+        Action afterAction = Direct.builder("after").execute(context -> {}).build();
+        Container container = Container.builder("container")
+                .child(throwingChild)
+                .after(afterAction)
+                .build();
+
+        assertThatThrownBy(() -> Runner.builder().build().run(container))
+                .isInstanceOf(OutOfMemoryError.class)
+                .hasMessage("simulated oom");
     }
 }

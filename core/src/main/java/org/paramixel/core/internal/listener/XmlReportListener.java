@@ -17,20 +17,11 @@
 package org.paramixel.core.internal.listener;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Objects;
-import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.Status;
 import org.paramixel.core.Version;
-import org.paramixel.core.internal.TildePathExpander;
-import org.paramixel.core.support.Arguments;
 
 /**
  * Writes an XML end-of-run summary report to a configured file.
@@ -40,9 +31,7 @@ import org.paramixel.core.support.Arguments;
  * Optional child elements {@code <message>} and {@code <exception>} are included when the status carries a message or
  * throwable. Time values are expressed as whole milliseconds.
  */
-public class XmlReportListener implements Listener {
-
-    private final Path reportFile;
+public class XmlReportListener extends AbstractReportFileListener {
 
     /**
      * Creates an XML report listener for the supplied file.
@@ -50,48 +39,46 @@ public class XmlReportListener implements Listener {
      * @param reportFile the file that will contain the generated report
      */
     public XmlReportListener(final String reportFile) {
-        Objects.requireNonNull(reportFile, "reportFile must not be null");
-        Arguments.requireNonBlank(reportFile, "reportFile must not be blank");
-        this.reportFile = TildePathExpander.expand(reportFile);
+        super(reportFile);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
-    public void runCompleted(Runner runner, Result result) {
-        Objects.requireNonNull(runner, "runner must not be null");
-        Objects.requireNonNull(result, "result must not be null");
+    protected void writeReport(Writer writer, Runner runner, Result result) throws IOException {
+        writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        writer.write("<paramixel version=\"" + escapeXml(Version.getVersion()) + "\">\n");
 
-        try {
-            Path parent = reportFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
+        writeResult(writer, result, 1);
 
-            try (Writer writer = Files.newBufferedWriter(reportFile, StandardCharsets.UTF_8)) {
-                writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-                writer.write("<paramixel version=\"" + escapeXml(Version.getVersion()) + "\">\n");
+        writer.write("</paramixel>\n");
+    }
 
-                writeResult(writer, result, 1);
-
-                writer.write("</paramixel>\n");
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Unable to write XML report file: " + reportFile, e);
-        }
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected String formatName() {
+        return "XML";
     }
 
     private void writeResult(Writer writer, Result result, int indent) throws IOException {
         String pad = "  ".repeat(indent);
         String padInner = pad + "  ";
 
+        var action = result.getAction();
         writer.write(pad + "<result");
-        writer.write(" name=\"" + escapeXml(result.getAction().getName()) + "\"");
-        writer.write(" kind=\"" + escapeXml(formatKind(result)) + "\"");
-        writer.write(" status=\"" + formatStatus(result.getStatus()) + "\"");
+        writer.write(" name=\"" + escapeXml(action.getName()) + "\"");
+        writer.write(" kind=\"" + escapeXml(Listeners.formatKind(action)) + "\"");
+
+        var status = result.getStatus();
+        writer.write(" status=\"" + Listeners.formatStatus(status) + "\"");
         writer.write(" runDuration=\"" + result.getRunDuration().toMillis() + "\"");
         writer.write(">");
 
-        String message = result.getStatus().getMessage().orElse(null);
-        String exception = formatException(result.getStatus());
+        String message = status.getMessage().orElse(null);
+        String exception = Listeners.formatException(status);
 
         boolean hasMessage = message != null;
         boolean hasException = exception != null;
@@ -123,41 +110,11 @@ public class XmlReportListener implements Listener {
         writer.write(pad + "</result>\n");
     }
 
-    private static String formatStatus(Status status) {
-        if (status.isStaged()) {
-            return "STAGED";
-        } else if (status.isPass()) {
-            return "PASS";
-        } else if (status.isFailure()) {
-            return "FAIL";
-        } else {
-            return "SKIP";
-        }
-    }
-
-    private static String formatKind(Result result) {
-        Class<?> actionClass = result.getAction().getClass();
-        if ("org.paramixel.core.action".equals(actionClass.getPackageName())) {
-            return actionClass.getSimpleName();
-        }
-        return actionClass.getName();
-    }
-
-    private static String formatException(Status status) {
-        if (status.isFailure()) {
-            return status.getThrowable()
-                    .map(f -> f.getClass().getSimpleName() + ": " + f.getMessage())
-                    .or(() -> status.getMessage())
-                    .orElse(null);
-        }
-        return null;
-    }
-
     private static String escapeXml(String value) {
         if (value == null) {
             return null;
         }
-        StringBuilder sb = new StringBuilder(value.length());
+        var sb = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             switch (c) {

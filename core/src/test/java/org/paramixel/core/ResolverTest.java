@@ -34,26 +34,6 @@ import org.paramixel.core.exception.ResolverException;
 class ResolverTest {
 
     @Nested
-    @DisplayName("resolveParallelism")
-    class ResolveParallelism {
-
-        @Test
-        @DisplayName("returns value from provided configuration map")
-        void returnsValueFromProvidedConfigurationMap() {
-            assertThat(Resolver.resolveParallelism(Map.of(Configuration.RUNNER_PARALLELISM, "4")))
-                    .isEqualTo(4);
-        }
-
-        @Test
-        @DisplayName("throws ConfigurationException for invalid value")
-        void throwsConfigurationExceptionForInvalidValue() {
-            assertThatThrownBy(() -> Resolver.resolveParallelism(Map.of(Configuration.RUNNER_PARALLELISM, "abc")))
-                    .isInstanceOf(ConfigurationException.class)
-                    .hasMessageContaining("expected integer");
-        }
-    }
-
-    @Nested
     @DisplayName("selector builder")
     class SelectorBuilder {
 
@@ -181,6 +161,44 @@ class ResolverTest {
             assertThatThrownBy(() -> Resolver.resolveActionFromClass(ErrorThrowingFactory.class))
                     .isInstanceOf(TestError.class)
                     .hasMessage("factory error");
+        }
+    }
+
+    @Nested
+    @DisplayName("resolveActions rejects null arguments")
+    class ResolveActionsRejectsNullArguments {
+
+        @Test
+        @DisplayName("resolveActions(Selector) rejects null selector")
+        void resolveActionsSelectorRejectsNullSelector() {
+            assertThatThrownBy(() -> Resolver.resolveActions((Selector) null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("selector must not be null");
+        }
+
+        @Test
+        @DisplayName("resolveActions(Map) rejects null configuration")
+        void resolveActionsMapRejectsNullConfiguration() {
+            assertThatThrownBy(() -> Resolver.resolveActions((Map<String, String>) null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("configuration must not be null");
+        }
+
+        @Test
+        @DisplayName("resolveActions(Map, Selector) rejects null configuration")
+        void resolveActionsMapSelectorRejectsNullConfiguration() {
+            assertThatThrownBy(() -> Resolver.resolveActions(
+                            null, Selector.builder().classMatch("X").build()))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("configuration must not be null");
+        }
+
+        @Test
+        @DisplayName("resolveActions(Map, Selector) rejects null selector")
+        void resolveActionsMapSelectorRejectsNullSelector() {
+            assertThatThrownBy(() -> Resolver.resolveActions(Map.of(), (Selector) null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("selector must not be null");
         }
     }
 

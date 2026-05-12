@@ -13,24 +13,25 @@ In `Direct`:
 - throw `FailException` -> `FAIL`
 - throw `SkipException` -> `SKIP`
 - throw any other exception -> `FAIL`
-- throw `Error` -> propagates immediately (not caught)
+- throw `OutOfMemoryError` or `StackOverflowError` -> propagates immediately
+- throw other `Error` subclasses -> `FAIL`
 
 Unexpected exceptions also trigger `Listener#actionThrowable(...)`.
 
-`Error` subclasses (such as `OutOfMemoryError`, `StackOverflowError`, and `ThreadDeath`) are never caught by the framework. They propagate immediately and terminate execution.
+`OutOfMemoryError` and `StackOverflowError` are treated as unrecoverable and are never caught by the framework. Other `Error` subclasses, such as `ThreadDeath`, are captured like other unexpected throwables and reported as failures.
 
 ## Composite actions
 
 - `Container` with `ChildMode.INDEPENDENT` runs all body children and computes status afterward
 - `Container` with `ChildMode.DEPENDENT` stops body execution at the first failure or skip and skips remaining body children
-- `Parallel` waits for all children and computes status from them. If the executing thread is interrupted during semaphore acquisition, `Parallel` sets a `FAIL` result, fires `afterAction`, and re-throws a `RuntimeException` wrapping the `InterruptedException`
+- `Parallel` waits for all children and computes status from them
 - `Container` skips body children if `before(...)` fails or skips, but still runs `after(...)`
 
 ## Skipped action context
 
-When actions are skipped, each one receives its own child context that mirrors the action tree — the same context hierarchy as normal execution. Listener callbacks interleave the same way: parent `beforeAction`, then children, then parent `afterAction`. This means `getParent()`, `findAncestor()`, and `getStore()` work identically whether an action executed or was skipped.
+When actions are skipped by framework control flow, built-in actions apply the same `ContextMode` behavior as normal execution: `ISOLATED` creates a child context and `SHARED` reuses the parent context. Listener callbacks interleave the same way: parent `beforeAction`, then children, then parent `afterAction`. This means `getParent()`, `findAncestor()`, and `getStore()` follow the same context-mode rules whether an action executed or was skipped.
 
-The `skipAction(Result)` listener callback fires for every skipped action.
+The `skipAction(Result)` listener callback fires for actions skipped through `Action.skip(...)`, such as descendants skipped after a dependent parent stops. A `SkipException` thrown from a running `Direct` action produces a `SKIP` result and flows through `afterAction(Result)`.
 
 ## Pre-execution validation
 
@@ -44,24 +45,10 @@ The `skipAction(Result)` listener callback fires for every skipped action.
 CycleDetectedException: Cycle detected in action graph: actionA[id1] -> actionB[id2] -> actionA[id1]
 ```
 
-### Thread-starvation deadlock
-
-`DeadlockDetector` detects nested `Parallel` configurations that would cause thread starvation. When detected, it throws `DeadlockDetected`:
-
-```
-DeadlockDetected: Potential thread-starvation deadlock detected: ...
-```
-
-The message includes:
-
-- The detected nesting depth
-- The configured parallelism
-- Instructions for resolving the deadlock
-
 See [Parallel: Pre-execution validation](../actions/parallel.md#pre-execution-validation) for details.
 
 ## Cleanup failures
 
 If you need to accumulate cleanup failures, use `Cleanup.runAndThrow()`, which throws the first failure and attaches the rest as suppressed exceptions.
 
-`Error` subclasses thrown by cleanup tasks are **not caught** and abort the cleanup loop immediately. Remaining cleanup tasks will not run.
+`OutOfMemoryError` and `StackOverflowError` thrown by cleanup tasks are **not caught** and abort the cleanup loop immediately. Other cleanup failures are accumulated by `Cleanup`.

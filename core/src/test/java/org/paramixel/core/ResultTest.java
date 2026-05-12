@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.action.Noop;
@@ -28,6 +30,46 @@ import org.paramixel.core.internal.DefaultStatus;
 
 @DisplayName("Result")
 class ResultTest {
+
+    @Test
+    @DisplayName("builder rejects null action")
+    void builderRejectsNullAction() {
+        assertThatThrownBy(() -> Result.builder(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
+    }
+
+    @Test
+    @DisplayName("staged rejects null action")
+    void stagedRejectsNullAction() {
+        assertThatThrownBy(() -> Result.staged(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
+    }
+
+    @Test
+    @DisplayName("pass rejects null action")
+    void passRejectsNullAction() {
+        assertThatThrownBy(() -> Result.pass(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
+    }
+
+    @Test
+    @DisplayName("skip rejects null action")
+    void skipRejectsNullAction() {
+        assertThatThrownBy(() -> Result.skip(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
+    }
+
+    @Test
+    @DisplayName("failure rejects null action")
+    void failureRejectsNullAction() {
+        assertThatThrownBy(() -> Result.failure(null, new RuntimeException()))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action must not be null");
+    }
 
     @Test
     @DisplayName("creates staged result")
@@ -236,13 +278,13 @@ class ResultTest {
             }
 
             @Override
-            public java.util.Optional<Result> getParent() {
-                return java.util.Optional.empty();
+            public Optional<Result> getParent() {
+                return Optional.empty();
             }
 
             @Override
-            public java.util.List<Result> getChildren() {
-                return java.util.List.of();
+            public List<Result> getChildren() {
+                return List.of();
             }
         };
 
@@ -311,5 +353,45 @@ class ResultTest {
         assertThatThrownBy(() -> result.setRunDuration(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("runDuration must not be null");
+    }
+
+    @Test
+    @DisplayName("builder status rejects null")
+    void builderStatusRejectsNull() {
+        Result.Builder builder = Result.builder(Noop.of("test"));
+
+        assertThatThrownBy(() -> builder.status(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("status must not be null");
+    }
+
+    @Test
+    @DisplayName("builder runDuration rejects null")
+    void builderRunDurationRejectsNull() {
+        Result.Builder builder = Result.builder(Noop.of("test"));
+
+        assertThatThrownBy(() -> builder.runDuration(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("runDuration must not be null");
+    }
+
+    @Test
+    @DisplayName("builder child rejects null")
+    void builderChildRejectsNull() {
+        Result.Builder builder = Result.builder(Noop.of("test"));
+
+        assertThatThrownBy(() -> builder.child(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("child must not be null");
+    }
+
+    @Test
+    @DisplayName("failure rejects null throwable")
+    void failureRejectsNullThrowable() {
+        Action action = Noop.of("test");
+
+        assertThatThrownBy(() -> Result.failure(action, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("throwable must not be null");
     }
 }

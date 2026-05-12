@@ -16,6 +16,7 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 | `examples.argument` | Argument type variants (primitives, collections, custom types, etc.) | Yes |
 | `examples.context` | Context inheritance and sharing | Yes |
 | `examples.lifecycle` | Custom listeners and full lifecycle | Yes |
+| `examples.retry` | Retry support class demonstration | Yes |
 | `examples.store` | Store context and operations | Yes |
 | `examples.support` | Shared utilities (Logger, Resource, NetworkFactory, Debug) | N/A |
 | `examples.testcontainers` | Testcontainers integration tests | Yes |
@@ -26,7 +27,7 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 
 ## `__ParamixelRunner__` Convention
 
-Each test package contains a `__ParamixelRunner__` class that serves as an entry point to run all tests in that package from the console or IDE. The double-underscore naming (`__`) sorts the file to the top of the package in IDE file trees, making the runner immediately visible.
+Most top-level runnable example packages contain a `__ParamixelRunner__` class that serves as an entry point to run all tests in that package from the console or IDE. Leaf Testcontainers packages are run through `examples.testcontainers.__ParamixelRunner__`. The double-underscore naming (`__`) sorts the file to the top of the package in IDE file trees, making the runner immediately visible.
 
 ```java
 public class __ParamixelRunner__ {
@@ -59,7 +60,7 @@ Shared utilities live in `examples.testcontainers.util/`:
 
 ### Docker Images
 
-Container image versions are loaded from `/docker-images.txt` classpath resources (one per test category). This allows image versions to be updated without modifying Java source.
+Container image versions are loaded from package-relative `docker-images.txt` classpath resources, such as `examples/testcontainers/kafka/docker-images.txt`. This allows image versions to be updated without modifying Java source.
 
 ### Container Cleanup on JVM Crash
 

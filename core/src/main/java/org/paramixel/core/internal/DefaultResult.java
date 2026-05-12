@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import org.paramixel.core.Action;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
@@ -35,9 +36,15 @@ import org.paramixel.core.Status;
  */
 public final class DefaultResult implements Result {
 
+    private record State(Status status, Duration runDuration) {
+        State {
+            Objects.requireNonNull(status);
+            Objects.requireNonNull(runDuration);
+        }
+    }
+
     private final Action action;
-    private volatile Status status;
-    private volatile Duration runDuration;
+    private final AtomicReference<State> state = new AtomicReference<>(new State(DefaultStatus.STAGED, Duration.ZERO));
     private volatile Result parent;
     private final List<Result> children = new CopyOnWriteArrayList<>();
 
@@ -49,8 +56,6 @@ public final class DefaultResult implements Result {
      */
     public DefaultResult(Action action) {
         this.action = Objects.requireNonNull(action, "action must not be null");
-        this.status = DefaultStatus.STAGED;
-        this.runDuration = Duration.ZERO;
     }
 
     /**
@@ -63,28 +68,48 @@ public final class DefaultResult implements Result {
      */
     public DefaultResult(Action action, Status status, Duration runDuration) {
         this.action = Objects.requireNonNull(action, "action must not be null");
-        this.status = Objects.requireNonNull(status, "status must not be null");
-        this.runDuration = Objects.requireNonNull(runDuration, "runDuration must not be null");
+        this.state.set(new State(
+                Objects.requireNonNull(status, "status must not be null"),
+                Objects.requireNonNull(runDuration, "runDuration must not be null")));
     }
 
     /**
-     * Updates the status recorded for this result.
+     * Atomically updates both the status and run duration recorded for this result.
+     *
+     * <p>This method provides atomicity guarantees that separate {@link #setStatus(Status)} and
+     * {@link #setRunDuration(Duration)} calls cannot: a concurrent reader calling {@link #getStatus()} and
+     * {@link #getRunDuration()} will never observe a new status paired with a stale duration.
+     *
+     * @param status the new status
+     * @param runDuration the run duration to record
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public void complete(Status status, Duration runDuration) {
+        this.state.set(new State(
+                Objects.requireNonNull(status, "status must not be null"),
+                Objects.requireNonNull(runDuration, "runDuration must not be null")));
+    }
+
+    /**
+     * Updates the status recorded for this result, preserving the current run duration.
      *
      * @param status the new status
      * @throws NullPointerException if {@code status} is {@code null}
      */
     public void setStatus(Status status) {
-        this.status = Objects.requireNonNull(status, "status must not be null");
+        Objects.requireNonNull(status, "status must not be null");
+        state.updateAndGet(s -> new State(status, s.runDuration()));
     }
 
     /**
-     * Updates the run duration recorded for this result.
+     * Updates the run duration recorded for this result, preserving the current status.
      *
      * @param runDuration the run duration to record
      * @throws NullPointerException if {@code runDuration} is {@code null}
      */
     public void setRunDuration(Duration runDuration) {
-        this.runDuration = Objects.requireNonNull(runDuration, "runDuration must not be null");
+        Objects.requireNonNull(runDuration, "runDuration must not be null");
+        state.updateAndGet(s -> new State(s.status(), runDuration));
     }
 
     /**
@@ -113,12 +138,12 @@ public final class DefaultResult implements Result {
 
     @Override
     public Status getStatus() {
-        return status;
+        return state.get().status();
     }
 
     @Override
     public Duration getRunDuration() {
-        return runDuration;
+        return state.get().runDuration();
     }
 
     @Override
@@ -138,6 +163,7 @@ public final class DefaultResult implements Result {
 
     @Override
     public String toString() {
-        return status + " | " + runDuration.toMillis() + " ms";
+        State snapshot = state.get();
+        return snapshot.status() + " | " + snapshot.runDuration().toMillis() + " ms";
     }
 }

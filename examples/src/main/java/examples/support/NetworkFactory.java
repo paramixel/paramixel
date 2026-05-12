@@ -20,7 +20,9 @@ import org.testcontainers.containers.Network;
 
 public final class NetworkFactory {
 
-    private NetworkFactory() {}
+    private NetworkFactory() {
+        // Intentionally empty
+    }
 
     public static Network createNetwork() {
         Network network = Network.newNetwork();

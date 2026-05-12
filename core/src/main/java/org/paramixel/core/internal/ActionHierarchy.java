@@ -29,13 +29,19 @@ import org.paramixel.core.CompositeAction;
 
 /**
  * Internal action hierarchy index for components that need path information during execution.
+ *
+ * <p>This class uses static mutable state and is not safe for concurrent access across runner instances. Only one
+ * runner should be active at a time; concurrent runs would corrupt the hierarchy index and produce incorrect path
+ * resolution in reporting output.
  */
 public final class ActionHierarchy {
 
     private static final Object LOCK = new Object();
     private static Map<Action, List<Action>> paths = Map.of();
 
-    private ActionHierarchy() {}
+    private ActionHierarchy() {
+        // Intentionally empty
+    }
 
     /**
      * Installs an action hierarchy index for the supplied root action.
@@ -45,7 +51,7 @@ public final class ActionHierarchy {
      */
     public static Scope install(Action root) {
         Objects.requireNonNull(root, "root must not be null");
-        Map<Action, List<Action>> indexedPaths = new IdentityHashMap<>();
+        var indexedPaths = new IdentityHashMap<Action, List<Action>>();
         index(root, new ArrayDeque<>(), indexedPaths);
         synchronized (LOCK) {
             paths = indexedPaths;
@@ -81,12 +87,18 @@ public final class ActionHierarchy {
     }
 
     /**
-     * Installed action hierarchy scope.
+     * An auto-closeable scope that installs and removes the action hierarchy index. Closing this scope clears the
+     * installed index.
      */
     public static final class Scope implements AutoCloseable {
 
-        private Scope() {}
+        private Scope() {
+            // Intentionally empty
+        }
 
+        /**
+         * Removes the installed action hierarchy index.
+         */
         @Override
         public void close() {
             synchronized (LOCK) {

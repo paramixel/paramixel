@@ -16,11 +16,11 @@ Action.ContextMode.ISOLATED
 Action.ContextMode.SHARED
 ```
 
-`ISOLATED` means the action executes with `context.createChild()`.
+`ISOLATED` means the action executes with `context.createChild()` when the action implementation honors the mode.
 
-`SHARED` means the action executes with the same context it received from its parent.
+`SHARED` means the action executes with the same context it received from its parent when the action implementation honors the mode.
 
-Parent actions pass their effective context directly to children; children decide whether to isolate or share.
+Built-in actions honor `ContextMode`. Custom action implementations are responsible for applying their own context scoping in `execute(Context)` and `skip(Context)`. Parent actions pass their effective context directly to children; children decide whether to isolate or share.
 
 Use shared mode when sibling actions intentionally share workflow state:
 
@@ -82,10 +82,13 @@ String value = context.findAncestor(2)
 Optional<Context> getParent()
 Map<String, String> getConfiguration()
 Listener getListener()
-ExecutorService getExecutorService()
+CompletableFuture<Result> runAsync(Action action)
 Store getStore()
 Optional<Context> findAncestor(int levelUp)
+Context createChild()
 ```
+
+`runAsync(action)` schedules an action through the effective scheduler for the current context. Inside a `Parallel` subtree configured with `scheduler(...)`, nested `context.runAsync(...)` calls use that same custom scheduler.
 
 ## Hierarchy
 
@@ -154,10 +157,10 @@ value.cast(MyClass.class)    // typed cast
 
 ## Example pattern
 
-From `examples/src/main/java/examples/context/ContextHierarchyTest.java`, a `before` action stores data and descendants read it later:
+This pattern mirrors the context examples under `examples/src/main/java/examples/context/`: a `before` action stores data and descendants read it later.
 
 ```java
-public class ContextHierarchyTest {
+public class SharedContextPattern {
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {

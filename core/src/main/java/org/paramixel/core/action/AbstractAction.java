@@ -16,30 +16,34 @@
 
 package org.paramixel.core.action;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Objects;
 import org.paramixel.core.Action;
-import org.paramixel.core.Context;
-import org.paramixel.core.Result;
 import org.paramixel.core.support.Arguments;
 import org.paramixel.core.support.FastId;
 
 /**
- * Base implementation for {@link Action} types.
+ * Base state and helpers for {@link Action} types.
  *
- * <p>This class provides generated identifiers, name validation, context scoping, and execute/skip null checks shared by
- * framework-provided action types.
+ * <p>This class provides generated identifiers, name validation, and context mode storage shared by
+ * framework-provided action types. Subclasses are responsible for implementing execution, skip, and context scoping
+ * behavior.
  */
 public abstract class AbstractAction implements Action {
 
-    /** The generated stable identifier for this action. */
+    /**
+     * The generated stable identifier for this action.
+     */
     protected final String id;
 
-    /** The display name for this action. */
+    /**
+     * The display name for this action.
+     */
     protected String name;
 
-    private final ContextMode contextMode;
+    /**
+     * The context scoping mode for this action.
+     */
+    protected final ContextMode contextMode;
 
     /**
      * Creates an action with a generated stable identifier.
@@ -77,7 +81,9 @@ public abstract class AbstractAction implements Action {
      *
      * <p>Subclasses may override this hook when a factory method needs to finish setup after construction.
      */
-    protected void initialize() {}
+    protected void initialize() {
+        // Intentionally empty
+    }
 
     /**
      * Returns the generated identifier for this action.
@@ -107,65 +113,5 @@ public abstract class AbstractAction implements Action {
     @Override
     public final ContextMode getContextMode() {
         return contextMode;
-    }
-
-    /**
-     * Executes this action.
-     *
-     * @param context the execution context
-     * @return the execution result
-     */
-    @Override
-    public final Result execute(Context context) {
-        Objects.requireNonNull(context, "context must not be null");
-        return executeSelf(contextForSelf(context));
-    }
-
-    /**
-     * Produces a skipped result for this action.
-     *
-     * @param context the execution context
-     * @return the skipped result
-     */
-    @Override
-    public final Result skip(Context context) {
-        Objects.requireNonNull(context, "context must not be null");
-        return skipSelf(contextForSelf(context));
-    }
-
-    /**
-     * Executes this action using its effective context.
-     *
-     * @param context the effective context after applying this action's context mode
-     * @return the execution result
-     */
-    protected abstract Result executeSelf(Context context);
-
-    /**
-     * Produces a skipped result using this action's effective context.
-     *
-     * @param context the effective context after applying this action's context mode
-     * @return the skipped result
-     */
-    protected abstract Result skipSelf(Context context);
-
-    /**
-     * Applies this action's context mode to the received parent context.
-     *
-     * @param context the context received from the parent action or runner
-     * @return this action's effective execution context
-     */
-    protected final Context contextForSelf(Context context) {
-        return contextMode == ContextMode.ISOLATED ? context.createChild() : context;
-    }
-
-    /**
-     * Returns the elapsed duration since the supplied instant.
-     *
-     * @param start the start instant
-     * @return the duration between {@code start} and the current instant
-     */
-    protected Duration durationSince(Instant start) {
-        return Duration.between(start, Instant.now());
     }
 }

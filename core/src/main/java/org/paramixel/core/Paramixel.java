@@ -24,13 +24,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Defines core annotations used by Paramixel discovery and execution.
+ * Namespace class holding core annotations used by Paramixel discovery and execution; not instantiable.
  *
  * <p>This class is a namespace for annotations consumed by the framework.
+ *
+ * <p>Public API.
  */
 public final class Paramixel {
 
-    private Paramixel() {}
+    private Paramixel() {
+        // Intentionally empty
+    }
 
     /**
      * Marks a method as an action factory.
@@ -79,6 +83,8 @@ public final class Paramixel {
 
     /**
      * Declares a logical tag for an action factory method.
+     *
+     * <p>Tags are consumed by {@link Selector} for tag-based discovery filtering.
      */
     @Documented
     @Retention(RetentionPolicy.RUNTIME)

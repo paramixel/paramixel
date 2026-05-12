@@ -19,6 +19,7 @@ package org.paramixel.core.internal.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -114,6 +115,6 @@ class HtmlReportListenerTest {
         assertThatThrownBy(() -> listener.runCompleted(runner, result))
                 .isInstanceOf(UncheckedIOException.class)
                 .hasMessageContaining("Unable to write HTML report file")
-                .hasCauseInstanceOf(java.io.IOException.class);
+                .hasCauseInstanceOf(IOException.class);
     }
 }

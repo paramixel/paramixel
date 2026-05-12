@@ -21,7 +21,9 @@ package org.paramixel.core.support;
  */
 public final class ElapsedTimeFormatter {
 
-    private ElapsedTimeFormatter() {}
+    private ElapsedTimeFormatter() {
+        // Intentionally empty
+    }
 
     /**
      * Formats a duration given in milliseconds into a human-readable string.

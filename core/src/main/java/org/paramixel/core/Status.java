@@ -29,7 +29,7 @@ import org.paramixel.core.internal.DefaultStatus;
 public interface Status {
 
     /**
-     * Creates a staged status.
+     * Produces a status indicating that the action has not yet been executed.
      *
      * @return a staged status
      */
@@ -38,7 +38,7 @@ public interface Status {
     }
 
     /**
-     * Creates a passing status.
+     * Produces a status indicating that the action completed successfully.
      *
      * @return a passing status
      */
@@ -47,7 +47,7 @@ public interface Status {
     }
 
     /**
-     * Creates a skipped status.
+     * Produces a status indicating that the action was intentionally skipped.
      *
      * @return a skipped status
      */
@@ -56,7 +56,7 @@ public interface Status {
     }
 
     /**
-     * Creates a skipped status with a message.
+     * Produces a status indicating that the action was skipped for the supplied reason.
      *
      * @param message the skip message
      * @return a skipped status
@@ -66,7 +66,7 @@ public interface Status {
     }
 
     /**
-     * Creates a failure status.
+     * Produces a status indicating that the action failed with a default message.
      *
      * @return a failure status
      */
@@ -75,7 +75,7 @@ public interface Status {
     }
 
     /**
-     * Creates a failure status with a throwable.
+     * Produces a status indicating that the action failed with the supplied throwable.
      *
      * @param throwable the failure throwable
      * @return a failure status
@@ -86,7 +86,7 @@ public interface Status {
     }
 
     /**
-     * Creates a failure status with a message.
+     * Produces a status indicating that the action failed with the supplied message.
      *
      * @param message the failure message
      * @return a failure status

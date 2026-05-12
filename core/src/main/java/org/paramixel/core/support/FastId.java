@@ -16,6 +16,7 @@
 
 package org.paramixel.core.support;
 
+import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -48,7 +49,9 @@ public class FastId {
     private static final AtomicLong counter =
             new AtomicLong(ThreadLocalRandom.current().nextLong(MAX_IDS));
 
-    private FastId() {}
+    private FastId() {
+        // Intentionally empty
+    }
 
     /**
      * Generates the next identifier.
@@ -75,7 +78,7 @@ public class FastId {
     }
 
     private static boolean isForbidden(String id) {
-        String lower = id.toLowerCase(java.util.Locale.ROOT);
+        String lower = id.toLowerCase(Locale.ROOT);
         for (String forbidden : FORBIDDEN) {
             if (lower.equals(forbidden)) {
                 return true;

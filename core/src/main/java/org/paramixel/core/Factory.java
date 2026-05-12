@@ -31,15 +31,19 @@ import org.paramixel.core.internal.listener.TreeSummaryRenderer;
 import org.paramixel.core.internal.listener.XmlReportListener;
 
 /**
- * Provides convenience factories for commonly used Paramixel defaults.
+ * Creates preconfigured runner and listener instances for standard Paramixel execution.
  *
  * <p>This class supplies preconfigured runner and listener instances suitable for standard command-line execution.
+ *
+ * <p>Public API.
  */
 public class Factory {
 
     private static final String TEXT_REPORT_FORMAT = "text";
 
-    private Factory() {}
+    private Factory() {
+        // Intentionally empty
+    }
 
     /**
      * Creates a runner using the framework's default configuration and listener chain.
@@ -50,7 +54,7 @@ public class Factory {
      * @return a default runner instance
      */
     public static Runner defaultRunner() {
-        return new DefaultRunner(Configuration.defaultProperties(), defaultListener(), null);
+        return new DefaultRunner(Configuration.defaultProperties(), defaultListener());
     }
 
     /**

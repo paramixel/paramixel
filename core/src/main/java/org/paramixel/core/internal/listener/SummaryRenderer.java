@@ -20,7 +20,9 @@ import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 
 /**
- * Renders a completed run summary for console-oriented listeners.
+ * Produces a human-readable summary of a completed run for console or file output.
+ *
+ * <p>SPI — implement to customize summary rendering.
  */
 public interface SummaryRenderer {
 

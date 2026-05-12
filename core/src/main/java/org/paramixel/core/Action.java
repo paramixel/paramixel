@@ -19,7 +19,7 @@ package org.paramixel.core;
 /**
  * Represents a Paramixel action.
  *
- * <p>An {@code Action} is the fundamental execution unit handled by a {@link Runner}. Actions may be composed into
+ * <p>An {@link Action} is the fundamental execution unit handled by a {@link Runner}. Actions may be composed into
  * parent-child hierarchies by implementations such as {@link CompositeAction} to model sequential, parallel, or
  * otherwise structured execution.
  *
@@ -36,10 +36,14 @@ public interface Action {
      */
     enum ContextMode {
 
-        /** Execute with a fresh child context whose parent is the received context. */
+        /**
+         * Execute with a fresh child context whose parent is the received context.
+         */
         ISOLATED,
 
-        /** Execute with the same context instance received from the parent action. */
+        /**
+         * Execute with the same context instance received from the parent action.
+         */
         SHARED
     }
 
@@ -54,7 +58,7 @@ public interface Action {
     String getId();
 
     /**
-     * Returns the display name for this action.
+     * Returns the human-readable display name used in console output and reports.
      *
      * @return the human-readable name used in output and reporting
      */

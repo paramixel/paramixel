@@ -21,7 +21,7 @@ import java.util.Objects;
 /**
  * Wraps a non-null object stored in a {@link Store}.
  *
- * <p>A {@code Value} centralizes runtime type conversion so callers can keep store operations
+ * <p>A {@link Value} centralizes runtime type conversion so callers can keep store operations
  * uniform while still retrieving strongly typed objects when needed.
  */
 public final class Value {
@@ -29,7 +29,7 @@ public final class Value {
     private final Object value;
 
     private Value(final Object value) {
-        this.value = Objects.requireNonNull(value, "value must not be null");
+        this.value = value;
     }
 
     /**
@@ -40,11 +40,11 @@ public final class Value {
      * @throws NullPointerException if {@code value} is {@code null}
      */
     public static Value of(final Object value) {
-        return new Value(value);
+        return new Value(Objects.requireNonNull(value, "value must not be null"));
     }
 
     /**
-     * Returns the wrapped object.
+     * Returns the object wrapped by this value.
      *
      * @return the wrapped object
      */

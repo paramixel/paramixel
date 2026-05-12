@@ -33,7 +33,9 @@ import java.io.InputStream;
  */
 public final class ResourceLoader {
 
-    private ResourceLoader() {}
+    private ResourceLoader() {
+        // Intentionally empty
+    }
 
     /**
      * Finds a classpath resource by name, trying the thread context ClassLoader, the defining

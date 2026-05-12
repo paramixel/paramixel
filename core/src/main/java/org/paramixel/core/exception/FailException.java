@@ -36,6 +36,7 @@ public final class FailException extends RuntimeException {
      *
      * @param message the exception message
      * @return a new failure exception
+     * @throws NullPointerException if {@code message} is {@code null}
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public static FailException of(String message) {

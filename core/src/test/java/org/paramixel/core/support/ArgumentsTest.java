@@ -20,8 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -103,7 +105,7 @@ class ArgumentsTest {
         @Test
         @DisplayName("rejects null message supplier")
         void rejectsNullMessageSupplier() {
-            assertThatThrownBy(() -> Arguments.requireNonBlank("", (java.util.function.Supplier<String>) null))
+            assertThatThrownBy(() -> Arguments.requireNonBlank("", (Supplier<String>) null))
                     .isInstanceOf(NullPointerException.class);
         }
     }
@@ -233,7 +235,7 @@ class ArgumentsTest {
         @Test
         @DisplayName("rejects null supplier")
         void rejectsNullSupplier() {
-            assertThatThrownBy(() -> Arguments.require(false, (java.util.function.Supplier<String>) null))
+            assertThatThrownBy(() -> Arguments.require(false, (Supplier<String>) null))
                     .isInstanceOf(NullPointerException.class);
         }
     }
@@ -279,7 +281,7 @@ class ArgumentsTest {
         @Test
         @DisplayName("rejects null collection")
         void rejectsNullCollection() {
-            assertThatThrownBy(() -> Arguments.requireNoNullElements((java.util.Collection<String>) null, "no nulls"))
+            assertThatThrownBy(() -> Arguments.requireNoNullElements((Collection<String>) null, "no nulls"))
                     .isInstanceOf(NullPointerException.class);
         }
 

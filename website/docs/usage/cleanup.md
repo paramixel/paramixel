@@ -68,7 +68,11 @@ cleanup.add(() -> stopOther()).run();
 
 ## Fatal errors
 
-`Error` subclasses (such as `OutOfMemoryError`, `StackOverflowError`, `ThreadDeath`) are **not caught** by cleanup tasks. If a cleanup task throws an `Error`, the cleanup loop aborts immediately and the error propagates. Remaining cleanup tasks will not run.
+`OutOfMemoryError` and `StackOverflowError` are **not caught** by cleanup tasks. If a cleanup task throws either error, the cleanup loop aborts immediately and the error propagates. Other `Error` subclasses are captured in `CleanupResult` like other cleanup failures.
+
+## Thread safety
+
+`Cleanup` is **not thread-safe**. Instances must not be shared across threads or accessed concurrently. Typical usage confines a `Cleanup` instance to a single lifecycle method pair such as `before`/`after`.
 
 ## Relationship to `Container`
 

@@ -11,6 +11,14 @@ description: Action result status.
 
 ```java
 interface Status {
+    static Status staged();
+    static Status pass();
+    static Status skip();
+    static Status skip(String message);
+    static Status failure();
+    static Status failure(Throwable throwable);
+    static Status failure(String message);
+
     boolean isStaged();
     boolean isPass();
     boolean isFailure();
@@ -50,12 +58,14 @@ This is internal to the SPI. Prefer using the interface methods (`isPass()`, `is
 
 ## Creating status instances
 
-Status instances are created internally by the framework during action execution. You do not typically create them yourself. The SPI provides factory constructors for custom action implementations:
+Status instances are created internally by the framework during built-in action execution. Custom action implementations can use the public static factories:
 
 ```java
-// In org.paramixel.core.internal.DefaultStatus:
-DefaultStatus(Kind kind)
-DefaultStatus(Kind kind, String message)
-DefaultStatus(Kind kind, Throwable throwable)
-DefaultStatus(Kind kind, String message, Throwable throwable)
+Status.staged();
+Status.pass();
+Status.skip();
+Status.skip("reason");
+Status.failure();
+Status.failure(throwable);
+Status.failure("message");
 ```

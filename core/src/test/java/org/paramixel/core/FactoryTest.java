@@ -17,6 +17,7 @@
 package org.paramixel.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -49,7 +50,14 @@ class FactoryTest {
     }
 
     @Test
-    @DisplayName("defaultListener(configuration) omits report listener when report file is absent")
+    @DisplayName("defaultListener(Map) rejects null configuration")
+    void defaultListenerRejectsNullConfiguration() {
+        assertThatThrownBy(() -> Factory.defaultListener(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("configuration must not be null");
+    }
+
+    @Test
     void defaultListenerWithReportFileAbsentOmitsReportListener() throws Exception {
         Listener listener = Factory.defaultListener(Map.of());
 

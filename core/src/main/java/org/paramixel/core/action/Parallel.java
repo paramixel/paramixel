@@ -22,45 +22,44 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
 import org.paramixel.core.Action;
+import org.paramixel.core.AsyncScheduler;
 import org.paramixel.core.CompositeAction;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.Status;
 import org.paramixel.core.internal.DefaultResult;
 import org.paramixel.core.internal.DefaultStatus;
+import org.paramixel.core.internal.SchedulerOverride;
 import org.paramixel.core.support.Arguments;
 
 /**
  * Executes child actions concurrently.
  *
- * <p>Child actions are submitted to an executor service and their concurrency is limited by a semaphore initialized
- * to the configured parallelism. When no explicit executor service is supplied, the context executor service is used.
+ * <p>Child actions are submitted to Paramixel's scheduler and their concurrency is limited by the configured
+ * parallelism.
  *
  * <p>All child actions are always submitted for execution regardless of individual outcomes. The parallel status is
  * computed from child results after all children complete: failure takes precedence over skip, and skip takes
  * precedence over pass.
  */
-public final class Parallel extends AbstractAction implements CompositeAction {
+public final class Parallel extends AbstractAction implements CompositeAction, SchedulerOverride {
 
     private final List<Action> children;
     private final int parallelism;
-    private final ExecutorService executorService;
+    private final AsyncScheduler scheduler;
 
     private Parallel(
             String name,
             int parallelism,
             List<Action> children,
-            ExecutorService executorService,
-            Action.ContextMode contextMode) {
+            Action.ContextMode contextMode,
+            AsyncScheduler scheduler) {
         super(contextMode);
         this.name = validateName(name);
         this.children = validateChildren(children);
         this.parallelism = parallelism;
-        this.executorService = executorService;
+        this.scheduler = scheduler;
     }
 
     /**
@@ -92,36 +91,37 @@ public final class Parallel extends AbstractAction implements CompositeAction {
         return parallelism;
     }
 
-    /**
-     * Returns the dedicated executor service, or an empty {@link Optional} when the context executor will be used.
-     *
-     * @return the configured executor service, or an empty {@link Optional} when none was supplied
-     */
-    public Optional<ExecutorService> getExecutorService() {
-        return Optional.ofNullable(executorService);
+    @Override
+    public Optional<AsyncScheduler> schedulerOverride() {
+        return Optional.ofNullable(scheduler);
     }
 
     @Override
-    protected Result skipSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
+    public Result skip(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
         for (Action child : children) {
             Result childResult = child.skip(context);
             result.addChild(childResult);
         }
-        result.setStatus(DefaultStatus.SKIP);
-        result.setRunDuration(Duration.ZERO);
+        result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
         return result;
     }
 
-    /** Fluent builder for {@link Parallel}. */
+    /**
+     * Fluent builder for {@link Parallel}.
+     */
     public static final class Builder {
 
         private final String name;
         private final List<Action> children = new ArrayList<>();
         private Action.ContextMode contextMode = Action.ContextMode.ISOLATED;
         private int parallelism = Integer.MAX_VALUE;
-        private ExecutorService executorService;
+        private AsyncScheduler scheduler;
         private boolean built;
 
         private Builder(String name) {
@@ -160,18 +160,19 @@ public final class Parallel extends AbstractAction implements CompositeAction {
         }
 
         /**
-         * Sets a dedicated executor service for this parallel action.
+         * Sets the scheduler used to execute this parallel action's subtree.
          *
-         * <p>When supplied, this executor service is used instead of the context executor service.
+         * <p>The scheduler receives each direct child admitted by this {@link Parallel}. Descendant calls to
+         * {@link Context#runAsync(Action)} also use this scheduler while executing within the subtree.
          *
-         * @param executorService the executor service to use
+         * @param scheduler the scheduler used for this parallel subtree
          * @return this builder
-         * @throws NullPointerException if {@code executorService} is {@code null}
+         * @throws NullPointerException if {@code scheduler} is {@code null}
          * @throws IllegalStateException if this builder has already been built
          */
-        public Builder executorService(ExecutorService executorService) {
+        public Builder scheduler(AsyncScheduler scheduler) {
             ensureNotBuilt();
-            this.executorService = Objects.requireNonNull(executorService, "executorService must not be null");
+            this.scheduler = Objects.requireNonNull(scheduler, "scheduler must not be null");
             return this;
         }
 
@@ -199,7 +200,7 @@ public final class Parallel extends AbstractAction implements CompositeAction {
             ensureNotBuilt();
             built = true;
             Arguments.require(!children.isEmpty(), "children must not be empty");
-            Parallel instance = new Parallel(name, parallelism, List.copyOf(children), executorService, contextMode);
+            var instance = new Parallel(name, parallelism, List.copyOf(children), contextMode, scheduler);
             instance.initialize();
             return instance;
         }
@@ -212,51 +213,50 @@ public final class Parallel extends AbstractAction implements CompositeAction {
     }
 
     @Override
-    protected Result executeSelf(Context context) {
-        DefaultResult result = new DefaultResult(this);
-        context.getListener().beforeAction(result);
+    public Result execute(Context context) {
+        Objects.requireNonNull(context, "context must not be null");
+        if (contextMode == Action.ContextMode.ISOLATED) {
+            context = context.createChild();
+        }
+        var result = new DefaultResult(this);
+        var listener = context.getListener();
+        listener.beforeAction(result);
         Instant start = Instant.now();
-
-        ExecutorService es = (executorService != null) ? executorService : context.getExecutorService();
-        Semaphore semaphore = new Semaphore(parallelism, true);
-        List<CompletableFuture<Result>> futures = new ArrayList<>();
 
         try {
             for (Action child : children) {
-                try {
-                    semaphore.acquire();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException(e);
-                }
-                futures.add(CompletableFuture.supplyAsync(
-                        () -> {
-                            try {
-                                return child.execute(context);
-                            } finally {
-                                semaphore.release();
-                            }
-                        },
-                        es));
+                result.addChild(child.execute(context));
             }
 
-            for (CompletableFuture<Result> f : futures) {
-                result.addChild(f.join());
-            }
-
-            result.setStatus(computeStatus(result.getChildren()));
-            result.setRunDuration(Duration.between(start, Instant.now()));
-            context.getListener().afterAction(result);
+            result.complete(computeStatus(result.getChildren()), Duration.between(start, Instant.now()));
+            listener.afterAction(result);
             return result;
         } catch (RuntimeException e) {
-            boolean interrupted = e.getCause() instanceof InterruptedException;
-            if (interrupted) {
-                result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getCause()));
-            } else {
-                result.setStatus(new DefaultStatus(DefaultStatus.Kind.FAILURE, e));
+            Throwable cause = e.getCause();
+            if (cause instanceof OutOfMemoryError || cause instanceof StackOverflowError) {
+                result.complete(
+                        new DefaultStatus(DefaultStatus.Kind.FAILURE, (Error) cause),
+                        Duration.between(start, Instant.now()));
+                listener.afterAction(result);
+                throw (Error) cause;
             }
-            result.setRunDuration(Duration.between(start, Instant.now()));
-            context.getListener().afterAction(result);
+            if (cause instanceof Error error) {
+                listener.actionThrowable(result, error);
+                result.complete(
+                        new DefaultStatus(DefaultStatus.Kind.FAILURE, error), Duration.between(start, Instant.now()));
+                listener.afterAction(result);
+                return result;
+            }
+            boolean interrupted = cause instanceof InterruptedException;
+            if (interrupted) {
+                result.complete(
+                        new DefaultStatus(DefaultStatus.Kind.FAILURE, e.getCause()),
+                        Duration.between(start, Instant.now()));
+            } else {
+                result.complete(
+                        new DefaultStatus(DefaultStatus.Kind.FAILURE, e), Duration.between(start, Instant.now()));
+            }
+            listener.afterAction(result);
             if (interrupted) {
                 Thread.currentThread().interrupt();
             }
@@ -267,13 +267,15 @@ public final class Parallel extends AbstractAction implements CompositeAction {
     private Status computeStatus(List<Result> childResults) {
         for (Result childResult : childResults) {
             Objects.requireNonNull(childResult, "childResults must not contain null elements");
-            if (childResult.getStatus().isFailure()) {
-                return DefaultStatus.FAILURE;
+            var status = childResult.getStatus();
+            if (status.isFailure()) {
+                return status;
             }
         }
         for (Result childResult : childResults) {
-            if (childResult.getStatus().isSkip()) {
-                return DefaultStatus.SKIP;
+            var status = childResult.getStatus();
+            if (status.isSkip()) {
+                return status;
             }
         }
         return DefaultStatus.PASS;
@@ -282,7 +284,7 @@ public final class Parallel extends AbstractAction implements CompositeAction {
     private List<Action> validateChildren(List<Action> children) {
         Objects.requireNonNull(children, "children must not be null");
         Arguments.requireNonEmpty(children, "children must not be empty");
-        List<Action> validated = new ArrayList<>(children.size());
+        var validated = new ArrayList<Action>(children.size());
         for (Action child : children) {
             Objects.requireNonNull(child, "children must not contain null elements");
             Arguments.require(child != this, "action must not add itself as a child");

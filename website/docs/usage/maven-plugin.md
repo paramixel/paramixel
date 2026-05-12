@@ -111,20 +111,22 @@ The plugin builds a test classloader from:
 It then calls:
 
 ```java
-Resolver.resolveActions(configuration, selector)
+Resolver.resolveActions(configuration)
 ```
 
-The configuration map is passed to the resolver so that `paramixel.parallelism` controls both thread pool sizing (in `Runner`) and discovered action parallelism (in `Resolver`).
+The configuration map is passed to the resolver so that `paramixel.parallelism` controls both default scheduler worker concurrency (in `Runner`) and discovered action parallelism (in `Resolver`).
 
 Discovered factories are always combined as a `Parallel` root.
 
 ## Configuration precedence
 
-The plugin builds configuration in this order:
+The plugin builds configuration with this effective precedence:
 
-1. `Configuration.defaultProperties()`
+1. test-classpath `paramixel.properties` and built-in defaults
 2. plugin `<properties>`
-3. system properties whose keys start with `paramixel.`
+3. `-Dparamixel.*` system properties
+
+System properties win over POM `<properties>` when both set the same key.
 
 ## Source layout note
 

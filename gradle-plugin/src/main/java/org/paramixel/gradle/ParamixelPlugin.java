@@ -31,8 +31,12 @@ import org.gradle.api.tasks.SourceSetContainer;
  */
 public class ParamixelPlugin implements Plugin<Project> {
 
-    /** Creates a Paramixel plugin instance. */
-    public ParamixelPlugin() {}
+    /**
+     * Creates a Paramixel plugin instance.
+     */
+    public ParamixelPlugin() {
+        // Intentionally empty
+    }
 
     /**
      * The Gradle plugin identifier used in {@code plugins { id(...) }} blocks.
@@ -53,16 +57,18 @@ public class ParamixelPlugin implements Plugin<Project> {
     public void apply(Project project) {
         project.getPluginManager().apply("java");
 
+        var extensions = project.getExtensions();
         ParamixelExtension extension =
-                project.getExtensions().create(EXTENSION_NAME, ParamixelExtension.class, project.getObjects());
+                extensions.create(EXTENSION_NAME, ParamixelExtension.class, project.getObjects());
 
         ProviderFactory providers = project.getProviders();
 
-        project.getTasks().register(TASK_NAME, ParamixelTestTask.class, task -> {
+        var tasks = project.getTasks();
+        tasks.register(TASK_NAME, ParamixelTestTask.class, task -> {
             task.setGroup("verification");
             task.setDescription("Discovers and executes Paramixel action trees");
 
-            SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
+            SourceSetContainer sourceSets = extensions.getByType(SourceSetContainer.class);
             SourceSet testSourceSet = sourceSets.getByName("test");
 
             task.getTestClasspath().from(testSourceSet.getRuntimeClasspath());
@@ -86,7 +92,7 @@ public class ParamixelPlugin implements Plugin<Project> {
                     stringProvider(providers, "paramixel.report.file").orElse(extension.getReportFile()));
         });
 
-        project.getTasks().named("check", check -> check.dependsOn(TASK_NAME));
+        tasks.named("check", check -> check.dependsOn(TASK_NAME));
     }
 
     private static Provider<Boolean> booleanProvider(ProviderFactory providers, String key) {

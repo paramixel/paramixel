@@ -23,7 +23,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.opentest4j.AssertionFailedError;
 import org.paramixel.core.Action;
+import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.exception.FailException;
@@ -80,6 +82,26 @@ class DirectTest {
     }
 
     @Test
+    @DisplayName("execute rejects null context")
+    void executeRejectsNullContext() {
+        Direct action = Direct.builder("direct").execute(context -> {}).build();
+
+        assertThatThrownBy(() -> action.execute(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("context must not be null");
+    }
+
+    @Test
+    @DisplayName("skip rejects null context")
+    void skipRejectsNullContext() {
+        Direct action = Direct.builder("direct").execute(context -> {}).build();
+
+        assertThatThrownBy(() -> action.skip(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("context must not be null");
+    }
+
+    @Test
     @DisplayName("builder validates arguments and one-shot behavior")
     void builderValidatesArgumentsAndOneShotBehavior() {
         assertThatThrownBy(() -> Direct.builder(null)).isInstanceOf(NullPointerException.class);
@@ -99,5 +121,63 @@ class DirectTest {
         assertThatIllegalStateException()
                 .isThrownBy(() -> builder.execute(context -> {}))
                 .withMessage("builder already built");
+    }
+
+    @Test
+    @DisplayName("AssertionError captured as failure with afterAction callback")
+    void assertionErrorCapturedAsFailureWithAfterActionCallback() {
+        AtomicBoolean afterActionCalled = new AtomicBoolean(false);
+        AtomicBoolean actionThrowableCalled = new AtomicBoolean(false);
+        Action action = Direct.builder("assertion")
+                .execute(context -> {
+                    throw new AssertionFailedError("expected true but was false");
+                })
+                .build();
+        Listener trackingListener = new Listener() {
+            @Override
+            public void actionThrowable(Result result, Throwable throwable) {
+                actionThrowableCalled.set(true);
+            }
+
+            @Override
+            public void afterAction(Result result) {
+                afterActionCalled.set(true);
+            }
+        };
+
+        Result result = Runner.builder().listener(trackingListener).build().run(action);
+
+        assertThat(result.getStatus().isFailure()).isTrue();
+        assertThat(result.getStatus().getThrowable()).isPresent().containsInstanceOf(AssertionFailedError.class);
+        assertThat(afterActionCalled).isTrue();
+        assertThat(actionThrowableCalled).isTrue();
+    }
+
+    @Test
+    @DisplayName("OutOfMemoryError rethrown from execute")
+    void outOfMemoryErrorRethrownFromExecute() {
+        Action action = Direct.builder("oom")
+                .execute(context -> {
+                    throw new OutOfMemoryError("simulated oom");
+                })
+                .build();
+
+        assertThatThrownBy(() -> Runner.builder().build().run(action))
+                .isInstanceOf(OutOfMemoryError.class)
+                .hasMessage("simulated oom");
+    }
+
+    @Test
+    @DisplayName("StackOverflowError rethrown from execute")
+    void stackOverflowErrorRethrownFromExecute() {
+        Action action = Direct.builder("soe")
+                .execute(context -> {
+                    throw new StackOverflowError("simulated stack overflow");
+                })
+                .build();
+
+        assertThatThrownBy(() -> Runner.builder().build().run(action))
+                .isInstanceOf(StackOverflowError.class)
+                .hasMessage("simulated stack overflow");
     }
 }

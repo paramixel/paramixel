@@ -133,11 +133,11 @@ class ConfigurationTest {
     }
 
     @Test
-    void shouldReturnIndependentDefaultPropertiesOnRepeatedCalls() {
+    void shouldReturnCachedDefaultPropertiesOnRepeatedCalls() {
         Map<String, String> first = Configuration.defaultProperties();
         Map<String, String> second = Configuration.defaultProperties();
         assertThat(first).isEqualTo(second);
-        assertThat(first).isNotSameAs(second);
+        assertThat(first).isSameAs(second);
     }
 
     @Test
@@ -191,7 +191,7 @@ class ConfigurationTest {
         Map<String, String> first = Configuration.defaultProperties();
         Map<String, String> second = Configuration.defaultProperties();
         assertThat(first).isEqualTo(second);
-        assertThat(first).isNotSameAs(second);
+        assertThat(first).isSameAs(second);
         assertThat(first.get(Configuration.RUNNER_PARALLELISM)).isEqualTo(second.get(Configuration.RUNNER_PARALLELISM));
     }
 }

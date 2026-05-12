@@ -25,11 +25,10 @@ import org.paramixel.core.Runner;
  * Wraps another {@link Listener} and suppresses non-{@link Error} callback failures.
  *
  * <p>When a delegate callback throws, this listener logs the problem to standard error and allows the run to
- * continue.
+ * continue. Only {@link OutOfMemoryError} and {@link StackOverflowError} are rethrown; all other {@link Error}
+ * subtypes are suppressed and logged like non-error throwables.
  */
 public class SafeListener implements Listener {
-
-    private static final String PARAMIXEL = Constants.PARAMIXEL;
 
     private final Listener delegate;
 
@@ -48,7 +47,7 @@ public class SafeListener implements Listener {
         Objects.requireNonNull(runner, "runner must not be null");
         try {
             delegate.runStarted(runner);
-        } catch (Error e) {
+        } catch (OutOfMemoryError | StackOverflowError e) {
             throw e;
         } catch (Throwable t) {
             log("runStarted", t);
@@ -60,7 +59,7 @@ public class SafeListener implements Listener {
         Objects.requireNonNull(result, "result must not be null");
         try {
             delegate.beforeAction(result);
-        } catch (Error e) {
+        } catch (OutOfMemoryError | StackOverflowError e) {
             throw e;
         } catch (Throwable t) {
             log("beforeAction", t);
@@ -73,7 +72,7 @@ public class SafeListener implements Listener {
         Objects.requireNonNull(throwable, "throwable must not be null");
         try {
             delegate.actionThrowable(result, throwable);
-        } catch (Error e) {
+        } catch (OutOfMemoryError | StackOverflowError e) {
             throw e;
         } catch (Throwable t) {
             log("actionThrowable", t);
@@ -85,7 +84,7 @@ public class SafeListener implements Listener {
         Objects.requireNonNull(result, "result must not be null");
         try {
             delegate.afterAction(result);
-        } catch (Error e) {
+        } catch (OutOfMemoryError | StackOverflowError e) {
             throw e;
         } catch (Throwable t) {
             log("afterAction", t);
@@ -97,7 +96,7 @@ public class SafeListener implements Listener {
         Objects.requireNonNull(result, "result must not be null");
         try {
             delegate.skipAction(result);
-        } catch (Error e) {
+        } catch (OutOfMemoryError | StackOverflowError e) {
             throw e;
         } catch (Throwable t) {
             log("skipAction", t);
@@ -110,7 +109,7 @@ public class SafeListener implements Listener {
         Objects.requireNonNull(result, "result must not be null");
         try {
             delegate.runCompleted(runner, result);
-        } catch (Error e) {
+        } catch (OutOfMemoryError | StackOverflowError e) {
             throw e;
         } catch (Throwable t) {
             log("runCompleted", t);
@@ -118,7 +117,7 @@ public class SafeListener implements Listener {
     }
 
     private void log(String methodName, Throwable t) {
-        System.err.println(Constants.PARAMIXEL + "Listener." + methodName + " threw exception: " + t.getMessage());
+        System.err.println(Constants.PARAMIXEL_ANSI + "Listener." + methodName + " threw exception: " + t.getMessage());
         t.printStackTrace(System.err);
     }
 }

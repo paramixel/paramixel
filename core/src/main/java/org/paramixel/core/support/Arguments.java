@@ -21,11 +21,14 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * Shared argument-validation helpers for Paramixel internals and support APIs.
+ * Argument validation methods for non-blank strings, non-empty collections, positive integers, non-negative longs,
+ * and conditional requirements.
  */
 public class Arguments {
 
-    private Arguments() {}
+    private Arguments() {
+        // Intentionally empty
+    }
 
     /**
      * Returns the supplied string when it is non-blank.
