@@ -41,6 +41,34 @@ require_maven_settings() {
     grep -q '<id>central</id>' "${settings_file}" || fail "Maven settings at ${settings_file} does not contain a <server> with <id>central</id>. See RELEASING.md for setup instructions."
 }
 
+require_java_17_home() {
+    if [[ -z "${JAVA_17_HOME:-}" ]]; then
+        fail "JAVA_17_HOME is not set. Set JAVA_17_HOME to a JDK 17 installation directory."
+    fi
+
+    if [[ ! -d "${JAVA_17_HOME}" ]]; then
+        fail "JAVA_17_HOME directory does not exist: ${JAVA_17_HOME}"
+    fi
+
+    if [[ ! -x "${JAVA_17_HOME}/bin/java" ]]; then
+        fail "JAVA_17_HOME/bin/java not executable: ${JAVA_17_HOME}/bin/java"
+    fi
+}
+
+require_build_documentation_deps() {
+    local missing=""
+
+    for cmd in node npm jq awk; do
+        if ! command -v "${cmd}" &>/dev/null; then
+            missing="${missing}${missing:+, }${cmd}"
+        fi
+    done
+
+    if [[ -n "${missing}" ]]; then
+        fail "Missing required commands for documentation build: ${missing}. Install them before running phase1."
+    fi
+}
+
 require_gradle_credentials() {
     [[ -n "${GRADLE_PUBLISH_KEY:-}" ]] || fail "GRADLE_PUBLISH_KEY is not set"
     [[ -n "${GRADLE_PUBLISH_SECRET:-}" ]] || fail "GRADLE_PUBLISH_SECRET is not set"
@@ -70,7 +98,9 @@ Usage:
 Phases:
 
   phase1 <version>    Prepare the release branch and set the version.
-                      Prints CI wait instructions on completion.
+                       Runs a full build and documentation build to verify
+                       before pushing. Prints CI wait instructions on
+                       completion.
 
   phase2 <version>    Deploy to Maven Central (Sonatype Central).
 
@@ -92,6 +122,8 @@ Prerequisites:
   - Maven Central credentials in ~/.m2/settings.xml
   - GPG signing key published to key servers
   - Clean working tree on main for phase1/phase5
+  - JAVA_17_HOME set to a JDK 17 installation (phase1, phase6)
+  - node, npm, jq, awk on PATH (phase1, for documentation build)
 
 Examples:
 
@@ -117,6 +149,8 @@ phase1() {
     local version="$1"
 
     validate_version "${version}"
+    require_java_17_home
+    require_build_documentation_deps
 
     log "Phase 1: Preparing release branch for version ${version}"
 
@@ -152,6 +186,16 @@ phase1() {
         log "Committing release"
         git add -A
         git commit -s -m "Release ${version}"
+
+        log "Running full build"
+        "${SCRIPT_DIR}/build.sh"
+
+        log "Building documentation"
+        "${SCRIPT_DIR}/build-documentation.sh"
+
+        if [[ -n "$(git status --porcelain)" ]]; then
+            fail "Uncommitted changes detected after build. Run 'git diff' to inspect, amend the commit, and retry."
+        fi
 
         log "Pushing release branch to origin"
         git push -u origin "release/${version}"

@@ -66,10 +66,12 @@ export GRADLE_PUBLISH_SECRET=YOUR_SECRET
 ### Phase 1 — Prepare the release branch
 
 ```bash
-./scripts/release.sh phase1 <VERSION>
+JAVA_17_HOME=/path/to/jdk17 ./scripts/release.sh phase1 <VERSION>
 ```
 
-Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets the version across all modules, applies spotless formatting, commits, and pushes the branch. Prints CI wait instructions on completion.
+Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets the version across all modules, applies spotless formatting, commits, runs a full build (`./scripts/build.sh`) and documentation build (`./scripts/build-documentation.sh`), and pushes the branch only if both succeed. Prints CI wait instructions on completion.
+
+**Prerequisites:** `JAVA_17_HOME` must point to a JDK 17 installation. `node`, `npm`, `jq`, and `awk` must be on `PATH` for the documentation build.
 
 **If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch, fix `main`, and start over.
 
