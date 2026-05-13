@@ -27,11 +27,6 @@ Annotation-based frameworks force you to express test logic through declarations
 
 For the full documentation, visit: **https://paramixel.github.io/paramixel**
 
-Use the version selector on the docs site to switch between versions.
-
-- **Latest** — current development docs
-- **3.y.z** — stable docs for the 3.x line
-
 ## Quick Start
 
 ### Add Dependency
@@ -149,7 +144,7 @@ See the [`examples/`](examples/src/main/java/examples/) module for more examples
 
 Most test classes have a `main` method and can be run directly from an IDE or console.
 
-You can create a `__ParamixelRunner__` in a package to run all tests in that package and its subpackages from a single entry point. See [`__ParamixelRunner__.java`](examples/src/main/java/examples/__ParamixelRunner__.java) for an example.
+You can create a `__ParamixelRunner__` in a package to run all tests in that package and its subpackages from a single entry point. See [__ParamixelRunner__.java](examples/src/main/java/examples/__ParamixelRunner__.java) for an example.
 
 ## Build from Source
 
@@ -166,9 +161,9 @@ cd paramixel
 ./mvnw clean install
 ```
 
-## Contributing Notes
+## Contributing
 
-- Javadoc conventions for the codebase are documented in [`JAVADOCS.md`](JAVADOCS.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
