@@ -72,6 +72,10 @@ JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh
 
 ## Coding Standards
 
+### Javadoc
+
+See [JAVADOCS.md](JAVADOCS.md) for guidelines on writing Javadoc comments.
+
 ### Code Formatting
 
 All code must be formatted before committing. The project uses Spotless with Palantir Java Format:
@@ -135,7 +139,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 
 ## Releasing (Maintainers)
 
-See [`RELEASING.md`](RELEASING.md).
+See [RELEASING.md](RELEASING.md).
 
 ## Review Process
 
