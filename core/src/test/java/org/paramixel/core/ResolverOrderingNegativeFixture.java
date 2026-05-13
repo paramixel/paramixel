@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package examples.context;
+package org.paramixel.core;
 
-import org.paramixel.core.Factory;
-import org.paramixel.core.Selector;
+@Paramixel.Priority(-1)
+public final class ResolverOrderingNegativeFixture {
 
-public class __ParamixelRunner__ {
+    private ResolverOrderingNegativeFixture() {
+        // Intentionally empty
+    }
 
-    public static void main(String[] args) {
-        Factory.defaultRunner()
-                .runAndExit(
-                        Selector.builder().packageOf(__ParamixelRunner__.class).build());
+    @Paramixel.ActionFactory
+    public static Action actionFactory() {
+        return new ResolverOrderingAction("negative");
     }
 }

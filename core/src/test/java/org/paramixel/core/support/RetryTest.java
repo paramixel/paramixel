@@ -80,12 +80,12 @@ class RetryTest {
 
     @Test
     @DisplayName("run rejects null executable")
-    void runRejectsNullExecutable() {
+    void runRejectsNullThrowableRunnable() {
         Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         assertThatThrownBy(() -> retry.run(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("executable must not be null");
+                .hasMessage("throwableRunnable must not be null");
     }
 
     @Test
@@ -619,12 +619,12 @@ class RetryTest {
 
     @Test
     @DisplayName("runAndThrow rejects null executable")
-    void runAndThrowRejectsNullExecutable() {
+    void runAndThrowRejectsNullThrowableRunnable() {
         Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         assertThatThrownBy(() -> retry.runAndThrow(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("executable must not be null");
+                .hasMessage("throwableRunnable must not be null");
     }
 
     @Test

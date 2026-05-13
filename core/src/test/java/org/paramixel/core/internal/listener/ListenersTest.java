@@ -73,7 +73,7 @@ class ListenersTest {
         @Test
         @DisplayName("returns simple name for Direct action in org.paramixel.core.action")
         void returnsSimpleNameForDirectAction() {
-            Action direct = Direct.builder("test").execute(context -> {}).build();
+            Action direct = Direct.builder("test").runnable(context -> {}).build();
             assertThat(Listeners.formatKind(direct)).isEqualTo("Direct");
         }
 
@@ -119,12 +119,7 @@ class ListenersTest {
         }
 
         @Override
-        public ContextMode getContextMode() {
-            return ContextMode.ISOLATED;
-        }
-
-        @Override
-        public Result execute(Context context) {
+        public Result run(Context context) {
             var result = new DefaultResult(this);
             result.complete(DefaultStatus.PASS, java.time.Duration.ZERO);
             return result;

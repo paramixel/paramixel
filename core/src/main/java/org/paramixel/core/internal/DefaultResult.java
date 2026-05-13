@@ -30,7 +30,7 @@ import org.paramixel.core.Status;
 /**
  * Default mutable {@link Result} implementation used while a run is in progress.
  *
- * <p>This SPI type stores the executed {@link Action}, aggregate child results, final {@link Status}, and run duration
+ * <p>This mutable result implementation stores the run {@link Action}, aggregate child results, final {@link Status}, and run duration
  * data. It is primarily intended for Paramixel internals and advanced integrations that need to construct result trees
  * manually.
  */
@@ -62,8 +62,8 @@ public final class DefaultResult implements Result {
      * Creates a result with explicit status and run duration values.
      *
      * @param action the action represented by this result
-     * @param status the initial status
-     * @param runDuration the initial run duration
+     * @param status the initial run status for this result
+     * @param runDuration the initial wall-clock duration for this result
      * @throws NullPointerException if any argument is {@code null}
      */
     public DefaultResult(Action action, Status status, Duration runDuration) {
@@ -80,8 +80,8 @@ public final class DefaultResult implements Result {
      * {@link #setRunDuration(Duration)} calls cannot: a concurrent reader calling {@link #getStatus()} and
      * {@link #getRunDuration()} will never observe a new status paired with a stale duration.
      *
-     * @param status the new status
-     * @param runDuration the run duration to record
+     * @param status the final run status to record
+     * @param runDuration the wall-clock duration to record atomically with the status
      * @throws NullPointerException if any argument is {@code null}
      */
     public void complete(Status status, Duration runDuration) {
@@ -93,7 +93,7 @@ public final class DefaultResult implements Result {
     /**
      * Updates the status recorded for this result, preserving the current run duration.
      *
-     * @param status the new status
+     * @param status the updated run status
      * @throws NullPointerException if {@code status} is {@code null}
      */
     public void setStatus(Status status) {
@@ -104,7 +104,7 @@ public final class DefaultResult implements Result {
     /**
      * Updates the run duration recorded for this result, preserving the current status.
      *
-     * @param runDuration the run duration to record
+     * @param runDuration the updated wall-clock duration
      * @throws NullPointerException if {@code runDuration} is {@code null}
      */
     public void setRunDuration(Duration runDuration) {
@@ -115,7 +115,7 @@ public final class DefaultResult implements Result {
     /**
      * Sets the parent result for this result.
      *
-     * @param parent the parent result
+     * @param parent the enclosing result for a nested action
      * @throws NullPointerException if {@code parent} is {@code null}
      */
     public void setParent(Result parent) {
@@ -125,7 +125,7 @@ public final class DefaultResult implements Result {
     /**
      * Adds a child result and assigns this result as its parent when possible.
      *
-     * @param child the child result to add
+     * @param child the result produced by a nested action run
      * @throws NullPointerException if {@code child} is {@code null}
      */
     public void addChild(Result child) {

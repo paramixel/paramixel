@@ -19,7 +19,6 @@ package org.paramixel.core.action;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.internal.DefaultResult;
@@ -49,9 +48,6 @@ public final class Noop extends AbstractAction {
     @Override
     public Result skip(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
         result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
@@ -61,15 +57,12 @@ public final class Noop extends AbstractAction {
     /**
      * Produces a passing result without invoking any user code.
      *
-     * @param context the execution context
-     * @return the execution result
+     * @param context the run context
+     * @return the run result
      */
     @Override
-    public Result execute(Context context) {
+    public Result run(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
         var listener = context.getListener();
         listener.beforeAction(result);

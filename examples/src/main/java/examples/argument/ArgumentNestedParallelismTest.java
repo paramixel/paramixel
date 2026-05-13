@@ -70,13 +70,13 @@ public class ArgumentNestedParallelismTest {
 
     private static Action leaf(int outerIndex, int innerIndex) {
         return Direct.builder("leaf " + outerIndex + "-" + innerIndex)
-                .execute(context -> INVOCATIONS.add("leaf " + outerIndex + "-" + innerIndex))
+                .runnable(context -> INVOCATIONS.add("leaf " + outerIndex + "-" + innerIndex))
                 .build();
     }
 
     private static Action verify() {
         return Direct.builder("verify")
-                .execute(context -> assertThat(INVOCATIONS).hasSize(OUTER_PARALLEL_COUNT * INNER_PARALLEL_COUNT))
+                .runnable(context -> assertThat(INVOCATIONS).hasSize(OUTER_PARALLEL_COUNT * INNER_PARALLEL_COUNT))
                 .build();
     }
 }

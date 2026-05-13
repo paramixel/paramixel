@@ -26,7 +26,7 @@ public interface AsyncScheduler {
     /**
      * Schedules an action for execution using the supplied parent context.
      *
-     * @param action the action to execute
+     * @param action the action to schedule for asynchronous execution
      * @param context the parent context for the scheduled action
      * @return a future completed with the action result
      */

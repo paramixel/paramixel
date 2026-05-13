@@ -36,7 +36,7 @@ public class DisabledTest {
     @Paramixel.ActionFactory
     public static Action disabledVerificationFactory() {
         return Direct.builder("DisabledVerification")
-                .execute(context -> assertThat(factoryInvoked.get())
+                .runnable(context -> assertThat(factoryInvoked.get())
                         .as("@Paramixel.Disabled must prevent the action factory from being invoked")
                         .isFalse())
                 .build();
@@ -48,19 +48,19 @@ public class DisabledTest {
         factoryInvoked.set(true);
 
         Action before = Direct.builder("before")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new AssertionError("Disabled action must not execute");
                 })
                 .build();
 
         Action child = Direct.builder("disabled-leaf")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new AssertionError("Disabled action must not execute");
                 })
                 .build();
 
         Action after = Direct.builder("after")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new AssertionError("Disabled action must not execute");
                 })
                 .build();

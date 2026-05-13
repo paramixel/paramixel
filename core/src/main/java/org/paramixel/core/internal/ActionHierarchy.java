@@ -63,7 +63,7 @@ public final class ActionHierarchy {
      * Returns the root-to-action path for an action when an index is installed.
      *
      * @param action the action
-     * @return the indexed path, or empty when the action is not known
+     * @return the root-to-action path, or an empty {@link Optional} when no hierarchy is installed or the action is not in the installed index
      */
     public static Optional<List<Action>> pathOf(Action action) {
         Objects.requireNonNull(action, "action must not be null");

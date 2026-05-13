@@ -74,7 +74,7 @@ public final class Selector {
     /**
      * Returns the tag-match pattern configured for this selector.
      *
-     * @return the tag pattern, or {@code null} when no tag criterion is configured
+     * @return the tag pattern, or {@code null} when no tag criterion is configured, callers must check for {@code null}
      */
     public Pattern getTagPattern() {
         return tagPattern;

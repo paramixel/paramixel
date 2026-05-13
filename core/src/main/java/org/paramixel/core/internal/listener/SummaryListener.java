@@ -108,21 +108,33 @@ public class SummaryListener implements Listener {
         var writer = getWriter();
         var prefix = getPrefix();
         var version = Version.getVersion();
-        writer.println(prefix);
-        writer.println(prefix + "Paramixel v" + version);
+        String versionLine = "Paramixel v" + version;
+        String statusLine = "Status      : " + Listeners.formatStatus(result.getStatus());
+        String finishedLine =
+                "Finished at : " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String timeLine = "Total time  : "
+                + ElapsedTimeFormatter.formatElapsedTime(result.getRunDuration().toMillis());
+
+        int maxLineLength = Math.max(
+                Math.max(versionLine.length(), statusLine.length()),
+                Math.max(finishedLine.length(), timeLine.length()));
+        String dashes = "-".repeat(maxLineLength);
+
+        writer.println(prefix + dashes);
+        writer.println(prefix + versionLine);
 
         summaryRenderer.renderSummary(runner, result);
 
-        long runDurationMillis = result.getRunDuration().toMillis();
-        String runDurationString = ElapsedTimeFormatter.formatElapsedTime(runDurationMillis);
+        String runDurationString =
+                ElapsedTimeFormatter.formatElapsedTime(result.getRunDuration().toMillis());
 
-        writer.println(prefix);
-        writer.println(prefix + "Paramixel v" + version);
-        writer.println(prefix);
+        writer.println(prefix + dashes);
+        writer.println(prefix + versionLine);
+        writer.println(prefix + dashes);
         writer.println(prefix + "Status      : " + formatStatus(result.getStatus()));
         writer.println(prefix + "Finished at : "
                 + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         writer.println(prefix + "Total time  : " + runDurationString);
-        writer.println(prefix);
+        writer.println(prefix + dashes);
     }
 }

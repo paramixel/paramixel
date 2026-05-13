@@ -274,6 +274,17 @@ class ResolverTest {
         }
 
         @Test
+        @DisplayName("orders resolved actions by priority then class name")
+        void ordersResolvedActionsByPriorityThenClassName() {
+            Optional<Action> result = Resolver.resolveActions(Map.of(Configuration.CLASS_MATCH, "ResolverOrdering"));
+
+            assertThat(result).isPresent();
+            assertThat(((Parallel) result.orElseThrow()).getChildren())
+                    .extracting(Action::getId)
+                    .containsExactly("high", "alpha", "beta", "negative");
+        }
+
+        @Test
         @DisplayName("throws ConfigurationException for invalid configured tag regex")
         void throwsConfigurationExceptionForInvalidConfiguredTagRegex() {
             assertThatThrownBy(() -> Resolver.resolveActions(Map.of(Configuration.TAG_MATCH, "[")))
@@ -301,27 +312,27 @@ class ResolverTest {
     static class ParentFactory {
         @Paramixel.ActionFactory
         public static Action actionFactory() {
-            return Direct.builder("parent-action").execute(context -> {}).build();
+            return Direct.builder("parent-action").runnable(context -> {}).build();
         }
     }
 
     static class ChildOverridesWithoutFactory extends ParentFactory {
         public static Action actionFactory() {
-            return Direct.builder("child-action").execute(context -> {}).build();
+            return Direct.builder("child-action").runnable(context -> {}).build();
         }
     }
 
     static class ParentFactoryTwo {
         @Paramixel.ActionFactory
         public static Action parentAction() {
-            return Direct.builder("parent-action").execute(context -> {}).build();
+            return Direct.builder("parent-action").runnable(context -> {}).build();
         }
     }
 
     static class ChildDeclaresOwnFactory extends ParentFactoryTwo {
         @Paramixel.ActionFactory
         public static Action childAction() {
-            return Direct.builder("child-action").execute(context -> {}).build();
+            return Direct.builder("child-action").runnable(context -> {}).build();
         }
     }
 
@@ -329,7 +340,7 @@ class ResolverTest {
         @Paramixel.ActionFactory
         @Paramixel.Tag(" ")
         public static Action actionFactory() {
-            return Direct.builder("blank-tag-action").execute(context -> {}).build();
+            return Direct.builder("blank-tag-action").runnable(context -> {}).build();
         }
     }
 

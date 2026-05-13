@@ -19,10 +19,8 @@ package examples.argument;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.paramixel.core.Action;
-import org.paramixel.core.Action.ContextMode;
 import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
-import org.paramixel.core.Value;
 import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Noop;
@@ -62,8 +60,7 @@ public class ArgumentContextMethodsTest {
 
     private static Action before(String argumentName) {
         return Direct.builder("before")
-                .contextMode(ContextMode.SHARED)
-                .execute(context -> context.getStore().put("argument", Value.of(new TestStoreValue(argumentName))))
+                .runnable(context -> context.getStore().put("argument", new TestStoreValue(argumentName)))
                 .build();
     }
 
@@ -80,14 +77,12 @@ public class ArgumentContextMethodsTest {
 
     private static Action assertContext(String argumentName) {
         return Direct.builder("assert-context")
-                .execute(context -> {
-                    assertThat(context.getParent()).isPresent();
-                    assertThat(context.findAncestor(2)
-                                    .orElseThrow()
+                .runnable(context -> {
+                    assertThat(context.getParent()).isNotNull();
+                    assertThat(context.getAncestor("../../")
                                     .getStore()
-                                    .get("argument")
+                                    .get("argument", TestStoreValue.class)
                                     .orElseThrow()
-                                    .cast(TestStoreValue.class)
                                     .argumentName())
                             .isEqualTo(argumentName);
                 })

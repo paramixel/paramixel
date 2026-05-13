@@ -31,11 +31,9 @@ import org.paramixel.core.internal.listener.TreeSummaryRenderer;
 import org.paramixel.core.internal.listener.XmlReportListener;
 
 /**
- * Creates preconfigured runner and listener instances for standard Paramixel execution.
+ * Creates preconfigured runner and listener instances for standard Paramixel runs.
  *
- * <p>This class supplies preconfigured runner and listener instances suitable for standard command-line execution.
- *
- * <p>Public API.
+ * <p>This class supplies preconfigured runner and listener instances suitable for standard command-line runs.
  */
 public class Factory {
 
@@ -75,8 +73,7 @@ public class Factory {
      * Creates the default listener chain used by Paramixel for the supplied configuration.
      *
      * <p>When {@link Configuration#REPORT_FILE} is configured, the returned chain includes a report listener in addition
-     * to the standard console listeners. The report listener type is inferred from the report file extension. Deprecated
-     * {@link Configuration#REPORT_FORMAT} values remain honored for compatibility, but emit a warning.
+     * to the standard console listeners. The report listener type is inferred from the report file extension.
      *
      * @param configuration the effective Paramixel configuration
      * @return the default listener
@@ -89,21 +86,14 @@ public class Factory {
             return defaultListener();
         }
 
-        String format = resolveReportFormat(configuration, reportFile);
+        String format = resolveReportFormat(reportFile);
 
         Listener reportListener = createReportListener(format, reportFile);
         return new SafeListener(new CompositeListener(
                 new StatusListener(), new SummaryListener(new TreeSummaryRenderer()), reportListener));
     }
 
-    @SuppressWarnings("removal")
-    private static String resolveReportFormat(final Map<String, String> configuration, final String reportFile) {
-        String explicitFormat = configuration.get(Configuration.REPORT_FORMAT);
-        if (!isBlank(explicitFormat)) {
-            warnDeprecatedReportFormat();
-            return explicitFormat;
-        }
-
+    private static String resolveReportFormat(final String reportFile) {
         String lowerReportFile = reportFile.toLowerCase(Locale.ROOT);
         if (lowerReportFile.endsWith(".json")) {
             return "json";
@@ -111,15 +101,8 @@ public class Factory {
             return "xml";
         } else if (lowerReportFile.endsWith(".html")) {
             return "html";
-        } else if (lowerReportFile.endsWith(".log") || lowerReportFile.endsWith(".txt")) {
-            return TEXT_REPORT_FORMAT;
         }
         return TEXT_REPORT_FORMAT;
-    }
-
-    private static void warnDeprecatedReportFormat() {
-        System.err.println("WARNING: 'paramixel.report.format' is deprecated and will be removed in a future release. "
-                + "Use a report file extension such as .txt, .json, .xml, or .html instead.");
     }
 
     private static boolean isBlank(final String value) {

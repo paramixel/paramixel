@@ -17,9 +17,9 @@
 package org.paramixel.core;
 
 /**
- * Receives lifecycle callbacks during action execution.
+ * Receives lifecycle callbacks during action runs.
  *
- * <p>A {@link Listener} can observe the overall run as well as individual action execution events. All methods provide
+ * <p>A {@link Listener} can observe the overall run as well as individual action run events. All methods provide
  * default no-op implementations so callers may override only the callbacks they need.
  *
  * <p>Listeners that hold resources (such as open file handles) should override {@link #close()} to release them.
@@ -33,7 +33,7 @@ package org.paramixel.core;
 public interface Listener extends AutoCloseable {
 
     /**
-     * Invoked once before the runner starts executing the requested action tree.
+     * Invoked once before the runner starts running the requested action tree.
      *
      * @param runner the active runner
      */
@@ -42,26 +42,26 @@ public interface Listener extends AutoCloseable {
     }
 
     /**
-     * Invoked immediately before an action begins execution.
+     * Invoked immediately before an action begins running.
      *
-     * @param result the mutable or in-progress result associated with the action about to execute
+     * @param result the mutable or in-progress result associated with the action about to run
      */
     default void beforeAction(Result result) {
         // Intentionally empty
     }
 
     /**
-     * Invoked when action execution throws an exception or error condition that is being reported.
+     * Invoked when an action run throws an exception or error condition that is being reported.
      *
      * @param result the result associated with the failing action
-     * @param throwable the reported throwable
+     * @param throwable the exception or error that caused the action to fail
      */
     default void actionThrowable(Result result, Throwable throwable) {
         // Intentionally empty
     }
 
     /**
-     * Invoked after an action finishes execution.
+     * Invoked after an action finishes running.
      *
      * @param result the completed result for the action
      */
@@ -70,7 +70,7 @@ public interface Listener extends AutoCloseable {
     }
 
     /**
-     * Invoked when an action is skipped rather than executed.
+     * Invoked when an action is skipped rather than run.
      *
      * @param result the result representing the skipped action
      */

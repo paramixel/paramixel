@@ -40,7 +40,7 @@ import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Parallel;
 
 /**
- * Default scheduler implementation that owns all Paramixel worker execution.
+ * Schedules action runs on a bounded thread pool, enforcing global and per-parallel parallelism limits.
  */
 public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseable {
 
@@ -49,7 +49,10 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
     private final ExecutorService executorService;
     private final int globalParallelism;
     private final ArrayDeque<RunnableTask> ready = new ArrayDeque<>();
+    private final ArrayDeque<Runnable> permitWaiters = new ArrayDeque<>();
+    private final ThreadLocal<Boolean> schedulerWorker = ThreadLocal.withInitial(() -> false);
     private int running;
+    private int activePermits;
 
     /**
      * Creates a scheduler using the configured default parallelism.
@@ -67,9 +70,15 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
     public CompletableFuture<Result> runAsync(Action action, Context context) {
         Objects.requireNonNull(action, "action must not be null");
         Objects.requireNonNull(context, "context must not be null");
-        return schedule(action, context);
+        if (globalParallelism == 1 && schedulerWorker.get()) {
+            return executeInline(action, context);
+        }
+        return schedule(action, context, null);
     }
 
+    /**
+     * Shuts down the worker pool, waiting up to 5 seconds before forcing termination.
+     */
     @Override
     public void close() {
         executorService.shutdown();
@@ -83,20 +92,32 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         }
     }
 
-    private CompletableFuture<Result> schedule(Action action, Context parentContext) {
+    private CompletableFuture<Result> schedule(Action action, Context parentContext, Permit permit) {
         if (action instanceof Parallel parallel) {
-            return scheduleParallel(parallel, parentContext);
+            return scheduleParallel(parallel, parentContext, permit);
         }
         if (action instanceof Container container) {
-            return scheduleContainer(container, parentContext);
+            return scheduleContainer(container, parentContext, permit);
         }
-        return scheduleExecutable(action, parentContext);
+        return scheduleExecutable(action, parentContext, permit);
     }
 
-    private CompletableFuture<Result> scheduleExecutable(Action action, Context context) {
+    private CompletableFuture<Result> scheduleExecutable(Action action, Context context, Permit permit) {
         var future = new CompletableFuture<Result>();
         enqueue(new RunnableTask(action, context, future));
         return future;
+    }
+
+    private CompletableFuture<Result> executeInline(Action action, Context context) {
+        try {
+            return CompletableFuture.completedFuture(action.run(context));
+        } catch (OutOfMemoryError | StackOverflowError e) {
+            return CompletableFuture.failedFuture(e);
+        } catch (Error e) {
+            return CompletableFuture.completedFuture(failureResult(action, context, e));
+        } catch (Throwable t) {
+            return CompletableFuture.failedFuture(t);
+        }
     }
 
     private void enqueue(RunnableTask task) {
@@ -121,8 +142,9 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
     }
 
     private void executeTask(RunnableTask task) {
+        schedulerWorker.set(true);
         try {
-            task.future().complete(task.action().execute(task.context()));
+            task.future().complete(task.action().run(task.context()));
         } catch (OutOfMemoryError | StackOverflowError e) {
             task.future().completeExceptionally(e);
         } catch (Error e) {
@@ -130,6 +152,7 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         } catch (Throwable t) {
             task.future().completeExceptionally(t);
         } finally {
+            schedulerWorker.remove();
             synchronized (this) {
                 running--;
                 drainLocked();
@@ -137,38 +160,63 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         }
     }
 
-    private CompletableFuture<Result> scheduleParallel(Parallel parallel, Context parentContext) {
-        Context context = contextFor(parallel, parentContext);
+    private CompletableFuture<Result> scheduleParallel(Parallel parallel, Context parentContext, Permit permit) {
         SchedulerOverride override = parallel;
-        Context baseContext = context;
-        context = override.schedulerOverride()
-                .map(scheduler -> withScheduler(baseContext, scheduler))
-                .orElse(context);
+        boolean usesDefaultScheduler = override.schedulerOverride().isEmpty();
+        Context context = override.schedulerOverride()
+                .map(scheduler -> withScheduler(parentContext, scheduler))
+                .orElse(parentContext);
         var result = new DefaultResult(parallel);
         Listener listener = context.getListener();
         listener.beforeAction(result);
         Instant start = Instant.now();
         var children = parallel.getChildren();
         var completion = new CompletableFuture<Result>();
-        var state = new ParallelState(parallel, context, result, completion, start, children);
+        var state =
+                new ParallelState(parallel, context, result, completion, start, children, permit, usesDefaultScheduler);
         state.drain();
         return completion;
     }
 
-    private CompletableFuture<Result> scheduleContainer(Container container, Context parentContext) {
-        Context context = contextFor(container, parentContext);
+    private CompletableFuture<Result> scheduleContainer(Container container, Context parentContext, Permit permit) {
         var result = new DefaultResult(container);
-        Listener listener = context.getListener();
+        Listener listener = parentContext.getListener();
         listener.beforeAction(result);
         Instant start = Instant.now();
         var completion = new CompletableFuture<Result>();
-        var state = new ContainerState(container, context, result, completion, start);
+        var state = new ContainerState(container, parentContext, result, completion, start, permit);
         state.start();
         return completion;
     }
 
-    private Context contextFor(Action action, Context context) {
-        return action.getContextMode() == Action.ContextMode.ISOLATED ? context.createChild() : context;
+    private Permit tryAcquirePermit() {
+        synchronized (this) {
+            if (activePermits >= globalParallelism) {
+                return null;
+            }
+            activePermits++;
+            return new Permit();
+        }
+    }
+
+    private void releasePermit(Permit permit) {
+        if (permit == null) {
+            return;
+        }
+        Runnable waiter;
+        synchronized (this) {
+            activePermits--;
+            waiter = permitWaiters.pollFirst();
+        }
+        if (waiter != null) {
+            waiter.run();
+        }
+    }
+
+    private void awaitPermit(Runnable waiter) {
+        synchronized (this) {
+            permitWaiters.addLast(waiter);
+        }
     }
 
     private Context withScheduler(Context context, AsyncScheduler scheduler) {
@@ -221,6 +269,8 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         return DefaultStatus.PASS;
     }
 
+    private static final class Permit {}
+
     private record RunnableTask(Action action, Context context, CompletableFuture<Result> future) {}
 
     private record SchedulerContext(Context delegate, AsyncScheduler scheduler) implements Context {
@@ -236,7 +286,7 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         }
 
         @Override
-        public java.util.Optional<Context> getParent() {
+        public Context getParent() {
             return delegate.getParent();
         }
 
@@ -256,8 +306,18 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         }
 
         @Override
-        public java.util.Optional<Context> findAncestor(int levelUp) {
-            return delegate.findAncestor(levelUp);
+        public java.util.Optional<Context> findParent() {
+            return delegate.findParent();
+        }
+
+        @Override
+        public Context getAncestor(String path) {
+            return delegate.getAncestor(path);
+        }
+
+        @Override
+        public java.util.Optional<Context> findAncestor(String path) {
+            return delegate.findAncestor(path);
         }
 
         @Override
@@ -273,11 +333,15 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         private final CompletableFuture<Result> completion;
         private final Instant start;
         private final List<Action> children;
+        private final Permit inheritedPermit;
+        private final boolean usesDefaultScheduler;
         private int nextIndex;
         private int active;
         private int completed;
+        private boolean inheritedPermitAvailable;
         private boolean failed;
         private boolean done;
+        private boolean waitingForPermit;
 
         private ParallelState(
                 Parallel parallel,
@@ -285,52 +349,103 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
                 DefaultResult result,
                 CompletableFuture<Result> completion,
                 Instant start,
-                List<Action> children) {
+                List<Action> children,
+                Permit inheritedPermit,
+                boolean usesDefaultScheduler) {
             this.parallel = parallel;
             this.context = context;
             this.result = result;
             this.completion = completion;
             this.start = start;
             this.children = children;
+            this.inheritedPermit = inheritedPermit;
+            this.inheritedPermitAvailable = inheritedPermit != null;
+            this.usesDefaultScheduler = usesDefaultScheduler;
         }
 
         private void drain() {
-            List<Action> toSchedule = new ArrayList<>();
+            List<AdmittedChild> toSchedule = new ArrayList<>();
             synchronized (this) {
                 while (!failed && active < parallel.getParallelism() && nextIndex < children.size()) {
+                    Permit permit = admitPermit();
+                    if (usesDefaultScheduler && permit == null) {
+                        if (!waitingForPermit) {
+                            waitingForPermit = true;
+                            awaitPermit(this::drain);
+                        }
+                        break;
+                    }
+                    waitingForPermit = false;
                     active++;
-                    toSchedule.add(children.get(nextIndex++));
+                    toSchedule.add(new AdmittedChild(children.get(nextIndex++), permit));
                 }
                 if (completed == children.size()) {
                     complete();
                     return;
                 }
             }
-            for (Action child : toSchedule) {
-                context.runAsync(child).whenComplete((childResult, throwable) -> {
+            for (AdmittedChild admittedChild : toSchedule) {
+                Action child = admittedChild.action();
+                scheduleChild(child, admittedChild.permit()).whenComplete((childResult, throwable) -> {
                     Throwable unwrapped = throwable == null ? null : unwrap(throwable);
                     if (unwrapped instanceof OutOfMemoryError || unwrapped instanceof StackOverflowError) {
+                        releaseChildPermit(admittedChild.permit());
                         completion.completeExceptionally(unwrapped);
                         return;
                     }
+                    boolean continueDraining;
                     synchronized (this) {
                         active--;
                         completed++;
                         if (done) {
-                            return;
-                        }
-                        if (unwrapped != null) {
+                            continueDraining = false;
+                        } else if (unwrapped != null) {
                             failed = true;
                             result.addChild(failureResult(child, context, unwrapped));
                             completeExceptionally(unwrapped);
-                            return;
+                            continueDraining = false;
                         } else {
                             result.addChild(childResult);
+                            continueDraining = true;
                         }
+                    }
+                    releaseChildPermit(admittedChild.permit());
+                    if (!continueDraining) {
+                        return;
                     }
                     drain();
                     DefaultAsyncScheduler.this.drain();
                 });
+            }
+        }
+
+        private CompletableFuture<Result> scheduleChild(Action child, Permit permit) {
+            Context childContext = context.createChild();
+            if (!usesDefaultScheduler) {
+                return childContext.runAsync(child);
+            }
+            return DefaultAsyncScheduler.this.schedule(child, childContext, permit);
+        }
+
+        private Permit admitPermit() {
+            if (!usesDefaultScheduler) {
+                return null;
+            }
+            if (inheritedPermitAvailable) {
+                inheritedPermitAvailable = false;
+                return inheritedPermit;
+            }
+            return tryAcquirePermit();
+        }
+
+        private void releaseChildPermit(Permit permit) {
+            if (!usesDefaultScheduler || permit == null) {
+                return;
+            }
+            if (permit == inheritedPermit) {
+                inheritedPermitAvailable = true;
+            } else {
+                releasePermit(permit);
             }
         }
 
@@ -355,6 +470,8 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         }
     }
 
+    private record AdmittedChild(Action action, Permit permit) {}
+
     private final class ContainerState {
         private final Container container;
         private final Context context;
@@ -363,24 +480,27 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
         private final Instant start;
         private final List<Result> statusResults = new ArrayList<>();
         private final List<Action> bodyChildren;
+        private final Permit permit;
 
         private ContainerState(
                 Container container,
                 Context context,
                 DefaultResult result,
                 CompletableFuture<Result> completion,
-                Instant start) {
+                Instant start,
+                Permit permit) {
             this.container = container;
             this.context = context;
             this.result = result;
             this.completion = completion;
             this.start = start;
             this.bodyChildren = container.orderedBodyChildren();
+            this.permit = permit;
         }
 
         private void start() {
             if (container.getBefore().isPresent()) {
-                scheduleChild(container.getBefore().orElseThrow(), beforeResult -> {
+                scheduleLifecycleChild(container.getBefore().orElseThrow(), beforeResult -> {
                     if (beforeResult.getStatus().isFailure()
                             || beforeResult.getStatus().isSkip()) {
                         skipBodyThenAfter();
@@ -399,12 +519,12 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
                 return;
             }
             Action child = bodyChildren.get(index);
-            scheduleChild(child, childResult -> {
+            scheduleBodyChild(child, childResult -> {
                 var childStatus = childResult.getStatus();
                 if (container.getPolicy().childMode() == Container.ChildMode.DEPENDENT
                         && (childStatus.isFailure() || childStatus.isSkip())) {
                     for (Action remaining : bodyChildren.subList(index + 1, bodyChildren.size())) {
-                        Result skipResult = remaining.skip(context);
+                        Result skipResult = remaining.skip(context.createChild());
                         result.addChild(skipResult);
                         statusResults.add(skipResult);
                     }
@@ -417,7 +537,7 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
 
         private void skipBodyThenAfter() {
             for (Action child : bodyChildren) {
-                Result skipResult = child.skip(context);
+                Result skipResult = child.skip(context.createChild());
                 result.addChild(skipResult);
                 statusResults.add(skipResult);
             }
@@ -426,20 +546,36 @@ public final class DefaultAsyncScheduler implements AsyncScheduler, AutoCloseabl
 
         private void runAfter() {
             if (container.getAfter().isPresent()) {
-                scheduleChild(container.getAfter().orElseThrow(), ignored -> complete());
+                scheduleLifecycleChild(container.getAfter().orElseThrow(), ignored -> complete());
             } else {
                 complete();
             }
         }
 
-        private void scheduleChild(Action child, java.util.function.Consumer<Result> next) {
-            DefaultAsyncScheduler.this.schedule(child, context).whenComplete((childResult, throwable) -> {
+        private void scheduleLifecycleChild(Action child, java.util.function.Consumer<Result> next) {
+            DefaultAsyncScheduler.this.schedule(child, context, permit).whenComplete((childResult, throwable) -> {
                 Throwable unwrapped = throwable == null ? null : unwrap(throwable);
                 if (unwrapped instanceof OutOfMemoryError || unwrapped instanceof StackOverflowError) {
                     completion.completeExceptionally(unwrapped);
                     return;
                 }
                 Result resolved = unwrapped == null ? childResult : failureResult(child, context, unwrapped);
+                result.addChild(resolved);
+                statusResults.add(resolved);
+                next.accept(resolved);
+                DefaultAsyncScheduler.this.drain();
+            });
+        }
+
+        private void scheduleBodyChild(Action child, java.util.function.Consumer<Result> next) {
+            Context childContext = context.createChild();
+            DefaultAsyncScheduler.this.schedule(child, childContext, permit).whenComplete((childResult, throwable) -> {
+                Throwable unwrapped = throwable == null ? null : unwrap(throwable);
+                if (unwrapped instanceof OutOfMemoryError || unwrapped instanceof StackOverflowError) {
+                    completion.completeExceptionally(unwrapped);
+                    return;
+                }
+                Result resolved = unwrapped == null ? childResult : failureResult(child, childContext, unwrapped);
                 result.addChild(resolved);
                 statusResults.add(resolved);
                 next.accept(resolved);

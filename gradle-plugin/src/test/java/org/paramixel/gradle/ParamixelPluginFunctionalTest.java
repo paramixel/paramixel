@@ -162,7 +162,7 @@ class ParamixelPluginFunctionalTest {
                 + "    @Paramixel.ActionFactory\n"
                 + "    public static Action actionFactory() {\n"
                 + "        return Direct.builder(\"sample-test\")\n"
-                + "                .execute(context -> {})\n"
+                + "                .runnable(context -> {})\n"
                 + "                .build();\n"
                 + "    }\n"
                 + "}\n");

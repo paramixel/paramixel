@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.core.support.Cleanup.Executable;
+import org.paramixel.core.support.Cleanup.ThrowableRunnable;
 
 @DisplayName("Cleanup")
 class CleanupTest {
@@ -77,19 +77,19 @@ class CleanupTest {
 
     @Test
     @DisplayName("add rejects null executable")
-    void addRejectsNullExecutable() {
+    void addRejectsNullThrowableRunnable() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> cleanup.add((Executable) null))
+        assertThatThrownBy(() -> cleanup.add((ThrowableRunnable) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("executable must not be null");
+                .hasMessage("throwableRunnable must not be null");
     }
 
     @Test
     @DisplayName("add with list registers all executables in REVERSE mode")
     void addListRegistersAllGetExecutables() {
         var executionOrder = new ArrayList<String>();
-        List<Executable> tasks = List.of(
+        List<ThrowableRunnable> tasks = List.of(
                 () -> executionOrder.add("first"),
                 () -> executionOrder.add("second"),
                 () -> executionOrder.add("third"));
@@ -103,7 +103,7 @@ class CleanupTest {
     @DisplayName("add with list registers all executables in FORWARD mode")
     void addListRegistersAllGetExecutablesInForwardMode() {
         var executionOrder = new ArrayList<String>();
-        List<Executable> tasks = List.of(
+        List<ThrowableRunnable> tasks = List.of(
                 () -> executionOrder.add("first"),
                 () -> executionOrder.add("second"),
                 () -> executionOrder.add("third"));
@@ -118,9 +118,9 @@ class CleanupTest {
     void addListRejectsNullList() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> cleanup.add((List<Executable>) null))
+        assertThatThrownBy(() -> cleanup.add((List<ThrowableRunnable>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("executables must not be null");
+                .hasMessage("throwableRunnables must not be null");
     }
 
     @Test
@@ -168,9 +168,9 @@ class CleanupTest {
     void addVarargRejectsNullArray() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> cleanup.add((Executable[]) null))
+        assertThatThrownBy(() -> cleanup.add((ThrowableRunnable[]) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("executables must not be null");
+                .hasMessage("throwableRunnables must not be null");
     }
 
     @Test
@@ -180,7 +180,7 @@ class CleanupTest {
 
         assertThatThrownBy(() -> cleanup.add(() -> {}, null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("executable must not be null");
+                .hasMessage("throwableRunnable must not be null");
     }
 
     @Test
@@ -253,12 +253,12 @@ class CleanupTest {
 
     @Test
     @DisplayName("addWhen rejects null executable")
-    void addWhenRejectsNullExecutable() {
+    void addWhenRejectsNullThrowableRunnable() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE);
 
-        assertThatThrownBy(() -> cleanup.addWhen(() -> true, (Executable) null))
+        assertThatThrownBy(() -> cleanup.addWhen(() -> true, (ThrowableRunnable) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("executable must not be null");
+                .hasMessage("throwableRunnable must not be null");
     }
 
     @Test
@@ -335,7 +335,7 @@ class CleanupTest {
 
         CleanupResult result = cleanup.run();
 
-        assertThat(result.getExecutableCount()).isEqualTo(3);
+        assertThat(result.getThrowableRunnableCount()).isEqualTo(3);
     }
 
     @Test
@@ -348,18 +348,19 @@ class CleanupTest {
     }
 
     @Test
-    @DisplayName("getExecutables returns immutable snapshot")
-    void getExecutablesReturnsImmutableSnapshot() {
+    @DisplayName("getThrowableRunnables returns immutable snapshot")
+    void getThrowableRunnablesReturnsImmutableSnapshot() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.REVERSE).add(() -> {});
 
-        assertThatThrownBy(() -> cleanup.getExecutables().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> cleanup.getThrowableRunnables().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
-    @DisplayName("getExecutables returns snapshot not affected by later mutations")
-    void getExecutablesReturnsSnapshotNotAffectedByLaterMutations() {
+    @DisplayName("getThrowableRunnables returns snapshot not affected by later mutations")
+    void getThrowableRunnablesReturnsSnapshotNotAffectedByLaterMutations() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD);
-        List<Executable> snapshot = cleanup.getExecutables();
+        List<ThrowableRunnable> snapshot = cleanup.getThrowableRunnables();
         assertThat(snapshot).isEmpty();
 
         cleanup.add(() -> {});
@@ -368,10 +369,10 @@ class CleanupTest {
     }
 
     @Test
-    @DisplayName("getExecutables snapshot reflects executables at time of call")
-    void getExecutablesSnapshotReflectsStateAtCallTime() {
+    @DisplayName("getThrowableRunnables snapshot reflects throwableRunnables at time of call")
+    void getThrowableRunnablesSnapshotReflectsStateAtCallTime() {
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> {}).add(() -> {});
-        List<Executable> snapshot = cleanup.getExecutables();
+        List<ThrowableRunnable> snapshot = cleanup.getThrowableRunnables();
         assertThat(snapshot).hasSize(2);
     }
 
@@ -597,7 +598,7 @@ class CleanupTest {
 
     @Test
     @DisplayName("reset preserves executables and allows re-run")
-    void resetPreservesExecutablesAndAllowsReRun() {
+    void resetPreservesThrowableRunnablesAndAllowsReRun() {
         var executionOrder = new ArrayList<String>();
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> executionOrder.add("first"))
@@ -616,7 +617,7 @@ class CleanupTest {
 
     @Test
     @DisplayName("clear clears executables and allows re-run")
-    void clearClearsExecutablesAndAllowsReRun() {
+    void clearClearsThrowableRunnablesAndAllowsReRun() {
         var executionOrder = new ArrayList<String>();
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD)
                 .add(() -> executionOrder.add("first"))
@@ -655,7 +656,7 @@ class CleanupTest {
 
     @Test
     @DisplayName("reset on unrun cleanup preserves executables")
-    void resetOnUnrunCleanupPreservesExecutables() {
+    void resetOnUnrunCleanupPreservesThrowableRunnables() {
         var executionOrder = new ArrayList<String>();
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> executionOrder.add("executed"));
 
@@ -668,7 +669,7 @@ class CleanupTest {
 
     @Test
     @DisplayName("clear on unrun cleanup clears executables and resets state")
-    void clearOnUnrunCleanupClearsExecutables() {
+    void clearOnUnrunCleanupClearsThrowableRunnables() {
         var executionOrder = new ArrayList<String>();
         Cleanup cleanup = Cleanup.of(Cleanup.Mode.FORWARD).add(() -> executionOrder.add("executed"));
 
@@ -694,7 +695,7 @@ class CleanupTest {
 
         CleanupResult result = cleanup.run();
         assertThat(executionOrder).containsExactly("first", "second");
-        assertThat(result.getExecutableCount()).isZero();
+        assertThat(result.getThrowableRunnableCount()).isZero();
         assertThat(result.hasExceptions()).isFalse();
     }
 

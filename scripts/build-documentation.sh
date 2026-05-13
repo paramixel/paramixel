@@ -16,7 +16,10 @@
 
 set -euo pipefail
 
-readonly WEBSITE_DIR="website"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+readonly PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+readonly WEBSITE_DIR="${PROJECT_DIR}/website"
 readonly DOCS_DIR="${WEBSITE_DIR}/docs"
 readonly SIDEBARS_FILE="${WEBSITE_DIR}/sidebars.js"
 readonly SIDEBAR_JS_DOC_ID_PATTERN="^['\"][a-zA-Z0-9_/-]+['\"]\$"
@@ -92,8 +95,8 @@ get_sidebar_doc_ids() {
     temp_file=$(mktemp)
     trap "rm -f '$temp_file'" RETURN
 
-    node -e "
-        const sidebars = require('./${SIDEBARS_FILE}');
+    (cd "${PROJECT_DIR}" && node -e "
+        const sidebars = require('./${SIDEBARS_FILE#${PROJECT_DIR}/}');
         const ids = [];
         
         function extractIds(items) {
@@ -113,7 +116,7 @@ get_sidebar_doc_ids() {
         }
         
         console.log(ids.join('\\n'));
-    " > "$temp_file" 2>/dev/null || fail "Failed to parse sidebars.js"
+    ") > "$temp_file" 2>/dev/null || fail "Failed to parse sidebars.js"
 
     sort -u < "$temp_file"
 }

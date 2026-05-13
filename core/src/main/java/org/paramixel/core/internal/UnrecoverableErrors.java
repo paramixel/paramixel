@@ -17,7 +17,7 @@
 package org.paramixel.core.internal;
 
 /**
- * Internal utilities for working with <em>unrecoverable</em> errors.
+ * Rethrows unrecoverable JVM errors ({@code OutOfMemoryError}, {@code StackOverflowError}) immediately while all other errors are captured in action results.
  *
  * <p>Unrecoverable errors are those that should always terminate execution immediately because the JVM
  * cannot meaningfully continue. All other {@link Error} subtypes are treated as recoverable failures and

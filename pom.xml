@@ -6,7 +6,7 @@
 
     <groupId>org.paramixel</groupId>
     <artifactId>parent</artifactId>
-    <version>3.0.1-POST</version>
+    <version>4.0.0</version>
     <packaging>pom</packaging>
 
     <name>Paramixel Parent</name>
@@ -75,7 +75,7 @@
         <mongodb-driver-sync.version>5.7.0</mongodb-driver-sync.version>
         <palantir-java-format.version>2.90.0</palantir-java-format.version>
         <pmd.version>7.22.0</pmd.version>
-        <slf4j.version>2.0.17</slf4j.version>
+        <slf4j.version>2.0.18</slf4j.version>
         <spotbugs.version>4.9.4</spotbugs.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>

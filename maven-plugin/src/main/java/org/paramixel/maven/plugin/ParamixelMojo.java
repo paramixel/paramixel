@@ -66,7 +66,7 @@ import org.paramixel.core.support.Arguments;
 public class ParamixelMojo extends AbstractMojo {
 
     /**
-     * Creates a Paramixel mojo.
+     * Constructs a mojo with default parameter values; Maven injects configuration after construction.
      */
     public ParamixelMojo() {
         // Intentionally empty
@@ -97,20 +97,10 @@ public class ParamixelMojo extends AbstractMojo {
     private boolean failureOnSkip;
 
     /**
-     * The file path for the per-run summary report.
+     * Path to the per-run summary report; when unset, no report file is generated.
      */
     @Parameter(property = "paramixel.report.file")
     private String reportFile;
-
-    /**
-     * The explicit format for per-run summary report files.
-     *
-     * @deprecated Report format is inferred from {@code reportFile}. Use a report file extension
-     *     such as {@code .txt}, {@code .json}, {@code .xml}, or {@code .html} instead.
-     */
-    @Deprecated(since = "3.0.0", forRemoval = true)
-    @Parameter(property = "paramixel.report.format")
-    private String reportFormat;
 
     /**
      * Additional Paramixel configuration properties declared in the POM.
@@ -118,6 +108,18 @@ public class ParamixelMojo extends AbstractMojo {
     @Parameter
     private List<Property> properties;
 
+    /**
+     * Discovers and executes Paramixel action trees from the test classpath.
+     *
+     * <p>Replaces the thread context classloader with a test classloader for the
+     * duration of execution. Fails the build when the root action result is
+     * {@code FAIL}, or {@code SKIP} when {@code failureOnSkip} is {@code true}.
+     *
+     * @throws MojoExecutionException when configuration is invalid, action resolution fails,
+     *     or an unexpected error occurs during execution
+     * @throws MojoFailureException when the root action result is {@code FAIL},
+     *     or {@code SKIP} with {@code failureOnSkip} enabled
+     */
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (skipTests) {
@@ -163,7 +165,7 @@ public class ParamixelMojo extends AbstractMojo {
         } catch (MojoFailureException e) {
             throw e;
         } catch (Exception e) {
-            throw new MojoExecutionException("Failed to execute Paramixel tests", e);
+            throw new MojoExecutionException("Failed to run Paramixel tests", e);
         } finally {
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
@@ -172,7 +174,6 @@ public class ParamixelMojo extends AbstractMojo {
     private Map<String, String> buildConfiguration(ClassLoader classLoader) throws MojoExecutionException {
         var configuration = new LinkedHashMap<String, String>(Configuration.defaultProperties(classLoader));
         putIfNotBlank(configuration, Configuration.REPORT_FILE, reportFile);
-        putDeprecatedReportFormatIfNotBlank(configuration, reportFormat);
 
         if (reportFile != null && !reportFile.isBlank() && project != null) {
             final var build = project.getBuild();
@@ -222,23 +223,7 @@ public class ParamixelMojo extends AbstractMojo {
             }
         }
 
-        warnIfDeprecatedReportFormatConfigured(configuration);
-
         return configuration;
-    }
-
-    @SuppressWarnings("removal")
-    private void putDeprecatedReportFormatIfNotBlank(Map<String, String> configuration, String value) {
-        putIfNotBlank(configuration, Configuration.REPORT_FORMAT, value);
-    }
-
-    @SuppressWarnings("removal")
-    private void warnIfDeprecatedReportFormatConfigured(Map<String, String> configuration) {
-        if (configuration.containsKey(Configuration.REPORT_FORMAT)
-                && !configuration.get(Configuration.REPORT_FORMAT).isBlank()) {
-            getLog().warn("'paramixel.report.format' is deprecated and will be removed in a future release. "
-                    + "Use a report file extension such as .txt, .json, .xml, or .html instead.");
-        }
     }
 
     private static void putIfNotBlank(Map<String, String> configuration, String key, String value) {
@@ -299,7 +284,7 @@ public class ParamixelMojo extends AbstractMojo {
     }
 
     /**
-     * Represents a key-value Paramixel configuration property declared in the POM.
+     * A key-value Paramixel configuration property declared in the POM.
      */
     public static class Property {
 
@@ -308,7 +293,7 @@ public class ParamixelMojo extends AbstractMojo {
         private String value;
 
         /**
-         * Creates a property instance.
+         * Constructs a property with null key and value; callers must set both before use.
          */
         public Property() {
             // Intentionally empty
@@ -317,16 +302,16 @@ public class ParamixelMojo extends AbstractMojo {
         /**
          * Returns the configuration property key.
          *
-         * @return the property key
+         * @return the property key, or {@code null} if not yet assigned
          */
         public String getKey() {
             return key;
         }
 
         /**
-         * Sets the configuration property key.
+         * Assigns the configuration property key, rejecting blank and null values.
          *
-         * @param key the property key
+         * @param key the configuration property key used to look up the Paramixel property; must not be blank
          * @throws NullPointerException if {@code key} is {@code null}
          * @throws IllegalArgumentException if {@code key} is blank
          */
@@ -341,16 +326,16 @@ public class ParamixelMojo extends AbstractMojo {
         /**
          * Returns the configuration property value.
          *
-         * @return the property value
+         * @return the property value, or {@code null} if not yet assigned
          */
         public String getValue() {
             return value;
         }
 
         /**
-         * Sets the configuration property value.
+         * Assigns the configuration property value, rejecting null.
          *
-         * @param value the property value
+         * @param value the configuration property value; must not be null
          * @throws NullPointerException if {@code value} is {@code null}
          */
         public void setValue(String value) {
@@ -358,6 +343,12 @@ public class ParamixelMojo extends AbstractMojo {
             this.value = value;
         }
 
+        /**
+         * Compares this property to another for equality based on {@code key} only.
+         *
+         * @param o the object to compare against
+         * @return {@code true} if the other object is a {@code Property} with the same key
+         */
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -366,6 +357,11 @@ public class ParamixelMojo extends AbstractMojo {
             return Objects.equals(key, property.key);
         }
 
+        /**
+         * Returns a hash code derived from {@code key} only.
+         *
+         * @return the hash code for this property
+         */
         @Override
         public int hashCode() {
             return Objects.hash(key);

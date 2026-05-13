@@ -63,11 +63,11 @@ public class CustomListenerTest {
     public static Action actionFactory() {
         resetCounts();
 
-        Action first = Direct.builder("first").execute(context -> {}).build();
+        Action first = Direct.builder("first").runnable(context -> {}).build();
 
-        Action second = Direct.builder("second").execute(context -> {}).build();
+        Action second = Direct.builder("second").runnable(context -> {}).build();
 
-        Action third = Direct.builder("third").execute(context -> {}).build();
+        Action third = Direct.builder("third").runnable(context -> {}).build();
 
         return Container.builder("CustomListenerTest")
                 .child(first)

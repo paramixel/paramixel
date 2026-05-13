@@ -34,15 +34,19 @@ const config = {
           routeBasePath: 'docs',
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl: 'https://github.com/paramixel/paramixel/tree/main/website/',
-          lastVersion: '3.0.1',
+          lastVersion: '4.0.0',
           versions: {
             current: {
               label: 'Unreleased',
               path: 'unreleased',
               banner: 'unreleased',
             },
-            '3.0.1': {
+            '4.0.0': {
               banner: 'none',
+            },
+            '3.0.1': {
+              banner: 'unmaintained',
+              label: '3.0.1 (Obsolete)',
             },
             '2.0.0': {
               banner: 'unmaintained',

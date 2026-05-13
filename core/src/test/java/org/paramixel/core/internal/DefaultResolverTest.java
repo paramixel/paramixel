@@ -190,27 +190,27 @@ class DefaultResolverTest {
     static class ParentFactory {
         @Paramixel.ActionFactory
         public static Action actionFactory() {
-            return Direct.builder("parent-action").execute(context -> {}).build();
+            return Direct.builder("parent-action").runnable(context -> {}).build();
         }
     }
 
     static class ChildOverridesWithoutFactory extends ParentFactory {
         public static Action actionFactory() {
-            return Direct.builder("child-action").execute(context -> {}).build();
+            return Direct.builder("child-action").runnable(context -> {}).build();
         }
     }
 
     static class ParentFactoryTwo {
         @Paramixel.ActionFactory
         public static Action parentAction() {
-            return Direct.builder("parent-action").execute(context -> {}).build();
+            return Direct.builder("parent-action").runnable(context -> {}).build();
         }
     }
 
     static class ChildDeclaresOwnFactory extends ParentFactoryTwo {
         @Paramixel.ActionFactory
         public static Action childAction() {
-            return Direct.builder("child-action").execute(context -> {}).build();
+            return Direct.builder("child-action").runnable(context -> {}).build();
         }
     }
 
@@ -218,7 +218,7 @@ class DefaultResolverTest {
         @Paramixel.ActionFactory
         @Paramixel.Tag(" ")
         public static Action actionFactory() {
-            return Direct.builder("blank-tag-action").execute(context -> {}).build();
+            return Direct.builder("blank-tag-action").runnable(context -> {}).build();
         }
     }
 

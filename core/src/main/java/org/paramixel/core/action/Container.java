@@ -35,12 +35,12 @@ import org.paramixel.core.internal.DefaultStatus;
 import org.paramixel.core.support.Arguments;
 
 /**
- * Executes child actions in order with optional setup and cleanup actions.
+ * Runs child actions in order with optional setup and cleanup actions.
  *
  * <p>A {@link Container} runs an optional {@code before} action first, then the body children, and finally an
  * optional {@code after} action. The {@code after} action always runs regardless of earlier outcomes.
  *
- * <p>Body child execution is governed by {@link ChildMode} and {@link OrderMode}. When
+ * <p>Body child running is governed by {@link ChildMode} and {@link OrderMode}. When
  * {@link ChildMode#DEPENDENT}, the container stops after the first failed or skipped body child and skips the
  * remaining body children. When {@link ChildMode#INDEPENDENT}, every body child runs regardless of earlier
  * failures or skips.
@@ -67,7 +67,7 @@ public final class Container extends AbstractAction implements CompositeAction {
     }
 
     /**
-     * Controls the order used for body child execution.
+     * Controls the order used for body child running.
      */
     public enum OrderMode {
 
@@ -77,16 +77,16 @@ public final class Container extends AbstractAction implements CompositeAction {
         DECLARED,
 
         /**
-         * Shuffle body children before execution using the policy seed.
+         * Shuffle body children before running using the policy seed.
          */
         SHUFFLED
     }
 
     /**
-     * Execution policy governing body child behavior and ordering.
+     * Run policy governing body child behavior and ordering.
      *
-     * @param childMode whether body children continue after failures or skips
-     * @param orderMode the execution order for body children
+     * @param childMode whether body children continue after earlier failures or skips
+     * @param orderMode the declaration or shuffled run order for body children
      * @param seed the seed used when {@code orderMode} is {@link OrderMode#SHUFFLED}
      */
     public record Policy(ChildMode childMode, OrderMode orderMode, long seed) {
@@ -94,8 +94,8 @@ public final class Container extends AbstractAction implements CompositeAction {
         /**
          * Compact constructor that rejects null arguments.
          *
-         * @param childMode whether body children continue after failures or skips
-         * @param orderMode the execution order for body children
+         * @param childMode whether body children continue after earlier failures or skips
+         * @param orderMode the declaration or shuffled run order for body children
          * @param seed the seed used when {@code orderMode} is {@link OrderMode#SHUFFLED}
          * @throws NullPointerException if any argument is null
          */
@@ -214,14 +214,8 @@ public final class Container extends AbstractAction implements CompositeAction {
     private final Policy policy;
     private final Random random;
 
-    private Container(
-            String name,
-            Action before,
-            List<Action> bodyChildren,
-            Action after,
-            Policy policy,
-            Action.ContextMode contextMode) {
-        super(contextMode);
+    private Container(String name, Action before, List<Action> bodyChildren, Action after, Policy policy) {
+        super();
         this.name = validateName(name);
         this.before = before;
         this.bodyChildren = List.copyOf(bodyChildren);
@@ -265,7 +259,7 @@ public final class Container extends AbstractAction implements CompositeAction {
      *
      * <p>The returned list does not include the before-action or after-action.
      *
-     * @return the immutable body child list
+     * @return the immutable body child list, in the order determined by the execution policy
      */
     public List<Action> getBodyChildren() {
         return bodyChildren;
@@ -292,13 +286,15 @@ public final class Container extends AbstractAction implements CompositeAction {
     @Override
     public Result skip(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
-        for (Action child : allChildren) {
-            Result childResult = child.skip(context);
-            result.addChild(childResult);
+        if (before != null) {
+            result.addChild(before.skip(context));
+        }
+        for (Action child : bodyChildren) {
+            result.addChild(child.skip(context.createChild()));
+        }
+        if (after != null) {
+            result.addChild(after.skip(context));
         }
         result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
@@ -311,7 +307,6 @@ public final class Container extends AbstractAction implements CompositeAction {
     public static final class Builder {
 
         private final String name;
-        private Action.ContextMode contextMode = Action.ContextMode.ISOLATED;
         private Policy policy = Policy.defaults();
         private Action before;
         private final List<Action> children = new ArrayList<>();
@@ -328,21 +323,7 @@ public final class Container extends AbstractAction implements CompositeAction {
         }
 
         /**
-         * Sets the context mode for this container.
-         *
-         * @param contextMode the context mode applied when this action executes or skips
-         * @return this builder
-         * @throws NullPointerException if {@code contextMode} is {@code null}
-         * @throws IllegalStateException if this builder has already been built
-         */
-        public Builder contextMode(Action.ContextMode contextMode) {
-            ensureNotBuilt();
-            this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
-            return this;
-        }
-
-        /**
-         * Sets the execution policy governing body child behavior.
+         * Sets the run policy governing body child behavior.
          *
          * @param policy the policy for this container
          * @return this builder
@@ -412,7 +393,7 @@ public final class Container extends AbstractAction implements CompositeAction {
             if (before == null && children.isEmpty() && after == null) {
                 throw new IllegalStateException("container must contain before, child, or after action");
             }
-            var instance = new Container(name, before, List.copyOf(children), after, policy, contextMode);
+            var instance = new Container(name, before, List.copyOf(children), after, policy);
             instance.initialize();
             return instance;
         }
@@ -425,11 +406,8 @@ public final class Container extends AbstractAction implements CompositeAction {
     }
 
     @Override
-    public Result execute(Context context) {
+    public Result run(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
         var listener = context.getListener();
         listener.beforeAction(result);
@@ -439,7 +417,7 @@ public final class Container extends AbstractAction implements CompositeAction {
         Status computedStatus = DefaultStatus.PASS;
 
         if (before != null) {
-            Result beforeResult = before.execute(context);
+            Result beforeResult = before.run(context);
             result.addChild(beforeResult);
             statusResults.add(beforeResult);
             var beforeStatus = beforeResult.getStatus();
@@ -452,13 +430,13 @@ public final class Container extends AbstractAction implements CompositeAction {
         if (computedStatus.isPass()) {
             for (int index = 0; index < orderedChildren.size(); index++) {
                 Action child = orderedChildren.get(index);
-                Result childResult = child.execute(context);
+                Result childResult = child.run(context.createChild());
                 result.addChild(childResult);
                 statusResults.add(childResult);
                 var childStatus = childResult.getStatus();
                 if (policy.childMode() == ChildMode.DEPENDENT && (childStatus.isFailure() || childStatus.isSkip())) {
                     for (Action remaining : orderedChildren.subList(index + 1, orderedChildren.size())) {
-                        Result skipResult = remaining.skip(context);
+                        Result skipResult = remaining.skip(context.createChild());
                         result.addChild(skipResult);
                         statusResults.add(skipResult);
                     }
@@ -467,14 +445,14 @@ public final class Container extends AbstractAction implements CompositeAction {
             }
         } else {
             for (Action child : orderedChildren) {
-                Result skipResult = child.skip(context);
+                Result skipResult = child.skip(context.createChild());
                 result.addChild(skipResult);
                 statusResults.add(skipResult);
             }
         }
 
         if (after != null) {
-            Result afterResult = after.execute(context);
+            Result afterResult = after.run(context);
             result.addChild(afterResult);
             statusResults.add(afterResult);
         }
@@ -494,9 +472,9 @@ public final class Container extends AbstractAction implements CompositeAction {
     }
 
     /**
-     * Returns body children in the order selected for this execution.
+     * Returns body children in the order selected for this run.
      *
-     * @return the ordered body children
+     * @return the ordered body children; may be empty when no body children are configured
      */
     public List<Action> orderedBodyChildren() {
         return orderedChildren();

@@ -21,9 +21,9 @@ import java.util.Optional;
 import org.paramixel.core.Status;
 
 /**
- * Default immutable {@link Status} implementation.
+ * Represents the four standard Paramixel outcomes (staged, pass, failure, skip) with optional message and throwable detail.
  *
- * <p>This SPI type represents the four standard Paramixel outcomes and optionally carries a message or throwable for
+ * <p>This immutable implementation represents the four standard Paramixel outcomes and optionally carries a message or throwable for
  * reporting purposes.
  */
 public final class DefaultStatus implements Status {
@@ -86,7 +86,7 @@ public final class DefaultStatus implements Status {
     /**
      * Creates a status with the supplied kind and no message or throwable.
      *
-     * @param kind the status kind
+     * @param kind the outcome category (staged, pass, failure, or skip)
      * @throws NullPointerException if {@code kind} is {@code null}
      */
     public DefaultStatus(Kind kind) {
@@ -99,7 +99,7 @@ public final class DefaultStatus implements Status {
     /**
      * Creates a status with the supplied kind and message.
      *
-     * @param kind the status kind
+     * @param kind the outcome category (staged, pass, failure, or skip)
      * @param message the associated message, or {@code null} when no message is needed
      * @throws NullPointerException if {@code kind} is {@code null}
      */
@@ -113,7 +113,7 @@ public final class DefaultStatus implements Status {
     /**
      * Creates a status with the supplied kind and throwable.
      *
-     * @param kind the status kind
+     * @param kind the outcome category (staged, pass, failure, or skip)
      * @param throwable the associated throwable, or {@code null} when no throwable is needed
      * @throws NullPointerException if {@code kind} is {@code null}
      */
@@ -127,7 +127,7 @@ public final class DefaultStatus implements Status {
     /**
      * Creates a status with the supplied kind, message, and throwable.
      *
-     * @param kind the status kind
+     * @param kind the outcome category (staged, pass, failure, or skip)
      * @param message the associated message, or {@code null} when no message is needed
      * @param throwable the associated throwable, or {@code null} when no throwable is needed
      * @throws NullPointerException if {@code kind} is {@code null}

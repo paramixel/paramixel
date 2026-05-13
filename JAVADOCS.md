@@ -46,7 +46,7 @@ Document:
 - the role of the type
 - where it fits in Paramixel
 - important lifecycle, hierarchy, or execution semantics
-- whether it is public API, advanced SPI, or primarily internal support
+- whether it is intended for end users or primarily internal support
 
 ### Public and protected members
 Every public or protected method should have meaningful Javadoc unless the inherited documentation is already sufficient and intentionally relied upon.
@@ -194,21 +194,6 @@ Examples:
 For helper methods like `fail()` or `skip()`, state that they always throw.
 
 ---
-
-## Public API vs SPI vs Support
-
-Be explicit about audience.
-
-### Public API
-Document for users of Paramixel.
-Focus on usage, contracts, and expected outcomes.
-
-### SPI
-Document for advanced integrators.
-Clarify extension expectations and any stability caveats.
-
-### Support/internal utilities
-Document enough for maintainability, but avoid presenting them as primary user entry points unless that is intentional.
 
 ---
 

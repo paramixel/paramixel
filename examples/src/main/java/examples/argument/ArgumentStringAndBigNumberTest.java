@@ -50,19 +50,19 @@ public class ArgumentStringAndBigNumberTest {
 
     private static Action stringTest() {
         return Direct.builder("string")
-                .execute(context -> assertThat("paramixel").startsWith("param"))
+                .runnable(context -> assertThat("paramixel").startsWith("param"))
                 .build();
     }
 
     private static Action bigIntegerTest() {
         return Direct.builder("big-integer")
-                .execute(context -> assertThat(new BigInteger("42")).isEqualTo(new BigInteger("42")))
+                .runnable(context -> assertThat(new BigInteger("42")).isEqualTo(new BigInteger("42")))
                 .build();
     }
 
     private static Action bigDecimalTest() {
         return Direct.builder("big-decimal")
-                .execute(context -> assertThat(new BigDecimal("3.14")).isEqualByComparingTo("3.14"))
+                .runnable(context -> assertThat(new BigDecimal("3.14")).isEqualByComparingTo("3.14"))
                 .build();
     }
 }

@@ -45,7 +45,7 @@ paramixel {
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `skipTests` | `Property<Boolean>` | `false` | Skip Paramixel test execution entirely |
+| `skipTests` | `Property<Boolean>` | `false` | Skip Paramixel test run entirely |
 | `failIfNoTests` | `Property<Boolean>` | `false` | Fail the build when no action factories are discovered |
 | `failureOnSkip` | `Property<Boolean>` | `false` | Treat skipped results as failures |
 | `parallelism` | `Property<Integer>` | unset | Runner parallelism level; framework default used when absent |

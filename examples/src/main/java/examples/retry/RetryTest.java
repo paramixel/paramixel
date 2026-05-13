@@ -38,7 +38,7 @@ public class RetryTest {
     public static Action actionFactory() {
         var counter = new AtomicInteger(0);
         return Direct.builder("retry-example")
-                .execute(context -> {
+                .runnable(context -> {
                     Retry.Result result = Retry.of(Policy.fixed(Duration.ofMillis(100), Duration.ofSeconds(1)))
                             .onRetry((attempt, cause) ->
                                     System.out.println("Retry attempt " + attempt + " after: " + cause.getMessage()))

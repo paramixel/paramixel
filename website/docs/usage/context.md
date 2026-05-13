@@ -7,84 +7,70 @@ description: Runtime state, hierarchy, and store.
 
 Every action receives a `Context` during execution.
 
-## Action Context Mode
+## Context scoping
 
-Each action owns its context scoping policy:
+Context scoping is owned by composite actions. Built-in actions apply the following rules:
 
-```java
-Action.ContextMode.ISOLATED
-Action.ContextMode.SHARED
-```
+- **`Container`** shares its received context with `before` and `after` actions, and creates an isolated child context for each body child.
+- **`Parallel`** creates an isolated child context for each child.
+- **`Direct`** uses whatever context it receives from its parent.
 
-`ISOLATED` means the action executes with `context.createChild()` when the action implementation honors the mode.
+Custom action implementations are responsible for applying their own context scoping in `run(Context)` and `skip(Context)`.
 
-`SHARED` means the action executes with the same context it received from its parent when the action implementation honors the mode.
+### Sharing state between before and after
 
-Built-in actions honor `ContextMode`. Custom action implementations are responsible for applying their own context scoping in `execute(Context)` and `skip(Context)`. Parent actions pass their effective context directly to children; children decide whether to isolate or share.
-
-Use shared mode when sibling actions intentionally share workflow state:
+`Container` shares its context with `before` and `after` actions, so they can read and write the same store directly:
 
 ```java
 private static Action setup() {
     return Direct.builder("setup")
-            .contextMode(Action.ContextMode.SHARED)
-            .execute(context -> context.getStore().put("token", Value.of("abc")))
+            .runnable(context -> context.getStore().put("token", "abc"))
             .build();
 }
 ```
 
-### SHARED vs ISOLATED
+### Accessing parent state from body children
 
-With `ISOLATED` (default), each action gets its own child context with an independent store. Sibling actions cannot see each other's store data directly.
-
-With `SHARED`, the action reuses the context it received from its parent. This means lifecycle phases (`before`, body children, `after`) all operate on the same store:
+Body children in a `Container` receive isolated child contexts. Use `getAncestor("../")` to navigate up and access data stored by `before`:
 
 ```java
-// All three actions use SHARED to read/write the same store
-Action before = Direct.builder("before")
-        .contextMode(Action.ContextMode.SHARED)
-        .execute(context -> context.getStore().put("shared-key", Value.of("hello")))
-        .build();
-
-Action writeChild = Direct.builder("write-child")
-        .contextMode(Action.ContextMode.SHARED)
-        .execute(context -> context.getStore().put("child-key", Value.of("world")))
-        .build();
-
-Action readChild = Direct.builder("read-child")
-        .contextMode(Action.ContextMode.SHARED)
-        .execute(context -> {
-            // Both keys are visible because all actions share the same context
-            String shared = context.getStore().get("shared-key").orElseThrow().cast(String.class);
-            String child = context.getStore().get("child-key").orElseThrow().cast(String.class);
-        })
-        .build();
+// A body child reads data stored by the before action (1 level up)
+String value = context.getAncestor("../")
+        .getStore()
+        .get("data", String.class)
+        .orElseThrow();
 ```
 
-### Ancestor navigation for isolated contexts
+### Sharing state between parallel children
 
-When actions use `ISOLATED` mode, use `findAncestor()` to navigate up the context chain and access data from an ancestor's store:
+`Parallel` creates an isolated child context for each child. To share state, store data on the parent context (e.g., in a `Container.before`) and access it from each child via `getAncestor("../")`:
 
 ```java
-// A deeply nested action reads data stored by a SHARED before action
-// at the argument-container level (2 levels up)
-String value = context.findAncestor(2)
-        .orElseThrow()
-        .getStore()
-        .get("arg-key")
-        .orElseThrow()
-        .cast(String.class);
+Action before = Direct.builder("before")
+        .runnable(context -> context.getStore().put("shared-key", "hello"))
+        .build();
+
+Action child = Direct.builder("child")
+        .runnable(context -> {
+            String shared = context.getAncestor("../")
+                    .getStore()
+                    .get("shared-key", String.class)
+                    .orElseThrow();
+        })
+        .build();
 ```
 
 ## Methods
 
 ```java
-Optional<Context> getParent()
+Context getParent()
+Optional<Context> findParent()
+Context getAncestor(String path)
+Optional<Context> findAncestor(String path)
 Map<String, String> getConfiguration()
 Listener getListener()
 CompletableFuture<Result> runAsync(Action action)
 Store getStore()
-Optional<Context> findAncestor(int levelUp)
 Context createChild()
 ```
 
@@ -92,23 +78,26 @@ Context createChild()
 
 ## Hierarchy
 
-Contexts form a parent/child chain based on action context modes. With `ISOLATED`, an action creates a child context. With `SHARED`, it reuses the received context.
+Contexts form a parent/child chain based on composite action scoping. `Container` shares context with `before`/`after` but creates child contexts for body children. `Parallel` creates a child context for each child.
 
-- `getParent()` returns the immediate parent context
-- `findAncestor(0)` returns the current context
-- `findAncestor(1)` returns the parent
-- larger levels walk farther up the chain
-- `findAncestor(levelUp)` throws `IllegalArgumentException` for negative levels
-- `findAncestor(levelUp)` returns `Optional.empty()` when that ancestor does not exist
+- `getParent()` returns the immediate parent context, throws `AncestorNotFoundException` at root
+- `findParent()` returns the immediate parent context wrapped in `Optional` (equivalent to `findAncestor("../")`)
+- `findAncestor("../")` returns the parent
+- `findAncestor("../../")` returns the grandparent
+- `findAncestor("/")` returns the root context
+- Both `"../"` and `".."` forms are accepted
+- `findAncestor(path)` returns `Optional.empty()` when the path traverses beyond the root
+- `findAncestor(path)` throws `IllegalArgumentException` for named segments or `.` segments
+- `getAncestor(path)` returns the ancestor context directly, throws `AncestorNotFoundException` when path traverses beyond root
 
 ## Store
 
-Each context owns an independent `Store` — a thread-safe key-value map using `String` keys and `Value` values.
+Each context owns an independent `Store` — a thread-safe key-value map using `String` keys.
 
 ### Writing values
 
 ```java
-context.getStore().put("key", Value.of(someObject));
+context.getStore().put("key", someObject);
 ```
 
 ### Reading values
@@ -118,7 +107,7 @@ context.getStore().put("key", Value.of(someObject));
 context.getStore().get("key");
 
 // From an ancestor context
-context.findAncestor(1).orElseThrow().getStore().get("key");
+context.getAncestor("../").getStore().get("key");
 ```
 
 ### Store API
@@ -126,41 +115,38 @@ context.findAncestor(1).orElseThrow().getStore().get("key");
 `Store` provides a `ConcurrentMap`-like interface:
 
 ```java
-Optional<Value> get(String key)
-Optional<Value> put(String key, Value value)
-Optional<Value> remove(String key)
-Optional<Value> putIfAbsent(String key, Value value)
+Optional<Object> get(String key)
+Optional<Object> put(String key, Object value)
+Optional<Object> remove(String key)
+Optional<Object> putIfAbsent(String key, Object value)
 boolean containsKey(String key)
 int size()
 boolean isEmpty()
 void clear()
-void forEach(BiConsumer<? super String, ? super Value> action)
-Optional<Value> computeIfAbsent(String key, Function<? super String, ? extends Value> mappingFunction)
-Optional<Value> computeIfPresent(String key, BiFunction<? super String, ? super Value, ? extends Value> remappingFunction)
-Optional<Value> compute(String key, BiFunction<? super String, ? super Value, ? extends Value> remappingFunction)
-Optional<Value> merge(String key, Value value, BiFunction<? super Value, ? super Value, ? extends Value> remappingFunction)
+void forEach(BiConsumer<? super String, ? super Object> action)
+Optional<Object> computeIfAbsent(String key, Function<? super String, ? extends Object> mappingFunction)
+Optional<Object> computeIfPresent(String key, BiFunction<? super String, ? super Object, ? extends Object> remappingFunction)
+Optional<Object> compute(String key, BiFunction<? super String, ? super Object, ? extends Object> remappingFunction)
+Optional<Object> merge(String key, Object value, BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction)
+<T> Optional<T> get(String key, Class<T> type)
+<T> Optional<T> remove(String key, Class<T> type)
+<T> T getOrDefault(String key, Class<T> type, T defaultValue)
+boolean isType(String key, Class<?> type)
 // ... and more
 ```
 
-Every method that returns a store value returns `Optional<Value>`. All methods reject `null` keys and values with `NullPointerException`.
-
-### Value
-
-`Value` wraps any object:
-
-```java
-Value.of(anyObject)          // factory, rejects null
-value.get()                  // returns the wrapped object
-value.isType(MyClass.class)  // type-check without casting
-value.cast(MyClass.class)    // typed cast
-```
+Every method that returns a store value returns `Optional<Object>`. Use `get(key, type)` for typed access. All methods reject `null` keys and values with `NullPointerException`.
 
 ## Example pattern
 
-This pattern mirrors the context examples under `examples/src/main/java/examples/context/`: a `before` action stores data and descendants read it later.
+This pattern mirrors the context examples under `examples/src/main/java/examples/lifecycle/`: a `before` action stores data and descendants read it later.
 
 ```java
 public class SharedContextPattern {
+
+    public static void main(String[] args) {
+        Factory.defaultRunner().runAndExit(actionFactory());
+    }
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
@@ -177,20 +163,17 @@ public class SharedContextPattern {
 
     private static Action before() {
         return Direct.builder("before")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> context.getStore().put("data", Value.of("suite-value")))
+                .runnable(context -> context.getStore().put("data", "suite-value"))
                 .build();
     }
 
     private static Action main() {
         return Direct.builder("main")
-                .execute(context -> {
-                    String value = context.findAncestor(1)
-                            .orElseThrow()
+                .runnable(context -> {
+                    String value = context.getAncestor("../")
                             .getStore()
-                            .get("data")
-                            .orElseThrow()
-                            .cast(String.class);
+                            .get("data", String.class)
+                            .orElseThrow();
                 })
                 .build();
     }
@@ -200,6 +183,20 @@ public class SharedContextPattern {
     }
 }
 ```
+
+## Full lifecycle example
+
+The `FullLifecycleTest` example under `examples/src/main/java/examples/lifecycle/` demonstrates context usage across a deep action hierarchy (suite → arguments → tests):
+
+- **Suite `before`** stores data in the Container's own context store (`context.getStore().put(...)`)
+- **Suite `after`** reads from the same store (`context.getStore().get(...)`) and accesses the root context (`context.getAncestor("/")`) — because `before` and `after` share the Container's context
+- **Argument `before`** stores per-argument data, and **argument `after`** removes it — same shared context
+- **Test `before`** stores a marker that **test `after`** reads — same shared context
+- **Test body** navigates the ancestor hierarchy to access data from parent levels:
+  - `context.getParent()` and `context.findParent()` for direct parent access
+  - `context.getAncestor("../../../")` to access the argument-level store (three levels up: test-body → test → arg-body → arg)
+
+This pattern shows how deeply nested actions use `getAncestor(path)` to reach ancestor stores while before/after pairs share their Container's context directly.
 
 ## Configuration access
 

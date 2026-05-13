@@ -48,7 +48,7 @@ import org.paramixel.gradle.internal.ConfigurationBuilder;
 public abstract class ParamixelTestTask extends DefaultTask {
 
     /**
-     * Creates a Paramixel test task.
+     * Constructs a task instance; Gradle registers and configures this task automatically.
      */
     public ParamixelTestTask() {
         // Intentionally empty
@@ -57,7 +57,7 @@ public abstract class ParamixelTestTask extends DefaultTask {
     /**
      * Returns whether Paramixel test execution is skipped entirely.
      *
-     * @return the skip-tests property
+     * @return whether test execution is skipped
      */
     @Input
     public abstract Property<Boolean> getSkipTests();
@@ -65,7 +65,7 @@ public abstract class ParamixelTestTask extends DefaultTask {
     /**
      * Returns whether the build should fail when no action factories are discovered.
      *
-     * @return the fail-if-no-tests property
+     * @return whether the build fails on zero discovered actions
      */
     @Input
     public abstract Property<Boolean> getFailIfNoTests();
@@ -73,7 +73,7 @@ public abstract class ParamixelTestTask extends DefaultTask {
     /**
      * Returns whether skipped results are treated as failures.
      *
-     * @return the failure-on-skip property
+     * @return whether a SKIP result is treated as a failure
      */
     @Input
     public abstract Property<Boolean> getFailureOnSkip();
@@ -126,7 +126,7 @@ public abstract class ParamixelTestTask extends DefaultTask {
     /**
      * Returns the test runtime classpath used to discover and execute action factories.
      *
-     * @return the test classpath file collection
+     * @return the test runtime classpath used for action discovery and execution
      */
     @Classpath
     public abstract ConfigurableFileCollection getTestClasspath();

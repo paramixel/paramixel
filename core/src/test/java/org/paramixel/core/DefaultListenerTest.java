@@ -37,13 +37,13 @@ class DefaultListenerTest {
     @DisplayName("prints action kind before and after execution")
     void printsActionKindBeforeAndAfterExecution() {
         Listener listener = Factory.defaultListener();
-        Direct.Executable executable = context -> {};
-        Action action = Direct.builder("direct").execute(executable).build();
+        Direct.ThrowableRunnable executable = context -> {};
+        Action action = Direct.builder("direct").runnable(executable).build();
         Context context = new DefaultContext(
                 Configuration.defaultProperties(),
                 listener,
                 (scheduledAction, scheduledContext) ->
-                        CompletableFuture.completedFuture(scheduledAction.execute(scheduledContext)));
+                        CompletableFuture.completedFuture(scheduledAction.run(scheduledContext)));
         DefaultResult result = new DefaultResult(action);
         result.setStatus(DefaultStatus.PASS);
         result.setRunDuration(Duration.ZERO);

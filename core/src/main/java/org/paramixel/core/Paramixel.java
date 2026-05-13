@@ -27,8 +27,6 @@ import java.lang.annotation.Target;
  * Namespace class holding core annotations used by Paramixel discovery and execution; not instantiable.
  *
  * <p>This class is a namespace for annotations consumed by the framework.
- *
- * <p>Public API.
  */
 public final class Paramixel {
 
@@ -46,6 +44,25 @@ public final class Paramixel {
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
     public @interface ActionFactory {}
+
+    /**
+     * Declares discovery ordering priority for a discovered action factory class.
+     *
+     * <p>Higher priority classes are ordered earlier when {@link Resolver} builds the discovered root action.
+     * Priority affects scheduling admission order only; concurrent execution does not imply completion order.
+     */
+    @Documented
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.TYPE)
+    public @interface Priority {
+
+        /**
+         * Returns the discovery priority. The neutral default priority is {@code 0}.
+         *
+         * @return the discovery priority
+         */
+        int value() default 0;
+    }
 
     /**
      * Marks an action factory method as disabled.

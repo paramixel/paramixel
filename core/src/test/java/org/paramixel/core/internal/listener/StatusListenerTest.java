@@ -122,7 +122,7 @@ class StatusListenerTest {
         void printsFailStatusWithRedColor() {
             StatusListener listener = new StatusListener();
             Action action = Direct.builder("failing-action")
-                    .execute(context -> {
+                    .runnable(context -> {
                         throw new RuntimeException("fail");
                     })
                     .build();
@@ -146,7 +146,7 @@ class StatusListenerTest {
         void printsSkipStatusWithOrangeColor() {
             StatusListener listener = new StatusListener();
             Action action = Direct.builder("skipping-action")
-                    .execute(context -> {
+                    .runnable(context -> {
                         throw org.paramixel.core.exception.SkipException.of("skipped");
                     })
                     .build();
@@ -198,7 +198,7 @@ class StatusListenerTest {
         void printsExceptionLineToStderr() {
             StatusListener listener = new StatusListener();
             Action action = Direct.builder("error-action")
-                    .execute(context -> {
+                    .runnable(context -> {
                         throw new RuntimeException("action error");
                     })
                     .build();
@@ -225,7 +225,7 @@ class StatusListenerTest {
         void suppressesOutputForRootInActionThrowable() {
             StatusListener listener = new StatusListener();
             Action failingChild = Direct.builder("child-fail")
-                    .execute(context -> {
+                    .runnable(context -> {
                         throw new RuntimeException("child error");
                     })
                     .build();

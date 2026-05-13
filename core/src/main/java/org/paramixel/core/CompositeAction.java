@@ -21,7 +21,7 @@ import java.util.List;
 /**
  * An {@link Action} that exposes a read-only child action hierarchy.
  *
- * <p>Composite actions define their own execution and skip semantics for their children. Implementations should return
+ * <p>Composite actions define their own run and skip semantics for their children. Implementations should return
  * a stable, unmodifiable view of the child actions that participate in the composite structure.
  */
 public interface CompositeAction extends Action {

@@ -39,24 +39,12 @@ class DirectTest {
     void builderCreatesPassingDirectAction() {
         AtomicBoolean ran = new AtomicBoolean();
         Direct action =
-                Direct.builder("direct").execute(context -> ran.set(true)).build();
+                Direct.builder("direct").runnable(context -> ran.set(true)).build();
 
         Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(ran).isTrue();
-        assertThat(action.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
-    }
-
-    @Test
-    @DisplayName("builder configures shared context mode")
-    void builderConfiguresSharedContextMode() {
-        Direct action = Direct.builder("direct")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {})
-                .build();
-
-        assertThat(action.getContextMode()).isEqualTo(Action.ContextMode.SHARED);
     }
 
     @Test
@@ -65,14 +53,14 @@ class DirectTest {
         Result skip = Runner.builder()
                 .build()
                 .run(Direct.builder("skip")
-                        .execute(context -> {
+                        .runnable(context -> {
                             throw SkipException.of("skip");
                         })
                         .build());
         Result fail = Runner.builder()
                 .build()
                 .run(Direct.builder("fail")
-                        .execute(context -> {
+                        .runnable(context -> {
                             throw FailException.of("fail");
                         })
                         .build());
@@ -82,11 +70,11 @@ class DirectTest {
     }
 
     @Test
-    @DisplayName("execute rejects null context")
+    @DisplayName("run rejects null context")
     void executeRejectsNullContext() {
-        Direct action = Direct.builder("direct").execute(context -> {}).build();
+        Direct action = Direct.builder("direct").runnable(context -> {}).build();
 
-        assertThatThrownBy(() -> action.execute(null))
+        assertThatThrownBy(() -> action.run(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("context must not be null");
     }
@@ -94,7 +82,7 @@ class DirectTest {
     @Test
     @DisplayName("skip rejects null context")
     void skipRejectsNullContext() {
-        Direct action = Direct.builder("direct").execute(context -> {}).build();
+        Direct action = Direct.builder("direct").runnable(context -> {}).build();
 
         assertThatThrownBy(() -> action.skip(null))
                 .isInstanceOf(NullPointerException.class)
@@ -106,20 +94,17 @@ class DirectTest {
     void builderValidatesArgumentsAndOneShotBehavior() {
         assertThatThrownBy(() -> Direct.builder(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> Direct.builder(" ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Direct.builder("direct").contextMode(null))
+        assertThatThrownBy(() -> Direct.builder("direct").runnable(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("contextMode must not be null");
-        assertThatThrownBy(() -> Direct.builder("direct").execute(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("executable must not be null");
+                .hasMessage("throwableRunnable must not be null");
         assertThatIllegalStateException()
                 .isThrownBy(() -> Direct.builder("direct").build())
-                .withMessage("executable must be configured");
+                .withMessage("throwableRunnable must be configured");
 
-        Direct.Builder builder = Direct.builder("direct").execute(context -> {});
+        Direct.Builder builder = Direct.builder("direct").runnable(context -> {});
         builder.build();
         assertThatIllegalStateException()
-                .isThrownBy(() -> builder.execute(context -> {}))
+                .isThrownBy(() -> builder.runnable(context -> {}))
                 .withMessage("builder already built");
     }
 
@@ -129,7 +114,7 @@ class DirectTest {
         AtomicBoolean afterActionCalled = new AtomicBoolean(false);
         AtomicBoolean actionThrowableCalled = new AtomicBoolean(false);
         Action action = Direct.builder("assertion")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new AssertionFailedError("expected true but was false");
                 })
                 .build();
@@ -157,7 +142,7 @@ class DirectTest {
     @DisplayName("OutOfMemoryError rethrown from execute")
     void outOfMemoryErrorRethrownFromExecute() {
         Action action = Direct.builder("oom")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new OutOfMemoryError("simulated oom");
                 })
                 .build();
@@ -171,7 +156,7 @@ class DirectTest {
     @DisplayName("StackOverflowError rethrown from execute")
     void stackOverflowErrorRethrownFromExecute() {
         Action action = Direct.builder("soe")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new StackOverflowError("simulated stack overflow");
                 })
                 .build();
