@@ -128,7 +128,7 @@ public class MyTest {
 
 ### Other Examples
 
-See the [`examples/`](examples/src/main/java/examples/) module for more examples, including [Testcontainers](https://github.com/testcontainers/testcontainers-java), lifecycle, parallel execution, argument testing, store operations, and tag-based selection.
+See the [examples/](examples/src/main/java/examples/) module for more examples, including [Testcontainers](https://github.com/testcontainers/testcontainers-java), lifecycle, parallel execution, argument testing, store operations, and tag-based selection.
 
 ### Run with Maven
 
