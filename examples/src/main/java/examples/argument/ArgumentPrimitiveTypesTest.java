@@ -52,31 +52,31 @@ public class ArgumentPrimitiveTypesTest {
 
     private static Action intTest() {
         return Direct.builder("int")
-                .execute(context -> assertThat(7).isEqualTo(7))
+                .runnable(context -> assertThat(7).isEqualTo(7))
                 .build();
     }
 
     private static Action longTest() {
         return Direct.builder("long")
-                .execute(context -> assertThat(11L).isEqualTo(11L))
+                .runnable(context -> assertThat(11L).isEqualTo(11L))
                 .build();
     }
 
     private static Action doubleTest() {
         return Direct.builder("double")
-                .execute(context -> assertThat(2.5d).isEqualTo(2.5d))
+                .runnable(context -> assertThat(2.5d).isEqualTo(2.5d))
                 .build();
     }
 
     private static Action booleanTest() {
         return Direct.builder("boolean")
-                .execute(context -> assertThat(true).isTrue())
+                .runnable(context -> assertThat(true).isTrue())
                 .build();
     }
 
     private static Action charTest() {
         return Direct.builder("char")
-                .execute(context -> assertThat('p').isEqualTo('p'))
+                .runnable(context -> assertThat('p').isEqualTo('p'))
                 .build();
     }
 }

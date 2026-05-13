@@ -1,20 +1,20 @@
 ---
-title: Store & Value
+title: Store
 description: Key-value state storage on Context.
 ---
 
-# Store & Value
+# Store
 
-`Store` and `Value` replace the old single-attachment model. Each `Context` has its own independent `Store`.
+`Store` replaces the old single-attachment model. Each `Context` has its own independent `Store`.
 
 ## Store
 
-`Store` is a thread-safe key-value map using `String` keys and `Value` values.
+`Store` is a thread-safe key-value map using `String` keys.
 
 ### Writing
 
 ```java
-context.getStore().put("key", Value.of(myObject));
+context.getStore().put("key", myObject);
 ```
 
 ### Reading
@@ -24,22 +24,19 @@ context.getStore().put("key", Value.of(myObject));
 context.getStore().get("key");
 
 // From ancestor context
-context.findAncestor(1).orElseThrow().getStore().get("key");
+context.getAncestor("../").getStore().get("key");
 ```
 
 ### Type-safe access
 
 ```java
 MyData data = context.getStore()
-        .get("key")
-        .map(Value::get)
-        .map(v -> (MyData) v)
+        .get("key", MyData.class)
         .orElseThrow();
 
-// Or use type-check and cast
-Value value = context.getStore().get("key").orElseThrow();
-if (value.isType(MyData.class)) {
-    MyData data = value.cast(MyData.class);
+// Type-check without casting
+if (context.getStore().isType("key", MyData.class)) {
+    MyData data = context.getStore().get("key", MyData.class).orElseThrow();
 }
 ```
 
@@ -50,54 +47,56 @@ context.getStore().remove("key");
 context.getStore().clear();
 ```
 
+### Typed convenience methods
+
+```java
+Optional<T> get(String key, Class<T> type)               // typed get, returns Optional<T>
+Optional<T> remove(String key, Class<T> type)             // typed remove, returns Optional<T>
+T getOrDefault(String key, Class<T> type, T defaultValue) // typed getOrDefault
+boolean isType(String key, Class<?> type)                  // returns false if key absent
+```
+
 ### Full API
 
 ```java
 interface Store {
     interface Entry {
         String getKey();
-        Value getValue();
-        Value setValue(Value value);
+        Object getValue();
+        Object setValue(Object value);
     }
 
     int size();
     boolean isEmpty();
     boolean containsKey(String key);
-    boolean containsValue(Value value);
-    Optional<Value> get(String key);
-    Optional<Value> put(String key, Value value);
-    Optional<Value> remove(String key);
+    boolean containsValue(Object value);
+    Optional<Object> get(String key);
+    Optional<Object> put(String key, Object value);
+    Optional<Object> remove(String key);
     void putAll(Store store);
     void clear();
     Set<String> keySet();
-    Collection<Value> values();
+    Collection<Object> values();
     Set<Entry> entrySet();
-    Value getOrDefault(String key, Value defaultValue);
-    void forEach(BiConsumer<? super String, ? super Value> action);
-    void replaceAll(BiFunction<? super String, ? super Value, ? extends Value> function);
-    Optional<Value> putIfAbsent(String key, Value value);
-    boolean remove(String key, Value value);
-    boolean replace(String key, Value oldValue, Value newValue);
-    Optional<Value> replace(String key, Value value);
-    Optional<Value> computeIfAbsent(String key, Function<? super String, ? extends Value> mappingFunction);
-    Optional<Value> computeIfPresent(String key, BiFunction<? super String, ? super Value, ? extends Value> remappingFunction);
-    Optional<Value> compute(String key, BiFunction<? super String, ? super Value, ? extends Value> remappingFunction);
-    Optional<Value> merge(String key, Value value, BiFunction<? super Value, ? super Value, ? extends Value> remappingFunction);
+    Object getOrDefault(String key, Object defaultValue);
+    void forEach(BiConsumer<? super String, ? super Object> action);
+    void replaceAll(BiFunction<? super String, ? super Object, ? extends Object> function);
+    Optional<Object> putIfAbsent(String key, Object value);
+    boolean remove(String key, Object value);
+    boolean replace(String key, Object oldValue, Object newValue);
+    Optional<Object> replace(String key, Object value);
+    Optional<Object> computeIfAbsent(String key, Function<? super String, ? extends Object> mappingFunction);
+    Optional<Object> computeIfPresent(String key, BiFunction<? super String, ? super Object, ? extends Object> remappingFunction);
+    Optional<Object> compute(String key, BiFunction<? super String, ? super Object, ? extends Object> remappingFunction);
+    Optional<Object> merge(String key, Object value, BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction);
+    <T> Optional<T> get(String key, Class<T> type);
+    <T> Optional<T> remove(String key, Class<T> type);
+    <T> T getOrDefault(String key, Class<T> type, T defaultValue);
+    boolean isType(String key, Class<?> type);
 }
 ```
 
-Every method that returns a store value returns `Optional<Value>`. All methods reject `null` keys and values with `NullPointerException`.
-
-## Value
-
-`Value` wraps any object:
-
-```java
-Value.of(anyObject)          // factory, rejects null
-value.get()                   // returns the wrapped object
-value.isType(MyClass.class)   // type-check without casting
-value.cast(MyClass.class)     // typed cast, throws ClassCastException if type doesn't match
-```
+Every method that returns a store value returns `Optional<Object>`. Use `get(key, type)` for typed access. All methods reject `null` keys and values with `NullPointerException`.
 
 ## Ancestor access pattern
 
@@ -108,10 +107,10 @@ To read data stored by an ancestor:
 context.findAttachment(1).flatMap(a -> a.to(MyData.class))
 
 // After (2.0.0):
-context.findAncestor(1).orElseThrow().getStore().get("key").map(Value::get).map(v -> (MyData) v)
+context.getAncestor("../").getStore().get("key", MyData.class)
 ```
 
-Each context has its own independent `Store`. Use `findAncestor(levelUp)` to navigate to an ancestor context, then call `getStore()` on it.
+Each context has its own independent `Store`. Use `getAncestor(path)` to navigate when the ancestor is expected to exist, or `findAncestor(path)` for safe navigation, then call `getStore()` on it.
 
 ## Advanced operations
 
@@ -119,19 +118,19 @@ Each context has its own independent `Store`. Use `findAncestor(levelUp)` to nav
 
 ```java
 context.getStore().compute("counter", (key, value) ->
-        Value.of(value.cast(Integer.class) + 1));
+        (Integer) value + 1);
 ```
 
 ### Conditional put
 
 ```java
-context.getStore().putIfAbsent("key", Value.of("default"));
+context.getStore().putIfAbsent("key", "default");
 ```
 
 ### Merge
 
 ```java
-context.getStore().merge("key", Value.of(newValue), (oldVal, newVal) -> newVal);
+context.getStore().merge("key", newValue, (oldVal, newVal) -> newVal);
 ```
 
 ### Conditional remove and replace
@@ -139,5 +138,5 @@ context.getStore().merge("key", Value.of(newValue), (oldVal, newVal) -> newVal);
 ```java
 context.getStore().remove("key", expectedValue);  // returns boolean
 context.getStore().replace("key", oldValue, newValue);  // returns boolean
-context.getStore().replace("key", Value.of(updated));  // returns Optional<Value>
+context.getStore().replace("key", updated);  // returns Optional<Object>
 ```

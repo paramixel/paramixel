@@ -28,9 +28,9 @@ import org.paramixel.core.exception.ConfigurationException;
 import org.paramixel.core.internal.listener.SafeListener;
 
 /**
- * Default {@link Runner} implementation used for standard Paramixel execution.
+ * Executes action trees with cycle detection, configurable parallelism, and listener lifecycle callbacks.
  *
- * <p>This SPI implementation validates configuration, creates execution infrastructure, detects invalid action-graph
+ * <p>This implementation validates configuration, creates execution infrastructure, detects invalid action-graph
  * conditions such as cycles and thread-starvation deadlocks, and drives listener callbacks around the root action.
  *
  * <p>{@code DefaultRunner} instances are not thread-safe and not reusable across multiple {@link #run(Action)}

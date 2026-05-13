@@ -30,7 +30,7 @@ import org.paramixel.core.internal.TildePathExpander;
 import org.paramixel.core.support.Arguments;
 
 /**
- * Base class for file-based report listeners that handles directory creation, writer creation, and error wrapping.
+ * Creates report output files with parent-directory creation, UTF-8 writer lifecycle management, and {@link UncheckedIOException} wrapping on I/O failure.
  * Subclasses implement {@code writeReport} to produce report content and {@code formatName} to identify the
  * report format in error messages.
  */

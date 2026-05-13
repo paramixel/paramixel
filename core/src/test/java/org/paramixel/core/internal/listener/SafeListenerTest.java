@@ -130,7 +130,7 @@ class SafeListenerTest {
 
         SafeListener safeListener = new SafeListener(throwingListener);
         Action action = Direct.builder("test")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new RuntimeException("action failed");
                 })
                 .build();
@@ -229,7 +229,7 @@ class SafeListenerTest {
 
         SafeListener safeListener = new SafeListener(throwingListener);
         Action action = Direct.builder("test")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new RuntimeException("action failed");
                 })
                 .build();

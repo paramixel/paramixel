@@ -128,7 +128,7 @@ class SummaryListenerTest {
         SummaryListener listener =
                 new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
         Action action = Direct.builder("fail")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new RuntimeException("boom");
                 })
                 .build();
@@ -154,7 +154,7 @@ class SummaryListenerTest {
         SummaryListener listener =
                 new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
         Action action = Direct.builder("skip")
-                .execute(context -> {
+                .runnable(context -> {
                     throw org.paramixel.core.exception.SkipException.of("reason");
                 })
                 .build();
@@ -170,6 +170,32 @@ class SummaryListenerTest {
 
         String result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("SKIP");
+    }
+
+    @Test
+    @DisplayName("runCompleted prints dash separators around footer")
+    void runCompletedPrintsDashSeparators() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream printStream = new PrintStream(output, true, StandardCharsets.UTF_8);
+        SummaryListener listener =
+                new SummaryListener(new TreeSummaryRenderer(printStream, false, false), printStream, false);
+        Noop noop = Noop.of("test");
+        Runner runner = Runner.builder().listener(listener).build();
+
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+            runner.run(noop);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result).contains("[PARAMIXEL] ----");
+        assertThat(result).contains("Paramixel v");
+        assertThat(result).contains("Status      : PASS");
+        assertThat(result).contains("Finished at :");
+        assertThat(result).contains("Total time  :");
     }
 
     @Test

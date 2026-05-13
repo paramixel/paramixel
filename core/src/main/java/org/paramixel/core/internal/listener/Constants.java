@@ -20,7 +20,7 @@ import org.paramixel.core.Version;
 import org.paramixel.core.support.AnsiColor;
 
 /**
- * Shared console output constants for built-in listener implementations.
+ * Defines console prefixes, package prefixes, and root-action name constants used by built-in listeners.
  */
 public class Constants {
 

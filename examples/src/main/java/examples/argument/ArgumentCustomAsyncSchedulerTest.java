@@ -64,13 +64,13 @@ public class ArgumentCustomAsyncSchedulerTest {
 
     private static Action first() {
         return Direct.builder("arg-0")
-                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .runnable(context -> INVOCATION_COUNT.incrementAndGet())
                 .build();
     }
 
     private static Action second() {
         return Direct.builder("arg-1")
-                .execute(context -> {
+                .runnable(context -> {
                     context.runAsync(Noop.of("nested-async")).join();
                     INVOCATION_COUNT.incrementAndGet();
                 })
@@ -79,7 +79,7 @@ public class ArgumentCustomAsyncSchedulerTest {
 
     private static Action third() {
         return Direct.builder("arg-2")
-                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .runnable(context -> INVOCATION_COUNT.incrementAndGet())
                 .build();
     }
 
@@ -94,7 +94,7 @@ public class ArgumentCustomAsyncSchedulerTest {
 
     private static Action verify() {
         return Direct.builder("verify")
-                .execute(context -> {
+                .runnable(context -> {
                     assertThat(INVOCATION_COUNT.get()).isEqualTo(3);
                     assertThat(SCHEDULER.scheduled()).isEqualTo(4);
                 })
@@ -123,7 +123,7 @@ public class ArgumentCustomAsyncSchedulerTest {
         public CompletableFuture<Result> runAsync(Action action, Context context) {
             scheduled.incrementAndGet();
             try {
-                return CompletableFuture.completedFuture(action.execute(context));
+                return CompletableFuture.completedFuture(action.run(context));
             } catch (Throwable throwable) {
                 return CompletableFuture.failedFuture(throwable);
             }

@@ -76,6 +76,44 @@ class DefaultAsyncSchedulerTest {
     }
 
     @Test
+    @DisplayName("enforces global parallelism for Parallel child admission")
+    void enforcesGlobalParallelismForParallelChildAdmission() {
+        var listener = new ActiveChildListener("inner-");
+        Action root = Parallel.builder("root")
+                .child(Parallel.builder("inner-0").child(Noop.of("leaf-0")).build())
+                .child(Parallel.builder("inner-1").child(Noop.of("leaf-1")).build())
+                .child(Parallel.builder("inner-2").child(Noop.of("leaf-2")).build())
+                .build();
+
+        Result result = runner(1, listener).run(root);
+
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(listener.maxActive()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("custom scheduler is not bound by global parallelism")
+    void customSchedulerIsNotBoundByGlobalParallelism() {
+        try (var scheduler = new RecordingScheduler()) {
+            AtomicInteger active = new AtomicInteger();
+            AtomicInteger maxActive = new AtomicInteger();
+            Action parallel = Parallel.builder("parallel")
+                    .scheduler(scheduler)
+                    .parallelism(4)
+                    .child(tracked("child-0", active, maxActive))
+                    .child(tracked("child-1", active, maxActive))
+                    .child(tracked("child-2", active, maxActive))
+                    .child(tracked("child-3", active, maxActive))
+                    .build();
+
+            Result result = runner(1).run(parallel);
+
+            assertThat(result.getStatus().isPass()).isTrue();
+            assertThat(maxActive.get()).isGreaterThan(1);
+        }
+    }
+
+    @Test
     @DisplayName("continues sibling branch when one Parallel has queued children")
     void continuesSiblingBranchWhenOneParallelHasQueuedChildren() throws InterruptedException {
         CountDownLatch blockerStarted = new CountDownLatch(1);
@@ -83,13 +121,13 @@ class DefaultAsyncSchedulerTest {
         CountDownLatch siblingRan = new CountDownLatch(1);
         AtomicBoolean queuedChildRanBeforeSiblingReleased = new AtomicBoolean();
         Action blockingChild = Direct.builder("blocking")
-                .execute(context -> {
+                .runnable(context -> {
                     blockerStarted.countDown();
                     releaseBlocker.await();
                 })
                 .build();
         Action queuedChild = Direct.builder("queued")
-                .execute(context -> queuedChildRanBeforeSiblingReleased.set(siblingRan.getCount() > 0))
+                .runnable(context -> queuedChildRanBeforeSiblingReleased.set(siblingRan.getCount() > 0))
                 .build();
         Action constrainedBranch = Parallel.builder("constrained")
                 .parallelism(1)
@@ -97,7 +135,7 @@ class DefaultAsyncSchedulerTest {
                 .child(queuedChild)
                 .build();
         Action sibling = Direct.builder("sibling")
-                .execute(context -> {
+                .runnable(context -> {
                     assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
                     siblingRan.countDown();
                     releaseBlocker.countDown();
@@ -119,10 +157,10 @@ class DefaultAsyncSchedulerTest {
         AtomicBoolean childComplete = new AtomicBoolean();
         AtomicBoolean afterSawChildComplete = new AtomicBoolean();
         Action child = Direct.builder("child")
-                .execute(context -> childComplete.set(true))
+                .runnable(context -> childComplete.set(true))
                 .build();
         Action after = Direct.builder("after")
-                .execute(context -> afterSawChildComplete.set(childComplete.get()))
+                .runnable(context -> afterSawChildComplete.set(childComplete.get()))
                 .build();
 
         Result result = runner(2)
@@ -137,14 +175,32 @@ class DefaultAsyncSchedulerTest {
     void supportsContextRunAsyncFromInsideAnAction() {
         AtomicBoolean asyncRan = new AtomicBoolean();
         Action async =
-                Direct.builder("async").execute(context -> asyncRan.set(true)).build();
+                Direct.builder("async").runnable(context -> asyncRan.set(true)).build();
         Action action = Direct.builder("scheduler")
-                .execute(context -> assertThat(
+                .runnable(context -> assertThat(
                                 context.runAsync(async).join().getStatus().isPass())
                         .isTrue())
                 .build();
 
         Result result = runner(2).run(action);
+
+        assertThat(result.getStatus().isPass()).isTrue();
+        assertThat(asyncRan).isTrue();
+    }
+
+    @Test
+    @DisplayName("supports blocking Context.runAsync from inside an action with global parallelism one")
+    void supportsBlockingContextRunAsyncFromInsideAnActionWithGlobalParallelismOne() {
+        AtomicBoolean asyncRan = new AtomicBoolean();
+        Action async =
+                Direct.builder("async").runnable(context -> asyncRan.set(true)).build();
+        Action action = Direct.builder("scheduler")
+                .runnable(context -> assertThat(
+                                context.runAsync(async).join().getStatus().isPass())
+                        .isTrue())
+                .build();
+
+        Result result = runner(1).run(action);
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(asyncRan).isTrue();
@@ -181,7 +237,7 @@ class DefaultAsyncSchedulerTest {
         try (var scheduler = new RecordingScheduler()) {
             Action nested = Noop.of("nested");
             Action child = Direct.builder("child")
-                    .execute(context -> assertThat(
+                    .runnable(context -> assertThat(
                                     context.runAsync(nested).join().getStatus().isPass())
                             .isTrue())
                     .build();
@@ -218,7 +274,7 @@ class DefaultAsyncSchedulerTest {
 
     private static Action tracked(String name, AtomicInteger active, AtomicInteger maxActive) {
         return Direct.builder(name)
-                .execute(context -> {
+                .runnable(context -> {
                     int current = active.incrementAndGet();
                     maxActive.accumulateAndGet(current, Math::max);
                     try {
@@ -240,8 +296,41 @@ class DefaultAsyncSchedulerTest {
     }
 
     private static DefaultRunner runner(int parallelism) {
-        return new DefaultRunner(
-                Map.of(Configuration.RUNNER_PARALLELISM, Integer.toString(parallelism)), new Listener() {});
+        return runner(parallelism, new Listener() {});
+    }
+
+    private static DefaultRunner runner(int parallelism, Listener listener) {
+        return new DefaultRunner(Map.of(Configuration.RUNNER_PARALLELISM, Integer.toString(parallelism)), listener);
+    }
+
+    private static final class ActiveChildListener implements Listener {
+
+        private final String prefix;
+        private final AtomicInteger active = new AtomicInteger();
+        private final AtomicInteger maxActive = new AtomicInteger();
+
+        private ActiveChildListener(String prefix) {
+            this.prefix = prefix;
+        }
+
+        @Override
+        public void beforeAction(Result result) {
+            if (result.getAction().getName().startsWith(prefix)) {
+                int current = active.incrementAndGet();
+                maxActive.accumulateAndGet(current, Math::max);
+            }
+        }
+
+        @Override
+        public void afterAction(Result result) {
+            if (result.getAction().getName().startsWith(prefix)) {
+                active.decrementAndGet();
+            }
+        }
+
+        private int maxActive() {
+            return maxActive.get();
+        }
     }
 
     private static final class RecordingScheduler implements AsyncScheduler, AutoCloseable {
@@ -253,7 +342,7 @@ class DefaultAsyncSchedulerTest {
         @Override
         public CompletableFuture<Result> runAsync(Action action, Context context) {
             scheduledNames.add(action.getName());
-            return CompletableFuture.supplyAsync(() -> action.execute(context), executor);
+            return CompletableFuture.supplyAsync(() -> action.run(context), executor);
         }
 
         private List<String> scheduledNames() {

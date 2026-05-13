@@ -66,6 +66,9 @@ public interface Runner extends AutoCloseable {
      *
      * @param action the root action to execute
      * @return the result produced for the supplied action
+     * @throws NullPointerException if {@code action} is {@code null}
+     * @throws org.paramixel.core.exception.CycleDetectedException if the action graph contains a cycle
+     * @throws org.paramixel.core.exception.ConfigurationException if the configuration is invalid
      */
     Result run(Action action);
 
@@ -74,6 +77,7 @@ public interface Runner extends AutoCloseable {
      *
      * @param selector the selector used to locate an action
      * @return the result of the resolved action, or an empty {@link Optional} when no matching action is found
+     * @throws NullPointerException if {@code selector} is {@code null}
      */
     default Optional<Result> run(Selector selector) {
         Objects.requireNonNull(selector, "selector must not be null");
@@ -89,6 +93,7 @@ public interface Runner extends AutoCloseable {
      *
      * @param action the root action to execute
      * @return {@code 0} for success and {@code 1} for failure
+     * @throws NullPointerException if {@code action} is {@code null}
      */
     default int runAndReturnExitCode(Action action) {
         Objects.requireNonNull(action, "action must not be null");
@@ -112,6 +117,7 @@ public interface Runner extends AutoCloseable {
      *
      * @param selector the selector used to locate an action
      * @return {@code 0} for success and {@code 1} for failure
+     * @throws NullPointerException if {@code selector} is {@code null}
      */
     default int runAndReturnExitCode(Selector selector) {
         Objects.requireNonNull(selector, "selector must not be null");
@@ -139,6 +145,7 @@ public interface Runner extends AutoCloseable {
      *
      * @param action the root action to execute
      * @see System#exit(int)
+     * @throws NullPointerException if {@code action} is {@code null}
      */
     default void runAndExit(Action action) {
         Objects.requireNonNull(action, "action must not be null");
@@ -152,6 +159,7 @@ public interface Runner extends AutoCloseable {
      *
      * @param selector the selector used to locate an action
      * @see System#exit(int)
+     * @throws NullPointerException if {@code selector} is {@code null}
      */
     default void runAndExit(Selector selector) {
         Objects.requireNonNull(selector, "selector must not be null");

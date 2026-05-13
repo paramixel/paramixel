@@ -22,8 +22,7 @@ import org.paramixel.core.Status;
 import org.paramixel.core.support.AnsiColor;
 
 /**
- * Static formatting methods for status, action kind, exception detail, and JSON escaping used by built-in listener
- * implementations.
+ * Formats status, action kind, exception detail, and JSON for built-in listener console and report output.
  */
 final class Listeners {
 

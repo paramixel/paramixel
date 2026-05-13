@@ -22,11 +22,10 @@ import org.paramixel.core.support.Arguments;
 import org.paramixel.core.support.FastId;
 
 /**
- * Base state and helpers for {@link Action} types.
+ * Provides generated identifiers and name validation shared by framework-provided action types.
  *
- * <p>This class provides generated identifiers, name validation, and context mode storage shared by
- * framework-provided action types. Subclasses are responsible for implementing execution, skip, and context scoping
- * behavior.
+ * <p>This class provides generated identifiers and name validation shared by framework-provided action types.
+ * Subclasses are responsible for implementing run and skip behavior.
  */
 public abstract class AbstractAction implements Action {
 
@@ -41,25 +40,10 @@ public abstract class AbstractAction implements Action {
     protected String name;
 
     /**
-     * The context scoping mode for this action.
-     */
-    protected final ContextMode contextMode;
-
-    /**
      * Creates an action with a generated stable identifier.
      */
     protected AbstractAction() {
-        this(ContextMode.ISOLATED);
-    }
-
-    /**
-     * Creates an action with a generated stable identifier and context mode.
-     *
-     * @param contextMode the context mode applied when this action executes or skips
-     */
-    protected AbstractAction(ContextMode contextMode) {
         this.id = FastId.generateId();
-        this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
     }
 
     /**
@@ -103,15 +87,5 @@ public abstract class AbstractAction implements Action {
     @Override
     public final String getName() {
         return name;
-    }
-
-    /**
-     * Returns this action's context scoping mode.
-     *
-     * @return the context mode used when this action executes or skips
-     */
-    @Override
-    public final ContextMode getContextMode() {
-        return contextMode;
     }
 }

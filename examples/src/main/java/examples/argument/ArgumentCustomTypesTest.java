@@ -57,7 +57,7 @@ public class ArgumentCustomTypesTest {
 
     private static Action recordTest(Sample sample) {
         return Direct.builder("record")
-                .execute(context -> {
+                .runnable(context -> {
                     assertThat(sample.name()).isEqualTo("alpha");
                     assertThat(sample.count()).isEqualTo(3);
                 })
@@ -66,13 +66,13 @@ public class ArgumentCustomTypesTest {
 
     private static Action enumTest() {
         return Direct.builder("enum")
-                .execute(context -> assertThat(Shape.CIRCLE).isEqualTo(Shape.CIRCLE))
+                .runnable(context -> assertThat(Shape.CIRCLE).isEqualTo(Shape.CIRCLE))
                 .build();
     }
 
     private static Action classTest(Sample sample) {
         return Direct.builder("class")
-                .execute(context -> assertThat(sample).isInstanceOf(Sample.class))
+                .runnable(context -> assertThat(sample).isInstanceOf(Sample.class))
                 .build();
     }
 }

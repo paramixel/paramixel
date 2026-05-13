@@ -32,7 +32,7 @@ import org.gradle.api.tasks.SourceSetContainer;
 public class ParamixelPlugin implements Plugin<Project> {
 
     /**
-     * Creates a Paramixel plugin instance.
+     * Constructs a plugin instance; Gradle instantiates this automatically via the plugin registry.
      */
     public ParamixelPlugin() {
         // Intentionally empty
@@ -53,6 +53,12 @@ public class ParamixelPlugin implements Plugin<Project> {
      */
     public static final String TASK_NAME = "paramixelTest";
 
+    /**
+     * Applies the Paramixel plugin to the given project, registering the {@code paramixel} DSL extension
+     * and the {@code paramixelTest} verification task.
+     *
+     * @param project the Gradle project to apply the plugin to
+     */
     @Override
     public void apply(Project project) {
         project.getPluginManager().apply("java");

@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.core.Action;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 
@@ -36,7 +35,6 @@ class NoopTest {
         Result result = Runner.builder().build().run(action);
 
         assertThat(result.getStatus().isPass()).isTrue();
-        assertThat(action.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
     }
 
     @Test
@@ -47,11 +45,11 @@ class NoopTest {
     }
 
     @Test
-    @DisplayName("execute rejects null context")
+    @DisplayName("run rejects null context")
     void executeRejectsNullContext() {
         Noop action = Noop.of("noop");
 
-        assertThatThrownBy(() -> action.execute(null))
+        assertThatThrownBy(() -> action.run(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("context must not be null");
     }

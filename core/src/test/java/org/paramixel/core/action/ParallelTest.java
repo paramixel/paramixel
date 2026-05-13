@@ -35,7 +35,6 @@ import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
 import org.paramixel.core.Status;
-import org.paramixel.core.Value;
 import org.paramixel.core.internal.DefaultResult;
 import org.paramixel.core.internal.DefaultStatus;
 
@@ -43,11 +42,11 @@ import org.paramixel.core.internal.DefaultStatus;
 class ParallelTest {
 
     @Test
-    @DisplayName("execute rejects null context")
+    @DisplayName("run rejects null context")
     void executeRejectsNullContext() {
         Parallel parallel = Parallel.builder("parallel").child(Noop.of("child")).build();
 
-        assertThatThrownBy(() -> parallel.execute(null))
+        assertThatThrownBy(() -> parallel.run(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("context must not be null");
     }
@@ -69,9 +68,6 @@ class ParallelTest {
         builder.build();
 
         assertThatIllegalStateException()
-                .isThrownBy(() -> builder.contextMode(Action.ContextMode.SHARED))
-                .withMessage("builder already built");
-        assertThatIllegalStateException()
                 .isThrownBy(() -> builder.parallelism(2))
                 .withMessage("builder already built");
         assertThatIllegalStateException().isThrownBy(builder::build).withMessage("builder already built");
@@ -90,7 +86,6 @@ class ParallelTest {
 
         assertThat(result.getStatus().isPass()).isTrue();
         assertThat(parallel.getParallelism()).isEqualTo(2);
-        assertThat(parallel.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
     }
 
     @Test
@@ -98,9 +93,6 @@ class ParallelTest {
     void validatesBuilderArguments() {
         assertThatThrownBy(() -> Parallel.builder(null)).isInstanceOf(NullPointerException.class);
         assertThatIllegalArgumentException().isThrownBy(() -> Parallel.builder(" "));
-        assertThatThrownBy(() -> Parallel.builder("parallel").contextMode(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("contextMode must not be null");
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> Parallel.builder("parallel").parallelism(0))
                 .withMessage("parallelism must be positive, was: 0");
@@ -131,23 +123,20 @@ class ParallelTest {
     }
 
     @Test
-    @DisplayName("shared children can coordinate through shared store")
-    void sharedChildrenCanCoordinateThroughSharedStore() {
+    @DisplayName("children can coordinate through parent store via ancestor navigation")
+    void childrenCanCoordinateThroughParentStoreViaAncestorNavigation() {
         Action setup = Direct.builder("setup")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> context.getStore().put("count", Value.of(new AtomicInteger())))
+                .runnable(context -> context.getAncestor("../").getStore().put("count", new AtomicInteger()))
                 .build();
         Action workers = Parallel.builder("workers")
-                .contextMode(Action.ContextMode.SHARED)
                 .child(incrementer("first"))
                 .child(incrementer("second"))
                 .build();
         Action verify = Direct.builder("verify")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> assertThat(context.getStore()
-                                .get("count")
+                .runnable(context -> assertThat(context.getAncestor("../")
+                                .getStore()
+                                .get("count", AtomicInteger.class)
                                 .orElseThrow()
-                                .cast(AtomicInteger.class)
                                 .get())
                         .isEqualTo(2))
                 .build();
@@ -165,11 +154,10 @@ class ParallelTest {
 
     private static Action incrementer(String name) {
         return Direct.builder(name)
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> context.getStore()
-                        .get("count")
+                .runnable(context -> context.getAncestor("../../")
+                        .getStore()
+                        .get("count", AtomicInteger.class)
                         .orElseThrow()
-                        .cast(AtomicInteger.class)
                         .incrementAndGet())
                 .build();
     }
@@ -180,7 +168,7 @@ class ParallelTest {
         var blocker = new CountDownLatch(1);
         var ready = new CountDownLatch(1);
         Action blockingChild = Direct.builder("blocking")
-                .execute(context -> {
+                .runnable(context -> {
                     ready.countDown();
                     blocker.countDown();
                 })
@@ -221,7 +209,7 @@ class ParallelTest {
             }
 
             @Override
-            public Result execute(Context context) {
+            public Result run(Context context) {
                 throw new RuntimeException("child error");
             }
 
@@ -265,7 +253,7 @@ class ParallelTest {
             }
 
             @Override
-            public Result execute(Context context) {
+            public Result run(Context context) {
                 throw new CustomError("child error");
             }
 
@@ -303,7 +291,7 @@ class ParallelTest {
             }
 
             @Override
-            public Result execute(Context context) {
+            public Result run(Context context) {
                 throw new OutOfMemoryError("child oom");
             }
 
@@ -331,7 +319,7 @@ class ParallelTest {
             }
 
             @Override
-            public Result execute(Context context) {
+            public Result run(Context context) {
                 throw new StackOverflowError("child soe");
             }
 
@@ -361,7 +349,7 @@ class ParallelTest {
             }
 
             @Override
-            public Result execute(Context context) {
+            public Result run(Context context) {
                 DefaultResult result = new DefaultResult(this);
                 result.setStatus(Status.failure(childFailure));
                 result.setRunDuration(Duration.ZERO);
@@ -402,7 +390,7 @@ class ParallelTest {
         var completed = new AtomicBoolean(false);
         var blocker = new CountDownLatch(1);
         Action slowChild = Direct.builder("slow")
-                .execute(context -> {
+                .runnable(context -> {
                     started.countDown();
                     blocker.await();
                     completed.set(true);
@@ -414,7 +402,7 @@ class ParallelTest {
             }
 
             @Override
-            public Result execute(Context context) {
+            public Result run(Context context) {
                 throw new RuntimeException("boom");
             }
 

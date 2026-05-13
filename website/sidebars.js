@@ -7,19 +7,8 @@ const sidebars = {
     'quick-start',
     {
       type: 'category',
-      label: 'Built-in Actions',
-      collapsed: false,
-      items: [
-        'actions/direct',
-        'actions/noop',
-        'actions/container',
-        'actions/parallel',
-      ],
-    },
-    {
-      type: 'category',
       label: 'Usage Guide',
-      collapsed: false,
+      collapsed: true,
       items: [
         'usage/action-composition',
         'usage/argument-testing',
@@ -33,13 +22,24 @@ const sidebars = {
         'usage/gradle-plugin',
         'usage/integration-testing',
         'usage/discovery',
-        
-        'usage/migration-guide',
-        'usage/migration-1-to-3',
-        'usage/migration-2-to-3',
+
+        'usage/migration-3-to-4',
+        'usage/migration-2-to-4',
+        'usage/migration-1-to-4',
       ],
     },
     'configuration',
+    {
+      type: 'category',
+      label: 'Built-in Actions',
+      collapsed: true,
+      items: [
+        'actions/direct',
+        'actions/noop',
+        'actions/container',
+        'actions/parallel',
+      ],
+    },
     'architecture',
     'releasing',
     {

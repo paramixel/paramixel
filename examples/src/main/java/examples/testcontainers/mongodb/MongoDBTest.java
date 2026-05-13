@@ -25,7 +25,6 @@ import org.bson.Document;
 import org.paramixel.core.Action;
 import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
-import org.paramixel.core.Value;
 import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Parallel;
@@ -66,8 +65,7 @@ public class MongoDBTest {
 
     private static Action setUp(MongoDBTestEnvironment environment) {
         return Direct.builder("setUp")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {
+                .runnable(context -> {
                     LOGGER.info("[%s] initialize test environment ...", environment.name());
 
                     Network network = NetworkFactory.createNetwork();
@@ -75,18 +73,19 @@ public class MongoDBTest {
                     environment.initialize(network);
                     assertThat(environment.isRunning()).isTrue();
 
-                    context.getStore().put(NETWORK, Value.of(network));
-                    context.getStore().put(ENVIRONMENT, Value.of(environment));
+                    context.getStore().put(NETWORK, network);
+                    context.getStore().put(ENVIRONMENT, environment);
                 })
                 .build();
     }
 
     private static Action test() {
         return Direct.builder("test insert and query")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {
-                    MongoDBTestEnvironment testEnvironment =
-                            context.getStore().get(ENVIRONMENT).orElseThrow().cast(MongoDBTestEnvironment.class);
+                .runnable(context -> {
+                    MongoDBTestEnvironment testEnvironment = context.getAncestor("../")
+                            .getStore()
+                            .get(ENVIRONMENT, MongoDBTestEnvironment.class)
+                            .orElseThrow();
 
                     LOGGER.info("[%s] testing insert and query ...", testEnvironment.name());
 
@@ -107,20 +106,15 @@ public class MongoDBTest {
 
     private static Action tearDown(MongoDBTestEnvironment environment) {
         return Direct.builder("after")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {
+                .runnable(context -> {
                     LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                    var removedNetwork = context.getStore().remove(NETWORK);
-                    var removedEnvironment = context.getStore().remove(ENVIRONMENT);
+                    var removedNetwork = context.getStore().remove(NETWORK, Network.class);
+                    var removedEnvironment = context.getStore().remove(ENVIRONMENT, MongoDBTestEnvironment.class);
                     if (removedNetwork.isPresent() && removedEnvironment.isPresent()) {
-                        Network network = removedNetwork.orElseThrow().cast(Network.class);
-                        MongoDBTestEnvironment testEnvironment =
-                                removedEnvironment.orElseThrow().cast(MongoDBTestEnvironment.class);
-
                         Cleanup.of(Cleanup.Mode.FORWARD)
-                                .addCloseable(testEnvironment)
-                                .addCloseable(network)
+                                .addCloseable(removedEnvironment.orElseThrow())
+                                .addCloseable(removedNetwork.orElseThrow())
                                 .runAndThrow();
                     }
                 })

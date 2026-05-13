@@ -27,7 +27,7 @@ import java.util.function.Predicate;
 import org.paramixel.core.internal.UnrecoverableErrors;
 
 /**
- * Retries an executable operation with configurable backoff and a wall-clock duration budget.
+ * Retries a runnable operation with configurable backoff and a wall-clock duration budget.
  *
  * <p>This utility is intended for operations that may fail transiently and succeed on a subsequent attempt.
  * Callers provide a {@link Policy} that defines both the inter-attempt delay schedule and the total
@@ -53,7 +53,7 @@ public class Retry {
      * duration budget. The default retry predicate retries on any throwable that is not an
      * {@link Error}.
      *
-     * @param policy the backoff policy
+     * @param policy the backoff strategy defining inter-attempt delays and the duration budget
      * @return a new retry sequence
      * @throws NullPointerException if {@code policy} is {@code null}
      */
@@ -75,7 +75,7 @@ public class Retry {
      * stops immediately and the result reflects the failure. When the predicate returns
      * {@code true}, the next attempt proceeds (if the duration budget has not been exhausted).
      *
-     * @param predicate the retry predicate
+     * @param predicate the predicate that decides whether a throwable warrants a retry attempt
      * @return this retry sequence
      * @throws NullPointerException if {@code predicate} is {@code null}
      */
@@ -92,7 +92,7 @@ public class Retry {
      * throwable from the previous failed attempt. Multiple callbacks can be registered;
      * they are invoked in registration order.
      *
-     * @param callback the retry callback
+     * @param callback the callback invoked with the next attempt number and the previous failure
      * @return this retry sequence
      * @throws NullPointerException if {@code callback} is {@code null}
      */
@@ -103,7 +103,7 @@ public class Retry {
     }
 
     /**
-     * Executes the supplied executable with retry behavior and returns the result.
+     * Runs the supplied throwable runnable with retry behavior and returns the result.
      *
      * <p>On each failed attempt where the {@link #retryOn(Predicate) retry predicate} returns
      * {@code true} and the wall-clock duration budget has not been exhausted, the on-retry callbacks
@@ -112,15 +112,15 @@ public class Retry {
      * immediately without retry; other {@link Error} subtypes are captured and may be retried
      * depending on the retry predicate.
      *
-     * @param executable the operation to execute
+     * @param throwableRunnable the operation to run
      * @return the retry result describing success, attempt count, elapsed duration, and captured exceptions
      * @throws IllegalStateException if this retry sequence has already run
-     * @throws OutOfMemoryError if the executable throws an {@code OutOfMemoryError}
-     * @throws StackOverflowError if the executable throws a {@code StackOverflowError}
-     * @throws NullPointerException if {@code executable} is {@code null}
+     * @throws OutOfMemoryError if the throwableRunnable throws an {@code OutOfMemoryError}
+     * @throws StackOverflowError if the throwableRunnable throws a {@code StackOverflowError}
+     * @throws NullPointerException if {@code throwableRunnable} is {@code null}
      */
-    public Result run(Executable executable) {
-        Objects.requireNonNull(executable, "executable must not be null");
+    public Result run(ThrowableRunnable throwableRunnable) {
+        Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
         if (hasRun) {
             throw new IllegalStateException("Retry has already run");
         }
@@ -136,7 +136,7 @@ public class Retry {
             attempt++;
 
             try {
-                executable.run();
+                throwableRunnable.run();
                 return new Result(maximumDuration, attempt, elapsedDuration(startNanos), true, Collections.emptyList());
             } catch (Throwable e) {
                 UnrecoverableErrors.rethrowIfUnrecoverable(e);
@@ -190,21 +190,21 @@ public class Retry {
     }
 
     /**
-     * Executes the supplied executable with retry behavior and rethrows the last captured
+     * Runs the supplied throwable runnable with retry behavior and rethrows the last captured
      * exception when the duration budget is exhausted or the retry predicate returns {@code false}.
      *
      * <p>Earlier exceptions are added to the last exception as suppressed throwables
      * in attempt order.
      *
-     * @param executable the operation to execute
+     * @param throwableRunnable the operation to run
      * @throws Throwable the last captured exception when all retries are exhausted, with earlier exceptions suppressed
      * @throws IllegalStateException if this retry sequence has already run
-     * @throws OutOfMemoryError if the executable throws an {@code OutOfMemoryError}
-     * @throws StackOverflowError if the executable throws a {@code StackOverflowError}
-     * @throws NullPointerException if {@code executable} is {@code null}
+     * @throws OutOfMemoryError if the throwableRunnable throws an {@code OutOfMemoryError}
+     * @throws StackOverflowError if the throwableRunnable throws a {@code StackOverflowError}
+     * @throws NullPointerException if {@code throwableRunnable} is {@code null}
      */
-    public void runAndThrow(Executable executable) throws Throwable {
-        Result result = run(executable);
+    public void runAndThrow(ThrowableRunnable throwableRunnable) throws Throwable {
+        Result result = run(throwableRunnable);
 
         if (!result.isPass() && result.hasExceptions()) {
             List<Throwable> exceptions = result.getExceptions();
@@ -217,9 +217,9 @@ public class Retry {
     }
 
     /**
-     * Returns whether this retry sequence has already been executed.
+     * Returns whether this retry sequence has already been run.
      *
-     * @return {@code true} when {@link #run(Executable)} or {@link #runAndThrow(Executable)} has already been called
+     * @return {@code true} when {@link #run(ThrowableRunnable)} or {@link #runAndThrow(ThrowableRunnable)} has already been called
      */
     public boolean hasRun() {
         return hasRun;
@@ -355,7 +355,7 @@ public class Retry {
     /**
      * Represents a single operation to be retried.
      */
-    public interface Executable {
+    public interface ThrowableRunnable {
 
         /**
          * Runs the operation.
@@ -366,7 +366,7 @@ public class Retry {
     }
 
     /**
-     * Describes the outcome of a {@link Retry} execution.
+     * Describes the outcome of a {@link Retry} run.
      *
      * <p>The result captures whether the operation ultimately succeeded, how many attempts
      * were made, the elapsed wall-clock duration, and the exceptions from each failed attempt.

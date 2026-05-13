@@ -46,7 +46,7 @@ public final class DefaultConfiguration {
     /**
      * Returns a configured value by key.
      *
-     * @param key the configuration key to read
+     * @param key the configuration property key to look up
      * @return the configured value, or {@code null} when absent
      */
     public String get(String key) {

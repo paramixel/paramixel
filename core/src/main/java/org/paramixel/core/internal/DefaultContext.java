@@ -27,10 +27,10 @@ import org.paramixel.core.Context;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Store;
-import org.paramixel.core.support.Arguments;
+import org.paramixel.core.exception.AncestorNotFoundException;
 
 /**
- * Default {@link Context} implementation used by Paramixel runners.
+ * Provides scoped runtime state to actions, with independent stores per context and shared configuration, listener, and scheduler across the ancestry chain.
  *
  * <p>Each context owns an independent local {@link Store} while sharing configuration, listener,
  * and scheduler state with its ancestry chain.
@@ -67,7 +67,7 @@ public final class DefaultContext implements Context {
     /**
      * Creates a root context with the supplied configuration, listener, and scheduler.
      *
-     * @param configuration the configuration
+     * @param configuration the immutable configuration properties for this context
      * @param listener the listener receiving lifecycle callbacks
      * @param scheduler the scheduler available to actions
      * @throws NullPointerException if any argument is {@code null}
@@ -113,16 +113,55 @@ public final class DefaultContext implements Context {
     }
 
     @Override
-    public Optional<Context> getParent() {
+    public Context getParent() {
+        if (parent == null) {
+            throw AncestorNotFoundException.of("parent does not exist: this context is the root");
+        }
+        return parent;
+    }
+
+    @Override
+    public Optional<Context> findParent() {
         return Optional.ofNullable(parent);
     }
 
     @Override
-    public Optional<Context> findAncestor(final int levelUp) {
-        Arguments.requireNonNegative(levelUp, "levelUp must be non-negative");
+    public Context getAncestor(final String path) {
+        return findAncestor(path)
+                .orElseThrow(() -> AncestorNotFoundException.of("ancestor does not exist for path: " + path));
+    }
+
+    @Override
+    public Optional<Context> findAncestor(final String path) {
+        Objects.requireNonNull(path, "path must not be null");
+        if (path.isEmpty()) {
+            throw new IllegalArgumentException("path must not be empty");
+        }
+        if ("/".equals(path)) {
+            Context current = this;
+            while (current.findParent().isPresent()) {
+                current = current.findParent().orElseThrow();
+            }
+            return Optional.of(current);
+        }
+        String[] segments = path.split("/");
+        int hops = 0;
+        for (String segment : segments) {
+            if (segment.isEmpty()) {
+                continue;
+            }
+            if (".".equals(segment)) {
+                throw new IllegalArgumentException("path must not contain '.' segments: " + path);
+            }
+            if ("..".equals(segment)) {
+                hops++;
+            } else {
+                throw new IllegalArgumentException("path must not contain named segments: " + path);
+            }
+        }
         Context current = this;
-        for (int i = 0; i < levelUp; i++) {
-            Optional<Context> parentContext = current.getParent();
+        for (int i = 0; i < hops; i++) {
+            Optional<Context> parentContext = current.findParent();
             if (parentContext.isEmpty()) {
                 return Optional.empty();
             }

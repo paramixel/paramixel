@@ -19,9 +19,10 @@ package org.paramixel.core;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import org.paramixel.core.exception.AncestorNotFoundException;
 
 /**
- * Provides runtime services and scoped state to an executing {@link Action}.
+ * Provides runtime services and scoped state to a running {@link Action}.
  *
  * <p>A {@link Context} exposes the active configuration, listener, scheduler, and a local
  * {@link Store}. Contexts may be arranged into a parent-child chain so nested actions can create
@@ -35,24 +36,27 @@ public interface Context {
     /**
      * Returns the effective configuration for the current run.
      *
-     * @return the configuration properties visible to this context
+     * @return the immutable configuration properties visible to this context
      */
     Map<String, String> getConfiguration();
 
     /**
      * Returns the direct parent context.
      *
-     * @return the direct parent context, or an empty {@link Optional} when this context is the
-     *     root context
+     * <p>Use this method when the parent is expected to exist. Use {@link #findParent()} when the
+     * parent may not exist.
+     *
+     * @return the direct parent context
+     * @throws AncestorNotFoundException when this context is the root context
      */
-    Optional<Context> getParent();
+    Context getParent();
 
     /**
      * Returns the local store for this context.
      *
      * <p>The returned store is scoped to this context only. Descendants may access ancestor stores
-     * by first navigating the context hierarchy with {@link #getParent()} or
-     * {@link #findAncestor(int)}.
+     * by navigating the context hierarchy with {@link #getParent()}, {@link #getAncestor(String)},
+     * {@link #findParent()}, or {@link #findAncestor(String)}.
      *
      * @return the local store for this context
      */
@@ -70,21 +74,72 @@ public interface Context {
      *
      * @param action the action to schedule
      * @return a future completed with the action result
+     *
+     * <p>The returned future completes when the action finishes running. Exceptions during the run are captured in the result status rather than propagated through the future.
      */
     CompletableFuture<Result> runAsync(Action action);
 
     /**
-     * Finds the ancestor context reached by walking upward from this context.
+     * Returns the direct parent context wrapped in an {@link Optional}.
      *
-     * <p>A {@code levelUp} of {@code 0} returns this context, {@code 1} returns the direct parent,
-     * and larger values continue upward through the ancestry chain.
+     * <p>Equivalent to {@code findAncestor("../")}.
      *
-     * @param levelUp the number of parent hops to traverse
-     * @return the ancestor context at the requested level, or an empty {@link Optional} when no
-     *     ancestor exists at that level
-     * @throws IllegalArgumentException if {@code levelUp} is negative
+     * @return the direct parent context, or an empty {@link Optional} when this context is the root
      */
-    Optional<Context> findAncestor(int levelUp);
+    Optional<Context> findParent();
+
+    /**
+     * Returns an ancestor context by navigating upward using a path.
+     *
+     * <p>Use this method when the ancestor is expected to exist. Use {@link #findAncestor(String)}
+     * when the ancestor may not exist.
+     *
+     * <p>Path semantics:
+     * <ul>
+     *   <li>{@code "../"} — parent context (one level up)</li>
+     *   <li>{@code "../../"} — grandparent context (two levels up)</li>
+     *   <li>{@code "/"} — root context</li>
+     * </ul>
+     *
+     * <p>Both trailing-slash and non-trailing-slash forms are accepted (e.g., {@code ".."} and
+     * {@code "../"} are equivalent). Named segments (e.g., {@code "../foo"}, {@code "/bar"}) and
+     * self-reference segments (e.g., {@code "."}, {@code "./"}) are not supported because action
+     * names are not unique per node.
+     *
+     * @param path the navigation path; {@code "../"} for parent, {@code "../../"} for grandparent,
+     *     {@code "/"} for root
+     * @return the ancestor context at the requested path
+     * @throws NullPointerException if {@code path} is {@code null}
+     * @throws IllegalArgumentException if {@code path} is empty, contains named segments, or
+     *     contains {@code "."} segments
+     * @throws AncestorNotFoundException if the path traverses beyond the root
+     */
+    Context getAncestor(String path);
+
+    /**
+     * Finds an ancestor context by navigating upward using a path.
+     *
+     * <p>Path semantics:
+     * <ul>
+     *   <li>{@code "../"} — parent context (one level up)</li>
+     *   <li>{@code "../../"} — grandparent context (two levels up)</li>
+     *   <li>{@code "/"} — root context</li>
+     * </ul>
+     *
+     * <p>Both trailing-slash and non-trailing-slash forms are accepted (e.g., {@code ".."} and
+     * {@code "../"} are equivalent). Named segments (e.g., {@code "../foo"}, {@code "/bar"}) and
+     * self-reference segments (e.g., {@code "."}, {@code "./"}) are not supported because action
+     * names are not unique per node.
+     *
+     * @param path the navigation path; {@code "../"} for parent, {@code "../../"} for grandparent,
+     *     {@code "/"} for root
+     * @return the ancestor context at the requested path, or an empty {@link Optional} when the
+     *     path traverses beyond the root
+     * @throws NullPointerException if {@code path} is {@code null}
+     * @throws IllegalArgumentException if {@code path} is empty, contains named segments, or
+     *     contains {@code "."} segments
+     */
+    Optional<Context> findAncestor(String path);
 
     /**
      * Creates a child context derived from this context.

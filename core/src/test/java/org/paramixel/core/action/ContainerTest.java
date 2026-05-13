@@ -30,18 +30,17 @@ import org.paramixel.core.Action;
 import org.paramixel.core.Listener;
 import org.paramixel.core.Result;
 import org.paramixel.core.Runner;
-import org.paramixel.core.Value;
 
 @DisplayName("Container")
 class ContainerTest {
 
     @Test
-    @DisplayName("execute rejects null context")
+    @DisplayName("run rejects null context")
     void executeRejectsNullContext() {
         Container container =
                 Container.builder("container").child(Noop.of("child")).build();
 
-        assertThatThrownBy(() -> container.execute(null))
+        assertThatThrownBy(() -> container.run(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("context must not be null");
     }
@@ -63,7 +62,6 @@ class ContainerTest {
         Container container =
                 Container.builder("container").child(Noop.of("child")).build();
 
-        assertThat(container.getContextMode()).isEqualTo(Action.ContextMode.ISOLATED);
         assertThat(container.getPolicy().childMode()).isEqualTo(Container.ChildMode.DEPENDENT);
         assertThat(container.getPolicy().orderMode()).isEqualTo(Container.OrderMode.DECLARED);
     }
@@ -73,9 +71,6 @@ class ContainerTest {
     void builderValidatesArguments() {
         assertThatThrownBy(() -> Container.builder(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> Container.builder(" ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Container.builder("container").contextMode(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("contextMode must not be null");
         assertThatThrownBy(() -> Container.builder("container").policy(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("policy must not be null");
@@ -159,9 +154,6 @@ class ContainerTest {
         builder.build();
 
         assertThatIllegalStateException()
-                .isThrownBy(() -> builder.contextMode(Action.ContextMode.SHARED))
-                .withMessage("builder already built");
-        assertThatIllegalStateException()
                 .isThrownBy(() -> builder.policy(Container.Policy.defaults()))
                 .withMessage("builder already built");
         assertThatIllegalStateException()
@@ -226,16 +218,16 @@ class ContainerTest {
     }
 
     @Test
-    @DisplayName("shared children use same container store")
-    void sharedChildrenUseSameContainerStore() {
+    @DisplayName("body children can coordinate through parent store")
+    void bodyChildrenCanCoordinateThroughParentStore() {
         Action writer = Direct.builder("writer")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> context.getStore().put("key", Value.of("value")))
+                .runnable(context -> context.getAncestor("../").getStore().put("key", "value"))
                 .build();
         Action reader = Direct.builder("reader")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> assertThat(
-                                context.getStore().get("key").orElseThrow().cast(String.class))
+                .runnable(context -> assertThat(context.getAncestor("../")
+                                .getStore()
+                                .get("key", String.class)
+                                .orElseThrow())
                         .isEqualTo("value"))
                 .build();
 
@@ -250,10 +242,10 @@ class ContainerTest {
     @DisplayName("isolated children do not use same store")
     void isolatedChildrenDoNotUseSameStore() {
         Action writer = Direct.builder("writer")
-                .execute(context -> context.getStore().put("key", Value.of("value")))
+                .runnable(context -> context.getStore().put("key", "value"))
                 .build();
         Action reader = Direct.builder("reader")
-                .execute(context -> assertThat(context.getStore().get("key")).isEmpty())
+                .runnable(context -> assertThat(context.getStore().get("key")).isEmpty())
                 .build();
 
         Result result = Runner.builder()
@@ -335,8 +327,8 @@ class ContainerTest {
         assertThat(actualShuffled).isNotEqualTo(declaredOrder);
     }
 
-    private static Direct direct(String name, Direct.Executable executable) {
-        return Direct.builder(name).execute(executable).build();
+    private static Direct direct(String name, Direct.ThrowableRunnable runnable) {
+        return Direct.builder(name).runnable(runnable).build();
     }
 
     @Test
@@ -344,11 +336,11 @@ class ContainerTest {
     void assertionErrorInChildIsCapturedAndAfterActionStillRuns() {
         AtomicBoolean afterActionCalled = new AtomicBoolean(false);
         Action throwingChild = Direct.builder("throwing")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new AssertionFailedError("expected true");
                 })
                 .build();
-        Action afterAction = Direct.builder("after").execute(context -> {}).build();
+        Action afterAction = Direct.builder("after").runnable(context -> {}).build();
         Container container = Container.builder("container")
                 .child(throwingChild)
                 .after(afterAction)
@@ -374,11 +366,11 @@ class ContainerTest {
     @DisplayName("OutOfMemoryError in child propagates and skips after-action")
     void outOfMemoryErrorInChildPropagatesAndSkipsAfterAction() {
         Action throwingChild = Direct.builder("throwing")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new OutOfMemoryError("simulated oom");
                 })
                 .build();
-        Action afterAction = Direct.builder("after").execute(context -> {}).build();
+        Action afterAction = Direct.builder("after").runnable(context -> {}).build();
         Container container = Container.builder("container")
                 .child(throwingChild)
                 .after(afterAction)

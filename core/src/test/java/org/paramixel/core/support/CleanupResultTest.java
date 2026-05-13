@@ -42,21 +42,21 @@ class CleanupResultTest {
     }
 
     @Nested
-    @DisplayName("getExecutableCount")
-    class GetExecutableCount {
+    @DisplayName("getThrowableRunnableCount")
+    class GetThrowableRunnableCount {
 
         @Test
         @DisplayName("returns executable count")
-        void returnsExecutableCount() {
+        void returnsThrowableRunnableCount() {
             CleanupResult result = new CleanupResult(3, Arrays.asList(null, null, null));
-            assertThat(result.getExecutableCount()).isEqualTo(3);
+            assertThat(result.getThrowableRunnableCount()).isEqualTo(3);
         }
 
         @Test
         @DisplayName("returns zero for empty result")
         void returnsZeroForEmptyResult() {
             CleanupResult result = new CleanupResult(0, List.of());
-            assertThat(result.getExecutableCount()).isZero();
+            assertThat(result.getThrowableRunnableCount()).isZero();
         }
     }
 

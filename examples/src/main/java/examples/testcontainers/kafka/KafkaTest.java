@@ -35,7 +35,6 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.paramixel.core.Action;
 import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
-import org.paramixel.core.Value;
 import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Parallel;
@@ -82,8 +81,7 @@ public class KafkaTest {
 
     private static Action setUp(KafkaTestEnvironment environment) {
         return Direct.builder("setUp")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {
+                .runnable(context -> {
                     LOGGER.info("[%s] initialize test environment ...", environment.name());
 
                     Network network = NetworkFactory.createNetwork();
@@ -94,23 +92,24 @@ public class KafkaTest {
                     LOGGER.info("bootstrap servers: %s", environment.getBootstrapServers());
                     environment.createTopic(TOPIC);
 
-                    context.getStore().put(NETWORK, Value.of(network));
-                    context.getStore().put(ENVIRONMENT, Value.of(environment));
+                    context.getStore().put(NETWORK, network);
+                    context.getStore().put(ENVIRONMENT, environment);
                 })
                 .build();
     }
 
     private static Action produce() {
         return Direct.builder("test produce")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {
-                    KafkaTestEnvironment testEnvironment =
-                            context.getStore().get(ENVIRONMENT).orElseThrow().cast(KafkaTestEnvironment.class);
+                .runnable(context -> {
+                    KafkaTestEnvironment testEnvironment = context.getAncestor("../")
+                            .getStore()
+                            .get(ENVIRONMENT, KafkaTestEnvironment.class)
+                            .orElseThrow();
 
                     LOGGER.info("[%s] testing produce() ...", testEnvironment.name());
 
                     String message = RandomUtil.getRandomString(16);
-                    context.getStore().put(MESSAGE, Value.of(message));
+                    context.getAncestor("../").getStore().put(MESSAGE, message);
 
                     LOGGER.info("[%s] producing message [%s] ...", testEnvironment.name(), message);
 
@@ -126,13 +125,16 @@ public class KafkaTest {
 
     private static Action consume() {
         return Direct.builder("test consume")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {
-                    KafkaTestEnvironment testEnvironment =
-                            context.getStore().get(ENVIRONMENT).orElseThrow().cast(KafkaTestEnvironment.class);
+                .runnable(context -> {
+                    KafkaTestEnvironment testEnvironment = context.getAncestor("../")
+                            .getStore()
+                            .get(ENVIRONMENT, KafkaTestEnvironment.class)
+                            .orElseThrow();
 
-                    String message =
-                            context.getStore().get(MESSAGE).orElseThrow().cast(String.class);
+                    String message = context.getAncestor("../")
+                            .getStore()
+                            .get(MESSAGE, String.class)
+                            .orElseThrow();
                     LOGGER.info("[%s] expected message [%s]", testEnvironment.name(), message);
 
                     boolean messageMatched = false;
@@ -169,20 +171,15 @@ public class KafkaTest {
 
     private static Action tearDown(KafkaTestEnvironment environment) {
         return Direct.builder("after")
-                .contextMode(Action.ContextMode.SHARED)
-                .execute(context -> {
+                .runnable(context -> {
                     LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                    var removedEnvironment = context.getStore().remove(ENVIRONMENT);
-                    var removedNetwork = context.getStore().remove(NETWORK);
+                    var removedEnvironment = context.getStore().remove(ENVIRONMENT, KafkaTestEnvironment.class);
+                    var removedNetwork = context.getStore().remove(NETWORK, Network.class);
                     if (removedEnvironment.isPresent() && removedNetwork.isPresent()) {
-                        KafkaTestEnvironment testEnvironment =
-                                removedEnvironment.orElseThrow().cast(KafkaTestEnvironment.class);
-                        Network network = removedNetwork.orElseThrow().cast(Network.class);
-
                         Cleanup.of(Cleanup.Mode.FORWARD)
-                                .addCloseable(testEnvironment)
-                                .addCloseable(network)
+                                .addCloseable(removedEnvironment.orElseThrow())
+                                .addCloseable(removedNetwork.orElseThrow())
                                 .runAndThrow();
                     }
                 })

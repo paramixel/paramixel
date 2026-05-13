@@ -22,7 +22,7 @@ import java.util.Properties;
 import org.paramixel.core.internal.ResourceLoader;
 
 /**
- * Exposes the Paramixel version.
+ * Provides the current Paramixel version string loaded from the classpath.
  *
  * <p>The current implementation loads version information from the classpath resource
  * {@code version.properties} when the class is initialized. If the resource is missing or
@@ -32,6 +32,7 @@ public final class Version {
 
     /**
      * Fallback version returned when the version resource is missing or unreadable.
+     * The value is {@code "UNKNOWN"}.
      */
     public static final String UNKNOWN = "UNKNOWN";
 

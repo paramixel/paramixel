@@ -17,14 +17,14 @@
 package org.paramixel.core;
 
 /**
- * Represents a Paramixel action.
+ * Defines the fundamental run unit processed by a {@link Runner}, with identity and run behavior.
  *
- * <p>An {@link Action} is the fundamental execution unit handled by a {@link Runner}. Actions may be composed into
+ * <p>An {@link Action} is the fundamental run unit handled by a {@link Runner}. Actions may be composed into
  * parent-child hierarchies by implementations such as {@link CompositeAction} to model sequential, parallel, or
- * otherwise structured execution.
+ * otherwise structured runs.
  *
- * <p>The action instance itself defines execution behavior, while {@link Result} captures the outcome of a specific
- * execution.
+ * <p>The action instance itself defines run behavior, while {@link Result} captures the outcome of a specific
+ * run.
  *
  * <p>Implementations should return a stable identifier from {@link #getId()} for the lifetime of the action
  *     instance.
@@ -32,28 +32,12 @@ package org.paramixel.core;
 public interface Action {
 
     /**
-     * Controls how an action scopes the {@link Context} it receives from its parent.
-     */
-    enum ContextMode {
-
-        /**
-         * Execute with a fresh child context whose parent is the received context.
-         */
-        ISOLATED,
-
-        /**
-         * Execute with the same context instance received from the parent action.
-         */
-        SHARED
-    }
-
-    /**
      * Returns the identifier for this action.
      *
      * <p>Identifiers are typically used for reporting, selection, and correlating an {@link Action} with its
      * corresponding {@link Result}.
      *
-     * @return the action identifier
+     * @return the stable identifier used to correlate this action with its {@link Result} in reports and selection
      */
     String getId();
 
@@ -65,29 +49,22 @@ public interface Action {
     String getName();
 
     /**
-     * Returns this action's context scoping mode.
+     * Runs this action using the supplied run context.
      *
-     * @return the context mode used when this action executes or skips
-     */
-    ContextMode getContextMode();
-
-    /**
-     * Executes this action using the supplied execution context.
-     *
-     * <p>The returned {@link Result} describes the outcome for this action execution and may include child results for
+     * <p>The returned {@link Result} describes the outcome for this action run and may include child results for
      * composed actions.
      *
-     * @param context the execution context for this invocation
-     * @return the execution result for this action
+     * @param context the run context for this invocation
+     * @return the run result for this action
      */
-    Result execute(Context context);
+    Result run(Context context);
 
     /**
-     * Produces a result representing a skipped execution of this action.
+     * Produces a result representing a skipped run of this action.
      *
-     * <p>This method is used when an action is intentionally not executed but still needs a reported outcome.
+     * <p>This method is used when an action is intentionally not run but still needs a reported outcome.
      *
-     * @param context the execution context associated with the skipped action
+     * @param context the run context associated with the skipped action
      * @return the result representing the skipped outcome
      */
     Result skip(Context context);

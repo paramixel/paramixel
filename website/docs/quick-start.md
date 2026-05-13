@@ -58,11 +58,17 @@ See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel)
 
 ```java
 import org.paramixel.core.Action;
+import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
+import org.paramixel.core.Runner;
 import org.paramixel.core.action.Container;
 import org.paramixel.core.action.Direct;
 
 public class ExampleTest {
+
+    public static void main(String[] args) {
+        Factory.defaultRunner().runAndExit(actionFactory());
+    }
 
     @Paramixel.ActionFactory
     public static Action actionFactory() {
@@ -76,11 +82,11 @@ public class ExampleTest {
     }
 
     private static Action first() {
-        return Direct.builder("first").execute(context -> {}).build();
+        return Direct.builder("first").runnable(context -> {}).build();
     }
 
     private static Action second() {
-        return Direct.builder("second").execute(context -> {}).build();
+        return Direct.builder("second").runnable(context -> {}).build();
     }
 }
 ```
@@ -107,15 +113,7 @@ The file extension controls the report format: `.log` and `.txt` write text, `.j
 
 ## Run directly from `main`
 
-```java
-import org.paramixel.core.Factory;
-import org.paramixel.core.Runner;
-
-public static void main(String[] args) {
-    Runner runner = Factory.defaultRunner();
-    System.exit(runner.runAndReturnExitCode(actionFactory()));
-}
-```
+The `ExampleTest` class above includes a `main` method for direct execution.
 
 ## Check the result programmatically
 

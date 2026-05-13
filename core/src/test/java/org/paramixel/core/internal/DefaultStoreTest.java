@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.core.Store;
-import org.paramixel.core.Value;
 
 @DisplayName("DefaultStore")
 class DefaultStoreTest {
@@ -36,9 +35,9 @@ class DefaultStoreTest {
     void putAndGetRoundTripValue() {
         Store store = new DefaultStore();
 
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("value");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("value");
     }
 
     @Test
@@ -54,7 +53,7 @@ class DefaultStoreTest {
     void putRejectsNullKeyAndValue() {
         Store store = new DefaultStore();
 
-        assertThatThrownBy(() -> store.put(null, Value.of("value")))
+        assertThatThrownBy(() -> store.put(null, "value"))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.put("key", null))
@@ -66,25 +65,25 @@ class DefaultStoreTest {
     @DisplayName("put returns previous value when replacing existing entry")
     void putReturnsPreviousValueWhenReplacingExistingEntry() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
-        var previous = store.put("key", Value.of("after"));
+        var previous = store.put("key", "after");
 
         assertThat(previous).isPresent();
-        assertThat(previous.orElseThrow().cast(String.class)).isEqualTo("before");
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("after");
+        assertThat((String) previous.orElseThrow()).isEqualTo("before");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("after");
     }
 
     @Test
     @DisplayName("remove returns optional value when present and empty when absent")
     void removeReturnsOptionalValueWhenPresentAndEmptyWhenAbsent() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
         var removed = store.remove("key");
 
         assertThat(removed).isPresent();
-        assertThat(removed.orElseThrow().cast(String.class)).isEqualTo("value");
+        assertThat((String) removed.orElseThrow()).isEqualTo("value");
         assertThat(store.remove("key")).isEmpty();
     }
 
@@ -92,13 +91,13 @@ class DefaultStoreTest {
     @DisplayName("entrySet setValue updates backing store")
     void entrySetSetValueUpdatesBackingStore() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
         Store.Entry entry = store.entrySet().iterator().next();
-        Value previous = entry.setValue(Value.of("after"));
+        Object previous = entry.setValue("after");
 
-        assertThat(previous.cast(String.class)).isEqualTo("before");
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("after");
+        assertThat((String) previous).isEqualTo("before");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("after");
     }
 
     @Test
@@ -106,31 +105,30 @@ class DefaultStoreTest {
     void computeIfAbsentStoresComputedValue() {
         Store store = new DefaultStore();
 
-        Value value =
-                store.computeIfAbsent("key", key -> Value.of(key + "-value")).orElseThrow();
+        Object value = store.computeIfAbsent("key", key -> key + "-value").orElseThrow();
 
-        assertThat(value.cast(String.class)).isEqualTo("key-value");
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("key-value");
+        assertThat((String) value).isEqualTo("key-value");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("key-value");
     }
 
     @Test
     @DisplayName("putIfAbsent returns existing value when key is present")
     void putIfAbsentReturnsExistingValueWhenKeyIsPresent() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
-        var current = store.putIfAbsent("key", Value.of("other"));
+        var current = store.putIfAbsent("key", "other");
 
         assertThat(current).isPresent();
-        assertThat(current.orElseThrow().cast(String.class)).isEqualTo("value");
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("value");
+        assertThat((String) current.orElseThrow()).isEqualTo("value");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("value");
     }
 
     @Test
     @DisplayName("map-like public methods reject null arguments")
     void mapLikePublicMethodsRejectNullArguments() {
         DefaultStore store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
         assertThatThrownBy(() -> store.containsKey(null))
                 .isInstanceOf(NullPointerException.class)
@@ -153,28 +151,28 @@ class DefaultStoreTest {
         assertThatThrownBy(() -> store.replaceAll(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("function must not be null");
-        assertThatThrownBy(() -> store.putIfAbsent(null, Value.of("value")))
+        assertThatThrownBy(() -> store.putIfAbsent(null, "value"))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.putIfAbsent("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("value must not be null");
-        assertThatThrownBy(() -> store.remove(null, Value.of("value")))
+        assertThatThrownBy(() -> store.remove(null, "value"))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("key must not be null");
-        assertThatThrownBy(() -> store.remove("key", null))
+        assertThatThrownBy(() -> store.remove("key", (Class<?>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("value must not be null");
+                .hasMessage("type must not be null");
         assertThatThrownBy(() -> store.replace("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("value must not be null");
-        assertThatThrownBy(() -> store.replace(null, Value.of("value")))
+        assertThatThrownBy(() -> store.replace(null, "value"))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.computeIfAbsent("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("mappingFunction must not be null");
-        assertThatThrownBy(() -> store.computeIfAbsent(null, k -> Value.of("value")))
+        assertThatThrownBy(() -> store.computeIfAbsent(null, k -> "value"))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("key must not be null");
         assertThatThrownBy(() -> store.computeIfPresent("key", null))
@@ -183,10 +181,10 @@ class DefaultStoreTest {
         assertThatThrownBy(() -> store.compute("key", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("remappingFunction must not be null");
-        assertThatThrownBy(() -> store.merge("key", Value.of("x"), null))
+        assertThatThrownBy(() -> store.merge("key", "x", null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("remappingFunction must not be null");
-        assertThatThrownBy(() -> store.merge(null, Value.of("x"), (v1, v2) -> v1))
+        assertThatThrownBy(() -> store.merge(null, "x", (v1, v2) -> v1))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("key must not be null");
     }
@@ -195,7 +193,7 @@ class DefaultStoreTest {
     @DisplayName("entrySet setValue rejects null value")
     void entrySetSetValueRejectsNullValue() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
         Store.Entry entry = store.entrySet().iterator().next();
 
@@ -208,14 +206,14 @@ class DefaultStoreTest {
     @DisplayName("putAll copies entries from another store")
     void putAllCopiesEntriesFromAnotherStore() {
         Store source = new DefaultStore();
-        source.put("one", Value.of(1));
-        source.put("two", Value.of(2));
+        source.put("one", 1);
+        source.put("two", 2);
 
         Store target = new DefaultStore();
         target.putAll(source);
 
-        assertThat(target.get("one").orElseThrow().cast(Integer.class)).isEqualTo(1);
-        assertThat(target.get("two").orElseThrow().cast(Integer.class)).isEqualTo(2);
+        assertThat(target.get("one", Integer.class).orElseThrow()).isEqualTo(1);
+        assertThat(target.get("two", Integer.class).orElseThrow()).isEqualTo(2);
     }
 
     @Test
@@ -233,7 +231,7 @@ class DefaultStoreTest {
                 executor.submit(() -> {
                     ready.countDown();
                     start.await();
-                    store.put("key-" + index, Value.of(index));
+                    store.put("key-" + index, index);
                     done.countDown();
                     return null;
                 });
@@ -248,7 +246,7 @@ class DefaultStoreTest {
 
         assertThat(store.size()).isEqualTo(workers);
         for (int i = 0; i < workers; i++) {
-            assertThat(store.get("key-" + i).orElseThrow().cast(Integer.class)).isEqualTo(i);
+            assertThat(store.get("key-" + i, Integer.class).orElseThrow()).isEqualTo(i);
         }
     }
 
@@ -256,13 +254,13 @@ class DefaultStoreTest {
     @DisplayName("computeIfPresent remaps existing key")
     void computeIfPresentRemapsExistingKey() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
-        var result = store.computeIfPresent("key", (k, v) -> Value.of("after"));
+        var result = store.computeIfPresent("key", (k, v) -> "after");
 
         assertThat(result).isPresent();
-        assertThat(result.orElseThrow().cast(String.class)).isEqualTo("after");
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("after");
+        assertThat((String) result.orElseThrow()).isEqualTo("after");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("after");
     }
 
     @Test
@@ -270,7 +268,7 @@ class DefaultStoreTest {
     void computeIfPresentReturnsEmptyForAbsentKey() {
         Store store = new DefaultStore();
 
-        var result = store.computeIfPresent("absent", (k, v) -> Value.of("value"));
+        var result = store.computeIfPresent("absent", (k, v) -> "value");
 
         assertThat(result).isEmpty();
         assertThat(store.get("absent")).isEmpty();
@@ -280,8 +278,7 @@ class DefaultStoreTest {
     @DisplayName("computeIfPresent rejects null key")
     void computeIfPresentRejectsNullKey() {
         Store store = new DefaultStore();
-        assertThatThrownBy(() -> store.computeIfPresent(null, (k, v) -> Value.of("x")))
-                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.computeIfPresent(null, (k, v) -> "x")).isInstanceOf(NullPointerException.class);
     }
 
     @Test
@@ -289,30 +286,30 @@ class DefaultStoreTest {
     void computeAddsNewKeyWhenAbsent() {
         Store store = new DefaultStore();
 
-        var result = store.compute("key", (k, v) -> Value.of("computed"));
+        var result = store.compute("key", (k, v) -> "computed");
 
         assertThat(result).isPresent();
-        assertThat(result.orElseThrow().cast(String.class)).isEqualTo("computed");
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("computed");
+        assertThat((String) result.orElseThrow()).isEqualTo("computed");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("computed");
     }
 
     @Test
     @DisplayName("compute replaces existing key when present")
     void computeReplacesExistingKeyWhenPresent() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
-        var result = store.compute("key", (k, v) -> Value.of("after"));
+        var result = store.compute("key", (k, v) -> "after");
 
         assertThat(result).isPresent();
-        assertThat(result.orElseThrow().cast(String.class)).isEqualTo("after");
+        assertThat((String) result.orElseThrow()).isEqualTo("after");
     }
 
     @Test
     @DisplayName("compute removes key when remapping function returns null")
     void computeRemovesKeyWhenRemappingFunctionReturnsNull() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
         var result = store.compute("key", (k, v) -> null);
 
@@ -324,7 +321,7 @@ class DefaultStoreTest {
     @DisplayName("compute rejects null key and null function")
     void computeRejectsNullKeyAndNullFunction() {
         Store store = new DefaultStore();
-        assertThatThrownBy(() -> store.compute(null, (k, v) -> Value.of("x"))).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.compute(null, (k, v) -> "x")).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> store.compute("key", null)).isInstanceOf(NullPointerException.class);
     }
 
@@ -333,70 +330,64 @@ class DefaultStoreTest {
     void mergeAddsValueForAbsentKey() {
         Store store = new DefaultStore();
 
-        var result = store.merge("key", Value.of("value"), (oldVal, newVal) -> Value.of("merged"));
+        var result = store.merge("key", "value", (oldVal, newVal) -> "merged");
 
         assertThat(result).isPresent();
-        assertThat(result.orElseThrow().cast(String.class)).isEqualTo("value");
+        assertThat((String) result.orElseThrow()).isEqualTo("value");
     }
 
     @Test
     @DisplayName("merge applies remapping function for present key")
     void mergeAppliesRemappingFunctionForPresentKey() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("old"));
+        store.put("key", "old");
 
-        var result = store.merge(
-                "key",
-                Value.of("new"),
-                (oldVal, newVal) -> Value.of(oldVal.cast(String.class) + "-" + newVal.cast(String.class)));
+        var result = store.merge("key", "new", (oldVal, newVal) -> (String) oldVal + "-" + (String) newVal);
 
         assertThat(result).isPresent();
-        assertThat(result.orElseThrow().cast(String.class)).isEqualTo("old-new");
+        assertThat((String) result.orElseThrow()).isEqualTo("old-new");
     }
 
     @Test
     @DisplayName("merge rejects null key, value, and function")
     void mergeRejectsNullKeyValueAndFunction() {
         Store store = new DefaultStore();
-        assertThatThrownBy(() -> store.merge(null, Value.of("x"), (o, n) -> Value.of("x")))
-                .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> store.merge("key", null, (o, n) -> Value.of("x")))
-                .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> store.merge("key", Value.of("x"), null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.merge(null, "x", (o, n) -> "x")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.merge("key", null, (o, n) -> "x")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.merge("key", "x", null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("replace(key, oldValue, newValue) succeeds when value matches")
     void replaceConditionalSucceedsWhenValueMatches() {
         Store store = new DefaultStore();
-        Value original = Value.of("before");
-        store.put("key", original);
+        store.put("key", "before");
 
-        assertThat(store.replace("key", original, Value.of("after"))).isTrue();
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("after");
+        assertThat(store.replace("key", "before", "after")).isTrue();
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("after");
     }
 
     @Test
     @DisplayName("replace(key, oldValue, newValue) fails when value does not match")
     void replaceConditionalFailsWhenValueDoesNotMatch() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
-        assertThat(store.replace("key", Value.of("wrong"), Value.of("after"))).isFalse();
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("before");
+        assertThat(store.replace("key", "wrong", "after")).isFalse();
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("before");
     }
 
     @Test
     @DisplayName("replace(key, value) returns previous value when present")
     void replaceReturnsPreviousWhenPresent() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("before"));
+        store.put("key", "before");
 
-        var previous = store.replace("key", Value.of("after"));
+        var previous = store.replace("key", "after");
 
         assertThat(previous).isPresent();
-        assertThat(previous.orElseThrow().cast(String.class)).isEqualTo("before");
-        assertThat(store.get("key").orElseThrow().cast(String.class)).isEqualTo("after");
+        assertThat((String) previous.orElseThrow()).isEqualTo("before");
+        assertThat(store.get("key", String.class).orElseThrow()).isEqualTo("after");
     }
 
     @Test
@@ -404,7 +395,7 @@ class DefaultStoreTest {
     void replaceReturnsEmptyWhenAbsent() {
         Store store = new DefaultStore();
 
-        var previous = store.replace("absent", Value.of("after"));
+        var previous = store.replace("absent", "after");
 
         assertThat(previous).isEmpty();
         assertThat(store.containsKey("absent")).isFalse();
@@ -414,10 +405,9 @@ class DefaultStoreTest {
     @DisplayName("remove(key, value) succeeds when value matches")
     void removeConditionalSucceedsWhenValueMatches() {
         Store store = new DefaultStore();
-        Value original = Value.of("value");
-        store.put("key", original);
+        store.put("key", "value");
 
-        assertThat(store.remove("key", original)).isTrue();
+        assertThat(store.remove("key", "value")).isTrue();
         assertThat(store.containsKey("key")).isFalse();
     }
 
@@ -425,9 +415,9 @@ class DefaultStoreTest {
     @DisplayName("remove(key, value) fails when value does not match")
     void removeConditionalFailsWhenValueDoesNotMatch() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
-        assertThat(store.remove("key", Value.of("wrong"))).isFalse();
+        assertThat(store.remove("key", "wrong")).isFalse();
         assertThat(store.containsKey("key")).isTrue();
     }
 
@@ -435,8 +425,8 @@ class DefaultStoreTest {
     @DisplayName("keySet returns all keys")
     void keySetReturnsAllKeys() {
         Store store = new DefaultStore();
-        store.put("a", Value.of(1));
-        store.put("b", Value.of(2));
+        store.put("a", 1);
+        store.put("b", 2);
 
         assertThat(store.keySet()).containsExactlyInAnyOrder("a", "b");
     }
@@ -445,8 +435,8 @@ class DefaultStoreTest {
     @DisplayName("values returns all values")
     void valuesReturnsAllValues() {
         Store store = new DefaultStore();
-        store.put("a", Value.of(1));
-        store.put("b", Value.of(2));
+        store.put("a", 1);
+        store.put("b", 2);
 
         assertThat(store.values()).hasSize(2);
     }
@@ -455,10 +445,10 @@ class DefaultStoreTest {
     @DisplayName("getOrDefault returns value when key is present")
     void getOrDefaultReturnsValueWhenKeyIsPresent() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("actual"));
+        store.put("key", "actual");
 
-        Value result = store.getOrDefault("key", Value.of("default"));
-        assertThat(result.cast(String.class)).isEqualTo("actual");
+        Object result = store.getOrDefault("key", "default");
+        assertThat((String) result).isEqualTo("actual");
     }
 
     @Test
@@ -466,30 +456,30 @@ class DefaultStoreTest {
     void getOrDefaultReturnsDefaultWhenKeyIsAbsent() {
         Store store = new DefaultStore();
 
-        Value result = store.getOrDefault("absent", Value.of("default"));
-        assertThat(result.cast(String.class)).isEqualTo("default");
+        Object result = store.getOrDefault("absent", "default");
+        assertThat((String) result).isEqualTo("default");
     }
 
     @Test
     @DisplayName("replaceAll replaces all values")
     void replaceAllReplacesAllValues() {
         Store store = new DefaultStore();
-        store.put("a", Value.of("1"));
-        store.put("b", Value.of("2"));
+        store.put("a", "1");
+        store.put("b", "2");
 
-        store.replaceAll((key, value) -> Value.of(value.cast(String.class) + "-updated"));
+        store.replaceAll((key, value) -> (String) value + "-updated");
 
-        assertThat(store.get("a").orElseThrow().cast(String.class)).isEqualTo("1-updated");
-        assertThat(store.get("b").orElseThrow().cast(String.class)).isEqualTo("2-updated");
+        assertThat(store.get("a", String.class).orElseThrow()).isEqualTo("1-updated");
+        assertThat(store.get("b", String.class).orElseThrow()).isEqualTo("2-updated");
     }
 
     @Test
     @DisplayName("equals returns true for same content stores")
     void equalsReturnsTrueForSameContentStores() {
         Store store1 = new DefaultStore();
-        store1.put("key", Value.of("value"));
+        store1.put("key", "value");
         Store store2 = new DefaultStore();
-        store2.put("key", Value.of("value"));
+        store2.put("key", "value");
 
         assertThat(store1).isEqualTo(store2);
     }
@@ -498,9 +488,9 @@ class DefaultStoreTest {
     @DisplayName("equals returns false for different content stores")
     void equalsReturnsFalseForDifferentContentStores() {
         Store store1 = new DefaultStore();
-        store1.put("key", Value.of("value1"));
+        store1.put("key", "value1");
         Store store2 = new DefaultStore();
-        store2.put("key", Value.of("value2"));
+        store2.put("key", "value2");
 
         assertThat(store1).isNotEqualTo(store2);
     }
@@ -509,7 +499,7 @@ class DefaultStoreTest {
     @DisplayName("equals returns false for non-DefaultStore type")
     void equalsReturnsFalseForNonDefaultStoreType() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
         assertThat(store).isNotEqualTo("not a store");
         assertThat(store).isNotEqualTo(null);
@@ -519,9 +509,9 @@ class DefaultStoreTest {
     @DisplayName("hashCode is consistent with equals")
     void hashCodeIsConsistentWithEquals() {
         Store store1 = new DefaultStore();
-        store1.put("key", Value.of("value"));
+        store1.put("key", "value");
         Store store2 = new DefaultStore();
-        store2.put("key", Value.of("value"));
+        store2.put("key", "value");
 
         assertThat(store1.hashCode()).isEqualTo(store2.hashCode());
     }
@@ -530,7 +520,7 @@ class DefaultStoreTest {
     @DisplayName("toString returns map representation")
     void toStringReturnsMapRepresentation() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
         assertThat(store.toString()).contains("key").contains("value");
     }
@@ -546,8 +536,7 @@ class DefaultStoreTest {
     @DisplayName("getOrDefault rejects null key and null default")
     void getOrDefaultRejectsNullKeyAndNullDefault() {
         Store store = new DefaultStore();
-        assertThatThrownBy(() -> store.getOrDefault(null, Value.of("default")))
-                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.getOrDefault(null, "default")).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> store.getOrDefault("key", null)).isInstanceOf(NullPointerException.class);
     }
 
@@ -555,18 +544,17 @@ class DefaultStoreTest {
     @DisplayName("replace(key, oldValue, newValue) rejects null arguments")
     void replaceConditionalRejectsNullArguments() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
-        assertThatThrownBy(() -> store.replace(null, Value.of("old"), Value.of("new")))
-                .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> store.replace("key", null, Value.of("new"))).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> store.replace("key", Value.of("old"), null)).isInstanceOf(NullPointerException.class);
+        store.put("key", "value");
+        assertThatThrownBy(() -> store.replace(null, "old", "new")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.replace("key", null, "new")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.replace("key", "old", null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("computeIfPresent rejects null remappingFunction")
     void computeIfPresentRejectsNullRemappingFunction() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
         assertThatThrownBy(() -> store.computeIfPresent("key", null)).isInstanceOf(NullPointerException.class);
     }
 
@@ -574,18 +562,16 @@ class DefaultStoreTest {
     @DisplayName("computeIfPresent rejects null key even when absent")
     void computeIfPresentRejectsNullKeyWhenAbsent() {
         Store store = new DefaultStore();
-        assertThatThrownBy(() -> store.computeIfPresent(null, (k, v) -> Value.of("x")))
-                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.computeIfPresent(null, (k, v) -> "x")).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("containsValue returns true for present value")
     void containsValueReturnsTrueForPresentValue() {
         Store store = new DefaultStore();
-        Value value = Value.of("test");
-        store.put("key", value);
+        store.put("key", "test");
 
-        assertThat(store.containsValue(value)).isTrue();
+        assertThat(store.containsValue("test")).isTrue();
     }
 
     @Test
@@ -593,7 +579,7 @@ class DefaultStoreTest {
     void containsValueReturnsFalseForAbsentValue() {
         Store store = new DefaultStore();
 
-        assertThat(store.containsValue(Value.of("missing"))).isFalse();
+        assertThat(store.containsValue("missing")).isFalse();
     }
 
     @Test
@@ -604,7 +590,7 @@ class DefaultStoreTest {
         assertThat(store.isEmpty()).isTrue();
         assertThat(store.size()).isZero();
 
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
         assertThat(store.isEmpty()).isFalse();
         assertThat(store.size()).isEqualTo(1);
@@ -614,8 +600,8 @@ class DefaultStoreTest {
     @DisplayName("clear removes all entries")
     void clearRemovesAllEntries() {
         Store store = new DefaultStore();
-        store.put("a", Value.of(1));
-        store.put("b", Value.of(2));
+        store.put("a", 1);
+        store.put("b", 2);
 
         store.clear();
 
@@ -626,7 +612,7 @@ class DefaultStoreTest {
     @DisplayName("entrySet contains entry and supports contains and remove by identity")
     void entrySetSupportsContainsAndRemove() {
         Store store = new DefaultStore();
-        store.put("key", Value.of("value"));
+        store.put("key", "value");
 
         assertThat(store.entrySet()).hasSize(1);
         assertThat(store.entrySet().iterator().next().getKey()).isEqualTo("key");
@@ -647,12 +633,102 @@ class DefaultStoreTest {
     @DisplayName("forEach iterates over all entries")
     void forEachIteratesOverAllEntries() {
         Store store = new DefaultStore();
-        store.put("a", Value.of(1));
-        store.put("b", Value.of(2));
+        store.put("a", 1);
+        store.put("b", 2);
 
         AtomicInteger count = new AtomicInteger(0);
         store.forEach((k, v) -> count.incrementAndGet());
 
         assertThat(count.get()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("get(String, Class<T>) returns Optional with correct type")
+    void getWithTypeReturnsCorrectType() {
+        Store store = new DefaultStore();
+        store.put("key", "value");
+
+        assertThat(store.get("key", String.class)).contains("value");
+    }
+
+    @Test
+    @DisplayName("get(String, Class<T>) throws ClassCastException for wrong type")
+    void getWithTypeThrowsClassCastExceptionForWrongType() {
+        Store store = new DefaultStore();
+        store.put("key", "value");
+
+        assertThatThrownBy(() -> store.get("key", Integer.class)).isInstanceOf(ClassCastException.class);
+    }
+
+    @Test
+    @DisplayName("remove(String, Class<T>) returns Optional with correct type")
+    void removeWithTypeReturnsCorrectType() {
+        Store store = new DefaultStore();
+        store.put("key", "value");
+
+        assertThat(store.remove("key", String.class)).contains("value");
+    }
+
+    @Test
+    @DisplayName("getOrDefault(String, Class<T>, T) returns typed value when present")
+    void getOrDefaultWithTypeReturnsValueWhenPresent() {
+        Store store = new DefaultStore();
+        store.put("key", "actual");
+
+        assertThat(store.getOrDefault("key", String.class, "default")).isEqualTo("actual");
+    }
+
+    @Test
+    @DisplayName("getOrDefault(String, Class<T>, T) returns default when absent")
+    void getOrDefaultWithTypeReturnsDefaultWhenAbsent() {
+        Store store = new DefaultStore();
+
+        assertThat(store.getOrDefault("absent", String.class, "default")).isEqualTo("default");
+    }
+
+    @Test
+    @DisplayName("isType returns true when key present and type matches")
+    void isTypeReturnsTrueWhenKeyPresentAndTypeMatches() {
+        Store store = new DefaultStore();
+        store.put("key", "value");
+
+        assertThat(store.isType("key", String.class)).isTrue();
+    }
+
+    @Test
+    @DisplayName("isType returns false when key present but type does not match")
+    void isTypeReturnsFalseWhenKeyPresentButTypeDoesNotMatch() {
+        Store store = new DefaultStore();
+        store.put("key", "value");
+
+        assertThat(store.isType("key", Integer.class)).isFalse();
+    }
+
+    @Test
+    @DisplayName("isType returns false when key absent")
+    void isTypeReturnsFalseWhenKeyAbsent() {
+        Store store = new DefaultStore();
+
+        assertThat(store.isType("absent", String.class)).isFalse();
+    }
+
+    @Test
+    @DisplayName("isType rejects null key and null type")
+    void isTypeRejectsNullKeyAndNullType() {
+        Store store = new DefaultStore();
+        store.put("key", "value");
+
+        assertThatThrownBy(() -> store.isType(null, String.class)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.isType("key", null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("get(String, Class<T>) rejects null key and null type")
+    void getWithTypeRejectsNullKeyAndNullType() {
+        Store store = new DefaultStore();
+        store.put("key", "value");
+
+        assertThatThrownBy(() -> store.get(null, String.class)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> store.get("key", null)).isInstanceOf(NullPointerException.class);
     }
 }

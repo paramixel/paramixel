@@ -49,7 +49,7 @@ public class StatusListener implements Listener {
     /**
      * Creates a console status listener.
      *
-     * @param ansiEnabled whether ANSI formatting should be used
+     * @param ansiEnabled whether ANSI color formatting should be applied to status output
      */
     public StatusListener(boolean ansiEnabled) {
         this.ansiEnabled = ansiEnabled;

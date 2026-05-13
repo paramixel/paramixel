@@ -22,7 +22,7 @@ import org.paramixel.core.Runner;
 /**
  * Produces a human-readable summary of a completed run for console or file output.
  *
- * <p>SPI — implement to customize summary rendering.
+ * <p>Implement to customize summary rendering for console or file output.
  */
 public interface SummaryRenderer {
 

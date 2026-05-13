@@ -183,7 +183,7 @@ class CompositeListenerTest {
         CompositeListener composite = new CompositeListener(first, second);
         Runner runner = Runner.builder().listener(composite).build();
         runner.run(Direct.builder("fail")
-                .execute(ctx -> {
+                .runnable(ctx -> {
                     throw new RuntimeException("boom");
                 })
                 .build());

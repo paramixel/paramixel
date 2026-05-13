@@ -47,12 +47,7 @@ public final class SubpackageAction implements Action {
     }
 
     @Override
-    public ContextMode getContextMode() {
-        return ContextMode.ISOLATED;
-    }
-
-    @Override
-    public Result execute(Context context) {
+    public Result run(Context context) {
         var result = new DefaultResult(this);
         result.complete(DefaultStatus.PASS, java.time.Duration.ZERO);
         return result;

@@ -19,7 +19,7 @@ package org.paramixel.core.support;
 import java.util.Objects;
 
 /**
- * ANSI color and style escape sequences used by built-in console output.
+ * Defines ANSI escape sequences for coloring and styling console status output and report highlighting.
  */
 public enum AnsiColor {
     /**

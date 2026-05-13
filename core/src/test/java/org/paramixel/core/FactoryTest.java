@@ -115,26 +115,6 @@ class FactoryTest {
         assertThat(extractListeners(missing)).anyMatch(ReportListener.class::isInstance);
     }
 
-    @Test
-    @DisplayName("defaultListener(configuration) honors deprecated explicit format")
-    @SuppressWarnings("removal")
-    void defaultListenerHonorsDeprecatedExplicitFormat() throws Exception {
-        Listener listener = Factory.defaultListener(
-                Map.of(Configuration.REPORT_FILE, "target/report.out", Configuration.REPORT_FORMAT, "json"));
-
-        assertThat(extractListeners(listener)).anyMatch(JsonReportListener.class::isInstance);
-    }
-
-    @Test
-    @DisplayName("defaultListener(configuration) infers format when deprecated explicit format is blank")
-    @SuppressWarnings("removal")
-    void defaultListenerInfersFormatWhenDeprecatedExplicitFormatIsBlank() throws Exception {
-        Listener listener = Factory.defaultListener(
-                Map.of(Configuration.REPORT_FILE, "target/report.xml", Configuration.REPORT_FORMAT, " "));
-
-        assertThat(extractListeners(listener)).anyMatch(XmlReportListener.class::isInstance);
-    }
-
     @SuppressWarnings("unchecked")
     private static List<Listener> extractListeners(Listener listener) throws Exception {
         Field delegateField = SafeListener.class.getDeclaredField("delegate");

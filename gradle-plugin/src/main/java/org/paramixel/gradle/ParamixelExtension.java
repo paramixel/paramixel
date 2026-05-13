@@ -21,7 +21,7 @@ import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.provider.Property;
 
 /**
- * DSL extension for configuring the Paramixel Gradle plugin.
+ * DSL extension that exposes Paramixel test-execution properties (skip, fail-if-no-tests, parallelism, filters, report file) as Gradle-convention defaults.
  *
  * <p>Properties set here convention-map to the {@link ParamixelTestTask} inputs. Unset optional
  * properties ({@code parallelism}, {@code matchPackage}, {@code matchClass}, {@code matchTag},
@@ -61,7 +61,7 @@ public abstract class ParamixelExtension {
      *
      * <p>Defaults to {@code false}.</p>
      *
-     * @return the skip-tests property
+     * @return whether test execution is skipped
      */
     public Property<Boolean> getSkipTests() {
         return skipTests;
@@ -72,7 +72,7 @@ public abstract class ParamixelExtension {
      *
      * <p>Defaults to {@code false}.</p>
      *
-     * @return the fail-if-no-tests property
+     * @return whether the build fails on zero discovered actions
      */
     public Property<Boolean> getFailIfNoTests() {
         return failIfNoTests;
@@ -84,7 +84,7 @@ public abstract class ParamixelExtension {
      * <p>Defaults to {@code false}. When {@code true}, a {@code SKIP} result causes the build to
      * fail.</p>
      *
-     * @return the failure-on-skip property
+     * @return whether a SKIP result is treated as a failure
      */
     public Property<Boolean> getFailureOnSkip() {
         return failureOnSkip;
@@ -96,7 +96,7 @@ public abstract class ParamixelExtension {
      * <p>Unset by default; when absent, the framework default from
      * {@link org.paramixel.core.Configuration#defaultProperties()} is used.</p>
      *
-     * @return the parallelism property
+     * @return the parallelism property, or an unset property to use the framework default
      */
     public Property<Integer> getParallelism() {
         return parallelism;
@@ -107,7 +107,7 @@ public abstract class ParamixelExtension {
      *
      * <p>Unset by default; when absent, all packages are included.</p>
      *
-     * @return the package-match property
+     * @return the package-match property, or an unset property to include all packages
      */
     public Property<String> getMatchPackage() {
         return matchPackage;
@@ -118,7 +118,7 @@ public abstract class ParamixelExtension {
      *
      * <p>Unset by default; when absent, all classes are included.</p>
      *
-     * @return the class-match property
+     * @return the class-match property, or an unset property to include all classes
      */
     public Property<String> getMatchClass() {
         return matchClass;
@@ -129,7 +129,7 @@ public abstract class ParamixelExtension {
      *
      * <p>Unset by default; when absent, all tags are included.</p>
      *
-     * @return the tag-match property
+     * @return the tag-match property, or an unset property to include all tags
      */
     public Property<String> getMatchTag() {
         return matchTag;
@@ -140,7 +140,7 @@ public abstract class ParamixelExtension {
      *
      * <p>Unset by default; when absent, no report is written.</p>
      *
-     * @return the report-file property
+     * @return the report-file property, or an unset property to disable report output
      */
     public Property<String> getReportFile() {
         return reportFile;

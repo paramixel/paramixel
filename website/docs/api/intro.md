@@ -5,7 +5,7 @@ description: Quick reference for the public Paramixel API.
 
 # API Reference
 
-This page is a compact map of the 3.x public API.
+This page is a compact map of the 4.x public API.
 
 ## Core types
 
@@ -55,23 +55,20 @@ final class Factory {
 interface Action {
     String getId();
     String getName();
-    ContextMode getContextMode();
-    Result execute(Context context);
+    Result run(Context context);
     Result skip(Context context);
-
-    enum ContextMode { ISOLATED, SHARED }
 }
 ```
 
 `getId()` returns a randomly generated 4-character string (a–z, A–Z) that uniquely identifies the action instance.
 
-`ISOLATED` creates a child context for the action. `SHARED` reuses the parent context — use this when sibling actions intentionally share workflow state (e.g. `before`/`after` lifecycle phases). Built-in actions honor `ContextMode`; custom action implementations are responsible for applying their own context scoping in `execute(Context)` and `skip(Context)`.
+Built-in composite actions decide when to create child contexts. `Container` shares its context with `before` and `after` actions and creates an isolated child context for each body child. `Parallel` creates an isolated child context for each child. `Direct` uses whatever context it receives. Custom action implementations are responsible for applying their own context scoping in `run(Context)` and `skip(Context)`.
 
 ### `AbstractAction`
 
-`AbstractAction` is a convenience base class for custom actions. It provides generated identifiers, name validation helpers, context mode storage, and final accessors for `getId()`, `getName()`, and `getContextMode()`.
+`AbstractAction` is a convenience base class for custom actions. It provides generated identifiers and name validation helpers, with final accessors for `getId()` and `getName()`.
 
-`AbstractAction` does not wrap execution. Subclasses implement `execute(Context)` and `skip(Context)` directly, including any null checks, listener callbacks, result construction, and `ContextMode` behavior they require.
+`AbstractAction` does not wrap execution. Subclasses implement `run(Context)` and `skip(Context)` directly, including any null checks, listener callbacks, result construction, and context scoping behavior they require.
 
 Built-in actions are final framework primitives and are not intended for subclassing. Implement `Action` directly, or extend `AbstractAction`, when you need custom action behavior.
 
@@ -99,21 +96,25 @@ Action (interface)
        └─ Parallel (also implements CompositeAction)
 ```
 
+Context scoping is owned by composite actions. `Container` shares its context with `before` and `after` actions and creates an isolated child context for each body child. `Parallel` creates an isolated child context for each child.
+
 ### `Context`
 
 ```java
 interface Context {
+    Context getParent();
+    Optional<Context> findParent();
+    Context getAncestor(String path);
+    Optional<Context> findAncestor(String path);
     Map<String, String> getConfiguration();
-    Optional<Context> getParent();
-    Store getStore();
     Listener getListener();
     CompletableFuture<Result> runAsync(Action action);
-    Optional<Context> findAncestor(int levelUp);
+    Store getStore();
     Context createChild();
 }
 ```
 
-`runAsync(action)` schedules an action through the effective scheduler for the current context. `findAncestor(levelUp)` returns the current/ancestor context wrapped in `Optional`; it throws if `levelUp` is negative and returns `Optional.empty()` if the ancestor does not exist.
+`runAsync(action)` schedules an action through the effective scheduler for the current context. `getParent()` returns the parent context directly and throws `AncestorNotFoundException` when this context is the root. `findParent()` returns the parent wrapped in `Optional`. `getAncestor(path)` navigates the context hierarchy using path semantics and throws `AncestorNotFoundException` when the path traverses beyond the root. `findAncestor(path)` is the safe variant that returns `Optional.empty()`. Path semantics: `"../"` for parent, `"../../"` for grandparent, `"/"` for root. Named segments and `.` segments are not allowed.
 
 ### `AsyncScheduler`
 
@@ -150,7 +151,7 @@ interface Result {
 }
 ```
 
-Results form a tree that mirrors the action tree. `getRunDuration()` returns the wall-clock time of the full execute or skip. Use `Result.builder(Action)` for custom result construction.
+Results form a tree that mirrors the action tree. `getRunDuration()` returns the wall-clock time of the full run or skip. Use `Result.builder(Action)` for custom result construction.
 
 ### `Status`
 
@@ -182,50 +183,41 @@ Display names: `STAGED`, `PASS`, `FAIL`, `SKIP`. Use `isFailure()` (not `isFail(
 interface Store {
     interface Entry {
         String getKey();
-        Value getValue();
-        Value setValue(Value value);
+        Object getValue();
+        Object setValue(Object value);
     }
 
     int size();
     boolean isEmpty();
     boolean containsKey(String key);
-    boolean containsValue(Value value);
-    Optional<Value> get(String key);
-    Optional<Value> put(String key, Value value);
-    Optional<Value> remove(String key);
+    boolean containsValue(Object value);
+    Optional<Object> get(String key);
+    Optional<Object> put(String key, Object value);
+    Optional<Object> remove(String key);
     void putAll(Store store);
     void clear();
     Set<String> keySet();
-    Collection<Value> values();
+    Collection<Object> values();
     Set<Entry> entrySet();
-    Value getOrDefault(String key, Value defaultValue);
-    void forEach(BiConsumer<? super String, ? super Value> action);
-    void replaceAll(BiFunction<? super String, ? super Value, ? extends Value> function);
-    Optional<Value> putIfAbsent(String key, Value value);
-    boolean remove(String key, Value value);
-    boolean replace(String key, Value oldValue, Value newValue);
-    Optional<Value> replace(String key, Value value);
-    Optional<Value> computeIfAbsent(String key, Function<? super String, ? extends Value> mappingFunction);
-    Optional<Value> computeIfPresent(String key, BiFunction<? super String, ? super Value, ? extends Value> remappingFunction);
-    Optional<Value> compute(String key, BiFunction<? super String, ? super Value, ? extends Value> remappingFunction);
-    Optional<Value> merge(String key, Value value, BiFunction<? super Value, ? super Value, ? extends Value> remappingFunction);
+    Object getOrDefault(String key, Object defaultValue);
+    void forEach(BiConsumer<? super String, ? super Object> action);
+    void replaceAll(BiFunction<? super String, ? super Object, ? extends Object> function);
+    Optional<Object> putIfAbsent(String key, Object value);
+    boolean remove(String key, Object value);
+    boolean replace(String key, Object oldValue, Object newValue);
+    Optional<Object> replace(String key, Object value);
+    Optional<Object> computeIfAbsent(String key, Function<? super String, ? extends Object> mappingFunction);
+    Optional<Object> computeIfPresent(String key, BiFunction<? super String, ? super Object, ? extends Object> remappingFunction);
+    Optional<Object> compute(String key, BiFunction<? super String, ? super Object, ? extends Object> remappingFunction);
+    Optional<Object> merge(String key, Object value, BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction);
+    <T> Optional<T> get(String key, Class<T> type);
+    <T> Optional<T> remove(String key, Class<T> type);
+    <T> T getOrDefault(String key, Class<T> type, T defaultValue);
+    boolean isType(String key, Class<?> type);
 }
 ```
 
-Every method that returns a store value returns `Optional<Value>`. All methods reject `null` keys and values with `NullPointerException`.
-
-### `Value`
-
-```java
-final class Value {
-    static Value of(Object value);
-    Object get();
-    boolean isType(Class<?> type);
-    <T> T cast(Class<T> type);
-}
-```
-
-`Value.of()` rejects `null`. Use `isType()` for type-checking without casting, `cast()` for typed access.
+Every method that returns a store value returns `Optional<Object>`. Use `get(key, type)` for typed access. All methods reject `null` keys and values with `NullPointerException`.
 
 ### `Listener`
 
@@ -274,7 +266,7 @@ final class Resolver {
 }
 ```
 
-Four overloads. No `ClassLoader`, `Predicate`, or `Composition` parameters. Discovered actions are always combined as `Parallel`.
+Four overloads. No `ClassLoader`, `Predicate`, or `Composition` parameters. Discovered actions are always combined as `Parallel` after ordering by priority descending, then package name, action name, and class name.
 
 ### `Configuration`
 
@@ -287,7 +279,6 @@ final class Configuration {
     static final String CLASS_MATCH = "paramixel.match.class";
     static final String TAG_MATCH = "paramixel.match.tag";
     static final String REPORT_FILE = "paramixel.report.file";
-    static final String REPORT_FORMAT = "paramixel.report.format"; // deprecated
 
     static Map<String, String> classpathProperties();
     static Map<String, String> classpathProperties(ClassLoader classLoader);
@@ -326,6 +317,17 @@ Tags a factory for selective discovery. Repeatable via `@Paramixel.Tags`.
 @Paramixel.Tag("fast")
 ```
 
+### `@Paramixel.Priority`
+
+Orders discovered factory classes before the resolver-created root `Parallel` is built. Higher values are ordered earlier; the default is `0`.
+
+```java
+@Target(ElementType.TYPE)
+@interface Priority {
+    int value() default 0;
+}
+```
+
 ## Exception classes
 
 All in `org.paramixel.core.exception`:
@@ -337,6 +339,7 @@ All in `org.paramixel.core.exception`:
 | `CycleDetectedException` | Action graph contains a parent-child cycle |
 | `ConfigurationException` | Invalid configuration |
 | `ResolverException` | Action discovery/resolution failure |
+| `AncestorNotFoundException` | Ancestor context does not exist |
 
 ## Built-in actions
 
@@ -344,15 +347,15 @@ All in `org.paramixel.core.action`:
 
 | Class | Extends | Description |
 |---|---|---|
-| `Direct` | `AbstractAction` | Final action that executes a callback |
+| `Direct` | `AbstractAction` | Final action that runs a callback |
 | `Noop` | `AbstractAction` | Final action that does nothing and passes |
 | `Container` | `AbstractAction` | Final action for ordered composition with optional setup, teardown, and policy |
-| `Parallel` | `AbstractAction` | Final action for concurrent execution |
+| `Parallel` | `AbstractAction` | Final action for concurrent running |
 
-Executable and composition actions expose one-shot builders that require a name up front and validate method arguments immediately:
+Runnable and composition actions expose one-shot builders that require a name up front and validate method arguments immediately:
 
 ```java
-Direct.builder(String name).execute(Direct.Executable executable).build();
+Direct.builder(String name).runnable(Direct.ThrowableRunnable runnable).build();
 Container.builder(String name).before(Action before).child(Action child).after(Action after).build();
 Parallel.builder(String name).parallelism(int parallelism).scheduler(AsyncScheduler scheduler).child(Action child).build();
 ```

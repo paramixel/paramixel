@@ -24,30 +24,30 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Describes the outcome of a {@link Cleanup} execution.
+ * Describes the outcome of a {@link Cleanup} run.
  *
  * <p>The result preserves one slot per registered cleanup callback so callers can inspect success or failure by
  * original registration index.
  */
 public final class CleanupResult {
 
-    private final int executableCount;
+    private final int throwableRunnableCount;
 
     private final List<Throwable> exceptions;
 
-    CleanupResult(int executableCount, List<Throwable> exceptions) {
-        this.executableCount = executableCount;
+    CleanupResult(int throwableRunnableCount, List<Throwable> exceptions) {
+        this.throwableRunnableCount = throwableRunnableCount;
         this.exceptions =
                 Collections.unmodifiableList(Objects.requireNonNull(exceptions, "exceptions must not be null"));
     }
 
     /**
-     * Returns the number of callbacks that were scheduled for execution.
+     * Returns the number of callbacks that were scheduled for running.
      *
      * @return the number of registered callbacks
      */
-    public int getExecutableCount() {
-        return executableCount;
+    public int getThrowableRunnableCount() {
+        return throwableRunnableCount;
     }
 
     /**
@@ -72,7 +72,7 @@ public final class CleanupResult {
      *     range
      */
     public Optional<Throwable> getException(final int index) {
-        if (index < 0 || index >= executableCount) {
+        if (index < 0 || index >= throwableRunnableCount) {
             return Optional.empty();
         }
         return Optional.ofNullable(exceptions.get(index));
@@ -85,7 +85,7 @@ public final class CleanupResult {
      * @return {@code true} when the callback succeeded; {@code false} when it failed or the index is out of range
      */
     public boolean isSuccess(final int index) {
-        if (index < 0 || index >= executableCount) {
+        if (index < 0 || index >= throwableRunnableCount) {
             return false;
         }
         return exceptions.get(index) == null;

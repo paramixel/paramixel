@@ -51,19 +51,19 @@ public class ArgumentCollectionTypesTest {
 
     private static Action listTest() {
         return Direct.builder("list")
-                .execute(context -> assertThat(List.of("a", "b", "c")).containsExactly("a", "b", "c"))
+                .runnable(context -> assertThat(List.of("a", "b", "c")).containsExactly("a", "b", "c"))
                 .build();
     }
 
     private static Action setTest() {
         return Direct.builder("set")
-                .execute(context -> assertThat(Set.of(1, 2, 3)).containsExactlyInAnyOrder(1, 2, 3))
+                .runnable(context -> assertThat(Set.of(1, 2, 3)).containsExactlyInAnyOrder(1, 2, 3))
                 .build();
     }
 
     private static Action mapTest() {
         return Direct.builder("map")
-                .execute(context -> assertThat(Map.of("one", 1, "two", 2)).containsEntry("two", 2))
+                .runnable(context -> assertThat(Map.of("one", 1, "two", 2)).containsEntry("two", 2))
                 .build();
     }
 }

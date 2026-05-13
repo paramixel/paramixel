@@ -198,26 +198,6 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
-        @DisplayName("deprecated report format is included in built configuration")
-        @SuppressWarnings("removal")
-        void deprecatedReportFormatShouldBeIncludedInConfiguration() throws Exception {
-            var originalReportFormat = System.getProperty(Configuration.REPORT_FORMAT);
-            var mojo = new ParamixelMojo();
-            try {
-                System.clearProperty(Configuration.REPORT_FORMAT);
-
-                setField(mojo, "reportFormat", "json");
-
-                var configuration =
-                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
-
-                assertThat(configuration.get(Configuration.REPORT_FORMAT)).isEqualTo("json");
-            } finally {
-                restoreSystemProperty(Configuration.REPORT_FORMAT, originalReportFormat);
-            }
-        }
-
-        @Test
         @DisplayName("system report file should override mojo report configuration")
         void systemReportFileShouldOverrideMojoReportConfiguration() throws Exception {
             var originalReportFile = System.getProperty(Configuration.REPORT_FILE);
@@ -234,26 +214,6 @@ class ParamixelMojoPropertyTest {
                         .isEqualTo("target/system-paramixel/paramixel.xml");
             } finally {
                 restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
-            }
-        }
-
-        @Test
-        @DisplayName("system report format should override deprecated mojo report format")
-        @SuppressWarnings("removal")
-        void systemReportFormatShouldOverrideDeprecatedMojoReportFormat() throws Exception {
-            var originalReportFormat = System.getProperty(Configuration.REPORT_FORMAT);
-            var mojo = new ParamixelMojo();
-            try {
-                System.setProperty(Configuration.REPORT_FORMAT, "xml");
-
-                setField(mojo, "reportFormat", "json");
-
-                var configuration =
-                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
-
-                assertThat(configuration.get(Configuration.REPORT_FORMAT)).isEqualTo("xml");
-            } finally {
-                restoreSystemProperty(Configuration.REPORT_FORMAT, originalReportFormat);
             }
         }
 

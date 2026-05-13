@@ -106,7 +106,7 @@ class TreeSummaryRendererTest {
     @DisplayName("FAIL status rendered with bold red")
     void failStatusRenderedWithBoldRed() {
         Action failing = Direct.builder("failing")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new RuntimeException("error");
                 })
                 .build();
@@ -119,7 +119,7 @@ class TreeSummaryRendererTest {
     @DisplayName("SKIP status rendered with bold orange")
     void skipStatusRenderedWithBoldOrange() {
         Action skipping = Direct.builder("skipper")
-                .execute(context -> {
+                .runnable(context -> {
                     throw org.paramixel.core.exception.SkipException.of("reason");
                 })
                 .build();
@@ -142,7 +142,7 @@ class TreeSummaryRendererTest {
     @DisplayName("failure info with throwable shows fully qualified exception class and message")
     void failureInfoWithThrowable() {
         Action failing = Direct.builder("fail-action")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new IllegalStateException("bad state");
                 })
                 .build();
@@ -156,7 +156,7 @@ class TreeSummaryRendererTest {
     @DisplayName("failure info with multi-line message renders on single line")
     void failureInfoWithMultiLineMessageRendersOnSingleLine() {
         Action failing = Direct.builder("multiline-fail")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new RuntimeException("\nline2\nline3");
                 })
                 .build();
@@ -171,7 +171,7 @@ class TreeSummaryRendererTest {
     @DisplayName("failure info shows fully qualified exception class name")
     void failureInfoShowsFullyQualifiedExceptionClassName() {
         Action failing = Direct.builder("fqcn-fail")
-                .execute(context -> {
+                .runnable(context -> {
                     throw new IllegalStateException("fqcn test");
                 })
                 .build();

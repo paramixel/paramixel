@@ -23,15 +23,15 @@ import java.util.Optional;
 import org.paramixel.core.internal.DefaultResult;
 
 /**
- * Describes the outcome of executing an {@link Action}.
+ * Describes the outcome of running an {@link Action}.
  *
- * <p>A {@link Result} records the action that was executed, its final {@link Status}, run duration, and any nested
+ * <p>A {@link Result} records the action that was run, its final {@link Status}, run duration, and any nested
  * child results produced by composed actions.
  */
 public interface Result {
 
     /**
-     * Produces a result indicating that the action has not yet been executed.
+     * Produces a result indicating that the action has not yet been run.
      *
      * @param action the action represented by the result
      * @return a staged result
@@ -64,7 +64,7 @@ public interface Result {
      * Produces a result indicating that the action failed with the supplied throwable.
      *
      * @param action the action represented by the result
-     * @param throwable the failure throwable
+     * @param throwable the exception that caused the action to fail
      * @return a failed result
      */
     static Result failure(Action action, Throwable throwable) {
@@ -115,7 +115,7 @@ public interface Result {
     /**
      * Returns the run duration for this action.
      *
-     * <p>This is the wall-clock time of the full execute or skip.
+     * <p>This is the wall-clock time of the full run or skip.
      *
      * @return the run duration for the action represented by this result
      */
@@ -136,7 +136,7 @@ public interface Result {
         /**
          * Sets the result status.
          *
-         * @param status the status
+         * @param status the run status to record for this result
          * @return this builder
          * @throws NullPointerException if {@code status} is {@code null}
          * @throws IllegalStateException if this builder has already been built
@@ -150,7 +150,7 @@ public interface Result {
         /**
          * Sets the result run duration.
          *
-         * @param runDuration the run duration
+         * @param runDuration the wall-clock duration of the action run
          * @return this builder
          * @throws NullPointerException if {@code runDuration} is {@code null}
          * @throws IllegalStateException if this builder has already been built
@@ -164,7 +164,7 @@ public interface Result {
         /**
          * Adds a child result.
          *
-         * @param child the child result
+         * @param child the child result produced by a nested action run
          * @return this builder
          * @throws NullPointerException if {@code child} is {@code null}
          * @throws IllegalStateException if this builder has already been built

@@ -115,12 +115,7 @@ class ActionTest {
         }
 
         @Override
-        public ContextMode getContextMode() {
-            return ContextMode.ISOLATED;
-        }
-
-        @Override
-        public Result execute(Context context) {
+        public Result run(Context context) {
             executed.set(true);
             return Result.pass(this);
         }
@@ -165,16 +160,11 @@ class ActionTest {
         }
 
         @Override
-        public ContextMode getContextMode() {
-            return ContextMode.ISOLATED;
-        }
-
-        @Override
-        public Result execute(Context context) {
+        public Result run(Context context) {
             executed.set(true);
             Result.Builder result = Result.builder(this).status(Status.pass());
             for (Action child : children) {
-                result.child(child.execute(context));
+                result.child(child.run(context));
             }
             return result.build();
         }

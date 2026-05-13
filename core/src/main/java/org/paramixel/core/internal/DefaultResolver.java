@@ -28,7 +28,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
@@ -101,6 +100,12 @@ public final class DefaultResolver {
      */
     public Optional<Action> resolveActionFromClass(
             Class<?> clazz, Pattern selectorTagPattern, Pattern configurationTagPattern) {
+        return resolveActionFactoryMethod(clazz, selectorTagPattern, configurationTagPattern)
+                .map(this::resolveActionFromMethod);
+    }
+
+    private Optional<Method> resolveActionFactoryMethod(
+            Class<?> clazz, Pattern selectorTagPattern, Pattern configurationTagPattern) {
         var seenSignatures = new HashSet<MethodKey>();
         var candidates = new ArrayList<Method>();
         Class<?> current = Objects.requireNonNull(clazz, "clazz must not be null");
@@ -134,7 +139,7 @@ public final class DefaultResolver {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(resolveActionFromMethod(candidates.get(0)));
+        return Optional.of(candidates.get(0));
     }
 
     private Pattern resolveConfiguredPattern(String key) {
@@ -157,7 +162,7 @@ public final class DefaultResolver {
             Pattern configuredClassPattern,
             Pattern configuredTagPattern,
             int parallelism) {
-        var actionsByPackage = new TreeMap<String, List<Action>>();
+        var resolvedActions = new ArrayList<ResolvedAction>();
         try (ScanResult scanResult = classGraph
                 .enableClassInfo()
                 .enableMethodInfo()
@@ -170,16 +175,22 @@ public final class DefaultResolver {
                     continue;
                 }
                 Pattern selectorTagPattern = selector != null ? selector.getTagPattern() : null;
-                resolveActionFromClass(clazz, selectorTagPattern, configuredTagPattern)
-                        .ifPresent(action -> actionsByPackage
-                                .computeIfAbsent(clazz.getPackageName(), ignored -> new ArrayList<>())
-                                .add(action));
+                resolveActionFactoryMethod(clazz, selectorTagPattern, configuredTagPattern)
+                        .ifPresent(method -> resolvedActions.add(new ResolvedAction(
+                                priorityOf(method),
+                                clazz.getPackageName(),
+                                clazz.getName(),
+                                resolveActionFromMethod(method))));
             }
         }
 
-        List<Action> actions = actionsByPackage.values().stream()
-                .peek(list -> list.sort(Comparator.comparing(Action::getName)))
-                .flatMap(List::stream)
+        List<Action> actions = resolvedActions.stream()
+                .sorted(Comparator.comparingInt(ResolvedAction::priority)
+                        .reversed()
+                        .thenComparing(ResolvedAction::packageName)
+                        .thenComparing(resolvedAction -> resolvedAction.action().getName())
+                        .thenComparing(ResolvedAction::className))
+                .map(ResolvedAction::action)
                 .toList();
         return collapse(actions, parallelism);
     }
@@ -222,6 +233,11 @@ public final class DefaultResolver {
             tags.add(value);
         }
         return tags;
+    }
+
+    private int priorityOf(Method method) {
+        Paramixel.Priority priority = method.getDeclaringClass().getAnnotation(Paramixel.Priority.class);
+        return priority == null ? 0 : priority.value();
     }
 
     private Optional<Action> collapse(List<Action> actions, int parallelism) {
@@ -280,4 +296,6 @@ public final class DefaultResolver {
             return 31 * name.hashCode() + Arrays.hashCode(parameterTypes);
         }
     }
+
+    private record ResolvedAction(int priority, String packageName, String className, Action action) {}
 }

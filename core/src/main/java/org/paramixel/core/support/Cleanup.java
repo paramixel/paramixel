@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 import org.paramixel.core.internal.UnrecoverableErrors;
 
 /**
- * Collects cleanup callbacks and executes them later in forward or reverse order.
+ * Collects cleanup callbacks and runs them later in forward or reverse order.
  *
  * <p>This utility is intended for resource teardown flows where callers want to register cleanup work incrementally
  * and then either inspect failures with {@link CleanupResult} or rethrow them with {@link #runAndThrow()}.
@@ -37,23 +37,23 @@ import org.paramixel.core.internal.UnrecoverableErrors;
 public class Cleanup {
 
     /**
-     * Defines the execution order for registered cleanup callbacks.
+     * Defines the run order for registered cleanup callbacks.
      */
     public enum Mode {
         /**
-         * Execute callbacks in the order they were registered.
+         * Run callbacks in the order they were registered.
          */
         FORWARD,
 
         /**
-         * Execute callbacks in reverse registration order.
+         * Run callbacks in reverse registration order.
          */
         REVERSE
     }
 
     private final Mode mode;
 
-    private final List<Executable> executables = new ArrayList<>();
+    private final List<ThrowableRunnable> throwableRunnables = new ArrayList<>();
 
     private boolean hasRun = false;
 
@@ -67,9 +67,9 @@ public class Cleanup {
     }
 
     /**
-     * Creates a cleanup sequence with the supplied execution mode.
+     * Creates a cleanup sequence with the supplied run mode.
      *
-     * @param mode the callback execution order
+     * @param mode the callback run order
      * @return a new cleanup sequence
      * @throws NullPointerException if {@code mode} is {@code null}
      */
@@ -92,11 +92,11 @@ public class Cleanup {
      * @return the number of registered callbacks
      */
     public int getCount() {
-        return executables.size();
+        return throwableRunnables.size();
     }
 
     /**
-     * Returns whether this cleanup sequence has already been executed.
+     * Returns whether this cleanup sequence has already been run.
      *
      * @return {@code true} when {@link #run()} or {@link #runAndThrow()} has already been called
      */
@@ -107,27 +107,27 @@ public class Cleanup {
     /**
      * Registers a cleanup callback.
      *
-     * @param executable the callback to register
+     * @param throwableRunnable the callback to register
      * @return this cleanup sequence
-     * @throws NullPointerException if {@code executable} is {@code null}
+     * @throws NullPointerException if {@code throwableRunnable} is {@code null}
      */
-    public Cleanup add(final Executable executable) {
-        Objects.requireNonNull(executable, "executable must not be null");
-        executables.add(executable);
+    public Cleanup add(final ThrowableRunnable throwableRunnable) {
+        Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
+        throwableRunnables.add(throwableRunnable);
         return this;
     }
 
     /**
      * Registers multiple cleanup callbacks.
      *
-     * @param executables the callbacks to register
+     * @param throwableRunnables the callbacks to register
      * @return this cleanup sequence
-     * @throws NullPointerException if {@code executables} is {@code null} or contains {@code null}
+     * @throws NullPointerException if {@code throwableRunnables} is {@code null} or contains {@code null}
      */
-    public Cleanup add(final Executable... executables) {
-        Objects.requireNonNull(executables, "executables must not be null");
-        for (Executable executable : executables) {
-            add(executable);
+    public Cleanup add(final ThrowableRunnable... throwableRunnables) {
+        Objects.requireNonNull(throwableRunnables, "throwableRunnables must not be null");
+        for (ThrowableRunnable throwableRunnable : throwableRunnables) {
+            add(throwableRunnable);
         }
         return this;
     }
@@ -135,32 +135,32 @@ public class Cleanup {
     /**
      * Registers multiple cleanup callbacks from the supplied list.
      *
-     * @param executables the callbacks to register
+     * @param throwableRunnables the callbacks to register
      * @return this cleanup sequence
-     * @throws NullPointerException if {@code executables} is {@code null} or contains {@code null}
+     * @throws NullPointerException if {@code throwableRunnables} is {@code null} or contains {@code null}
      */
-    public Cleanup add(final List<? extends Executable> executables) {
-        Objects.requireNonNull(executables, "executables must not be null");
-        for (Executable executable : executables) {
-            add(executable);
+    public Cleanup add(final List<? extends ThrowableRunnable> throwableRunnables) {
+        Objects.requireNonNull(throwableRunnables, "throwableRunnables must not be null");
+        for (ThrowableRunnable throwableRunnable : throwableRunnables) {
+            add(throwableRunnable);
         }
         return this;
     }
 
     /**
-     * Registers a callback that runs only when the supplied condition evaluates to {@code true} at execution time.
+     * Registers a callback that runs only when the supplied condition evaluates to {@code true} at run time.
      *
      * @param condition the condition to evaluate during cleanup
-     * @param executable the callback to run when the condition passes
+     * @param throwableRunnable the callback to run when the condition passes
      * @return this cleanup sequence
-     * @throws NullPointerException if {@code condition} or {@code executable} is {@code null}
+     * @throws NullPointerException if {@code condition} or {@code throwableRunnable} is {@code null}
      */
-    public Cleanup addWhen(final Supplier<Boolean> condition, final Executable executable) {
+    public Cleanup addWhen(final Supplier<Boolean> condition, final ThrowableRunnable throwableRunnable) {
         Objects.requireNonNull(condition, "condition must not be null");
-        Objects.requireNonNull(executable, "executable must not be null");
+        Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
         return add(() -> {
             if (condition.get()) {
-                executable.run();
+                throwableRunnable.run();
             }
         });
     }
@@ -169,15 +169,15 @@ public class Cleanup {
      * Registers a callback that runs only when the supplied condition is {@code true}.
      *
      * @param condition the static condition to evaluate
-     * @param executable the callback to run when the condition passes
+     * @param throwableRunnable the callback to run when the condition passes
      * @return this cleanup sequence
-     * @throws NullPointerException if {@code executable} is {@code null}
+     * @throws NullPointerException if {@code throwableRunnable} is {@code null}
      */
-    public Cleanup addWhen(final boolean condition, final Executable executable) {
-        Objects.requireNonNull(executable, "executable must not be null");
+    public Cleanup addWhen(final boolean condition, final ThrowableRunnable throwableRunnable) {
+        Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
         return add(() -> {
             if (condition) {
-                executable.run();
+                throwableRunnable.run();
             }
         });
     }
@@ -198,10 +198,10 @@ public class Cleanup {
     /**
      * Returns an immutable snapshot of the registered callbacks.
      *
-     * @return the registered callbacks in registration order
+     * @return an immutable snapshot of the registered callbacks, in registration order
      */
-    public List<Executable> getExecutables() {
-        return List.copyOf(executables);
+    public List<ThrowableRunnable> getThrowableRunnables() {
+        return List.copyOf(throwableRunnables);
     }
 
     /**
@@ -220,13 +220,13 @@ public class Cleanup {
      * @return this cleanup sequence
      */
     public Cleanup clear() {
-        executables.clear();
+        throwableRunnables.clear();
         hasRun = false;
         return this;
     }
 
     /**
-     * Executes all registered callbacks and captures any failures that are not
+     * Runs all registered callbacks and captures any failures that are not
      * {@link OutOfMemoryError} or {@link StackOverflowError}.
      *
      * <p>Callbacks run in the configured {@link Mode}. Every callback is attempted even when earlier callbacks fail.
@@ -243,23 +243,23 @@ public class Cleanup {
 
         hasRun = true;
 
-        Throwable[] exceptions = new Throwable[executables.size()];
-        int[] indices = getExecutionIndices();
+        Throwable[] exceptions = new Throwable[throwableRunnables.size()];
+        int[] indices = getRunIndices();
 
         for (int index : indices) {
             try {
-                executables.get(index).run();
+                throwableRunnables.get(index).run();
             } catch (Throwable e) {
                 UnrecoverableErrors.rethrowIfUnrecoverable(e);
                 exceptions[index] = e;
             }
         }
 
-        return new CleanupResult(executables.size(), Arrays.asList(exceptions));
+        return new CleanupResult(throwableRunnables.size(), Arrays.asList(exceptions));
     }
 
-    private int[] getExecutionIndices() {
-        int size = executables.size();
+    private int[] getRunIndices() {
+        int size = throwableRunnables.size();
         int[] indices = new int[size];
         if (mode == Mode.FORWARD) {
             for (int i = 0; i < size; i++) {
@@ -274,10 +274,10 @@ public class Cleanup {
     }
 
     /**
-     * Executes all registered callbacks and rethrows the first failure that is not
+     * Runs all registered callbacks and rethrows the first failure that is not
      * an {@link OutOfMemoryError} or {@link StackOverflowError}.
      *
-     * <p>Later failures are added to the first failure as suppressed exceptions in execution order.
+     * <p>Later failures are added to the first failure as suppressed exceptions in run order.
      *
      * @throws Throwable the first captured callback failure, with later failures suppressed
      * @throws IllegalStateException if this cleanup sequence has already run
@@ -288,7 +288,7 @@ public class Cleanup {
         CleanupResult result = run();
 
         Throwable firstException = null;
-        int[] indices = getExecutionIndices();
+        int[] indices = getRunIndices();
 
         for (int index : indices) {
             Optional<Throwable> exception = result.getException(index);
@@ -310,7 +310,7 @@ public class Cleanup {
     /**
      * Represents a single cleanup callback.
      */
-    public interface Executable {
+    public interface ThrowableRunnable {
 
         /**
          * Runs the cleanup callback.

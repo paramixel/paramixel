@@ -142,7 +142,7 @@ class RunnerConvenienceTest {
         @DisplayName("returns result with SKIP status for skipped action")
         void runReturnsSkipResultForSkippedAction() {
             Action action = Direct.builder("skipped")
-                    .execute(context -> SkipException.skip())
+                    .runnable(context -> SkipException.skip())
                     .build();
 
             Result result = Factory.defaultRunner().run(action);
@@ -177,7 +177,7 @@ class RunnerConvenienceTest {
         @DisplayName("returns 0 for skipped action")
         void returns0ForSkippedAction() {
             Action action = Direct.builder("skipped")
-                    .execute(context -> SkipException.skip())
+                    .runnable(context -> SkipException.skip())
                     .build();
 
             int exitCode = Factory.defaultRunner().runAndReturnExitCode(action);
@@ -189,7 +189,7 @@ class RunnerConvenienceTest {
         @DisplayName("returns 1 for failing action")
         void returns1ForFailingAction() {
             Action action = Direct.builder("failing")
-                    .execute(context -> {
+                    .runnable(context -> {
                         throw new RuntimeException("test failure");
                     })
                     .build();
@@ -208,7 +208,7 @@ class RunnerConvenienceTest {
         @DisplayName("returns 1 for skipped action when FAILURE_ON_SKIP is true")
         void returns1ForSkippedActionWhenFailureOnSkipIsTrue() {
             Action action = Direct.builder("skipped")
-                    .execute(context -> SkipException.skip())
+                    .runnable(context -> SkipException.skip())
                     .build();
             Runner runner = Runner.builder()
                     .configuration(Map.of(Configuration.FAILURE_ON_SKIP, "true"))

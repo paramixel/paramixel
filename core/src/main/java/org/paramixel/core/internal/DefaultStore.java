@@ -29,10 +29,9 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import org.paramixel.core.Store;
-import org.paramixel.core.Value;
 
 /**
- * Default thread-safe {@link Store} implementation backed by a {@link ConcurrentHashMap}.
+ * Thread-safe store that rejects null keys and values, backed by a concurrent hash map.
  *
  * <p>This implementation enforces Paramixel store invariants by rejecting {@code null} keys and
  * {@code null} values through the underlying concurrent map.
@@ -46,7 +45,7 @@ public final class DefaultStore implements Store {
         // Intentionally empty
     }
 
-    private final ConcurrentMap<String, Value> delegate = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Object> delegate = new ConcurrentHashMap<>();
 
     @Override
     public int size() {
@@ -65,26 +64,26 @@ public final class DefaultStore implements Store {
     }
 
     @Override
-    public boolean containsValue(final Value value) {
+    public boolean containsValue(final Object value) {
         Objects.requireNonNull(value, "value must not be null");
         return delegate.containsValue(value);
     }
 
     @Override
-    public Optional<Value> get(final String key) {
+    public Optional<Object> get(final String key) {
         Objects.requireNonNull(key, "key must not be null");
         return Optional.ofNullable(delegate.get(key));
     }
 
     @Override
-    public Optional<Value> put(final String key, final Value value) {
+    public Optional<Object> put(final String key, final Object value) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(value, "value must not be null");
         return Optional.ofNullable(delegate.put(key, value));
     }
 
     @Override
-    public Optional<Value> remove(final String key) {
+    public Optional<Object> remove(final String key) {
         Objects.requireNonNull(key, "key must not be null");
         return Optional.ofNullable(delegate.remove(key));
     }
@@ -106,7 +105,7 @@ public final class DefaultStore implements Store {
     }
 
     @Override
-    public Collection<Value> values() {
+    public Collection<Object> values() {
         return delegate.values();
     }
 
@@ -116,40 +115,40 @@ public final class DefaultStore implements Store {
     }
 
     @Override
-    public Value getOrDefault(final String key, final Value defaultValue) {
+    public Object getOrDefault(final String key, final Object defaultValue) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(defaultValue, "defaultValue must not be null");
         return delegate.getOrDefault(key, defaultValue);
     }
 
     @Override
-    public void forEach(final BiConsumer<? super String, ? super Value> action) {
+    public void forEach(final BiConsumer<? super String, ? super Object> action) {
         Objects.requireNonNull(action, "action must not be null");
         delegate.forEach(action);
     }
 
     @Override
-    public void replaceAll(final BiFunction<? super String, ? super Value, ? extends Value> function) {
+    public void replaceAll(final BiFunction<? super String, ? super Object, ? extends Object> function) {
         Objects.requireNonNull(function, "function must not be null");
         delegate.replaceAll(function);
     }
 
     @Override
-    public Optional<Value> putIfAbsent(final String key, final Value value) {
+    public Optional<Object> putIfAbsent(final String key, final Object value) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(value, "value must not be null");
         return Optional.ofNullable(delegate.putIfAbsent(key, value));
     }
 
     @Override
-    public boolean remove(final String key, final Value value) {
+    public boolean remove(final String key, final Object value) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(value, "value must not be null");
         return delegate.remove(key, value);
     }
 
     @Override
-    public boolean replace(final String key, final Value oldValue, final Value newValue) {
+    public boolean replace(final String key, final Object oldValue, final Object newValue) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(oldValue, "oldValue must not be null");
         Objects.requireNonNull(newValue, "newValue must not be null");
@@ -157,41 +156,41 @@ public final class DefaultStore implements Store {
     }
 
     @Override
-    public Optional<Value> replace(final String key, final Value value) {
+    public Optional<Object> replace(final String key, final Object value) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(value, "value must not be null");
         return Optional.ofNullable(delegate.replace(key, value));
     }
 
     @Override
-    public Optional<Value> computeIfAbsent(
-            final String key, final Function<? super String, ? extends Value> mappingFunction) {
+    public Optional<Object> computeIfAbsent(
+            final String key, final Function<? super String, ? extends Object> mappingFunction) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(mappingFunction, "mappingFunction must not be null");
         return Optional.ofNullable(delegate.computeIfAbsent(key, mappingFunction));
     }
 
     @Override
-    public Optional<Value> computeIfPresent(
-            final String key, final BiFunction<? super String, ? super Value, ? extends Value> remappingFunction) {
+    public Optional<Object> computeIfPresent(
+            final String key, final BiFunction<? super String, ? super Object, ? extends Object> remappingFunction) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(remappingFunction, "remappingFunction must not be null");
         return Optional.ofNullable(delegate.computeIfPresent(key, remappingFunction));
     }
 
     @Override
-    public Optional<Value> compute(
-            final String key, final BiFunction<? super String, ? super Value, ? extends Value> remappingFunction) {
+    public Optional<Object> compute(
+            final String key, final BiFunction<? super String, ? super Object, ? extends Object> remappingFunction) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(remappingFunction, "remappingFunction must not be null");
         return Optional.ofNullable(delegate.compute(key, remappingFunction));
     }
 
     @Override
-    public Optional<Value> merge(
+    public Optional<Object> merge(
             final String key,
-            final Value value,
-            final BiFunction<? super Value, ? super Value, ? extends Value> remappingFunction) {
+            final Object value,
+            final BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction) {
         Objects.requireNonNull(key, "key must not be null");
         Objects.requireNonNull(value, "value must not be null");
         Objects.requireNonNull(remappingFunction, "remappingFunction must not be null");
@@ -223,7 +222,7 @@ public final class DefaultStore implements Store {
 
         @Override
         public Iterator<Entry> iterator() {
-            Iterator<Map.Entry<String, Value>> iterator = delegate.entrySet().iterator();
+            Iterator<Map.Entry<String, Object>> iterator = delegate.entrySet().iterator();
             return new Iterator<>() {
                 @Override
                 public boolean hasNext() {
@@ -257,7 +256,7 @@ public final class DefaultStore implements Store {
             if (!(object instanceof Entry entry)) {
                 return false;
             }
-            Value value = delegate.get(entry.getKey());
+            Object value = delegate.get(entry.getKey());
             return Objects.equals(value, entry.getValue());
         }
 
@@ -272,9 +271,9 @@ public final class DefaultStore implements Store {
 
     private static final class EntryView implements Entry {
 
-        private final Map.Entry<String, Value> delegate;
+        private final Map.Entry<String, Object> delegate;
 
-        private EntryView(final Map.Entry<String, Value> delegate) {
+        private EntryView(final Map.Entry<String, Object> delegate) {
             this.delegate = delegate;
         }
 
@@ -284,12 +283,12 @@ public final class DefaultStore implements Store {
         }
 
         @Override
-        public Value getValue() {
+        public Object getValue() {
             return delegate.getValue();
         }
 
         @Override
-        public Value setValue(final Value value) {
+        public Object setValue(final Object value) {
             Objects.requireNonNull(value, "value must not be null");
             return delegate.setValue(value);
         }

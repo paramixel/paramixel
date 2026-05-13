@@ -19,7 +19,6 @@ package org.paramixel.core.action;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import org.paramixel.core.Action;
 import org.paramixel.core.Context;
 import org.paramixel.core.Result;
 import org.paramixel.core.exception.FailException;
@@ -30,9 +29,9 @@ import org.paramixel.core.internal.UnrecoverableErrors;
 import org.paramixel.core.support.Arguments;
 
 /**
- * Executes a single callback against a {@link Context}.
+ * Runs a single callback against a {@link Context}.
  *
- * <p>{@code Direct} is the simplest executable action type. The supplied {@link Executable} determines the outcome.
+ * <p>{@code Direct} is the simplest runnable action type. The supplied {@link ThrowableRunnable} determines the outcome.
  * Throwing {@link SkipException} marks the action as skipped, throwing {@link FailException} marks it as failed, and
  * any other throwable that is not an {@link OutOfMemoryError} or {@link StackOverflowError} is reported to the
  * listener and converted into a failure result. Unrecoverable errors are rethrown immediately.
@@ -40,23 +39,22 @@ import org.paramixel.core.support.Arguments;
 public final class Direct extends AbstractAction {
 
     /**
-     * The callback executed when this action runs.
+     * The callback run when this action runs.
      */
-    protected final Executable executable;
+    protected final ThrowableRunnable throwableRunnable;
 
     /**
-     * Creates a direct action with the supplied name, callback, and context mode.
+     * Creates a direct action with the supplied name and callback.
      *
      * @param name the action name
-     * @param executable the callback to execute
-     * @param contextMode the context mode applied when this action executes or skips
+     * @param throwableRunnable the callback to run
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    private Direct(String name, Executable executable, Action.ContextMode contextMode) {
-        super(contextMode);
+    private Direct(String name, ThrowableRunnable throwableRunnable) {
+        super();
         this.name = validateName(name);
-        this.executable = Objects.requireNonNull(executable, "executable must not be null");
+        this.throwableRunnable = Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
     }
 
     /**
@@ -70,11 +68,8 @@ public final class Direct extends AbstractAction {
     }
 
     @Override
-    public final Result skip(Context context) {
+    public Result skip(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
         result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
@@ -87,8 +82,7 @@ public final class Direct extends AbstractAction {
     public static final class Builder {
 
         private final String name;
-        private Action.ContextMode contextMode = Action.ContextMode.ISOLATED;
-        private Executable executable;
+        private ThrowableRunnable throwableRunnable;
         private boolean built;
 
         private Builder(String name) {
@@ -98,30 +92,16 @@ public final class Direct extends AbstractAction {
         }
 
         /**
-         * Sets the context mode for this action.
+         * Sets the callback to run.
          *
-         * @param contextMode the context mode
+         * @param throwableRunnable the callback whose outcome determines the action status
          * @return this builder
-         * @throws NullPointerException if {@code contextMode} is {@code null}
+         * @throws NullPointerException if {@code throwableRunnable} is {@code null}
          * @throws IllegalStateException if this builder has already been built
          */
-        public Builder contextMode(Action.ContextMode contextMode) {
+        public Builder runnable(ThrowableRunnable throwableRunnable) {
             ensureNotBuilt();
-            this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
-            return this;
-        }
-
-        /**
-         * Sets the callback to execute.
-         *
-         * @param executable the callback to execute
-         * @return this builder
-         * @throws NullPointerException if {@code executable} is {@code null}
-         * @throws IllegalStateException if this builder has already been built
-         */
-        public Builder execute(Executable executable) {
-            ensureNotBuilt();
-            this.executable = Objects.requireNonNull(executable, "executable must not be null");
+            this.throwableRunnable = Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
             return this;
         }
 
@@ -129,15 +109,15 @@ public final class Direct extends AbstractAction {
          * Builds a new direct action.
          *
          * @return a new direct action
-         * @throws IllegalStateException if no executable has been set or if this builder has already been built
+         * @throws IllegalStateException if no throwableRunnable has been set or if this builder has already been built
          */
         public Direct build() {
             ensureNotBuilt();
             built = true;
-            if (executable == null) {
-                throw new IllegalStateException("executable must be configured");
+            if (throwableRunnable == null) {
+                throw new IllegalStateException("throwableRunnable must be configured");
             }
-            var instance = new Direct(name, executable, contextMode);
+            var instance = new Direct(name, throwableRunnable);
             instance.initialize();
             return instance;
         }
@@ -150,23 +130,20 @@ public final class Direct extends AbstractAction {
     }
 
     /**
-     * Invokes the configured {@link Executable} callback and maps the outcome to a pass, skip, or failure status.
+     * Invokes the configured {@link ThrowableRunnable} callback and maps the outcome to a pass, skip, or failure status.
      *
-     * @param context the execution context
-     * @return the execution result
+     * @param context the run context
+     * @return the run result
      */
     @Override
-    public final Result execute(Context context) {
+    public Result run(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
         var listener = context.getListener();
         listener.beforeAction(result);
         Instant start = Instant.now();
         try {
-            executable.execute(context);
+            throwableRunnable.run(context);
             result.complete(DefaultStatus.PASS, Duration.between(start, Instant.now()));
         } catch (SkipException e) {
             result.complete(
@@ -185,19 +162,19 @@ public final class Direct extends AbstractAction {
     }
 
     /**
-     * Functional callback executed by a {@link Direct} action.
+     * Functional callback run by a {@link Direct} action.
      */
     @FunctionalInterface
-    public interface Executable {
+    public interface ThrowableRunnable {
 
         /**
          * Performs the action's work.
          *
-         * @param context the execution context
+         * @param context the run context
          * @throws SkipException to mark the action as skipped
          * @throws FailException to mark the action as failed
          * @throws Throwable any other throwable to report as an action failure
          */
-        void execute(Context context) throws Throwable;
+        void run(Context context) throws Throwable;
     }
 }

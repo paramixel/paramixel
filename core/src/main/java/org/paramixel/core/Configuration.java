@@ -26,8 +26,6 @@ import org.paramixel.core.internal.DefaultConfiguration;
  * <p>This utility exposes configuration from classpath resources and JVM system properties, and applies framework
  * defaults when needed.
  *
- * <p>Public API.
- *
  * <p>{@link #defaultProperties()} loads classpath properties first, overlays JVM system properties, and then
  *     applies built-in defaults for any remaining unset keys.
  */
@@ -35,6 +33,9 @@ public class Configuration {
 
     /**
      * The classpath resource name searched for Paramixel configuration.
+     *
+     * <p>The default value is {@code "paramixel.properties"}. When this resource is absent,
+     * classpath properties are empty.
      */
     public static final String CONFIG_FILE_NAME = "paramixel.properties";
 
@@ -84,15 +85,6 @@ public class Configuration {
      * is written. Consumed by listeners in {@link Factory#defaultListener(Map)}.
      */
     public static final String REPORT_FILE = "paramixel.report.file";
-
-    /**
-     * Configuration key formerly used to control the output format of per-run summary report files.
-     *
-     * @deprecated Report format is inferred from {@link #REPORT_FILE}. This compatibility key will
-     *     be removed in a future breaking release.
-     */
-    @Deprecated(since = "3.0.0", forRemoval = true)
-    public static final String REPORT_FORMAT = "paramixel.report.format";
 
     private Configuration() {
         // Intentionally empty

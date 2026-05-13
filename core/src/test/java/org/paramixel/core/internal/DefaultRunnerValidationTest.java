@@ -75,7 +75,7 @@ class DefaultRunnerValidationTest {
     @DisplayName("DefaultRunner with null configuration falls back to default properties")
     void defaultRunnerWithNullConfigurationFallsBack() {
         DefaultRunner runner = new DefaultRunner(null, new Listener() {});
-        Action action = Direct.builder("test").execute(context -> {}).build();
+        Action action = Direct.builder("test").runnable(context -> {}).build();
 
         assertThat(runner.run(action).getStatus().isPass()).isTrue();
         assertThat(runner.getConfiguration()).containsKey(Configuration.RUNNER_PARALLELISM);

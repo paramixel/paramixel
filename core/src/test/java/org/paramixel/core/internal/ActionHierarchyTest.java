@@ -172,12 +172,7 @@ class ActionHierarchyTest {
             }
 
             @Override
-            public Action.ContextMode getContextMode() {
-                return Action.ContextMode.ISOLATED;
-            }
-
-            @Override
-            public Result execute(Context context) {
+            public Result run(Context context) {
                 return Result.pass(this);
             }
 
@@ -195,7 +190,7 @@ class ActionHierarchyTest {
     @Test
     @DisplayName("putIfAbsent semantics: first path wins for same action")
     void putIfAbsentSemanticsFirstPathWins() {
-        Action shared = Direct.builder("shared").execute(ctx -> {}).build();
+        Action shared = Direct.builder("shared").runnable(ctx -> {}).build();
         Action root = Container.builder("root").child(shared).child(shared).build();
 
         try (ActionHierarchy.Scope ignored = ActionHierarchy.install(root)) {

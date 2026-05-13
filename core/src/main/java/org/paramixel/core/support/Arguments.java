@@ -21,8 +21,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * Argument validation methods for non-blank strings, non-empty collections, positive integers, non-negative longs,
- * and conditional requirements.
+ * Validates method arguments by rejecting blank strings, empty collections, non-positive integers, and failed conditions with descriptive exceptions.
  */
 public class Arguments {
 

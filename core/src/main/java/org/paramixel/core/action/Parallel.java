@@ -34,12 +34,12 @@ import org.paramixel.core.internal.SchedulerOverride;
 import org.paramixel.core.support.Arguments;
 
 /**
- * Executes child actions concurrently.
+ * Runs child actions concurrently.
  *
  * <p>Child actions are submitted to Paramixel's scheduler and their concurrency is limited by the configured
  * parallelism.
  *
- * <p>All child actions are always submitted for execution regardless of individual outcomes. The parallel status is
+ * <p>All child actions are always submitted for running regardless of individual outcomes. The parallel status is
  * computed from child results after all children complete: failure takes precedence over skip, and skip takes
  * precedence over pass.
  */
@@ -49,13 +49,8 @@ public final class Parallel extends AbstractAction implements CompositeAction, S
     private final int parallelism;
     private final AsyncScheduler scheduler;
 
-    private Parallel(
-            String name,
-            int parallelism,
-            List<Action> children,
-            Action.ContextMode contextMode,
-            AsyncScheduler scheduler) {
-        super(contextMode);
+    private Parallel(String name, int parallelism, List<Action> children, AsyncScheduler scheduler) {
+        super();
         this.name = validateName(name);
         this.children = validateChildren(children);
         this.parallelism = parallelism;
@@ -99,13 +94,9 @@ public final class Parallel extends AbstractAction implements CompositeAction, S
     @Override
     public Result skip(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
         for (Action child : children) {
-            Result childResult = child.skip(context);
-            result.addChild(childResult);
+            result.addChild(child.skip(context.createChild()));
         }
         result.complete(DefaultStatus.SKIP, Duration.ZERO);
         context.getListener().skipAction(result);
@@ -119,7 +110,6 @@ public final class Parallel extends AbstractAction implements CompositeAction, S
 
         private final String name;
         private final List<Action> children = new ArrayList<>();
-        private Action.ContextMode contextMode = Action.ContextMode.ISOLATED;
         private int parallelism = Integer.MAX_VALUE;
         private AsyncScheduler scheduler;
         private boolean built;
@@ -128,20 +118,6 @@ public final class Parallel extends AbstractAction implements CompositeAction, S
             Objects.requireNonNull(name, "name must not be null");
             Arguments.requireNonBlank(name, "name must not be blank");
             this.name = name;
-        }
-
-        /**
-         * Sets the context mode for this parallel action.
-         *
-         * @param contextMode the context mode applied when this action executes or skips
-         * @return this builder
-         * @throws NullPointerException if {@code contextMode} is {@code null}
-         * @throws IllegalStateException if this builder has already been built
-         */
-        public Builder contextMode(Action.ContextMode contextMode) {
-            ensureNotBuilt();
-            this.contextMode = Objects.requireNonNull(contextMode, "contextMode must not be null");
-            return this;
         }
 
         /**
@@ -200,7 +176,7 @@ public final class Parallel extends AbstractAction implements CompositeAction, S
             ensureNotBuilt();
             built = true;
             Arguments.require(!children.isEmpty(), "children must not be empty");
-            var instance = new Parallel(name, parallelism, List.copyOf(children), contextMode, scheduler);
+            var instance = new Parallel(name, parallelism, List.copyOf(children), scheduler);
             instance.initialize();
             return instance;
         }
@@ -213,11 +189,8 @@ public final class Parallel extends AbstractAction implements CompositeAction, S
     }
 
     @Override
-    public Result execute(Context context) {
+    public Result run(Context context) {
         Objects.requireNonNull(context, "context must not be null");
-        if (contextMode == Action.ContextMode.ISOLATED) {
-            context = context.createChild();
-        }
         var result = new DefaultResult(this);
         var listener = context.getListener();
         listener.beforeAction(result);
@@ -225,7 +198,7 @@ public final class Parallel extends AbstractAction implements CompositeAction, S
 
         try {
             for (Action child : children) {
-                result.addChild(child.execute(context));
+                result.addChild(child.run(context.createChild()));
             }
 
             result.complete(computeStatus(result.getChildren()), Duration.between(start, Instant.now()));

@@ -60,7 +60,7 @@ public class SequentialArgumentTest2 {
 
     private static Action suiteBefore() {
         return Direct.builder("before")
-                .execute(context -> beforeCount.incrementAndGet())
+                .runnable(context -> beforeCount.incrementAndGet())
                 .build();
     }
 
@@ -90,7 +90,7 @@ public class SequentialArgumentTest2 {
 
     private static Action argumentBefore() {
         return Direct.builder("beforeArgument")
-                .execute(context -> {
+                .runnable(context -> {
                     int current = concurrentCount.incrementAndGet();
                     maxConcurrentCount.accumulateAndGet(current, Math::max);
                     beforeArgumentCount.incrementAndGet();
@@ -112,13 +112,13 @@ public class SequentialArgumentTest2 {
 
     private static Action test(String name) {
         return Direct.builder(name)
-                .execute(context -> testCount.incrementAndGet())
+                .runnable(context -> testCount.incrementAndGet())
                 .build();
     }
 
     private static Action argumentAfter() {
         return Direct.builder("afterArgument")
-                .execute(context -> {
+                .runnable(context -> {
                     concurrentCount.decrementAndGet();
                     afterArgumentCount.incrementAndGet();
                 })
@@ -127,7 +127,7 @@ public class SequentialArgumentTest2 {
 
     private static Action suiteAfter() {
         return Direct.builder("after")
-                .execute(context -> {
+                .runnable(context -> {
                     afterCount.incrementAndGet();
                     assertThat(beforeCount.get()).isEqualTo(1);
                     assertThat(beforeArgumentCount.get()).isEqualTo(ARGUMENT_COUNT);

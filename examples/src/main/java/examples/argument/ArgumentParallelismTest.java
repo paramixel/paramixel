@@ -56,19 +56,19 @@ public class ArgumentParallelismTest {
 
     private static Action first() {
         return Direct.builder("arg-0")
-                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .runnable(context -> INVOCATION_COUNT.incrementAndGet())
                 .build();
     }
 
     private static Action second() {
         return Direct.builder("arg-1")
-                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .runnable(context -> INVOCATION_COUNT.incrementAndGet())
                 .build();
     }
 
     private static Action third() {
         return Direct.builder("arg-2")
-                .execute(context -> INVOCATION_COUNT.incrementAndGet())
+                .runnable(context -> INVOCATION_COUNT.incrementAndGet())
                 .build();
     }
 
@@ -82,7 +82,7 @@ public class ArgumentParallelismTest {
 
     private static Action verify() {
         return Direct.builder("verify")
-                .execute(context -> assertThat(INVOCATION_COUNT.get()).isEqualTo(3))
+                .runnable(context -> assertThat(INVOCATION_COUNT.get()).isEqualTo(3))
                 .build();
     }
 }
