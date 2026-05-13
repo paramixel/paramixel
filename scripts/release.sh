@@ -102,7 +102,8 @@ Phases:
                        before pushing. Prints CI wait instructions on
                        completion.
 
-  phase2 <version>    Deploy to Maven Central (Sonatype Central).
+  phase2              Deploy to Maven Central (Sonatype Central).
+                       Must be run on the release/* branch.
 
   phase3              Verify and publish to Maven Central.
                       Prompts for confirmation before the irreversible
@@ -122,13 +123,14 @@ Prerequisites:
   - Maven Central credentials in ~/.m2/settings.xml
   - GPG signing key published to key servers
   - Clean working tree on main for phase1/phase5
+  - On the release/* branch for phase2
   - JAVA_17_HOME set to a JDK 17 installation (phase1, phase6)
   - node, npm, jq, awk on PATH (phase1, for documentation build)
 
 Examples:
 
   ./scripts/release.sh phase1 3.0.1
-  ./scripts/release.sh phase2 3.0.1
+  ./scripts/release.sh phase2
   ./scripts/release.sh phase3
   ./scripts/release.sh phase4 3.0.1
   ./scripts/release.sh phase5 3.0.1
@@ -210,26 +212,18 @@ phase1() {
 }
 
 phase2() {
-    local version="$1"
+    local current_branch
+    current_branch="$(git branch --show-current)"
 
-    validate_version "${version}"
+    if [[ "${current_branch}" != release/* ]]; then
+        fail "Current branch is '${current_branch}', expected a release/* branch. Checkout the release branch before running phase2."
+    fi
 
-    log "Phase 2: Deploying to Maven Central"
+    local version="${current_branch#release/}"
 
-    (
-        cd "${PROJECT_DIR}"
+    log "Phase 2: Deploying version ${version} to Maven Central"
 
-        local current_branch
-        current_branch="$(git branch --show-current)"
-
-        if [[ "${current_branch}" != "release/${version}" ]]; then
-            log "Checking out release/${version}"
-            git checkout "release/${version}"
-        fi
-
-        log "Running Maven deploy with release profile"
-        ./mvnw -Prelease clean deploy
-    )
+    "${MVNW}" -Prelease clean deploy
 
     log "Phase 2 complete: artifacts uploaded to Sonatype Central"
     log "Deployment is pending and not yet published."
@@ -370,8 +364,7 @@ main() {
             phase1 "$1"
             ;;
         phase2)
-            [[ $# -ge 1 ]] || fail "phase2 requires a version argument"
-            phase2 "$1"
+            phase2
             ;;
         phase3)
             phase3

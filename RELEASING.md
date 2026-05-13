@@ -78,10 +78,12 @@ Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets th
 ### Phase 2 — Deploy to Maven Central
 
 ```bash
-./scripts/release.sh phase2 <VERSION>
+./scripts/release.sh phase2
 ```
 
-Checks out the release branch and runs `./mvnw -Prelease clean deploy`. This uploads the artifact bundle to Sonatype Central. Sonatype validates the bundle on upload, but does **not** publish it yet. The deployment remains in a pending state until you explicitly publish it in the next phase.
+Runs `./mvnw -Prelease clean deploy` on the current release branch. This uploads the artifact bundle to Sonatype Central. Sonatype validates the bundle on upload, but does **not** publish it yet. The deployment remains in a pending state until you explicitly publish it in the next phase.
+
+**Prerequisites:** You must already be on the `release/<VERSION>` branch (left there after phase 1).
 
 ### Phase 3 — Verify and publish to Maven Central
 
