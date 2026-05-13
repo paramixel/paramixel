@@ -11,7 +11,7 @@ java {
 }
 
 dependencies {
-    implementation("org.paramixel:core:4.0.0")
+    implementation("org.paramixel:core:4.0.0-POST")
     testImplementation("org.junit.jupiter:junit-jupiter:6.0.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.0.3")
     testImplementation("org.assertj:assertj-core:3.27.7")
