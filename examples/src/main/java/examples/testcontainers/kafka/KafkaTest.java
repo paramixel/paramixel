@@ -170,7 +170,7 @@ public class KafkaTest {
     }
 
     private static Action tearDown(KafkaTestEnvironment environment) {
-        return Direct.builder("after")
+        return Direct.builder("tearDown")
                 .runnable(context -> {
                     LOGGER.info("[%s] destroy test environment ...", environment.name());
 
