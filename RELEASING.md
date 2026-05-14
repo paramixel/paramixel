@@ -2,8 +2,6 @@
 
 This repository publishes artifacts to Maven Central through a manual release process with CI validation.
 
-The release process is automated by `scripts/release.sh`. Run `./scripts/release.sh --help` for usage.
-
 ## Prerequisites
 
 ### Maven Central Credentials
@@ -54,57 +52,107 @@ echo "test" | gpg --batch --clearsign >/dev/null
 
 ## Release Process
 
-### Phase 1 — Prepare the release branch
+### Step 1 — Prepare the release branch
+
+From `main`, create the release branch, set the version, validate the build, then push:
 
 ```bash
-./scripts/release.sh phase1 <VERSION>
+git checkout main
+git pull
+git checkout -b release/<VERSION>
+
+./mvnw versions:set \
+  -DnewVersion=<VERSION> \
+  -DprocessAllModules \
+  -DgenerateBackupPoms=false
+
+./mvnw spotless:apply
+./mvnw clean install
+./gradlew check --no-daemon
+./scripts/build-documentation.sh
+
+git add -A
+git commit -s -m "Release <VERSION>"
+git push -u origin release/<VERSION>
 ```
 
-Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets the version across all modules, applies spotless formatting, commits, runs a full build (`./mvnw -B clean install`) and documentation build (`./scripts/build-documentation.sh`), and pushes the branch only if both succeed. Prints CI wait instructions on completion.
-
-**Prerequisites:** `JAVA_HOME` must point to a JDK 17+ installation. `node`, `npm`, `jq`, and `awk` must be on `PATH` for the documentation build.
-
-**If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch, fix `main`, and start over.
-
-### Phase 2 — Deploy to Maven Central
+**If any command in the build fails:** delete the release branch and fix the issue on `main`:
 
 ```bash
-./scripts/release.sh phase2
+git checkout main
+git branch -D release/<VERSION>
 ```
 
-Runs `./mvnw -Prelease clean deploy` on the current release branch. This uploads the artifact bundle to Sonatype Central. Sonatype validates the bundle on upload, but does **not** publish it yet. The deployment remains in a pending state until you explicitly publish it in the next phase.
+Fix the issue on `main`, then start over from Step 1.
 
-**Prerequisites:** You must already be on the `release/<VERSION>` branch (left there after phase 1).
+### Step 2 — Wait for CI to pass
 
-### Phase 3 — Verify and publish to Maven Central
+CI runs automatically on the release branch. Wait for all jobs to pass before proceeding.
+
+See: [GitHub Actions](https://github.com/paramixel/paramixel-private/actions)
+
+**If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch (local and remote), fix `main`, and start over:
 
 ```bash
-./scripts/release.sh phase3
+git push origin --delete release/<VERSION>
+git branch -D release/<VERSION>
 ```
 
-> **Maven Central releases are immutable and cannot be undone or overwritten.** Before proceeding, verify the deployment at [Sonatype Central](https://central.sonatype.com):
->
-> - Confirm the version number is correct
-> - Confirm the artifacts (JAR, sources, javadoc, POM) are present and valid
-> - Confirm GPG signatures are present
+### Step 3 — Deploy to Maven Central
 
-Prompts for confirmation, then runs `./mvnw -Prelease central-publishing:publish` to publish the deployment.
-
-### Phase 4 — Tag the release
+Once CI is green, deploy the release artifacts to Sonatype Central. The deployment remains in a pending state until you explicitly publish it in the next step.
 
 ```bash
-./scripts/release.sh phase4 <VERSION>
+# Ensure you are on the release branch
+git checkout release/<VERSION>
+
+./mvnw -Prelease clean deploy
 ```
 
-Creates an annotated tag `v<VERSION>` and pushes it to origin.
+### Step 4 — Verify and publish to Maven Central
 
-### Phase 5 — Bump main to the next development version
+> **Maven Central releases are immutable and cannot be undone or overwritten.**
+
+Before proceeding, verify the deployment at [Sonatype Central](https://central.sonatype.com):
+
+- Confirm the version number is correct
+- Confirm the artifacts (JAR, sources, javadoc, POM) are present and valid
+- Confirm GPG signatures are present
+
+Once verified, publish the deployment:
 
 ```bash
-./scripts/release.sh phase5 <VERSION>
+./mvnw -Prelease central-publishing:publish
 ```
 
-Checks out `main`, pulls latest, sets the version to `<VERSION>-POST` across all modules, applies spotless formatting, runs `./mvnw clean install`, commits, and pushes.
+### Step 5 — Tag the release
+
+After a successful publish, create and push the tag:
+
+```bash
+git tag -a v<VERSION> -m "Release <VERSION>"
+git push origin v<VERSION>
+```
+
+### Step 6 — Bump main to the next development version
+
+```bash
+git checkout main
+git pull
+
+./mvnw versions:set \
+  -DnewVersion=<VERSION>-POST \
+  -DprocessAllModules \
+  -DgenerateBackupPoms=false
+
+./mvnw spotless:apply
+./mvnw clean install
+./gradlew check --no-daemon
+
+git add -A
+git commit -s -m "Prepare for development"
+git push
+```
 
 ## Troubleshooting
 
