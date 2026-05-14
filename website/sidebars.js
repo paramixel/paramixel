@@ -19,7 +19,7 @@ const sidebars = {
         'usage/cleanup',
         'usage/retry',
         'usage/maven-plugin',
-        'usage/gradle-plugin',
+        'usage/gradle',
         'usage/integration-testing',
         'usage/discovery',
 

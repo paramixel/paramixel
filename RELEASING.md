@@ -1,6 +1,6 @@
 # Releasing Paramixel
 
-This repository publishes artifacts to Maven Central and the Gradle Plugin Portal through a manual release process with CI validation.
+This repository publishes artifacts to Maven Central through a manual release process with CI validation.
 
 The release process is automated by `scripts/release.sh`. Run `./scripts/release.sh --help` for usage.
 
@@ -44,15 +44,6 @@ gpg --keyserver pgp.mit.edu --send-keys XXXXXXXXXXXXXXXX
 echo "test" | gpg --batch --clearsign >/dev/null
 ```
 
-### Gradle Plugin Portal Credentials
-
-Publishing the Gradle plugin requires credentials for the Gradle Plugin Portal. Set the following environment variables or Gradle properties:
-
-```bash
-export GRADLE_PUBLISH_KEY=YOUR_KEY
-export GRADLE_PUBLISH_SECRET=YOUR_SECRET
-```
-
 ## Conventions
 
 - Release tag: `v<VERSION>`
@@ -66,12 +57,12 @@ export GRADLE_PUBLISH_SECRET=YOUR_SECRET
 ### Phase 1 — Prepare the release branch
 
 ```bash
-JAVA_17_HOME=/path/to/jdk17 ./scripts/release.sh phase1 <VERSION>
+./scripts/release.sh phase1 <VERSION>
 ```
 
-Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets the version across all modules, applies spotless formatting, commits, runs a full build (`./scripts/build.sh`) and documentation build (`./scripts/build-documentation.sh`), and pushes the branch only if both succeed. Prints CI wait instructions on completion.
+Checks out `main`, pulls latest, creates the `release/<VERSION>` branch, sets the version across all modules, applies spotless formatting, commits, runs a full build (`./mvnw -B clean install`) and documentation build (`./scripts/build-documentation.sh`), and pushes the branch only if both succeed. Prints CI wait instructions on completion.
 
-**Prerequisites:** `JAVA_17_HOME` must point to a JDK 17 installation. `node`, `npm`, `jq`, and `awk` must be on `PATH` for the documentation build.
+**Prerequisites:** `JAVA_HOME` must point to a JDK 17+ installation. `node`, `npm`, `jq`, and `awk` must be on `PATH` for the documentation build.
 
 **If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch, fix `main`, and start over.
 
@@ -114,21 +105,6 @@ Creates an annotated tag `v<VERSION>` and pushes it to origin.
 ```
 
 Checks out `main`, pulls latest, sets the version to `<VERSION>-POST` across all modules, applies spotless formatting, runs `./mvnw clean install`, commits, and pushes.
-
-### Phase 6 — Publish the Gradle plugin
-
-This phase is not yet automated. Publish the Gradle plugin to the Gradle Plugin Portal manually:
-
-```bash
-JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh gradle-plugin
-
-cd gradle-plugin
-GRADLE_PUBLISH_KEY=YOUR_KEY \
-GRADLE_PUBLISH_SECRET=YOUR_SECRET \
-JAVA_HOME="$JAVA_17_HOME" \
-  ./gradlew publishPlugins --no-daemon
-cd ..
-```
 
 ## Troubleshooting
 

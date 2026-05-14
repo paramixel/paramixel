@@ -48,7 +48,7 @@ jobs:
         run: ./mvnw spotless:check
 
       - name: Build and Test
-        run: ./scripts/build.sh maven --skip-static-analysis
+        run: ./mvnw -B clean install -Dspotbugs.skip=true -Dpmd.skip=true
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -66,7 +66,6 @@ jobs:
     runs-on:
       group: Default
       labels: runner
-    needs: build-java-25
 
     env:
       JAVA_VERSION: 21
@@ -103,7 +102,7 @@ jobs:
         run: ./mvnw spotless:check
 
       - name: Build and Test
-        run: ./scripts/build.sh maven
+        run: ./mvnw -B clean install
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -121,7 +120,6 @@ jobs:
     runs-on:
       group: Default
       labels: runner
-    needs: build-java-21
 
     env:
       JAVA_VERSION: 17
@@ -158,7 +156,7 @@ jobs:
         run: ./mvnw spotless:check
 
       - name: Build and Test
-        run: ./scripts/build.sh maven
+        run: ./mvnw -B clean install
         env:
           MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
 
@@ -171,3 +169,33 @@ jobs:
           echo "Testing complete for: $RUNNER_DESCRIPTION"
           echo "Java version used: $JAVA_VERSION"
 
+  gradle-java-17:
+    name: Build and Test (Java 17 / Gradle)
+    runs-on:
+      group: Default
+      labels: runner
+
+    env:
+      JAVA_VERSION: 17
+      RUNNER_DESCRIPTION: "Java 17 Gradle Build"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: corretto
+
+      - name: Verify Java Runtime
+        run: |
+          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
+          java -version
+          javac -version
+
+      - name: Build and Test (Gradle)
+        run: ./gradlew check --no-daemon
+        env:
+          GRADLE_OPTS: "-Xmx2g -XX:+UseG1GC"

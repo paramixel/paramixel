@@ -41,20 +41,6 @@ require_maven_settings() {
     grep -q '<id>central</id>' "${settings_file}" || fail "Maven settings at ${settings_file} does not contain a <server> with <id>central</id>. See RELEASING.md for setup instructions."
 }
 
-require_java_17_home() {
-    if [[ -z "${JAVA_17_HOME:-}" ]]; then
-        fail "JAVA_17_HOME is not set. Set JAVA_17_HOME to a JDK 17 installation directory."
-    fi
-
-    if [[ ! -d "${JAVA_17_HOME}" ]]; then
-        fail "JAVA_17_HOME directory does not exist: ${JAVA_17_HOME}"
-    fi
-
-    if [[ ! -x "${JAVA_17_HOME}/bin/java" ]]; then
-        fail "JAVA_17_HOME/bin/java not executable: ${JAVA_17_HOME}/bin/java"
-    fi
-}
-
 require_build_documentation_deps() {
     local missing=""
 
@@ -67,11 +53,6 @@ require_build_documentation_deps() {
     if [[ -n "${missing}" ]]; then
         fail "Missing required commands for documentation build: ${missing}. Install them before running phase1."
     fi
-}
-
-require_gradle_credentials() {
-    [[ -n "${GRADLE_PUBLISH_KEY:-}" ]] || fail "GRADLE_PUBLISH_KEY is not set"
-    [[ -n "${GRADLE_PUBLISH_SECRET:-}" ]] || fail "GRADLE_PUBLISH_SECRET is not set"
 }
 
 confirm() {
@@ -124,7 +105,6 @@ Prerequisites:
   - GPG signing key published to key servers
   - Clean working tree on main for phase1/phase5
   - On the release/* branch for phase2
-  - JAVA_17_HOME set to a JDK 17 installation (phase1, phase6)
   - node, npm, jq, awk on PATH (phase1, for documentation build)
 
 Examples:
@@ -151,7 +131,6 @@ phase1() {
     local version="$1"
 
     validate_version "${version}"
-    require_java_17_home
     require_build_documentation_deps
 
     log "Phase 1: Preparing release branch for version ${version}"
@@ -182,15 +161,12 @@ phase1() {
         log "Applying spotless formatting"
         ./mvnw spotless:apply
 
-        log "Syncing Gradle plugin version"
-        "${SCRIPT_DIR}/build.sh" sync-gradle-version
-
         log "Committing release"
         git add -A
         git commit -s -m "Release ${version}"
 
         log "Running full build"
-        "${SCRIPT_DIR}/build.sh"
+        ./mvnw -B clean install
 
         log "Building documentation"
         "${SCRIPT_DIR}/build-documentation.sh"
@@ -301,9 +277,6 @@ phase5() {
         log "Applying spotless formatting"
         ./mvnw spotless:apply
 
-        log "Syncing Gradle plugin version"
-        "${SCRIPT_DIR}/build.sh" sync-gradle-version
-
         log "Running clean install"
         ./mvnw clean install
 
@@ -316,34 +289,6 @@ phase5() {
     )
 
     log "Phase 5 complete: main bumped to ${post_version}"
-}
-
-# DISABLED: Publish the Gradle plugin to the Gradle Plugin Portal.
-# Re-enable by adding "phase6" to the case statement and usage text.
-publish_gradle_plugin() {
-    local java_17_home="$1"
-
-    [[ -d "${java_17_home}" ]] || fail "JAVA_17_HOME directory does not exist: ${java_17_home}"
-    [[ -x "${java_17_home}/bin/java" ]] || fail "JAVA_17_HOME/bin/java not executable: ${java_17_home}/bin/java"
-
-    require_gradle_credentials
-
-    log "Publishing Gradle plugin to Gradle Plugin Portal"
-
-    (
-        cd "${PROJECT_DIR}"
-        JAVA_17_HOME="${java_17_home}" "${SCRIPT_DIR}/build.sh" gradle-plugin
-    )
-
-    (
-        cd "${PROJECT_DIR}/gradle-plugin"
-        GRADLE_PUBLISH_KEY="${GRADLE_PUBLISH_KEY}" \
-        GRADLE_PUBLISH_SECRET="${GRADLE_PUBLISH_SECRET}" \
-        JAVA_HOME="${java_17_home}" \
-            ./gradlew publishPlugins --no-daemon
-    )
-
-    log "Gradle plugin published to Gradle Plugin Portal"
 }
 
 main() {

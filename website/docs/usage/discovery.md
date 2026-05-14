@@ -254,4 +254,4 @@ Action root = Resolver.resolveActions(selector).orElseThrow();
 Result result = Runner.builder().build().run(root);
 ```
 
-With Maven plugin, discovered factories run automatically during the `test` phase.
+With Maven plugin, discovered factories run automatically during the `test` phase. With Gradle, `Runner.main()` discovers and executes factories from the test classpath.

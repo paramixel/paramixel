@@ -111,6 +111,59 @@ To also write a per-run summary file:
 
 The file extension controls the report format: `.log` and `.txt` write text, `.json` writes JSON, `.xml` writes XML, and `.html` writes a self-contained HTML report.
 
+## Run with Gradle
+
+Register a `JavaExec` task that compiles core and examples from source:
+
+```groovy
+plugins {
+    id 'java'
+}
+
+sourceSets {
+    paramixel {
+        java {
+            srcDir 'core/src/main/java'
+            srcDir 'examples/src/main/java'
+        }
+        resources {
+            srcDir 'core/src/main/resources'
+            srcDir 'examples/src/main/resources'
+        }
+    }
+}
+
+dependencies {
+    paramixelImplementation 'io.github.classgraph:classgraph:4.8.184'
+    // add other dependencies required by your tests
+}
+
+tasks.register('paramixelTest', JavaExec) {
+    dependsOn 'paramixelClasses'
+    group = 'verification'
+    mainClass = 'org.paramixel.core.Runner'
+    classpath = sourceSets.paramixel.runtimeClasspath
+}
+
+tasks.named('check').configure {
+    dependsOn 'paramixelTest'
+}
+```
+
+Run:
+
+```bash
+./gradlew paramixelTest
+```
+
+`Runner.main()` discovers `@Paramixel.ActionFactory` methods on the classpath and executes the returned actions. To write a per-run summary file:
+
+```bash
+./gradlew paramixelTest -Dparamixel.report.file=build/paramixel/paramixel.json
+```
+
+See [Gradle](usage/gradle.md) for the full system property reference and advanced configuration.
+
 ## Run directly from `main`
 
 The `ExampleTest` class above includes a `main` method for direct execution.
