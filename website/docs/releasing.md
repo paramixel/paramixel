@@ -72,7 +72,7 @@ git checkout -b release/<VERSION>
 
 ./mvnw spotless:apply
 ./mvnw clean install
-./gradlew check --no-daemon
+./gradlew clean check --no-daemon
 ./scripts/build-documentation.sh
 
 git add -A
@@ -151,7 +151,7 @@ git pull
 
 ./mvnw spotless:apply
 ./mvnw clean install
-./gradlew check --no-daemon
+./gradlew clean check --no-daemon
 
 git add -A
 git commit -s -m "Prepare for development"
