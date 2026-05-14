@@ -30,7 +30,7 @@ java_pid*.hprof
 pom.xml.releaseBackup
 release.properties
 **/.flattened-pom.xml
-.opencode/plans/
+.opencode/
 stress-test.log
 .DS_Store
 website/.DS_Store

@@ -34,9 +34,9 @@ We welcome feature suggestions! Please create an issue with:
    ```
 3. Make your changes
 4. Run tests to ensure all tests pass:
-   ```bash
-   JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh
-   ```
+    ```bash
+    ./mvnw clean install
+    ```
 5. Commit your changes with a clear commit message
 6. Push to your fork and submit a pull request
 
@@ -46,7 +46,6 @@ We welcome feature suggestions! Please create an issue with:
 
 - Java 17 or higher
 - Maven 3.9+
-- `JAVA_17_HOME` set to a JDK 17 installation for the full repository build
 
 ### Building the Project
 
@@ -55,11 +54,8 @@ We welcome feature suggestions! Please create an issue with:
 git clone https://github.com/paramixel/paramixel.git
 cd paramixel
 
-# Build Maven project and Gradle plugin
-JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh
-
-# Build Maven project only
-./scripts/build.sh maven
+# Build and install
+./mvnw clean install
 ```
 
 ### Project Structure

@@ -86,6 +86,15 @@ public class Configuration {
      */
     public static final String REPORT_FILE = "paramixel.report.file";
 
+    /**
+     * Configuration key controlling whether the absence of discovered action factories should produce a failing exit
+     * code.
+     *
+     * <p>The value is interpreted with {@link Boolean#parseBoolean(String)}. When {@code true}, {@link Runner#main}
+     * exits with code {@code 1} when no action factories are discovered.
+     */
+    public static final String FAIL_IF_NO_TESTS = "paramixel.failIfNoTests";
+
     private Configuration() {
         // Intentionally empty
     }

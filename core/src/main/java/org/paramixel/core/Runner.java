@@ -241,4 +241,27 @@ public interface Runner extends AutoCloseable {
             }
         }
     }
+
+    static void main(String[] args) {
+        Map<String, String> configuration = Configuration.defaultProperties();
+        Optional<Action> optionalAction = Resolver.resolveActions(configuration);
+
+        if (optionalAction.isEmpty()) {
+            boolean failIfNoTests =
+                    Boolean.parseBoolean(configuration.getOrDefault(Configuration.FAIL_IF_NO_TESTS, "false"));
+            if (failIfNoTests) {
+                System.err.println("No Paramixel tests found");
+                System.exit(1);
+            }
+            System.out.println("No Paramixel tests found.");
+            System.exit(0);
+        }
+
+        try (Runner runner = Runner.builder()
+                .configuration(configuration)
+                .listener(Factory.defaultListener(configuration))
+                .build()) {
+            runner.runAndExit(optionalAction.get());
+        }
+    }
 }

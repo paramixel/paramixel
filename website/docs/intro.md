@@ -83,6 +83,10 @@ Factory.defaultRunner().runAndExit(action);
 
 Use the Paramixel Maven plugin. It discovers `@Paramixel.ActionFactory` methods on the test classpath and runs them during the `test` phase.
 
+### With Gradle
+
+Use `Runner.main()` with a `JavaExec` task. It discovers `@Paramixel.ActionFactory` methods on the test classpath and executes the returned actions.
+
 ## Built-in actions
 
 - `Direct` - run a callback

@@ -1,6 +1,6 @@
 ---
 title: Releasing
-description: How to release Paramixel to Maven Central and the Gradle Plugin Portal.
+description: How to release Paramixel to Maven Central.
 ---
 
 # Releasing
@@ -44,15 +44,6 @@ gpg --keyserver pgp.mit.edu --send-keys XXXXXXXXXXXXXXXX
 
 # Verify signing works
 echo "test" | gpg --batch --clearsign >/dev/null
-```
-
-### Gradle Plugin Portal credentials
-
-Publishing the Gradle plugin requires credentials for the Gradle Plugin Portal:
-
-```bash
-export GRADLE_PUBLISH_KEY=YOUR_KEY
-export GRADLE_PUBLISH_SECRET=YOUR_SECRET
 ```
 
 ## Conventions
@@ -111,21 +102,6 @@ Creates an annotated tag `v<VERSION>` and pushes it to origin.
 ```
 
 Checks out `main`, pulls latest, sets the version to `<VERSION>-POST` across all modules, applies spotless formatting, runs `./mvnw clean install`, commits, and pushes.
-
-### Phase 6 — Publish the Gradle plugin
-
-This phase is not yet automated. Publish the Gradle plugin to the Gradle Plugin Portal manually:
-
-```bash
-JAVA_17_HOME=/path/to/jdk17 ./scripts/build.sh gradle-plugin
-
-cd gradle-plugin
-GRADLE_PUBLISH_KEY=YOUR_KEY \
-GRADLE_PUBLISH_SECRET=YOUR_SECRET \
-JAVA_HOME="$JAVA_17_HOME" \
-  ./gradlew publishPlugins --no-daemon
-cd ..
-```
 
 ## Troubleshooting
 

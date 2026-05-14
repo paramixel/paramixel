@@ -1,0 +1,50 @@
+plugins {
+    id 'java'
+}
+
+sourceSets {
+    paramixel {
+        java {
+            srcDir 'core/src/main/java'
+            srcDir 'examples/src/main/java'
+        }
+        resources {
+            srcDir 'core/src/main/resources'
+            srcDir 'examples/src/main/resources'
+        }
+    }
+}
+
+dependencies {
+    paramixelImplementation 'io.github.classgraph:classgraph:4.8.184'
+    paramixelImplementation 'org.apache.commons:commons-compress:1.28.0'
+    paramixelImplementation 'org.apache.kafka:kafka-clients:4.2.0'
+    paramixelImplementation 'org.assertj:assertj-core:3.27.7'
+    paramixelImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    paramixelImplementation 'org.mongodb:mongodb-driver-sync:5.7.0'
+    paramixelImplementation 'org.slf4j:slf4j-nop:2.0.18'
+    paramixelImplementation 'org.testcontainers:kafka:1.21.4'
+    paramixelImplementation 'org.testcontainers:mongodb:1.21.4'
+    paramixelImplementation 'org.testcontainers:nginx:1.21.4'
+    paramixelImplementation 'org.testcontainers:testcontainers:2.0.5'
+}
+
+tasks.register('paramixelTest', JavaExec) {
+    dependsOn 'paramixelClasses'
+    group = 'verification'
+    description = 'Discovers and executes Paramixel action trees'
+    mainClass = 'org.paramixel.core.Runner'
+    classpath = sourceSets.paramixel.runtimeClasspath
+}
+
+tasks.named('build').configure {
+    dependsOn 'paramixelClasses'
+}
+
+tasks.named('test').configure {
+    dependsOn 'paramixelTest'
+}
+
+tasks.named('check').configure {
+    dependsOn 'paramixelTest'
+}

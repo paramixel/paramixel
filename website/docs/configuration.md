@@ -51,9 +51,9 @@ paramixel.failureOnSkip=true
 Notes:
 
 - Default is `false`. When `false`, SKIP produces exit code `0` (same as PASS). When `true`, SKIP produces exit code `1` (same as FAIL).
-- This affects `Runner.runAndReturnExitCode(Action)`, `Runner.runAndReturnExitCode(Selector)`, the Maven plugin, and the Gradle plugin.
+- This affects `Runner.runAndReturnExitCode(Action)`, `Runner.runAndReturnExitCode(Selector)`, the Maven plugin, and `Runner.main()`.
 - In the Maven plugin, this corresponds to the `<failureOnSkip>` POM parameter or `-Dparamixel.failureOnSkip=true` system property.
-- In the Gradle plugin, this corresponds to `failureOnSkip.set(true)`, `-Pparamixel.failureOnSkip=true`, or `-Dparamixel.failureOnSkip=true`.
+- With `Runner.main()`, set `-Dparamixel.failureOnSkip=true`.
 
 ### `paramixel.report.file`
 
@@ -109,6 +109,19 @@ paramixel.match.tag=smoke
 ```
 
 When set, only action factories annotated with a matching `@Paramixel.Tag` are included. Uses `Pattern.matcher().find()` (substring match). For exact match, anchor with `^...$`.
+
+### `paramixel.failIfNoTests`
+
+Controls whether the absence of discovered action factories should produce a failing exit code.
+
+```properties
+paramixel.failIfNoTests=true
+```
+
+Notes:
+
+- Default is `false`. When `false`, `Runner.main()` prints a message and exits with code `0` when no action factories are discovered. When `true`, it exits with code `1`.
+- This is read by `Runner.main()`. In the Maven plugin, the same behavior is controlled by the `<failIfNoTests>` POM parameter.
 
 ## Accessing configuration inside actions
 
@@ -203,34 +216,36 @@ Plugin flags:
 ./mvnw test -Dparamixel.report.file=target/paramixel/paramixel.json
 ```
 
-`paramixel.skipTests` and `paramixel.failIfNoTests` are Maven plugin parameters, not core `Configuration` keys.
+`paramixel.skipTests` and `paramixel.failIfNoTests` are Maven plugin parameters. `paramixel.failIfNoTests` is also a core `Configuration` key used by `Runner.main()`.
 
-## Gradle plugin configuration
+## Gradle configuration
 
-The Gradle plugin exposes first-class DSL properties for common configuration keys.
+When using `Runner.main()` with a Gradle `JavaExec` task, configuration is set via JVM system properties.
 
-Precedence in the plugin is:
+Precedence:
 
 1. classpath `paramixel.properties` plus built-in defaults
-2. DSL extension / task properties (only when `Property.isPresent()` is true)
-3. explicit Gradle provider properties (`-Dparamixel.*` over `-Pparamixel.*`)
+2. JVM system properties (`-Dparamixel.*`)
 
-Example:
+Example `JavaExec` task:
 
-```kotlin
-paramixel {
-    parallelism.set(4)
-    matchTag.set("smoke")
-    reportFile.set(layout.buildDirectory.file("paramixel/paramixel.json").map { it.asFile.absolutePath })
+```groovy
+tasks.register('paramixelTest', JavaExec) {
+    dependsOn 'testClasses'
+    mainClass = 'org.paramixel.core.Runner'
+    classpath = sourceSets.test.runtimeClasspath
+    systemProperty('paramixel.parallelism', '4')
+    systemProperty('paramixel.match.tag', 'smoke')
+    systemProperty('paramixel.report.file', layout.buildDirectory.file('paramixel/paramixel.json').get().asFile.absolutePath)
 }
 ```
 
-CLI flags:
+CLI:
 
 ```bash
-./gradlew paramixelTest -Pparamixel.parallelism=8
-./gradlew paramixelTest -Pparamixel.match.tag=smoke
-./gradlew paramixelTest -Pparamixel.report.file=build/paramixel/paramixel.json
+./gradlew paramixelTest -Dparamixel.parallelism=8
+./gradlew paramixelTest -Dparamixel.match.tag=smoke
+./gradlew paramixelTest -Dparamixel.report.file=build/paramixel/paramixel.json
 ```
 
-See [Gradle Plugin](usage/gradle-plugin.md) for the full DSL property reference.
+See [Gradle](usage/gradle.md) for the full system property reference.

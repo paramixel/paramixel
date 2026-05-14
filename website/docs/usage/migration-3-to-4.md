@@ -21,15 +21,28 @@ Most tests built from `Container`, `Parallel`, `Direct`, and `Noop` only need de
 
 ### Gradle
 
-```kotlin
+The Paramixel Gradle plugin has been removed. Use `Runner.main()` with a Gradle `JavaExec` task instead:
+
+```groovy
 plugins {
-    id("org.paramixel") version "4.0.0"
+    id 'java'
 }
 
 dependencies {
-    testImplementation("org.paramixel:core:4.0.0")
+    testImplementation 'org.paramixel:core:4.0.0'
+}
+
+tasks.register('paramixelTest', JavaExec) {
+    dependsOn 'testClasses'
+    group = 'verification'
+    mainClass = 'org.paramixel.core.Runner'
+    classpath = sourceSets.test.runtimeClasspath
 }
 ```
+
+Configure via JVM system properties: `-Dparamixel.parallelism=8`, `-Dparamixel.match.tag=smoke`, etc.
+
+See [Gradle](usage/gradle.md) for details.
 
 ## Runner lifecycle
 
