@@ -2,6 +2,8 @@ plugins {
     id 'java'
 }
 
+version = (file('pom.xml').text =~ /<version>([^<]+)<\/version>/)[0][1]
+
 sourceSets {
     paramixel {
         java {
@@ -27,6 +29,12 @@ dependencies {
     paramixelImplementation 'org.testcontainers:mongodb:1.21.4'
     paramixelImplementation 'org.testcontainers:nginx:1.21.4'
     paramixelImplementation 'org.testcontainers:testcontainers:2.0.5'
+}
+
+tasks.named('processParamixelResources') {
+    filesMatching('version.properties') {
+        expand(project: [version: project.version])
+    }
 }
 
 tasks.register('paramixelTest', JavaExec) {
