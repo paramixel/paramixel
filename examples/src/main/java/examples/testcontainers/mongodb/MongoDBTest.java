@@ -105,7 +105,7 @@ public class MongoDBTest {
     }
 
     private static Action tearDown(MongoDBTestEnvironment environment) {
-        return Direct.builder("after")
+        return Direct.builder("tearDown")
                 .runnable(context -> {
                     LOGGER.info("[%s] destroy test environment ...", environment.name());
 
