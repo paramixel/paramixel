@@ -200,8 +200,8 @@ validate_internal_links() {
         while IFS= read -r link; do
             [[ -z "$link" ]] && continue
 
-            if [[ "$link" =~ ^/docs/ ]]; then
-                target="${DOCS_DIR}/${link#/docs/}"
+            if [[ "$link" =~ ^/[^/]+ ]]; then
+                target="${DOCS_DIR}/${link#/}"
             elif [[ "$link" =~ ^\.\./ ]]; then
                 target="$(dirname "$file")/${link}"
             elif [[ "$link" =~ ^\./ ]]; then
@@ -218,7 +218,7 @@ validate_internal_links() {
                     ((issues++)) || true
                 fi
             fi
-        done < <(grep -oE '\]\([^)]+\)' "$file" 2>/dev/null | sed 's/](\(.*\))/\1/' | grep -E '^/docs/|^\.\./|^\./' || true)
+        done < <(grep -oE '\]\([^)]+\)' "$file" 2>/dev/null | sed 's/](\(.*\))/\1/' | grep -E '^/[^/]+|^\.\./|^\./' || true)
     done < <(find "$DOCS_DIR" -type f \( -name "*.md" -o -name "*.mdx" \) -print0)
 
     if [[ -n "$broken_links" ]]; then

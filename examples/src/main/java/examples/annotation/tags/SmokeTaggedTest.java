@@ -16,19 +16,32 @@
 
 package examples.annotation.tags;
 
-import org.paramixel.core.Action;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Noop;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Spec;
 
-public final class SmokeTaggedTest {
+/**
+ * Example test class annotated with {@code @Paramixel.Tag("smoke")} to demonstrate
+ * tag-based test selection.
+ */
+public class SmokeTaggedTest {
 
-    private SmokeTaggedTest() {
+    /**
+     * Returns a no-op action tagged as {@code "smoke"}.
+     *
+     * @return a no-op action
+     */
+    @Paramixel.Factory
+    @Paramixel.Tag("smoke")
+    public static Spec<?> factory() {
+        return Instance.of("SmokeTaggedTest", SmokeTaggedTest::new).child("test()", SmokeTaggedTest::test);
+    }
+
+    public SmokeTaggedTest() {
         // Intentionally empty
     }
 
-    @Paramixel.ActionFactory
-    @Paramixel.Tag("smoke")
-    public static Action actionFactory() {
-        return Noop.of("SmokeTaggedTest");
+    public void test() {
+        // Intentionally empty
     }
 }

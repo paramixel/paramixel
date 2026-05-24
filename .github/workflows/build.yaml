@@ -9,114 +9,6 @@ on:
     branches: ["main"]
 
 jobs:
-  build-java-25:
-    name: Build and Test (Java 25)
-    runs-on:
-      group: Default
-      labels: runner
-
-    env:
-      JAVA_VERSION: 25
-      RUNNER_DESCRIPTION: "Java 25 Compatibility Test"
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v5
-        with:
-          java-version: 25
-          distribution: corretto
-
-      - name: Cache Maven local repository
-        uses: actions/cache@v5
-        with:
-          path: ~/.m2/repository
-          key: maven-local-repo-${{ runner.os }}-java25-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-25.txt') }}
-          restore-keys: |
-            maven-local-repo-${{ runner.os }}-java25-
-
-      - name: Clean Maven Wrapper Distributions
-        run: rm -rf ~/.m2/wrapper/dists/
-
-      - name: Verify Java Runtime
-        run: |
-          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
-          java -version
-          javac -version
-
-      - name: Verify formatting and license headers
-        run: ./mvnw spotless:check
-
-      - name: Build and Test
-        run: ./mvnw -B clean install -Dspotbugs.skip=true -Dpmd.skip=true
-        env:
-          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
-
-      - name: Verify Compatibility
-        run: |
-          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
-
-      - name: Verify Threading Mode
-        run: |
-          echo "Testing complete for: $RUNNER_DESCRIPTION"
-          echo "Java version used: $JAVA_VERSION"
-
-  build-java-21:
-    name: Build and Test (Java 21)
-    runs-on:
-      group: Default
-      labels: runner
-
-    env:
-      JAVA_VERSION: 21
-      RUNNER_DESCRIPTION: "Java 21 Compatibility Test"
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
-        with:
-          java-version: 21
-          distribution: corretto
-
-      - name: Cache Maven local repository
-        uses: actions/cache@v5
-        with:
-          path: ~/.m2/repository
-          key: maven-local-repo-${{ runner.os }}-java21-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-21.txt') }}
-          restore-keys: |
-            maven-local-repo-${{ runner.os }}-java21-
-
-      - name: Clean Maven Wrapper Distributions
-        run: rm -rf ~/.m2/wrapper/dists/
-
-      - name: Verify Java Runtime
-        run: |
-          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
-          java -version
-          javac -version
-
-      - name: Verify formatting and license headers
-        run: ./mvnw spotless:check
-
-      - name: Build and Test
-        run: ./mvnw -B clean install
-        env:
-          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
-
-      - name: Verify Compatibility
-        run: |
-          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
-
-      - name: Verify Threading Mode
-        run: |
-          echo "Testing complete for: $RUNNER_DESCRIPTION"
-          echo "Java version used: $JAVA_VERSION"
-
   build-java-17:
     name: Build and Test (Java 17)
     runs-on:
@@ -171,8 +63,119 @@ jobs:
           echo "Testing complete for: $RUNNER_DESCRIPTION"
           echo "Java version used: $JAVA_VERSION"
 
+  build-java-21:
+    name: Build and Test (Java 21)
+    needs: build-java-17
+    runs-on:
+      group: Default
+      labels: runner
+
+    env:
+      JAVA_VERSION: 21
+      RUNNER_DESCRIPTION: "Java 21 Compatibility Test"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: corretto
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: maven-local-repo-${{ runner.os }}-java21-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-21.txt') }}
+          restore-keys: |
+            maven-local-repo-${{ runner.os }}-java21-
+
+      - name: Clean Maven Wrapper Distributions
+        run: rm -rf ~/.m2/wrapper/dists/
+
+      - name: Verify Java Runtime
+        run: |
+          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
+          java -version
+          javac -version
+
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
+
+      - name: Build and Test
+        run: ./mvnw -B clean install
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
+
+      - name: Verify Compatibility
+        run: |
+          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
+
+      - name: Verify Threading Mode
+        run: |
+          echo "Testing complete for: $RUNNER_DESCRIPTION"
+          echo "Java version used: $JAVA_VERSION"
+
+  build-java-25:
+    name: Build and Test (Java 25)
+    needs: build-java-21
+    runs-on:
+      group: Default
+      labels: runner
+
+    env:
+      JAVA_VERSION: 25
+      RUNNER_DESCRIPTION: "Java 25 Compatibility Test"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: 25
+          distribution: corretto
+
+      - name: Cache Maven local repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: maven-local-repo-${{ runner.os }}-java25-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-25.txt') }}
+          restore-keys: |
+            maven-local-repo-${{ runner.os }}-java25-
+
+      - name: Clean Maven Wrapper Distributions
+        run: rm -rf ~/.m2/wrapper/dists/
+
+      - name: Verify Java Runtime
+        run: |
+          echo "Running with Java $JAVA_VERSION - $RUNNER_DESCRIPTION"
+          java -version
+          javac -version
+
+      - name: Verify formatting and license headers
+        run: ./mvnw spotless:check
+
+      - name: Build and Test
+        run: ./mvnw -B clean install -Dspotbugs.skip=true -Dpmd.skip=true
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
+
+      - name: Verify Compatibility
+        run: |
+          echo "Java $JAVA_VERSION - $RUNNER_DESCRIPTION: Compatibility verified"
+
+      - name: Verify Threading Mode
+        run: |
+          echo "Testing complete for: $RUNNER_DESCRIPTION"
+          echo "Java version used: $JAVA_VERSION"
+
   gradle-java-17:
     name: Build and Test (Java 17 / Gradle)
+    needs: build-java-25
     runs-on:
       group: Default
       labels: runner
@@ -190,6 +193,7 @@ jobs:
         with:
           java-version: 17
           distribution: corretto
+          cache: 'gradle'
 
       - name: Verify Java Runtime
         run: |
@@ -201,3 +205,30 @@ jobs:
         run: ./gradlew check --no-daemon
         env:
           GRADLE_OPTS: "-Xmx2g -XX:+UseG1GC"
+
+  documentation:
+    name: Build Documentation
+    runs-on:
+      group: Default
+      labels: runner
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'website/package-lock.json'
+
+      - name: Install jq
+        uses: dcarbone/install-jq-action@v3
+        with:
+          version: '1.7.1'
+
+      - name: Build documentation
+        run: ./scripts/build-documentation.sh

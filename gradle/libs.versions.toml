@@ -1,0 +1,30 @@
+[versions]
+assertj-core = "3.27.7"
+classgraph = "4.8.184"
+commons-compress = "1.28.0"
+junit = "6.1.0"
+kafka-clients = "4.3.0"
+mongodb-driver-sync = "5.7.0"
+pmd = "7.24.0"
+slf4j = "2.0.18"
+testcontainers = "2.0.5"
+testcontainers-kafka = "1.21.4"
+testcontainers-mongodb = "1.21.4"
+testcontainers-nginx = "1.21.4"
+
+[libraries]
+assertj-core = { group = "org.assertj", name = "assertj-core", version.ref = "assertj-core" }
+classgraph = { group = "io.github.classgraph", name = "classgraph", version.ref = "classgraph" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commons-compress" }
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit" }
+kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.ref = "kafka-clients" }
+mongodb-driver-sync = { group = "org.mongodb", name = "mongodb-driver-sync", version.ref = "mongodb-driver-sync" }
+slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
+testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
+testcontainers-kafka = { group = "org.testcontainers", name = "kafka", version.ref = "testcontainers-kafka" }
+testcontainers-mongodb = { group = "org.testcontainers", name = "mongodb", version.ref = "testcontainers-mongodb" }
+testcontainers-nginx = { group = "org.testcontainers", name = "nginx", version.ref = "testcontainers-nginx" }
+
+[plugins]
+[bundles]

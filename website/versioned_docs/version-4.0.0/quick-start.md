@@ -57,7 +57,7 @@ See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel)
 ## Write a test factory
 
 ```java
-import org.paramixel.core.Action;
+import org.paramixel.core.action.Action;
 import org.paramixel.core.Factory;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.Runner;

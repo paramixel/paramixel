@@ -61,9 +61,9 @@ git checkout main
 git pull
 git checkout -b release/<VERSION>
 
-./mvnw versions:set \
+./mvnw versions:set-property \
+  -Dproperty=revision \
   -DnewVersion=<VERSION> \
-  -DprocessAllModules \
   -DgenerateBackupPoms=false
 
 ./mvnw spotless:apply
@@ -89,7 +89,7 @@ Fix the issue on `main`, then start over from Step 1.
 
 CI runs automatically on the release branch. Wait for all jobs to pass before proceeding.
 
-See: [GitHub Actions](https://github.com/paramixel/paramixel-private/actions)
+See: [GitHub Actions](https://github.com/paramixel/paramixel/actions)
 
 **If CI fails:** fix the issue on the release branch, push, and wait for CI to pass again. If the issue requires changes on `main`, delete the release branch (local and remote), fix `main`, and start over:
 
@@ -134,15 +134,37 @@ git tag -a v<VERSION> -m "Release <VERSION>"
 git push origin v<VERSION>
 ```
 
-### Step 6 — Bump main to the next development version
+### Step 6 — Publish documentation
+
+After tagging, publish the documentation site. This builds the Docusaurus site and deploys it via rsync over SSH.
+
+Requires the `WWW_PARAMIXEL_ORG` environment variable (or pass `--ssh-host`).
+
+```bash
+./scripts/publish-documentation.sh
+```
+
+To preview what will be deployed without transferring files:
+
+```bash
+./scripts/publish-documentation.sh --dry-run
+```
+
+If the documentation was already built during Step 1, skip the build step:
+
+```bash
+./scripts/publish-documentation.sh --skip-build
+```
+
+### Step 7 — Bump main to the next development version
 
 ```bash
 git checkout main
 git pull
 
-./mvnw versions:set \
+./mvnw versions:set-property \
+  -Dproperty=revision \
   -DnewVersion=<VERSION>-POST \
-  -DprocessAllModules \
   -DgenerateBackupPoms=false
 
 ./mvnw spotless:apply

@@ -1,0 +1,359 @@
+/*
+ * Copyright (c) 2026-present Douglas Hoard
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.paramixel.api;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import org.paramixel.api.action.Descriptor;
+import org.paramixel.api.exception.AbortedException;
+import org.paramixel.api.exception.FailException;
+import org.paramixel.api.exception.SkipException;
+import org.paramixel.api.internal.support.UnrecoverableErrors;
+
+/**
+ * Represents the local execution state of a descriptor.
+ *
+ * <p>A descriptor starts in {@link #PENDING}, transitions to {@link #RUNNING}, and then
+ * reaches exactly one terminal status: {@link #PASSED}, {@link #FAILED}, {@link #SKIPPED},
+ * or {@link #ABORTED}.
+ *
+ * <p>Instances are immutable. The canonical instances are available as static constants
+ * on this class. Terminal statuses carrying a message or throwable can be created via
+ * the named factory methods {@link #failed(String)}, {@link #skipped(String)}, and
+ * {@link #aborted(String)}.
+ */
+public final class Status {
+
+    /**
+     * Descriptor has been discovered but has not started execution.
+     */
+    public static final Status PENDING = new Status("PENDING");
+
+    /**
+     * Descriptor execution has started and has not yet reached a terminal state.
+     */
+    public static final Status RUNNING = new Status("RUNNING");
+
+    /**
+     * Descriptor completed without errors or exceptions.
+     */
+    public static final Status PASSED = new Status("PASSED");
+
+    /**
+     * Descriptor completed with a failure.
+     */
+    public static final Status FAILED = new Status("FAILED");
+
+    /**
+     * Descriptor was deliberately skipped and did not perform normal work.
+     */
+    public static final Status SKIPPED = new Status("SKIPPED");
+
+    /**
+     * Descriptor was aborted due to a failed precondition or assumption.
+     */
+    public static final Status ABORTED = new Status("ABORTED");
+
+    private final String statusName;
+    private final String message;
+    private final Throwable throwable;
+
+    private Status(final String statusName) {
+        this.statusName = statusName;
+        this.message = null;
+        this.throwable = null;
+    }
+
+    private Status(final String statusName, final String message) {
+        this.statusName = statusName;
+        this.message = message;
+        this.throwable = null;
+    }
+
+    private Status(final String statusName, final String message, final Throwable throwable) {
+        this.statusName = statusName;
+        this.message = message;
+        this.throwable = throwable;
+    }
+
+    /**
+     * Creates a {@code FAILED} status with a message.
+     *
+     * @param message the status message; must not be {@code null}
+     * @return a failed status with the given message
+     * @throws NullPointerException if {@code message} is {@code null}
+     */
+    public static Status failed(final String message) {
+        Objects.requireNonNull(message, "message must not be null");
+        return new Status("FAILED", message);
+    }
+
+    /**
+     * Creates a {@code FAILED} status with a message and throwable.
+     *
+     * @param message the status message; must not be {@code null}
+     * @param throwable the throwable associated with the status; must not be {@code null}
+     * @return a failed status with the given message and throwable
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static Status failed(final String message, final Throwable throwable) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(throwable, "throwable must not be null");
+        return new Status("FAILED", message, throwable);
+    }
+
+    /**
+     * Creates a {@code SKIPPED} status with a message.
+     *
+     * @param message the status message; must not be {@code null}
+     * @return a skipped status with the given message
+     * @throws NullPointerException if {@code message} is {@code null}
+     */
+    public static Status skipped(final String message) {
+        Objects.requireNonNull(message, "message must not be null");
+        return new Status("SKIPPED", message);
+    }
+
+    /**
+     * Creates a {@code SKIPPED} status with a message and throwable.
+     *
+     * @param message the status message; must not be {@code null}
+     * @param throwable the throwable associated with the status; must not be {@code null}
+     * @return a skipped status with the given message and throwable
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static Status skipped(final String message, final Throwable throwable) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(throwable, "throwable must not be null");
+        return new Status("SKIPPED", message, throwable);
+    }
+
+    /**
+     * Creates a {@code ABORTED} status with a message.
+     *
+     * @param message the status message; must not be {@code null}
+     * @return an aborted status with the given message
+     * @throws NullPointerException if {@code message} is {@code null}
+     */
+    public static Status aborted(final String message) {
+        Objects.requireNonNull(message, "message must not be null");
+        return new Status("ABORTED", message);
+    }
+
+    /**
+     * Creates a {@code ABORTED} status with a message and throwable.
+     *
+     * @param message the status message; must not be {@code null}
+     * @param throwable the throwable associated with the status; must not be {@code null}
+     * @return an aborted status with the given message and throwable
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static Status aborted(final String message, final Throwable throwable) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(throwable, "throwable must not be null");
+        return new Status("ABORTED", message, throwable);
+    }
+
+    /**
+     * Returns the name of this status.
+     *
+     * <p>The name matches the canonical constant name: {@code "PENDING"}, {@code "RUNNING"},
+     * {@code "PASSED"}, {@code "FAILED"}, {@code "SKIPPED"}, or {@code "ABORTED"}.
+     *
+     * @return the status name; never {@code null}
+     */
+    public String name() {
+        return statusName;
+    }
+
+    /**
+     * Returns whether this status means execution has not started.
+     *
+     * @return {@code true} when pending
+     */
+    public boolean isPending() {
+        return "PENDING".equals(statusName);
+    }
+
+    /**
+     * Returns whether this status means execution is in progress.
+     *
+     * @return {@code true} when running
+     */
+    public boolean isRunning() {
+        return "RUNNING".equals(statusName);
+    }
+
+    /**
+     * Returns whether this status is terminal.
+     *
+     * @return {@code true} when this status is not pending or running
+     */
+    public boolean isTerminal() {
+        return !isPending() && !isRunning();
+    }
+
+    /**
+     * Returns whether execution completed successfully.
+     *
+     * @return {@code true} when passed
+     */
+    public boolean isPassed() {
+        return "PASSED".equals(statusName);
+    }
+
+    /**
+     * Returns whether execution completed with a failure.
+     *
+     * @return {@code true} when failed
+     */
+    public boolean isFailed() {
+        return "FAILED".equals(statusName);
+    }
+
+    /**
+     * Returns whether execution was skipped.
+     *
+     * @return {@code true} when skipped
+     */
+    public boolean isSkipped() {
+        return "SKIPPED".equals(statusName);
+    }
+
+    /**
+     * Returns whether execution was aborted.
+     *
+     * @return {@code true} when aborted
+     */
+    public boolean isAborted() {
+        return "ABORTED".equals(statusName);
+    }
+
+    /**
+     * Returns the optional message associated with this status.
+     *
+     * @return the message, or empty when no message is available
+     */
+    public Optional<String> message() {
+        return Optional.ofNullable(message);
+    }
+
+    /**
+     * Returns the optional throwable associated with this status.
+     *
+     * @return the throwable, or empty when no throwable is available
+     */
+    public Optional<Throwable> throwable() {
+        return Optional.ofNullable(throwable);
+    }
+
+    /**
+     * Computes the aggregate status from a list of child descriptors.
+     *
+     * <p>Severity ordering: {@code FAILED} &gt; {@code ABORTED} &gt; {@code RUNNING}/{@code PENDING} &gt;
+     * {@code SKIPPED} &gt; {@code PASSED}. Non-terminal child statuses (RUNNING or PENDING) cause the
+     * aggregate to be {@link #RUNNING}, indicating that execution is incomplete.
+     *
+     * @param descriptors the child descriptors; must not be {@code null}
+     * @return the aggregate status
+     */
+    public static Status aggregate(final List<Descriptor> descriptors) {
+        boolean hasSkipped = false;
+        boolean hasNonTerminal = false;
+        for (Descriptor descriptor : descriptors) {
+            Status s = descriptor.metadata().status();
+            if (s.isFailed()) {
+                return FAILED;
+            }
+            if (s.isAborted()) {
+                return ABORTED;
+            }
+            if (!s.isTerminal()) {
+                hasNonTerminal = true;
+            }
+            if (s.isSkipped()) {
+                hasSkipped = true;
+            }
+        }
+        if (hasNonTerminal) {
+            return RUNNING;
+        }
+        if (hasSkipped) {
+            return SKIPPED;
+        }
+        return PASSED;
+    }
+
+    /**
+     * Maps a throwable to the corresponding terminal status.
+     *
+     * <p>Catches {@link AbortedException}, {@link SkipException}, and {@link FailException}
+     * and maps them to the corresponding status. Unrecoverable errors are rethrown.
+     * {@link InterruptedException} restores the interrupt flag.
+     *
+     * @param throwable the throwable to map; must not be {@code null}
+     * @return the terminal status; never {@code null}
+     * @throws Error if the throwable is an unrecoverable error
+     */
+    public static Status fromThrowable(final Throwable throwable) {
+        var t = throwable;
+        if (t instanceof RuntimeException re && re.getCause() != null) {
+            var cause = re.getCause();
+            if (UnrecoverableErrors.isUnrecoverable(cause)
+                    || cause instanceof Error
+                    || cause instanceof InterruptedException) {
+                t = cause;
+            }
+        }
+        UnrecoverableErrors.rethrowIfUnrecoverable(t);
+        if (t instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        if (t instanceof AbortedException e) {
+            return aborted(e.getMessage());
+        }
+        if (t instanceof SkipException e) {
+            return skipped(e.getMessage());
+        }
+        if (t instanceof FailException e) {
+            return failed(e.getMessage());
+        }
+        return failed(t.getMessage() != null ? t.getMessage() : "failed", t);
+    }
+
+    @Override
+    public String toString() {
+        return statusName;
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof Status other)) {
+            return false;
+        }
+        return statusName.equals(other.name());
+    }
+
+    @Override
+    public int hashCode() {
+        return statusName.hashCode();
+    }
+}

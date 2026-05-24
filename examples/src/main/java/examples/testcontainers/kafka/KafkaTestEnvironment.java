@@ -16,13 +16,13 @@
 
 package examples.testcontainers.kafka;
 
+import examples.support.NetworkFactory;
 import examples.support.Resource;
 import examples.testcontainers.util.ContainerLogConsumer;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +38,21 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
+/**
+ * Manages the lifecycle of a Kafka container for parameterized integration tests.
+ * Starts a single-node Kafka broker inside a Docker container and provides methods
+ * to create topics and retrieve connection details.
+ *
+ * <p>Supports two initialization modes:
+ * <ul>
+ *   <li>{@link #initialize()} — creates and owns the Docker network; {@link #close()}
+ *       stops both the container and the network.</li>
+ *   <li>{@link #initialize(Network)} — attaches to a caller-owned network;
+ *       {@link #close()} stops only the container.</li>
+ * </ul>
+ *
+ * <p>The container is stopped silently on failure during initialization.
+ */
 public class KafkaTestEnvironment implements AutoCloseable {
 
     private static final Duration INITIALIZE_TIMEOUT = Duration.ofMinutes(3);
@@ -52,18 +67,63 @@ public class KafkaTestEnvironment implements AutoCloseable {
 
     private final String argumentName;
 
-    private KafkaContainer kafkaContainer;
+    private volatile KafkaContainer kafkaContainer;
 
+    private volatile Network network;
+
+    private volatile boolean ownsNetwork;
+
+    /**
+     * Creates a test environment for the given Docker image.
+     *
+     * @param dockerImageName the Kafka Docker image (e.g. {@code "apache/kafka:3.7.0"})
+     */
     public KafkaTestEnvironment(final String dockerImageName) {
         this.dockerImageName = dockerImageName;
         this.argumentName = dockerImageName.replace("[", "").replace("]", "");
     }
 
+    /**
+     * Returns the display name derived from the Docker image, with bracket characters removed.
+     *
+     * @return the argument name used for test identification
+     */
     public String name() {
         return argumentName;
     }
 
+    /**
+     * Creates a new Docker network and starts the Kafka container on it. The network
+     * is owned by this environment; {@link #close()} will stop both the container
+     * and the network.
+     *
+     * @throws ContainerLaunchException if the container fails to start or the broker does not become ready
+     * @see #initialize(Network)
+     */
+    public void initialize() {
+        initialize(NetworkFactory.createNetwork(), true);
+    }
+
+    /**
+     * Starts the Kafka container on the given Docker network and waits for the broker
+     * to become ready. The caller owns the network; {@link #close()} stops only
+     * the container.
+     *
+     * <p>If startup or readiness probing fails, the container is stopped silently
+     * before the exception is re-thrown. Restores the thread interrupt flag if the
+     * failure was caused by an {@link InterruptedException}.
+     *
+     * @param network the Testcontainers network to attach the container to
+     * @throws ContainerLaunchException if the container fails to start or the broker does not become ready
+     * @see #initialize()
+     */
     public void initialize(final Network network) {
+        initialize(network, false);
+    }
+
+    private void initialize(final Network network, final boolean ownsNetwork) {
+        this.network = Objects.requireNonNull(network, "network must not be null");
+        this.ownsNetwork = ownsNetwork;
         boolean success = false;
         boolean interrupted = false;
 
@@ -74,7 +134,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
             kafkaContainer = new KafkaContainer(image)
                     .withNetwork(network)
                     .withStartupAttempts(1)
-                    .withLogConsumer(new ContainerLogConsumer(getClass().getName(), argumentName))
+                    .withLogConsumer(new ContainerLogConsumer(getClass().getSimpleName(), argumentName))
                     .waitingFor(Wait.forLogMessage(".*Transitioning from RECOVERY to RUNNING.*", 1)
                             .withStartupTimeout(INITIALIZE_TIMEOUT))
                     .withReuse(false);
@@ -84,7 +144,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
                 waitForBrokerReadiness();
             } catch (Exception e) {
                 captureLogsOnFailure(e);
-                if (e.getCause() instanceof InterruptedException) {
+                if (hasInterruptedException(e)) {
                     interrupted = true;
                 }
                 throw e;
@@ -101,14 +161,42 @@ public class KafkaTestEnvironment implements AutoCloseable {
         }
     }
 
+    /**
+     * Returns the {@code bootstrap.servers} URL for connecting Kafka clients to this broker.
+     *
+     * @return the bootstrap servers string
+     * @throws IllegalStateException if called before {@link #initialize()} or {@link #initialize(Network)}
+     */
     public String getBootstrapServers() {
         return kafkaContainer.getBootstrapServers();
     }
 
+    /**
+     * Returns whether the Kafka container is currently running.
+     *
+     * @return {@code true} if the container has been started and not yet stopped
+     */
     public boolean isRunning() {
         return kafkaContainer != null && kafkaContainer.isRunning();
     }
 
+    /**
+     * Returns the Docker network this container is attached to.
+     *
+     * @return the Testcontainers network, or {@code null} if not yet initialized
+     */
+    public Network getNetwork() {
+        return network;
+    }
+
+    /**
+     * Creates a Kafka topic with a single partition and replication factor of 1.
+     * Silently succeeds if the topic already exists.
+     *
+     * @param topic the topic name to create
+     * @throws ExecutionException if an asynchronous admin operation fails (other than topic-exists)
+     * @throws InterruptedException if the calling thread is interrupted; the interrupt flag is restored
+     */
     public void createTopic(final String topic) throws ExecutionException, InterruptedException {
         var properties = new Properties();
         properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
@@ -117,11 +205,14 @@ public class KafkaTestEnvironment implements AutoCloseable {
 
         try (var adminClient = AdminClient.create(properties)) {
             adminClient
-                    .createTopics(Collections.singletonList(new NewTopic(topic, 1, (short) 1)))
+                    .createTopics(List.of(new NewTopic(topic, 1, (short) 1)))
                     .all()
                     .get(ADMIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             throw new IllegalStateException("Timed out creating topic: " + topic, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw e;
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             if (cause instanceof TopicExistsException
@@ -133,8 +224,28 @@ public class KafkaTestEnvironment implements AutoCloseable {
         }
     }
 
+    /**
+     * Stops the Kafka container silently, suppressing any exceptions. If this
+     * environment owns the Docker network (created via {@link #initialize()}), the
+     * network is also closed. Safe to call multiple times or when the container was
+     * never started.
+     */
     public void close() {
         stopQuietly();
+        closeNetworkIfOwned();
+    }
+
+    private void closeNetworkIfOwned() {
+        if (ownsNetwork && network != null) {
+            try {
+                network.close();
+            } catch (Exception ignored) {
+                // Intentionally suppress close exception
+            } finally {
+                network = null;
+                ownsNetwork = false;
+            }
+        }
     }
 
     private void waitForBrokerReadiness() {
@@ -165,7 +276,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
                 throw new ContainerLaunchException("Interrupted while waiting for Kafka broker readiness", e);
             } catch (Exception e) {
                 lastException = e;
-                long delay = Math.min(100L * (1L << attempt), maxBackoffMs);
+                long delay = Math.min(100L * (1L << Math.min(attempt, 4)), maxBackoffMs);
                 try {
                     Thread.sleep(delay);
                 } catch (InterruptedException ee) {
@@ -203,11 +314,26 @@ public class KafkaTestEnvironment implements AutoCloseable {
         }
     }
 
-    public static List<KafkaTestEnvironment> createTestEnvironments() throws IOException {
-        var kafkaTestEnvironments = new ArrayList<KafkaTestEnvironment>();
-        for (String version : Resource.load(KafkaTestEnvironment.class, "/docker-images.txt")) {
-            kafkaTestEnvironments.add(new KafkaTestEnvironment(version));
+    private static boolean hasInterruptedException(Throwable t) {
+        while (t != null) {
+            if (t instanceof InterruptedException) {
+                return true;
+            }
+            t = t.getCause();
         }
-        return kafkaTestEnvironments;
+        return false;
+    }
+
+    /**
+     * Creates one {@link KafkaTestEnvironment} per Kafka Docker image listed in the
+     * {@code /docker-images.txt} classpath resource.
+     *
+     * @return list of test environments, one per image version
+     * @throws IOException if the resource file cannot be read
+     */
+    public static List<KafkaTestEnvironment> createTestEnvironments() throws IOException {
+        return Resource.load(KafkaTestEnvironment.class, "/docker-images.txt").stream()
+                .map(KafkaTestEnvironment::new)
+                .toList();
     }
 }

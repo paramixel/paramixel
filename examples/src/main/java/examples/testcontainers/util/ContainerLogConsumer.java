@@ -19,17 +19,32 @@ package examples.testcontainers.util;
 import java.util.function.Consumer;
 import org.testcontainers.containers.output.OutputFrame;
 
+/**
+ * Writes Testcontainers {@link OutputFrame} log lines to stdout, each prefixed with
+ * the consumer label and Docker image name for easy filtering.
+ */
 public class ContainerLogConsumer implements Consumer<OutputFrame> {
 
     private final String prefix;
 
     private final String dockerImageName;
 
+    /**
+     * Creates a log consumer that prefixes each line with the given label and image name.
+     *
+     * @param prefix label printed before the image name (typically the owning class name)
+     * @param dockerImageName Docker image identifier included in each log line
+     */
     public ContainerLogConsumer(final String prefix, final String dockerImageName) {
         this.prefix = prefix;
         this.dockerImageName = dockerImageName;
     }
 
+    /**
+     * Prints a trimmed, non-blank log line to stdout. Blank lines are silently skipped.
+     *
+     * @param outputFrame the container output frame to consume
+     */
     @Override
     public void accept(final OutputFrame outputFrame) {
         String message = outputFrame.getUtf8String();

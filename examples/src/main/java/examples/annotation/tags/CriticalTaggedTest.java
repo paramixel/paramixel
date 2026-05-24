@@ -16,20 +16,33 @@
 
 package examples.annotation.tags;
 
-import org.paramixel.core.Action;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Noop;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Spec;
 
-public final class CriticalTaggedTest {
+/**
+ * Example test class annotated with multiple tags ({@code "smoke-fast"} and
+ * {@code "critical"}) to demonstrate tag-based test selection with compound tags.
+ */
+public class CriticalTaggedTest {
 
-    private CriticalTaggedTest() {
+    /**
+     * Returns a no-op action tagged as both {@code "smoke-fast"} and {@code "critical"}.
+     *
+     * @return a no-op action
+     */
+    @Paramixel.Factory
+    @Paramixel.Tag("smoke-fast")
+    @Paramixel.Tag("critical")
+    public static Spec<?> factory() {
+        return Instance.of("CriticalTaggedTest", CriticalTaggedTest::new).child("test()", CriticalTaggedTest::test);
+    }
+
+    public CriticalTaggedTest() {
         // Intentionally empty
     }
 
-    @Paramixel.ActionFactory
-    @Paramixel.Tag("smoke-fast")
-    @Paramixel.Tag("critical")
-    public static Action actionFactory() {
-        return Noop.of("CriticalTaggedTest");
+    public void test() {
+        // Intentionally empty
     }
 }

@@ -19,15 +19,16 @@ package org.paramixel.maven.plugin;
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -36,27 +37,40 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
-import org.paramixel.core.Action;
-import org.paramixel.core.Configuration;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Resolver;
-import org.paramixel.core.Result;
-import org.paramixel.core.Runner;
-import org.paramixel.core.exception.ConfigurationException;
-import org.paramixel.core.exception.ResolverException;
-import org.paramixel.core.internal.TildePathExpander;
-import org.paramixel.core.support.AnsiColor;
-import org.paramixel.core.support.Arguments;
+import org.paramixel.api.Configuration;
+import org.paramixel.api.Listener;
+import org.paramixel.api.Result;
+import org.paramixel.api.Runner;
+import org.paramixel.api.Status;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.exception.ConfigurationException;
+import org.paramixel.api.exception.ResolverException;
+import org.paramixel.api.internal.ClasspathResolver;
+import org.paramixel.api.internal.support.AnsiColor;
+import org.paramixel.api.internal.support.Arguments;
+import org.paramixel.api.selector.Selector;
 
 /**
- * Maven mojo that discovers and executes Paramixel action trees during the test phase.
+ * Maven mojo bound to the {@code test} goal that discovers and executes Paramixel action trees
+ * during the {@link LifecyclePhase#TEST} phase with {@link ResolutionScope#TEST} dependency resolution.
  *
- * <p>The mojo resolves action factories from the test classpath using {@link Resolver},
- * executes them with a {@link Runner}, and fails the build when the root action result
- * is {@code FAIL} (or {@code SKIP} when {@code failureOnSkip} is {@code true}).
+ * <p>The mojo resolves action factories from the test classpath using the runner's internal classpath scanner,
+ * executes them with a {@link Runner}, and fails the build when {{@link Result#status()}}
+ * returns {@link Status#FAILED} or {@link Status#PENDING}. Configuration-based promotion
+ * rules ({@code failureOnSkip}, {@code failureOnAbort}) are applied by the runner result,
+ * so SKIPPED and ABORTED are promoted to FAILED when the corresponding flags are enabled.
  *
- * <p>The action tree is executed exactly once. The result is returned
- * directly from the runner, avoiding redundant re-execution.
+ * <p>The action tree is executed exactly once. The result is returned directly from the runner,
+ * avoiding redundant re-execution.
+ *
+ * <p>During execution the thread context classloader is replaced with a test classloader derived
+ * from the Maven project's test classpath; the original classloader is restored in a {@code finally}
+ * block regardless of outcome.
+ *
+ * <p>Configuration property precedence, from lowest to highest: Paramixel defaults,
+ * POM {@code <properties>} declarations, the {@code reportFile} parameter, and system properties.
+ *
+ * <p>This mojo is thread-safe and may run concurrently with other mojos in a parallel build.
  */
 @Mojo(
         name = "test",
@@ -66,14 +80,16 @@ import org.paramixel.core.support.Arguments;
 public class ParamixelMojo extends AbstractMojo {
 
     /**
-     * Constructs a mojo with default parameter values; Maven injects configuration after construction.
+     * Constructs a mojo with default parameter values.
+     *
+     * <p>Maven injects {@code @Parameter} fields after construction and before {@link #execute()} is invoked.
      */
     public ParamixelMojo() {
         // Intentionally empty
     }
 
     /**
-     * The Maven project being built.
+     * The Maven project being built; used to resolve test classpath elements for action discovery.
      */
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
@@ -97,99 +113,244 @@ public class ParamixelMojo extends AbstractMojo {
     private boolean failureOnSkip;
 
     /**
+     * When {@code true}, ABORTED results are treated as failures and cause the build to fail.
+     */
+    @Parameter(property = "paramixel.failureOnAbort", defaultValue = "true")
+    private boolean failureOnAbort;
+
+    /**
      * Path to the per-run summary report; when unset, no report file is generated.
      */
     @Parameter(property = "paramixel.report.file")
     private String reportFile;
 
     /**
-     * Additional Paramixel configuration properties declared in the POM.
+     * Package-name regular expression for filtering discovered action factories.
+     *
+     * <p>When set, only classes whose package name matches the pattern are considered for discovery.
+     */
+    @Parameter(property = "paramixel.match.package.regex")
+    private String matchPackage;
+
+    /**
+     * Fully qualified class-name regular expression for filtering discovered action factories.
+     *
+     * <p>When set, only classes whose fully qualified name matches the pattern are considered for discovery.
+     */
+    @Parameter(property = "paramixel.match.class.regex")
+    private String matchClass;
+
+    /**
+     * Tag regular expression for filtering discovered action factories.
+     *
+     * <p>When set, only methods tagged with a matching {@code @Paramixel.Tag} value are considered for discovery.
+     */
+    @Parameter(property = "paramixel.match.tag.regex")
+    private String matchTag;
+
+    /**
+     * Additional Paramixel configuration properties declared in the POM; override Paramixel defaults
+     * but are themselves overridden by system properties.
      */
     @Parameter
     private List<Property> properties;
 
     /**
+     * When {@code true}, fail the build when non-daemon threads are still running after Paramixel execution
+     * that retain a reference to the test classloader.
+     */
+    @Parameter(property = "paramixel.strictThreadLifecycle", defaultValue = "false")
+    private boolean strictThreadLifecycle;
+
+    /**
+     * Thread name prefixes for well-known JVM system threads that should be excluded
+     * from the lingering-thread leak detector. Prefix-matched — a thread named
+     * {@code "ForkJoinPool-1"} is excluded by the prefix {@code "ForkJoinPool"}.
+     */
+    private static final Set<String> SYSTEM_THREAD_PREFIXES = Set.of(
+            "main",
+            "Reference Handler",
+            "Finalizer",
+            "Signal Dispatcher",
+            "Attach Listener",
+            "Common-Cleaner",
+            "notification-thread",
+            "ForkJoinPool",
+            "Timer",
+            "process-reaper");
+
+    /**
      * Discovers and executes Paramixel action trees from the test classpath.
      *
-     * <p>Replaces the thread context classloader with a test classloader for the
-     * duration of execution. Fails the build when the root action result is
-     * {@code FAIL}, or {@code SKIP} when {@code failureOnSkip} is {@code true}.
+     * <p>Replaces the thread context classloader with a test classloader for the duration of execution,
+     * restoring the original classloader in a {@code finally} block. After execution, checks for
+     * non-daemon threads that retain a reference to the test classloader and warns or fails depending
+     * on {@code strictThreadLifecycle}.
+     *
+     * <p>Fails the build when {{@link Result#status()}} returns {@link Status#FAILED}
+     * or {@link Status#PENDING}. Configuration-based promotion rules ({@code failureOnSkip},
+     * {@code failureOnAbort}) are applied by the runner result.
      *
      * @throws MojoExecutionException when configuration is invalid, action resolution fails,
+     *     lingering threads are detected with {@code strictThreadLifecycle} enabled,
      *     or an unexpected error occurs during execution
-     * @throws MojoFailureException when the root action result is {@code FAIL},
-     *     or {@code SKIP} with {@code failureOnSkip} enabled
+     * @throws MojoFailureException when {{@link Result#status()}} returns {@link Status#FAILED}
+     *     or {@link Status#PENDING}
      */
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (skipTests) {
-            getLog().info("Tests are skipped.");
+            getLog().info("Paramixel tests are skipped");
             return;
         }
 
         Objects.requireNonNull(project, "MavenProject must not be null");
 
         final var originalClassLoader = Thread.currentThread().getContextClassLoader();
+        final var preExecutionThreads = snapshotNonDaemonThreads();
 
         try (URLClassLoader testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
-            final var configuration = buildConfiguration(testClassLoader);
+            try {
+                final var configuration = buildConfiguration(testClassLoader);
+                final var selector = buildSelector();
 
-            Optional<Action> optionalAction = Resolver.resolveActions(configuration);
+                Optional<Action<?>> optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
 
-            if (optionalAction.isEmpty()) {
-                if (failIfNoTests) {
-                    throw new MojoExecutionException("No tests found and failIfNoTests is true");
+                if (optionalAction.isEmpty()) {
+                    if (failIfNoTests) {
+                        throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
+                    }
+
+                    getLog().info("No Paramixel tests found");
+                    return;
                 }
 
-                getLog().info("No Paramixel tests found.");
-                return;
-            }
+                Runner runner = Runner.builder()
+                        .configuration(configuration)
+                        .listener(Listener.defaultListener(configuration))
+                        .build();
 
-            try (Runner runner = Runner.builder()
-                    .configuration(configuration)
-                    .listener(Factory.defaultListener(configuration))
-                    .build()) {
-
-                Action action = optionalAction.get();
+                Action<?> action = optionalAction.get();
                 Result result = runner.run(action);
-                var status = result.getStatus();
-                if (status.isFailure() || (status.isSkip() && failureOnSkip)) {
+                var status = result.status();
+                if (status.isFailed() || status.isPending()) {
                     throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                 }
+            } finally {
+                Thread.currentThread().setContextClassLoader(originalClassLoader);
+                warnOrErrorLingeringThreads(preExecutionThreads);
             }
         } catch (ConfigurationException e) {
             throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);
         } catch (ResolverException e) {
             throw new MojoExecutionException("Failed to resolve Paramixel actions: " + e.getMessage(), e);
-        } catch (MojoFailureException e) {
+        } catch (MojoFailureException | MojoExecutionException e) {
             throw e;
         } catch (Exception e) {
             throw new MojoExecutionException("Failed to run Paramixel tests", e);
-        } finally {
-            Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
     }
 
-    private Map<String, String> buildConfiguration(ClassLoader classLoader) throws MojoExecutionException {
-        var configuration = new LinkedHashMap<String, String>(Configuration.defaultProperties(classLoader));
-        putIfNotBlank(configuration, Configuration.REPORT_FILE, reportFile);
+    /**
+     * Builds a {@link Selector} from POM parameters for action discovery filtering.
+     *
+     * <p>When no match parameters are configured, returns {@link Selector#all()}.
+     *
+     * @return the selector for action discovery
+     */
+    Selector buildSelector() {
+        List<Selector> selectors = new ArrayList<>();
+        if (matchPackage != null && !matchPackage.isBlank()) {
+            selectors.add(Selector.packageRegex(matchPackage));
+        }
+        if (matchClass != null && !matchClass.isBlank()) {
+            selectors.add(Selector.classRegex(matchClass));
+        }
+        if (matchTag != null && !matchTag.isBlank()) {
+            selectors.add(Selector.tagRegex(matchTag));
+        }
+        return switch (selectors.size()) {
+            case 0 -> Selector.all();
+            case 1 -> selectors.get(0);
+            default -> Selector.and(selectors);
+        };
+    }
 
-        if (reportFile != null && !reportFile.isBlank() && project != null) {
-            final var build = project.getBuild();
-            if (build != null) {
-                Path reportPath = TildePathExpander.expand(reportFile);
-                Path targetPath = Paths.get(build.getDirectory());
-                if (!reportPath.normalize().startsWith(targetPath.normalize())) {
-                    getLog().warn("Report file path '" + reportFile + "' resolves outside target directory '"
-                            + build.getDirectory() + "'");
-                }
+    /**
+     * Snapshots all live non-daemon, non-system threads at the current moment.
+     *
+     * <p>Uses {@link Thread#enumerate(Thread[])} instead of {@link Thread#getAllStackTraces()}
+     * because stack traces are not required — only thread identity is needed for the
+     * lingering-thread leak detector.
+     *
+     * <p>The returned set is a mutable best-effort snapshot; threads created during enumeration
+     * may be missed. This is acceptable for a diagnostic warning.
+     *
+     * @return a mutable set of live non-daemon threads excluding known JVM system threads
+     */
+    private Set<Thread> snapshotNonDaemonThreads() {
+        Thread[] buffer = new Thread[Thread.activeCount() + 10];
+        int count = Thread.enumerate(buffer);
+        Set<Thread> result = new HashSet<>(count);
+        for (int i = 0; i < count; i++) {
+            Thread t = buffer[i];
+            if (!t.isDaemon()
+                    && t.getThreadGroup() != null
+                    && !"system".equals(t.getThreadGroup().getName())
+                    && SYSTEM_THREAD_PREFIXES.stream().noneMatch(t.getName()::startsWith)) {
+                result.add(t);
             }
         }
+        return result;
+    }
 
-        // POM <properties> override file/defaults but not system properties
+    /**
+     * Compares the current set of non-daemon threads against a pre-execution baseline
+     * and warns or fails when new threads are detected that hold a reference to the test classloader.
+     *
+     * @param baseline the mutable set of non-daemon threads captured before action execution
+     * @throws MojoExecutionException when {@code strictThreadLifecycle} is {@code true}
+     *     and lingering threads are detected
+     */
+    private void warnOrErrorLingeringThreads(final Set<Thread> baseline) throws MojoExecutionException {
+        Set<Thread> current = snapshotNonDaemonThreads();
+        current.removeAll(baseline);
+
+        List<Thread> lingering = current.stream()
+                .filter(t -> t.getContextClassLoader() instanceof URLClassLoader)
+                .toList();
+
+        if (!lingering.isEmpty()) {
+            String message = "Non-daemon threads are still running after Paramixel execution; "
+                    + "these threads may fail when the test classloader is closed:";
+            if (strictThreadLifecycle) {
+                throw new MojoExecutionException(message);
+            }
+            getLog().warn(message);
+            for (Thread t : lingering) {
+                getLog().warn("  - " + t.getName() + " [id=" + t.getId() + ", state=" + t.getState() + "]");
+            }
+        }
+    }
+
+    /**
+     * Builds the configuration from default, POM, and system properties.
+     *
+     * @param classLoader the classloader for classpath resource loading
+     * @return the merged configuration
+     * @throws MojoExecutionException if configuration loading fails
+     */
+    private Configuration buildConfiguration(final ClassLoader classLoader) throws MojoExecutionException {
+        var configMap = new LinkedHashMap<String, String>();
+
+        // Start from default configuration (classpath + system properties + defaults)
+        var defaultConfig = Configuration.defaultConfiguration(classLoader);
+        defaultConfig.keySet().forEach(key -> defaultConfig.getString(key).ifPresent(v -> configMap.put(key, v)));
+
+        // POM <properties> override defaults
         if (properties != null) {
-            var seenKeys = new LinkedHashSet<String>();
+            var seenKeys = new HashSet<String>();
             for (Property property : properties) {
                 String key = property.getKey();
                 String value = property.getValue();
@@ -210,72 +371,84 @@ public class ParamixelMojo extends AbstractMojo {
                     getLog().warn("Duplicate Paramixel property key '" + key + "' — later value overrides earlier");
                 }
 
-                configuration.put(key, value);
+                configMap.put(key, value);
             }
+        }
+
+        // <configuration><reportFile> overrides POM properties
+        putIfNotBlank(configMap, Configuration.REPORT_FILE, reportFile);
+
+        // <configuration><failureOnSkip> overrides POM properties
+        if (failureOnSkip) {
+            configMap.put(Configuration.FAILURE_ON_SKIP, "true");
+        }
+
+        // <configuration><failureOnAbort> overrides POM properties
+        configMap.put(Configuration.FAILURE_ON_ABORT, String.valueOf(failureOnAbort));
+
+        // <configuration><failIfNoTests> overrides POM properties
+        if (failIfNoTests) {
+            configMap.put(Configuration.FAIL_IF_NO_TESTS, "true");
         }
 
         // System properties always win (matches JUnit Platform precedence)
-        var systemProps = System.getProperties().entrySet().stream().toList();
-        for (var entry : systemProps) {
+        var systemProps = System.getProperties();
+        List<Map.Entry<Object, Object>> snapshot;
+        synchronized (systemProps) {
+            snapshot = systemProps.entrySet().stream().toList();
+        }
+        for (var entry : snapshot) {
             String k = String.valueOf(entry.getKey());
-            if (k.startsWith("paramixel.")) {
-                configuration.put(k, String.valueOf(entry.getValue()));
-            }
+            configMap.put(k, String.valueOf(entry.getValue()));
         }
 
-        return configuration;
+        return Configuration.of(configMap);
     }
 
-    private static void putIfNotBlank(Map<String, String> configuration, String key, String value) {
+    private static void putIfNotBlank(final Map<String, String> configuration, final String key, final String value) {
         if (value != null && !value.isBlank()) {
             configuration.put(key, value);
         }
     }
 
-    private URLClassLoader buildTestClassLoader() throws MojoExecutionException {
+    /**
+     * Builds a {@link URLClassLoader} from the Maven project's test classpath elements.
+     *
+     * <p>The returned classloader uses the mojo's own classloader as the parent.
+     * Blank and null classpath elements are silently skipped.
+     *
+     * @return a new test classloader backed by the resolved classpath URLs
+     * @throws MojoExecutionException when the project build information is unavailable,
+     *     test dependency resolution fails, or a classpath element cannot be converted to a URL
+     */
+    URLClassLoader buildTestClassLoader() throws MojoExecutionException {
         final List<URL> classpathUrls = buildTestClasspathUrls();
-        final var urls = new URL[classpathUrls.size()];
-        for (int i = 0; i < classpathUrls.size(); i++) {
-            var classpathUrl = classpathUrls.get(i);
-            try {
-                urls[i] = new File(classpathUrl.toURI()).toURI().toURL();
-            } catch (Exception e) {
-                throw new MojoExecutionException("Failed to convert classpath URL: " + classpathUrl, e);
-            }
-        }
-        return new URLClassLoader(urls, getClass().getClassLoader());
+        return new URLClassLoader(classpathUrls.toArray(new URL[0]), getClass().getClassLoader());
     }
 
     private List<URL> buildTestClasspathUrls() throws MojoExecutionException {
-        final var build = project.getBuild();
-        if (build == null) {
+        if (project.getBuild() == null) {
             throw new MojoExecutionException("Project build information is not available");
         }
-        final var testClassesDir = new File(build.getTestOutputDirectory());
-        final var classesDir = new File(build.getOutputDirectory());
-        final var classpathUrls = new LinkedHashSet<URL>();
 
+        final List<String> classpathElements;
         try {
-            if (testClassesDir.exists()) {
-                classpathUrls.add(testClassesDir.toURI().toURL());
-            }
+            classpathElements = project.getTestClasspathElements();
+        } catch (DependencyResolutionRequiredException e) {
+            throw new MojoExecutionException(
+                    "Failed to resolve Maven test classpath; run the mojo in a phase with test dependency resolution",
+                    e);
+        }
 
-            if (classesDir.exists()) {
-                classpathUrls.add(classesDir.toURI().toURL());
-            }
-
-            final var artifacts = project.getArtifacts();
-            if (artifacts != null) {
-                for (var artifact : artifacts) {
-                    File artifactFile = artifact.getFile();
-                    if (artifactFile != null) {
-                        classpathUrls.add(artifactFile.toURI().toURL());
-                    }
+        final var classpathUrls = new LinkedHashSet<URL>();
+        try {
+            for (String element : classpathElements) {
+                if (element == null || element.isBlank()) {
+                    getLog().debug("Skipping blank Maven test classpath element");
+                    continue;
                 }
-            } else {
-                getLog().warn("Project artifacts are not available; classpath may be incomplete");
+                classpathUrls.add(new File(element).toURI().toURL());
             }
-
         } catch (Exception e) {
             throw new MojoExecutionException("Failed to build test classpath URLs", e);
         }
@@ -285,6 +458,8 @@ public class ParamixelMojo extends AbstractMojo {
 
     /**
      * A key-value Paramixel configuration property declared in the POM.
+     *
+     * <p>Instances are mutable; both {@code key} and {@code value} may be reassigned after construction.
      */
     public static class Property {
 
@@ -315,7 +490,7 @@ public class ParamixelMojo extends AbstractMojo {
          * @throws NullPointerException if {@code key} is {@code null}
          * @throws IllegalArgumentException if {@code key} is blank
          */
-        public void setKey(String key) {
+        public void setKey(final String key) {
             Objects.requireNonNull(key, "key must not be null");
 
             Arguments.requireNonBlank(key, "key must not be blank");
@@ -333,38 +508,51 @@ public class ParamixelMojo extends AbstractMojo {
         }
 
         /**
-         * Assigns the configuration property value, rejecting null.
+         * Assigns the configuration property value, rejecting null and blank values.
          *
-         * @param value the configuration property value; must not be null
+         * @param value the configuration property value; must not be null or blank
          * @throws NullPointerException if {@code value} is {@code null}
+         * @throws IllegalArgumentException if {@code value} is blank
          */
-        public void setValue(String value) {
+        public void setValue(final String value) {
             Objects.requireNonNull(value, "value must not be null");
+
+            Arguments.requireNonBlank(value, "value must not be blank");
+
             this.value = value;
         }
 
         /**
-         * Compares this property to another for equality based on {@code key} only.
+         * Compares this property to another for equality based on both {@code key} and {@code value}.
          *
          * @param o the object to compare against
-         * @return {@code true} if the other object is a {@code Property} with the same key
+         * @return {@code true} if the other object is a {@code Property} with the same key and value
          */
         @Override
-        public boolean equals(Object o) {
+        public boolean equals(final Object o) {
             if (this == o) return true;
-            if (!(o instanceof Property)) return false;
-            Property property = (Property) o;
-            return Objects.equals(key, property.key);
+            if (!(o instanceof Property property)) return false;
+            return Objects.equals(key, property.key) && Objects.equals(value, property.value);
         }
 
         /**
-         * Returns a hash code derived from {@code key} only.
+         * Returns a hash code derived from both {@code key} and {@code value}.
          *
          * @return the hash code for this property
          */
         @Override
         public int hashCode() {
-            return Objects.hash(key);
+            return Objects.hash(key, value);
+        }
+
+        /**
+         * Returns a string representation of this property for debugging purposes.
+         *
+         * @return a string in the form {@code Property{key='...', value='...'}}
+         */
+        @Override
+        public String toString() {
+            return "Property{key='" + key + "', value='" + value + "'}";
         }
     }
 }

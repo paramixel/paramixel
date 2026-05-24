@@ -18,6 +18,10 @@ package examples.support;
 
 import static java.lang.String.format;
 
+/**
+ * Lightweight stdout logger for example code. Each line is prefixed with the logger name,
+ * typically the fully-qualified class name supplied at creation.
+ */
 public class Logger {
 
     private final String name;
@@ -26,10 +30,22 @@ public class Logger {
         this.name = name;
     }
 
+    /**
+     * Logs an object to stdout using its {@link Object#toString()} representation.
+     *
+     * @param object the object to log
+     */
     public void info(final Object object) {
         System.out.printf("%s | %s%n", name, object);
     }
 
+    /**
+     * Logs a formatted message to stdout using {@link String#format} semantics.
+     *
+     * @param format a non-blank format string
+     * @param objects format arguments
+     * @throws IllegalArgumentException if {@code format} is blank
+     */
     public void info(final String format, final Object... objects) {
         if (format.trim().isEmpty()) {
             throw new IllegalArgumentException("format is blank");
@@ -38,11 +54,18 @@ public class Logger {
         info(format(format, objects));
     }
 
+    /**
+     * Creates a logger whose prefix is the fully-qualified name of the given class.
+     *
+     * @param clazz the class to derive the logger name from
+     * @return a new logger instance
+     * @throws IllegalArgumentException if {@code clazz} is null
+     */
     public static Logger createLogger(final Class<?> clazz) {
         if (clazz == null) {
             throw new IllegalArgumentException("clazz is null");
         }
 
-        return new Logger(clazz.getName());
+        return new Logger(clazz.getSimpleName());
     }
 }

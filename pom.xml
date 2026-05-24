@@ -6,7 +6,7 @@
 
     <groupId>org.paramixel</groupId>
     <artifactId>parent</artifactId>
-    <version>4.0.0-POST</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
     <name>Paramixel Parent</name>
@@ -51,11 +51,10 @@
     </modules>
 
     <properties>
+        <revision>5.0.0</revision>
         <!-- Build settings -->
         <jacoco.skip>false</jacoco.skip>
         <maven.compiler.release>17</maven.compiler.release>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
         <maven.deploy.skip>true</maven.deploy.skip>
         <pmd.skip>false</pmd.skip>
         <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
@@ -63,20 +62,18 @@
         <project.build.testSourceEncoding>UTF-8</project.build.testSourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <project.reporting.sourceEncoding>UTF-8</project.reporting.sourceEncoding>
-        <spotbugs.skip>false</spotbugs.skip>
         <!-- Dependency versions -->
         <assertj-core.version>3.27.7</assertj-core.version>
         <classgraph.version>4.8.184</classgraph.version>
         <commons-compress.version>1.28.0</commons-compress.version>
-        <junit.version>6.0.3</junit.version>
-        <kafka-clients.version>4.2.0</kafka-clients.version>
-        <maven.version>3.9.15</maven.version>
+        <junit.version>6.1.0</junit.version>
+        <kafka-clients.version>4.3.0</kafka-clients.version>
+        <maven.version>3.9.16</maven.version>
         <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
         <mongodb-driver-sync.version>5.7.0</mongodb-driver-sync.version>
         <palantir-java-format.version>2.90.0</palantir-java-format.version>
-        <pmd.version>7.22.0</pmd.version>
+        <pmd.version>7.24.0</pmd.version>
         <slf4j.version>2.0.18</slf4j.version>
-        <spotbugs.version>4.9.4</spotbugs.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
         <testcontainers-mongodb.version>1.21.4</testcontainers-mongodb.version>
@@ -88,7 +85,7 @@
         <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <maven-dependency-plugin.version>3.10.0</maven-dependency-plugin.version>
-        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
@@ -96,10 +93,9 @@
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
         <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
         <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
-        <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+        <maven-source-plugin.version>3.5.1</maven-source-plugin.version>
         <maven-surefire-plugin.version>3.5.5</maven-surefire-plugin.version>
-        <spotbugs-maven-plugin.version>4.9.8.3</spotbugs-maven-plugin.version>
-        <spotless-maven-plugin.version>3.4.0</spotless-maven-plugin.version>
+        <spotless-maven-plugin.version>3.5.1</spotless-maven-plugin.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     </properties>
 
@@ -143,6 +139,11 @@
             <dependency>
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-artifact</artifactId>
+                <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-model</artifactId>
                 <version>${maven.version}</version>
             </dependency>
             <dependency>
@@ -211,8 +212,6 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
-                        <source>${maven.compiler.source}</source>
-                        <target>${maven.compiler.target}</target>
                         <release>${maven.compiler.release}</release>
                         <encoding>UTF-8</encoding>
                     </configuration>
@@ -351,17 +350,6 @@
                     <version>${maven-javadoc-plugin.version}</version>
                 </plugin>
                 <plugin>
-                    <groupId>com.github.spotbugs</groupId>
-                    <artifactId>spotbugs-maven-plugin</artifactId>
-                    <version>${spotbugs-maven-plugin.version}</version>
-                    <configuration>
-                        <effort>Max</effort>
-                        <threshold>Low</threshold>
-                        <failOnError>true</failOnError>
-                        <excludeFilterFile>${maven.multiModuleProjectDirectory}/assets/spotbugs-exclude.xml</excludeFilterFile>
-                    </configuration>
-                </plugin>
-                <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-pmd-plugin</artifactId>
                     <version>${maven-pmd-plugin.version}</version>
@@ -373,6 +361,18 @@
                         <failOnViolation>false</failOnViolation>
                         <linkXRef>false</linkXRef>
                     </configuration>
+                    <dependencies>
+                        <dependency>
+                            <groupId>net.sourceforge.pmd</groupId>
+                            <artifactId>pmd-core</artifactId>
+                            <version>${pmd.version}</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>net.sourceforge.pmd</groupId>
+                            <artifactId>pmd-java</artifactId>
+                            <version>${pmd.version}</version>
+                        </dependency>
+                    </dependencies>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -390,6 +390,30 @@
                 <artifactId>maven-enforcer-plugin</artifactId>
             </plugin>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <executions>
@@ -403,24 +427,11 @@
                 </executions>
                 <configuration>
                     <failOnError>true</failOnError>
-                    <doclint>none</doclint>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <configuration>
-                    <skip>${spotbugs.skip}</skip>
+                    <doclint>all</doclint>
+                    <additionalJOptions>
+                        <additionalJOption>-Werror</additionalJOption>
+                    </additionalJOptions>
                 </configuration>
-                <executions>
-                    <execution>
-                        <id>spotbugs-analyze</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>spotbugs</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -449,23 +460,6 @@
     </build>
 
     <profiles>
-        <profile>
-            <id>javadoc-strict</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-javadoc-plugin</artifactId>
-                        <configuration>
-                            <doclint>all</doclint>
-                            <additionalJOptions>
-                                <additionalJOption>-Werror</additionalJOption>
-                            </additionalJOptions>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
         <profile>
             <id>release</id>
             <properties>

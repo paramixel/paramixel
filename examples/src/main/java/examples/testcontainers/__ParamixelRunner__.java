@@ -16,14 +16,22 @@
 
 package examples.testcontainers;
 
-import org.paramixel.core.Factory;
-import org.paramixel.core.Selector;
+import org.paramixel.api.Runner;
+import org.paramixel.api.selector.Selector;
 
+/**
+ * Entry point for the Paramixel runner that discovers and executes all action factories
+ * in the {@code examples.testcontainers} package and sub-packages.
+ */
 public class __ParamixelRunner__ {
 
-    public static void main(String[] args) {
-        Factory.defaultRunner()
-                .runAndExit(
-                        Selector.builder().packageOf(__ParamixelRunner__.class).build());
+    /**
+     * Discovers and executes all action factories in this package and sub-packages,
+     * then exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
+    public static void main(final String[] args) {
+        Runner.defaultRunner().runAndExit(Selector.packageTreeOf(__ParamixelRunner__.class));
     }
 }

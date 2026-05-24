@@ -55,7 +55,7 @@ If you want to run Paramixel tests with Maven, also add the Paramixel Maven plug
 ## Write a test factory
 
 ```java
-import org.paramixel.core.Action;
+import org.paramixel.core.action.Action;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Sequential;

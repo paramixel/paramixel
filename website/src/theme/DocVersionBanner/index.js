@@ -26,12 +26,16 @@ function UnreleasedVersionLabel({siteTitle, versionMetadata}) {
 }
 
 function UnmaintainedVersionLabel({siteTitle, versionMetadata}) {
-  if (/^1\./.test(versionMetadata.name)) {
+  if (versionMetadata.className === 'notice-legacy') {
     return (
       <Translate
-        id="theme.docs.versions.maintenanceModeLabel"
-        description="The label used to tell the user that the Paramixel 1.x release line is in maintenance mode">
-        {'You are viewing documentation for Paramixel 1.y.z, which is in maintenance mode.'}
+        id="theme.docs.versions.legacyVersionLabel"
+        description="The label used to tell the user that this is a legacy version where issues will be addressed"
+        values={{
+          siteTitle,
+          versionLabel: <b>{versionMetadata.label}</b>,
+        }}>
+        {'{siteTitle} {versionLabel} is a legacy version. Reported issues will be addressed.'}
       </Translate>
     );
   }
@@ -39,12 +43,12 @@ function UnmaintainedVersionLabel({siteTitle, versionMetadata}) {
   return (
     <Translate
       id="theme.docs.versions.unmaintainedVersionLabel"
-      description="The label used to tell the user that they're browsing an unmaintained doc version"
+      description="The label used to tell the user that this version is no longer maintained"
       values={{
         siteTitle,
         versionLabel: <b>{versionMetadata.label}</b>,
       }}>
-      {'{siteTitle} {versionLabel} is in maintenance mode.'}
+      {'{siteTitle} {versionLabel} is no longer maintained.'}
     </Translate>
   );
 }

@@ -18,6 +18,10 @@ package examples.testcontainers.util;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Generates random alphanumeric strings using {@link ThreadLocalRandom} for
+ * thread-safe, contention-free usage in parallel test environments.
+ */
 public class RandomUtil {
 
     private static final char[] CHARS = new char[62];
@@ -42,6 +46,14 @@ public class RandomUtil {
         // Intentionally empty
     }
 
+    /**
+     * Generates a random alphanumeric string of the requested length, drawing from
+     * {@code [0-9A-Za-z]}.
+     *
+     * @param length the desired string length; must be positive
+     * @return a random string of exactly {@code length} characters
+     * @throws IllegalArgumentException if {@code length} is not positive
+     */
     public static String getRandomString(final int length) {
         if (length <= 0) {
             throw new IllegalArgumentException("Length must be positive, got: " + length);

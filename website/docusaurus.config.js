@@ -3,16 +3,29 @@ const {themes} = require('prism-react-renderer');
 const lightCodeTheme = themes.github;
 const darkCodeTheme = themes.dracula;
 
+const baseUrl = '/';
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Paramixel Test Framework',
-  tagline: 'An action-based test framework for Java 17+ with composable action trees, lifecycle management, and parallel execution.',
+  title: 'Paramixel',
+  tagline: 'A tree-based test framework for Java 17+ with composable action trees.',
   favicon: 'img/favicon.ico',
 
-  url: 'https://paramixel.github.io',
-  baseUrl: '/paramixel/',
+  url: 'https://www.paramixel.org',
+  baseUrl,
 
   onBrokenLinks: 'throw',
+
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/svg+xml',
+        href: `${baseUrl}img/logo.svg`,
+      },
+    },
+  ],
 
   markdown: {
     hooks: {
@@ -31,30 +44,38 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          routeBasePath: 'docs',
+          routeBasePath: '/',
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl: 'https://github.com/paramixel/paramixel/tree/main/website/',
-          lastVersion: '4.0.0',
+          lastVersion: '5.0.0',
           versions: {
             current: {
               label: 'Unreleased',
               path: 'unreleased',
               banner: 'unreleased',
             },
-            '4.0.0': {
+            '5.0.0': {
               banner: 'none',
+            },
+            '4.0.0': {
+              banner: 'unmaintained',
+              label: '4.0.0 (Legacy)',
+              className: 'notice-legacy',
             },
             '3.0.1': {
               banner: 'unmaintained',
               label: '3.0.1 (Obsolete)',
+              className: 'notice-unmaintained',
             },
             '2.0.0': {
               banner: 'unmaintained',
               label: '2.0.0 (Obsolete)',
+              className: 'notice-unmaintained',
             },
             '1.0.2': {
               banner: 'unmaintained',
               label: '1.0.2 (Obsolete)',
+              className: 'notice-unmaintained',
             },
           },
         },
@@ -62,6 +83,32 @@ const config = {
           customCss: require.resolve('./src/css/custom.css'),
         },
       }),
+    ],
+  ],
+
+  plugins: [
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        redirects: [
+          {
+            from: '/4.0.0/',
+            to: '/4.0.0/intro',
+          },
+          {
+            from: '/3.0.1/',
+            to: '/3.0.1/intro',
+          },
+          {
+            from: '/2.0.0/',
+            to: '/2.0.0/intro',
+          },
+          {
+            from: '/1.0.2/',
+            to: '/1.0.2/intro',
+          },
+        ],
+      },
     ],
   ],
 
@@ -79,7 +126,6 @@ const config = {
         logo: {
           alt: 'Paramixel Logo',
           src: 'img/logo.svg',
-          href: 'https://paramixel.github.io/paramixel/',
         },
         items: [
           {
@@ -110,18 +156,9 @@ const config = {
           {
             title: 'Documentation',
             items: [
-              {
-                label: 'Quick Start',
-                to: '/docs/quick-start',
-              },
-              {
-                label: 'Usage Guide',
-                to: '/docs/usage/action-composition',
-              },
-              {
-                label: 'API Reference',
-                to: '/docs/api/intro',
-              },
+              { label: 'Getting Started', to: '/getting-started/introduction' },
+              { label: 'Core Concepts', to: '/core-concepts/actions' },
+              { label: 'API Reference', to: '/api/intro' },
             ],
           },
           {

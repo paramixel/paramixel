@@ -19,105 +19,90 @@ package examples.testcontainers.nginx;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import examples.support.Logger;
-import examples.support.NetworkFactory;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URLConnection;
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Container;
-import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Parallel;
-import org.paramixel.core.support.Cleanup;
-import org.testcontainers.containers.Network;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Spec;
 
+/**
+ * Parameterized integration test that starts Nginx containers for each Docker image
+ * listed in {@code /docker-images.txt}, performs an HTTP GET, and asserts the
+ * default welcome page is served.
+ */
 public class NginxTest {
 
-    private static final String NETWORK = "network";
-    private static final String ENVIRONMENT = "environment";
     private static final Logger LOGGER = Logger.createLogger(NginxTest.class);
 
-    public static void main(String[] args) throws Throwable {
-        Factory.defaultRunner().runAndExit(actionFactory());
+    private final NginxTestEnvironment environment;
+
+    /**
+     * Runs the action factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     * @throws Throwable if environment creation fails
+     */
+    public static void main(final String[] args) throws Throwable {
+        Runner.defaultRunner().runAndExit(factory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() throws Throwable {
-        var parallelBuilder = Parallel.builder("NginxExample");
+    /**
+     * Builds a parallel action tree with one instance branch per Nginx Docker image,
+     * each managing a {@code NginxTest} instance with setUp, test, and tearDown lifecycle.
+     *
+     * @return the action tree for this test
+     * @throws Throwable if environment creation fails
+     */
+    @Paramixel.Factory
+    public static Spec<?> factory() throws Throwable {
+        var parallel = Parallel.of(NginxTest.class.getName());
         for (NginxTestEnvironment environment : NginxTestEnvironment.createTestEnvironments()) {
-            Action argumentContainer = argument(environment);
-            parallelBuilder.child(argumentContainer);
+            parallel.child(Instance.of(environment.name(), () -> new NginxTest(environment))
+                    .child(Lifecycle.<NginxTest>of("lifecycle")
+                            .before("setUp()", "Before", NginxTest::setUp)
+                            .child("testGet()", NginxTest::testGet)
+                            .after("tearDown()", "After", NginxTest::tearDown)
+                            .resolve()));
         }
-        return parallelBuilder.build();
+        return parallel;
     }
 
-    private static Action argument(NginxTestEnvironment environment) {
-        Action setUp = setUp(environment);
-        Action test = test();
-        Action tearDown = tearDown(environment);
-
-        return Container.builder(environment.name())
-                .before(setUp)
-                .child(test)
-                .after(tearDown)
-                .build();
+    private NginxTest(final NginxTestEnvironment environment) {
+        this.environment = environment;
     }
 
-    private static Action setUp(NginxTestEnvironment environment) {
-        return Direct.builder("setUp")
-                .runnable(context -> {
-                    LOGGER.info("[%s] initialize test environment ...", environment.name());
+    public void setUp() {
+        LOGGER.info("[%s] initialize test environment ...", environment.name());
 
-                    Network network = NetworkFactory.createNetwork();
-
-                    environment.initialize(network);
-                    assertThat(environment.isRunning()).isTrue();
-
-                    context.getStore().put(NETWORK, network);
-                    context.getStore().put(ENVIRONMENT, environment);
-                })
-                .build();
+        environment.initialize();
+        assertThat(environment.isRunning()).isTrue();
     }
 
-    private static Action test() {
-        return Direct.builder("get")
-                .runnable(context -> {
-                    NginxTestEnvironment testEnvironment = context.getAncestor("../")
-                            .getStore()
-                            .get(ENVIRONMENT, NginxTestEnvironment.class)
-                            .orElseThrow();
+    public void testGet() throws Exception {
+        LOGGER.info("[%s] testing GET ...", environment.name());
 
-                    LOGGER.info("[%s] testing GET ...", testEnvironment.name());
-
-                    int port = testEnvironment.getNginxContainer().getMappedPort(80);
-                    String content = doGet("http://localhost:" + port);
-                    assertThat(content).contains("Welcome to nginx!");
-                })
-                .build();
+        int port = environment.getNginxContainer().getMappedPort(80);
+        String content = doGet("http://localhost:" + port);
+        assertThat(content).contains("Welcome to nginx!");
     }
 
-    private static Action tearDown(NginxTestEnvironment environment) {
-        return Direct.builder("tearDown")
-                .runnable(context -> {
-                    LOGGER.info("[%s] destroy test environment ...", environment.name());
+    public void tearDown() {
+        LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                    var removedNetwork = context.getStore().remove(NETWORK, Network.class);
-                    var removedEnvironment = context.getStore().remove(ENVIRONMENT, NginxTestEnvironment.class);
-                    if (removedNetwork.isPresent() && removedEnvironment.isPresent()) {
-                        Cleanup.of(Cleanup.Mode.FORWARD)
-                                .addCloseable(removedEnvironment.orElseThrow())
-                                .addCloseable(removedNetwork.orElseThrow())
-                                .runAndThrow();
-                    }
-                })
-                .build();
+        environment.close();
     }
 
     private static String doGet(final String url) throws Exception {
         var result = new StringBuilder();
-        URLConnection connection = URI.create(url).toURL().openConnection();
+        HttpURLConnection connection =
+                (HttpURLConnection) URI.create(url).toURL().openConnection();
+        connection.setConnectTimeout(5_000);
+        connection.setReadTimeout(10_000);
 
         try (var reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
             String line;

@@ -19,13 +19,20 @@ package examples;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Container;
-import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Parallel;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Sequential;
+import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Step;
 
+/**
+ * Demonstrates parallel argument execution with bounded parallelism. Verifies that
+ * all tests execute exactly once, that concurrent argument count drops to zero on
+ * completion, and that peak concurrency stays within the configured limit.
+ */
 public class ParallelArgumentTest {
 
     private static final int ARGUMENT_COUNT = 5;
@@ -36,92 +43,69 @@ public class ParallelArgumentTest {
     private static final AtomicInteger concurrentCount = new AtomicInteger();
     private static final AtomicInteger maxConcurrentCount = new AtomicInteger();
 
-    public static void main(String[] args) {
+    /**
+     * Runs the action factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
+    public static void main(final String[] args) {
         resetCounts();
-        Factory.defaultRunner().runAndExit(actionFactory());
+        Runner.defaultRunner().runAndExit(factory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        var suiteName = "Parallel argument example";
+    /**
+     * Builds a parallel argument tree with per-argument before/after callbacks.
+     *
+     * @return the action tree for this test
+     */
+    @Paramixel.Factory
+    public static Spec<?> factory() {
+        resetCounts();
 
-        Action parallel = parallel(suiteName);
+        var testName = ParallelArgumentTest.class.getName();
 
-        Action validate = validate();
-
-        var suiteBuilder = Container.builder(suiteName)
-                .policy(Container.Policy.builder()
-                        .childMode(Container.ChildMode.INDEPENDENT)
-                        .build());
-        suiteBuilder.child(parallel);
-        suiteBuilder.child(validate);
-
-        return suiteBuilder.build();
-    }
-
-    private static Action parallel(String suiteName) {
-        var parallelBuilder = Parallel.builder(suiteName).parallelism(PARALLELISM);
+        var parallel = Parallel.of(testName).parallelism(PARALLELISM);
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
-            Action argument = argument("string-" + i);
-            parallelBuilder.child(argument);
+            String argumentValue = "string-" + i;
+
+            var tests = Sequential.<ParallelArgumentTest>of(argumentValue)
+                    .independent()
+                    .child("test()", ParallelArgumentTest::test)
+                    .child("test()", ParallelArgumentTest::test)
+                    .child("test()", ParallelArgumentTest::test);
+
+            parallel.child(Instance.of(argumentValue, ParallelArgumentTest::new)
+                    .child(Lifecycle.<ParallelArgumentTest>of("lifecycle")
+                            .before("before()", ParallelArgumentTest::before)
+                            .child(tests)
+                            .after("after()", ParallelArgumentTest::after)));
         }
-        return parallelBuilder.build();
+
+        return Lifecycle.of(testName).child(parallel).after(Step.of("validate", ignored -> validate()));
     }
 
-    private static Action argument(String argumentValue) {
-        Action before = before();
-        Action tests = tests(argumentValue);
-        Action after = after();
-
-        return Container.builder(argumentValue)
-                .before(before)
-                .child(tests)
-                .after(after)
-                .build();
+    public ParallelArgumentTest() {
+        // Intentionally empty
     }
 
-    private static Action before() {
-        return Direct.builder("before")
-                .runnable(context -> {
-                    int current = concurrentCount.incrementAndGet();
-                    maxConcurrentCount.accumulateAndGet(current, Math::max);
-                })
-                .build();
+    public void before() {
+        int current = concurrentCount.incrementAndGet();
+        maxConcurrentCount.accumulateAndGet(current, Math::max);
     }
 
-    private static Action tests(String argumentValue) {
-        var testsBuilder = Container.builder(argumentValue)
-                .policy(Container.Policy.builder()
-                        .childMode(Container.ChildMode.INDEPENDENT)
-                        .build());
-        for (int i = 1; i <= TEST_COUNT_PER_ARGUMENT; i++) {
-            Action test = test("test" + i);
-            testsBuilder.child(test);
-        }
-        return testsBuilder.build();
+    public void test() {
+        testCount.incrementAndGet();
     }
 
-    private static Action test(String name) {
-        return Direct.builder(name)
-                .runnable(context -> testCount.incrementAndGet())
-                .build();
+    public void after() {
+        concurrentCount.decrementAndGet();
     }
 
-    private static Action after() {
-        return Direct.builder("after")
-                .runnable(context -> concurrentCount.decrementAndGet())
-                .build();
-    }
-
-    private static Action validate() {
-        return Direct.builder("validate")
-                .runnable(context -> {
-                    assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
-                    assertThat(concurrentCount.get()).isEqualTo(0);
-                    assertThat(maxConcurrentCount.get()).isGreaterThan(0);
-                    assertThat(maxConcurrentCount.get()).isLessThanOrEqualTo(PARALLELISM);
-                })
-                .build();
+    public static void validate() {
+        assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
+        assertThat(concurrentCount.get()).isEqualTo(0);
+        assertThat(maxConcurrentCount.get()).isGreaterThan(0);
+        assertThat(maxConcurrentCount.get()).isLessThanOrEqualTo(PARALLELISM);
     }
 
     private static void resetCounts() {

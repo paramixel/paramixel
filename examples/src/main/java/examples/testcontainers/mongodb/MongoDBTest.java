@@ -20,104 +20,85 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
-import examples.support.NetworkFactory;
 import org.bson.Document;
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Container;
-import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Parallel;
-import org.paramixel.core.support.Cleanup;
-import org.testcontainers.containers.Network;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Spec;
 
+/**
+ * Parameterized integration test that starts MongoDB containers for each Docker image
+ * listed in {@code /docker-images.txt}, inserts a document, queries it back, and
+ * asserts the stored value matches.
+ */
 public class MongoDBTest {
 
-    private static final String NETWORK = "network";
-    private static final String ENVIRONMENT = "environment";
     private static final Logger LOGGER = Logger.createLogger(MongoDBTest.class);
 
-    public static void main(String[] args) throws Throwable {
-        Factory.defaultRunner().runAndExit(actionFactory());
+    private final MongoDBTestEnvironment environment;
+
+    /**
+     * Runs the action factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     * @throws Throwable if environment creation fails
+     */
+    public static void main(final String[] args) throws Throwable {
+        Runner.defaultRunner().runAndExit(factory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() throws Throwable {
-        var parallelBuilder = Parallel.builder("MongoDBExample");
+    /**
+     * Builds a parallel action tree with one instance branch per MongoDB Docker image,
+     * each managing a {@code MongoDBTest} instance with setUp, test, and tearDown lifecycle.
+     *
+     * @return the action tree for this test
+     * @throws Throwable if environment creation fails
+     */
+    @Paramixel.Factory
+    public static Spec<?> factory() throws Throwable {
+        var parallel = Parallel.of(MongoDBTest.class.getName());
         for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            Action argumentContainer = argument(environment);
-            parallelBuilder.child(argumentContainer);
+            parallel.child(Instance.of(environment.name(), () -> new MongoDBTest(environment))
+                    .child(Lifecycle.<MongoDBTest>of("lifecycle")
+                            .before("setUp()", "Before", MongoDBTest::setUp)
+                            .child("testInsertAndQuery()", MongoDBTest::testInsertAndQuery)
+                            .after("tearDown()", "After", MongoDBTest::tearDown)
+                            .resolve()));
         }
-        return parallelBuilder.build();
+        return parallel;
     }
 
-    private static Action argument(MongoDBTestEnvironment environment) {
-        Action setUp = setUp(environment);
-        Action test = test();
-        Action tearDown = tearDown(environment);
-
-        return Container.builder(environment.name())
-                .before(setUp)
-                .child(test)
-                .after(tearDown)
-                .build();
+    private MongoDBTest(final MongoDBTestEnvironment environment) {
+        this.environment = environment;
     }
 
-    private static Action setUp(MongoDBTestEnvironment environment) {
-        return Direct.builder("setUp")
-                .runnable(context -> {
-                    LOGGER.info("[%s] initialize test environment ...", environment.name());
+    public void setUp() throws Throwable {
+        LOGGER.info("[%s] initialize test environment ...", environment.name());
 
-                    Network network = NetworkFactory.createNetwork();
-
-                    environment.initialize(network);
-                    assertThat(environment.isRunning()).isTrue();
-
-                    context.getStore().put(NETWORK, network);
-                    context.getStore().put(ENVIRONMENT, environment);
-                })
-                .build();
+        environment.initialize();
+        assertThat(environment.isRunning()).isTrue();
     }
 
-    private static Action test() {
-        return Direct.builder("test insert and query")
-                .runnable(context -> {
-                    MongoDBTestEnvironment testEnvironment = context.getAncestor("../")
-                            .getStore()
-                            .get(ENVIRONMENT, MongoDBTestEnvironment.class)
-                            .orElseThrow();
+    public void testInsertAndQuery() {
+        LOGGER.info("[%s] testing insert and query ...", environment.name());
 
-                    LOGGER.info("[%s] testing insert and query ...", testEnvironment.name());
+        try (var mongoClient = MongoClients.create(environment.getConnectionString())) {
+            var database = mongoClient.getDatabase("testdb");
+            var collection = database.getCollection("testcol");
+            collection.insertOne(new Document("key", "value"));
 
-                    try (var mongoClient = MongoClients.create(testEnvironment.getConnectionString())) {
-                        var database = mongoClient.getDatabase("testdb");
-                        var collection = database.getCollection("testcol");
-                        collection.insertOne(new Document("key", "value"));
+            Document found = collection.find(new Document("key", "value")).first();
 
-                        Document found =
-                                collection.find(new Document("key", "value")).first();
-
-                        assertThat(found).isNotNull();
-                        assertThat(found.getString("key")).isEqualTo("value");
-                    }
-                })
-                .build();
+            assertThat(found).isNotNull();
+            assertThat(found.getString("key")).isEqualTo("value");
+        }
     }
 
-    private static Action tearDown(MongoDBTestEnvironment environment) {
-        return Direct.builder("tearDown")
-                .runnable(context -> {
-                    LOGGER.info("[%s] destroy test environment ...", environment.name());
+    public void tearDown() {
+        LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                    var removedNetwork = context.getStore().remove(NETWORK, Network.class);
-                    var removedEnvironment = context.getStore().remove(ENVIRONMENT, MongoDBTestEnvironment.class);
-                    if (removedNetwork.isPresent() && removedEnvironment.isPresent()) {
-                        Cleanup.of(Cleanup.Mode.FORWARD)
-                                .addCloseable(removedEnvironment.orElseThrow())
-                                .addCloseable(removedNetwork.orElseThrow())
-                                .runAndThrow();
-                    }
-                })
-                .build();
+        environment.close();
     }
 }

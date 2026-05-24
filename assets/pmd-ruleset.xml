@@ -56,7 +56,6 @@
     <rule ref="category/java/design.xml">
         <exclude name="LawOfDemeter"/>
         <exclude name="UseUtilityClass"/>
-        <exclude name="AvoidCatchingGenericException"/>
         <exclude name="LoosePackageCoupling"/>
         <exclude name="ClassWithOnlyPrivateConstructorsShouldBeFinal"/>
         <exclude name="TooManyMethods"/>
@@ -71,6 +70,22 @@
         <exclude name="SimplifyBooleanReturns"/>
         <exclude name="AvoidDeeplyNestedIfStmts"/>
         <exclude name="MutableStaticState"/>
+        <exclude name="SwitchDensity"/>
+    </rule>
+    <rule ref="category/java/design.xml/CouplingBetweenObjects">
+        <properties>
+            <property name="threshold" value="50"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/NPathComplexity">
+        <properties>
+            <property name="reportLevel" value="2000"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/NcssCount">
+        <properties>
+            <property name="methodReportLevel" value="100"/>
+        </properties>
     </rule>
     
     <!-- Error Prone -->
@@ -79,6 +94,7 @@
         <exclude name="AvoidFieldNameMatchingTypeName"/>
         <exclude name="AvoidLiteralsInIfCondition"/>
         <exclude name="AvoidCatchingThrowable"/>
+        <exclude name="AvoidCatchingGenericException"/>
         <exclude name="CloseResource"/>
         <exclude name="MissingSerialVersionUID"/>
         <exclude name="UseProperClassLoader"/>
