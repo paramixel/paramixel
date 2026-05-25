@@ -36,14 +36,6 @@
         <url>https://github.com/paramixel/paramixel</url>
     </scm>
 
-    <distributionManagement>
-        <repository>
-            <id>central</id>
-            <name>Maven Central</name>
-            <url>https://central.sonatype.com/api/v1/maven/upload</url>
-        </repository>
-    </distributionManagement>
-
     <modules>
         <module>core</module>
         <module>maven-plugin</module>
