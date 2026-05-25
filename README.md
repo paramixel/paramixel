@@ -5,7 +5,7 @@
 
 # Paramixel
 
-An action-based test framework for Java 17+ with composable action trees, lifecycle management, parallel execution, etc.
+A tree-based test framework for Java 17+ with composable action trees.
 
 ## Why Paramixel?
 
@@ -14,13 +14,12 @@ Annotation-based frameworks force you to express test logic through declarations
 **Key Benefits:**
 - **Composable action trees built with code** — setup/teardown, sequential and parallel children compose to arbitrary depth, making test topology explicit
 - **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) instead of declarative annotations
-- **Explicit teardown** — configured `after` actions run even when setup or body actions fail or skip; `Cleanup.runAndThrow()` can aggregate teardown failures with suppressed exceptions
+- **Explicit teardown** — configured `after` actions run even when setup or body actions fail or skip; `CleanUp.runAndThrow()` can aggregate teardown failures with suppressed exceptions
 - **Parallel execution at any depth** — embed parallel children anywhere in the tree with per-node parallelism control
 - **Fail-fast or run-all semantics** — choose per-node whether children stop on first failure or run all regardless
 - **Write custom actions** — implement your own execution semantics; custom actions compose alongside built-in primitives with zero framework changes
 - **Single factory method produces the entire test plan** — one static method returns the full action tree; no per-method reflection at test time
-- **No test class instantiation** — only the static factory method is called; state flows through a key-value store, not instance fields
-- **Key-value store for state sharing** — each node has an isolated store; navigate parent chains to share state across actions
+- **Optional managed instances** — use `Instance` actions when tests need fixture objects; otherwise actions run without test-class instantiation
 - **Result tree mirrors the action tree** — walk the result tree for aggregated or granular reporting at any level
 
 ## Documentation
@@ -70,56 +69,25 @@ See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel)
 ### Write Your First Test
 
 ```java
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Container;
-import org.paramixel.core.action.Direct;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Lifecycle;
 
 public class MyTest {
 
     public static void main(String[] args) {
-        Factory.defaultRunner().runAndExit(actionFactory());
+        Runner.defaultRunner().runAndExit(factory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        return Container.builder(MyTest.class.getName())
-                .child(Container.builder("test1")
-                        .before(setUp())
-                        .child(test1())
-                        .after(tearDown())
-                        .build())
-                .child(Container.builder("test2")
-                        .before(setUp())
-                        .child(test2())
-                        .after(tearDown())
-                        .build())
-                .build();
-    }
-
-    private static Action setUp() {
-        return Direct.builder("setUp")
-                .execute(context -> { /* setup */ })
-                .build();
-    }
-
-    private static Action test1() {
-        return Direct.builder("test1")
-                .execute(context -> { /* test something */ })
-                .build();
-    }
-
-    private static Action test2() {
-        return Direct.builder("test2")
-                .execute(context -> { /* test something else */ })
-                .build();
-    }
-
-    private static Action tearDown() {
-        return Direct.builder("tearDown")
-                .execute(context -> { /* teardown */ })
-                .build();
+    @Paramixel.Factory
+    public static Action<?> factory() {
+        return Lifecycle.of(MyTest.class.getName())
+                .before("setUp()", ctx -> { /* setup */ })
+                .child("test1()", ctx -> { /* test something */ })
+                .child("test2()", ctx -> { /* test something else */ })
+                .after("tearDown()", ctx -> { /* teardown */ })
+                .resolve();
     }
 }
 ```

@@ -19,56 +19,78 @@ package examples.annotation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Container;
-import org.paramixel.core.action.Direct;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Spec;
 
+/**
+ * Verifies that {@code @Paramixel.Disabled} prevents the annotated action factory
+ * from being invoked by the runner. A separate verification factory asserts the
+ * disabled factory was never called.
+ */
 public class DisabledTest {
 
     private static final AtomicBoolean factoryInvoked = new AtomicBoolean();
 
-    public static void main(String[] args) {
-        Factory.defaultRunner().runAndExit(disabledVerificationFactory());
+    /**
+     * Runs the verification factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
+    public static void main(final String[] args) {
+        Runner.defaultRunner().runAndExit(disabledVerificationFactory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action disabledVerificationFactory() {
-        return Direct.builder("DisabledVerification")
-                .runnable(context -> assertThat(factoryInvoked.get())
-                        .as("@Paramixel.Disabled must prevent the action factory from being invoked")
-                        .isFalse())
-                .build();
+    /**
+     * Verification factory that asserts the disabled factory was never invoked.
+     *
+     * @return a single-step action that checks the disabled flag
+     */
+    @Paramixel.Factory
+    public static Spec<?> disabledVerificationFactory() {
+        return Instance.of("DisabledVerification", DisabledTest::new).child("verify()", DisabledTest::verify);
     }
 
+    /**
+     * Action factory annotated with {@code @Paramixel.Disabled} — must not be
+     * invoked by the runner.
+     *
+     * @return a flow that would fail if ever executed
+     */
     @Paramixel.Disabled("covered by resolver skip behavior")
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
+    @Paramixel.Factory
+    public static Spec<?> factory() {
         factoryInvoked.set(true);
 
-        Action before = Direct.builder("before")
-                .runnable(context -> {
-                    throw new AssertionError("Disabled action must not execute");
-                })
-                .build();
+        return Instance.of("DisabledTest", DisabledTest::new)
+                .child(Lifecycle.<DisabledTest>of("lifecycle")
+                        .before("before()", DisabledTest::before)
+                        .child("disabledLeaf()", DisabledTest::disabledLeaf)
+                        .after("after()", DisabledTest::after)
+                        .resolve());
+    }
 
-        Action child = Direct.builder("disabled-leaf")
-                .runnable(context -> {
-                    throw new AssertionError("Disabled action must not execute");
-                })
-                .build();
+    public DisabledTest() {
+        // Intentionally empty
+    }
 
-        Action after = Direct.builder("after")
-                .runnable(context -> {
-                    throw new AssertionError("Disabled action must not execute");
-                })
-                .build();
+    public void verify() {
+        assertThat(factoryInvoked.get())
+                .as("@Paramixel.Disabled must prevent the action factory from being invoked")
+                .isFalse();
+    }
 
-        return Container.builder("DisabledTest")
-                .before(before)
-                .child(child)
-                .after(after)
-                .build();
+    public void before() {
+        throw new AssertionError("Disabled action must not execute");
+    }
+
+    public void disabledLeaf() {
+        throw new AssertionError("Disabled action must not execute");
+    }
+
+    public void after() {
+        throw new AssertionError("Disabled action must not execute");
     }
 }

@@ -1,7 +1,6 @@
 ---
 title: Paramixel
 description: Action-based Java testing with composable action trees.
-slug: /
 ---
 
 # Paramixel
@@ -21,7 +20,7 @@ Instead of describing tests with many framework-specific annotations, you build 
 ## Minimal example
 
 ```java
-import org.paramixel.core.Action;
+import org.paramixel.core.action.Action;
 import org.paramixel.core.Paramixel;
 import org.paramixel.core.action.Direct;
 import org.paramixel.core.action.Sequential;

@@ -23,13 +23,30 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+/**
+ * Reads classpath resource files as lists of non-blank, non-comment lines.
+ *
+ * <p>Blank lines and lines starting with {@code #} are silently excluded.
+ */
 public class Resource {
 
     private Resource() {
         // Intentionally empty
     }
 
-    public static List<String> load(Class<?> clazz, String relativeResourceName) throws IOException {
+    /**
+     * Reads a classpath resource relative to the package of {@code clazz} and returns
+     * its non-blank, non-comment lines.
+     *
+     * <p>If {@code relativeResourceName} starts with {@code /}, the path is appended to
+     * the package of {@code clazz}; otherwise a {@code /} separator is inserted.
+     *
+     * @param clazz class whose package anchors the resource path
+     * @param relativeResourceName resource path, optionally starting with {@code /}
+     * @return unmodifiable list of trimmed, non-blank lines that do not start with {@code #}
+     * @throws IOException if the resource cannot be found on the classpath
+     */
+    public static List<String> load(final Class<?> clazz, final String relativeResourceName) throws IOException {
         String packagePath = clazz.getPackage().getName().replace('.', '/');
 
         try (InputStream in = getInputStream(relativeResourceName, packagePath);
@@ -42,7 +59,8 @@ public class Resource {
         }
     }
 
-    private static InputStream getInputStream(String relativeResourceName, String packageName) throws IOException {
+    private static InputStream getInputStream(final String relativeResourceName, final String packageName)
+            throws IOException {
         String qualifiedResourceName;
         if (relativeResourceName.startsWith("/")) {
             qualifiedResourceName = packageName + relativeResourceName;

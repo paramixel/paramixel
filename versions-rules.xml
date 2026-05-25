@@ -5,7 +5,7 @@
          comparisonMethod="maven">
     
     <ignoreVersions>
-        <ignoreVersion type="regex">.*[-_\.](alpha|Alpha|ALPHA|b|beta|Dev|Beta|BETA|rc|RC|M|EA|ea|SNAPSHOT)[-_.+]?[0-9]*</ignoreVersion>
+        <ignoreVersion type="regex">.*[-_\.](alpha|Alpha|ALPHA|beta|Beta|BETA|rc|RC|M|EA|ea|SNAPSHOT)[-_.+]?[0-9]*</ignoreVersion>
     </ignoreVersions>
     
 </ruleset>

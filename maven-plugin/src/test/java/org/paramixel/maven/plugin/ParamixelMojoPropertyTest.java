@@ -27,12 +27,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
+import org.apache.maven.plugin.MojoExecutionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.paramixel.core.Configuration;
+import org.paramixel.api.Configuration;
 import org.paramixel.maven.plugin.ParamixelMojo.Property;
 
 @DisplayName("ParamixelMojo.Property tests")
@@ -99,6 +99,15 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
+        @DisplayName("should throw IllegalArgumentException for blank value")
+        void shouldThrowForBlankValue() {
+            var property = new Property();
+            assertThatThrownBy(() -> property.setValue("  "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("value must not be blank");
+        }
+
+        @Test
         @DisplayName("should set valid value")
         void shouldSetValidValue() {
             var property = new Property();
@@ -135,6 +144,66 @@ class ParamixelMojoPropertyTest {
     }
 
     @Nested
+    @DisplayName("equals and hashCode tests")
+    class EqualsAndHashCodeTests {
+
+        @Test
+        @DisplayName("properties with same key and value are equal")
+        void propertiesWithSameKeyAndValueAreEqual() {
+            var a = new Property();
+            a.setKey("key");
+            a.setValue("value");
+            var b = new Property();
+            b.setKey("key");
+            b.setValue("value");
+
+            assertThat(a).isEqualTo(b);
+            assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        }
+
+        @Test
+        @DisplayName("properties with same key but different values are not equal")
+        void propertiesWithSameKeyButDifferentValuesAreNotEqual() {
+            var a = new Property();
+            a.setKey("key");
+            a.setValue("value1");
+            var b = new Property();
+            b.setKey("key");
+            b.setValue("value2");
+
+            assertThat(a).isNotEqualTo(b);
+        }
+
+        @Test
+        @DisplayName("properties with different keys but same value are not equal")
+        void propertiesWithDifferentKeysButSameValueAreNotEqual() {
+            var a = new Property();
+            a.setKey("key1");
+            a.setValue("value");
+            var b = new Property();
+            b.setKey("key2");
+            b.setValue("value");
+
+            assertThat(a).isNotEqualTo(b);
+        }
+    }
+
+    @Nested
+    @DisplayName("toString tests")
+    class ToStringTests {
+
+        @Test
+        @DisplayName("toString returns key and value")
+        void toStringReturnsKeyAndValue() {
+            var property = new Property();
+            property.setKey("my.key");
+            property.setValue("my.value");
+
+            assertThat(property.toString()).isEqualTo("Property{key='my.key', value='my.value'}");
+        }
+    }
+
+    @Nested
     @DisplayName("mojo configuration loading tests")
     class MojoConfigurationLoadingTests {
 
@@ -149,7 +218,8 @@ class ParamixelMojoPropertyTest {
                 var configuration =
                         invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
 
-                assertThat(configuration.get(Configuration.RUNNER_PARALLELISM)).isEqualTo("6");
+                assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM))
+                        .contains("6");
             } finally {
                 if (originalParallelism != null) {
                     System.setProperty(Configuration.RUNNER_PARALLELISM, originalParallelism);
@@ -163,7 +233,7 @@ class ParamixelMojoPropertyTest {
         @DisplayName("test classpath paramixel.properties should be discovered")
         void testClasspathPropertiesShouldBeDiscovered() throws Exception {
             Files.writeString(
-                    tempDir.resolve(Configuration.CONFIG_FILE_NAME),
+                    tempDir.resolve(Configuration.CONFIGURATION_FILE_NAME),
                     Configuration.RUNNER_PARALLELISM + "=7\n",
                     StandardCharsets.UTF_8);
 
@@ -173,7 +243,8 @@ class ParamixelMojoPropertyTest {
                     new URL[] {tempDir.toUri().toURL()}, getClass().getClassLoader())) {
                 var configuration = invokeBuildConfiguration(mojo, classLoader);
 
-                assertThat(configuration.get(Configuration.RUNNER_PARALLELISM)).isEqualTo("7");
+                assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM))
+                        .contains("7");
             }
         }
 
@@ -190,8 +261,8 @@ class ParamixelMojoPropertyTest {
                 var configuration =
                         invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
 
-                assertThat(configuration.get(Configuration.REPORT_FILE))
-                        .isEqualTo("target/custom-paramixel/paramixel.json");
+                assertThat(configuration.getString(Configuration.REPORT_FILE))
+                        .contains("target/custom-paramixel/paramixel.json");
             } finally {
                 restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
             }
@@ -210,8 +281,32 @@ class ParamixelMojoPropertyTest {
                 var configuration =
                         invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
 
-                assertThat(configuration.get(Configuration.REPORT_FILE))
-                        .isEqualTo("target/system-paramixel/paramixel.xml");
+                assertThat(configuration.getString(Configuration.REPORT_FILE))
+                        .contains("target/system-paramixel/paramixel.xml");
+            } finally {
+                restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
+            }
+        }
+
+        @Test
+        @DisplayName("reportFile element overrides POM property paramixel.report.file")
+        void reportFileElementOverridesPomProperty() throws Exception {
+            var originalReportFile = System.getProperty(Configuration.REPORT_FILE);
+            try {
+                System.clearProperty(Configuration.REPORT_FILE);
+
+                var mojo = new ParamixelMojo();
+
+                var property = new Property();
+                property.setKey(Configuration.REPORT_FILE);
+                property.setValue("pom-property-path.txt");
+                setField(mojo, "properties", List.of(property));
+                setField(mojo, "reportFile", "config-element-path.txt");
+
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+                assertThat(configuration.getString(Configuration.REPORT_FILE)).contains("config-element-path.txt");
             } finally {
                 restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
             }
@@ -227,7 +322,7 @@ class ParamixelMojoPropertyTest {
 
             assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
                     .cause()
-                    .isInstanceOf(org.apache.maven.plugin.MojoExecutionException.class)
+                    .isInstanceOf(MojoExecutionException.class)
                     .hasMessage("Paramixel property key must not be null");
         }
 
@@ -241,17 +336,27 @@ class ParamixelMojoPropertyTest {
 
             assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
                     .cause()
-                    .isInstanceOf(org.apache.maven.plugin.MojoExecutionException.class)
+                    .isInstanceOf(MojoExecutionException.class)
                     .hasMessage("Paramixel property 'paramixel.custom' value must not be null");
+        }
+
+        @Test
+        @DisplayName("blank Maven property value should throw descriptive exception")
+        void blankMavenPropertyValueShouldThrowDescriptiveException() {
+            var property = new Property();
+            property.setKey("paramixel.custom");
+
+            assertThatThrownBy(() -> property.setValue("   "))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("value must not be blank");
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> invokeBuildConfiguration(final ParamixelMojo mojo, final ClassLoader classLoader)
+    private static Configuration invokeBuildConfiguration(final ParamixelMojo mojo, final ClassLoader classLoader)
             throws Exception {
         Method method = ParamixelMojo.class.getDeclaredMethod("buildConfiguration", ClassLoader.class);
         method.setAccessible(true);
-        return (Map<String, String>) method.invoke(mojo, classLoader);
+        return (Configuration) method.invoke(mojo, classLoader);
     }
 
     private static void setField(final ParamixelMojo mojo, final String name, final Object value) throws Exception {

@@ -70,7 +70,7 @@ cd paramixel
 
 ### Javadoc
 
-See [JAVADOCS.md](JAVADOCS.md) for guidelines on writing Javadoc comments.
+See `AGENTS.md` (## Javadoc) for guidelines on writing Javadoc comments.
 
 ### Code Formatting
 
@@ -94,6 +94,7 @@ This project uses conventional commit prefixes:
 | `fix:` | Bug fixes |
 | `refactor:` | Code refactoring |
 | `chore:` | Maintenance tasks |
+| `performance:` | Performance improvements |
 | `polish:` | Minor improvements |
 
 Dependency updates use a scoped prefix: `chore(deps):` or `fix(deps):`.
@@ -107,7 +108,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 - Follow existing code style and patterns
 - Write clear, self-documenting code with meaningful variable names
 - Add Javadoc for public APIs
-- Follow [`JAVADOCS.md`](JAVADOCS.md) for Javadoc conventions
+- Follow `AGENTS.md` (## Javadoc) for Javadoc conventions
 - Keep methods focused and reasonably sized
 - Write unit tests for new functionality
 
@@ -119,7 +120,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 # Run all tests
 ./mvnw test
 
-# Build + SpotBugs + PMD analysis
+# Build + PMD analysis
 ./mvnw verify
 
 # Build without Paramixel tests
@@ -129,7 +130,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 ### Writing Tests
 
 - Place tests in the `examples/` module under `src/main/java/`
-- Use the `@Paramixel.ActionFactory` annotation on static methods that return `Action` trees
+- Use the `@Paramixel.Factory` annotation on static methods that return `Action` trees
 - Use descriptive test names and argument names
 - Test edge cases and error conditions
 

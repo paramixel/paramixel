@@ -18,12 +18,23 @@ package examples.support;
 
 import org.testcontainers.containers.Network;
 
+/**
+ * Creates Testcontainers {@link Network} instances with eager Docker allocation to
+ * prevent race conditions during parallel container startup.
+ */
 public final class NetworkFactory {
 
     private NetworkFactory() {
         // Intentionally empty
     }
 
+    /**
+     * Creates a new Docker network and eagerly materializes it by calling
+     * {@link Network#getId()}, ensuring the network is fully allocated before any
+     * container references it.
+     *
+     * @return a new, eagerly-allocated Testcontainers network
+     */
     public static Network createNetwork() {
         Network network = Network.newNetwork();
         // Eagerly allocate the Docker network by calling getId().

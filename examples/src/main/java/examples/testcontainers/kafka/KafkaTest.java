@@ -19,10 +19,9 @@ package examples.testcontainers.kafka;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import examples.support.Logger;
-import examples.support.NetworkFactory;
 import examples.testcontainers.util.RandomUtil;
 import java.time.Duration;
-import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -32,161 +31,128 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Container;
-import org.paramixel.core.action.Direct;
-import org.paramixel.core.action.Parallel;
-import org.paramixel.core.support.Cleanup;
-import org.testcontainers.containers.Network;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Spec;
 
+/**
+ * Parameterized integration test that starts Kafka containers for each Docker image
+ * listed in {@code /docker-images.txt}, produces a message, consumes it, and asserts
+ * the round-trip content matches.
+ */
 public class KafkaTest {
 
     private static final Logger LOGGER = Logger.createLogger(KafkaTest.class);
     private static final String TOPIC = "test";
     private static final String GROUP_ID = "test-group-id";
     private static final String EARLIEST = "earliest";
-    private static final String NETWORK = "network";
-    private static final String ENVIRONMENT = "environment";
-    private static final String MESSAGE = "message";
 
-    public static void main(String[] args) throws Throwable {
-        Factory.defaultRunner().runAndExit(actionFactory());
+    private final KafkaTestEnvironment environment;
+    private String message;
+
+    /**
+     * Runs the action factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     * @throws Throwable if environment creation fails
+     */
+    public static void main(final String[] args) throws Throwable {
+        Runner.defaultRunner().runAndExit(factory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() throws Throwable {
-        var parallelBuilder = Parallel.builder("KafkaExample");
+    /**
+     * Builds a parallel action tree with one instance branch per Kafka Docker image,
+     * each managing a {@code KafkaTest} instance with setUp, produce, consume, and
+     * tearDown lifecycle.
+     *
+     * @return the action tree for this test
+     * @throws Throwable if environment creation fails
+     */
+    @Paramixel.Factory
+    public static Spec<?> factory() throws Throwable {
+        var parallel = Parallel.of(KafkaTest.class.getName());
         for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
-            Action argumentContainer = argument(environment);
-            parallelBuilder.child(argumentContainer);
+            parallel.parallelism(2)
+                    .child(Instance.of(environment.name(), () -> new KafkaTest(environment))
+                            .child(Lifecycle.<KafkaTest>of("lifecycle")
+                                    .before("setUp()", "Before", KafkaTest::setUp)
+                                    .child("produce()", KafkaTest::produce)
+                                    .child("consume()", KafkaTest::consume)
+                                    .after("tearDown()", "After", KafkaTest::tearDown)));
         }
-        return parallelBuilder.build();
+        return parallel;
     }
 
-    private static Action argument(KafkaTestEnvironment environment) {
-        Action setUp = setUp(environment);
-        Action produce = produce();
-        Action consume = consume();
-        Action tearDown = tearDown(environment);
-
-        return Container.builder(environment.name())
-                .before(setUp)
-                .child(produce)
-                .child(consume)
-                .after(tearDown)
-                .build();
+    private KafkaTest(final KafkaTestEnvironment environment) {
+        this.environment = environment;
     }
 
-    private static Action setUp(KafkaTestEnvironment environment) {
-        return Direct.builder("setUp")
-                .runnable(context -> {
-                    LOGGER.info("[%s] initialize test environment ...", environment.name());
+    public void setUp() throws Throwable {
+        LOGGER.info("[%s] initialize test environment ...", environment.name());
 
-                    Network network = NetworkFactory.createNetwork();
+        environment.initialize();
+        assertThat(environment.isRunning()).isTrue();
 
-                    environment.initialize(network);
-                    assertThat(environment.isRunning()).isTrue();
-
-                    LOGGER.info("bootstrap servers: %s", environment.getBootstrapServers());
-                    environment.createTopic(TOPIC);
-
-                    context.getStore().put(NETWORK, network);
-                    context.getStore().put(ENVIRONMENT, environment);
-                })
-                .build();
+        LOGGER.info("bootstrap servers: %s", environment.getBootstrapServers());
+        environment.createTopic(TOPIC);
     }
 
-    private static Action produce() {
-        return Direct.builder("test produce")
-                .runnable(context -> {
-                    KafkaTestEnvironment testEnvironment = context.getAncestor("../")
-                            .getStore()
-                            .get(ENVIRONMENT, KafkaTestEnvironment.class)
-                            .orElseThrow();
+    public void produce() throws Throwable {
+        LOGGER.info("[%s] testing produce() ...", environment.name());
 
-                    LOGGER.info("[%s] testing produce() ...", testEnvironment.name());
+        message = RandomUtil.getRandomString(16);
 
-                    String message = RandomUtil.getRandomString(16);
-                    context.getAncestor("../").getStore().put(MESSAGE, message);
+        LOGGER.info("[%s] producing message [%s] ...", environment.name(), message);
 
-                    LOGGER.info("[%s] producing message [%s] ...", testEnvironment.name(), message);
+        try (KafkaProducer<String, String> producer = createKafkaProducer()) {
+            producer.send(new ProducerRecord<>(TOPIC, message)).get();
+            producer.flush();
+        }
 
-                    try (KafkaProducer<String, String> producer = createKafkaProducer(testEnvironment)) {
-                        producer.send(new ProducerRecord<>(TOPIC, message)).get();
-                        producer.flush();
-                    }
-
-                    LOGGER.info("[%s] message [%s] produced", testEnvironment.name(), message);
-                })
-                .build();
+        LOGGER.info("[%s] message [%s] produced", environment.name(), message);
     }
 
-    private static Action consume() {
-        return Direct.builder("test consume")
-                .runnable(context -> {
-                    KafkaTestEnvironment testEnvironment = context.getAncestor("../")
-                            .getStore()
-                            .get(ENVIRONMENT, KafkaTestEnvironment.class)
-                            .orElseThrow();
+    public void consume() {
+        LOGGER.info("[%s] expected message [%s]", environment.name(), message);
 
-                    String message = context.getAncestor("../")
-                            .getStore()
-                            .get(MESSAGE, String.class)
-                            .orElseThrow();
-                    LOGGER.info("[%s] expected message [%s]", testEnvironment.name(), message);
+        boolean messageMatched = false;
+        int attempts = 0;
+        int maxAttempts = 5;
+        Duration pollTimeout = Duration.ofSeconds(2);
 
-                    boolean messageMatched = false;
-                    int attempts = 0;
-                    int maxAttempts = 5;
-                    Duration pollTimeout = Duration.ofSeconds(2);
+        try (KafkaConsumer<String, String> consumer = createKafkaConsumer()) {
+            consumer.subscribe(List.of(TOPIC));
 
-                    try (KafkaConsumer<String, String> consumer = createKafkaConsumer(testEnvironment)) {
-                        consumer.subscribe(Collections.singletonList(TOPIC));
+            while (!messageMatched && attempts < maxAttempts) {
+                var consumerRecords = consumer.poll(pollTimeout);
+                for (ConsumerRecord<String, String> consumerRecord : consumerRecords) {
+                    LOGGER.info("[%s] consumed message [%s]", environment.name(), consumerRecord.value());
+                    assertThat(consumerRecord.value()).isEqualTo(message);
+                    messageMatched = true;
+                }
+                attempts++;
+            }
 
-                        while (!messageMatched && attempts < maxAttempts) {
-                            var consumerRecords = consumer.poll(pollTimeout);
-                            for (ConsumerRecord<String, String> consumerRecord : consumerRecords) {
-                                LOGGER.info(
-                                        "[%s] consumed message [%s]", testEnvironment.name(), consumerRecord.value());
-                                assertThat(consumerRecord.value()).isEqualTo(message);
-                                messageMatched = true;
-                            }
-                            attempts++;
-                        }
+            assertThat(messageMatched)
+                    .withFailMessage(
+                            "Expected message not received within %d polls of %ds each",
+                            maxAttempts, pollTimeout.toSeconds())
+                    .isTrue();
 
-                        assertThat(messageMatched)
-                                .withFailMessage(
-                                        "Expected message not received within %d polls of %ds each",
-                                        maxAttempts, pollTimeout.toSeconds())
-                                .isTrue();
-
-                        assertThat(consumer.poll(Duration.ofMillis(500)).isEmpty())
-                                .isTrue();
-                    }
-                })
-                .build();
+            assertThat(consumer.poll(Duration.ofMillis(500)).isEmpty()).isTrue();
+        }
     }
 
-    private static Action tearDown(KafkaTestEnvironment environment) {
-        return Direct.builder("tearDown")
-                .runnable(context -> {
-                    LOGGER.info("[%s] destroy test environment ...", environment.name());
+    public void tearDown() {
+        LOGGER.info("[%s] destroy test environment ...", environment.name());
 
-                    var removedEnvironment = context.getStore().remove(ENVIRONMENT, KafkaTestEnvironment.class);
-                    var removedNetwork = context.getStore().remove(NETWORK, Network.class);
-                    if (removedEnvironment.isPresent() && removedNetwork.isPresent()) {
-                        Cleanup.of(Cleanup.Mode.FORWARD)
-                                .addCloseable(removedEnvironment.orElseThrow())
-                                .addCloseable(removedNetwork.orElseThrow())
-                                .runAndThrow();
-                    }
-                })
-                .build();
+        environment.close();
     }
 
-    private static KafkaProducer<String, String> createKafkaProducer(final KafkaTestEnvironment environment) {
+    private KafkaProducer<String, String> createKafkaProducer() {
         var properties = new Properties();
         properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, environment.getBootstrapServers());
         properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -194,7 +160,7 @@ public class KafkaTest {
         return new KafkaProducer<>(properties);
     }
 
-    private static KafkaConsumer<String, String> createKafkaConsumer(final KafkaTestEnvironment environment) {
+    private KafkaConsumer<String, String> createKafkaConsumer() {
         var properties = new Properties();
         properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, environment.getBootstrapServers());
         properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());

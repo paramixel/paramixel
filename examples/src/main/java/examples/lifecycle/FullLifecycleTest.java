@@ -18,178 +18,89 @@ package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Container;
-import org.paramixel.core.action.Direct;
+import java.util.ArrayList;
+import java.util.List;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Static;
 
 public class FullLifecycleTest {
 
-    record TestState(String name) {}
+    private static final List<String> callOrder = new ArrayList<>();
 
-    private static final int EXPECTED_ARGUMENT_COUNT = 3;
-    private static final int EXPECTED_METHOD_COUNT_PER_ARGUMENT = 2;
-
-    private static final AtomicInteger beforeCount = new AtomicInteger();
-    private static final AtomicInteger beforeArgumentCount = new AtomicInteger();
-    private static final AtomicInteger beforeTestCount = new AtomicInteger();
-    private static final AtomicInteger invokeTestCount = new AtomicInteger();
-    private static final AtomicInteger afterTestCount = new AtomicInteger();
-    private static final AtomicInteger afterArgumentCount = new AtomicInteger();
-    private static final AtomicInteger afterCount = new AtomicInteger();
-
-    public static void main(String[] args) {
-        Factory.defaultRunner().runAndExit(actionFactory());
+    public static void main(final String[] args) {
+        Runner.defaultRunner().runAndExit(factory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        resetCounts();
-
-        Action suiteBefore = suiteBefore();
-        Action arguments = arguments();
-        Action suiteAfter = suiteAfter();
-
-        return Container.builder("FullLifecycleTest")
-                .before(suiteBefore)
-                .child(arguments)
-                .after(suiteAfter)
-                .build();
+    @Paramixel.Factory
+    public static Spec<?> factory() {
+        return Static.of(FullLifecycleTest.class.getName())
+                .before("staticSetUp()", FullLifecycleTest::staticSetUp)
+                .child(Instance.of("FullLifecycleTest", FullLifecycleTest::new)
+                        .child(Lifecycle.<FullLifecycleTest>of("lifecycle")
+                                .before("setUp()", FullLifecycleTest::setUp)
+                                .child(Lifecycle.<FullLifecycleTest>of("testOne")
+                                        .before("beforeEach()", FullLifecycleTest::beforeEach)
+                                        .child("testOne()", FullLifecycleTest::testOne)
+                                        .after("afterEach()", FullLifecycleTest::afterEach))
+                                .child(Lifecycle.<FullLifecycleTest>of("testTwo")
+                                        .before("beforeEach()", FullLifecycleTest::beforeEach)
+                                        .child("testTwo()", FullLifecycleTest::testTwo)
+                                        .after("afterEach()", FullLifecycleTest::afterEach))
+                                .after("tearDown()", FullLifecycleTest::tearDown)))
+                .after("staticTearDown()", FullLifecycleTest::staticTearDown);
     }
 
-    private static Action suiteBefore() {
-        return Direct.builder("before")
-                .runnable(context -> {
-                    beforeCount.incrementAndGet();
-                    context.getStore().put("suite", new TestState("FullLifecycleTest"));
-                })
-                .build();
+    public FullLifecycleTest() {
+        // Intentionally empty
     }
 
-    private static Action arguments() {
-        var argumentsBuilder = Container.builder("arguments")
-                .policy(Container.Policy.builder()
-                        .childMode(Container.ChildMode.INDEPENDENT)
-                        .build());
-        for (int i = 0; i < EXPECTED_ARGUMENT_COUNT; i++) {
-            Action argument = argument("arg-" + i);
-            argumentsBuilder.child(argument);
-        }
-        return argumentsBuilder.build();
+    public static void staticSetUp() {
+        callOrder.clear();
+        callOrder.add("staticSetUp");
     }
 
-    private static Action argument(String name) {
-        Action before = argumentBefore(name);
-        Action body = argumentBody(name);
-        Action after = argumentAfter();
-
-        return Container.builder(name).before(before).child(body).after(after).build();
+    public void setUp() {
+        callOrder.add("setUp");
     }
 
-    private static Action argumentBefore(String name) {
-        return Direct.builder("before")
-                .runnable(context -> {
-                    beforeArgumentCount.incrementAndGet();
-                    context.getStore().put("argument", new TestState(name));
-                })
-                .build();
+    public void beforeEach() {
+        callOrder.add("beforeEach");
     }
 
-    private static Action argumentBody(String name) {
-        var bodyBuilder = Container.builder(name + "-body")
-                .policy(Container.Policy.builder()
-                        .childMode(Container.ChildMode.INDEPENDENT)
-                        .build());
-        for (int i = 0; i < EXPECTED_METHOD_COUNT_PER_ARGUMENT; i++) {
-            Action test = test("test-" + i, name);
-            bodyBuilder.child(test);
-        }
-        return bodyBuilder.build();
+    public void testOne() {
+        callOrder.add("testOne");
     }
 
-    private static Action test(String name, String argumentName) {
-        Action before = testBefore();
-        Action body = testBody(name, argumentName);
-        Action after = testAfter();
-
-        return Container.builder(name).before(before).child(body).after(after).build();
+    public void testTwo() {
+        callOrder.add("testTwo");
     }
 
-    private static Action testBefore() {
-        return Direct.builder("before")
-                .runnable(context -> {
-                    beforeTestCount.incrementAndGet();
-                    context.getStore().put("test-before-ran", true);
-                })
-                .build();
+    public void afterEach() {
+        callOrder.add("afterEach");
     }
 
-    private static Action testBody(String name, String argumentName) {
-        return Direct.builder(name + "-body")
-                .runnable(context -> {
-                    invokeTestCount.incrementAndGet();
-
-                    assertThat(context.findParent()).isPresent();
-                    assertThat(context.getParent()).isNotNull();
-
-                    TestState argumentState = context.getAncestor("../../../")
-                            .getStore()
-                            .get("argument", TestState.class)
-                            .orElseThrow();
-                    assertThat(argumentState.name()).isEqualTo(argumentName);
-                })
-                .build();
+    public void tearDown() {
+        callOrder.add("tearDown");
     }
 
-    private static Action testAfter() {
-        return Direct.builder("after")
-                .runnable(context -> {
-                    afterTestCount.incrementAndGet();
-                    assertThat(context.getStore().get("test-before-ran", Boolean.class))
-                            .isPresent();
-                })
-                .build();
-    }
+    public static void staticTearDown() {
+        callOrder.add("staticTearDown");
 
-    private static Action argumentAfter() {
-        return Direct.builder("after")
-                .runnable(context -> {
-                    afterArgumentCount.incrementAndGet();
-                    assertThat(context.getStore().remove("argument", TestState.class))
-                            .isPresent();
-                })
-                .build();
-    }
-
-    private static Action suiteAfter() {
-        return Direct.builder("after")
-                .runnable(context -> {
-                    afterCount.incrementAndGet();
-                    assertThat(context.getStore().get("suite", TestState.class)).isPresent();
-                    assertThat(context.getAncestor("/")).isNotNull();
-                    assertThat(beforeCount.get()).isEqualTo(1);
-                    assertThat(beforeArgumentCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT);
-                    assertThat(beforeTestCount.get())
-                            .isEqualTo(EXPECTED_ARGUMENT_COUNT * EXPECTED_METHOD_COUNT_PER_ARGUMENT);
-                    assertThat(invokeTestCount.get())
-                            .isEqualTo(EXPECTED_ARGUMENT_COUNT * EXPECTED_METHOD_COUNT_PER_ARGUMENT);
-                    assertThat(afterTestCount.get())
-                            .isEqualTo(EXPECTED_ARGUMENT_COUNT * EXPECTED_METHOD_COUNT_PER_ARGUMENT);
-                    assertThat(afterArgumentCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT);
-                    assertThat(afterCount.get()).isEqualTo(1);
-                })
-                .build();
-    }
-
-    private static void resetCounts() {
-        beforeCount.set(0);
-        beforeArgumentCount.set(0);
-        beforeTestCount.set(0);
-        invokeTestCount.set(0);
-        afterTestCount.set(0);
-        afterArgumentCount.set(0);
-        afterCount.set(0);
+        assertThat(callOrder)
+                .containsExactly(
+                        "staticSetUp",
+                        "setUp",
+                        "beforeEach",
+                        "testOne",
+                        "afterEach",
+                        "beforeEach",
+                        "testTwo",
+                        "afterEach",
+                        "tearDown",
+                        "staticTearDown");
     }
 }

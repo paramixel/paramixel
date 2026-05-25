@@ -16,11 +16,22 @@
 
 package examples.support;
 
+/**
+ * Simple stdout debug printer for example code. Enable or disable by setting {@link #ENABLED}.
+ */
 public class Debug {
 
+    /**
+     * Whether debug output is active. Mutable so tests can toggle it at runtime.
+     */
     public static boolean ENABLED = true;
 
-    public static void debug(String message) {
+    /**
+     * Prints a debug message to stdout prefixed with the calling thread name.
+     *
+     * @param message the message to print
+     */
+    public static void debug(final String message) {
         var threadName = Thread.currentThread().getName();
         System.out.println("[DEBUG] DEBUG | " + threadName + " | " + message);
     }

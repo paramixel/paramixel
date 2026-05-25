@@ -1,0 +1,93 @@
+---
+title: Paramixel
+description: Composable action trees for Java testing.
+slug: /
+hide_table_of_contents: true
+---
+
+import Link from '@docusaurus/Link';
+
+# Paramixel
+
+**Composable action trees for Java testing.**
+
+Build tests from composable action trees. Paramixel is a tree-based test framework for Java 17+ that models test plans as immutable, composable `Action` hierarchies — not annotation-driven test classes.
+
+## Why Paramixel?
+
+- **Composable by design** — Tests are trees of `Action` objects, not flat annotated methods. Compose, nest, and reuse actions freely.
+- **Discovery when you need it** — `@Paramixel.Factory` enables classpath scanning. Programmatic `Runner.run(action)` works without it.
+- **Built-in parallelism** — `Parallel` actions run children concurrently with configurable parallelism limits.
+- **Instance lifecycle** — `Instance` actions manage factory-created objects with automatic `AutoCloseable` teardown.
+- **Annotation-driven actions** — `@Paramixel.Id`-annotated methods resolve to `Step` actions via `AnnotationResolver`, enabling method-to-action mapping for test composition.
+- **First-class Maven & Gradle** — Maven plugin for the `test` phase; Gradle `JavaExec` task for `paramixelTest`.
+- **Report generation** — Built-in text, JSON, XML, and HTML report listeners.
+
+## Quick Start
+
+Add the dependency:
+
+```xml
+<dependency>
+    <groupId>org.paramixel</groupId>
+    <artifactId>core</artifactId>
+    <version>5.0.0</version>
+</dependency>
+```
+
+Write a test:
+
+```java
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
+
+public class MyTest {
+
+    public static void main(String[] args) {
+        Runner.defaultRunner().runAndExit(factory());
+    }
+
+    @Paramixel.Factory
+    public static Action<?> factory() {
+        return Step.of("hello", instance -> {
+            System.out.println("Hello from Paramixel!");
+        });
+    }
+}
+```
+
+Run:
+
+```bash
+./mvnw test
+```
+
+## Explore
+
+<Link className="button button--primary button--lg" to="/getting-started/introduction">Getting Started</Link>
+&nbsp;
+<Link className="button button--secondary button--lg" to="/core-concepts/actions">Core Concepts</Link>
+&nbsp;
+<Link className="button button--secondary button--lg" to="/integrations/maven-plugin">Maven Plugin</Link>
+
+## Key Concepts
+
+| Concept | Description |
+| --- | --- |
+| [Action](core-concepts/actions) | The fundamental execution unit — composable, reusable, immutable |
+| [Step](core-concepts/elements#step) | A single callback that passes, fails, skips, or aborts |
+| [Lifecycle](core-concepts/elements#lifecycle) | Before/body/after composition with dependent or independent body children |
+| [Sequential](core-concepts/elements#sequential) | Ordered dependent or independent children |
+| [Parallel](core-concepts/elements#parallel) | Concurrent children with a configurable parallelism limit |
+| [Instance](core-concepts/elements#instance) | Factory-created instance with automatic lifecycle and `AutoCloseable` teardown |
+| [Static](core-concepts/elements#static) | Instance-free before/body/after lifecycle |
+| [Delay](core-concepts/elements#delay) | Fixed or random duration pause |
+| [Repeat](core-concepts/elements#repeat) | Repeated execution of a single child |
+| [Timeout](core-concepts/elements#timeout) | Wall-clock deadline for a single child |
+| [AssertTrue](core-concepts/elements#asserttrue) | Asserts a boolean condition is true |
+| [AssertFalse](core-concepts/elements#assertfalse) | Asserts a boolean condition is false |
+| [Discovery](core-concepts/discovery) | Classpath scanning with `@Paramixel.Factory` and `Selector` filtering |
+| [Configuration](configuration/properties) | Layered config from classpath, system properties, and programmatic overrides |
+| [Reporting](integrations/reporting) | Built-in text, JSON, XML, and HTML reports |

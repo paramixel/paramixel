@@ -20,38 +20,59 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.paramixel.core.Action;
-import org.paramixel.core.Factory;
-import org.paramixel.core.Paramixel;
-import org.paramixel.core.action.Direct;
-import org.paramixel.core.exception.FailException;
-import org.paramixel.core.support.Retry;
-import org.paramixel.core.support.Retry.Policy;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Spec;
+import org.paramixel.api.exception.FailException;
+import org.paramixel.api.support.Retry;
+import org.paramixel.api.support.Retry.Policy;
 
+/**
+ * Demonstrates the {@link Retry} support with a fixed-delay policy. The test step
+ * fails with {@link FailException} on the first two attempts and succeeds on the
+ * third, verifying that the retry result reports pass with an attempt count of 3.
+ */
 public class RetryTest {
 
-    public static void main(String[] args) {
-        Factory.defaultRunner().runAndExit(actionFactory());
+    private final AtomicInteger counter = new AtomicInteger(0);
+
+    /**
+     * Runs the action factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
+    public static void main(final String[] args) {
+        Runner.defaultRunner().runAndExit(factory());
     }
 
-    @Paramixel.ActionFactory
-    public static Action actionFactory() {
-        var counter = new AtomicInteger(0);
-        return Direct.builder("retry-example")
-                .runnable(context -> {
-                    Retry.Result result = Retry.of(Policy.fixed(Duration.ofMillis(100), Duration.ofSeconds(1)))
-                            .onRetry((attempt, cause) ->
-                                    System.out.println("Retry attempt " + attempt + " after: " + cause.getMessage()))
-                            .run(() -> {
-                                int attempt = counter.incrementAndGet();
-                                if (attempt < 3) {
-                                    FailException.fail("flaky failure on attempt " + attempt);
-                                }
-                            });
+    /**
+     * Builds a single-step action that retries a flaky operation using
+     * {@link FailException} on early attempts.
+     *
+     * @return the action tree for this test
+     */
+    @Paramixel.Factory
+    public static Spec<?> factory() {
+        return Instance.of("retry-example", RetryTest::new).child("retry()", RetryTest::retry);
+    }
 
-                    assertThat(result.isPass()).isTrue();
-                    assertThat(result.getAttemptCount()).isEqualTo(3);
-                })
-                .build();
+    public RetryTest() {
+        // Intentionally empty
+    }
+
+    public void retry() {
+        Retry.Result result = Retry.of(Policy.fixed(Duration.ofMillis(100), Duration.ofSeconds(1)))
+                .onRetry((attempt, cause) ->
+                        System.out.println("Retry attempt " + attempt + " after: " + cause.getMessage()))
+                .run(() -> {
+                    int attempt = counter.incrementAndGet();
+                    if (attempt < 3) {
+                        FailException.fail("flaky failure on attempt " + attempt);
+                    }
+                });
+
+        assertThat(result.isSuccessful()).isTrue();
+        assertThat(result.attemptCount()).isEqualTo(3);
     }
 }

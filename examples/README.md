@@ -32,17 +32,15 @@ Most top-level runnable example packages contain a `__ParamixelRunner__` class t
 ```java
 public class __ParamixelRunner__ {
     public static void main(String[] args) {
-        Factory.defaultRunner()
-                .runAndExit(Selector.builder()
-                        .packageOf(__ParamixelRunner__.class)
-                        .build());
+        Runner.defaultRunner()
+                .runAndExit(Selector.packageTreeOf(__ParamixelRunner__.class));
     }
 }
 ```
 
 Key details:
 
-- **Scope**: `Selector.packageOf()` selects all classes in the specified package and its subpackages. For example, running `examples.annotation.__ParamixelRunner__` executes `DisabledTest` in `examples.annotation` as well as `CriticalTaggedTest` and `SmokeTaggedTest` in `examples.annotation.tags`.
+- **Scope**: `Selector.packageTreeOf()` selects all classes in the specified package and its subpackages. For example, running `examples.annotation.__ParamixelRunner__` executes `DisabledTest` in `examples.annotation` as well as `CriticalTaggedTest` and `SmokeTaggedTest` in `examples.annotation.tags`.
 - **PMD violations**: The `__ParamixelRunner__` name intentionally violates PMD's `ClassNamingConventions` rule. These are tooling entry points, not application classes.
 - **`examples.support`** has no runner because it contains only utility classes, not test classes.
 
