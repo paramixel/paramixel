@@ -516,6 +516,9 @@
                         <configuration>
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>false</autoPublish>
+                            <excludeArtifacts>
+                                <excludeArtifact>examples</excludeArtifact>
+                            </excludeArtifacts>
                         </configuration>
                     </plugin>
                  </plugins>
