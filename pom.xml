@@ -43,7 +43,7 @@
     </modules>
 
     <properties>
-        <revision>5.0.0</revision>
+        <revision>5.0.0-POST</revision>
         <!-- Build settings -->
         <jacoco.skip>false</jacoco.skip>
         <maven.compiler.release>17</maven.compiler.release>
