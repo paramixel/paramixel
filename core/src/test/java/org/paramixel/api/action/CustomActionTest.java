@@ -21,15 +21,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.support.Arguments;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Configuration;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
+import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
-import org.paramixel.api.internal.ConcreteExecutionContext;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 @DisplayName("Custom action")
 class CustomActionTest {
@@ -103,7 +104,8 @@ class CustomActionTest {
         private final List<String> messages;
 
         SimplePrintAction(final String name, final List<String> messages) {
-            this.name = Arguments.requireValidName(name);
+            Objects.requireNonNull(name, "name is null");
+            this.name = Arguments.requireNonBlank(name, "name is blank");
             this.messages = Objects.requireNonNull(messages);
         }
 
@@ -118,7 +120,7 @@ class CustomActionTest {
         }
 
         @Override
-        public void execute(final ExecutionContext context) {
+        public void execute(final Context context) {
             Objects.requireNonNull(context);
             var descriptor = context.descriptor();
             var listener = context.listener();
@@ -141,7 +143,8 @@ class CustomActionTest {
         private final List<String> messages;
 
         SequentialPrintAction(final String name, final List<Action<?>> children, final List<String> messages) {
-            this.name = Arguments.requireValidName(name);
+            Objects.requireNonNull(name, "name is null");
+            this.name = Arguments.requireNonBlank(name, "name is blank");
             this.children = List.copyOf(Objects.requireNonNull(children));
             this.messages = Objects.requireNonNull(messages);
         }
@@ -162,7 +165,7 @@ class CustomActionTest {
         }
 
         @Override
-        public void execute(final ExecutionContext context) {
+        public void execute(final Context context) {
             Objects.requireNonNull(context);
             var descriptor = context.descriptor();
             var listener = context.listener();
@@ -171,7 +174,7 @@ class CustomActionTest {
             try {
                 var mode = descriptor.metadata().mode();
                 if (mode != Mode.RUN) {
-                    if (context instanceof ConcreteExecutionContext concrete) {
+                    if (context instanceof ConcreteContext concrete) {
                         concrete.runChildren(mode);
                     }
                     context.setStatus(mode.toStatus());
@@ -180,7 +183,7 @@ class CustomActionTest {
                     var childDescriptors = context.descriptor().children();
                     var completed = new ArrayList<Descriptor>();
                     for (Descriptor child : childDescriptors) {
-                        if (context instanceof ConcreteExecutionContext concrete) {
+                        if (context instanceof ConcreteContext concrete) {
                             completed.add(concrete.runChild(child, Mode.RUN));
                         }
                     }
@@ -201,6 +204,12 @@ class CustomActionTest {
         RecordingListener(final List<String> events) {
             this.events = Objects.requireNonNull(events);
         }
+
+        @Override
+        public void initialize(final Configuration configuration) {}
+
+        @Override
+        public void onDiscoveryStarted() {}
 
         @Override
         public void onRunStarted() {
@@ -224,7 +233,7 @@ class CustomActionTest {
         }
 
         @Override
-        public void onRunCompleted(final org.paramixel.api.Result result) {
+        public void onRunCompleted(final Result result) {
             events.add("run-completed");
         }
     }

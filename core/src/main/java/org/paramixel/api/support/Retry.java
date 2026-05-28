@@ -23,10 +23,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
+import nonapi.org.paramixel.support.Arguments;
+import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.ThrowingRunnable;
 import org.paramixel.api.exception.PolicyException;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.api.internal.support.UnrecoverableErrors;
 
 /**
  * Retries a runnable operation with configurable backoff and a wall-clock duration budget.
@@ -39,7 +39,7 @@ import org.paramixel.api.internal.support.UnrecoverableErrors;
  * or accessed concurrently. Typical usage confines a {@code Retry} instance to a single
  * method call or lifecycle scope.
  */
-public class Retry {
+public final class Retry {
 
     private static final Predicate<Throwable> DEFAULT_RETRY_ON = t -> !(t instanceof Error);
 
@@ -61,7 +61,7 @@ public class Retry {
      * @throws NullPointerException if {@code policy} is {@code null}
      */
     public static Retry of(final Policy policy) {
-        Objects.requireNonNull(policy, "policy must not be null");
+        Objects.requireNonNull(policy, "policy is null");
         return new Retry(policy);
     }
 
@@ -83,9 +83,9 @@ public class Retry {
      * @throws NullPointerException if {@code predicate} is {@code null}
      */
     public Retry retryOn(final Predicate<Throwable> predicate) {
-        Objects.requireNonNull(predicate, "predicate must not be null");
+        Objects.requireNonNull(predicate, "predicate is null");
         if (everRun) {
-            throw new IllegalStateException("retryOn must not be called after run");
+            throw new IllegalStateException("retryOn is called after run");
         }
         this.retryOn = predicate;
         return this;
@@ -104,9 +104,9 @@ public class Retry {
      * @throws IllegalStateException if this retry sequence has already run
      */
     public Retry onRetry(final BiConsumer<Integer, Throwable> callback) {
-        Objects.requireNonNull(callback, "callback must not be null");
+        Objects.requireNonNull(callback, "callback is null");
         if (hasRun) {
-            throw new IllegalStateException("onRetry must not be called after run");
+            throw new IllegalStateException("onRetry is called after run");
         }
         onRetryCallbacks.add(callback);
         return this;
@@ -130,7 +130,7 @@ public class Retry {
      * @throws NullPointerException if {@code throwableRunnable} is {@code null}
      */
     public Result run(final ThrowingRunnable throwableRunnable) {
-        Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
+        Objects.requireNonNull(throwableRunnable, "throwableRunnable is null");
         if (hasRun) {
             throw new IllegalStateException("Retry has already run");
         }
@@ -256,6 +256,7 @@ public class Retry {
      */
     public Retry reset() {
         hasRun = false;
+        everRun = false;
         return this;
     }
 
@@ -326,13 +327,12 @@ public class Retry {
          *     {@code maximumDuration}
          */
         static Policy fixed(final Duration initialDelay, final Duration maximumDuration) {
-            Objects.requireNonNull(initialDelay, "initialDelay must not be null");
-            Objects.requireNonNull(maximumDuration, "maximumDuration must not be null");
-            Arguments.requireFalse(initialDelay.isNegative(), "initialDelay must not be negative");
-            Arguments.requireFalse(maximumDuration.isNegative(), "maximumDuration must not be negative");
+            Objects.requireNonNull(initialDelay, "initialDelay is null");
+            Objects.requireNonNull(maximumDuration, "maximumDuration is null");
+            Arguments.requireFalse(initialDelay.isNegative(), "initialDelay is negative");
+            Arguments.requireFalse(maximumDuration.isNegative(), "maximumDuration is negative");
             Arguments.requireTrue(
-                    initialDelay.compareTo(maximumDuration) <= 0,
-                    "initialDelay must not be greater than maximumDuration");
+                    initialDelay.compareTo(maximumDuration) <= 0, "initialDelay is greater than maximumDuration");
             return new Policy() {
                 @Override
                 public Duration waitDuration(final int attempt, final Throwable cause) {
@@ -365,13 +365,12 @@ public class Retry {
          *     {@code maximumDuration}
          */
         static Policy exponential(final Duration initialDelay, final Duration maximumDuration) {
-            Objects.requireNonNull(initialDelay, "initialDelay must not be null");
-            Objects.requireNonNull(maximumDuration, "maximumDuration must not be null");
-            Arguments.requireFalse(initialDelay.isNegative(), "initialDelay must not be negative");
-            Arguments.requireFalse(maximumDuration.isNegative(), "maximumDuration must not be negative");
+            Objects.requireNonNull(initialDelay, "initialDelay is null");
+            Objects.requireNonNull(maximumDuration, "maximumDuration is null");
+            Arguments.requireFalse(initialDelay.isNegative(), "initialDelay is negative");
+            Arguments.requireFalse(maximumDuration.isNegative(), "maximumDuration is negative");
             Arguments.requireTrue(
-                    initialDelay.compareTo(maximumDuration) <= 0,
-                    "initialDelay must not be greater than maximumDuration");
+                    initialDelay.compareTo(maximumDuration) <= 0, "initialDelay is greater than maximumDuration");
             return new Policy() {
                 @Override
                 public Duration waitDuration(final int attempt, final Throwable cause) {

@@ -64,7 +64,7 @@ class ParamixelMojoPropertyTest {
             var property = new Property();
             assertThatThrownBy(() -> property.setKey(null))
                     .isInstanceOf(NullPointerException.class)
-                    .hasMessage("key must not be null");
+                    .hasMessage("key is null");
         }
 
         @Test
@@ -73,7 +73,7 @@ class ParamixelMojoPropertyTest {
             var property = new Property();
             assertThatThrownBy(() -> property.setKey("  "))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("key must not be blank");
+                    .hasMessage("key is blank");
         }
 
         @Test
@@ -95,7 +95,7 @@ class ParamixelMojoPropertyTest {
             var property = new Property();
             assertThatThrownBy(() -> property.setValue(null))
                     .isInstanceOf(NullPointerException.class)
-                    .hasMessage("value must not be null");
+                    .hasMessage("value is null");
         }
 
         @Test
@@ -104,7 +104,7 @@ class ParamixelMojoPropertyTest {
             var property = new Property();
             assertThatThrownBy(() -> property.setValue("  "))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("value must not be blank");
+                    .hasMessage("value is blank");
         }
 
         @Test
@@ -323,7 +323,7 @@ class ParamixelMojoPropertyTest {
             assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
                     .cause()
                     .isInstanceOf(MojoExecutionException.class)
-                    .hasMessage("Paramixel property key must not be null");
+                    .hasMessage("Paramixel property key is null");
         }
 
         @Test
@@ -337,7 +337,7 @@ class ParamixelMojoPropertyTest {
             assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
                     .cause()
                     .isInstanceOf(MojoExecutionException.class)
-                    .hasMessage("Paramixel property 'paramixel.custom' value must not be null");
+                    .hasMessage("Paramixel property 'paramixel.custom' value is null");
         }
 
         @Test
@@ -348,7 +348,7 @@ class ParamixelMojoPropertyTest {
 
             assertThatThrownBy(() -> property.setValue("   "))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("value must not be blank");
+                    .hasMessage("value is blank");
         }
     }
 

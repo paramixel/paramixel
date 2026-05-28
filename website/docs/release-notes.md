@@ -5,6 +5,12 @@ description: Paramixel release history and version notes.
 
 # Release Notes
 
+## Unreleased
+
+## 5.1.0
+
+- **Listener output exclusion** — new `paramixel.listener.exclude` configuration key allows fine-grained suppression of listener output sections (`status.header`, `status.footer`, `summary.header`, `summary.tree`, `summary.footer`, `quiet`, `all`). See [Configuration Properties](./configuration/properties#paramixellistenerexclude).
+
 ## 5.0.0
 
 Paramixel 5.0.0 is a major release with significant API changes from 4.x.

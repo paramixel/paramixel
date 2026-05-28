@@ -129,56 +129,56 @@ class ConfigurationArgumentsTest {
     @Test
     @DisplayName("Configuration.of(Map) returns non-null configuration")
     void ofMapReturnsNonNull() {
-        Configuration config = Configuration.of(java.util.Map.of());
+        Configuration config = Configuration.of(Map.of());
         assertThat(config).isNotNull();
     }
 
     @Test
     @DisplayName("getString returns empty optional for absent key")
     void getStringReturnsEmptyForAbsentKey() {
-        Configuration config = Configuration.of(java.util.Map.of());
+        Configuration config = Configuration.of(Map.of());
         assertThat(config.getString("nonexistent")).isEmpty();
     }
 
     @Test
     @DisplayName("getString returns present optional for present key")
     void getStringReturnsPresentForPresentKey() {
-        Configuration config = Configuration.of(java.util.Map.of("key", "value"));
+        Configuration config = Configuration.of(Map.of("key", "value"));
         assertThat(config.getString("key")).contains("value");
     }
 
     @Test
     @DisplayName("getBoolean returns true for 'true' value")
     void getBooleanReturnsTrueForTrueValue() {
-        Configuration config = Configuration.of(java.util.Map.of("key", "true"));
+        Configuration config = Configuration.of(Map.of("key", "true"));
         assertThat(config.getBoolean("key")).contains(true);
     }
 
     @Test
     @DisplayName("getBoolean returns false for 'false' value")
     void getBooleanReturnsFalseForFalseValue() {
-        Configuration config = Configuration.of(java.util.Map.of("key", "false"));
+        Configuration config = Configuration.of(Map.of("key", "false"));
         assertThat(config.getBoolean("key")).contains(false);
     }
 
     @Test
     @DisplayName("getBoolean returns empty optional for absent key")
     void getBooleanReturnsEmptyForAbsentKey() {
-        Configuration config = Configuration.of(java.util.Map.of());
+        Configuration config = Configuration.of(Map.of());
         assertThat(config.getBoolean("key")).isEmpty();
     }
 
     @Test
     @DisplayName("getInteger returns present optional for valid integer")
     void getIntegerReturnsPresentForValidInteger() {
-        Configuration config = Configuration.of(java.util.Map.of("key", "42"));
+        Configuration config = Configuration.of(Map.of("key", "42"));
         assertThat(config.getInteger("key")).contains(42);
     }
 
     @Test
     @DisplayName("keySet returns all keys")
     void keySetReturnsAllKeys() {
-        Configuration config = Configuration.of(java.util.Map.of("a", "1", "b", "2"));
+        Configuration config = Configuration.of(Map.of("a", "1", "b", "2"));
         assertThat(config.keySet()).containsExactlyInAnyOrder("a", "b");
     }
 

@@ -19,6 +19,7 @@
         <exclude name="SystemPrintln"/>
         <exclude name="MissingOverride"/>
         <exclude name="LooseCoupling"/>
+        <exclude name="UnitTestShouldUseTestAnnotation"/>
         <exclude name="RelianceOnDefaultCharset"/>
         <exclude name="AvoidReassigningParameters"/>
         <exclude name="PreserveStackTrace"/>
@@ -120,6 +121,7 @@
     <!-- Multithreading -->
     <rule ref="category/java/multithreading.xml">
         <exclude name="DoNotUseThreads"/>
+        <exclude name="AvoidThreadGroup"/>
         <exclude name="AvoidSynchronizedStatement"/>
         <exclude name="AvoidSynchronizedAtMethodLevel"/>
         <exclude name="UseConcurrentHashMap"/>

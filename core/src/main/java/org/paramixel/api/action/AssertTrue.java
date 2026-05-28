@@ -18,10 +18,8 @@ package org.paramixel.api.action;
 
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * Leaf action that evaluates a boolean condition and passes when it is
@@ -51,8 +49,9 @@ public final class AssertTrue implements Action<Void> {
     private final String message;
 
     private AssertTrue(final String name, final BooleanSupplier conditionSupplier, final String message) {
-        this.name = Arguments.requireValidName(name);
-        this.conditionSupplier = Objects.requireNonNull(conditionSupplier, "conditionSupplier must not be null");
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
+        this.conditionSupplier = Objects.requireNonNull(conditionSupplier, "conditionSupplier is null");
         this.message = message;
     }
 
@@ -66,8 +65,8 @@ public final class AssertTrue implements Action<Void> {
      * @throws IllegalArgumentException if {@code name} is blank
      */
     public static AssertTrue of(final String name, final boolean condition) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
         return new AssertTrue(name, () -> condition, null);
     }
 
@@ -83,10 +82,10 @@ public final class AssertTrue implements Action<Void> {
      * @throws IllegalArgumentException if {@code name} or {@code message} is blank
      */
     public static AssertTrue of(final String name, final boolean condition, final String message) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(message, "message must not be null");
-        Arguments.requireNonBlank(message, "message must not be blank");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Objects.requireNonNull(message, "message is null");
+        Arguments.requireNonBlank(message, "message is blank");
         return new AssertTrue(name, () -> condition, message);
     }
 
@@ -100,9 +99,9 @@ public final class AssertTrue implements Action<Void> {
      * @throws IllegalArgumentException if {@code name} is blank
      */
     public static AssertTrue of(final String name, final BooleanSupplier supplier) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(supplier, "supplier must not be null");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Objects.requireNonNull(supplier, "supplier is null");
         return new AssertTrue(name, supplier, null);
     }
 
@@ -118,11 +117,11 @@ public final class AssertTrue implements Action<Void> {
      * @throws IllegalArgumentException if {@code name} or {@code message} is blank
      */
     public static AssertTrue of(final String name, final BooleanSupplier supplier, final String message) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(supplier, "supplier must not be null");
-        Objects.requireNonNull(message, "message must not be null");
-        Arguments.requireNonBlank(message, "message must not be blank");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Objects.requireNonNull(supplier, "supplier is null");
+        Objects.requireNonNull(message, "message is null");
+        Arguments.requireNonBlank(message, "message is blank");
         return new AssertTrue(name, supplier, message);
     }
 
@@ -137,8 +136,8 @@ public final class AssertTrue implements Action<Void> {
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);

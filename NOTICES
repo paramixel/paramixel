@@ -4,6 +4,24 @@ Copyright 2006-present Douglas Hoard
 This project is licensed under the Apache License, Version 2.0.
 See: LICENSE
 
+Source Code Third-Party Notices
+
+This product includes embedded and relocated source code from the following
+third-party projects. The original package names have been relocated as noted
+below.
+
+- ClassGraph
+  - Version: 4.8.184
+  - Website: https://github.com/classgraph/classgraph
+  - License: MIT License
+  - Original packages: io.github.classgraph, nonapi.io.github.classgraph
+  - Relocated to: nonapi.org.paramixel.classgraph.io.github.classgraph,
+    nonapi.org.paramixel.classgraph.nonapi.io.github.classgraph
+  - Copyright:
+    - Copyright (c) 2019-2021 Luke Hutchison
+    - Copyright (c) 2016 Johno Crawford
+    - Copyright (c) 2017 Harith Elrufaie
+
 Third-Party Notices
 
 Test and examples are adapted from the following third-party projects
@@ -33,12 +51,6 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - Coordinates: org.assertj:assertj-core
   - Website: https://assertj.github.io/doc/
   - License: Apache License 2.0
-
-- ClassGraph
-  - Coordinates: io.github.classgraph:classgraph
-  - Website: https://github.com/classgraph/classgraph
-  - License: MIT License
-  - Copyright: Copyright (c) 2022 Luke Hutchison
 
 - JUnit Platform / JUnit Jupiter (JUnit Project)
   - Coordinates: org.junit.platform:* and org.junit.jupiter:*
@@ -82,11 +94,6 @@ Direct Dependency Inventory (as declared in Gradle build files)
   - Coordinates: org.junit.platform:* and org.junit.jupiter:*
   - Website: https://junit.org/
   - License: Eclipse Public License 2.0 (EPL-2.0)
-
-- Paramixel Core
-  - Coordinates: org.paramixel:core
-  - Website: https://github.com/paramixel/paramixel
-  - License: Apache License 2.0
 
 Note: Transitive dependencies pulled in by the above components may carry
 additional license obligations. When redistributing binaries, you must ensure

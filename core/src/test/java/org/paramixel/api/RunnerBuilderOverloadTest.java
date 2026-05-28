@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Spec;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Runner Builder overloads")
@@ -32,7 +33,7 @@ class RunnerBuilderOverloadTest {
     void runSpecResolvesAndRunsLifecycle() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        org.paramixel.api.action.Spec<?> spec = Lifecycle.of("lifecycle").before("step", obj -> {});
+        Spec<?> spec = Lifecycle.of("lifecycle").before("step", obj -> {});
 
         Result result = runner.run(spec);
 
@@ -47,7 +48,7 @@ class RunnerBuilderOverloadTest {
         Runner runner = Runner.builder().listener(listener).build();
         Step<?> step = Step.of("step", obj -> {});
 
-        Result specResult = runner.run((org.paramixel.api.action.Spec<?>) step);
+        Result specResult = runner.run((Spec<?>) step);
         Result actionResult = runner.run(step);
 
         assertThat(specResult.status()).isEqualTo(actionResult.status());
@@ -58,7 +59,7 @@ class RunnerBuilderOverloadTest {
     void runAndReturnExitCodeSpecReturnsZeroForPassingAction() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        org.paramixel.api.action.Spec<?> spec = Lifecycle.of("lifecycle").before("step", obj -> {});
+        Spec<?> spec = Lifecycle.of("lifecycle").before("step", obj -> {});
 
         int exitCode = runner.runAndReturnExitCode(spec);
 
@@ -86,7 +87,7 @@ class RunnerBuilderOverloadTest {
         Runner runner = Runner.builder().listener(listener).build();
         Step<?> step = Step.of("step", obj -> {});
 
-        int specCode = runner.runAndReturnExitCode((org.paramixel.api.action.Spec<?>) step);
+        int specCode = runner.runAndReturnExitCode((Spec<?>) step);
         int actionCode = runner.runAndReturnExitCode(step);
 
         assertThat(specCode).isEqualTo(actionCode);
@@ -109,18 +110,24 @@ class RunnerBuilderOverloadTest {
     private static final class NoOpListener implements Listener {
 
         @Override
+        public void initialize(final Configuration configuration) {}
+
+        @Override
+        public void onDiscoveryStarted() {}
+
+        @Override
         public void onRunStarted() {}
 
         @Override
-        public void onDiscoveryCompleted(final org.paramixel.api.action.Descriptor root) {}
+        public void onDiscoveryCompleted(final Descriptor root) {}
 
         @Override
-        public void onBeforeExecution(final org.paramixel.api.action.Descriptor descriptor) {}
+        public void onBeforeExecution(final Descriptor descriptor) {}
 
         @Override
-        public void onAfterExecution(final org.paramixel.api.action.Descriptor descriptor) {}
+        public void onAfterExecution(final Descriptor descriptor) {}
 
         @Override
-        public void onRunCompleted(final org.paramixel.api.Result result) {}
+        public void onRunCompleted(final Result result) {}
     }
 }

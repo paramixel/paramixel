@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Instance;
@@ -45,7 +46,8 @@ public class ParallelInstanceTest {
     private static final AtomicInteger testCount = new AtomicInteger();
     private static final AtomicInteger concurrentCount = new AtomicInteger();
     private static final AtomicInteger maxConcurrentCount = new AtomicInteger();
-    private static final CountDownLatch latch = new CountDownLatch(METHOD_COUNT);
+    private static final AtomicInteger expectedConcurrency = new AtomicInteger();
+    private static volatile CountDownLatch latch = new CountDownLatch(1);
     private static final Set<Integer> instanceIds = ConcurrentHashMap.newKeySet();
 
     /**
@@ -95,29 +97,32 @@ public class ParallelInstanceTest {
     }
 
     public void method1() throws InterruptedException {
+        var currentLatch = latch;
         instanceIds.add(System.identityHashCode(this));
         enter();
         testCount.incrementAndGet();
-        latch.countDown();
-        latch.await();
+        currentLatch.countDown();
+        currentLatch.await();
         exit();
     }
 
     public void method2() throws InterruptedException {
+        var currentLatch = latch;
         instanceIds.add(System.identityHashCode(this));
         enter();
         testCount.incrementAndGet();
-        latch.countDown();
-        latch.await();
+        currentLatch.countDown();
+        currentLatch.await();
         exit();
     }
 
     public void method3() throws InterruptedException {
+        var currentLatch = latch;
         instanceIds.add(System.identityHashCode(this));
         enter();
         testCount.incrementAndGet();
-        latch.countDown();
-        latch.await();
+        currentLatch.countDown();
+        currentLatch.await();
         exit();
     }
 
@@ -135,14 +140,23 @@ public class ParallelInstanceTest {
     }
 
     public static void validate() {
+        var expected = expectedConcurrency.get();
         assertThat(testCount.get()).isEqualTo(METHOD_COUNT);
         assertThat(concurrentCount.get()).isEqualTo(0);
-        assertThat(maxConcurrentCount.get()).isGreaterThan(1);
-        assertThat(maxConcurrentCount.get()).isLessThanOrEqualTo(PARALLELISM);
+        if (expected > 1) {
+            assertThat(maxConcurrentCount.get()).isGreaterThan(1);
+        } else {
+            assertThat(maxConcurrentCount.get()).isEqualTo(1);
+        }
+        assertThat(maxConcurrentCount.get()).isLessThanOrEqualTo(expected);
         assertThat(instanceIds).hasSize(1);
     }
 
     private static void resetCounts() {
+        var configuredParallelism = Integer.getInteger(Configuration.RUNNER_PARALLELISM, PARALLELISM);
+        var effectiveParallelism = Math.max(1, Math.min(PARALLELISM, configuredParallelism));
+        expectedConcurrency.set(effectiveParallelism);
+        latch = new CountDownLatch(effectiveParallelism);
         testCount.set(0);
         concurrentCount.set(0);
         maxConcurrentCount.set(0);

@@ -31,7 +31,7 @@ class RetryArgumentsTest {
     void ofRejectsNullPolicy() {
         assertThatThrownBy(() -> Retry.of(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("policy must not be null");
+                .hasMessage("policy is null");
     }
 
     @Test
@@ -41,7 +41,7 @@ class RetryArgumentsTest {
 
         assertThatThrownBy(() -> retry.retryOn(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("predicate must not be null");
+                .hasMessage("predicate is null");
     }
 
     @Test
@@ -51,7 +51,7 @@ class RetryArgumentsTest {
 
         assertThatThrownBy(() -> retry.onRetry(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("callback must not be null");
+                .hasMessage("callback is null");
     }
 
     @Test
@@ -62,7 +62,7 @@ class RetryArgumentsTest {
 
         assertThatThrownBy(() -> retry.onRetry((attempt, cause) -> {}))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("onRetry must not be called after run");
+                .hasMessage("onRetry is called after run");
     }
 
     @Test
@@ -72,7 +72,7 @@ class RetryArgumentsTest {
 
         assertThatThrownBy(() -> retry.run(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("throwableRunnable must not be null");
+                .hasMessage("throwableRunnable is null");
     }
 
     @Test
@@ -80,7 +80,7 @@ class RetryArgumentsTest {
     void policyFixedRejectsNullInitialDelay() {
         assertThatThrownBy(() -> Policy.fixed(null, Duration.ofSeconds(1)))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("initialDelay must not be null");
+                .hasMessage("initialDelay is null");
     }
 
     @Test
@@ -88,7 +88,7 @@ class RetryArgumentsTest {
     void policyFixedRejectsNullMaximumDuration() {
         assertThatThrownBy(() -> Policy.fixed(Duration.ofMillis(100), null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("maximumDuration must not be null");
+                .hasMessage("maximumDuration is null");
     }
 
     @Test
@@ -96,7 +96,7 @@ class RetryArgumentsTest {
     void policyFixedRejectsNegativeInitialDelay() {
         assertThatThrownBy(() -> Policy.fixed(Duration.ofMillis(-1), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay must not be negative");
+                .hasMessage("initialDelay is negative");
     }
 
     @Test
@@ -104,7 +104,7 @@ class RetryArgumentsTest {
     void policyFixedRejectsNegativeMaximumDuration() {
         assertThatThrownBy(() -> Policy.fixed(Duration.ZERO, Duration.ofMillis(-1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("maximumDuration must not be negative");
+                .hasMessage("maximumDuration is negative");
     }
 
     @Test
@@ -112,7 +112,7 @@ class RetryArgumentsTest {
     void policyFixedRejectsInitialGreaterThanMax() {
         assertThatThrownBy(() -> Policy.fixed(Duration.ofSeconds(2), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay must not be greater than maximumDuration");
+                .hasMessage("initialDelay is greater than maximumDuration");
     }
 
     @Test
@@ -120,7 +120,7 @@ class RetryArgumentsTest {
     void policyExponentialRejectsNullInitialDelay() {
         assertThatThrownBy(() -> Policy.exponential(null, Duration.ofSeconds(1)))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("initialDelay must not be null");
+                .hasMessage("initialDelay is null");
     }
 
     @Test
@@ -128,7 +128,7 @@ class RetryArgumentsTest {
     void policyExponentialRejectsNullMaximumDuration() {
         assertThatThrownBy(() -> Policy.exponential(Duration.ofMillis(100), null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("maximumDuration must not be null");
+                .hasMessage("maximumDuration is null");
     }
 
     @Test
@@ -136,7 +136,7 @@ class RetryArgumentsTest {
     void policyExponentialRejectsNegativeInitialDelay() {
         assertThatThrownBy(() -> Policy.exponential(Duration.ofMillis(-1), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay must not be negative");
+                .hasMessage("initialDelay is negative");
     }
 
     @Test
@@ -144,7 +144,7 @@ class RetryArgumentsTest {
     void policyExponentialRejectsNegativeMaximumDuration() {
         assertThatThrownBy(() -> Policy.exponential(Duration.ZERO, Duration.ofMillis(-1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("maximumDuration must not be negative");
+                .hasMessage("maximumDuration is negative");
     }
 
     @Test
@@ -152,7 +152,7 @@ class RetryArgumentsTest {
     void policyExponentialRejectsInitialGreaterThanMax() {
         assertThatThrownBy(() -> Policy.exponential(Duration.ofSeconds(2), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay must not be greater than maximumDuration");
+                .hasMessage("initialDelay is greater than maximumDuration");
     }
 
     @Test
@@ -174,6 +174,6 @@ class RetryArgumentsTest {
 
         assertThatThrownBy(() -> retry.runAndThrow(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("throwableRunnable must not be null");
+                .hasMessage("throwableRunnable is null");
     }
 }

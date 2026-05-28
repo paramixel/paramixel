@@ -18,6 +18,9 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Step;
@@ -31,11 +34,11 @@ class DefaultListenerTest {
         Listener listener = Listener.defaultListener();
         var action = Step.of("direct", obj -> {});
 
-        var output = new java.io.ByteArrayOutputStream();
-        java.io.PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
 
         try {
-            System.setOut(new java.io.PrintStream(output, true, java.nio.charset.StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
 
             Runner runner = Runner.builder().listener(listener).build();
             runner.run(action);
@@ -43,8 +46,6 @@ class DefaultListenerTest {
             System.setOut(originalOut);
         }
 
-        assertThat(output.toString(java.nio.charset.StandardCharsets.UTF_8))
-                .contains("direct")
-                .contains("PASSED");
+        assertThat(output.toString(StandardCharsets.UTF_8)).contains("direct").contains("PASSED");
     }
 }

@@ -35,7 +35,7 @@ class AnnotationResolverArgumentsTest {
     void createRejectsNullType() {
         assertThatThrownBy(() -> AnnotationResolver.create(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("type must not be null");
+                .hasMessage("type is null");
     }
 
     @Test
@@ -44,7 +44,7 @@ class AnnotationResolverArgumentsTest {
         assertThatThrownBy(() -> AnnotationResolver.create(AnnotationResolverTest.ResolveFixture.class)
                         .byId(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("id must not be null");
+                .hasMessage("id is null");
     }
 
     @Test
@@ -53,7 +53,7 @@ class AnnotationResolverArgumentsTest {
         assertThatThrownBy(() -> AnnotationResolver.create(AnnotationResolverTest.ResolveFixture.class)
                         .byId(" "))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("id must not be blank");
+                .hasMessage("id is blank");
     }
 
     @Test
@@ -100,7 +100,7 @@ class AnnotationResolverArgumentsTest {
         assertThatThrownBy(() -> AnnotationResolver.create(AnnotationResolverTest.StaticResolveFixture.class)
                         .staticById(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("id must not be null");
+                .hasMessage("id is null");
     }
 
     @Test
@@ -109,7 +109,7 @@ class AnnotationResolverArgumentsTest {
         assertThatThrownBy(() -> AnnotationResolver.create(AnnotationResolverTest.StaticResolveFixture.class)
                         .staticById(" "))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("id must not be blank");
+                .hasMessage("id is blank");
     }
 
     @Test

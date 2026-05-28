@@ -18,14 +18,17 @@ package org.paramixel.api;
 
 import java.util.Objects;
 import java.util.Optional;
+import nonapi.org.paramixel.ConcreteRunner;
 import org.paramixel.api.action.Spec;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.CycleDetectedException;
-import org.paramixel.api.internal.ConcreteRunner;
 import org.paramixel.api.selector.Selector;
 
 /**
  * Executes Paramixel actions and returns results containing descriptor trees and effective aggregate status.
+ *
+ * <p>Implementations are not required to be thread-safe. Concurrent use of a single {@code Runner} instance
+ * from multiple threads is undefined unless the implementation documents otherwise.
  *
  * @see Result
  */
@@ -155,7 +158,7 @@ public interface Runner {
          */
         public Builder configuration(final Configuration configuration) {
             ensureNotBuilt();
-            this.configuration = Objects.requireNonNull(configuration, "configuration must not be null");
+            this.configuration = Objects.requireNonNull(configuration, "configuration is null");
             return this;
         }
 
@@ -167,7 +170,7 @@ public interface Runner {
          */
         public Builder listener(final Listener listener) {
             ensureNotBuilt();
-            this.listener = Objects.requireNonNull(listener, "listener must not be null");
+            this.listener = Objects.requireNonNull(listener, "listener is null");
             this.explicitListener = true;
             return this;
         }

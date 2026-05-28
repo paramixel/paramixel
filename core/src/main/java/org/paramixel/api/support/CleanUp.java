@@ -18,8 +18,8 @@ package org.paramixel.api.support;
 
 import java.util.Collection;
 import java.util.Objects;
+import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.ThrowingRunnable;
-import org.paramixel.api.internal.support.UnrecoverableErrors;
 
 /**
  * A single-use wrapper that executes a {@link ThrowingRunnable} and captures any
@@ -56,7 +56,7 @@ public final class CleanUp {
      * @throws NullPointerException if {@code throwableRunnable} is {@code null}
      */
     public static CleanUp of(final ThrowingRunnable throwableRunnable) {
-        Objects.requireNonNull(throwableRunnable, "throwableRunnable must not be null");
+        Objects.requireNonNull(throwableRunnable, "throwableRunnable is null");
         return new CleanUp(throwableRunnable);
     }
 
@@ -184,10 +184,10 @@ public final class CleanUp {
      *     if any instance captured a throwable
      */
     public static void runAndThrow(final CleanUp... cleanUps) throws Throwable {
-        Objects.requireNonNull(cleanUps, "cleanUps must not be null");
+        Objects.requireNonNull(cleanUps, "cleanUps is null");
         Throwable firstException = null;
         for (CleanUp cleanUp : cleanUps) {
-            Objects.requireNonNull(cleanUp, "cleanUp must not be null");
+            Objects.requireNonNull(cleanUp, "cleanUp is null");
             if (!cleanUp.hasRun()) {
                 cleanUp.run();
             }
@@ -222,14 +222,14 @@ public final class CleanUp {
      *     if any instance captured a throwable
      */
     public static void runAndThrow(final Collection<CleanUp> cleanUps) throws Throwable {
-        Objects.requireNonNull(cleanUps, "cleanUps must not be null");
+        Objects.requireNonNull(cleanUps, "cleanUps is null");
         runAllAndThrow(cleanUps);
     }
 
     private static void runAllAndThrow(final Collection<? extends CleanUp> cleanUps) throws Throwable {
         Throwable firstException = null;
         for (CleanUp cleanUp : cleanUps) {
-            Objects.requireNonNull(cleanUp, "cleanUp must not be null");
+            Objects.requireNonNull(cleanUp, "cleanUp is null");
             if (!cleanUp.hasRun()) {
                 cleanUp.run();
             }

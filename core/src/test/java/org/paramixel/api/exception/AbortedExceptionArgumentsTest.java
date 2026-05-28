@@ -47,4 +47,16 @@ class AbortedExceptionArgumentsTest {
     void abortStringRejectsNullMessage() {
         assertThatThrownBy(() -> AbortedException.abort(null)).isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    @DisplayName("abort(String) rejects empty message")
+    void abortStringRejectsEmptyMessage() {
+        assertThatThrownBy(() -> AbortedException.abort("")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("abort(String) rejects blank message")
+    void abortStringRejectsBlankMessage() {
+        assertThatThrownBy(() -> AbortedException.abort("   ")).isInstanceOf(IllegalArgumentException.class);
+    }
 }

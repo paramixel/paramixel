@@ -20,10 +20,8 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.LongSupplier;
+import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * Leaf action that pauses execution for a fixed or random duration.
@@ -45,9 +43,9 @@ public final class Delay implements Action<Void> {
     private final LongSupplier millisecondsSupplier;
 
     private Delay(final String name, final LongSupplier millisecondsSupplier) {
-        this.name = Arguments.requireValidName(name);
-        this.millisecondsSupplier =
-                Objects.requireNonNull(millisecondsSupplier, "millisecondsSupplier must not be null");
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
+        this.millisecondsSupplier = Objects.requireNonNull(millisecondsSupplier, "millisecondsSupplier is null");
     }
 
     /**
@@ -60,9 +58,9 @@ public final class Delay implements Action<Void> {
      * @throws IllegalArgumentException if {@code name} is blank or {@code milliseconds} is negative
      */
     public static Delay of(final String name, final long milliseconds) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Arguments.requireNonNegative(milliseconds, "milliseconds must not be negative");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Arguments.requireNonNegative(milliseconds, "milliseconds is negative");
         return new Delay(name, () -> milliseconds);
     }
 
@@ -76,10 +74,10 @@ public final class Delay implements Action<Void> {
      * @throws IllegalArgumentException if {@code name} is blank or {@code duration} is negative
      */
     public static Delay of(final String name, final Duration duration) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(duration, "duration must not be null");
-        Arguments.requireNonNegative(duration.toMillis(), "duration must not be negative");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Objects.requireNonNull(duration, "duration is null");
+        Arguments.requireNonNegative(duration.toMillis(), "duration is negative");
         return new Delay(name, duration::toMillis);
     }
 
@@ -97,12 +95,11 @@ public final class Delay implements Action<Void> {
      *     or {@code maximumMilliseconds} is less than {@code minimumMilliseconds}
      */
     public static Delay random(final String name, final long minimumMilliseconds, final long maximumMilliseconds) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Arguments.requireNonNegative(minimumMilliseconds, "minimumMilliseconds must not be negative");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Arguments.requireNonNegative(minimumMilliseconds, "minimumMilliseconds is negative");
         Arguments.requireTrue(
-                maximumMilliseconds >= minimumMilliseconds,
-                "maximumMilliseconds must not be less than minimumMilliseconds");
+                maximumMilliseconds >= minimumMilliseconds, "maximumMilliseconds is less than minimumMilliseconds");
         if (maximumMilliseconds < Long.MAX_VALUE) {
             return new Delay(
                     name, () -> ThreadLocalRandom.current().nextLong(minimumMilliseconds, maximumMilliseconds + 1));
@@ -121,8 +118,8 @@ public final class Delay implements Action<Void> {
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);

@@ -22,14 +22,12 @@ import java.util.Objects;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import nonapi.org.paramixel.ExecutionRequest;
+import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.MutableDescriptor;
+import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
 import org.paramixel.api.ThrowingConsumer;
-import org.paramixel.api.internal.ConcreteExecutionContext;
-import org.paramixel.api.internal.ExecutionRequest;
-import org.paramixel.api.internal.action.MutableDescriptor;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * An action that executes a single child with a wall-clock deadline.
@@ -55,8 +53,9 @@ public final class Timeout implements Action<Void> {
     private final Duration timeout;
 
     private Timeout(final String name, final Action<?> child, final Duration timeout) {
-        this.name = Arguments.requireValidName(name);
-        this.child = Objects.requireNonNull(child, "child must not be null");
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
+        this.child = Objects.requireNonNull(child, "child is null");
         Arguments.requireTrue(child != this, "action must not add itself as a child");
         this.timeout = validateTimeout(timeout);
     }
@@ -70,8 +69,8 @@ public final class Timeout implements Action<Void> {
      * @throws IllegalArgumentException if {@code name} is blank
      */
     public static Spec of(final String name) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
         return new Spec(name);
     }
 
@@ -109,8 +108,8 @@ public final class Timeout implements Action<Void> {
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);
@@ -129,9 +128,9 @@ public final class Timeout implements Action<Void> {
         listener.onAfterExecution(descriptor);
     }
 
-    private Status run(final ExecutionContext context) {
-        if (!(context instanceof ConcreteExecutionContext concreteContext)) {
-            throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+    private Status run(final Context context) {
+        if (!(context instanceof ConcreteContext concreteContext)) {
+            throw new IllegalArgumentException("context must be a ConcreteContext");
         }
 
         var childDescriptor =
@@ -174,16 +173,16 @@ public final class Timeout implements Action<Void> {
     }
 
     private static Duration validateTimeout(final Duration timeout) {
-        Objects.requireNonNull(timeout, "timeout must not be null");
+        Objects.requireNonNull(timeout, "timeout is null");
         Arguments.requireFalse(timeout.isZero() || timeout.isNegative(), "timeout must be positive, was: " + timeout);
         return timeout;
     }
 
-    private static void runChildren(final ExecutionContext context, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static void runChildren(final Context context, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             concrete.runChildren(mode);
         } else {
-            throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+            throw new IllegalArgumentException("context must be a ConcreteContext");
         }
     }
 
@@ -212,7 +211,7 @@ public final class Timeout implements Action<Void> {
          */
         public Spec timeout(final Duration timeout) {
             ensureNotResolved();
-            Objects.requireNonNull(timeout, "timeout must not be null");
+            Objects.requireNonNull(timeout, "timeout is null");
             Arguments.requireFalse(
                     timeout.isZero() || timeout.isNegative(), "timeout must be positive, was: " + timeout);
             this.timeout = timeout;
@@ -242,7 +241,7 @@ public final class Timeout implements Action<Void> {
          */
         public Spec child(final org.paramixel.api.action.Spec<?> spec) {
             ensureNotResolved();
-            this.child = Objects.requireNonNull(spec, "spec must not be null").resolve();
+            this.child = Objects.requireNonNull(spec, "spec is null").resolve();
             return this;
         }
 

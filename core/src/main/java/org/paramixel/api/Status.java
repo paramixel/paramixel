@@ -19,11 +19,10 @@ package org.paramixel.api;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.paramixel.api.action.Descriptor;
+import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
-import org.paramixel.api.internal.support.UnrecoverableErrors;
 
 /**
  * Represents the local execution state of a descriptor.
@@ -99,7 +98,7 @@ public final class Status {
      * @throws NullPointerException if {@code message} is {@code null}
      */
     public static Status failed(final String message) {
-        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(message, "message is null");
         return new Status("FAILED", message);
     }
 
@@ -112,8 +111,8 @@ public final class Status {
      * @throws NullPointerException if any argument is {@code null}
      */
     public static Status failed(final String message, final Throwable throwable) {
-        Objects.requireNonNull(message, "message must not be null");
-        Objects.requireNonNull(throwable, "throwable must not be null");
+        Objects.requireNonNull(message, "message is null");
+        Objects.requireNonNull(throwable, "throwable is null");
         return new Status("FAILED", message, throwable);
     }
 
@@ -125,7 +124,7 @@ public final class Status {
      * @throws NullPointerException if {@code message} is {@code null}
      */
     public static Status skipped(final String message) {
-        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(message, "message is null");
         return new Status("SKIPPED", message);
     }
 
@@ -138,8 +137,8 @@ public final class Status {
      * @throws NullPointerException if any argument is {@code null}
      */
     public static Status skipped(final String message, final Throwable throwable) {
-        Objects.requireNonNull(message, "message must not be null");
-        Objects.requireNonNull(throwable, "throwable must not be null");
+        Objects.requireNonNull(message, "message is null");
+        Objects.requireNonNull(throwable, "throwable is null");
         return new Status("SKIPPED", message, throwable);
     }
 
@@ -151,7 +150,7 @@ public final class Status {
      * @throws NullPointerException if {@code message} is {@code null}
      */
     public static Status aborted(final String message) {
-        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(message, "message is null");
         return new Status("ABORTED", message);
     }
 
@@ -164,8 +163,8 @@ public final class Status {
      * @throws NullPointerException if any argument is {@code null}
      */
     public static Status aborted(final String message, final Throwable throwable) {
-        Objects.requireNonNull(message, "message must not be null");
-        Objects.requireNonNull(throwable, "throwable must not be null");
+        Objects.requireNonNull(message, "message is null");
+        Objects.requireNonNull(throwable, "throwable is null");
         return new Status("ABORTED", message, throwable);
     }
 
@@ -273,15 +272,17 @@ public final class Status {
      * @return the aggregate status
      */
     public static Status aggregate(final List<Descriptor> descriptors) {
-        boolean hasSkipped = false;
+        boolean hasFailed = false;
+        boolean hasAborted = false;
         boolean hasNonTerminal = false;
+        boolean hasSkipped = false;
         for (Descriptor descriptor : descriptors) {
             Status s = descriptor.metadata().status();
             if (s.isFailed()) {
-                return FAILED;
+                hasFailed = true;
             }
             if (s.isAborted()) {
-                return ABORTED;
+                hasAborted = true;
             }
             if (!s.isTerminal()) {
                 hasNonTerminal = true;
@@ -289,6 +290,12 @@ public final class Status {
             if (s.isSkipped()) {
                 hasSkipped = true;
             }
+        }
+        if (hasFailed) {
+            return FAILED;
+        }
+        if (hasAborted) {
+            return ABORTED;
         }
         if (hasNonTerminal) {
             return RUNNING;
@@ -318,6 +325,12 @@ public final class Status {
                     || cause instanceof Error
                     || cause instanceof InterruptedException) {
                 t = cause;
+            } else if (cause instanceof AbortedException e) {
+                return aborted(e.getMessage());
+            } else if (cause instanceof SkipException e) {
+                return skipped(e.getMessage());
+            } else if (cause instanceof FailException e) {
+                return failed(e.getMessage());
             }
         }
         UnrecoverableErrors.rethrowIfUnrecoverable(t);
@@ -349,11 +362,13 @@ public final class Status {
         if (!(obj instanceof Status other)) {
             return false;
         }
-        return statusName.equals(other.name());
+        return statusName.equals(other.statusName)
+                && Objects.equals(message, other.message)
+                && Objects.equals(throwable, other.throwable);
     }
 
     @Override
     public int hashCode() {
-        return statusName.hashCode();
+        return Objects.hash(statusName, message, throwable);
     }
 }

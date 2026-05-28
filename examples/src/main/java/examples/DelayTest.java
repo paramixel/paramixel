@@ -21,11 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Context;
 import org.paramixel.api.action.Delay;
 import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Spec;
 import org.paramixel.api.action.Step;
-import org.paramixel.spi.action.ExecutionContext;
 
 /**
  * Demonstrates the {@link Delay} action with fixed and random durations.
@@ -56,7 +56,7 @@ public class DelayTest {
                 .child(Delay.random("random-duration", 50, 150))
                 .child(Delay.of("zero-duration", 0L))
                 .child(Step.of("verify", ctx -> {
-                    var context = (ExecutionContext) ctx;
+                    var context = (Context) ctx;
                     var children = context.descriptor().parent().orElseThrow().children();
                     assertThat(children).hasSize(5);
                     assertThat(children.subList(0, 4))

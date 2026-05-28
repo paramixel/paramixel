@@ -101,7 +101,7 @@ public class MongoDBTestEnvironment implements AutoCloseable {
     }
 
     private void initialize(final Network network, final boolean ownsNetwork) {
-        this.network = Objects.requireNonNull(network, "network must not be null");
+        this.network = Objects.requireNonNull(network, "network is null");
         this.ownsNetwork = ownsNetwork;
         mongoDBContainer = new MongoDBContainer(DockerImageName.parse(dockerImageName))
                 .withNetwork(network)

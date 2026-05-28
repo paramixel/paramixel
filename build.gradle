@@ -5,6 +5,8 @@ plugins {
 
 def projectVersion = (file('pom.xml').text =~ /<revision>([^<]+)<\/revision>/)[0][1]
 
+def classgraphExclude = '**/nonapi/org/paramixel/classgraph/**'
+
 version = projectVersion
 
 sourceSets {
@@ -34,13 +36,10 @@ sourceSets {
 }
 
 dependencies {
-    implementation libs.classgraph
-
     testImplementation libs.assertj.core
     testImplementation libs.junit.jupiter
     testRuntimeOnly libs.junit.platform.launcher
 
-    paramixelImplementation libs.classgraph
     paramixelImplementation libs.commons.compress
     paramixelImplementation libs.kafka.clients
     paramixelImplementation libs.assertj.core
@@ -62,11 +61,13 @@ pmd {
 }
 
 tasks.named('javadoc') {
+    exclude classgraphExclude
     options.addStringOption('Xdoclint:all', '-quiet')
     options.addBooleanOption('Werror', true)
 }
 
 tasks.named('pmdMain') {
+    exclude classgraphExclude
     reports {
         xml.required = true
         html.required = true

@@ -21,11 +21,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Map;
+import nonapi.org.paramixel.listener.CompositeListener;
+import nonapi.org.paramixel.listener.ReportListener;
+import nonapi.org.paramixel.listener.SafeListener;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.internal.listener.CompositeListener;
-import org.paramixel.api.internal.listener.ReportListener;
-import org.paramixel.api.internal.listener.SafeListener;
 
 @DisplayName("Listener.defaultListener arguments")
 class FactoryArgumentsTest {
@@ -35,14 +36,13 @@ class FactoryArgumentsTest {
     void defaultListenerRejectsNullConfiguration() {
         assertThatThrownBy(() -> Listener.defaultListener(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("configuration must not be null");
+                .hasMessage("configuration is null");
     }
 
     @Test
     @DisplayName("defaultListener(configuration) omits report listener when report file is blank")
     void defaultListenerWithBlankReportFileOmitsReportListener() throws Exception {
-        Listener listener =
-                Listener.defaultListener(Configuration.of(java.util.Map.of(Configuration.REPORT_FILE, " ")));
+        Listener listener = Listener.defaultListener(Configuration.of(Map.of(Configuration.REPORT_FILE, " ")));
 
         assertThat(listener).isInstanceOf(SafeListener.class);
         Field delegateField = SafeListener.class.getDeclaredField("delegate");

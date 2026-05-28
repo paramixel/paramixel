@@ -21,16 +21,15 @@ import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Context;
 import org.paramixel.api.action.Instance;
 import org.paramixel.api.action.Spec;
 import org.paramixel.api.action.Step;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
 
 /**
  * Demonstrates implementing a custom {@link Action} that operates on a test
  * fixture instance managed by {@link Instance}. The {@link CustomAction} leaf
- * action retrieves the fixture from {@link ExecutionContext#instance} and
+ * action retrieves the fixture from {@link Context#instance} and
  * sets a value; a sibling {@link Step} validates the value was set correctly.
  */
 public class CustomActionTest {
@@ -78,7 +77,7 @@ public class CustomActionTest {
      * A leaf {@link Action} that retrieves the fixture instance from the
      * execution context and sets a value on it. Demonstrates implementing
      * {@link Action} directly with listener callbacks and
-     * {@link ExecutionContext#instance} for accessing the parent
+     * {@link Context#instance} for accessing the parent
      * {@link Instance} fixture.
      */
     private static final class CustomAction implements Action<Void> {
@@ -93,7 +92,11 @@ public class CustomActionTest {
          * @throws IllegalArgumentException if {@code name} is blank
          */
         CustomAction(final String name) {
-            this.name = Arguments.requireValidName(name);
+            Objects.requireNonNull(name, "name is null");
+            if (name.isBlank()) {
+                throw new IllegalArgumentException("name is blank");
+            }
+            this.name = name;
         }
 
         @Override
@@ -107,7 +110,7 @@ public class CustomActionTest {
         }
 
         @Override
-        public void execute(final ExecutionContext context) {
+        public void execute(final Context context) {
             Objects.requireNonNull(context);
             var descriptor = context.descriptor();
             var listener = context.listener();

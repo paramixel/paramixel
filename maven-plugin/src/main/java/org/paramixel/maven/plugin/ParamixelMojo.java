@@ -28,6 +28,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import nonapi.org.paramixel.ClasspathResolver;
+import nonapi.org.paramixel.support.AnsiColor;
+import nonapi.org.paramixel.support.Arguments;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -45,9 +48,6 @@ import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.ResolverException;
-import org.paramixel.api.internal.ClasspathResolver;
-import org.paramixel.api.internal.support.AnsiColor;
-import org.paramixel.api.internal.support.Arguments;
 import org.paramixel.api.selector.Selector;
 
 /**
@@ -204,7 +204,7 @@ public class ParamixelMojo extends AbstractMojo {
             return;
         }
 
-        Objects.requireNonNull(project, "MavenProject must not be null");
+        Objects.requireNonNull(project, "MavenProject is null");
 
         final var originalClassLoader = Thread.currentThread().getContextClassLoader();
         final var preExecutionThreads = snapshotNonDaemonThreads();
@@ -260,7 +260,7 @@ public class ParamixelMojo extends AbstractMojo {
      * @return the selector for action discovery
      */
     Selector buildSelector() {
-        List<Selector> selectors = new ArrayList<>();
+        var selectors = new ArrayList<Selector>();
         if (matchPackage != null && !matchPackage.isBlank()) {
             selectors.add(Selector.packageRegex(matchPackage));
         }
@@ -292,15 +292,18 @@ public class ParamixelMojo extends AbstractMojo {
     private Set<Thread> snapshotNonDaemonThreads() {
         Thread[] buffer = new Thread[Thread.activeCount() + 10];
         int count = Thread.enumerate(buffer);
-        Set<Thread> result = new HashSet<>(count);
-        for (int i = 0; i < count; i++) {
-            Thread t = buffer[i];
-            if (!t.isDaemon()
-                    && t.getThreadGroup() != null
-                    && !"system".equals(t.getThreadGroup().getName())
-                    && SYSTEM_THREAD_PREFIXES.stream().noneMatch(t.getName()::startsWith)) {
-                result.add(t);
+        var result = new HashSet<Thread>(count);
+        for (Thread t : buffer) {
+            if (t == null) {
+                continue;
             }
+            if (t.isDaemon()
+                    || t.getThreadGroup() == null
+                    || "system".equals(t.getThreadGroup().getName())
+                    || SYSTEM_THREAD_PREFIXES.contains(t.getName())) {
+                continue;
+            }
+            result.add(t);
         }
         return result;
     }
@@ -356,15 +359,15 @@ public class ParamixelMojo extends AbstractMojo {
                 String value = property.getValue();
 
                 if (key == null) {
-                    throw new MojoExecutionException("Paramixel property key must not be null");
+                    throw new MojoExecutionException("Paramixel property key is null");
                 }
 
                 if (key.isBlank()) {
-                    throw new MojoExecutionException("Paramixel property key must not be blank");
+                    throw new MojoExecutionException("Paramixel property key is blank");
                 }
 
                 if (value == null) {
-                    throw new MojoExecutionException("Paramixel property '" + key + "' value must not be null");
+                    throw new MojoExecutionException("Paramixel property '" + key + "' value is null");
                 }
 
                 if (!seenKeys.add(key)) {
@@ -491,9 +494,9 @@ public class ParamixelMojo extends AbstractMojo {
          * @throws IllegalArgumentException if {@code key} is blank
          */
         public void setKey(final String key) {
-            Objects.requireNonNull(key, "key must not be null");
+            Objects.requireNonNull(key, "key is null");
 
-            Arguments.requireNonBlank(key, "key must not be blank");
+            Arguments.requireNonBlank(key, "key is blank");
 
             this.key = key;
         }
@@ -515,9 +518,9 @@ public class ParamixelMojo extends AbstractMojo {
          * @throws IllegalArgumentException if {@code value} is blank
          */
         public void setValue(final String value) {
-            Objects.requireNonNull(value, "value must not be null");
+            Objects.requireNonNull(value, "value is null");
 
-            Arguments.requireNonBlank(value, "value must not be blank");
+            Arguments.requireNonBlank(value, "value is blank");
 
             this.value = value;
         }

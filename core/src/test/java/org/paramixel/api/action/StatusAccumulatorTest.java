@@ -20,11 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.StatusAccumulator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
-import org.paramixel.api.internal.action.ConcreteDescriptor;
-import org.paramixel.api.internal.action.StatusAccumulator;
 
 @DisplayName("Status accumulator")
 class StatusAccumulatorTest {

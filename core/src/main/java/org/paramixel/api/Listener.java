@@ -19,17 +19,15 @@ package org.paramixel.api;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import org.paramixel.api.action.Descriptor;
-import org.paramixel.api.internal.listener.CompositeListener;
-import org.paramixel.api.internal.listener.HtmlReportListener;
-import org.paramixel.api.internal.listener.JsonReportListener;
-import org.paramixel.api.internal.listener.ReportListener;
-import org.paramixel.api.internal.listener.SafeListener;
-import org.paramixel.api.internal.listener.StatusListener;
-import org.paramixel.api.internal.listener.SummaryListener;
-import org.paramixel.api.internal.listener.TreeSummaryRenderer;
-import org.paramixel.api.internal.listener.XmlReportListener;
-import org.paramixel.api.internal.support.AnsiDetector;
+import nonapi.org.paramixel.listener.CompositeListener;
+import nonapi.org.paramixel.listener.HtmlReportListener;
+import nonapi.org.paramixel.listener.JsonReportListener;
+import nonapi.org.paramixel.listener.ReportListener;
+import nonapi.org.paramixel.listener.SafeListener;
+import nonapi.org.paramixel.listener.StatusListener;
+import nonapi.org.paramixel.listener.SummaryListener;
+import nonapi.org.paramixel.listener.XmlReportListener;
+import nonapi.org.paramixel.support.AnsiDetector;
 
 /**
  * Receives run, discovery, and descriptor execution callbacks.
@@ -56,12 +54,14 @@ public interface Listener {
      * @return the default listener chain
      */
     static Listener defaultListener(final Configuration configuration) {
-        Objects.requireNonNull(configuration, "configuration must not be null");
+        Objects.requireNonNull(configuration, "configuration is null");
 
         final var ansiEnabled = resolveAnsiEnabled(configuration);
-        final var statusListener = new StatusListener(ansiEnabled);
-        final var renderer = new TreeSummaryRenderer(ansiEnabled);
-        final var summaryListener = new SummaryListener(renderer, ansiEnabled);
+        final var statusListener = new StatusListener();
+        final var summaryListener = new SummaryListener();
+
+        statusListener.initialize(configuration);
+        summaryListener.initialize(configuration);
 
         final var reportFile =
                 configuration.getString(Configuration.REPORT_FILE).orElse(null);
@@ -71,17 +71,11 @@ public interface Listener {
         }
 
         final var format = resolveReportFormat(reportFile);
-        final var reportListener = createReportListener(format, reportFile);
+        final var reportListener = createReportListener(format);
+        reportListener.initialize(configuration);
         return new SafeListener(
                 new CompositeListener(List.of(statusListener, summaryListener, reportListener), ansiEnabled),
                 ansiEnabled);
-    }
-
-    /**
-     * Invoked once before run discovery begins.
-     */
-    default void onRunStarted() {
-        // Intentionally empty
     }
 
     /**
@@ -90,6 +84,43 @@ public interface Listener {
      * @param root the discovered root descriptor; never {@code null}
      */
     default void onDiscoveryCompleted(final Descriptor root) {
+        // Intentionally empty
+    }
+
+    /**
+     * Invoked once before the run begins, allowing listeners to configure themselves based on the
+     * supplied configuration.
+     *
+     * <p>This method is called exactly once per {@link Runner#run(Spec)} invocation, before any other
+     * listener callbacks. It is called from a synchronized context ({@code Runner.run()}).
+     *
+     * <p>Implementations are responsible for thread-safety if they maintain mutable state.
+     *
+     * @param configuration the effective configuration; never {@code null}
+     * @see SafeListener for exception handling behavior
+     */
+    default void initialize(final Configuration configuration) {
+        // Intentionally empty
+    }
+
+    /**
+     * Invoked once before run discovery begins.
+     *
+     * <p>This method is called exactly once per {@link Runner#run(Spec)} invocation, after
+     * {@link #initialize(Configuration)} and {@link #onRunStarted()}, but before the discovery phase.
+     *
+     * <p>Implementations are responsible for thread-safety if they maintain mutable state.
+     *
+     * @see SafeListener for exception handling behavior
+     */
+    default void onDiscoveryStarted() {
+        // Intentionally empty
+    }
+
+    /**
+     * Invoked once before the run begins, before discovery and execution.
+     */
+    default void onRunStarted() {
         // Intentionally empty
     }
 
@@ -149,13 +180,13 @@ public interface Listener {
         return value == null || value.isBlank();
     }
 
-    private static Listener createReportListener(final String format, final String reportFile) {
+    private static Listener createReportListener(final String format) {
         return switch (format.toLowerCase(Locale.ROOT)) {
-            case "text" -> new ReportListener(reportFile);
-            case "json" -> new JsonReportListener(reportFile);
-            case "xml" -> new XmlReportListener(reportFile);
-            case "html" -> new HtmlReportListener(reportFile);
-            default -> new ReportListener(reportFile);
+            case "text" -> new ReportListener();
+            case "json" -> new JsonReportListener();
+            case "xml" -> new XmlReportListener();
+            case "html" -> new HtmlReportListener();
+            default -> new ReportListener();
         };
     }
 }

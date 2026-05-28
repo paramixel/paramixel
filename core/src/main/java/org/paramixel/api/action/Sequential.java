@@ -19,13 +19,14 @@ package org.paramixel.api.action;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.StatusAccumulator;
+import nonapi.org.paramixel.support.Arguments;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.ThrowingConsumer;
-import org.paramixel.api.internal.ConcreteExecutionContext;
-import org.paramixel.api.internal.action.StatusAccumulator;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * An action that executes its children sequentially in the order they were added.
@@ -45,7 +46,8 @@ public final class Sequential<T> implements Action<T> {
     private final boolean dependent;
 
     private Sequential(final String name, final List<Action<?>> children, final boolean dependent) {
-        this.name = Arguments.requireValidName(name);
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
         this.children = validateChildren(children);
         this.dependent = dependent;
     }
@@ -97,8 +99,8 @@ public final class Sequential<T> implements Action<T> {
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);
@@ -117,21 +119,22 @@ public final class Sequential<T> implements Action<T> {
         listener.onAfterExecution(descriptor);
     }
 
-    private Status run(final ExecutionContext context) {
-        var childDescriptors = context.descriptor().children();
+    private Status run(final Context context) {
+        var descriptors = context.descriptor().children();
         var aggregated = new StatusAccumulator();
+        var mode = Mode.RUN;
 
-        for (int index = 0; index < childDescriptors.size(); index++) {
-            Descriptor child = childDescriptors.get(index);
-            Descriptor childResult = runChild(context, child, Mode.RUN);
+        for (var descriptor : descriptors) {
+            var childResult = runChild(context, descriptor, mode);
             aggregated.include(childResult);
+
+            if (mode != Mode.RUN) {
+                continue;
+            }
+
             var childStatus = childResult.metadata().status();
-            if (dependent && !childStatus.isPassed()) {
-                Mode propagateMode = Mode.fromStatus(childStatus);
-                for (Descriptor remaining : childDescriptors.subList(index + 1, childDescriptors.size())) {
-                    aggregated.include(runChild(context, remaining, propagateMode));
-                }
-                break;
+            if (dependent && !childStatus.isPassed() && !childStatus.isAborted()) {
+                mode = Mode.fromStatus(childStatus);
             }
         }
 
@@ -139,28 +142,28 @@ public final class Sequential<T> implements Action<T> {
     }
 
     private List<Action<?>> validateChildren(final List<Action<?>> children) {
-        Objects.requireNonNull(children, "children must not be null");
+        Objects.requireNonNull(children, "children is null");
         var validated = new ArrayList<Action<?>>(children.size());
         for (Action<?> child : children) {
-            Objects.requireNonNull(child, "children must not contain null elements");
+            Objects.requireNonNull(child, "children contains null element");
             Arguments.requireTrue(child != this, "action must not add itself as a child");
             validated.add(child);
         }
         return List.copyOf(validated);
     }
 
-    private static Descriptor runChild(final ExecutionContext context, final Descriptor child, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static Descriptor runChild(final Context context, final Descriptor child, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             return concrete.runChild(child, mode);
         }
-        throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+        throw new IllegalArgumentException("context must be a ConcreteContext");
     }
 
-    private static void runChildren(final ExecutionContext context, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static void runChildren(final Context context, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             concrete.runChildren(mode);
         } else {
-            throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+            throw new IllegalArgumentException("context must be a ConcreteContext");
         }
     }
 
@@ -177,8 +180,8 @@ public final class Sequential<T> implements Action<T> {
         private boolean resolved;
 
         private Spec(final String name) {
-            Objects.requireNonNull(name, "name must not be null");
-            Arguments.requireNonBlank(name, "name must not be blank");
+            Objects.requireNonNull(name, "name is null");
+            Arguments.requireNonBlank(name, "name is blank");
             this.name = name;
         }
 
@@ -218,7 +221,7 @@ public final class Sequential<T> implements Action<T> {
          */
         public Spec<T> child(final org.paramixel.api.action.Spec<?> spec) {
             ensureNotResolved();
-            children.add(Objects.requireNonNull(spec, "spec must not be null").resolve());
+            children.add(Objects.requireNonNull(spec, "spec is null").resolve());
             return this;
         }
 
@@ -249,6 +252,52 @@ public final class Sequential<T> implements Action<T> {
          */
         public Spec<T> child(final String name, final String kind, final ThrowingConsumer<? super T> consumer) {
             return child(Step.of(name, kind, consumer));
+        }
+
+        /**
+         * Adds a child action for each item in the iterable by applying the supplied mapper function.
+         *
+         * <p>This is a convenience method that produces the same tree as calling
+         * {@link #child(org.paramixel.api.action.Spec) child(Spec)} in a for-loop. The mapper is called for
+         * each item at spec-building time ({@link #resolve()}), not at execution time. An empty
+         * iterable adds no children.</p>
+         *
+         * @param <U> the type of items in the iterable
+         * @param items the items to iterate over; must not be {@code null}
+         * @param mapper the function that maps each item to a child action spec; must not be
+         *     {@code null}
+         * @return this spec
+         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
+         * @throws IllegalStateException if this spec has already been resolved
+         */
+        public <U> Spec<T> each(final Iterable<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
+            ensureNotResolved();
+            Objects.requireNonNull(items, "items is null");
+            Objects.requireNonNull(mapper, "mapper is null");
+            for (U item : items) {
+                child(mapper.apply(item));
+            }
+            return this;
+        }
+
+        /**
+         * Adds a child action for each item in the stream by applying the supplied mapper function.
+         *
+         * <p>The stream is materialized to a list immediately and then delegated to
+         * {@link #each(Iterable, Function)}. The mapper is called for each item at spec-building time
+         * ({@link #resolve()}), not at execution time. An empty stream adds no children.</p>
+         *
+         * @param <U> the type of items in the stream
+         * @param items the items to iterate over; must not be {@code null}
+         * @param mapper the function that maps each item to a child action spec; must not be
+         *     {@code null}
+         * @return this spec
+         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
+         * @throws IllegalStateException if this spec has already been resolved
+         */
+        public <U> Spec<T> each(final Stream<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
+            Objects.requireNonNull(items, "items is null");
+            return each(items.toList(), mapper);
         }
 
         /**

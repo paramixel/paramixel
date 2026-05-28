@@ -47,7 +47,7 @@ class StepKindTest {
     void ofWithKindRejectsNullKind() {
         assertThatThrownBy(() -> Step.of("test", (String) null, obj -> {}))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("kind must not be null");
+                .hasMessage("kind is null");
     }
 
     @Test
@@ -55,7 +55,7 @@ class StepKindTest {
     void ofWithKindRejectsBlankKind() {
         assertThatThrownBy(() -> Step.of("test", "   ", obj -> {}))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("kind must not be blank");
+                .hasMessage("kind is blank");
     }
 
     @Test
@@ -63,7 +63,7 @@ class StepKindTest {
     void ofWithKindRejectsNullName() {
         assertThatThrownBy(() -> Step.of(null, "Before", obj -> {}))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("name must not be null");
+                .hasMessage("name is null");
     }
 
     @Test
@@ -71,7 +71,7 @@ class StepKindTest {
     void ofWithKindRejectsBlankName() {
         assertThatThrownBy(() -> Step.of("   ", "Before", obj -> {}))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("name must not be blank");
+                .hasMessage("name is blank");
     }
 
     @Test
@@ -79,7 +79,7 @@ class StepKindTest {
     void ofWithKindRejectsNullConsumer() {
         assertThatThrownBy(() -> Step.of("test", "Before", null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("consumer must not be null");
+                .hasMessage("consumer is null");
     }
 
     @Test
@@ -97,7 +97,7 @@ class StepKindTest {
 
         assertThatThrownBy(() -> step.kind(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("kind must not be null");
+                .hasMessage("kind is null");
     }
 
     @Test
@@ -107,7 +107,7 @@ class StepKindTest {
 
         assertThatThrownBy(() -> step.kind("   "))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("kind must not be blank");
+                .hasMessage("kind is blank");
     }
 
     @Test

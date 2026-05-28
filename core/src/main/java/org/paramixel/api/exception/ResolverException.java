@@ -17,7 +17,7 @@
 package org.paramixel.api.exception;
 
 import java.util.Objects;
-import org.paramixel.api.internal.support.Arguments;
+import nonapi.org.paramixel.support.Arguments;
 
 /**
  * Signals that action discovery or action-factory resolution failed during classpath scanning.
@@ -37,8 +37,8 @@ public final class ResolverException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public ResolverException(final String message) {
-        super(Objects.requireNonNull(message, "message must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 
     /**
@@ -50,9 +50,7 @@ public final class ResolverException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public ResolverException(final String message, final Throwable cause) {
-        super(
-                Objects.requireNonNull(message, "message must not be null"),
-                Objects.requireNonNull(cause, "cause must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"), Objects.requireNonNull(cause, "cause is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 }

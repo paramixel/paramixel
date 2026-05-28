@@ -32,7 +32,7 @@ class CleanUpArgumentsTest {
     void ofThrowingRunnableRejectsNull() {
         assertThatThrownBy(() -> CleanUp.of((ThrowingRunnable) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("throwableRunnable must not be null");
+                .hasMessage("throwableRunnable is null");
     }
 
     @Test
@@ -72,7 +72,7 @@ class CleanUpArgumentsTest {
     void staticRunAndThrowVarargRejectsNullArray() {
         assertThatThrownBy(() -> CleanUp.runAndThrow((CleanUp[]) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("cleanUps must not be null");
+                .hasMessage("cleanUps is null");
     }
 
     @Test
@@ -80,7 +80,7 @@ class CleanUpArgumentsTest {
     void staticRunAndThrowVarargRejectsNullElement() {
         assertThatThrownBy(() -> CleanUp.runAndThrow(CleanUp.of((ThrowingRunnable) () -> {}), null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("cleanUp must not be null");
+                .hasMessage("cleanUp is null");
     }
 
     @Test
@@ -88,7 +88,7 @@ class CleanUpArgumentsTest {
     void staticRunAndThrowCollectionRejectsNullCollection() {
         assertThatThrownBy(() -> CleanUp.runAndThrow((List<CleanUp>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("cleanUps must not be null");
+                .hasMessage("cleanUps is null");
     }
 
     @Test
@@ -96,6 +96,6 @@ class CleanUpArgumentsTest {
     void staticRunAndThrowCollectionRejectsNullElement() {
         assertThatThrownBy(() -> CleanUp.runAndThrow(Arrays.asList(CleanUp.of((ThrowingRunnable) () -> {}), null)))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("cleanUp must not be null");
+                .hasMessage("cleanUp is null");
     }
 }

@@ -17,7 +17,7 @@
 package org.paramixel.api.exception;
 
 import java.util.Objects;
-import org.paramixel.api.internal.support.Arguments;
+import nonapi.org.paramixel.support.Arguments;
 
 /**
  * Signals that an action should be marked as aborted rather than executed or failed.
@@ -39,8 +39,8 @@ public final class AbortedException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public AbortedException(final String message) {
-        super(Objects.requireNonNull(message, "message must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 
     /**
@@ -61,6 +61,8 @@ public final class AbortedException extends RuntimeException {
      * @throws AbortedException always
      */
     public static void abort(final String message) {
-        throw new AbortedException(Objects.requireNonNull(message, "message must not be null"));
+        Objects.requireNonNull(message, "message is null");
+        Arguments.requireNonBlank(message, "message is blank");
+        throw new AbortedException(message);
     }
 }

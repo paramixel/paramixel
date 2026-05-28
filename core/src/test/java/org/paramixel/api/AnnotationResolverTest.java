@@ -23,7 +23,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Descriptor;
 import org.paramixel.api.action.Instance;
 
 @DisplayName("AnnotationResolver")
@@ -121,7 +120,7 @@ class AnnotationResolverTest {
     void byIdUnwrapsInvocationTargetException() {
         Descriptor descriptor = runById(ThrowingFixture.class, ThrowingFixture::new, "throw");
 
-        assertThat(descriptor.metadata().status()).isEqualTo(Status.FAILED);
+        assertThat(descriptor.metadata().status().isFailed()).isTrue();
         Throwable throwable = descriptor.metadata().throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(RuntimeException.class).hasMessage("boom");
         assertThat(throwable.getCause()).isNull();
@@ -167,7 +166,7 @@ class AnnotationResolverTest {
     void byIdUnwrapsErrorFromInvocationTargetException() {
         Descriptor descriptor = runById(ErrorThrowingFixture.class, ErrorThrowingFixture::new, "errorMethod");
 
-        assertThat(descriptor.metadata().status()).isEqualTo(Status.FAILED);
+        assertThat(descriptor.metadata().status().isFailed()).isTrue();
         Throwable throwable = descriptor.metadata().throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(AssertionError.class).hasMessage("test error");
         assertThat(throwable.getCause()).isNull();
@@ -185,7 +184,7 @@ class AnnotationResolverTest {
     void byIdWrapsCheckedExceptionInRuntimeException() {
         Descriptor descriptor = runById(CheckedThrowingFixture.class, CheckedThrowingFixture::new, "checkedMethod");
 
-        assertThat(descriptor.metadata().status()).isEqualTo(Status.FAILED);
+        assertThat(descriptor.metadata().status().isFailed()).isTrue();
         assertThat(descriptor.metadata().throwable().orElseThrow())
                 .isInstanceOf(RuntimeException.class)
                 .hasCauseInstanceOf(Exception.class)
@@ -226,7 +225,7 @@ class AnnotationResolverTest {
     void staticByIdUnwrapsInvocationTargetException() {
         Descriptor descriptor = runStaticById(StaticThrowingFixture.class, "staticThrow");
 
-        assertThat(descriptor.metadata().status()).isEqualTo(Status.FAILED);
+        assertThat(descriptor.metadata().status().isFailed()).isTrue();
         Throwable throwable = descriptor.metadata().throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(RuntimeException.class).hasMessage("static boom");
         assertThat(throwable.getCause()).isNull();
@@ -244,7 +243,7 @@ class AnnotationResolverTest {
     void staticByIdUnwrapsErrorFromInvocationTargetException() {
         Descriptor descriptor = runStaticById(StaticErrorThrowingFixture.class, "staticErrorMethod");
 
-        assertThat(descriptor.metadata().status()).isEqualTo(Status.FAILED);
+        assertThat(descriptor.metadata().status().isFailed()).isTrue();
         Throwable throwable = descriptor.metadata().throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(AssertionError.class).hasMessage("static test error");
         assertThat(throwable.getCause()).isNull();
@@ -262,7 +261,7 @@ class AnnotationResolverTest {
     void staticByIdWrapsCheckedExceptionInRuntimeException() {
         Descriptor descriptor = runStaticById(StaticCheckedThrowingFixture.class, "staticCheckedMethod");
 
-        assertThat(descriptor.metadata().status()).isEqualTo(Status.FAILED);
+        assertThat(descriptor.metadata().status().isFailed()).isTrue();
         assertThat(descriptor.metadata().throwable().orElseThrow())
                 .isInstanceOf(RuntimeException.class)
                 .hasCauseInstanceOf(Exception.class)

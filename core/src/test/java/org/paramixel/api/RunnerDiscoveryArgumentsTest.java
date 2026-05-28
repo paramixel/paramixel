@@ -32,7 +32,7 @@ class RunnerDiscoveryArgumentsTest {
     void rejectsBlankRegex() {
         assertThatThrownBy(() -> Selector.tagRegex(" "))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("tagRegex regex must not be blank");
+                .hasMessageContaining("tagRegex regex is blank");
     }
 
     @Test
@@ -94,7 +94,7 @@ class RunnerDiscoveryArgumentsTest {
     void packageTreeOfRejectsNull() {
         assertThatThrownBy(() -> Selector.packageTreeOf(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("clazz must not be null");
+                .hasMessageContaining("clazz is null");
     }
 
     @Test
@@ -102,7 +102,7 @@ class RunnerDiscoveryArgumentsTest {
     void classOfRejectsNull() {
         assertThatThrownBy(() -> Selector.classOf(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("clazz must not be null");
+                .hasMessageContaining("clazz is null");
     }
 
     @Test
@@ -110,7 +110,7 @@ class RunnerDiscoveryArgumentsTest {
     void runSelectorRejectsNullSelector() {
         assertThatThrownBy(() -> Runner.builder().build().run((Selector) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector must not be null");
+                .hasMessage("selector is null");
     }
 
     @Test
@@ -119,7 +119,7 @@ class RunnerDiscoveryArgumentsTest {
         Selector selector = Selector.packageRegex("test");
         assertThatThrownBy(() -> selector.matchesPackage(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("packageName must not be null");
+                .hasMessageContaining("packageName is null");
     }
 
     @Test
@@ -128,7 +128,7 @@ class RunnerDiscoveryArgumentsTest {
         Selector selector = Selector.classRegex("test");
         assertThatThrownBy(() -> selector.matchesClass(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("className must not be null");
+                .hasMessageContaining("className is null");
     }
 
     @Test
@@ -137,6 +137,6 @@ class RunnerDiscoveryArgumentsTest {
         Selector selector = Selector.tagRegex("test");
         assertThatThrownBy(() -> selector.matchesTag(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("tag must not be null");
+                .hasMessageContaining("tag is null");
     }
 }

@@ -19,6 +19,10 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,5 +158,69 @@ class RunnerDiscoveryTest {
         assertThat(children)
                 .anySatisfy(child -> assertThat(child.metadata().name())
                         .contains("ClasspathResolverAnotherInvalidBlankTagDiscoveryFixture#factory"));
+    }
+
+    @Test
+    @DisplayName("run() class regex filters by class name")
+    void runClassRegexFiltersByClassName() {
+        var config = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "ClasspathResolverSmokeFixture"));
+
+        int exitCode = Runner.builder().configuration(config).build().run();
+
+        assertThat(exitCode).isZero();
+    }
+
+    @Test
+    @DisplayName("run() package regex filters by package name")
+    void runPackageRegexFiltersByPackage() {
+        var config = Configuration.of(Map.of(
+                Configuration.MATCH_PACKAGE_REGEX, "^org\\.paramixel\\.api$",
+                Configuration.MATCH_CLASS_REGEX, "ClasspathResolverSmokeFixture"));
+
+        int exitCode = Runner.builder().configuration(config).build().run();
+
+        assertThat(exitCode).isZero();
+    }
+
+    @Test
+    @DisplayName("run() tag regex filters by tag value")
+    void runTagRegexFiltersByTag() {
+        var config = Configuration.of(Map.of(
+                Configuration.MATCH_CLASS_REGEX, "ClasspathResolverSmokeFixture",
+                Configuration.MATCH_TAG_REGEX, "^smoke$"));
+
+        int exitCode = Runner.builder().configuration(config).build().run();
+
+        assertThat(exitCode).isZero();
+    }
+
+    @Test
+    @DisplayName("run() combines multiple regex keys with AND (no match)")
+    void runCombinesMultipleRegexKeysWithAndNoMatch() {
+        var config = Configuration.of(Map.of(
+                Configuration.MATCH_CLASS_REGEX, "ClasspathResolverSmokeFixture",
+                Configuration.MATCH_TAG_REGEX, "NONEXISTENT",
+                Configuration.FAIL_IF_NO_TESTS, "true"));
+
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        PrintStream originalErr = System.err;
+        try {
+            System.setErr(new PrintStream(err, true, StandardCharsets.UTF_8));
+            int exitCode = Runner.builder().configuration(config).build().run();
+            assertThat(exitCode).isEqualTo(1);
+        } finally {
+            System.setErr(originalErr);
+        }
+        assertThat(err.toString(StandardCharsets.UTF_8)).contains("No Paramixel tests found");
+    }
+
+    @Test
+    @DisplayName("run() with only class regex is backward compatible")
+    void runWithOnlyClassRegexIsBackwardCompatible() {
+        var config = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "ClasspathResolverSmokeFixture"));
+
+        int exitCode = Runner.builder().configuration(config).build().run();
+
+        assertThat(exitCode).isZero();
     }
 }

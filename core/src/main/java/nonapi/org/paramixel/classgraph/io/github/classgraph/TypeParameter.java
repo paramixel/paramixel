@@ -1,0 +1,268 @@
+/*
+ * Copyright (c) 2026-present Douglas Hoard
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package nonapi.org.paramixel.classgraph.io.github.classgraph;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import nonapi.org.paramixel.classgraph.io.github.classgraph.Classfile.TypePathNode;
+import nonapi.org.paramixel.classgraph.nonapi.io.github.classgraph.types.ParseException;
+import nonapi.org.paramixel.classgraph.nonapi.io.github.classgraph.types.Parser;
+import nonapi.org.paramixel.classgraph.nonapi.io.github.classgraph.types.TypeUtils;
+
+/** A type parameter. */
+public final class TypeParameter extends HierarchicalTypeSignature {
+    /** The type parameter identifier. */
+    final String name;
+
+    /** Class bound -- may be null. */
+    final ReferenceTypeSignature classBound;
+
+    /** Interface bounds -- may be empty. */
+    final List<ReferenceTypeSignature> interfaceBounds;
+
+    // -------------------------------------------------------------------------------------------------------------
+
+    /**
+     * Constructor.
+     *
+     * @param identifier
+     *            The type parameter identifier.
+     * @param classBound
+     *            The type parameter class bound.
+     * @param interfaceBounds
+     *            The type parameter interface bound.
+     */
+    protected TypeParameter(
+            final String identifier,
+            final ReferenceTypeSignature classBound,
+            final List<ReferenceTypeSignature> interfaceBounds) {
+        super();
+        this.name = identifier;
+        this.classBound = classBound;
+        this.interfaceBounds = interfaceBounds;
+    }
+
+    /**
+     * Get the type parameter identifier.
+     *
+     * @return The type parameter identifier.
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Get the type parameter class bound.
+     *
+     * @return The type parameter class bound. May be null.
+     */
+    public ReferenceTypeSignature getClassBound() {
+        return classBound;
+    }
+
+    /**
+     * Get the type parameter interface bound(s).
+     *
+     * @return Get the type parameter interface bound(s), which may be the empty list.
+     */
+    public List<ReferenceTypeSignature> getInterfaceBounds() {
+        return interfaceBounds;
+    }
+
+    @Override
+    protected void addTypeAnnotation(final List<TypePathNode> typePath, final AnnotationInfo annotationInfo) {
+        if (typePath.isEmpty()) {
+            addTypeAnnotation(annotationInfo);
+        } else {
+            throw new IllegalArgumentException("Type parameter should have empty typePath");
+        }
+    }
+
+    // -------------------------------------------------------------------------------------------------------------
+
+    /**
+     * Parse a list of type parameters into {@link TypeParameter} objects.
+     *
+     * @param parser
+     *            the parser
+     * @param definingClassName
+     *            the defining class name
+     * @return the list of {@link TypeParameter} objects.
+     * @throws ParseException
+     *             if parsing fails
+     */
+    static List<TypeParameter> parseList(final Parser parser, final String definingClassName) throws ParseException {
+        if (parser.peek() != '<') {
+            return Collections.emptyList();
+        }
+        parser.expect('<');
+        final List<TypeParameter> typeParams = new ArrayList<>(1);
+        while (parser.peek() != '>') {
+            if (!parser.hasMore()) {
+                throw new ParseException(parser, "Missing '>'");
+            }
+            // Scala can contain '$' in type parameter names (#495)
+            if (!TypeUtils.getIdentifierToken(parser, /* stopAtDollarSign = */ false, /* stopAtDot = */ true)) {
+                throw new ParseException(parser, "Could not parse identifier token");
+            }
+            final String identifier = parser.currToken();
+            // classBound may be null
+            final ReferenceTypeSignature classBound = ReferenceTypeSignature.parseClassBound(parser, definingClassName);
+            List<ReferenceTypeSignature> interfaceBounds;
+            if (parser.peek() == ':') {
+                interfaceBounds = new ArrayList<>();
+                while (parser.peek() == ':') {
+                    parser.expect(':');
+                    final ReferenceTypeSignature interfaceTypeSignature =
+                            ReferenceTypeSignature.parseReferenceTypeSignature(parser, definingClassName);
+                    if (interfaceTypeSignature == null) {
+                        throw new ParseException(parser, "Missing interface type signature");
+                    }
+                    interfaceBounds.add(interfaceTypeSignature);
+                }
+            } else {
+                interfaceBounds = Collections.emptyList();
+            }
+            typeParams.add(new TypeParameter(identifier, classBound, interfaceBounds));
+        }
+        parser.expect('>');
+        return typeParams;
+    }
+
+    // -------------------------------------------------------------------------------------------------------------
+
+    /* (non-Javadoc)
+     * @see nonapi.org.paramixel.classgraph.io.github.classgraph.ScanResultObject#getClassName()
+     */
+    @Override
+    protected String getClassName() {
+        // getClassInfo() is not valid for this type, so getClassName() does not need to be implemented
+        throw new IllegalArgumentException("getClassName() cannot be called here");
+    }
+
+    /* (non-Javadoc)
+     * @see nonapi.org.paramixel.classgraph.io.github.classgraph.ScanResultObject#getClassInfo()
+     */
+    @Override
+    protected ClassInfo getClassInfo() {
+        throw new IllegalArgumentException("getClassInfo() cannot be called here");
+    }
+
+    /* (non-Javadoc)
+     * @see nonapi.org.paramixel.classgraph.io.github.classgraph.ScanResultObject#setScanResult(nonapi.org.paramixel.classgraph.io.github.classgraph.ScanResult)
+     */
+    @Override
+    void setScanResult(final ScanResult scanResult) {
+        super.setScanResult(scanResult);
+        if (this.classBound != null) {
+            this.classBound.setScanResult(scanResult);
+        }
+        if (interfaceBounds != null) {
+            for (final ReferenceTypeSignature referenceTypeSignature : interfaceBounds) {
+                referenceTypeSignature.setScanResult(scanResult);
+            }
+        }
+    }
+
+    /**
+     * Get the names of any classes referenced in the type signature.
+     *
+     * @param refdClassNames
+     *            the referenced class names.
+     */
+    protected void findReferencedClassNames(final Set<String> refdClassNames) {
+        if (classBound != null) {
+            classBound.findReferencedClassNames(refdClassNames);
+        }
+        for (final ReferenceTypeSignature typeSignature : interfaceBounds) {
+            typeSignature.findReferencedClassNames(refdClassNames);
+        }
+    }
+
+    // -------------------------------------------------------------------------------------------------------------
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#hashCode()
+     */
+    @Override
+    public int hashCode() {
+        return name.hashCode() + (classBound == null ? 0 : classBound.hashCode() * 7) + interfaceBounds.hashCode() * 15;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
+    @Override
+    public boolean equals(final Object obj) {
+        if (obj == this) {
+            return true;
+        } else if (!(obj instanceof TypeParameter)) {
+            return false;
+        }
+        final TypeParameter other = (TypeParameter) obj;
+        return other.name.equals(this.name)
+                && Objects.equals(other.typeAnnotationInfo, this.typeAnnotationInfo)
+                && ((other.classBound == null && this.classBound == null)
+                        || (other.classBound != null && other.classBound.equals(this.classBound)))
+                && other.interfaceBounds.equals(this.interfaceBounds);
+    }
+
+    // -------------------------------------------------------------------------------------------------------------
+
+    @Override
+    protected void toStringInternal(
+            final boolean useSimpleNames, final AnnotationInfoList annotationsToExclude, final StringBuilder buf) {
+        if (typeAnnotationInfo != null) {
+            for (final AnnotationInfo annotationInfo : typeAnnotationInfo) {
+                if (annotationsToExclude == null || !annotationsToExclude.contains(annotationInfo)) {
+                    annotationInfo.toString(useSimpleNames, buf);
+                    buf.append(' ');
+                }
+            }
+        }
+        buf.append(useSimpleNames ? ClassInfo.getSimpleName(name) : name);
+        String classBoundStr;
+        if (classBound == null) {
+            classBoundStr = null;
+        } else {
+            classBoundStr = classBound.toString(useSimpleNames);
+            if (classBoundStr.equals("java.lang.Object")
+                    || (classBoundStr.equals("Object")
+                            && ((ClassRefTypeSignature) classBound).className.equals("java.lang.Object"))) {
+                // Don't add "extends java.lang.Object"
+                classBoundStr = null;
+            }
+        }
+        if (classBoundStr != null || !interfaceBounds.isEmpty()) {
+            buf.append(" extends");
+        }
+        if (classBoundStr != null) {
+            buf.append(' ');
+            buf.append(classBoundStr);
+        }
+        for (int i = 0; i < interfaceBounds.size(); i++) {
+            if (i > 0 || classBoundStr != null) {
+                buf.append(" &");
+            }
+            buf.append(' ');
+            interfaceBounds.get(i).toString(useSimpleNames, buf);
+        }
+    }
+}

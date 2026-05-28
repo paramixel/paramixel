@@ -16,16 +16,18 @@
 
 package org.paramixel.api;
 
+import java.util.Objects;
+import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
+import org.paramixel.api.action.Context;
 
 final class ResolverOrderingAction implements Action<Void> {
 
     private final String name;
 
     ResolverOrderingAction(final String name) {
-        this.name = Arguments.requireValidName(name);
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
     }
 
     @Override
@@ -39,7 +41,7 @@ final class ResolverOrderingAction implements Action<Void> {
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
+    public void execute(final Context context) {
         throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
     }
 }

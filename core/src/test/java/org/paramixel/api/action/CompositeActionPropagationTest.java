@@ -47,11 +47,11 @@ class CompositeActionPropagationTest {
         var children = root.children();
 
         assertThat(root.metadata().status().isFailed()).isTrue();
-        assertThat(children).hasSize(4);
-        assertThat(children.get(0).metadata().status().isFailed()).isTrue();
+        assertThat(children).hasSize(2);
+        assertThat(root.before().orElseThrow().metadata().status().isFailed()).isTrue();
+        assertThat(children.get(0).metadata().status()).isSameAs(Status.SKIPPED);
         assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(children.get(2).metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(children.get(3).metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
         assertThat(bodyCalls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -75,11 +75,11 @@ class CompositeActionPropagationTest {
         var children = root.children();
 
         assertThat(root.metadata().status()).isSameAs(Status.ABORTED);
-        assertThat(children).hasSize(3);
+        assertThat(children).hasSize(2);
         assertThat(children.get(0).metadata().status().isAborted()).isTrue();
-        assertThat(children.get(1).metadata().status()).isSameAs(Status.ABORTED);
-        assertThat(children.get(2).metadata().status()).isSameAs(Status.PASSED);
-        assertThat(bodyCalls.get()).isEqualTo(1);
+        assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
+        assertThat(bodyCalls.get()).isEqualTo(2);
         assertThat(afterCalls.get()).isEqualTo(1);
     }
 
@@ -98,11 +98,11 @@ class CompositeActionPropagationTest {
         var children = root.children();
 
         assertThat(root.metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(children).hasSize(4);
-        assertThat(children.get(0).metadata().status()).isSameAs(Status.PASSED);
-        assertThat(children.get(1).metadata().status().isSkipped()).isTrue();
-        assertThat(children.get(2).metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(children.get(3).metadata().status()).isSameAs(Status.PASSED);
+        assertThat(children).hasSize(2);
+        assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
+        assertThat(children.get(0).metadata().status().isSkipped()).isTrue();
+        assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
+        assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
         assertThat(secondBodyCalls.get()).isZero();
         assertThat(closed.get()).isEqualTo(1);
     }
@@ -157,8 +157,8 @@ class CompositeActionPropagationTest {
         var action = Instance.of("empty", Object::new).resolve();
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
         assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.children()).hasSize(2);
-        assertThat(root.children().get(0).metadata().name()).isEqualTo("Instantiate");
-        assertThat(root.children().get(1).metadata().name()).isEqualTo("Destroy");
+        assertThat(root.children()).isEmpty();
+        assertThat(root.before().orElseThrow().metadata().name()).isEqualTo("Instantiate");
+        assertThat(root.after().orElseThrow().metadata().name()).isEqualTo("Destroy");
     }
 }

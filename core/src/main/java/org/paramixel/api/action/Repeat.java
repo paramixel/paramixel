@@ -19,13 +19,12 @@ package org.paramixel.api.action;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.StatusAccumulator;
+import nonapi.org.paramixel.support.Arguments;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.ThrowingConsumer;
-import org.paramixel.api.internal.ConcreteExecutionContext;
-import org.paramixel.api.internal.action.StatusAccumulator;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * An action that executes a single child action a configurable number of times.
@@ -49,8 +48,9 @@ public final class Repeat<T> implements Action<T> {
     private final boolean dependent;
 
     private Repeat(final String name, final Action<?> child, final int repeatCount, final boolean dependent) {
-        this.name = Arguments.requireValidName(name);
-        this.child = Objects.requireNonNull(child, "child must not be null");
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
+        this.child = Objects.requireNonNull(child, "child is null");
         Arguments.requireTrue(child != this, "action must not add itself as a child");
         this.repeatCount = validateRepeatCount(repeatCount);
         var list = new ArrayList<Action<?>>(this.repeatCount);
@@ -71,8 +71,8 @@ public final class Repeat<T> implements Action<T> {
      * @throws IllegalArgumentException if {@code name} is blank
      */
     public static <T> Spec<T> of(final String name) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
         return new Spec<>(name);
     }
 
@@ -130,8 +130,8 @@ public final class Repeat<T> implements Action<T> {
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);
@@ -150,20 +150,22 @@ public final class Repeat<T> implements Action<T> {
         listener.onAfterExecution(descriptor);
     }
 
-    private Status run(final ExecutionContext context) {
-        var childDescriptors = context.descriptor().children();
+    private Status run(final Context context) {
+        var descriptors = context.descriptor().children();
         var aggregated = new StatusAccumulator();
+        var mode = Mode.RUN;
 
-        for (int index = 0; index < childDescriptors.size(); index++) {
-            Descriptor childResult = runChild(context, childDescriptors.get(index), Mode.RUN);
+        for (var descriptor : descriptors) {
+            var childResult = runChild(context, descriptor, mode);
             aggregated.include(childResult);
+
+            if (mode != Mode.RUN) {
+                continue;
+            }
+
             var childStatus = childResult.metadata().status();
-            if (dependent && !childStatus.isPassed()) {
-                Mode propagateMode = Mode.fromStatus(childStatus);
-                for (Descriptor remaining : childDescriptors.subList(index + 1, childDescriptors.size())) {
-                    aggregated.include(runChild(context, remaining, propagateMode));
-                }
-                break;
+            if (dependent && !childStatus.isPassed() && !childStatus.isAborted()) {
+                mode = Mode.fromStatus(childStatus);
             }
         }
 
@@ -175,18 +177,18 @@ public final class Repeat<T> implements Action<T> {
         return repeatCount;
     }
 
-    private static Descriptor runChild(final ExecutionContext context, final Descriptor child, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static Descriptor runChild(final Context context, final Descriptor child, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             return concrete.runChild(child, mode);
         }
-        throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+        throw new IllegalArgumentException("context must be a ConcreteContext");
     }
 
-    private static void runChildren(final ExecutionContext context, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static void runChildren(final Context context, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             concrete.runChildren(mode);
         } else {
-            throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+            throw new IllegalArgumentException("context must be a ConcreteContext");
         }
     }
 
@@ -260,7 +262,7 @@ public final class Repeat<T> implements Action<T> {
          */
         public Spec<T> child(final org.paramixel.api.action.Spec<?> spec) {
             ensureNotResolved();
-            this.child = Objects.requireNonNull(spec, "spec must not be null").resolve();
+            this.child = Objects.requireNonNull(spec, "spec is null").resolve();
             return this;
         }
 

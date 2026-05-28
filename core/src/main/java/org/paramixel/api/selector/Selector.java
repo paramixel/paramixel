@@ -21,14 +21,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import org.paramixel.api.internal.ConcreteAllSelector;
-import org.paramixel.api.internal.ConcreteAndSelector;
-import org.paramixel.api.internal.ConcreteClassRegexSelector;
-import org.paramixel.api.internal.ConcreteNotSelector;
-import org.paramixel.api.internal.ConcreteOrSelector;
-import org.paramixel.api.internal.ConcretePackageRegexSelector;
-import org.paramixel.api.internal.ConcreteTagRegexSelector;
-import org.paramixel.api.internal.support.Arguments;
+import nonapi.org.paramixel.ConcreteAllSelector;
+import nonapi.org.paramixel.ConcreteAndSelector;
+import nonapi.org.paramixel.ConcreteClassRegexSelector;
+import nonapi.org.paramixel.ConcreteNotSelector;
+import nonapi.org.paramixel.ConcreteOrSelector;
+import nonapi.org.paramixel.ConcretePackageRegexSelector;
+import nonapi.org.paramixel.ConcreteTagRegexSelector;
+import nonapi.org.paramixel.support.Arguments;
 
 /**
  * Describes discovery criteria used by {@link org.paramixel.api.Runner} when locating {@code @Paramixel.Factory} methods.
@@ -112,7 +112,7 @@ public interface Selector {
      * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
      */
     static Selector packageRegex(final String regex) {
-        return new ConcretePackageRegexSelector(compilePattern(normalizeRegex(regex, "packageRegex"), "packageRegex"));
+        return new ConcretePackageRegexSelector(compileAndValidate(regex, "packageRegex"));
     }
 
     /**
@@ -126,7 +126,7 @@ public interface Selector {
      * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
      */
     static Selector classRegex(final String regex) {
-        return new ConcreteClassRegexSelector(compilePattern(normalizeRegex(regex, "classRegex"), "classRegex"));
+        return new ConcreteClassRegexSelector(compileAndValidate(regex, "classRegex"));
     }
 
     /**
@@ -141,7 +141,7 @@ public interface Selector {
      * @throws IllegalArgumentException if {@code regex} is blank or not a valid regular expression
      */
     static Selector tagRegex(final String regex) {
-        return new ConcreteTagRegexSelector(compilePattern(normalizeRegex(regex, "tagRegex"), "tagRegex"));
+        return new ConcreteTagRegexSelector(compileAndValidate(regex, "tagRegex"));
     }
 
     /**
@@ -156,7 +156,7 @@ public interface Selector {
      * @throws NullPointerException if {@code clazz} is {@code null}
      */
     static Selector packageTreeOf(final Class<?> clazz) {
-        Objects.requireNonNull(clazz, "clazz must not be null");
+        Objects.requireNonNull(clazz, "clazz is null");
         var regex = "^" + Pattern.quote(clazz.getPackageName()) + "(\\..*)?$";
         return new ConcretePackageRegexSelector(Pattern.compile(regex));
     }
@@ -173,7 +173,7 @@ public interface Selector {
      * @throws NullPointerException if {@code clazz} is {@code null}
      */
     static Selector packageOf(final Class<?> clazz) {
-        Objects.requireNonNull(clazz, "clazz must not be null");
+        Objects.requireNonNull(clazz, "clazz is null");
         var regex = "^" + Pattern.quote(clazz.getPackageName()) + "$";
         return new ConcretePackageRegexSelector(Pattern.compile(regex));
     }
@@ -190,7 +190,7 @@ public interface Selector {
      * @throws NullPointerException if {@code clazz} is {@code null}
      */
     static Selector classOf(final Class<?> clazz) {
-        Objects.requireNonNull(clazz, "clazz must not be null");
+        Objects.requireNonNull(clazz, "clazz is null");
         var regex = "^" + Pattern.quote(clazz.getName()) + "$";
         return new ConcreteClassRegexSelector(Pattern.compile(regex));
     }
@@ -209,8 +209,8 @@ public interface Selector {
      * @throws IllegalArgumentException if fewer than two selectors are provided
      */
     static Selector and(final Selector... selectors) {
-        Objects.requireNonNull(selectors, "selectors must not be null");
-        Arguments.requireNoNullElements(selectors, "Selector.and() selectors must not contain null elements");
+        Objects.requireNonNull(selectors, "selectors is null");
+        Arguments.requireNoNullElements(selectors, "Selector.and() selectors contains null element");
         return andFromList(List.of(selectors), "Selector.and()");
     }
 
@@ -227,8 +227,8 @@ public interface Selector {
      * @throws IllegalArgumentException if fewer than two selectors are provided
      */
     static Selector and(final List<Selector> selectors) {
-        Objects.requireNonNull(selectors, "selectors must not be null");
-        Arguments.requireNoNullElements(selectors, "Selector.and() selectors must not contain null elements");
+        Objects.requireNonNull(selectors, "selectors is null");
+        Arguments.requireNoNullElements(selectors, "Selector.and() selectors contains null element");
         return andFromList(selectors, "Selector.and()");
     }
 
@@ -246,8 +246,8 @@ public interface Selector {
      * @throws IllegalArgumentException if fewer than two selectors are provided
      */
     static Selector or(final Selector... selectors) {
-        Objects.requireNonNull(selectors, "selectors must not be null");
-        Arguments.requireNoNullElements(selectors, "Selector.or() selectors must not contain null elements");
+        Objects.requireNonNull(selectors, "selectors is null");
+        Arguments.requireNoNullElements(selectors, "Selector.or() selectors contains null element");
         return orFromList(List.of(selectors), "Selector.or()");
     }
 
@@ -264,8 +264,8 @@ public interface Selector {
      * @throws IllegalArgumentException if fewer than two selectors are provided
      */
     static Selector or(final List<Selector> selectors) {
-        Objects.requireNonNull(selectors, "selectors must not be null");
-        Arguments.requireNoNullElements(selectors, "Selector.or() selectors must not contain null elements");
+        Objects.requireNonNull(selectors, "selectors is null");
+        Arguments.requireNoNullElements(selectors, "Selector.or() selectors contains null element");
         return orFromList(selectors, "Selector.or()");
     }
 
@@ -280,7 +280,7 @@ public interface Selector {
      * @throws NullPointerException if {@code selector} is {@code null}
      */
     static Selector not(final Selector selector) {
-        Objects.requireNonNull(selector, "Selector.not() selector must not be null");
+        Objects.requireNonNull(selector, "Selector.not() selector is null");
         return new ConcreteNotSelector(selector);
     }
 
@@ -314,14 +314,9 @@ public interface Selector {
         return new ConcreteOrSelector(List.copyOf(flattened));
     }
 
-    private static String normalizeRegex(final String regex, final String methodName) {
-        Objects.requireNonNull(regex, methodName + " regex must not be null");
-        Arguments.requireNonBlank(regex, methodName + " regex must not be blank");
-        compilePattern(regex, methodName);
-        return regex;
-    }
-
-    private static Pattern compilePattern(final String regex, final String methodName) {
+    private static Pattern compileAndValidate(final String regex, final String methodName) {
+        Objects.requireNonNull(regex, methodName + " regex is null");
+        Arguments.requireNonBlank(regex, methodName + " regex is blank");
         try {
             return Pattern.compile(regex);
         } catch (PatternSyntaxException e) {

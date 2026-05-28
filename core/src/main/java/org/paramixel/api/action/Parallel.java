@@ -21,15 +21,18 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import nonapi.org.paramixel.Scheduler;
+import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.MutableDescriptor;
+import nonapi.org.paramixel.support.Arguments;
+import nonapi.org.paramixel.support.UnrecoverableErrors;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.ThrowingConsumer;
-import org.paramixel.api.internal.AsyncScheduler;
-import org.paramixel.api.internal.ConcreteExecutionContext;
-import org.paramixel.api.internal.action.MutableDescriptor;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * Composite action that executes all direct children concurrently with bounded admission.
@@ -38,27 +41,39 @@ import org.paramixel.spi.action.Mode;
  * consumes one branch slot from this Parallel, regardless of whether that child is a Step, Sequence, or
  * nested Parallel. Nested Parallel actions enforce their own limits inside their own execution state.</p>
  *
+ * <p>{@link #parallelism()} is an upper bound, not a guarantee. Actual concurrency may be lower due to
+ * global scheduler limits ({@code paramixel.parallelism}), nested branch contention, and normal task
+ * timing.</p>
+ *
  * <p>This prevents large Parallel actions from flooding the scheduler ready queue while avoiding the
  * over-aggressive branch-weighting behavior that caused child Parallel actions to reserve multiple parent
  * slots and accidentally cap overall execution.</p>
  *
  * <p>Thread-safety: instances are immutable and safe for concurrent use. Execution state is managed by
- * the internal {@code ParallelState}, which coordinates scheduling via the shared {@link AsyncScheduler}.</p>
+ * the internal {@code ParallelState}, which coordinates scheduling via the shared {@link Scheduler}.</p>
  *
  * @param <T> the type accepted by child consumers
  */
 public final class Parallel<T> implements Action<T> {
 
     private static final String KIND = "Parallel";
+    private static final int UNSPECIFIED_PARALLELISM = Integer.MAX_VALUE;
 
     private final String name;
     private final List<Action<?>> children;
     private final int parallelism;
+    private final boolean parallelismConfigured;
 
-    private Parallel(final String name, final int parallelism, final List<Action<?>> children) {
-        this.name = Arguments.requireValidName(name);
+    private Parallel(
+            final String name,
+            final int parallelism,
+            final List<Action<?>> children,
+            final boolean parallelismConfigured) {
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
         this.children = validateChildren(children, this);
         this.parallelism = parallelism;
+        this.parallelismConfigured = parallelismConfigured;
     }
 
     /**
@@ -95,10 +110,20 @@ public final class Parallel<T> implements Action<T> {
     }
 
     /**
-     * Returns the configured parallelism limit.
+     * Returns the declared direct-child parallelism value.
      *
-     * <p>This is the maximum number of direct child branches that may be in-flight simultaneously.
-     * The effective parallelism at runtime is further bounded by the scheduler's global parallelism.</p>
+     * <p>When {@link Spec#parallelism(int)} is not called, this method returns {@link
+     * Integer#MAX_VALUE} as an internal sentinel. In that case, execution-time admission inherits
+     * the scheduler parallelism (derived from {@code paramixel.parallelism}).
+     *
+     * <p>When explicitly configured, this value is the requested maximum number of direct child
+     * branches that may be in-flight simultaneously, capped by scheduler parallelism
+     * ({@code paramixel.parallelism}). Global scheduler parallelism is enforced separately at
+     * leaf-action execution time. At the root parallel node, runner-level top-level admission may
+     * also be throttled by {@code paramixel.parallelism}.</p>
+     *
+     * <p>This value is a cap only. Runtime concurrency is best-effort and can be lower depending on
+     * global and nested contention.</p>
      *
      * @return the parallelism limit
      */
@@ -120,11 +145,11 @@ public final class Parallel<T> implements Action<T> {
      *
      * @param context the execution context (must not be {@code null})
      * @throws NullPointerException if {@code context} is {@code null}
-     * @throws IllegalArgumentException if {@code context} is not a {@code ConcreteExecutionContext}
+     * @throws IllegalArgumentException if {@code context} is not a {@code ConcreteContext}
      */
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);
@@ -143,21 +168,27 @@ public final class Parallel<T> implements Action<T> {
         listener.onAfterExecution(descriptor);
     }
 
-    private Status run(final ExecutionContext context) {
-        if (!(context instanceof ConcreteExecutionContext concreteContext)) {
-            throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+    private Status run(final Context context) {
+        if (!(context instanceof ConcreteContext concreteContext)) {
+            throw new IllegalArgumentException("context must be a ConcreteContext");
         }
 
         var descriptor = (MutableDescriptor) context.descriptor();
         var children = getConcreteChildren(descriptor);
         var scheduler = concreteContext.scheduler();
+        var topLevelThrottleEnabled = descriptor.parent().isEmpty() && concreteContext.hasTopLevelParallelThrottle();
 
         var completion = new CompletableFuture<Descriptor>();
-        var state = new ParallelState(parallelism, concreteContext, completion, children, scheduler);
-
-        state.drain();
+        var state = new ParallelState(
+                resolveEffectiveParallelism(scheduler),
+                concreteContext,
+                completion,
+                children,
+                scheduler,
+                topLevelThrottleEnabled);
 
         try {
+            state.drain();
             scheduler.managedJoin(completion);
         } catch (CompletionException e) {
             var cause = e.getCause();
@@ -183,12 +214,20 @@ public final class Parallel<T> implements Action<T> {
         return result;
     }
 
-    private static void runChildren(final ExecutionContext context, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static void runChildren(final Context context, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             concrete.runChildren(mode);
         } else {
-            throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+            throw new IllegalArgumentException("context must be a ConcreteContext");
         }
+    }
+
+    private int resolveEffectiveParallelism(final Scheduler scheduler) {
+        var schedulerParallelism = scheduler.parallelism();
+        if (!parallelismConfigured) {
+            return schedulerParallelism;
+        }
+        return Math.min(parallelism, schedulerParallelism);
     }
 
     /**
@@ -201,29 +240,31 @@ public final class Parallel<T> implements Action<T> {
     private static final class ParallelState {
 
         private final int effectiveParallelism;
-        private final ConcreteExecutionContext context;
+        private final ConcreteContext context;
         private final CompletableFuture<Descriptor> completion;
         private final List<MutableDescriptor> children;
-        private final AsyncScheduler scheduler;
+        private final Scheduler scheduler;
+        private final boolean topLevelThrottleEnabled;
 
         private final AtomicInteger scheduledCount = new AtomicInteger(0);
         private final AtomicInteger completedCount = new AtomicInteger(0);
-        private final AtomicInteger admittedCount = new AtomicInteger(0);
-        private final AsyncScheduler.ExecutionCallback executionCallback = new ParallelExecutionCallback();
 
         private volatile boolean done = false;
+        private volatile Throwable firstError;
 
         ParallelState(
                 final int configuredParallelism,
-                final ConcreteExecutionContext context,
+                final ConcreteContext context,
                 final CompletableFuture<Descriptor> completion,
                 final List<MutableDescriptor> children,
-                final AsyncScheduler scheduler) {
+                final Scheduler scheduler,
+                final boolean topLevelThrottleEnabled) {
             this.context = context;
             this.completion = completion;
             this.children = children;
             this.scheduler = scheduler;
-            this.effectiveParallelism = Math.max(1, Math.min(configuredParallelism, scheduler.parallelism()));
+            this.topLevelThrottleEnabled = topLevelThrottleEnabled;
+            this.effectiveParallelism = Math.max(1, configuredParallelism);
         }
 
         void drain() {
@@ -255,27 +296,92 @@ public final class Parallel<T> implements Action<T> {
             for (var i = 0; i < scheduleCount; i++) {
                 var child = children.get(startIndex + i);
                 var mode = child.metadata().mode();
-                scheduler.schedule(child, mode, context, executionCallback);
+                var callback = new ParallelExecutionCallback(child, topLevelThrottleEnabled);
+                if (topLevelThrottleEnabled) {
+                    try {
+                        context.acquireTopLevelParallelPermit();
+                        callback.markTopLevelPermitAcquired();
+                    } catch (InterruptedException interruptedException) {
+                        failScheduling(interruptedException);
+                        return;
+                    }
+                }
+                try {
+                    scheduler
+                            .schedule(child, mode, context, callback)
+                            .whenComplete((ignored, error) -> callback.onFutureComplete(error));
+                } catch (Throwable t) {
+                    callback.onFutureComplete(t);
+                    failScheduling(t);
+                    return;
+                }
             }
 
             checkCompletion();
         }
 
-        private final class ParallelExecutionCallback implements AsyncScheduler.ExecutionCallback {
+        private final class ParallelExecutionCallback implements Scheduler.ExecutionCallback {
+
+            private final MutableDescriptor child;
+            private final boolean usesTopLevelPermit;
+            private final AtomicBoolean executionStarted = new AtomicBoolean(false);
+            private final AtomicBoolean completionNotified = new AtomicBoolean(false);
+            private final AtomicBoolean topLevelPermitAcquired = new AtomicBoolean(false);
+            private final AtomicBoolean topLevelPermitReleased = new AtomicBoolean(false);
+
+            ParallelExecutionCallback(final MutableDescriptor child, final boolean usesTopLevelPermit) {
+                this.child = child;
+                this.usesTopLevelPermit = usesTopLevelPermit;
+            }
+
+            void markTopLevelPermitAcquired() {
+                if (usesTopLevelPermit) {
+                    topLevelPermitAcquired.set(true);
+                }
+            }
+
             @Override
             public void onAdmitted() {
-                admittedCount.incrementAndGet();
+                // Intentionally empty
             }
 
             @Override
             public void onExecutionStart() {
-                // Retained for monitoring compatibility
+                executionStarted.set(true);
             }
 
             @Override
             public void onExecutionComplete(final Throwable error) {
-                admittedCount.decrementAndGet();
-                handleCompletion(error);
+                releaseTopLevelPermitIfNeeded();
+                if (completionNotified.compareAndSet(false, true)) {
+                    handleCompletion(resolveCompletionError(error));
+                }
+            }
+
+            void onFutureComplete(final Throwable error) {
+                releaseTopLevelPermitIfNeeded();
+                if (completionNotified.compareAndSet(false, true)) {
+                    handleCompletion(resolveCompletionError(error));
+                }
+            }
+
+            private void releaseTopLevelPermitIfNeeded() {
+                if (!usesTopLevelPermit || !topLevelPermitAcquired.get()) {
+                    return;
+                }
+                if (topLevelPermitReleased.compareAndSet(false, true)) {
+                    context.releaseTopLevelParallelPermit();
+                }
+            }
+
+            private Throwable resolveCompletionError(final Throwable error) {
+                if (error == null) {
+                    return null;
+                }
+                if (!executionStarted.get()) {
+                    return error;
+                }
+                return child.metadata().status().isTerminal() ? null : error;
             }
         }
 
@@ -288,10 +394,31 @@ public final class Parallel<T> implements Action<T> {
                     completion.completeExceptionally(unwrapped);
                     return;
                 }
+                if (firstError == null) {
+                    firstError = unwrapped;
+                }
             }
 
             checkCompletion();
             drain();
+        }
+
+        private void failScheduling(final Throwable throwable) {
+            if (throwable instanceof InterruptedException interruptedException) {
+                Thread.currentThread().interrupt();
+                var wrapped =
+                        new InterruptedException("Interrupted while acquiring top-level parallel throttle permit");
+                wrapped.initCause(interruptedException);
+                synchronized (this) {
+                    done = true;
+                }
+                completion.completeExceptionally(wrapped);
+                return;
+            }
+            synchronized (this) {
+                done = true;
+            }
+            completion.completeExceptionally(unwrap(throwable));
         }
 
         private void checkCompletion() {
@@ -305,7 +432,11 @@ public final class Parallel<T> implements Action<T> {
                 return;
             }
             done = true;
-            completion.complete(context.descriptor());
+            if (firstError != null) {
+                completion.completeExceptionally(firstError);
+            } else {
+                completion.complete(context.descriptor());
+            }
         }
 
         private static Throwable unwrap(final Throwable t) {
@@ -313,17 +444,22 @@ public final class Parallel<T> implements Action<T> {
                 return t.getCause();
             }
             if (t instanceof RuntimeException rt && rt.getCause() != null) {
-                return rt.getCause();
+                var cause = rt.getCause();
+                if (UnrecoverableErrors.isUnrecoverable(cause)
+                        || cause instanceof Error
+                        || cause instanceof InterruptedException) {
+                    return cause;
+                }
             }
             return t;
         }
     }
 
     private static List<Action<?>> validateChildren(final List<Action<?>> children, final Action<?> self) {
-        Objects.requireNonNull(children, "children must not be null");
+        Objects.requireNonNull(children, "children is null");
         var validated = new ArrayList<Action<?>>(children.size());
         for (Action<?> child : children) {
-            Objects.requireNonNull(child, "children must not contain null elements");
+            Objects.requireNonNull(child, "children contains null element");
             Arguments.requireTrue(child != self, "action must not add itself as a child");
             validated.add(child);
         }
@@ -342,20 +478,24 @@ public final class Parallel<T> implements Action<T> {
 
         private final String name;
         private final List<Action<?>> children = new ArrayList<>();
-        private int parallelism = Integer.MAX_VALUE;
+        private int parallelism = UNSPECIFIED_PARALLELISM;
+        private boolean parallelismConfigured;
         private boolean resolved;
 
         private Spec(final String name) {
-            Objects.requireNonNull(name, "name must not be null");
-            Arguments.requireNonBlank(name, "name must not be blank");
+            Objects.requireNonNull(name, "name is null");
+            Arguments.requireNonBlank(name, "name is blank");
             this.name = name;
         }
 
         /**
          * Sets the maximum number of in-flight direct child branches.
          *
-         * <p>Defaults to {@code Integer.MAX_VALUE} (unbounded). The effective parallelism at runtime
-         * is further capped by the scheduler's global parallelism.</p>
+         * <p>When this method is not called, direct-child admission inherits scheduler parallelism
+         * at execution time (derived from {@code paramixel.parallelism}). When configured, the
+         * requested value is capped by scheduler parallelism. Global scheduler parallelism is
+         * enforced separately at leaf-action execution time. At the root parallel node, runner-level
+         * top-level admission may also be throttled by {@code paramixel.parallelism}.</p>
          *
          * @param parallelism the parallelism limit (must be positive)
          * @return this spec
@@ -365,6 +505,7 @@ public final class Parallel<T> implements Action<T> {
             ensureNotResolved();
             Arguments.requirePositive(parallelism, "parallelism must be positive, was: " + parallelism);
             this.parallelism = parallelism;
+            parallelismConfigured = true;
             return this;
         }
 
@@ -377,7 +518,7 @@ public final class Parallel<T> implements Action<T> {
          */
         public Spec<T> child(final org.paramixel.api.action.Spec<?> spec) {
             ensureNotResolved();
-            children.add(Objects.requireNonNull(spec, "spec must not be null").resolve());
+            children.add(Objects.requireNonNull(spec, "spec is null").resolve());
             return this;
         }
 
@@ -408,6 +549,52 @@ public final class Parallel<T> implements Action<T> {
         }
 
         /**
+         * Adds a child action for each item in the iterable by applying the supplied mapper function.
+         *
+         * <p>This is a convenience method that produces the same tree as calling
+         * {@link #child(org.paramixel.api.action.Spec) child(Spec)} in a for-loop. The mapper is called for
+         * each item at spec-building time ({@link #resolve()}), not at execution time. An empty
+         * iterable adds no children.</p>
+         *
+         * @param <U> the type of items in the iterable
+         * @param items the items to iterate over; must not be {@code null}
+         * @param mapper the function that maps each item to a child action spec; must not be
+         *     {@code null}
+         * @return this spec
+         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
+         * @throws IllegalStateException if this spec has already been resolved
+         */
+        public <U> Spec<T> each(final Iterable<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
+            ensureNotResolved();
+            Objects.requireNonNull(items, "items is null");
+            Objects.requireNonNull(mapper, "mapper is null");
+            for (U item : items) {
+                child(mapper.apply(item));
+            }
+            return this;
+        }
+
+        /**
+         * Adds a child action for each item in the stream by applying the supplied mapper function.
+         *
+         * <p>The stream is materialized to a list immediately and then delegated to
+         * {@link #each(Iterable, Function)}. The mapper is called for each item at spec-building time
+         * ({@link #resolve()}), not at execution time. An empty stream adds no children.</p>
+         *
+         * @param <U> the type of items in the stream
+         * @param items the items to iterate over; must not be {@code null}
+         * @param mapper the function that maps each item to a child action spec; must not be
+         *     {@code null}
+         * @return this spec
+         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
+         * @throws IllegalStateException if this spec has already been resolved
+         */
+        public <U> Spec<T> each(final Stream<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
+            Objects.requireNonNull(items, "items is null");
+            return each(items.toList(), mapper);
+        }
+
+        /**
          * Builds an immutable {@link Parallel} action from this spec's configuration.
          *
          * @return a new Parallel action
@@ -416,7 +603,7 @@ public final class Parallel<T> implements Action<T> {
         public Parallel<T> resolve() {
             ensureNotResolved();
             resolved = true;
-            return new Parallel<>(name, parallelism, List.copyOf(children));
+            return new Parallel<>(name, parallelism, List.copyOf(children), parallelismConfigured);
         }
 
         private void ensureNotResolved() {

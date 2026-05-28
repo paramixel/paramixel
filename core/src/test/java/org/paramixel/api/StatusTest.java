@@ -18,8 +18,17 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.action.Metadata;
+import org.paramixel.api.action.Mode;
+import org.paramixel.api.exception.AbortedException;
+import org.paramixel.api.exception.FailException;
+import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Status")
 class StatusTest {
@@ -152,16 +161,28 @@ class StatusTest {
     }
 
     @Test
-    @DisplayName("Status equals is based on name only")
+    @DisplayName("Status equals and hashCode include message and throwable")
     void statusEqualsAndHashCode() {
         var failedWithMessage = Status.failed("err");
         var failedWithOtherMessage = Status.failed("other");
 
-        assertThat(failedWithMessage).isEqualTo(Status.FAILED);
-        assertThat(failedWithOtherMessage).isEqualTo(Status.FAILED);
-        assertThat(failedWithMessage).isEqualTo(failedWithOtherMessage);
-        assertThat(failedWithMessage.hashCode()).isEqualTo(Status.FAILED.hashCode());
+        assertThat(failedWithMessage).isNotEqualTo(Status.FAILED);
+        assertThat(failedWithMessage).isNotEqualTo(failedWithOtherMessage);
+        assertThat(failedWithMessage.hashCode()).isNotEqualTo(Status.FAILED.hashCode());
         assertThat(Status.PASSED).isNotEqualTo(Status.FAILED);
+
+        var failedWithSameMessage = Status.failed("err");
+        assertThat(failedWithMessage).isEqualTo(failedWithSameMessage);
+        assertThat(failedWithMessage.hashCode()).isEqualTo(failedWithSameMessage.hashCode());
+
+        var exception1 = new RuntimeException("boom");
+        var exception2 = new RuntimeException("bang");
+        var failedWithThrowable1 = Status.failed("err", exception1);
+        var failedWithThrowable2 = Status.failed("err", exception2);
+
+        assertThat(failedWithThrowable1).isNotEqualTo(failedWithThrowable2);
+        assertThat(failedWithThrowable1).isNotEqualTo(failedWithMessage);
+        assertThat(failedWithThrowable1).isEqualTo(Status.failed("err", exception1));
     }
 
     @Test
@@ -169,5 +190,175 @@ class StatusTest {
     void statusToString() {
         assertThat(Status.PASSED.toString()).isEqualTo("PASSED");
         assertThat(Status.failed("err").toString()).isEqualTo("FAILED");
+    }
+
+    @Nested
+    @DisplayName("fromThrowable()")
+    class FromThrowable {
+
+        @Test
+        @DisplayName("FailException wrapped in RuntimeException returns failed with message")
+        void failExceptionWrappedInRuntimeException() {
+            var status = Status.fromThrowable(new RuntimeException(new FailException("assertion")));
+
+            assertThat(status.isFailed()).isTrue();
+            assertThat(status.message()).contains("assertion");
+        }
+
+        @Test
+        @DisplayName("SkipException wrapped in RuntimeException returns skipped with message")
+        void skipExceptionWrappedInRuntimeException() {
+            var status = Status.fromThrowable(new RuntimeException(new SkipException("not ready")));
+
+            assertThat(status.isSkipped()).isTrue();
+            assertThat(status.message()).contains("not ready");
+        }
+
+        @Test
+        @DisplayName("AbortedException wrapped in RuntimeException returns aborted with message")
+        void abortedExceptionWrappedInRuntimeException() {
+            var status = Status.fromThrowable(new RuntimeException(new AbortedException("precondition")));
+
+            assertThat(status.isAborted()).isTrue();
+            assertThat(status.message()).contains("precondition");
+        }
+    }
+
+    @Nested
+    @DisplayName("aggregate()")
+    class Aggregate {
+
+        @Test
+        @DisplayName("empty list returns PASSED")
+        void emptyReturnsPassed() {
+            assertThat(Status.aggregate(List.of())).isSameAs(Status.PASSED);
+        }
+
+        @Test
+        @DisplayName("all PASSED returns PASSED")
+        void allPassedReturnsPassed() {
+            assertThat(Status.aggregate(descriptorsWith(Status.PASSED, Status.PASSED)))
+                    .isSameAs(Status.PASSED);
+        }
+
+        @Test
+        @DisplayName("ABORTED before FAILED returns FAILED")
+        void abortedBeforeFailedReturnsFailed() {
+            assertThat(Status.aggregate(descriptorsWith(Status.ABORTED, Status.FAILED)))
+                    .isSameAs(Status.FAILED);
+        }
+
+        @Test
+        @DisplayName("SKIPPED, ABORTED, FAILED returns FAILED")
+        void skippedAbortedFailedReturnsFailed() {
+            assertThat(Status.aggregate(descriptorsWith(Status.SKIPPED, Status.ABORTED, Status.FAILED)))
+                    .isSameAs(Status.FAILED);
+        }
+
+        @Test
+        @DisplayName("PASSED, ABORTED, PASSED returns ABORTED")
+        void passedAbortedPassedReturnsAborted() {
+            assertThat(Status.aggregate(descriptorsWith(Status.PASSED, Status.ABORTED, Status.PASSED)))
+                    .isSameAs(Status.ABORTED);
+        }
+
+        @Test
+        @DisplayName("SKIPPED, ABORTED returns ABORTED")
+        void skippedAbortedReturnsAborted() {
+            assertThat(Status.aggregate(descriptorsWith(Status.SKIPPED, Status.ABORTED)))
+                    .isSameAs(Status.ABORTED);
+        }
+
+        @Test
+        @DisplayName("non-terminal before terminal returns RUNNING")
+        void nonTerminalReturnsRunning() {
+            assertThat(Status.aggregate(descriptorsWith(Status.PENDING, Status.PASSED)))
+                    .isSameAs(Status.RUNNING);
+        }
+
+        @Test
+        @DisplayName("SKIPPED without FAILED or ABORTED returns SKIPPED")
+        void skippedWithoutFailedOrAbortedReturnsSkipped() {
+            assertThat(Status.aggregate(descriptorsWith(Status.SKIPPED, Status.PASSED)))
+                    .isSameAs(Status.SKIPPED);
+        }
+
+        private List<Descriptor> descriptorsWith(final Status... statuses) {
+            var descriptors = new Descriptor[statuses.length];
+            for (int i = 0; i < statuses.length; i++) {
+                descriptors[i] = stubDescriptor(statuses[i]);
+            }
+            return List.of(descriptors);
+        }
+
+        private Descriptor stubDescriptor(final Status status) {
+            var metadata = new Metadata() {
+                @Override
+                public String id() {
+                    return "stub";
+                }
+
+                @Override
+                public String name() {
+                    return "stub";
+                }
+
+                @Override
+                public String kind() {
+                    return "stub";
+                }
+
+                @Override
+                public String className() {
+                    return "Stub";
+                }
+
+                @Override
+                public Status status() {
+                    return status;
+                }
+
+                @Override
+                public Mode mode() {
+                    return Mode.RUN;
+                }
+
+                @Override
+                public Duration runDuration() {
+                    return Duration.ZERO;
+                }
+
+                @Override
+                public Optional<String> message() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<Throwable> throwable() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public boolean isCompleted() {
+                    return status.isTerminal();
+                }
+            };
+            return new Descriptor() {
+                @Override
+                public Optional<Descriptor> parent() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Metadata metadata() {
+                    return metadata;
+                }
+
+                @Override
+                public List<Descriptor> children() {
+                    return List.of();
+                }
+            };
+        }
     }
 }

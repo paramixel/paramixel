@@ -59,6 +59,7 @@ const sidebars = {
         'guides/best-practices',
         'guides/troubleshooting',
         'guides/examples',
+        'guides/migration-5-to-5.1',
         'guides/migration-4-to-5',
         'guides/migration-3-to-5',
         'guides/migration-2-to-5',

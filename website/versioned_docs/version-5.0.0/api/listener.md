@@ -15,7 +15,9 @@ import org.paramixel.api.Listener;
 
 | Method | Description |
 | --- | --- |
+| `initialize(Configuration configuration)` | Invoked once before the run begins; allows listeners to configure themselves |
 | `onRunStarted()` | Invoked once before run discovery begins |
+| `onDiscoveryStarted()` | Invoked after `onRunStarted()`, before the discovery phase |
 | `onDiscoveryCompleted(Descriptor root)` | Invoked after discovery creates the descriptor tree |
 | `onBeforeExecution(Descriptor descriptor)` | Invoked by an action immediately before its execution logic runs |
 | `onAfterExecution(Descriptor descriptor)` | Invoked by an action after its descriptor reaches a terminal status |
@@ -78,7 +80,9 @@ Runner runner = Runner.builder()
 The callbacks occur in this order:
 
 ```
-onRunStarted()
+initialize(configuration)
+  onRunStarted()
+  onDiscoveryStarted()
   onDiscoveryCompleted(root)
   [for each descriptor execution:]
     onBeforeExecution(descriptor)

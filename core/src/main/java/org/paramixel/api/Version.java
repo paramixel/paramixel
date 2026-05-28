@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.function.Function;
-import org.paramixel.api.internal.support.ResourceLoader;
+import nonapi.org.paramixel.support.ResourceLoader;
 
 /**
  * Provides the current Paramixel version string loaded from the classpath.

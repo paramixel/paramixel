@@ -17,7 +17,7 @@
 package org.paramixel.api.exception;
 
 import java.util.Objects;
-import org.paramixel.api.internal.support.Arguments;
+import nonapi.org.paramixel.support.Arguments;
 
 /**
  * Signals that the action hierarchy contains a cyclic parent-child relationship.
@@ -37,7 +37,7 @@ public final class CycleDetectedException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public CycleDetectedException(final String message) {
-        super(Objects.requireNonNull(message, "message must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 }

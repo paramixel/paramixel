@@ -162,8 +162,23 @@ class RetryTest {
     }
 
     @Test
-    @DisplayName("reset allows run to be called again")
-    void resetAllowsRunToBeCalledAgain() {
+    @DisplayName("reset allows retryOn to be called after run")
+    void resetAllowsRetryOnToBeCalledAfterRun() {
+        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
+        retry.run(() -> {});
+
+        Retry same = retry.reset();
+
+        assertThat(same).isSameAs(retry);
+        assertThat(retry.hasRun()).isFalse();
+
+        Retry reconfigured = retry.retryOn(t -> t instanceof IOException);
+        assertThat(reconfigured).isSameAs(retry);
+    }
+
+    @Test
+    @DisplayName("reset allows run to be called after run")
+    void resetAllowsRunToBeCalledAfterRun() {
         Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
         retry.run(() -> {});
 
