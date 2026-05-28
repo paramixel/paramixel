@@ -49,7 +49,7 @@ class PolicyExceptionTest {
     void constructorWithMessageRejectsNull() {
         assertThatThrownBy(() -> new PolicyException(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("message must not be null");
+                .hasMessage("message is null");
     }
 
     @Test
@@ -57,7 +57,7 @@ class PolicyExceptionTest {
     void constructorWithMessageRejectsBlank() {
         assertThatThrownBy(() -> new PolicyException("  "))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("message must not be blank");
+                .hasMessage("message is blank");
     }
 
     @Test
@@ -65,7 +65,7 @@ class PolicyExceptionTest {
     void constructorWithMessageAndCauseRejectsNullMessage() {
         assertThatThrownBy(() -> new PolicyException(null, new ArithmeticException("cause")))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("message must not be null");
+                .hasMessage("message is null");
     }
 
     @Test
@@ -73,7 +73,7 @@ class PolicyExceptionTest {
     void constructorWithMessageAndCauseRejectsBlankMessage() {
         assertThatThrownBy(() -> new PolicyException("  ", new ArithmeticException("cause")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("message must not be blank");
+                .hasMessage("message is blank");
     }
 
     @Test
@@ -81,6 +81,6 @@ class PolicyExceptionTest {
     void constructorWithMessageAndCauseRejectsNullCause() {
         assertThatThrownBy(() -> new PolicyException("overflow", null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("cause must not be null");
+                .hasMessage("cause is null");
     }
 }

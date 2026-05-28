@@ -18,9 +18,11 @@ package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Configuration;
 import org.paramixel.api.Runner;
 
 /**
@@ -138,8 +140,7 @@ class ParallelDeadlockPreventionTest {
         }
 
         var result = Runner.builder()
-                .configuration(org.paramixel.api.Configuration.of(
-                        java.util.Map.of(org.paramixel.api.Configuration.RUNNER_PARALLELISM, "10")))
+                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "10")))
                 .build()
                 .run(parallel);
 
@@ -181,8 +182,7 @@ class ParallelDeadlockPreventionTest {
         }
 
         var result = Runner.builder()
-                .configuration(org.paramixel.api.Configuration.of(
-                        java.util.Map.of(org.paramixel.api.Configuration.RUNNER_PARALLELISM, "8")))
+                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "8")))
                 .build()
                 .run(parallel);
 

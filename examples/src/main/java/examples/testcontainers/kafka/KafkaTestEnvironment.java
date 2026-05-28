@@ -122,7 +122,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
     }
 
     private void initialize(final Network network, final boolean ownsNetwork) {
-        this.network = Objects.requireNonNull(network, "network must not be null");
+        this.network = Objects.requireNonNull(network, "network is null");
         this.ownsNetwork = ownsNetwork;
         boolean success = false;
         boolean interrupted = false;
@@ -133,7 +133,8 @@ public class KafkaTestEnvironment implements AutoCloseable {
 
             kafkaContainer = new KafkaContainer(image)
                     .withNetwork(network)
-                    .withStartupAttempts(1)
+                    .withStartupAttempts(3)
+                    .withStartupTimeout(Duration.ofMinutes(3))
                     .withLogConsumer(new ContainerLogConsumer(getClass().getSimpleName(), argumentName))
                     .waitingFor(Wait.forLogMessage(".*Transitioning from RECOVERY to RUNNING.*", 1)
                             .withStartupTimeout(INITIALIZE_TIMEOUT))

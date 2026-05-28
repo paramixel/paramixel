@@ -19,13 +19,12 @@ package org.paramixel.api.action;
 import java.util.List;
 import java.util.Optional;
 import org.paramixel.api.Runner;
-import org.paramixel.spi.action.ExecutionContext;
 
 /**
  * Defines a reusable execution unit processed by a {@link Runner}.
  *
  * <p>Actions are reusable definitions. Discovery binds an action occurrence to a descriptor,
- * and execution uses an {@link ExecutionContext} for descriptor state, listener access, and
+ * and execution uses a {@link Context} for descriptor state, listener access, and
  * fixture instances.
  *
  * @param <T> the type consumed by the action
@@ -97,7 +96,7 @@ public interface Action<T> extends Spec<T> {
      *
      * @param context the active execution context; must not be {@code null}
      */
-    void execute(ExecutionContext context);
+    void execute(Context context);
 
     @Override
     default Action<T> resolve() {

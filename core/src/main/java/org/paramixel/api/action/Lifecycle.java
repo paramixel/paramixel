@@ -20,20 +20,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.StatusAccumulator;
+import nonapi.org.paramixel.support.Arguments;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.ThrowingConsumer;
-import org.paramixel.api.internal.ConcreteExecutionContext;
-import org.paramixel.api.internal.action.StatusAccumulator;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * An action that executes a before-action, zero or more body children, and an after-action
  * in sequence, with lifecycle-style guarantees.
  *
  * <p>When configured as <em>dependent</em> (the default), a failure in any body child
- * causes remaining body children to be skipped or aborted. When configured as
+ * causes remaining body children to be skipped. When configured as
  * <em>independent</em>, all body children run regardless of individual outcomes. The
  * after-action always runs, regardless of earlier outcomes.
  *
@@ -55,7 +56,8 @@ public final class Lifecycle<T> implements Action<T> {
             final List<Action<?>> children,
             final Action<?> after,
             final boolean dependent) {
-        this.name = Arguments.requireValidName(name);
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
         this.before = before;
         this.children = List.copyOf(children);
         this.after = after;
@@ -100,7 +102,7 @@ public final class Lifecycle<T> implements Action<T> {
 
     /**
      * Returns whether body children are dependent — i.e., a failure in one child causes
-     * remaining children to be skipped or aborted.
+     * remaining children to be skipped.
      *
      * @return {@code true} if body children are dependent
      */
@@ -119,8 +121,8 @@ public final class Lifecycle<T> implements Action<T> {
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);
@@ -139,63 +141,57 @@ public final class Lifecycle<T> implements Action<T> {
         listener.onAfterExecution(descriptor);
     }
 
-    private Status run(final ExecutionContext context) {
-        var descriptors = context.descriptor().children();
+    private Status run(final Context context) {
+        var descriptor = context.descriptor();
         var aggregated = new StatusAccumulator();
-        var index = 0;
+        var mode = Mode.RUN;
 
-        if (before != null) {
-            Descriptor beforeResult = runChild(context, descriptors.get(index++), Mode.RUN);
-            aggregated.include(beforeResult);
-            if (!beforeResult.metadata().status().isPassed()) {
-                Mode propagateMode = Mode.fromStatus(beforeResult.metadata().status());
-                for (var ignored : children) {
-                    aggregated.include(runChild(context, descriptors.get(index++), propagateMode));
+        try {
+            var beforeDescriptor = descriptor.before().orElse(null);
+            if (beforeDescriptor != null) {
+                var beforeResult = runChild(context, beforeDescriptor, Mode.RUN);
+                aggregated.include(beforeResult);
+                var beforeStatus = beforeResult.metadata().status();
+                if (!beforeStatus.isPassed()) {
+                    mode = Mode.SKIP;
                 }
-                runAfter(context, descriptors, aggregated, index);
-                return aggregated.status();
+            }
+
+            for (var child : descriptor.children()) {
+                var childResult = runChild(context, child, mode);
+                aggregated.include(childResult);
+
+                if (mode != Mode.RUN) {
+                    continue;
+                }
+
+                var childStatus = childResult.metadata().status();
+                if (dependent && !childStatus.isPassed() && !childStatus.isAborted()) {
+                    mode = Mode.fromStatus(childStatus);
+                }
+            }
+        } finally {
+            var afterDescriptor = descriptor.after().orElse(null);
+            if (afterDescriptor != null) {
+                aggregated.include(runChild(context, afterDescriptor, Mode.RUN));
             }
         }
 
-        for (int body = 0; body < children.size(); body++) {
-            Descriptor childResult = runChild(context, descriptors.get(index++), Mode.RUN);
-            aggregated.include(childResult);
-            var childStatus = childResult.metadata().status();
-            if (dependent && !childStatus.isPassed()) {
-                Mode propagateMode = Mode.fromStatus(childStatus);
-                for (int remaining = body + 1; remaining < children.size(); remaining++) {
-                    aggregated.include(runChild(context, descriptors.get(index++), propagateMode));
-                }
-                break;
-            }
-        }
-
-        runAfter(context, descriptors, aggregated, index);
         return aggregated.status();
     }
 
-    private void runAfter(
-            final ExecutionContext context,
-            final List<Descriptor> descriptors,
-            final StatusAccumulator aggregated,
-            final int index) {
-        if (after != null) {
-            aggregated.include(runChild(context, descriptors.get(index), Mode.RUN));
-        }
-    }
-
-    private static Descriptor runChild(final ExecutionContext context, final Descriptor child, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static Descriptor runChild(final Context context, final Descriptor child, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             return concrete.runChild(child, mode);
         }
-        throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+        throw new IllegalArgumentException("context must be a ConcreteContext");
     }
 
-    private static void runChildren(final ExecutionContext context, final Mode mode) {
-        if (context instanceof ConcreteExecutionContext concrete) {
+    private static void runChildren(final Context context, final Mode mode) {
+        if (context instanceof ConcreteContext concrete) {
             concrete.runChildren(mode);
         } else {
-            throw new IllegalArgumentException("context must be a ConcreteExecutionContext");
+            throw new IllegalArgumentException("context must be a ConcreteContext");
         }
     }
 
@@ -214,14 +210,14 @@ public final class Lifecycle<T> implements Action<T> {
         private boolean resolved;
 
         private Spec(final String name) {
-            Objects.requireNonNull(name, "name must not be null");
-            Arguments.requireNonBlank(name, "name must not be blank");
+            Objects.requireNonNull(name, "name is null");
+            Arguments.requireNonBlank(name, "name is blank");
             this.name = name;
         }
 
         /**
          * Configures the lifecycle as dependent, so that a failure in any body child causes
-         * remaining body children to be skipped or aborted. This is the default.
+         * remaining body children to be skipped. This is the default.
          *
          * @return this spec
          * @throws IllegalStateException if this spec has already been resolved
@@ -256,7 +252,7 @@ public final class Lifecycle<T> implements Action<T> {
          */
         public Spec<T> before(final org.paramixel.api.action.Spec<?> spec) {
             ensureNotResolved();
-            this.before = Objects.requireNonNull(spec, "spec must not be null").resolve();
+            this.before = Objects.requireNonNull(spec, "spec is null").resolve();
             return this;
         }
 
@@ -301,7 +297,7 @@ public final class Lifecycle<T> implements Action<T> {
          */
         public Spec<T> child(final org.paramixel.api.action.Spec<?> spec) {
             ensureNotResolved();
-            children.add(Objects.requireNonNull(spec, "spec must not be null").resolve());
+            children.add(Objects.requireNonNull(spec, "spec is null").resolve());
             return this;
         }
 
@@ -335,6 +331,52 @@ public final class Lifecycle<T> implements Action<T> {
         }
 
         /**
+         * Adds a body action for each item in the iterable by applying the supplied mapper function.
+         *
+         * <p>This is a convenience method that produces the same tree as calling
+         * {@link #child(org.paramixel.api.action.Spec) child(Spec)} in a for-loop. The mapper is called for
+         * each item at spec-building time ({@link #resolve()}), not at execution time. An empty
+         * iterable adds no children.</p>
+         *
+         * @param <U> the type of items in the iterable
+         * @param items the items to iterate over; must not be {@code null}
+         * @param mapper the function that maps each item to a child action spec; must not be
+         *     {@code null}
+         * @return this spec
+         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
+         * @throws IllegalStateException if this spec has already been resolved
+         */
+        public <U> Spec<T> each(final Iterable<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
+            ensureNotResolved();
+            Objects.requireNonNull(items, "items is null");
+            Objects.requireNonNull(mapper, "mapper is null");
+            for (U item : items) {
+                child(mapper.apply(item));
+            }
+            return this;
+        }
+
+        /**
+         * Adds a body action for each item in the stream by applying the supplied mapper function.
+         *
+         * <p>The stream is materialized to a list immediately and then delegated to
+         * {@link #each(Iterable, Function)}. The mapper is called for each item at spec-building time
+         * ({@link #resolve()}), not at execution time. An empty stream adds no children.</p>
+         *
+         * @param <U> the type of items in the stream
+         * @param items the items to iterate over; must not be {@code null}
+         * @param mapper the function that maps each item to a child action spec; must not be
+         *     {@code null}
+         * @return this spec
+         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
+         * @throws IllegalStateException if this spec has already been resolved
+         */
+        public <U> Spec<T> each(final Stream<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
+            Objects.requireNonNull(items, "items is null");
+            return each(items.toList(), mapper);
+        }
+
+        /**
          * Adds an after-action resolved from the supplied spec. Calling this method
          * again overwrites the previous after-action.
          *
@@ -345,7 +387,7 @@ public final class Lifecycle<T> implements Action<T> {
          */
         public Spec<T> after(final org.paramixel.api.action.Spec<?> spec) {
             ensureNotResolved();
-            this.after = Objects.requireNonNull(spec, "spec must not be null").resolve();
+            this.after = Objects.requireNonNull(spec, "spec is null").resolve();
             return this;
         }
 

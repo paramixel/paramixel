@@ -29,7 +29,7 @@ class AbstractActionArgumentsTest {
     void nullNameThrowsNpe() {
         assertThatThrownBy(() -> Step.of(null, obj -> {}))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("name must not be null");
+                .hasMessageContaining("name is null");
     }
 
     @Test
@@ -37,6 +37,6 @@ class AbstractActionArgumentsTest {
     void blankNameThrowsIae() {
         assertThatThrownBy(() -> Step.of("   ", obj -> {}))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("name must not be blank");
+                .hasMessageContaining("name is blank");
     }
 }

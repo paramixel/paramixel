@@ -65,7 +65,7 @@ class ParamixelMojoExecutionExceptionTest {
 
             assertThatThrownBy(mojo::execute)
                     .isInstanceOf(MojoExecutionException.class)
-                    .hasMessage("Paramixel property key must not be null");
+                    .hasMessage("Paramixel property key is null");
         }
 
         @Test

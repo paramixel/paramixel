@@ -16,14 +16,16 @@
 
 package org.paramixel.api.action;
 
-import org.paramixel.api.internal.support.Arguments;
+import java.util.Objects;
+import nonapi.org.paramixel.support.Arguments;
 
 abstract class TestAction implements Action<Void> {
 
     private final String name;
 
     TestAction(final String name) {
-        this.name = Arguments.requireValidName(name);
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
     }
 
     @Override

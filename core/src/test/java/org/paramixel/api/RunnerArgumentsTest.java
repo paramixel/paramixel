@@ -18,6 +18,7 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Spec;
@@ -33,7 +34,7 @@ class RunnerArgumentsTest {
 
         builder.build();
 
-        assertThatThrownBy(() -> builder.configuration(Configuration.of(java.util.Map.of())))
+        assertThatThrownBy(() -> builder.configuration(Configuration.of(Map.of())))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("builder already built");
         assertThatThrownBy(() -> builder.listener(new Listener() {}))
@@ -49,7 +50,7 @@ class RunnerArgumentsTest {
     void runRejectsNullSelector() {
         assertThatThrownBy(() -> Runner.defaultRunner().run((Selector) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector must not be null");
+                .hasMessage("selector is null");
     }
 
     @Test
@@ -57,7 +58,7 @@ class RunnerArgumentsTest {
     void runAndReturnExitCodeRejectsNullSelector() {
         assertThatThrownBy(() -> Runner.defaultRunner().runAndReturnExitCode((Selector) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector must not be null");
+                .hasMessage("selector is null");
     }
 
     @Test
@@ -65,7 +66,7 @@ class RunnerArgumentsTest {
     void runAndReturnExitCodeRejectsNullSpec() {
         assertThatThrownBy(() -> Runner.defaultRunner().runAndReturnExitCode((Spec<?>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec must not be null");
+                .hasMessage("spec is null");
     }
 
     @Test
@@ -73,7 +74,7 @@ class RunnerArgumentsTest {
     void runAndExitRejectsNullSpec() {
         assertThatThrownBy(() -> Runner.defaultRunner().runAndExit((Spec<?>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec must not be null");
+                .hasMessage("spec is null");
     }
 
     @Test
@@ -88,7 +89,7 @@ class RunnerArgumentsTest {
     void runRejectsNullSpec() {
         assertThatThrownBy(() -> Runner.defaultRunner().run((Spec<?>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec must not be null");
+                .hasMessage("spec is null");
     }
 
     @Test
@@ -97,7 +98,7 @@ class RunnerArgumentsTest {
         Runner runner = Runner.builder().build();
         assertThatThrownBy(() -> runner.runAndReturnExitCode((Spec<?>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec must not be null");
+                .hasMessage("spec is null");
     }
 
     @Test
@@ -106,7 +107,7 @@ class RunnerArgumentsTest {
         Runner runner = Runner.builder().build();
         assertThatThrownBy(() -> runner.runAndReturnExitCode((Selector) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector must not be null");
+                .hasMessage("selector is null");
     }
 
     @Test
@@ -114,7 +115,7 @@ class RunnerArgumentsTest {
     void runAndExitNullSpecThrowsNPE() {
         assertThatThrownBy(() -> Runner.builder().build().runAndExit((Spec<?>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec must not be null");
+                .hasMessage("spec is null");
     }
 
     @Test
@@ -122,7 +123,7 @@ class RunnerArgumentsTest {
     void runAndExitSelectorNullThrowsNPE() {
         assertThatThrownBy(() -> Runner.builder().build().runAndExit((Selector) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector must not be null");
+                .hasMessage("selector is null");
     }
 
     @Test
@@ -130,7 +131,7 @@ class RunnerArgumentsTest {
     void runnerBuilderRejectsNullListener() {
         assertThatThrownBy(() -> Runner.builder().listener(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("listener must not be null");
+                .hasMessage("listener is null");
     }
 
     @Test
@@ -138,7 +139,7 @@ class RunnerArgumentsTest {
     void configurationNullThrowsNPE() {
         assertThatThrownBy(() -> Runner.builder().configuration(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("configuration must not be null");
+                .hasMessage("configuration is null");
     }
 
     @Test
@@ -146,7 +147,7 @@ class RunnerArgumentsTest {
     void listenerNullThrowsNPE() {
         assertThatThrownBy(() -> Runner.builder().listener(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("listener must not be null");
+                .hasMessage("listener is null");
     }
 
     @Test

@@ -17,7 +17,7 @@
 package org.paramixel.api.exception;
 
 import java.util.Objects;
-import org.paramixel.api.internal.support.Arguments;
+import nonapi.org.paramixel.support.Arguments;
 
 /**
  * Signals that an action should be marked as failed rather than allowed to propagate an unexpected error.
@@ -37,8 +37,8 @@ public final class FailException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public FailException(final String message) {
-        super(Objects.requireNonNull(message, "message must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 
     /**
@@ -59,6 +59,8 @@ public final class FailException extends RuntimeException {
      * @throws FailException always
      */
     public static void fail(final String message) {
-        throw new FailException(Objects.requireNonNull(message, "message must not be null"));
+        Objects.requireNonNull(message, "message is null");
+        Arguments.requireNonBlank(message, "message is blank");
+        throw new FailException(message);
     }
 }

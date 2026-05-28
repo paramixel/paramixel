@@ -146,34 +146,27 @@ Analyze for:
 
 ## 5. Java 17 Best Practices & Idioms
 
-Analyze for:
-- Modern Java 17 usage
-- Proper Optional usage
-- Stream API misuse
-- Immutable object opportunities
-- Proper generics usage
-- Proper exception hierarchy
-- Proper use of records
-- Sealed classes/interfaces opportunities
-- Pattern matching for instanceof opportunities
-- Switch expression opportunities
-- Text block opportunities
-- Effective enum usage
-- Correct annotations
-- try-with-resources opportunities
-- Proper use of List.of / Set.of / Map.of
-- Stream.toList() implications
-- Misuse of var
-- Overuse of Lombok where Java 17 features are cleaner
-- Prefer final fields and immutability
-- Constructor injection best practices
+Prefer these Java 17 features over pre-Java 17 equivalents:
 
-Specifically evaluate whether newer Java features:
-- improve clarity
-- reduce boilerplate
-- strengthen type safety
-- improve immutability
-- simplify domain modeling
+| Prefer | Over |
+|--------|------|
+| `if (obj instanceof String s)` | `if (obj instanceof String) { String s = (String) obj; }` |
+| Switch expressions (`->` arrow, yield) | Switch statements with `break` and mutable accumulation |
+| Records | Hand-written data classes (getters, equals, hashCode, toString) |
+| Sealed classes/interfaces with `permits` | Final class hierarchies where subtype control matters |
+| Text blocks (`"""`) | Concatenated or escaped multi-line strings |
+| `stream.toList()` | `.collect(Collectors.toList())` |
+| `List.of` / `Set.of` / `Map.of` | `Collections.unmodifiableXxx(wrappedList)` |
+| `var` when RHS type is obvious | Redundant explicit type declaration |
+| Records over Lombok `@Data`/`@Value` | Lombok where a record suffices |
+| `try-with-resources` | Manual `close()` in `finally` |
+
+Also analyze for:
+- Proper Optional usage (avoid `get()` without `isPresent()`, avoid Optional for fields/params)
+- Stream API misuse (side effects, order-dependent operations)
+- `var` misuse when type is not obvious from context
+- Final fields and immutability by default
+- Proper generics and exception hierarchy usage
 
 Do not recommend newer features when they reduce readability or provide little practical value.
 

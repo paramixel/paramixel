@@ -19,7 +19,6 @@ package org.paramixel.api.action;
 import java.time.Duration;
 import java.util.Optional;
 import org.paramixel.api.Status;
-import org.paramixel.spi.action.Mode;
 
 /**
  * Describes the identity and execution-occurrence state of an action.

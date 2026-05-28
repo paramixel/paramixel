@@ -17,7 +17,6 @@
 package org.paramixel.api;
 
 import java.util.Optional;
-import org.paramixel.api.action.Descriptor;
 import org.paramixel.api.action.Spec;
 
 /**

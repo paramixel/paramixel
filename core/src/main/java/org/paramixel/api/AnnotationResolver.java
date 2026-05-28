@@ -22,11 +22,10 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import nonapi.org.paramixel.support.Arguments;
+import nonapi.org.paramixel.support.LRUCache;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
-import org.paramixel.api.internal.support.Arguments;
 
 /**
  * Resolves {@link Paramixel.Id @Paramixel.Id} annotated methods on a concrete type into
@@ -45,14 +44,14 @@ import org.paramixel.api.internal.support.Arguments;
  */
 public final class AnnotationResolver<T> {
 
-    private static final ConcurrentMap<Class<?>, Map<String, Method>> CACHE = new ConcurrentHashMap<>();
+    private static final LRUCache<Class<?>, Map<String, Method>> CACHE = new LRUCache<>(100, 60_000);
 
-    private static final ConcurrentMap<Class<?>, Map<String, Method>> STATIC_CACHE = new ConcurrentHashMap<>();
+    private static final LRUCache<Class<?>, Map<String, Method>> STATIC_CACHE = new LRUCache<>(100, 60_000);
 
     private final Class<T> type;
 
     private AnnotationResolver(final Class<T> type) {
-        this.type = Objects.requireNonNull(type, "type must not be null");
+        this.type = Objects.requireNonNull(type, "type is null");
     }
 
     /**
@@ -82,30 +81,21 @@ public final class AnnotationResolver<T> {
      *     unsupported signature
      */
     public Action<T> byId(final String id) {
-        Objects.requireNonNull(id, "id must not be null");
-        Arguments.requireNonBlank(id, "id must not be blank");
+        Objects.requireNonNull(id, "id is null");
+        Arguments.requireNonBlank(id, "id is blank");
 
-        Map<String, Method> methods = CACHE.computeIfAbsent(type, AnnotationResolver::discover);
+        Map<String, Method> methods = CACHE.get(type);
+        if (methods == null) {
+            methods = discover(type);
+            CACHE.put(type, methods);
+        }
         Method method = methods.get(id);
         if (method == null) {
             throw new IllegalArgumentException(
                     "no method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
         }
 
-        return Step.of(id, instance -> {
-            try {
-                method.invoke(instance);
-            } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof Error error) {
-                    throw error;
-                }
-                if (cause instanceof RuntimeException runtimeException) {
-                    throw runtimeException;
-                }
-                throw new RuntimeException(cause);
-            }
-        });
+        return Step.of(id, reflectingConsumer(method));
     }
 
     /**
@@ -125,32 +115,23 @@ public final class AnnotationResolver<T> {
      *     method has an unsupported signature
      */
     public Action<T> byId(final String id, final String kind) {
-        Objects.requireNonNull(id, "id must not be null");
-        Arguments.requireNonBlank(id, "id must not be blank");
-        Objects.requireNonNull(kind, "kind must not be null");
-        Arguments.requireNonBlank(kind, "kind must not be blank");
+        Objects.requireNonNull(id, "id is null");
+        Arguments.requireNonBlank(id, "id is blank");
+        Objects.requireNonNull(kind, "kind is null");
+        Arguments.requireNonBlank(kind, "kind is blank");
 
-        Map<String, Method> methods = CACHE.computeIfAbsent(type, AnnotationResolver::discover);
+        Map<String, Method> methods = CACHE.get(type);
+        if (methods == null) {
+            methods = discover(type);
+            CACHE.put(type, methods);
+        }
         Method method = methods.get(id);
         if (method == null) {
             throw new IllegalArgumentException(
                     "no method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
         }
 
-        return Step.of(id, kind, instance -> {
-            try {
-                method.invoke(instance);
-            } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof Error error) {
-                    throw error;
-                }
-                if (cause instanceof RuntimeException runtimeException) {
-                    throw runtimeException;
-                }
-                throw new RuntimeException(cause);
-            }
-        });
+        return Step.of(id, kind, reflectingConsumer(method));
     }
 
     /**
@@ -168,30 +149,21 @@ public final class AnnotationResolver<T> {
      *     unsupported signature
      */
     public Action<?> staticById(final String id) {
-        Objects.requireNonNull(id, "id must not be null");
-        Arguments.requireNonBlank(id, "id must not be blank");
+        Objects.requireNonNull(id, "id is null");
+        Arguments.requireNonBlank(id, "id is blank");
 
-        Map<String, Method> methods = STATIC_CACHE.computeIfAbsent(type, AnnotationResolver::discoverStatic);
+        Map<String, Method> methods = STATIC_CACHE.get(type);
+        if (methods == null) {
+            methods = discoverStatic(type);
+            STATIC_CACHE.put(type, methods);
+        }
         Method method = methods.get(id);
         if (method == null) {
             throw new IllegalArgumentException(
                     "no static method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
         }
 
-        ThrowingRunnable runnable = () -> {
-            try {
-                method.invoke(null);
-            } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof Error error) {
-                    throw error;
-                }
-                if (cause instanceof RuntimeException runtimeException) {
-                    throw runtimeException;
-                }
-                throw new RuntimeException(cause);
-            }
-        };
+        ThrowingRunnable runnable = reflectingStaticInvocation(method);
 
         return Step.of(id, ctx -> runnable.run());
     }
@@ -213,32 +185,23 @@ public final class AnnotationResolver<T> {
      *     method has an unsupported signature
      */
     public Action<?> staticById(final String id, final String kind) {
-        Objects.requireNonNull(id, "id must not be null");
-        Arguments.requireNonBlank(id, "id must not be blank");
-        Objects.requireNonNull(kind, "kind must not be null");
-        Arguments.requireNonBlank(kind, "kind must not be blank");
+        Objects.requireNonNull(id, "id is null");
+        Arguments.requireNonBlank(id, "id is blank");
+        Objects.requireNonNull(kind, "kind is null");
+        Arguments.requireNonBlank(kind, "kind is blank");
 
-        Map<String, Method> methods = STATIC_CACHE.computeIfAbsent(type, AnnotationResolver::discoverStatic);
+        Map<String, Method> methods = STATIC_CACHE.get(type);
+        if (methods == null) {
+            methods = discoverStatic(type);
+            STATIC_CACHE.put(type, methods);
+        }
         Method method = methods.get(id);
         if (method == null) {
             throw new IllegalArgumentException(
                     "no static method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
         }
 
-        ThrowingRunnable runnable = () -> {
-            try {
-                method.invoke(null);
-            } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof Error error) {
-                    throw error;
-                }
-                if (cause instanceof RuntimeException runtimeException) {
-                    throw runtimeException;
-                }
-                throw new RuntimeException(cause);
-            }
-        };
+        ThrowingRunnable runnable = reflectingStaticInvocation(method);
 
         return Step.of(id, kind, ctx -> runnable.run());
     }
@@ -356,5 +319,32 @@ public final class AnnotationResolver<T> {
                     + id + "\") has unsupported signature: " + method.toGenericString()
                     + "; expected a static no-argument void method");
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> ThrowingConsumer<T> reflectingConsumer(final Method method) {
+        return instance -> {
+            try {
+                method.invoke(instance);
+            } catch (InvocationTargetException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof Error error) throw error;
+                if (cause instanceof RuntimeException re) throw re;
+                throw new RuntimeException(cause);
+            }
+        };
+    }
+
+    private static ThrowingRunnable reflectingStaticInvocation(final Method method) {
+        return () -> {
+            try {
+                method.invoke(null);
+            } catch (InvocationTargetException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof Error error) throw error;
+                if (cause instanceof RuntimeException re) throw re;
+                throw new RuntimeException(cause);
+            }
+        };
     }
 }

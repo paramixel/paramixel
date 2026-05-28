@@ -82,7 +82,7 @@ Prompt files reference this section as the canonical source. See `.ai/prompts/ja
 
 ## Planning
 
-Plans go in `.ai/plans/` — see `.ai/prompts/plan-workflow.md` for naming convention and examples.
+Plans go in `.ai/plans/`.
 
 ## Static Analysis
 

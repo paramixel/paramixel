@@ -20,9 +20,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import nonapi.org.paramixel.ConfigurationFactory;
 import org.paramixel.api.action.Spec;
 import org.paramixel.api.exception.ConfigurationException;
-import org.paramixel.api.internal.ConfigurationFactory;
 
 /**
  * Provides typed access to Paramixel configuration properties.
@@ -140,6 +140,18 @@ public interface Configuration {
      * against each declared {@link Paramixel.Tag} value.
      */
     String MATCH_TAG_REGEX = "paramixel.match.tag.regex";
+
+    /**
+     * Configuration key controlling exclusion of listener output sections.
+     *
+     * <p>The value is a comma-separated list of tokens. Supported tokens include
+     * {@code "status.header"}, {@code "status.footer"}, {@code "summary.header"},
+     * {@code "summary.tree"}, {@code "summary.footer"}, {@code "status"}
+     * (shorthand for {@code status.header,status.footer}), {@code "quiet"}
+     * (shorthand for {@code status,summary.tree}), and {@code "all"} (exclude all sections).
+     * Unrecognized tokens are silently ignored.
+     */
+    String LISTENER_EXCLUDE = "paramixel.listener.exclude";
 
     /**
      * Returns the configuration value for the supplied key as a string.

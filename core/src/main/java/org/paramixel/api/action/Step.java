@@ -17,11 +17,9 @@
 package org.paramixel.api.action;
 
 import java.util.Objects;
+import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
 import org.paramixel.api.ThrowingConsumer;
-import org.paramixel.api.internal.support.Arguments;
-import org.paramixel.spi.action.ExecutionContext;
-import org.paramixel.spi.action.Mode;
 
 /**
  * Leaf action that invokes a user-supplied consumer during run-mode execution.
@@ -37,10 +35,11 @@ public final class Step<T> implements Action<T> {
     private final ThrowingConsumer<T> consumer;
 
     private Step(final String name, final String kind, final ThrowingConsumer<T> consumer) {
-        this.name = Arguments.requireValidName(name);
-        this.kind = Arguments.requireNonBlank(
-                Objects.requireNonNull(kind, "kind must not be null"), "kind must not be blank");
-        this.consumer = Objects.requireNonNull(consumer, "consumer must not be null");
+        Objects.requireNonNull(name, "name is null");
+        this.name = Arguments.requireNonBlank(name, "name is blank");
+        Objects.requireNonNull(kind, "kind is null");
+        this.kind = Arguments.requireNonBlank(kind, "kind is blank");
+        this.consumer = Objects.requireNonNull(consumer, "consumer is null");
     }
 
     /**
@@ -54,9 +53,9 @@ public final class Step<T> implements Action<T> {
      * @throws IllegalArgumentException if {@code name} is blank
      */
     public static <T> Step<T> of(final String name, final ThrowingConsumer<T> consumer) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(consumer, "consumer must not be null");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Objects.requireNonNull(consumer, "consumer is null");
         return new Step<>(name, KIND, consumer);
     }
 
@@ -72,11 +71,11 @@ public final class Step<T> implements Action<T> {
      * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
      */
     public static <T> Step<T> of(final String name, final String kind, final ThrowingConsumer<T> consumer) {
-        Objects.requireNonNull(name, "name must not be null");
-        Arguments.requireNonBlank(name, "name must not be blank");
-        Objects.requireNonNull(kind, "kind must not be null");
-        Arguments.requireNonBlank(kind, "kind must not be blank");
-        Objects.requireNonNull(consumer, "consumer must not be null");
+        Objects.requireNonNull(name, "name is null");
+        Arguments.requireNonBlank(name, "name is blank");
+        Objects.requireNonNull(kind, "kind is null");
+        Arguments.requireNonBlank(kind, "kind is blank");
+        Objects.requireNonNull(consumer, "consumer is null");
         return new Step<>(name, kind, consumer);
     }
 
@@ -102,14 +101,14 @@ public final class Step<T> implements Action<T> {
      * @throws IllegalArgumentException if {@code kind} is blank
      */
     public Step<T> kind(final String kind) {
-        Objects.requireNonNull(kind, "kind must not be null");
-        Arguments.requireNonBlank(kind, "kind must not be blank");
+        Objects.requireNonNull(kind, "kind is null");
+        Arguments.requireNonBlank(kind, "kind is blank");
         return new Step<>(this.name, kind, this.consumer);
     }
 
     @Override
-    public void execute(final ExecutionContext context) {
-        Objects.requireNonNull(context, "context must not be null");
+    public void execute(final Context context) {
+        Objects.requireNonNull(context, "context is null");
         var descriptor = context.descriptor();
         var listener = context.listener();
         listener.onBeforeExecution(descriptor);
@@ -128,7 +127,7 @@ public final class Step<T> implements Action<T> {
         listener.onAfterExecution(descriptor);
     }
 
-    private void run(final ExecutionContext context) throws Throwable {
+    private void run(final Context context) throws Throwable {
         var instanceOpt = context.instance(Object.class);
         if (instanceOpt.isPresent()) {
             @SuppressWarnings("unchecked")

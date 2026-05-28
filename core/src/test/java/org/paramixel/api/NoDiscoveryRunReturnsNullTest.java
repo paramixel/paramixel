@@ -49,18 +49,24 @@ class NoDiscoveryRunReturnsNullTest {
     private static final class NoOpListener implements Listener {
 
         @Override
+        public void initialize(final Configuration configuration) {}
+
+        @Override
+        public void onDiscoveryStarted() {}
+
+        @Override
         public void onRunStarted() {}
 
         @Override
-        public void onDiscoveryCompleted(final org.paramixel.api.action.Descriptor root) {}
+        public void onDiscoveryCompleted(final Descriptor root) {}
 
         @Override
-        public void onBeforeExecution(final org.paramixel.api.action.Descriptor descriptor) {}
+        public void onBeforeExecution(final Descriptor descriptor) {}
 
         @Override
-        public void onAfterExecution(final org.paramixel.api.action.Descriptor descriptor) {}
+        public void onAfterExecution(final Descriptor descriptor) {}
 
         @Override
-        public void onRunCompleted(final org.paramixel.api.Result result) {}
+        public void onRunCompleted(final Result result) {}
     }
 }

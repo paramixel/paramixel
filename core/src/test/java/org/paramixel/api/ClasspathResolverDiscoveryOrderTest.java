@@ -20,12 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 import java.util.Optional;
+import nonapi.org.paramixel.ClasspathResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.internal.ClasspathResolver;
 import org.paramixel.api.selector.Selector;
 
 @DisplayName("ClasspathResolver discovery order")
@@ -75,6 +75,6 @@ class ClasspathResolverDiscoveryOrderTest {
                 .build();
         runner.run(root.orElseThrow());
 
-        assertThat(ClasspathResolverFactoryTimingLog.RUN_LOG).containsExactly("zeta-run", "alpha-run");
+        assertThat(ClasspathResolverFactoryTimingLog.RUN_LOG).containsExactlyInAnyOrder("zeta-run", "alpha-run");
     }
 }

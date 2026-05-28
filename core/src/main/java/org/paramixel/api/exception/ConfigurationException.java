@@ -17,7 +17,7 @@
 package org.paramixel.api.exception;
 
 import java.util.Objects;
-import org.paramixel.api.internal.support.Arguments;
+import nonapi.org.paramixel.support.Arguments;
 
 /**
  * Signals that Paramixel configuration is invalid, inconsistent, or cannot be loaded.
@@ -36,8 +36,8 @@ public final class ConfigurationException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public ConfigurationException(final String message) {
-        super(Objects.requireNonNull(message, "message must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 
     /**
@@ -49,7 +49,7 @@ public final class ConfigurationException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public ConfigurationException(final String message, final Throwable cause) {
-        super(Objects.requireNonNull(message, "message must not be null"), cause);
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"), cause);
+        Arguments.requireNonBlank(message, "message is blank");
     }
 }

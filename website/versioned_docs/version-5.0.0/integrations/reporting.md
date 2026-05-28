@@ -93,7 +93,7 @@ Implement `Listener` to receive lifecycle callbacks:
 ```java
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
-import org.paramixel.api.action.Descriptor;
+import org.paramixel.api.Descriptor;
 
 public class CustomListener implements Listener {
 

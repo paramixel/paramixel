@@ -17,7 +17,7 @@
 package org.paramixel.api.exception;
 
 import java.util.Objects;
-import org.paramixel.api.internal.support.Arguments;
+import nonapi.org.paramixel.support.Arguments;
 
 /**
  * Signals that a retry {@link org.paramixel.api.support.Retry.Policy backoff policy}
@@ -43,8 +43,8 @@ public final class PolicyException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public PolicyException(final String message) {
-        super(Objects.requireNonNull(message, "message must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 
     /**
@@ -56,9 +56,7 @@ public final class PolicyException extends RuntimeException {
      * @throws IllegalArgumentException if {@code message} is blank
      */
     public PolicyException(final String message, final Throwable cause) {
-        super(
-                Objects.requireNonNull(message, "message must not be null"),
-                Objects.requireNonNull(cause, "cause must not be null"));
-        Arguments.requireNonBlank(message, "message must not be blank");
+        super(Objects.requireNonNull(message, "message is null"), Objects.requireNonNull(cause, "cause is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 }

@@ -10,7 +10,7 @@ A `Descriptor` represents one bound occurrence of an `Action` in a run descripto
 Reusing the same `Action` instance in multiple locations creates distinct descriptors with independent execution state.
 
 ```java
-import org.paramixel.api.action.Descriptor;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.action.Metadata;
 ```
 
@@ -30,9 +30,9 @@ public interface Descriptor {
 | --- | --- |
 | `parent()` | The parent descriptor, or empty for the root |
 | `metadata()` | The per-occurrence identity and execution state |
-| `before()` | The before-child descriptor (Lifecycle, Static, Instance) |
-| `children()` | The direct child descriptors in discovery order |
-| `after()` | The after-child descriptor (Lifecycle, Static, Instance) |
+| `before()` | The before-child descriptor (Lifecycle, Static, Instance); not included in `children()` |
+| `children()` | The body child descriptors in discovery order; does not include before or after |
+| `after()` | The after-child descriptor (Lifecycle, Static, Instance); not included in `children()` |
 
 Descriptors are read-only through this interface. The framework creates and mutates descriptors during discovery and execution.
 
