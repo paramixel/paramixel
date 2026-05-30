@@ -196,7 +196,7 @@ public interface Selector {
     }
 
     /**
-     * Creates a selector that matches when all of the supplied selectors match (logical AND).
+     * Creates a selector that matches when all the supplied selectors match (logical AND).
      *
      * <p>At least two selectors must be provided. Nested AND selectors are flattened:
      * {@code and(and(a, b), c)} produces the same matches as {@code and(a, b, c)}.
@@ -215,7 +215,7 @@ public interface Selector {
     }
 
     /**
-     * Creates a selector that matches when all of the supplied selectors match (logical AND).
+     * Creates a selector that matches when all the supplied selectors match (logical AND).
      *
      * <p>At least two selectors must be provided. Nested AND selectors are flattened.
      * Null elements are rejected.

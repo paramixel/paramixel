@@ -23,7 +23,7 @@ import nonapi.org.paramixel.support.Arguments;
  * Internal semaphore-backed throttle for root {@code Parallel} direct-child admission.
  *
  * <p>The permit count is derived from {@code paramixel.parallelism}. This throttle is intentionally
- * scoped to top-level branch admission and is independent from scheduler leaf-permit accounting.
+ * scoped to top-level branch admission and is independent of scheduler leaf-permit accounting.
  */
 public final class TopLevelParallelThrottle {
 

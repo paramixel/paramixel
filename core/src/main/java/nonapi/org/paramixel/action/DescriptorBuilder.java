@@ -20,7 +20,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.paramixel.api.Configuration;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.CycleDetectedException;
 
@@ -34,16 +33,10 @@ import org.paramixel.api.exception.CycleDetectedException;
  */
 public final class DescriptorBuilder {
 
-    private final Configuration configuration;
-
     /**
      * Creates a descriptor builder.
-     *
-     * @param configuration the run configuration; must not be {@code null}
      */
-    public DescriptorBuilder(final Configuration configuration) {
-        this.configuration = Objects.requireNonNull(configuration, "configuration is null");
-    }
+    public DescriptorBuilder() {}
 
     /**
      * Builds a descriptor tree rooted at the supplied action.

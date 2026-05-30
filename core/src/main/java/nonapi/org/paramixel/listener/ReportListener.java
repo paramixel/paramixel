@@ -17,7 +17,6 @@
 package nonapi.org.paramixel.listener;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.io.Writer;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Result;
@@ -62,22 +61,14 @@ public final class ReportListener extends AbstractReportFileListener {
             writer.write(Listeners.sanitizeMessage(message.orElseThrow()));
         }
         writer.write(LINE_SEPARATOR);
-        descriptor.before().ifPresent(b -> {
-            try {
-                write(writer, b, depth + 1);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        if (descriptor.before().isPresent()) {
+            write(writer, descriptor.before().orElseThrow(), depth + 1);
+        }
         for (Descriptor child : descriptor.children()) {
             write(writer, child, depth + 1);
         }
-        descriptor.after().ifPresent(a -> {
-            try {
-                write(writer, a, depth + 1);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        if (descriptor.after().isPresent()) {
+            write(writer, descriptor.after().orElseThrow(), depth + 1);
+        }
     }
 }

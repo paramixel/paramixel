@@ -226,4 +226,47 @@ public class Arguments {
         }
         return array;
     }
+
+    /**
+     * Returns the supplied object when it is an instance of the specified type.
+     *
+     * @param <T> the expected type
+     * @param object the object to validate
+     * @param type the expected class type
+     * @param message the exception message to use when validation fails
+     * @return {@code object} cast to {@code T}
+     * @throws NullPointerException if {@code object} or {@code type} is {@code null}
+     * @throws IllegalArgumentException if {@code object} is not an instance of {@code type}
+     */
+    public static <T> T requireInstanceOf(final Object object, final Class<T> type, final String message) {
+        Objects.requireNonNull(object, "object is null");
+        Objects.requireNonNull(type, "type is null");
+        if (!type.isInstance(object)) {
+            throw new IllegalArgumentException(message);
+        }
+        return type.cast(object);
+    }
+
+    /**
+     * Returns the supplied object when it is an instance of the specified type.
+     *
+     * @param <T> the expected type
+     * @param object the object to validate
+     * @param type the expected class type
+     * @param messageSupplier the exception message supplier to use when validation fails
+     * @return {@code object} cast to {@code T}
+     * @throws NullPointerException if {@code object}, {@code type}, or
+     *     {@code messageSupplier} is {@code null}
+     * @throws IllegalArgumentException if {@code object} is not an instance of {@code type}
+     */
+    public static <T> T requireInstanceOf(
+            final Object object, final Class<T> type, final Supplier<String> messageSupplier) {
+        Objects.requireNonNull(object, "object is null");
+        Objects.requireNonNull(type, "type is null");
+        Objects.requireNonNull(messageSupplier, "messageSupplier is null");
+        if (!type.isInstance(object)) {
+            throw new IllegalArgumentException(messageSupplier.get());
+        }
+        return type.cast(object);
+    }
 }

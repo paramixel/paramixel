@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.LongSupplier;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
 
@@ -133,7 +134,7 @@ public final class Delay implements Action<Void> {
                 context.setStatus(Status.PASSED);
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }

@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.support.Arguments;
@@ -149,7 +150,7 @@ public final class Static implements Action<Void> {
                 context.setStatus(run(context));
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }
@@ -184,10 +185,9 @@ public final class Static implements Action<Void> {
                 }
             }
         } finally {
-            var afterDescriptor = descriptor.after().orElse(null);
-            if (afterDescriptor != null) {
-                aggregated.include(runChild(context, afterDescriptor, Mode.RUN));
-            }
+            descriptor
+                    .after()
+                    .ifPresent(afterDescriptor -> aggregated.include(runChild(context, afterDescriptor, Mode.RUN)));
         }
 
         return aggregated.status();

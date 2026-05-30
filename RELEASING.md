@@ -61,10 +61,7 @@ git checkout main
 git pull
 git checkout -b release/<VERSION>
 
-./mvnw versions:set-property \
-  -Dproperty=revision \
-  -DnewVersion=<VERSION> \
-  -DgenerateBackupPoms=false
+./mvnw versions:set-property -Dproperty=revision -DnewVersion=<VERSION> -DgenerateBackupPoms=false
 
 ./mvnw spotless:apply
 ./mvnw clean install
@@ -72,7 +69,7 @@ git checkout -b release/<VERSION>
 ./scripts/build-documentation.sh
 
 git add -A
-git commit -s -m "Release <VERSION>"
+git commit -s -m "release: Release <VERSION>"
 git push -u origin release/<VERSION>
 ```
 
@@ -162,17 +159,14 @@ If the documentation was already built during Step 1, skip the build step:
 git checkout main
 git pull
 
-./mvnw versions:set-property \
-  -Dproperty=revision \
-  -DnewVersion=<VERSION>-POST \
-  -DgenerateBackupPoms=false
+./mvnw versions:set-property -Dproperty=revision -DnewVersion=<VERSION>-POST -DgenerateBackupPoms=false
 
 ./mvnw spotless:apply
 ./mvnw clean install
 ./gradlew clean check --no-daemon
 
 git add -A
-git commit -s -m "Prepare for development"
+git commit -s -m "chore: Prepare for development"
 git push
 ```
 

@@ -42,7 +42,7 @@ public interface Runner {
      */
     static Runner defaultRunner() {
         final var configuration = Configuration.defaultConfiguration();
-        return new ConcreteRunner(configuration, Listener.defaultListener(configuration), true);
+        return new ConcreteRunner(configuration, Listener.defaultListener(configuration));
     }
 
     /**
@@ -186,9 +186,9 @@ public interface Runner {
             final var effectiveConfiguration =
                     configuration == null ? Configuration.defaultConfiguration() : configuration;
             if (explicitListener) {
-                return new ConcreteRunner(effectiveConfiguration, listener, true);
+                return new ConcreteRunner(effectiveConfiguration, listener);
             }
-            return new ConcreteRunner(effectiveConfiguration, Listener.defaultListener(effectiveConfiguration), false);
+            return new ConcreteRunner(effectiveConfiguration, Listener.defaultListener(effectiveConfiguration));
         }
 
         private void ensureNotBuilt() {

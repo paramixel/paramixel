@@ -19,6 +19,7 @@ package org.paramixel.api.action;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.support.Arguments;
@@ -29,11 +30,16 @@ import org.paramixel.api.ThrowingConsumer;
 /**
  * An action that executes a single child action a configurable number of times.
  *
- * <p>The child action is discovered once per repetition, producing distinct
- * descriptor occurrences for each repetition. When configured as
- * <em>dependent</em> (the default), a failure in any repetition causes
- * remaining repetitions to be skipped or aborted. When configured as
- * <em>independent</em>, all repetitions run regardless of individual outcomes.
+ * <p>The child action instance is reused for all repetitions — it appears once in
+ * {@link #children()} and shares the same mutable state across repetitions. The
+ * child action must therefore be stateless or designed for repeated execution.
+ * This is the test author's responsibility to ensure; {@code Repeat} does not
+ * clone or reset the child between repetitions.
+ *
+ * <p>When configured as <em>dependent</em> (the default), a failure in any
+ * repetition causes remaining repetitions to be skipped or aborted. When
+ * configured as <em>independent</em>, all repetitions run regardless of
+ * individual outcomes.
  *
  * @param <T> the type accepted by child consumers
  */
@@ -44,7 +50,7 @@ public final class Repeat<T> implements Action<T> {
     private final String name;
     private final Action<?> child;
     private final int repeatCount;
-    private final List<Action<?>> childrenList;
+    private final List<Action<?>> children;
     private final boolean dependent;
 
     private Repeat(final String name, final Action<?> child, final int repeatCount, final boolean dependent) {
@@ -57,7 +63,7 @@ public final class Repeat<T> implements Action<T> {
         for (int i = 0; i < this.repeatCount; i++) {
             list.add(child);
         }
-        this.childrenList = List.copyOf(list);
+        this.children = List.copyOf(list);
         this.dependent = dependent;
     }
 
@@ -88,6 +94,9 @@ public final class Repeat<T> implements Action<T> {
 
     /**
      * Returns the child action being repeated.
+     *
+     * <p>The returned instance is the same object used for all repetitions. If
+     * the child has mutable state, that state persists across repetitions.
      *
      * @return the child action; never {@code null}
      */
@@ -126,7 +135,7 @@ public final class Repeat<T> implements Action<T> {
 
     @Override
     public List<Action<?>> children() {
-        return childrenList;
+        return children;
     }
 
     @Override
@@ -145,7 +154,7 @@ public final class Repeat<T> implements Action<T> {
                 context.setStatus(run(context));
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }
@@ -267,8 +276,8 @@ public final class Repeat<T> implements Action<T> {
         }
 
         /**
-         * Sets a child action that invokes the supplied consumer. Calling this method
-         * again overwrites the previous child.
+         * Sets a child action that invokes the supplied consumer.
+         * Calling this method again overwrites the previous child.
          *
          * @param name the action name; must not be {@code null} or blank
          * @param consumer the consumer to invoke; must not be {@code null}
@@ -276,6 +285,8 @@ public final class Repeat<T> implements Action<T> {
          * @throws NullPointerException if {@code name} or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the fixture instance when this action is wrapped in an
+         * {@link Instance}, or the execution {@link Context} when standalone.
          */
         public Spec<T> child(final String name, final ThrowingConsumer<? super T> consumer) {
             return child(Step.of(name, consumer));
@@ -292,6 +303,8 @@ public final class Repeat<T> implements Action<T> {
          * @throws NullPointerException if {@code name}, {@code kind}, or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the fixture instance when this action is wrapped in an
+         * {@link Instance}, or the execution {@link Context} when standalone.
          */
         public Spec<T> child(final String name, final String kind, final ThrowingConsumer<? super T> consumer) {
             return child(Step.of(name, kind, consumer));

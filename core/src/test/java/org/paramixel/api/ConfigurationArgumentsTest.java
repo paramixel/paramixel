@@ -213,7 +213,8 @@ class ConfigurationArgumentsTest {
             Configuration config = Configuration.of(Map.of("key", "not-a-long"));
             assertThatThrownBy(() -> config.getLong("key"))
                     .isInstanceOf(ConfigurationException.class)
-                    .hasMessage("Invalid configuration for 'key': expected long but was 'not-a-long'");
+                    .hasMessage("Invalid configuration for 'key': expected long but was 'not-a-long'")
+                    .hasCauseInstanceOf(NumberFormatException.class);
         }
 
         @Test
@@ -255,7 +256,8 @@ class ConfigurationArgumentsTest {
             Configuration config = Configuration.of(Map.of("key", "not-a-float"));
             assertThatThrownBy(() -> config.getFloat("key"))
                     .isInstanceOf(ConfigurationException.class)
-                    .hasMessage("Invalid configuration for 'key': expected float but was 'not-a-float'");
+                    .hasMessage("Invalid configuration for 'key': expected float but was 'not-a-float'")
+                    .hasCauseInstanceOf(NumberFormatException.class);
         }
 
         @Test
@@ -297,7 +299,8 @@ class ConfigurationArgumentsTest {
             Configuration config = Configuration.of(Map.of("key", "not-a-double"));
             assertThatThrownBy(() -> config.getDouble("key"))
                     .isInstanceOf(ConfigurationException.class)
-                    .hasMessage("Invalid configuration for 'key': expected double but was 'not-a-double'");
+                    .hasMessage("Invalid configuration for 'key': expected double but was 'not-a-double'")
+                    .hasCauseInstanceOf(NumberFormatException.class);
         }
 
         @Test
@@ -375,7 +378,8 @@ class ConfigurationArgumentsTest {
             Configuration config = Configuration.of(Map.of("key", "not-an-int"));
             assertThatThrownBy(() -> config.getInteger("key"))
                     .isInstanceOf(ConfigurationException.class)
-                    .hasMessage("Invalid configuration for 'key': expected integer but was 'not-an-int'");
+                    .hasMessage("Invalid configuration for 'key': expected integer but was 'not-an-int'")
+                    .hasCauseInstanceOf(NumberFormatException.class);
         }
     }
 }

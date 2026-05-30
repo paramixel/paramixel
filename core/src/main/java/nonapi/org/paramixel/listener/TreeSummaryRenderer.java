@@ -155,7 +155,7 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
 
         String connector = ConnectorStyle.STANDARD.connector(isLast);
         String line = prefix + connector + status + " " + actionName + " (" + kind + ") " + timing + failureInfo;
-        sb.append(line).append(System.lineSeparator());
+        sb.append(line.stripTrailing()).append(System.lineSeparator());
     }
 
     private String formatStatus(final Status status) {

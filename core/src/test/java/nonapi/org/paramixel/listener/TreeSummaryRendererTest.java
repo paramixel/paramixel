@@ -474,6 +474,19 @@ class TreeSummaryRendererTest {
     }
 
     @Test
+    @DisplayName("passed status lines have no trailing whitespace")
+    void passedStatusLinesHaveNoTrailingWhitespace() {
+        Step<?> noop = Step.of("trailing-space-test", obj -> {});
+        String output = runAndCapturePlainOutput(noop);
+
+        for (var line : output.split(System.lineSeparator())) {
+            if (line.contains("trailing-space-test")) {
+                assertThat(line).doesNotEndWith(" ");
+            }
+        }
+    }
+
+    @Test
     void renderRejectsNullDescriptor() {
         var renderer = new TreeSummaryRenderer();
         String output = renderer.render(null);

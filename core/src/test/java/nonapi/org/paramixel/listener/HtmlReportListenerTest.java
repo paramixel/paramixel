@@ -59,7 +59,7 @@ class HtmlReportListenerTest {
 
         assertThat(reportFile).exists();
         String content = Files.readString(reportFile, StandardCharsets.UTF_8);
-        assertThat(content).contains("<!doctype html>");
+        assertThat(content).contains("<!DOCTYPE html>");
         assertThat(content).contains("No Paramixel tests found");
         assertThat(content).contains("</html>");
     }
@@ -77,7 +77,7 @@ class HtmlReportListenerTest {
         listener.onRunCompleted(result);
 
         String content = Files.readString(reportFile, StandardCharsets.UTF_8);
-        assertThat(content).contains("<!doctype html>");
+        assertThat(content).contains("<!DOCTYPE html>");
         assertThat(content).contains("PASSED");
         assertThat(content).contains("root-action");
         assertThat(content).contains("</html>");

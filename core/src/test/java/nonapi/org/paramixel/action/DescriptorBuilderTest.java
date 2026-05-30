@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.Configuration;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Context;
 import org.paramixel.api.action.Step;
@@ -32,7 +31,7 @@ import org.paramixel.api.exception.CycleDetectedException;
 @DisplayName("DescriptorBuilder")
 class DescriptorBuilderTest {
 
-    private final DescriptorBuilder builder = new DescriptorBuilder(Configuration.defaultConfiguration());
+    private final DescriptorBuilder builder = new DescriptorBuilder();
 
     @Test
     @DisplayName("discovers single leaf action")

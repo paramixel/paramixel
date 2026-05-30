@@ -28,6 +28,7 @@ import nonapi.org.paramixel.listener.StatusListener;
 import nonapi.org.paramixel.listener.SummaryListener;
 import nonapi.org.paramixel.listener.XmlReportListener;
 import nonapi.org.paramixel.support.AnsiDetector;
+import org.paramixel.api.action.Spec;
 
 /**
  * Receives run, discovery, and descriptor execution callbacks.
@@ -97,7 +98,7 @@ public interface Listener {
      * <p>Implementations are responsible for thread-safety if they maintain mutable state.
      *
      * @param configuration the effective configuration; never {@code null}
-     * @see SafeListener for exception handling behavior
+     * @see SafeListener
      */
     default void initialize(final Configuration configuration) {
         // Intentionally empty
@@ -111,7 +112,7 @@ public interface Listener {
      *
      * <p>Implementations are responsible for thread-safety if they maintain mutable state.
      *
-     * @see SafeListener for exception handling behavior
+     * @see SafeListener
      */
     default void onDiscoveryStarted() {
         // Intentionally empty
@@ -182,7 +183,6 @@ public interface Listener {
 
     private static Listener createReportListener(final String format) {
         return switch (format.toLowerCase(Locale.ROOT)) {
-            case "text" -> new ReportListener();
             case "json" -> new JsonReportListener();
             case "xml" -> new XmlReportListener();
             case "html" -> new HtmlReportListener();

@@ -16,9 +16,9 @@
 
 package nonapi.org.paramixel.support;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -34,11 +34,11 @@ import java.util.concurrent.TimeUnit;
  * @param <K> the type of keys
  * @param <V> the type of values
  */
-public final class LRUCache<K, V> {
+public final class LRUCache<K, V> implements AutoCloseable {
 
     private final int maxSize;
     private final long ttlMillis;
-    private final ConcurrentHashMap<K, CacheEntry<V>> backingMap;
+    private final LinkedHashMap<K, CacheEntry<V>> backingMap;
     private final ScheduledExecutorService reaper;
     private final ScheduledFuture<?> reaperTask;
 
@@ -52,7 +52,12 @@ public final class LRUCache<K, V> {
     public LRUCache(final int maxSize, final long ttlMillis) {
         this.maxSize = maxSize;
         this.ttlMillis = ttlMillis;
-        this.backingMap = new ConcurrentHashMap<>();
+        this.backingMap = new LinkedHashMap<>(maxSize, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(final Map.Entry<K, CacheEntry<V>> eldest) {
+                return size() > LRUCache.this.maxSize;
+            }
+        };
         this.reaper = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "paramixel-lrucache");
             t.setDaemon(true);
@@ -70,13 +75,14 @@ public final class LRUCache<K, V> {
      * @return the value, or {@code null} if not found or expired
      * @throws NullPointerException if {@code key} is {@code null}
      */
-    public V get(final K key) {
+    public synchronized V get(final K key) {
+        Objects.requireNonNull(key, "key cannot be null");
         CacheEntry<V> entry = backingMap.get(key);
         if (entry == null) {
             return null;
         }
         if (isExpired(entry)) {
-            backingMap.remove(key, entry);
+            backingMap.remove(key);
             return null;
         }
         entry.lastAccessTime = System.currentTimeMillis();
@@ -92,21 +98,11 @@ public final class LRUCache<K, V> {
      * @throws NullPointerException if {@code key} or {@code value} is {@code null}
      */
     @SuppressWarnings("AvoidThrowingNullPointerException")
-    public void put(final K key, final V value) {
+    public synchronized void put(final K key, final V value) {
         Objects.requireNonNull(key, "key cannot be null");
         Objects.requireNonNull(value, "value cannot be null");
 
-        if (backingMap.size() >= maxSize) {
-            evictLRU();
-        }
-        CacheEntry<V> entry = new CacheEntry<>(value);
-        backingMap.compute(key, (k, existing) -> {
-            if (existing != null && !isExpired(existing)) {
-                existing.lastAccessTime = System.currentTimeMillis();
-                return existing;
-            }
-            return entry;
-        });
+        backingMap.put(key, new CacheEntry<>(value));
     }
 
     /**
@@ -116,7 +112,8 @@ public final class LRUCache<K, V> {
      * @return the removed value, or {@code null} if not found
      * @throws NullPointerException if {@code key} is {@code null}
      */
-    public V remove(final K key) {
+    public synchronized V remove(final K key) {
+        Objects.requireNonNull(key, "key cannot be null");
         CacheEntry<V> entry = backingMap.remove(key);
         return entry != null ? entry.value : null;
     }
@@ -124,7 +121,7 @@ public final class LRUCache<K, V> {
     /**
      * Removes all entries from the cache.
      */
-    public void clear() {
+    public synchronized void clear() {
         backingMap.clear();
     }
 
@@ -133,13 +130,11 @@ public final class LRUCache<K, V> {
      *
      * @return the size
      */
-    public int size() {
+    public synchronized int size() {
         return backingMap.size();
     }
 
-    /**
-     * Shuts down the daemon reaper thread. The cache should not be used after calling this.
-     */
+    @Override
     public void close() {
         reaperTask.cancel(false);
         reaper.shutdown();
@@ -150,31 +145,14 @@ public final class LRUCache<K, V> {
         return System.currentTimeMillis() - entry.lastAccessTime > ttlMillis;
     }
 
-    private void evictExpired() {
+    private synchronized void evictExpired() {
         long now = System.currentTimeMillis();
         backingMap.entrySet().removeIf(entry -> now - entry.getValue().lastAccessTime > ttlMillis);
     }
 
-    private void evictLRU() {
-        if (backingMap.isEmpty()) {
-            return;
-        }
-        K lruKey = null;
-        long oldest = Long.MAX_VALUE;
-        for (Map.Entry<K, CacheEntry<V>> entry : backingMap.entrySet()) {
-            if (entry.getValue().lastAccessTime < oldest) {
-                oldest = entry.getValue().lastAccessTime;
-                lruKey = entry.getKey();
-            }
-        }
-        if (lruKey != null) {
-            backingMap.remove(lruKey);
-        }
-    }
-
     private static final class CacheEntry<V> {
         final V value;
-        volatile long lastAccessTime;
+        long lastAccessTime;
 
         CacheEntry(final V value) {
             this.value = value;

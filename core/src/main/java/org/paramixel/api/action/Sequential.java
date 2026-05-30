@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.support.Arguments;
@@ -114,7 +115,7 @@ public final class Sequential<T> implements Action<T> {
                 context.setStatus(run(context));
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }
@@ -234,6 +235,8 @@ public final class Sequential<T> implements Action<T> {
          * @throws NullPointerException if {@code name} or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the fixture instance when this action is wrapped in an
+         * {@link Instance}, or the execution {@link Context} when standalone.
          */
         public Spec<T> child(final String name, final ThrowingConsumer<? super T> consumer) {
             return child(Step.of(name, consumer));
@@ -249,6 +252,8 @@ public final class Sequential<T> implements Action<T> {
          * @throws NullPointerException if {@code name}, {@code kind}, or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the fixture instance when this action is wrapped in an
+         * {@link Instance}, or the execution {@link Context} when standalone.
          */
         public Spec<T> child(final String name, final String kind, final ThrowingConsumer<? super T> consumer) {
             return child(Step.of(name, kind, consumer));

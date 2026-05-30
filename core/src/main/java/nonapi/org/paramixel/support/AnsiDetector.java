@@ -56,9 +56,6 @@ public final class AnsiDetector {
         if (noColor != null) {
             return false;
         }
-        if ("dumb".equals(term)) {
-            return false;
-        }
-        return true;
+        return !"dumb".equals(term);
     }
 }

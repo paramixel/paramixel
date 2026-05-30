@@ -18,6 +18,7 @@ package org.paramixel.api.action;
 
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
 
@@ -154,7 +155,7 @@ public final class AssertTrue implements Action<Void> {
                 context.setStatus(Status.FAILED);
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }

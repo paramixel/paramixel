@@ -64,29 +64,43 @@ public final class ElapsedTimeFormatter {
         Arguments.requireFalse(milliseconds < 0, "milliseconds is negative");
         long hours = milliseconds / 3_600_000;
         milliseconds %= 3_600_000;
-
         long minutes = milliseconds / 60_000;
         milliseconds %= 60_000;
-
         long seconds = milliseconds / 1_000;
-        milliseconds %= 1_000;
+        long ms = milliseconds % 1_000;
 
         StringBuilder result = new StringBuilder();
+        boolean hasPrevious = false;
 
         if (hours > 0) {
-            result.append(hours).append(" h ");
+            if (hasPrevious) {
+                result.append(" ");
+            }
+            result.append(hours).append(" h");
+            hasPrevious = true;
         }
 
         if (minutes > 0 || hours > 0) {
-            result.append(minutes).append(" m ");
+            if (hasPrevious) {
+                result.append(" ");
+            }
+            result.append(minutes).append(" m");
+            hasPrevious = true;
         }
 
         if (seconds > 0 || minutes > 0 || hours > 0) {
-            result.append(seconds).append(" s ");
+            if (hasPrevious) {
+                result.append(" ");
+            }
+            result.append(seconds).append(" s");
+            hasPrevious = true;
         }
 
-        result.append(milliseconds).append(" ms");
+        if (hasPrevious) {
+            result.append(" ");
+        }
+        result.append(ms).append(" ms");
 
-        return result.toString().strip();
+        return result.toString();
     }
 }

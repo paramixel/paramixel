@@ -72,7 +72,7 @@ public final class ConcreteConfiguration implements Configuration {
             return Optional.of(Integer.parseInt(value.strip()));
         } catch (NumberFormatException e) {
             throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected integer but was '" + value + "'");
+                    "Invalid configuration for '" + key + "': expected integer but was '" + value + "'", e);
         }
     }
 
@@ -87,7 +87,7 @@ public final class ConcreteConfiguration implements Configuration {
             return Optional.of(Long.parseLong(value.strip()));
         } catch (NumberFormatException e) {
             throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected long but was '" + value + "'");
+                    "Invalid configuration for '" + key + "': expected long but was '" + value + "'", e);
         }
     }
 
@@ -102,7 +102,7 @@ public final class ConcreteConfiguration implements Configuration {
             return Optional.of(Float.parseFloat(value.strip()));
         } catch (NumberFormatException e) {
             throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected float but was '" + value + "'");
+                    "Invalid configuration for '" + key + "': expected float but was '" + value + "'", e);
         }
     }
 
@@ -117,7 +117,7 @@ public final class ConcreteConfiguration implements Configuration {
             return Optional.of(Double.parseDouble(value.strip()));
         } catch (NumberFormatException e) {
             throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected double but was '" + value + "'");
+                    "Invalid configuration for '" + key + "': expected double but was '" + value + "'", e);
         }
     }
 

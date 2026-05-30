@@ -59,7 +59,7 @@ class ContextAsyncSchedulingTest {
     void scheduleAsyncReturnsFuture() {
         Action<?> child = Step.of("child", obj -> {});
         Action<?> parent = new CompositeTestAction("parent", child);
-        MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(parent);
+        MutableDescriptor root = new DescriptorBuilder().discover(parent);
         var childDescriptor = (MutableDescriptor) root.children().get(0);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
@@ -75,7 +75,7 @@ class ContextAsyncSchedulingTest {
     @DisplayName("scheduleAsync rejects null request")
     void scheduleAsyncRejectsNullRequest() {
         Action<?> leaf = Step.of("leaf", obj -> {});
-        MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
@@ -90,7 +90,7 @@ class ContextAsyncSchedulingTest {
         Action<?> grandchild = Step.of("grandchild", obj -> {});
         Action<?> childAction = new CompositeTestAction("child", grandchild);
         Action<?> rootAction = new CompositeTestAction("root", childAction);
-        MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(rootAction);
+        MutableDescriptor root = new DescriptorBuilder().discover(rootAction);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
         root.markScheduled(Mode.RUN);
@@ -108,10 +108,9 @@ class ContextAsyncSchedulingTest {
     @DisplayName("scheduleAsync rejects foreign descriptor")
     void scheduleAsyncRejectsForeignDescriptor() {
         Action<?> foreign = Step.of("foreign", obj -> {});
-        MutableDescriptor foreignDescriptor =
-                new DescriptorBuilder(Configuration.defaultConfiguration()).discover(foreign);
+        MutableDescriptor foreignDescriptor = new DescriptorBuilder().discover(foreign);
         Action<?> rootAction = Step.of("root", obj -> {});
-        MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(rootAction);
+        MutableDescriptor root = new DescriptorBuilder().discover(rootAction);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
@@ -123,7 +122,7 @@ class ContextAsyncSchedulingTest {
     @DisplayName("setStatus delegates to descriptor")
     void setStatusDelegatesToDescriptor() {
         Action<?> leaf = Step.of("leaf", obj -> {});
-        MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
@@ -136,7 +135,7 @@ class ContextAsyncSchedulingTest {
     @DisplayName("getInstance returns empty when no instance set")
     void getInstanceReturnsEmptyWhenNoInstance() {
         Action<?> leaf = Step.of("leaf", obj -> {});
-        MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
@@ -147,7 +146,7 @@ class ContextAsyncSchedulingTest {
     @DisplayName("getInstance returns present when instance set")
     void getInstanceReturnsPresentWhenInstanceSet() {
         Action<?> leaf = Step.of("leaf", obj -> {});
-        MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         instanceHolder.set("hello");
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);

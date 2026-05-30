@@ -45,11 +45,11 @@ class ConfigurationFactoryClasspathTest {
     }
 
     @Test
-    @DisplayName("with null ClassLoader delegates to default strategy")
-    void withNullClassLoaderDelegatesToDefaultStrategy() {
-        Configuration config = ConfigurationFactory.classpathConfiguration(null);
-
-        assertThat(config).isNotNull();
+    @DisplayName("with null ClassLoader throws NullPointerException")
+    void withNullClassLoaderThrowsNullPointerException() {
+        assertThatThrownBy(() -> ConfigurationFactory.classpathConfiguration(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("classLoader is null");
     }
 
     @Test
@@ -108,13 +108,11 @@ class ConfigurationFactoryClasspathTest {
     }
 
     @Test
-    @DisplayName("defaultConfiguration(null) returns same content as no-arg defaultConfiguration()")
-    void defaultConfigurationNullReturnsSameContentAsNoArg() {
-        Configuration fromNoArg = ConfigurationFactory.defaultConfiguration();
-        Configuration fromNull = ConfigurationFactory.defaultConfiguration(null);
-
-        assertThat(fromNoArg.getString(Configuration.RUNNER_PARALLELISM))
-                .isEqualTo(fromNull.getString(Configuration.RUNNER_PARALLELISM));
+    @DisplayName("defaultConfiguration(null) throws NullPointerException")
+    void defaultConfigurationNullThrowsNullPointerException() {
+        assertThatThrownBy(() -> ConfigurationFactory.defaultConfiguration(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("classLoader is null");
     }
 
     @Test

@@ -31,6 +31,12 @@ import org.paramixel.api.exception.ConfigurationException;
  * {@value #CONFIGURATION_FILE_NAME}, JVM system properties, and built-in framework defaults
  * for any remaining unset keys. Later layers override earlier ones.
  *
+ * <p><strong>Security Note:</strong> When using {@link #defaultConfiguration()} or
+ * {@link #systemConfiguration()}, all JVM system properties are copied into the returned
+ * configuration. This includes potentially sensitive properties such as {@code java.home},
+ * {@code user.name}, and {@code user.password}. Use {@link #classpathConfiguration()} or
+ * access system properties directly via {@link System#getProperty(String)} if this is a concern.
+ *
  * <p>All typed getters return {@link Optional}; absent keys produce empty optionals rather than
  * exceptions. Invalid values — for example, a non-numeric string for {@link #getInteger(String)} —
  * throw {@link ConfigurationException}.
@@ -272,10 +278,10 @@ public interface Configuration {
      * <p>The returned configuration is built from classpath properties, overlaid with JVM system
      * properties, and supplemented with built-in defaults for any missing keys.
      *
-     * @param classLoader the preferred classloader, or {@code null} to use the default fallback
-     *     strategy
+     * @param classLoader the preferred classloader; must not be {@code null}
      * @return the default configuration; never {@code null}
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws NullPointerException if {@code classLoader} is {@code null}
      */
     static Configuration defaultConfiguration(ClassLoader classLoader) {
         return ConfigurationFactory.defaultConfiguration(classLoader);
@@ -296,10 +302,10 @@ public interface Configuration {
      * Returns a configuration containing only classpath properties from
      * {@value #CONFIGURATION_FILE_NAME} using the supplied classloader first.
      *
-     * @param classLoader the preferred classloader, or {@code null} to use the default fallback
-     *     strategy
+     * @param classLoader the preferred classloader; must not be {@code null}
      * @return the classpath configuration; never {@code null}
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws NullPointerException if {@code classLoader} is {@code null}
      */
     static Configuration classpathConfiguration(ClassLoader classLoader) {
         return ConfigurationFactory.classpathConfiguration(classLoader);
@@ -307,6 +313,10 @@ public interface Configuration {
 
     /**
      * Returns a configuration built from JVM system properties supplemented with built-in defaults.
+     *
+     * <p><strong>Security Note:</strong> All JVM system properties are copied into the returned
+     * configuration, including potentially sensitive ones. Use {@link System#getProperty(String)}
+     * directly if you only need specific system properties.
      *
      * @return the system configuration; never {@code null}
      */

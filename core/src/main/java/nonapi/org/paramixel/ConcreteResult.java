@@ -33,6 +33,7 @@ public final class ConcreteResult implements Result {
 
     private final Descriptor root;
     private final Configuration configuration;
+    private final Status statusOverride;
 
     /**
      * Creates a result for a run that produced a descriptor tree.
@@ -44,6 +45,7 @@ public final class ConcreteResult implements Result {
     public ConcreteResult(final Descriptor root, final Configuration configuration) {
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
         this.root = root;
+        this.statusOverride = null;
     }
 
     /**
@@ -56,6 +58,19 @@ public final class ConcreteResult implements Result {
         this(null, configuration);
     }
 
+    /**
+     * Creates a result with an explicit status override for when no descriptor is available.
+     *
+     * @param configuration the run configuration; must not be {@code null}
+     * @param statusOverride the status to return; must not be {@code null}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    ConcreteResult(final Configuration configuration, final Status statusOverride) {
+        this.configuration = Objects.requireNonNull(configuration, "configuration is null");
+        this.statusOverride = Objects.requireNonNull(statusOverride, "statusOverride is null");
+        this.root = null;
+    }
+
     @Override
     public Optional<Descriptor> descriptor() {
         return Optional.ofNullable(root);
@@ -63,6 +78,9 @@ public final class ConcreteResult implements Result {
 
     @Override
     public Status status() {
+        if (statusOverride != null) {
+            return statusOverride;
+        }
         if (root == null) {
             final var failIfNoTests =
                     configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(false);

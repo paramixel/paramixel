@@ -20,7 +20,7 @@ package nonapi.org.paramixel.listener;
  * Targets for listener output exclusion controlled by the
  * {@link org.paramixel.api.Configuration#LISTENER_EXCLUDE} configuration key.
  */
-enum ExcludeTarget {
+public enum ExcludeTarget {
 
     /**
      * Exclude per-action "starting" header lines from

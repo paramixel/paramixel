@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import nonapi.org.paramixel.ConcreteMetadata;
+import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.FastId;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
@@ -46,6 +47,7 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     private volatile MutableDescriptor after;
     private volatile List<Descriptor> frozenChildren;
     private volatile SchedulerPriorityKey schedulerPriorityKey = SchedulerPriorityKey.root();
+    private volatile Thread executingThread;
     private CompletableFuture<Descriptor> scheduledFuture;
     volatile MutableDescriptor parent;
 
@@ -192,7 +194,8 @@ public final class ConcreteDescriptor implements MutableDescriptor {
             beforeSnapshot.freeze();
         }
         for (var child : childrenSnapshot) {
-            ((MutableDescriptor) child).freeze();
+            Arguments.requireInstanceOf(child, MutableDescriptor.class, "child must be a MutableDescriptor")
+                    .freeze();
         }
         if (afterSnapshot != null) {
             afterSnapshot.freeze();
@@ -242,6 +245,23 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     public synchronized void completeFutureExceptionally(final Throwable throwable) {
         if (scheduledFuture != null && !scheduledFuture.isDone()) {
             scheduledFuture.completeExceptionally(throwable);
+        }
+    }
+
+    /**
+     * Records the thread executing this descriptor's action.
+     *
+     * @param thread the executing thread; may be {@code null} to clear the record
+     */
+    public synchronized void setExecutingThread(final Thread thread) {
+        this.executingThread = thread;
+    }
+
+    @Override
+    public synchronized void interruptExecutingThread() {
+        var thread = executingThread;
+        if (thread != null) {
+            thread.interrupt();
         }
     }
 }

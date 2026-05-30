@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.AnsiDetector;
 import nonapi.org.paramixel.support.ElapsedTimeFormatter;
@@ -37,15 +38,14 @@ import org.paramixel.api.Version;
  * <p>The action tree rendering is delegated to a {@link SummaryRenderer}. Each rendered line is
  * prefixed with the {@code [PARAMIXEL]} tag (ANSI-colored or plain depending on configuration).
  *
- * <p><strong>Thread safety:</strong> The output writer is lazily initialized and stored in a
- * {@code volatile} field. Concurrent callbacks may race to initialize the writer, resulting in a
- * harmless duplicate allocation. Once initialized, concurrent writes to the underlying
- * {@link PrintWriter} are safe.
+ * <p><strong>Thread safety:</strong> The output writer is lazily initialized using an
+ * {@code AtomicReference} with compare-and-set semantics to ensure single initialization.
+ * Once initialized, concurrent writes to the underlying {@link PrintWriter} are safe.
  */
 public final class SummaryListener implements Listener {
 
     private volatile SummaryRenderer renderer;
-    private volatile PrintWriter out;
+    private final AtomicReference<PrintWriter> out = new AtomicReference<>();
     private volatile boolean ansiEnabled;
     private volatile EnumSet<ExcludeTarget> excludes = EnumSet.noneOf(ExcludeTarget.class);
 
@@ -71,12 +71,14 @@ public final class SummaryListener implements Listener {
     }
 
     private PrintWriter getWriter() {
-        var w = out;
+        var w = out.get();
         if (w == null) {
-            w = new PrintWriter(System.out, true);
-            out = w;
+            var newWriter = new PrintWriter(System.out, true);
+            if (!out.compareAndSet(null, newWriter)) {
+                newWriter.close();
+            }
         }
-        return w;
+        return out.get();
     }
 
     private String getPrefix() {

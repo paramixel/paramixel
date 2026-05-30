@@ -186,28 +186,62 @@ class StatusListenerOutputTest {
     }
 
     @Test
-    @DisplayName("prints EXCEPTION line to System.err")
-    void printsExceptionLineToStderr() {
+    @DisplayName("prints exception details appended to FAILED status line")
+    void printsExceptionDetailsAppendedToFailedStatusLine() {
         StatusListener listener = new StatusListener();
         Action<?> action = Step.of("error-action", context -> {
             throw new RuntimeException("action error");
         });
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream outputErr = new ByteArrayOutputStream();
-        PrintStream originalErr = System.err;
+        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setErr(new PrintStream(outputErr, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
             runner.run(action);
         } finally {
-            System.setErr(originalErr);
             System.setOut(originalOut);
         }
 
-        String errResult = outputErr.toString(StandardCharsets.UTF_8);
-        assertThat(errResult).contains("EXCEPTION");
-        assertThat(errResult).contains("error-action");
+        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        assertThat(outResult).contains("FAILED");
+        assertThat(outResult).contains("error-action");
+        assertThat(outResult).contains(RuntimeException.class.getName() + ": action error");
+    }
+
+    @Test
+    @DisplayName("prints EXCEPTION stack trace with prefix on each line")
+    void printsExceptionStackTraceWithPrefixOnEachLine() {
+        StatusListener listener = new StatusListener();
+        Action<?> action = Step.of("error-action", context -> {
+            throw new RuntimeException("action error");
+        });
+        Runner runner = Runner.builder().listener(listener).build();
+
+        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
+            runner.run(action);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        String[] lines = outResult.split(System.lineSeparator());
+        int failedLineIndex = -1;
+        for (int i = 0; i < lines.length; i++) {
+            if (lines[i].contains("FAILED")) {
+                failedLineIndex = i;
+                break;
+            }
+        }
+        assertThat(failedLineIndex).isNotEqualTo(-1);
+        for (int i = failedLineIndex + 1; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.isBlank()) continue;
+            assertThat(line).as("Stack trace line should start with prefix").startsWith(Constants.PARAMIXEL_PLAIN);
+        }
     }
 
     @Test
@@ -221,18 +255,16 @@ class StatusListenerOutputTest {
                 Parallel.of(ROOT_NAME).parallelism(1).child(failingChild).resolve();
         Runner runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream outputErr = new ByteArrayOutputStream();
-        PrintStream originalErr = System.err;
+        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setErr(new PrintStream(outputErr, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
             runner.run(parallel);
         } finally {
-            System.setErr(originalErr);
             System.setOut(originalOut);
         }
 
-        String errResult = outputErr.toString(StandardCharsets.UTF_8);
-        assertThat(errResult).doesNotContain(ROOT_NAME);
+        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        assertThat(outResult).doesNotContain(ROOT_NAME);
     }
 }
