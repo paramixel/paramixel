@@ -32,7 +32,7 @@ For the full documentation, visit: **https://paramixel.github.io/paramixel**
 
 ```xml
 <properties>
-    <paramixel.version><PARAMIXEL_VERSION></paramixel.version>
+    <paramixel.version>5.1.1</paramixel.version>
 </properties>
 
 <dependency>

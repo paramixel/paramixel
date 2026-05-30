@@ -19,14 +19,18 @@ package org.paramixel.api.action;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.Scheduler;
 import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
@@ -51,6 +55,13 @@ import org.paramixel.api.ThrowingConsumer;
  *
  * <p>Thread-safety: instances are immutable and safe for concurrent use. Execution state is managed by
  * the internal {@code ParallelState}, which coordinates scheduling via the shared {@link Scheduler}.</p>
+ *
+ * <p><b>Cancellation and interruptibility:</b> When a child fails and causes the Parallel to cancel,
+ * {@link Thread#interrupt()} is called on all scheduled children's executing threads. This provides
+ * best-effort cancellation. Actions that do not call interruptible methods (e.g., compute-bound
+ * {@link Step} actions) will continue executing until they naturally complete. Long-running leaf
+ * actions should periodically check {@link Thread#isInterrupted()} or use interruptible operations
+ * to support timely cancellation.</p>
  *
  * @param <T> the type accepted by child consumers
  */
@@ -122,7 +133,7 @@ public final class Parallel<T> implements Action<T> {
      * leaf-action execution time. At the root parallel node, runner-level top-level admission may
      * also be throttled by {@code paramixel.parallelism}.</p>
      *
-     * <p>This value is a cap only. Runtime concurrency is best-effort and can be lower depending on
+     * <p>This value is a cap only. Runtime concurrency is best-effort and may be lower depending on
      * global and nested contention.</p>
      *
      * @return the parallelism limit
@@ -163,7 +174,7 @@ public final class Parallel<T> implements Action<T> {
                 context.setStatus(run(context));
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }
@@ -173,7 +184,8 @@ public final class Parallel<T> implements Action<T> {
             throw new IllegalArgumentException("context must be a ConcreteContext");
         }
 
-        var descriptor = (MutableDescriptor) context.descriptor();
+        var descriptor = Arguments.requireInstanceOf(
+                context.descriptor(), MutableDescriptor.class, "descriptor must be a MutableDescriptor");
         var children = getConcreteChildren(descriptor);
         var scheduler = concreteContext.scheduler();
         var topLevelThrottleEnabled = descriptor.parent().isEmpty() && concreteContext.hasTopLevelParallelThrottle();
@@ -194,6 +206,9 @@ public final class Parallel<T> implements Action<T> {
             var cause = e.getCause();
             if (cause instanceof Error err) {
                 throw err;
+            }
+            if (cause instanceof RuntimeException re) {
+                throw re;
             }
             throw new RuntimeException(cause);
         }
@@ -250,7 +265,9 @@ public final class Parallel<T> implements Action<T> {
         private final AtomicInteger completedCount = new AtomicInteger(0);
 
         private volatile boolean done = false;
+        private volatile boolean cancelled = false;
         private volatile Throwable firstError;
+        private final List<ParallelExecutionCallback> scheduledCallbacks = new CopyOnWriteArrayList<>();
 
         ParallelState(
                 final int configuredParallelism,
@@ -272,7 +289,7 @@ public final class Parallel<T> implements Action<T> {
             int scheduleCount;
 
             synchronized (this) {
-                if (done) {
+                if (done || cancelled) {
                     return;
                 }
 
@@ -297,6 +314,7 @@ public final class Parallel<T> implements Action<T> {
                 var child = children.get(startIndex + i);
                 var mode = child.metadata().mode();
                 var callback = new ParallelExecutionCallback(child, topLevelThrottleEnabled);
+                scheduledCallbacks.add(callback);
                 if (topLevelThrottleEnabled) {
                     try {
                         context.acquireTopLevelParallelPermit();
@@ -340,9 +358,8 @@ public final class Parallel<T> implements Action<T> {
                 }
             }
 
-            @Override
-            public void onAdmitted() {
-                // Intentionally empty
+            void releaseTopLevelPermitIfAcquired() {
+                releaseTopLevelPermitIfNeeded();
             }
 
             @Override
@@ -354,14 +371,42 @@ public final class Parallel<T> implements Action<T> {
             public void onExecutionComplete(final Throwable error) {
                 releaseTopLevelPermitIfNeeded();
                 if (completionNotified.compareAndSet(false, true)) {
-                    handleCompletion(resolveCompletionError(error));
+                    if (isCancelled() && isFrameworkInterrupted(error)) {
+                        scheduledCallbacks.remove(this);
+                        handleCompletion(new CancellationException("Parent Parallel was cancelled"));
+                    } else {
+                        scheduledCallbacks.remove(this);
+                        handleCompletion(resolveCompletionError(error));
+                    }
                 }
             }
 
             void onFutureComplete(final Throwable error) {
                 releaseTopLevelPermitIfNeeded();
                 if (completionNotified.compareAndSet(false, true)) {
-                    handleCompletion(resolveCompletionError(error));
+                    if (isCancelled() && isFrameworkInterrupted(error)) {
+                        scheduledCallbacks.remove(this);
+                        handleCompletion(new CancellationException("Parent Parallel was cancelled"));
+                    } else {
+                        scheduledCallbacks.remove(this);
+                        handleCompletion(resolveCompletionError(error));
+                    }
+                }
+            }
+
+            private static boolean isFrameworkInterrupted(final Throwable error) {
+                if (error instanceof InterruptedException) {
+                    return true;
+                }
+                if (error instanceof FrameworkException fe && fe.getCause() instanceof InterruptedException) {
+                    return false;
+                }
+                return false;
+            }
+
+            void interruptChild() {
+                if (child instanceof ConcreteDescriptor concrete) {
+                    concrete.interruptExecutingThread();
                 }
             }
 
@@ -392,15 +437,28 @@ public final class Parallel<T> implements Action<T> {
                 var unwrapped = unwrap(t);
                 if (unwrapped instanceof OutOfMemoryError || unwrapped instanceof StackOverflowError) {
                     completion.completeExceptionally(unwrapped);
+                    done = true;
                     return;
                 }
                 if (firstError == null) {
                     firstError = unwrapped;
+                    cancelled = true;
+                    interruptScheduledChildren();
                 }
             }
 
             checkCompletion();
             drain();
+        }
+
+        private void interruptScheduledChildren() {
+            for (var callback : scheduledCallbacks) {
+                callback.interruptChild();
+            }
+        }
+
+        boolean isCancelled() {
+            return cancelled;
         }
 
         private void failScheduling(final Throwable throwable) {
@@ -441,7 +499,7 @@ public final class Parallel<T> implements Action<T> {
 
         private static Throwable unwrap(final Throwable t) {
             if (t instanceof CompletionException && t.getCause() != null) {
-                return t.getCause();
+                return unwrap(t.getCause());
             }
             if (t instanceof RuntimeException rt && rt.getCause() != null) {
                 var cause = rt.getCause();
@@ -529,6 +587,8 @@ public final class Parallel<T> implements Action<T> {
          * @param consumer the child step consumer (must not be {@code null})
          * @return this spec
          * @throws NullPointerException if any argument is {@code null}
+         * <p>The consumer receives the fixture instance when this action is wrapped in an
+         * {@link Instance}, or the execution {@link Context} when standalone.
          */
         public Spec<T> child(final String name, final ThrowingConsumer<? super T> consumer) {
             return child(Step.of(name, consumer));
@@ -543,6 +603,8 @@ public final class Parallel<T> implements Action<T> {
          * @return this spec
          * @throws NullPointerException if {@code name}, {@code kind}, or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
+         * <p>The consumer receives the fixture instance when this action is wrapped in an
+         * {@link Instance}, or the execution {@link Context} when standalone.
          */
         public Spec<T> child(final String name, final String kind, final ThrowingConsumer<? super T> consumer) {
             return child(Step.of(name, kind, consumer));

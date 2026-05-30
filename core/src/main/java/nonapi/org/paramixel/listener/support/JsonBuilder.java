@@ -25,8 +25,8 @@ import java.io.Writer;
  * <p>This builder manages commas, indentation, and character escaping internally so that callers do not need to
  * handle these details. It supports objects, arrays, strings, numbers, booleans, and null values.
  *
- * <p><strong>Buffering strategy:</strong> {@link #writeJsonString(String)} accumulates non-special characters into a
- * per-call {@code char[]} buffer and flushes in bulk at escape points or when the buffer fills, reducing per-character
+ * <p><strong>Buffering strategy:</strong> {@link #writeJsonString(String)} accumulates non-special characters into an
+ * instance {@code char[]} buffer and flushes in bulk at escape points or when the buffer fills, reducing per-character
  * write overhead compared to individual {@code writer.write(int)} calls.
  *
  * <p><strong>Thread safety:</strong> This class is <em>not</em> thread-safe. It is intended for single-threaded use;
@@ -54,6 +54,7 @@ public final class JsonBuilder {
     private final boolean escapeForHtmlScript;
     private int indentLevel;
     private boolean needsComma;
+    private final char[] stringBuffer;
 
     /**
      * Creates a JSON builder that writes to the supplied writer with standard JSON escaping.
@@ -76,6 +77,7 @@ public final class JsonBuilder {
         this.escapeForHtmlScript = escapeForHtmlScript;
         this.indentLevel = 0;
         this.needsComma = false;
+        this.stringBuffer = new char[STRING_BUFFER_SIZE];
     }
 
     /**
@@ -320,7 +322,7 @@ public final class JsonBuilder {
      */
     private void writeJsonString(final String value) throws IOException {
         writer.write('"');
-        char[] buffer = new char[STRING_BUFFER_SIZE];
+        char[] buffer = stringBuffer;
         int bufferPos = 0;
         int i = 0;
         while (i < value.length()) {

@@ -17,7 +17,6 @@
 package nonapi.org.paramixel.listener;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.io.Writer;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Result;
@@ -37,7 +36,7 @@ public final class HtmlReportListener extends AbstractReportFileListener {
 
     @Override
     protected void writeReport(final Writer writer, final Result result) throws IOException {
-        writer.write("<!doctype html><html><body><pre>");
+        writer.write("<!DOCTYPE html><html><body><pre>");
         if (result.descriptor().isEmpty()) {
             writer.write("No Paramixel tests found");
         } else {
@@ -59,23 +58,15 @@ public final class HtmlReportListener extends AbstractReportFileListener {
         writer.write(escape(descriptor.metadata().name()));
         writer.write(LINE_SEPARATOR);
         final var childIndent = indent + INDENT;
-        descriptor.before().ifPresent(b -> {
-            try {
-                writeDescriptor(writer, b, childIndent);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        if (descriptor.before().isPresent()) {
+            writeDescriptor(writer, descriptor.before().get(), childIndent);
+        }
         for (Descriptor child : descriptor.children()) {
             writeDescriptor(writer, child, childIndent);
         }
-        descriptor.after().ifPresent(a -> {
-            try {
-                writeDescriptor(writer, a, childIndent);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        if (descriptor.after().isPresent()) {
+            writeDescriptor(writer, descriptor.after().get(), childIndent);
+        }
     }
 
     private static String escape(final String value) {

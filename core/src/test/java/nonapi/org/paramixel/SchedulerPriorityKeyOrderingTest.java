@@ -26,7 +26,6 @@ import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.Configuration;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
@@ -55,8 +54,7 @@ class SchedulerPriorityKeyOrderingTest {
                 .after(Step.of("after", ctx -> {}))
                 .resolve();
 
-        MutableDescriptor descriptorTree =
-                new DescriptorBuilder(Configuration.defaultConfiguration()).discover(rootAction);
+        MutableDescriptor descriptorTree = new DescriptorBuilder().discover(rootAction);
 
         var descriptors = collectDescriptors(descriptorTree);
         var expected = descriptors.stream()

@@ -30,9 +30,12 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.action.SchedulerPriorityKey;
+import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
@@ -91,13 +94,17 @@ public final class Scheduler implements AutoCloseable {
     private static final long EXECUTOR_TERMINATION_TIMEOUT_SECONDS = 5L;
     private static final int DEFAULT_QUEUE_CAPACITY = 1024;
     private static final Comparator<Runnable> PRIORITY_COMPARATOR = (left, right) -> {
-        var leftTask = (PrioritizedTask) left;
-        var rightTask = (PrioritizedTask) right;
-        var keyComparison = leftTask.priorityKey.compareTo(rightTask.priorityKey);
-        if (keyComparison != 0) {
-            return keyComparison;
+        if (left instanceof PrioritizedTask leftTask && right instanceof PrioritizedTask rightTask) {
+            var keyComparison = leftTask.priorityKey.compareTo(rightTask.priorityKey);
+            if (keyComparison != 0) {
+                return keyComparison;
+            }
+            return Long.compare(leftTask.sequence, rightTask.sequence);
         }
-        return Long.compare(leftTask.sequence, rightTask.sequence);
+        throw new ClassCastException("PRIORITY_COMPARATOR requires PrioritizedTask, got: "
+                + (left != null ? left.getClass().getName() : "null")
+                + " and "
+                + (right != null ? right.getClass().getName() : "null"));
     };
 
     private final ConcurrentHashMap<Integer, ThreadPoolExecutor> depthExecutors = new ConcurrentHashMap<>();
@@ -107,9 +114,11 @@ public final class Scheduler implements AutoCloseable {
     private final int parallelism;
     private final AtomicInteger workerThreadCounter = new AtomicInteger();
     private final AtomicInteger activeThreadCounter = new AtomicInteger();
+    private final AtomicInteger runningLeafCounter = new AtomicInteger();
     private final AtomicLong taskSequence = new AtomicLong(0);
 
     private volatile boolean closing;
+    private final ReentrantLock closingLock = new ReentrantLock();
 
     /**
      * Creates a scheduler with the given parallelism.
@@ -126,10 +135,15 @@ public final class Scheduler implements AutoCloseable {
     /**
      * Creates a scheduler with the given parallelism.
      *
-     * <p>{@code queueCapacity} bounds each depth executor queue.
+     * <p>{@code queueCapacity} sets the initial array size for each depth executor's internal
+     * priority queue and determines the number of admission permits per depth. The actual bound on
+     * queued tasks is enforced by a semaphore — {@link java.util.concurrent.PriorityBlockingQueue}
+     * is unbounded and never rejects elements. If the semaphore is exhausted, subsequent submissions
+     * for that depth are rejected immediately.
      *
      * @param parallelism the maximum concurrent leaf execution count (must be positive)
-     * @param queueCapacity per-depth queue capacity (must be positive)
+     * @param queueCapacity per-depth admission permit count and initial queue allocation (must be
+     *     positive)
      * @throws IllegalArgumentException if {@code parallelism} or {@code queueCapacity} is not
      *     positive
      */
@@ -184,19 +198,24 @@ public final class Scheduler implements AutoCloseable {
         Objects.requireNonNull(mode, "mode is null");
         Objects.requireNonNull(parentContext, "parentContext is null");
 
-        if (closing) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Scheduler is closing"));
-        }
-
-        if (!descriptor.isFrozen()) {
-            descriptor.freeze();
-        }
-
         final CompletableFuture<Descriptor> future;
+        closingLock.lock();
         try {
-            future = descriptor.markScheduled(mode);
-        } catch (Throwable t) {
-            return CompletableFuture.failedFuture(t);
+            if (closing) {
+                return CompletableFuture.failedFuture(new IllegalStateException("Scheduler is closing"));
+            }
+
+            if (!descriptor.isFrozen()) {
+                descriptor.freeze();
+            }
+
+            try {
+                future = descriptor.markScheduled(mode);
+            } catch (Throwable t) {
+                return CompletableFuture.failedFuture(t);
+            }
+        } finally {
+            closingLock.unlock();
         }
 
         var context = new ConcreteContext(
@@ -207,8 +226,10 @@ public final class Scheduler implements AutoCloseable {
                 parentContext.instanceHolder());
 
         var depth = descriptor.depth();
+        @SuppressWarnings("resource")
         var depthExecutor = depthExecutor(depth);
         var queuePermit = depthQueuePermit(depth);
+        var acquiredPermit = false;
         if (!queuePermit.tryAcquire()) {
             var rejected = new RejectedExecutionException(
                     "Scheduler queue capacity exceeded at depth " + depth + " (capacity=" + queueCapacity + ")");
@@ -217,6 +238,7 @@ public final class Scheduler implements AutoCloseable {
             notifyRejectedCompletion(callback, rejected);
             return future;
         }
+        acquiredPermit = true;
 
         var priorityKey = descriptor.schedulerPriorityKey();
         var sequence = taskSequence.getAndIncrement();
@@ -229,12 +251,16 @@ public final class Scheduler implements AutoCloseable {
                     priorityKey,
                     sequence));
         } catch (RejectedExecutionException rejected) {
-            queuePermit.release();
+            if (acquiredPermit) {
+                queuePermit.release();
+            }
             ensureTerminalStatus(context, rejected);
             completeExceptionally(descriptor, future, rejected);
             notifyRejectedCompletion(callback, rejected);
         } catch (Throwable t) {
-            queuePermit.release();
+            if (acquiredPermit) {
+                queuePermit.release();
+            }
             UnrecoverableErrors.rethrowIfUnrecoverable(t);
             ensureTerminalStatus(context, t);
             completeExceptionally(descriptor, future, t);
@@ -261,15 +287,17 @@ public final class Scheduler implements AutoCloseable {
      * @return the running leaf count, always non-negative
      */
     public int running() {
-        return parallelism - leafPermits.availablePermits();
+        return runningLeafCounter.get();
     }
 
     /**
-     * Returns queue capacity for compatibility with previous scheduler telemetry.
+     * Returns the per-depth admission permit count, which also sets the initial array size for each
+     * depth executor's priority queue.
      *
-     * <p>Each depth executor uses this bounded capacity.
+     * <p>This is not a hard queue bound — admission is controlled by a semaphore with this many
+     * permits.
      *
-     * @return configured queue capacity, always positive
+     * @return configured admission permit count, always positive
      */
     public int queueCapacity() {
         return queueCapacity;
@@ -284,15 +312,6 @@ public final class Scheduler implements AutoCloseable {
         return depthExecutors.values().stream()
                 .mapToInt(executor -> executor.getQueue().size())
                 .sum();
-    }
-
-    /**
-     * Returns the active thread count.
-     *
-     * @return the active thread count
-     */
-    public int activeThreadCount() {
-        return activeThreadCounter.get();
     }
 
     /**
@@ -316,26 +335,36 @@ public final class Scheduler implements AutoCloseable {
      */
     @Override
     public void close() {
-        closing = true;
-        var executors = List.copyOf(depthExecutors.values());
-        executors.forEach(ExecutorService::shutdown);
+        closingLock.lock();
         try {
-            var allTerminated = true;
-            for (var executor : executors) {
-                if (!executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                    allTerminated = false;
+            closing = true;
+            List<ExecutorService> executors = List.copyOf(depthExecutors.values());
+            leafPermits.release(parallelism);
+            executors.forEach(ExecutorService::shutdown);
+            var executorsList = executors;
+            try {
+                var allTerminated = true;
+                for (var executor : executorsList) {
+                    if (!executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                        allTerminated = false;
+                    }
                 }
-            }
-            if (!allTerminated) {
-                executors.forEach(ExecutorService::shutdownNow);
-                for (var executor : executors) {
-                    executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                if (!allTerminated) {
+                    executorsList.forEach(ExecutorService::shutdownNow);
+                    for (var executor : executorsList) {
+                        executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    }
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                executorsList.forEach(ExecutorService::shutdownNow);
+                throw new IllegalStateException("Interrupted while closing scheduler", e);
+            } finally {
+                depthExecutors.clear();
+                depthQueuePermits.clear();
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            executors.forEach(ExecutorService::shutdownNow);
-            throw new IllegalStateException("Interrupted while closing scheduler", e);
+        } finally {
+            closingLock.unlock();
         }
     }
 
@@ -372,6 +401,7 @@ public final class Scheduler implements AutoCloseable {
             if (leafAction) {
                 leafPermits.acquire();
                 acquiredPermit = true;
+                runningLeafCounter.incrementAndGet();
             }
 
             if (callback != null) {
@@ -379,19 +409,27 @@ public final class Scheduler implements AutoCloseable {
                 callback.onExecutionStart();
             }
 
+            if (descriptor instanceof ConcreteDescriptor concrete) {
+                concrete.setExecutingThread(Thread.currentThread());
+            }
+
             executed = true;
             descriptor.action().execute(context);
         } catch (Throwable t) {
-            executionError = unwrap(t);
+            executionError = Throwables.unwrap(t);
             if (executionError instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             UnrecoverableErrors.rethrowIfUnrecoverable(executionError);
         } finally {
+            if (descriptor instanceof ConcreteDescriptor concrete) {
+                concrete.setExecutingThread(null);
+            }
             if (!executed) {
                 ensureTerminalStatus(context, executionError);
             }
             if (acquiredPermit) {
+                runningLeafCounter.decrementAndGet();
                 leafPermits.release();
             }
         }
@@ -404,7 +442,7 @@ public final class Scheduler implements AutoCloseable {
             try {
                 callback.onExecutionComplete(executionError);
             } catch (Throwable t) {
-                callbackFailure = unwrap(t);
+                callbackFailure = Throwables.unwrap(t);
             }
         }
 
@@ -479,31 +517,15 @@ public final class Scheduler implements AutoCloseable {
         try {
             callback.onExecutionComplete(error);
         } catch (Throwable callbackFailure) {
-            UnrecoverableErrors.rethrowIfUnrecoverable(unwrap(callbackFailure));
+            UnrecoverableErrors.rethrowIfUnrecoverable(Throwables.unwrap(callbackFailure));
         }
-    }
-
-    private static Throwable unwrap(final Throwable throwable) {
-        if (throwable instanceof CompletionException && throwable.getCause() != null) {
-            return throwable.getCause();
-        }
-        if (throwable instanceof RuntimeException rt && rt.getCause() != null) {
-            var cause = rt.getCause();
-            if (UnrecoverableErrors.isUnrecoverable(cause)
-                    || cause instanceof Error
-                    || cause instanceof InterruptedException) {
-                return cause;
-            }
-        }
-        return throwable;
     }
 
     private ThreadPoolExecutor depthExecutor(final int depth) {
-        var executor = depthExecutors.computeIfAbsent(depth, this::createDepthExecutor);
         if (closing) {
-            executor.shutdownNow();
+            throw new IllegalStateException("Scheduler is closing");
         }
-        return executor;
+        return depthExecutors.computeIfAbsent(depth, this::createDepthExecutor);
     }
 
     private Semaphore depthQueuePermit(final int depth) {
@@ -539,7 +561,7 @@ public final class Scheduler implements AutoCloseable {
     /**
      * Wrapper that applies descriptor-key ordering to a task.
      */
-    private final class PrioritizedTask implements Runnable {
+    private static final class PrioritizedTask implements Runnable {
         private final Runnable delegate;
         private final SchedulerPriorityKey priorityKey;
         private final long sequence;

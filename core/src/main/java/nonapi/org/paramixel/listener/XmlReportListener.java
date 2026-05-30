@@ -17,7 +17,6 @@
 package nonapi.org.paramixel.listener;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.io.Writer;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Result;
@@ -63,23 +62,15 @@ public final class XmlReportListener extends AbstractReportFileListener {
         writer.write("\">");
         writer.write(LINE_SEPARATOR);
         final var childIndent = indent + INDENT;
-        descriptor.before().ifPresent(b -> {
-            try {
-                writeDescriptor(writer, b, childIndent);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        if (descriptor.before().isPresent()) {
+            writeDescriptor(writer, descriptor.before().orElseThrow(), childIndent);
+        }
         for (Descriptor child : descriptor.children()) {
             writeDescriptor(writer, child, childIndent);
         }
-        descriptor.after().ifPresent(a -> {
-            try {
-                writeDescriptor(writer, a, childIndent);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        if (descriptor.after().isPresent()) {
+            writeDescriptor(writer, descriptor.after().orElseThrow(), childIndent);
+        }
         writer.write(indent);
         writer.write("</descriptor>");
         writer.write(LINE_SEPARATOR);

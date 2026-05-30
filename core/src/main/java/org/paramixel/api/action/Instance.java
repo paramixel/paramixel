@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.InstanceHolder;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.StatusAccumulator;
@@ -201,7 +202,7 @@ public final class Instance<T> implements Action<T> {
                 context.setStatus(run(context));
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }
@@ -236,10 +237,9 @@ public final class Instance<T> implements Action<T> {
                 }
             }
         } finally {
-            var afterDescriptor = descriptor.after().orElse(null);
-            if (afterDescriptor != null) {
-                aggregated.include(runChild(context, afterDescriptor, Mode.RUN));
-            }
+            descriptor
+                    .after()
+                    .ifPresent(afterDescriptor -> aggregated.include(runChild(context, afterDescriptor, Mode.RUN)));
         }
 
         return aggregated.status();
@@ -299,6 +299,7 @@ public final class Instance<T> implements Action<T> {
          * @throws NullPointerException if {@code name} or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the fixture instance of type {@code T}.
          */
         public Spec<T> child(final String name, final ThrowingConsumer<T> consumer) {
             ensureNotResolved();
@@ -320,6 +321,7 @@ public final class Instance<T> implements Action<T> {
          * @throws NullPointerException if {@code name}, {@code kind}, or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the fixture instance of type {@code T}.
          */
         public Spec<T> child(final String name, final String kind, final ThrowingConsumer<T> consumer) {
             ensureNotResolved();
@@ -448,7 +450,7 @@ public final class Instance<T> implements Action<T> {
                     context.setStatus(Status.PASSED);
                 }
             } catch (Throwable t) {
-                context.setStatus(Status.fromThrowable(t));
+                context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
             }
             listener.onAfterExecution(descriptor);
         }
@@ -497,7 +499,7 @@ public final class Instance<T> implements Action<T> {
                     }
                 }
             } catch (Throwable t) {
-                context.setStatus(Status.fromThrowable(t));
+                context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
             }
             listener.onAfterExecution(descriptor);
         }

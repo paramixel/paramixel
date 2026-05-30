@@ -23,6 +23,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import nonapi.org.paramixel.ExecutionRequest;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.support.Arguments;
@@ -36,16 +37,17 @@ import org.paramixel.api.ThrowingConsumer;
  * propagates. If the child does not complete within the duration, the action
  * fails with {@link Status#FAILED} and a message indicating the timeout.
  *
- * <p>On timeout, the thread executing the child is interrupted. If the child
- * does not terminate after interruption, the action records failure and
- * continues — the child thread becomes orphaned. Because the framework's
- * scheduler uses daemon threads, orphaned threads cannot prevent JVM shutdown.
+ * <p>On timeout, the child's executing thread is interrupted after a brief
+ * grace period. If the child does not terminate after interruption, the action
+ * records failure and continues — the child thread becomes orphaned. Because
+ * the framework's scheduler uses daemon threads, orphaned threads cannot
+ * prevent JVM shutdown.
  *
  * <p>Non-{@link Mode#RUN} modes short-circuit without executing the child.
  */
 public final class Timeout implements Action<Void> {
 
-    private static final Duration GRACE_PERIOD = Duration.ofMillis(100);
+    private static final Duration GRACE_PERIOD = Duration.ofMillis(1000);
     private static final String KIND = "Timeout";
 
     private final String name;
@@ -123,7 +125,7 @@ public final class Timeout implements Action<Void> {
                 context.setStatus(run(context));
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }
@@ -133,8 +135,11 @@ public final class Timeout implements Action<Void> {
             throw new IllegalArgumentException("context must be a ConcreteContext");
         }
 
-        var childDescriptor =
-                (MutableDescriptor) context.descriptor().children().get(0);
+        var childDescriptor = Arguments.requireInstanceOf(
+                context.descriptor().children().get(0),
+                MutableDescriptor.class,
+                "child descriptor must be a MutableDescriptor");
+        @SuppressWarnings("resource")
         var scheduler = concreteContext.scheduler();
 
         var childFuture = concreteContext.scheduleAsync(ExecutionRequest.run(childDescriptor));
@@ -151,13 +156,15 @@ public final class Timeout implements Action<Void> {
             if (cause instanceof Error err) {
                 throw err;
             }
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
             throw new RuntimeException(cause);
         }
     }
 
     private Status handleTimeout(final MutableDescriptor childDescriptor) {
         if (!childDescriptor.metadata().isCompleted()) {
-
             var graceDeadline = System.nanoTime() + GRACE_PERIOD.toNanos();
             while (!childDescriptor.metadata().isCompleted() && System.nanoTime() < graceDeadline) {
                 Thread.yield();
@@ -165,6 +172,7 @@ public final class Timeout implements Action<Void> {
         }
 
         if (!childDescriptor.metadata().isCompleted()) {
+            childDescriptor.interruptExecutingThread();
             childDescriptor.setStatus(Status.failed("timed out after " + timeout.toMillis() + " ms"));
             childDescriptor.completeFuture();
         }
@@ -246,8 +254,8 @@ public final class Timeout implements Action<Void> {
         }
 
         /**
-         * Sets a child action that invokes the supplied consumer. Calling this method
-         * again overwrites the previous child.
+         * Sets a child action that invokes the supplied consumer.
+         * Calling this method again overwrites the previous child.
          *
          * @param name the action name; must not be {@code null} or blank
          * @param consumer the consumer to invoke; must not be {@code null}
@@ -255,6 +263,7 @@ public final class Timeout implements Action<Void> {
          * @throws NullPointerException if {@code name} or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the execution {@link Context}.
          */
         public Spec child(final String name, final ThrowingConsumer<?> consumer) {
             return child(Step.of(name, consumer));
@@ -271,6 +280,7 @@ public final class Timeout implements Action<Void> {
          * @throws NullPointerException if {@code name}, {@code kind}, or {@code consumer} is {@code null}
          * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
          * @throws IllegalStateException if this spec has already been resolved
+         * <p>The consumer receives the execution {@link Context}.
          */
         public Spec child(final String name, final String kind, final ThrowingConsumer<?> consumer) {
             return child(Step.of(name, kind, consumer));

@@ -309,8 +309,9 @@ public final class Status {
     /**
      * Maps a throwable to the corresponding terminal status.
      *
-     * <p>Catches {@link AbortedException}, {@link SkipException}, and {@link FailException}
-     * and maps them to the corresponding status. Unrecoverable errors are rethrown.
+     * <p>If the throwable is a framework wrapper, its cause is unwrapped first.
+     * Then {@link AbortedException}, {@link SkipException}, and {@link FailException}
+     * are mapped to their corresponding statuses. Unrecoverable errors are rethrown.
      * {@link InterruptedException} restores the interrupt flag.
      *
      * @param throwable the throwable to map; must not be {@code null}
@@ -319,19 +320,8 @@ public final class Status {
      */
     public static Status fromThrowable(final Throwable throwable) {
         var t = throwable;
-        if (t instanceof RuntimeException re && re.getCause() != null) {
-            var cause = re.getCause();
-            if (UnrecoverableErrors.isUnrecoverable(cause)
-                    || cause instanceof Error
-                    || cause instanceof InterruptedException) {
-                t = cause;
-            } else if (cause instanceof AbortedException e) {
-                return aborted(e.getMessage());
-            } else if (cause instanceof SkipException e) {
-                return skipped(e.getMessage());
-            } else if (cause instanceof FailException e) {
-                return failed(e.getMessage());
-            }
+        if (t instanceof nonapi.org.paramixel.FrameworkException frameworkException) {
+            t = frameworkException.getCause();
         }
         UnrecoverableErrors.rethrowIfUnrecoverable(t);
         if (t instanceof InterruptedException) {
@@ -364,11 +354,25 @@ public final class Status {
         }
         return statusName.equals(other.statusName)
                 && Objects.equals(message, other.message)
-                && Objects.equals(throwable, other.throwable);
+                && throwableClassMessageEquals(throwable, other.throwable);
+    }
+
+    private static boolean throwableClassMessageEquals(Throwable a, Throwable b) {
+        if (a == b) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.getClass().equals(b.getClass()) && Objects.equals(a.getMessage(), b.getMessage());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(statusName, message, throwable);
+        return Objects.hash(
+                statusName,
+                message,
+                throwable != null ? throwable.getClass().getName() : null,
+                throwable != null ? throwable.getMessage() : null);
     }
 }

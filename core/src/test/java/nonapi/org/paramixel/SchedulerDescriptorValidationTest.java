@@ -38,7 +38,7 @@ class SchedulerDescriptorValidationTest {
         var scheduler = new Scheduler(1);
         try {
             Action<?> leaf = Step.of("leaf", obj -> {});
-            MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
                     Listener.defaultListener(),
@@ -60,7 +60,7 @@ class SchedulerDescriptorValidationTest {
         var scheduler = new Scheduler(1);
         try {
             Action<?> leaf = Step.of("leaf", obj -> {});
-            MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
                     Listener.defaultListener(),
@@ -82,7 +82,7 @@ class SchedulerDescriptorValidationTest {
         var scheduler = new Scheduler(1);
         try {
             Action<?> leaf = Step.of("leaf", obj -> {});
-            MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
 
             assertThatThrownBy(() -> scheduler.schedule(root, Mode.RUN, null))
                     .isInstanceOf(NullPointerException.class)
@@ -98,7 +98,7 @@ class SchedulerDescriptorValidationTest {
         var scheduler = new Scheduler(1);
         try {
             Action<?> leaf = Step.of("leaf", obj -> {});
-            MutableDescriptor root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(leaf);
+            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
                     Listener.defaultListener(),

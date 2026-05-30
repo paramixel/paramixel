@@ -17,6 +17,7 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -203,9 +204,10 @@ class ConfigurationTest {
     }
 
     @Test
-    @DisplayName("defaultConfiguration(ClassLoader) returns non-null with null classloader")
+    @DisplayName("defaultConfiguration(ClassLoader) throws NullPointerException with null classloader")
     void defaultConfigurationWithNullClassloader() {
-        Configuration config = Configuration.defaultConfiguration(null);
-        assertThat(config).isNotNull();
+        assertThatThrownBy(() -> Configuration.defaultConfiguration(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("classLoader is null");
     }
 }

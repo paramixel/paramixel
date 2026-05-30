@@ -22,8 +22,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.selector.Selector;
@@ -202,16 +204,16 @@ class RunnerDiscoveryTest {
                 Configuration.MATCH_TAG_REGEX, "NONEXISTENT",
                 Configuration.FAIL_IF_NO_TESTS, "true"));
 
-        ByteArrayOutputStream err = new ByteArrayOutputStream();
-        PrintStream originalErr = System.err;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
         try {
-            System.setErr(new PrintStream(err, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
             int exitCode = Runner.builder().configuration(config).build().run();
             assertThat(exitCode).isEqualTo(1);
         } finally {
-            System.setErr(originalErr);
+            System.setOut(originalOut);
         }
-        assertThat(err.toString(StandardCharsets.UTF_8)).contains("No Paramixel tests found");
+        assertThat(out.toString(StandardCharsets.UTF_8)).contains("No Paramixel tests found");
     }
 
     @Test
@@ -222,5 +224,41 @@ class RunnerDiscoveryTest {
         int exitCode = Runner.builder().configuration(config).build().run();
 
         assertThat(exitCode).isZero();
+    }
+
+    @Test
+    @DisplayName("run() with no tests calls onRunStarted and onRunCompleted on listener")
+    void runWithNoTestsCallsListenerCallbacks() {
+        var calls = new ArrayList<String>();
+        var capturedResult = new AtomicReference<Result>();
+        var config = Configuration.of(Map.of(
+                Configuration.MATCH_CLASS_REGEX, "nonexistent.ClassName",
+                Configuration.FAIL_IF_NO_TESTS, "true"));
+
+        Listener listener = new Listener() {
+
+            @Override
+            public void onRunStarted() {
+                calls.add("onRunStarted");
+            }
+
+            @Override
+            public void onRunCompleted(final Result result) {
+                capturedResult.set(result);
+                calls.add("onRunCompleted");
+            }
+        };
+
+        int exitCode = Runner.builder()
+                .configuration(config)
+                .listener(listener)
+                .build()
+                .run();
+
+        assertThat(exitCode).isEqualTo(1);
+        assertThat(calls).containsExactly("onRunStarted", "onRunCompleted");
+        var result = capturedResult.get();
+        assertThat(result.descriptor()).isEmpty();
+        assertThat(result.status()).isEqualTo(Status.FAILED);
     }
 }

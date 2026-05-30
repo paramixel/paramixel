@@ -1,0 +1,160 @@
+---
+title: Paramixel
+description: Composable action trees for Java testing.
+slug: /
+hide_table_of_contents: true
+---
+
+import Link from '@docusaurus/Link';
+
+# Composable action trees for Java testing
+
+Paramixel is a tree-based test framework for Java 17+ that models test plans as immutable, composable `Action` hierarchies — not annotation-driven test classes. Build tests from composable action trees, run them with built-in parallelism, and integrate with Maven and Gradle.
+
+<div className="row margin-vert--lg">
+  <div className="col col--4">
+    <div className="card">
+      <div className="card__header">
+        <h3>Composable by Design</h3>
+      </div>
+      <div className="card__body">
+        <p>Tests are trees of <code>Action</code> objects, not flat annotated methods. Compose, nest, and reuse actions freely.</p>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4">
+    <div className="card">
+      <div className="card__header">
+        <h3>Built-in Parallelism</h3>
+      </div>
+      <div className="card__body">
+        <p><code>Parallel</code> actions run children concurrently with configurable parallelism limits. No external runners needed.</p>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4">
+    <div className="card">
+      <div className="card__header">
+        <h3>Instance Lifecycle</h3>
+      </div>
+      <div className="card__body">
+        <p><code>Instance</code> actions manage factory-created objects with automatic <code>AutoCloseable</code> teardown.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div className="row margin-vert--lg">
+  <div className="col col--4">
+    <div className="card">
+      <div className="card__header">
+        <h3>Annotation-Driven</h3>
+      </div>
+      <div className="card__body">
+        <p><code>@Paramixel.Id</code> methods resolve to <code>Step</code> actions via <code>AnnotationResolver</code>. Programmatic or annotated — your choice.</p>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4">
+    <div className="card">
+      <div className="card__header">
+        <h3>Maven & Gradle</h3>
+      </div>
+      <div className="card__body">
+        <p>Maven plugin for the <code>test</code> phase. Gradle <code>JavaExec</code> task for <code>paramixelTest</code>. First-class build integration.</p>
+      </div>
+    </div>
+  </div>
+  <div className="col col--4">
+    <div className="card">
+      <div className="card__header">
+        <h3>Report Generation</h3>
+      </div>
+      <div className="card__body">
+        <p>Built-in text, JSON, XML, and HTML report listeners. Format inferred from file extension.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+## Quick Start
+
+Add the dependency:
+
+```xml
+<dependency>
+    <groupId>org.paramixel</groupId>
+    <artifactId>core</artifactId>
+    <version>5.0.0</version>
+</dependency>
+```
+
+Write a test:
+
+```java
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
+
+public class MyTest {
+
+    public static void main(String[] args) {
+        Runner.defaultRunner().runAndExit(factory());
+    }
+
+    @Paramixel.Factory
+    public static Action<?> factory() {
+        return Step.of("hello", instance -> {
+            System.out.println("Hello from Paramixel!");
+        });
+    }
+}
+```
+
+Run:
+
+```bash
+./mvnw test
+```
+
+## Get Started
+
+<div className="row margin-vert--lg">
+  <div className="col col--3">
+    <Link className="button button--primary button--lg button--block" to="/getting-started/introduction">Getting Started</Link>
+  </div>
+  <div className="col col--3">
+    <Link className="button button--secondary button--lg button--block" to="/core-concepts/actions">Core Concepts</Link>
+  </div>
+  <div className="col col--3">
+    <Link className="button button--secondary button--lg button--block" to="/api/intro">API Reference</Link>
+  </div>
+  <div className="col col--3">
+    <Link className="button button--secondary button--lg button--block" to="/guides/examples">Examples</Link>
+  </div>
+</div>
+
+## Action Types
+
+| Type | Description |
+| --- | --- |
+| [Step](core-concepts/elements#step) | A single callback that passes, fails, skips, or aborts |
+| [Lifecycle](core-concepts/elements#lifecycle) | Before/body/after composition with dependent or independent body children |
+| [Sequential](core-concepts/elements#sequential) | Ordered dependent or independent children |
+| [Parallel](core-concepts/elements#parallel) | Concurrent children with a configurable parallelism limit |
+| [Instance](core-concepts/elements#instance) | Factory-created instance with automatic lifecycle and `AutoCloseable` teardown |
+| [Static](core-concepts/elements#static) | Instance-free before/body/after lifecycle |
+| [Delay](core-concepts/elements#delay) | Fixed or random duration pause |
+| [Repeat](core-concepts/elements#repeat) | Repeated execution of a single child |
+| [Timeout](core-concepts/elements#timeout) | Wall-clock deadline for a single child |
+| [AssertTrue](core-concepts/elements#asserttrue) | Asserts a boolean condition is true |
+| [AssertFalse](core-concepts/elements#assertfalse) | Asserts a boolean condition is false |
+
+## Key Concepts
+
+| Concept | Description |
+| --- | --- |
+| [Action](core-concepts/actions) | The fundamental execution unit — composable, reusable, immutable |
+| [Discovery](core-concepts/discovery) | Classpath scanning with `@Paramixel.Factory` and `Selector` filtering |
+| [Configuration](configuration/properties) | Layered config from classpath, system properties, and programmatic overrides |
+| [Reporting](integrations/reporting) | Built-in text, JSON, XML, and HTML reports |

@@ -96,11 +96,31 @@ public final class ConcreteMetadata implements Metadata {
         return runDuration;
     }
 
+    /**
+     * Returns the message associated with the current status, if any.
+     *
+     * <p>This is a point-in-time snapshot: the returned {@code Optional} reflects the
+     * message of the status at the moment this method is called. The status itself is
+     * immutable, so the message value will not change even if the metadata's status
+     * transitions to a new value.
+     *
+     * @return the message, or empty if the current status has no associated message
+     */
     @Override
     public synchronized Optional<String> message() {
         return status.message();
     }
 
+    /**
+     * Returns the throwable associated with the current status, if any.
+     *
+     * <p>This is a point-in-time snapshot: the returned {@code Optional} reflects the
+     * throwable of the status at the moment this method is called. The status itself is
+     * immutable, so the throwable value will not change even if the metadata's status
+     * transitions to a new value.
+     *
+     * @return the throwable, or empty if the current status has no associated throwable
+     */
     @Override
     public synchronized Optional<Throwable> throwable() {
         return status.throwable();
@@ -161,16 +181,5 @@ public final class ConcreteMetadata implements Metadata {
      */
     public synchronized void setMode(final Mode mode) {
         this.mode = Objects.requireNonNull(mode, "mode is null");
-    }
-
-    /**
-     * Marks this metadata as running by setting status to {@link Status#RUNNING}
-     * and recording the start time.
-     *
-     * <p>Equivalent to calling {@code setStatus(Status.RUNNING)} but provided as
-     * a convenience for the common PENDING → RUNNING transition.
-     */
-    synchronized void markRunning() {
-        setStatus(Status.RUNNING);
     }
 }

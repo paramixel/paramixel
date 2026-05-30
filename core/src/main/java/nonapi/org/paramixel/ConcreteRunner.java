@@ -17,7 +17,6 @@
 package nonapi.org.paramixel;
 
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
@@ -30,6 +29,7 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Status;
 import org.paramixel.api.action.Mode;
 import org.paramixel.api.action.Spec;
 import org.paramixel.api.exception.ConfigurationException;
@@ -45,7 +45,6 @@ public final class ConcreteRunner implements Runner {
     private final ReentrantLock lock = new ReentrantLock();
     private final SafeListener safeListener;
     private final Configuration configuration;
-    private final Map<String, String> configurationMap;
     private final int parallelism;
     private final int schedulerQueueCapacity;
 
@@ -54,14 +53,11 @@ public final class ConcreteRunner implements Runner {
      *
      * @param configuration the configuration, or {@code null} to load defaults
      * @param listener the listener; must not be {@code null}
-     * @param explicitListener whether the listener was explicitly supplied
      */
-    public ConcreteRunner(final Configuration configuration, final Listener listener, final boolean explicitListener) {
+    public ConcreteRunner(final Configuration configuration, final Listener listener) {
         Objects.requireNonNull(listener, "listener is null");
         this.safeListener = listener instanceof SafeListener safe ? safe : new SafeListener(listener);
         this.configuration = configuration != null ? configuration : Configuration.defaultConfiguration();
-        this.configurationMap =
-                this.configuration instanceof ConcreteConfiguration dc ? dc.toMap() : Map.<String, String>of();
         this.parallelism = resolveParallelism(this.configuration);
         this.schedulerQueueCapacity = resolveSchedulerQueueCapacity(this.configuration);
     }
@@ -90,7 +86,7 @@ public final class ConcreteRunner implements Runner {
         MutableDescriptor root = null;
         Scheduler scheduler = null;
         try {
-            root = new DescriptorBuilder(configuration).discover(action);
+            root = new DescriptorBuilder().discover(action);
             safeListener.onDiscoveryCompleted(root);
             scheduler = new Scheduler(parallelism, schedulerQueueCapacity);
             var topLevelParallelThrottle = new TopLevelParallelThrottle(parallelism);
@@ -105,7 +101,17 @@ public final class ConcreteRunner implements Runner {
             if (UnrecoverableErrors.isUnrecoverable(t) && t instanceof Error error) {
                 throw error;
             }
-            var result = root != null ? new ConcreteResult(root, configuration) : new ConcreteResult(configuration);
+            final String message = t.getMessage() != null ? t.getMessage() : "Runner failed";
+            if (root != null) {
+                var status = root.metadata().status();
+                if (status.isPending()) {
+                    root.setStatus(Status.RUNNING);
+                }
+                root.setStatus(Status.failed(message, t));
+            }
+            final var result = root != null
+                    ? new ConcreteResult(root, configuration)
+                    : new ConcreteResult(configuration, Status.failed(message, t));
             safeListener.onRunCompleted(result);
             return result;
         } finally {
@@ -182,25 +188,29 @@ public final class ConcreteRunner implements Runner {
 
     @Override
     public void runAndExit(final Spec<?> spec) {
+        final int exitCode;
         lock.lock();
         try {
             Objects.requireNonNull(spec, "spec is null");
-            System.exit(exitCode(runInternal(spec)));
+            exitCode = exitCode(runInternal(spec));
         } finally {
             lock.unlock();
         }
+        System.exit(exitCode);
     }
 
     @Override
     public void runAndExit(final Selector selector) {
+        final int exitCode;
         lock.lock();
         try {
             Objects.requireNonNull(selector, "selector is null");
             var optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
-            System.exit(optionalAction.map(this::runAndReturnExitCodeInternal).orElseGet(this::noTestsExitCode));
+            exitCode = optionalAction.map(this::runAndReturnExitCodeInternal).orElseGet(this::noTestsExitCode);
         } finally {
             lock.unlock();
         }
+        System.exit(exitCode);
     }
 
     @Override
@@ -209,12 +219,10 @@ public final class ConcreteRunner implements Runner {
         try {
             var optionalAction = new ClasspathResolver(configuration, buildSelector(configuration)).resolveActions();
             if (optionalAction.isEmpty()) {
-                if (noTestsExitCode() == 1) {
-                    System.err.println(NO_TESTS_FOUND);
-                    return 1;
-                }
-                System.out.println(NO_TESTS_FOUND);
-                return 0;
+                safeListener.onRunStarted();
+                var result = new ConcreteResult(configuration);
+                safeListener.onRunCompleted(result);
+                return exitCode(result);
             }
             return exitCode(runInternal(optionalAction.get()));
         } finally {
@@ -235,23 +243,31 @@ public final class ConcreteRunner implements Runner {
             return Selector.all();
         }
         var selectors = new ArrayList<Selector>();
-        try {
-            pkg.filter(s -> !s.isBlank()).ifPresent(s -> selectors.add(Selector.packageRegex(s)));
-        } catch (RuntimeException e) {
-            throw new ConfigurationException(
-                    "Invalid regex for '" + Configuration.MATCH_PACKAGE_REGEX + "': " + e.getMessage(), e);
+        var pkgRegex = pkg.filter(s -> !s.isBlank()).orElse(null);
+        if (pkgRegex != null) {
+            try {
+                selectors.add(Selector.packageRegex(pkgRegex));
+            } catch (Exception e) {
+                throw new ConfigurationException(
+                        "Invalid package regex pattern '" + pkgRegex + "': " + e.getMessage(), e);
+            }
         }
-        try {
-            cls.filter(s -> !s.isBlank()).ifPresent(s -> selectors.add(Selector.classRegex(s)));
-        } catch (RuntimeException e) {
-            throw new ConfigurationException(
-                    "Invalid regex for '" + Configuration.MATCH_CLASS_REGEX + "': " + e.getMessage(), e);
+        var clsRegex = cls.filter(s -> !s.isBlank()).orElse(null);
+        if (clsRegex != null) {
+            try {
+                selectors.add(Selector.classRegex(clsRegex));
+            } catch (Exception e) {
+                throw new ConfigurationException(
+                        "Invalid class regex pattern '" + clsRegex + "': " + e.getMessage(), e);
+            }
         }
-        try {
-            tag.filter(s -> !s.isBlank()).ifPresent(s -> selectors.add(Selector.tagRegex(s)));
-        } catch (RuntimeException e) {
-            throw new ConfigurationException(
-                    "Invalid regex for '" + Configuration.MATCH_TAG_REGEX + "': " + e.getMessage(), e);
+        var tagRegex = tag.filter(s -> !s.isBlank()).orElse(null);
+        if (tagRegex != null) {
+            try {
+                selectors.add(Selector.tagRegex(tagRegex));
+            } catch (Exception e) {
+                throw new ConfigurationException("Invalid tag regex pattern '" + tagRegex + "': " + e.getMessage(), e);
+            }
         }
         return selectors.size() == 1 ? selectors.get(0) : Selector.and(selectors);
     }
@@ -268,7 +284,9 @@ public final class ConcreteRunner implements Runner {
             return 0;
         }
         if (status.isSkipped()) {
-            return 0;
+            final var failureOnSkip =
+                    configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(false);
+            return failureOnSkip ? 1 : 0;
         }
         if (status.isAborted()) {
             final var failureOnAbort =
@@ -276,14 +294,5 @@ public final class ConcreteRunner implements Runner {
             return failureOnAbort ? 1 : 0;
         }
         return 1;
-    }
-
-    /**
-     * Returns the captured configuration as a map for compatibility with existing diagnostics.
-     *
-     * @return immutable configuration map
-     */
-    Map<String, String> configurationMap() {
-        return configurationMap;
     }
 }

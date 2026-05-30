@@ -24,8 +24,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +36,7 @@ import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
+import nonapi.org.paramixel.support.Throwables;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -253,7 +256,7 @@ class SchedulerQueueBoundsTest {
                     .parallelism(1)
                     .child(Step.of("leaf", ctx -> leafRuns.incrementAndGet()))
                     .resolve();
-            var root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(action);
+            var root = new DescriptorBuilder().discover(action);
             var context = newContext(scheduler, root);
 
             scheduler.schedule(root, Mode.RUN, context).join();
@@ -272,7 +275,7 @@ class SchedulerQueueBoundsTest {
         var scheduler = new Scheduler(1);
         try {
             var action = Step.of("success", ctx -> {});
-            var root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(action);
+            var root = new DescriptorBuilder().discover(action);
             var context = newContext(scheduler);
 
             var callback = new Scheduler.ExecutionCallback() {
@@ -321,7 +324,7 @@ class SchedulerQueueBoundsTest {
                     throw expected;
                 }
             };
-            var root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(action);
+            var root = new DescriptorBuilder().discover(action);
             var context = newContext(scheduler);
 
             var callback = new Scheduler.ExecutionCallback() {
@@ -372,7 +375,7 @@ class SchedulerQueueBoundsTest {
                     context.setStatus(Status.failed("status-based failure"));
                 }
             };
-            var root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(action);
+            var root = new DescriptorBuilder().discover(action);
             var context = newContext(scheduler, root);
             var callback = new Scheduler.ExecutionCallback() {
                 @Override
@@ -482,7 +485,7 @@ class SchedulerQueueBoundsTest {
                     throw new RuntimeException(new IOException("disk full"));
                 }
             };
-            var root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(action);
+            var root = new DescriptorBuilder().discover(action);
             var context = newContext(scheduler);
 
             var future = scheduler.schedule(root, Mode.RUN, context);
@@ -496,9 +499,97 @@ class SchedulerQueueBoundsTest {
         }
     }
 
+    @Test
+    @DisplayName("unwrap recursively unwraps nested CompletionException")
+    void unwrapRecursivelyUnwrapsNestedCompletionException() throws Exception {
+        var scheduler = new Scheduler(1);
+        try {
+            var innermost = new IOException("disk full");
+            var middle = new CompletionException(innermost);
+            var outer = new CompletionException(middle);
+
+            var result = Throwables.unwrap(outer);
+
+            assertThat(result).isSameAs(innermost);
+        } finally {
+            scheduler.close();
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    @DisplayName("depthQueuePermit semaphore never exceeds queueCapacity")
+    void depthQueuePermitSemaphoreNeverExceedsQueueCapacity() throws Exception {
+        var queueCapacity = 3;
+        var scheduler = new Scheduler(1, queueCapacity);
+        try {
+            var context = newContext(scheduler);
+            var root = contextRoot(context);
+
+            var depthQueuePermitsField = Scheduler.class.getDeclaredField("depthQueuePermits");
+            depthQueuePermitsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            var depthQueuePermits = (ConcurrentHashMap<Integer, Semaphore>) depthQueuePermitsField.get(scheduler);
+
+            for (var i = 0; i < 10; i++) {
+                var task = newChildDescriptor(root, Step.of("task-" + i, obj -> {}));
+                scheduler.schedule(task, Mode.RUN, context).join();
+                var semaphore = depthQueuePermits.get(1);
+                if (semaphore != null) {
+                    assertThat(semaphore.availablePermits()).isLessThanOrEqualTo(queueCapacity);
+                }
+            }
+        } finally {
+            scheduler.close();
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    @DisplayName("schedule while closing returns IllegalStateException not RejectedExecutionException")
+    void scheduleWhileClosingReturnsIllegalStateNotRejectedExecution() throws Exception {
+        var scheduler = new Scheduler(1, 16);
+        try {
+            var context = newContext(scheduler);
+            var root = contextRoot(context);
+
+            var started = new CountDownLatch(1);
+            var scheduleResult = new AtomicReference<Throwable>();
+            var scheduleDone = new CountDownLatch(1);
+
+            var scheduleThread = new Thread(() -> {
+                started.countDown();
+                var task = newChildDescriptor(root, Step.of("task", obj -> {
+                    return;
+                }));
+                try {
+                    scheduler.schedule(task, Mode.RUN, context).join();
+                } catch (Throwable t) {
+                    scheduleResult.set(t);
+                } finally {
+                    scheduleDone.countDown();
+                }
+            });
+            scheduleThread.start();
+
+            started.await();
+            scheduler.close();
+
+            scheduleDone.await(10, TimeUnit.SECONDS);
+
+            assertThat(scheduleResult.get())
+                    .isNotNull()
+                    .isInstanceOf(CompletionException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Scheduler is closing");
+        } finally {
+            scheduler.close();
+        }
+    }
+
     private static ConcreteContext newContext(final Scheduler scheduler) {
         var rootAction = Step.of("root", obj -> {});
-        var root = new DescriptorBuilder(Configuration.defaultConfiguration()).discover(rootAction);
+        var root = new DescriptorBuilder().discover(rootAction);
         return newContext(scheduler, root);
     }
 

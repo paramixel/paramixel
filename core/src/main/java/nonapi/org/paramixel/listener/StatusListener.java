@@ -16,7 +16,9 @@
 
 package nonapi.org.paramixel.listener;
 
+import java.io.BufferedReader;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.time.Duration;
 import java.util.EnumSet;
@@ -33,7 +35,8 @@ import org.paramixel.api.Listener;
  */
 public class StatusListener implements Listener {
 
-    private static final Object OUTPUT_LOCK = new Object();
+    private static final String LINE_SEPARATOR = System.lineSeparator();
+
     private volatile boolean ansiEnabled;
     private volatile EnumSet<ExcludeTarget> excludes = EnumSet.noneOf(ExcludeTarget.class);
 
@@ -58,10 +61,13 @@ public class StatusListener implements Listener {
     public void onBeforeExecution(final Descriptor descriptor) {
         if (excludes.contains(ExcludeTarget.STATUS_HEADER)) return;
         Objects.requireNonNull(descriptor, "descriptor is null");
-        var output = prefix() + Listeners.formatIdPath(descriptor) + " | " + displayName(descriptor);
-        synchronized (OUTPUT_LOCK) {
-            System.out.println(output);
-        }
+        var sb = new StringBuilder();
+        sb.append(prefix())
+                .append(Listeners.formatIdPath(descriptor))
+                .append(" | ")
+                .append(displayName(descriptor))
+                .append(LINE_SEPARATOR);
+        System.out.print(sb.toString());
     }
 
     @Override
@@ -69,31 +75,54 @@ public class StatusListener implements Listener {
         Objects.requireNonNull(descriptor, "descriptor is null");
 
         if (!excludes.contains(ExcludeTarget.STATUS_FOOTER)) {
+            var sb = new StringBuilder();
             var statusText = ansiEnabled
                     ? Listeners.formatAnsiStatus(descriptor.metadata().status())
                     : Listeners.formatStatus(descriptor.metadata().status());
-            var output = prefix()
-                    + statusText
-                    + " | "
-                    + Listeners.formatIdPath(descriptor)
-                    + " | "
-                    + displayName(descriptor)
-                    + " "
-                    + formatTiming(descriptor.metadata().runDuration());
-            synchronized (OUTPUT_LOCK) {
-                System.out.println(output);
+            sb.append(prefix())
+                    .append(statusText)
+                    .append(" | ")
+                    .append(Listeners.formatIdPath(descriptor))
+                    .append(" | ")
+                    .append(displayName(descriptor))
+                    .append(' ')
+                    .append(formatTiming(descriptor.metadata().runDuration()));
+            var throwable = descriptor.metadata().throwable().orElse(null);
+            if (throwable != null) {
+                sb.append(" | ")
+                        .append(throwable.getClass().getName())
+                        .append(": ")
+                        .append(throwable.getMessage());
+                var sw = new StringWriter();
+                throwable.printStackTrace(new PrintWriter(sw));
+                try (var br = new BufferedReader(new StringReader(sw.toString()))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        sb.append(prefix()).append(line).append(LINE_SEPARATOR);
+                    }
+                } catch (java.io.IOException e) {
+                    throw new AssertionError(e);
+                }
+            } else {
+                sb.append(LINE_SEPARATOR);
             }
+            System.out.print(sb.toString());
+        } else {
+            descriptor.metadata().throwable().ifPresent(throwable -> {
+                var sb = new StringBuilder();
+                var sw = new StringWriter();
+                throwable.printStackTrace(new PrintWriter(sw));
+                try (var br = new BufferedReader(new StringReader(sw.toString()))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        sb.append(prefix()).append(line).append(LINE_SEPARATOR);
+                    }
+                } catch (java.io.IOException e) {
+                    throw new AssertionError(e);
+                }
+                System.out.print(sb.toString());
+            });
         }
-
-        descriptor.metadata().throwable().ifPresent(throwable -> {
-            var sw = new StringWriter();
-            throwable.printStackTrace(new PrintWriter(sw));
-            synchronized (OUTPUT_LOCK) {
-                System.err.println(prefix() + "EXCEPTION | " + Listeners.formatIdPath(descriptor) + " | "
-                        + displayName(descriptor));
-                System.err.print(sw);
-            }
-        });
     }
 
     private String prefix() {

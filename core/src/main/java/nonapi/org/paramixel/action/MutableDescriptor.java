@@ -142,6 +142,14 @@ public interface MutableDescriptor extends Descriptor {
     void completeFutureExceptionally(Throwable throwable);
 
     /**
+     * Interrupts the thread executing this descriptor's action, if one is recorded.
+     *
+     * <p>Called by the scheduler's timeout handler after the grace period expires.
+     * If no thread is recorded, this method is a no-op.
+     */
+    void interruptExecutingThread();
+
+    /**
      * Returns the descriptor depth from the root.
      *
      * <p>Root descriptors have depth {@code 0}. Direct children of root have depth {@code 1}, and

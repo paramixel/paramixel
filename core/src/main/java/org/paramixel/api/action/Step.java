@@ -17,12 +17,17 @@
 package org.paramixel.api.action;
 
 import java.util.Objects;
+import nonapi.org.paramixel.FrameworkException;
 import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
 import org.paramixel.api.ThrowingConsumer;
 
 /**
  * Leaf action that invokes a user-supplied consumer during run-mode execution.
+ *
+ * <p>When this step is wrapped in an {@link Instance} action, the consumer receives
+ * the fixture instance of type {@code T}. When executed without a containing instance,
+ * the consumer receives the execution {@link Context}.
  *
  * @param <T> the type accepted by the consumer
  */
@@ -122,7 +127,7 @@ public final class Step<T> implements Action<T> {
                 context.setStatus(Status.PASSED);
             }
         } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(t));
+            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
         }
         listener.onAfterExecution(descriptor);
     }

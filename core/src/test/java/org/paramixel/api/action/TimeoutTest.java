@@ -61,6 +61,34 @@ class TimeoutTest {
     }
 
     @Test
+    @DisplayName("child thread is interrupted on timeout")
+    void childThreadIsInterruptedOnTimeout() throws Exception {
+        var interrupted = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var latch = new java.util.concurrent.CountDownLatch(1);
+
+        var action = Timeout.of("interrupt-child")
+                .timeout(Duration.ofMillis(50))
+                .child("sleep-step", ctx -> {
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        interrupted.set(true);
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        latch.countDown();
+                    }
+                })
+                .resolve();
+
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
+
+        assertThat(latch.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        assertThat(interrupted.get()).isTrue();
+        assertThat(root.metadata().status().isFailed()).isTrue();
+    }
+
+    @Test
     @DisplayName("child fails on its own within timeout — child's FAILED propagates")
     void childFailsWithinTimeout() {
         var action = Timeout.of("failing-child")
@@ -74,6 +102,26 @@ class TimeoutTest {
 
         assertThat(root.metadata().status().isFailed()).isTrue();
         assertThat(root.children().get(0).metadata().status().isFailed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("child RuntimeException preserves instance and stack trace")
+    void childRuntimeExceptionPreservesInstance() {
+        var exception = new RuntimeException("intentional failure");
+        var action = Timeout.of("failing-child")
+                .timeout(Duration.ofSeconds(5))
+                .child("fail-step", ctx -> {
+                    throw exception;
+                })
+                .resolve();
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
+
+        assertThat(root.metadata().status().isFailed()).isTrue();
+        var childStatus = root.children().get(0).metadata().status();
+        assertThat(childStatus.isFailed()).isTrue();
+        assertThat(childStatus.throwable()).isPresent();
+        assertThat(childStatus.throwable().get()).isSameAs(exception);
     }
 
     @Test

@@ -186,9 +186,8 @@ class AnnotationResolverTest {
 
         assertThat(descriptor.metadata().status().isFailed()).isTrue();
         assertThat(descriptor.metadata().throwable().orElseThrow())
-                .isInstanceOf(RuntimeException.class)
-                .hasCauseInstanceOf(Exception.class)
-                .hasRootCauseMessage("checked exception");
+                .isInstanceOf(Exception.class)
+                .hasMessage("checked exception");
     }
 
     private static class CacheClearFixture {
@@ -263,9 +262,8 @@ class AnnotationResolverTest {
 
         assertThat(descriptor.metadata().status().isFailed()).isTrue();
         assertThat(descriptor.metadata().throwable().orElseThrow())
-                .isInstanceOf(RuntimeException.class)
-                .hasCauseInstanceOf(Exception.class)
-                .hasRootCauseMessage("static checked exception");
+                .isInstanceOf(Exception.class)
+                .hasMessage("static checked exception");
     }
 
     static class StaticCacheFixture {

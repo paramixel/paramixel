@@ -17,10 +17,12 @@
 package nonapi.org.paramixel;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.WeakHashMap;
 import nonapi.org.paramixel.support.ResourceLoader;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.exception.ConfigurationException;
@@ -30,14 +32,18 @@ import org.paramixel.api.exception.ConfigurationException;
  * and built-in defaults.
  *
  * <p>Internal sorting uses {@link TreeMap} which is never exposed to callers.
+ *
+ * <p><strong>Security Note:</strong> This factory copies all JVM system properties into the returned
+ * configuration. This includes potentially sensitive properties such as {@code java.home}, {@code user.name},
+ * and {@code user.password}. If this is a concern, use {@link #classpathConfiguration()} or access system
+ * properties directly via {@link System#getProperty(String)} instead.
  */
 public final class ConfigurationFactory {
 
     private static final int DEFAULT_SCHEDULER_QUEUE_CAPACITY = 1024;
 
-    private static final ClassLoader NULL_CLASSLOADER_KEY = new ClassLoader() {};
-
-    private static final ConcurrentHashMap<ClassLoader, Configuration> CLASSLOADER_CACHE = new ConcurrentHashMap<>();
+    private static final Map<ClassLoader, Configuration> CLASSLOADER_CACHE =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     private ConfigurationFactory() {
         // Intentionally empty
@@ -55,14 +61,14 @@ public final class ConfigurationFactory {
 
     /**
      * Creates a configuration containing only classpath properties from
-     * {@value Configuration#CONFIGURATION_FILE_NAME} using the default classloader strategy.
+     * {@value Configuration#CONFIGURATION_FILE_NAME} using the defining ClassLoader.
      *
      * @return a configuration containing classpath properties; empty when the resource is absent
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Configuration classpathConfiguration() {
         var map = new TreeMap<String, String>();
-        loadClasspathProperties(map, null);
+        loadClasspathProperties(map, ResourceLoader.class.getClassLoader());
         return new ConcreteConfiguration(map);
     }
 
@@ -70,11 +76,13 @@ public final class ConfigurationFactory {
      * Creates a configuration containing only classpath properties from
      * {@value Configuration#CONFIGURATION_FILE_NAME} using the supplied class loader.
      *
-     * @param classLoader the class loader to use, or {@code null} for the default fallback strategy
+     * @param classLoader the class loader to use; must not be {@code null}
      * @return a configuration containing classpath properties; empty when the resource is absent
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws NullPointerException if {@code classLoader} is {@code null}
      */
     public static Configuration classpathConfiguration(final ClassLoader classLoader) {
+        Objects.requireNonNull(classLoader, "classLoader is null");
         var map = new TreeMap<String, String>();
         loadClasspathProperties(map, classLoader);
         return new ConcreteConfiguration(map);
@@ -94,26 +102,37 @@ public final class ConfigurationFactory {
     /**
      * Creates the default configuration for a Paramixel run.
      *
-     * <p>Built from classpath properties, overlaid with JVM system properties,
-     * and supplemented with framework defaults.
+     * <p>Built from classpath properties (loaded using the defining ClassLoader),
+     * overlaid with JVM system properties, and supplemented with framework defaults.
      *
      * @return the default configuration
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Configuration defaultConfiguration() {
-        return defaultConfiguration(null);
+        var cached = CLASSLOADER_CACHE.get(ResourceLoader.class.getClassLoader());
+        if (cached != null) {
+            return cached;
+        }
+        var map = new TreeMap<String, String>();
+        loadClasspathProperties(map, ResourceLoader.class.getClassLoader());
+        map.putAll(systemPropertiesRaw());
+        configureDefaults(map);
+        var configuration = new ConcreteConfiguration(Map.copyOf(map));
+        CLASSLOADER_CACHE.putIfAbsent(ResourceLoader.class.getClassLoader(), configuration);
+        return CLASSLOADER_CACHE.get(ResourceLoader.class.getClassLoader());
     }
 
     /**
      * Creates the default configuration using the supplied class loader first for classpath properties.
      *
-     * @param classLoader the class loader to use for classpath lookup, or {@code null}
+     * @param classLoader the class loader to use for classpath lookup; must not be {@code null}
      * @return the default configuration
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
+     * @throws NullPointerException if {@code classLoader} is {@code null}
      */
     public static Configuration defaultConfiguration(final ClassLoader classLoader) {
-        var cacheKey = classLoader != null ? classLoader : NULL_CLASSLOADER_KEY;
-        var cached = CLASSLOADER_CACHE.get(cacheKey);
+        Objects.requireNonNull(classLoader, "classLoader is null");
+        var cached = CLASSLOADER_CACHE.get(classLoader);
         if (cached != null) {
             return cached;
         }
@@ -122,8 +141,8 @@ public final class ConfigurationFactory {
         map.putAll(systemPropertiesRaw());
         configureDefaults(map);
         var configuration = new ConcreteConfiguration(Map.copyOf(map));
-        CLASSLOADER_CACHE.putIfAbsent(cacheKey, configuration);
-        return CLASSLOADER_CACHE.get(cacheKey);
+        CLASSLOADER_CACHE.putIfAbsent(classLoader, configuration);
+        return CLASSLOADER_CACHE.get(classLoader);
     }
 
     private static void configureDefaults(final TreeMap<String, String> map) {
@@ -134,6 +153,14 @@ public final class ConfigurationFactory {
         map.putIfAbsent(Configuration.FAILURE_ON_ABORT, "true");
     }
 
+    /**
+     * Copies all JVM system properties into a TreeMap.
+     *
+     * <p><strong>Warning:</strong> This includes all system properties, some of which may be sensitive.
+     * Access system properties directly via {@link System#getProperty(String)} if you only need specific values.
+     *
+     * @return a map containing all system properties
+     */
     private static TreeMap<String, String> systemPropertiesRaw() {
         var map = new TreeMap<String, String>();
         System.getProperties().forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
@@ -151,8 +178,10 @@ public final class ConfigurationFactory {
         try (inputStream) {
             properties.load(inputStream);
         } catch (IOException e) {
-            throw new ConfigurationException("failed to load default properties resource: "
-                    + Configuration.CONFIGURATION_FILE_NAME + " (" + e.getMessage() + ")");
+            throw new ConfigurationException(
+                    "failed to load default properties resource: " + Configuration.CONFIGURATION_FILE_NAME + " ("
+                            + e.getMessage() + ")",
+                    e);
         }
         properties.forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
     }

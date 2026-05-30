@@ -93,8 +93,8 @@ class StatusListenerExcludesTest {
     }
 
     @Test
-    @DisplayName("suppresses both before and after lines when STATUS excluded")
-    void suppressesBeforeAndAfterWhenStatusExcluded() {
+    @DisplayName("suppresses status lines but prints exception when STATUS excluded")
+    void suppressesStatusLinesButPrintsExceptionWhenStatusExcluded() {
         StatusListener listener = new StatusListener();
         Action<?> action = Step.of("test-action", context -> {
             throw new RuntimeException("test error");
@@ -114,35 +114,36 @@ class StatusListenerExcludesTest {
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result).doesNotContain("PASSED");
+        assertThat(result).doesNotContain("FAILED");
         assertThat(result).doesNotContain("test-action");
+        assertThat(result).contains(RuntimeException.class.getName() + ": test error");
     }
 
     @Test
-    @DisplayName("still prints exception to stderr when STATUS excluded")
-    void exceptionStillPrintedToStderrWhenStatusExcluded() {
+    @DisplayName("prints stack trace to stdout when STATUS_FOOTER excluded")
+    void printsStackTraceToStdoutWhenStatusFooterExcluded() {
         StatusListener listener = new StatusListener();
         Action<?> action = Step.of("error-action", context -> {
             throw new RuntimeException("expected error");
         });
         Runner runner = Runner.builder()
-                .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status")))
+                .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.footer")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream outputErr = new ByteArrayOutputStream();
-        PrintStream originalErr = System.err;
+        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         try {
-            System.setErr(new PrintStream(outputErr, true, StandardCharsets.UTF_8));
+            System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
             runner.run(action);
         } finally {
-            System.setErr(originalErr);
             System.setOut(originalOut);
         }
 
-        String errResult = outputErr.toString(StandardCharsets.UTF_8);
-        assertThat(errResult).contains("EXCEPTION");
-        assertThat(errResult).contains("error-action");
+        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        assertThat(outResult).contains("error-action");
+        assertThat(outResult).contains(RuntimeException.class.getName() + ": expected error");
     }
 
     @Test

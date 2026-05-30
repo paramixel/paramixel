@@ -19,11 +19,11 @@ package nonapi.org.paramixel.action;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import nonapi.org.paramixel.ExecutionRequest;
 import nonapi.org.paramixel.InstanceHolder;
 import nonapi.org.paramixel.Scheduler;
 import nonapi.org.paramixel.TopLevelParallelThrottle;
+import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
@@ -158,6 +158,12 @@ public final class ConcreteContext implements Context {
      * Schedules a direct child descriptor synchronously, handling unrecoverable errors
      * and interruption.
      *
+     * <p>Any non-{@link RuntimeException} cause is wrapped in {@code RuntimeException} before
+     * being thrown. This integrates with {@link nonapi.org.paramixel.FrameworkException#wrap}
+     * at the API boundary, which peels exactly one {@code RuntimeException} layer from the
+     * chain produced here, preserving the original semantic cause for {@link Status#fromThrowable}
+     * classification.
+     *
      * @param child the child descriptor to run; must not be {@code null}
      * @param mode the execution mode for the child; must not be {@code null}
      * @return the executed child descriptor
@@ -166,7 +172,7 @@ public final class ConcreteContext implements Context {
         try {
             return scheduleSync(ExecutionRequest.of(child, mode));
         } catch (Throwable t) {
-            var cause = unwrap(t);
+            var cause = Throwables.unwrap(t);
             UnrecoverableErrors.rethrowIfUnrecoverable(cause);
             if (cause instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -187,21 +193,6 @@ public final class ConcreteContext implements Context {
             runChild(child, mode);
         }
         descriptor.after().ifPresent(a -> runChild(a, mode));
-    }
-
-    private static Throwable unwrap(final Throwable throwable) {
-        if (throwable instanceof CompletionException && throwable.getCause() != null) {
-            return throwable.getCause();
-        }
-        if (throwable instanceof RuntimeException rt && rt.getCause() != null) {
-            var cause = rt.getCause();
-            if (UnrecoverableErrors.isUnrecoverable(cause)
-                    || cause instanceof Error
-                    || cause instanceof InterruptedException) {
-                return cause;
-            }
-        }
-        return throwable;
     }
 
     /**
@@ -266,17 +257,5 @@ public final class ConcreteContext implements Context {
             throw new IllegalStateException("No top-level parallel throttle configured");
         }
         topLevelParallelThrottle.release();
-    }
-
-    /**
-     * Returns the current number of available root-parallel permits.
-     *
-     * @return the available permit count, or {@code 0} when no throttle is configured
-     */
-    public int availableTopLevelParallelPermits() {
-        if (topLevelParallelThrottle == null) {
-            return 0;
-        }
-        return topLevelParallelThrottle.availablePermits();
     }
 }

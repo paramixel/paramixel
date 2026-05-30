@@ -1,0 +1,90 @@
+{
+  "docsSidebar": [
+    "intro",
+    {
+      "type": "category",
+      "label": "Getting Started",
+      "collapsed": false,
+      "items": [
+        "getting-started/introduction",
+        "getting-started/installation",
+        "getting-started/first-test",
+        "getting-started/project-setup"
+      ]
+    },
+    {
+      "type": "category",
+      "label": "Core Concepts",
+      "collapsed": false,
+      "items": [
+        "core-concepts/actions",
+        "core-concepts/elements",
+        "core-concepts/discovery",
+        "core-concepts/assertions",
+        "core-concepts/data-driven-testing"
+      ]
+    },
+    {
+      "type": "category",
+      "label": "Configuration",
+      "collapsed": true,
+      "items": [
+        "configuration/properties",
+        "configuration/system-properties",
+        "configuration/profiles"
+      ]
+    },
+    {
+      "type": "category",
+      "label": "Integrations",
+      "collapsed": true,
+      "items": [
+        "integrations/maven-plugin",
+        "integrations/gradle",
+        "integrations/cicd",
+        "integrations/reporting"
+      ]
+    },
+    {
+      "type": "category",
+      "label": "Guides",
+      "collapsed": true,
+      "items": [
+        "guides/quick-reference",
+        "guides/parallel-execution",
+        "guides/custom-actions",
+        "guides/best-practices",
+        "guides/troubleshooting",
+        "guides/examples",
+        "guides/migration-5-to-5.1",
+        "guides/migration-4-to-5",
+        "guides/migration-3-to-5",
+        "guides/migration-2-to-5",
+        "guides/migration-1-to-5"
+      ]
+    },
+    {
+      "type": "category",
+      "label": "API Reference",
+      "collapsed": true,
+      "items": [
+        "api/intro",
+        "api/status",
+        "api/result",
+        "api/action",
+        "api/spec",
+        "api/descriptor-and-metadata",
+        "api/runner",
+        "api/configuration",
+        "api/listener",
+        "api/selector",
+        "api/execution-context",
+        "api/annotation-resolver",
+        "api/retry-and-cleanup",
+        "api/exception-reference",
+        "api/javadocs"
+      ]
+    },
+    "release-notes"
+  ]
+}

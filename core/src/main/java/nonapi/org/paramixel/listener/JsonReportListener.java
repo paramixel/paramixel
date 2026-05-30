@@ -55,7 +55,7 @@ public final class JsonReportListener extends AbstractReportFileListener {
         writer.write("\",\"name\":\"");
         writer.write(escape(descriptor.metadata().name()));
         writer.write("\",\"status\":\"");
-        writer.write(descriptor.metadata().status().name());
+        writer.write(escape(descriptor.metadata().status().name()));
         writer.write("\",\"children\":[");
         var first = true;
         if (descriptor.before().isPresent()) {
@@ -110,7 +110,8 @@ public final class JsonReportListener extends AbstractReportFileListener {
     private static int firstEscapedCharacter(final String value) {
         for (var i = 0; i < value.length(); i++) {
             final var c = value.charAt(i);
-            if (c == '\\' || c == '"' || c == '\n' || c == '\r' || c == '\t' || c == '\b' || c == '\f' || c < ' ') {
+            // c < ' ' covers all control characters: \b, \t, \n, \f, \r (0x00-0x1F)
+            if (c == '\\' || c == '"' || c < ' ') {
                 return i;
             }
         }

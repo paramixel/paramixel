@@ -321,7 +321,6 @@ public final class AnnotationResolver<T> {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static <T> ThrowingConsumer<T> reflectingConsumer(final Method method) {
         return instance -> {
             try {

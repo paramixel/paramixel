@@ -43,11 +43,14 @@ public final class Retry {
 
     private static final Predicate<Throwable> DEFAULT_RETRY_ON = t -> !(t instanceof Error);
 
+    private static final int STATE_INITIAL = 0;
+    private static final int STATE_RUNNING = 1;
+    private static final int STATE_COMPLETED = 2;
+
     private final Policy backoffPolicy;
     private Predicate<Throwable> retryOn;
     private final List<BiConsumer<Integer, Throwable>> onRetryCallbacks;
-    private boolean hasRun;
-    private boolean everRun;
+    private int state;
 
     /**
      * Creates a retry sequence with the supplied backoff policy.
@@ -84,7 +87,7 @@ public final class Retry {
      */
     public Retry retryOn(final Predicate<Throwable> predicate) {
         Objects.requireNonNull(predicate, "predicate is null");
-        if (everRun) {
+        if (state != STATE_INITIAL) {
             throw new IllegalStateException("retryOn is called after run");
         }
         this.retryOn = predicate;
@@ -105,7 +108,7 @@ public final class Retry {
      */
     public Retry onRetry(final BiConsumer<Integer, Throwable> callback) {
         Objects.requireNonNull(callback, "callback is null");
-        if (hasRun) {
+        if (state != STATE_INITIAL) {
             throw new IllegalStateException("onRetry is called after run");
         }
         onRetryCallbacks.add(callback);
@@ -131,12 +134,10 @@ public final class Retry {
      */
     public Result run(final ThrowingRunnable throwableRunnable) {
         Objects.requireNonNull(throwableRunnable, "throwableRunnable is null");
-        if (hasRun) {
+        if (state != STATE_INITIAL) {
             throw new IllegalStateException("Retry has already run");
         }
-
-        hasRun = true;
-        everRun = true;
+        state = STATE_RUNNING;
 
         List<BiConsumer<Integer, Throwable>> callbacks = List.copyOf(onRetryCallbacks);
         Duration maximumDuration = maximumDurationOrZero();
@@ -149,12 +150,14 @@ public final class Retry {
 
             try {
                 throwableRunnable.run();
+                state = STATE_COMPLETED;
                 return new Result(maximumDuration, attempt, elapsedDuration(startNanos), true, List.of());
             } catch (Throwable e) {
                 UnrecoverableErrors.rethrowIfUnrecoverable(e);
                 exceptions.add(e);
 
                 if (!retryOn.test(e)) {
+                    state = STATE_COMPLETED;
                     return new Result(
                             maximumDuration, attempt, elapsedDuration(startNanos), false, List.copyOf(exceptions));
                 }
@@ -163,6 +166,7 @@ public final class Retry {
                 Duration remaining = maximumDuration.minus(elapsed);
 
                 if (remaining.isZero() || remaining.isNegative()) {
+                    state = STATE_COMPLETED;
                     return new Result(maximumDuration, attempt, elapsed, false, List.copyOf(exceptions));
                 }
 
@@ -181,6 +185,7 @@ public final class Retry {
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         exceptions.add(ie);
+                        state = STATE_COMPLETED;
                         return new Result(
                                 maximumDuration, attempt, elapsedDuration(startNanos), false, List.copyOf(exceptions));
                     }
@@ -246,7 +251,7 @@ public final class Retry {
      * @return {@code true} when {@link #run(ThrowingRunnable)} or {@link #runAndThrow(ThrowingRunnable)} has already been called
      */
     public boolean hasRun() {
-        return hasRun;
+        return state != STATE_INITIAL;
     }
 
     /**
@@ -255,8 +260,7 @@ public final class Retry {
      * @return this retry sequence
      */
     public Retry reset() {
-        hasRun = false;
-        everRun = false;
+        state = STATE_INITIAL;
         return this;
     }
 
@@ -268,7 +272,7 @@ public final class Retry {
     public Retry clear() {
         onRetryCallbacks.clear();
         retryOn = DEFAULT_RETRY_ON;
-        hasRun = false;
+        state = STATE_INITIAL;
         return this;
     }
 

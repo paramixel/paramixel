@@ -113,11 +113,7 @@ public class FastId {
      */
     private static String generateLcgChunk() {
         while (true) {
-            long num = counter.getAndUpdate(n -> (n * MULTIPLIER + INCREMENT) % MAX_IDS);
-            if (num < 0) {
-                counter.set(ThreadLocalRandom.current().nextLong(MAX_IDS));
-                continue;
-            }
+            long num = counter.getAndUpdate(n -> Math.floorMod(n * MULTIPLIER + INCREMENT, MAX_IDS));
             String id = encode(num);
             if (!isForbidden(id)) {
                 return id;

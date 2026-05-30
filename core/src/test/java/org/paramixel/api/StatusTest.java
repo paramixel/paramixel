@@ -18,9 +18,11 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import nonapi.org.paramixel.FrameworkException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -177,12 +179,17 @@ class StatusTest {
 
         var exception1 = new RuntimeException("boom");
         var exception2 = new RuntimeException("bang");
+        var exception3 = new RuntimeException("boom");
         var failedWithThrowable1 = Status.failed("err", exception1);
         var failedWithThrowable2 = Status.failed("err", exception2);
+        var failedWithThrowable3 = Status.failed("err", exception3);
 
         assertThat(failedWithThrowable1).isNotEqualTo(failedWithThrowable2);
         assertThat(failedWithThrowable1).isNotEqualTo(failedWithMessage);
         assertThat(failedWithThrowable1).isEqualTo(Status.failed("err", exception1));
+        assertThat(failedWithThrowable1).isEqualTo(failedWithThrowable3);
+        assertThat(failedWithThrowable1.hashCode()).isEqualTo(failedWithThrowable3.hashCode());
+        assertThat(failedWithThrowable1).isNotEqualTo(Status.failed("err", new IllegalStateException("boom")));
     }
 
     @Test
@@ -197,30 +204,88 @@ class StatusTest {
     class FromThrowable {
 
         @Test
-        @DisplayName("FailException wrapped in RuntimeException returns failed with message")
-        void failExceptionWrappedInRuntimeException() {
-            var status = Status.fromThrowable(new RuntimeException(new FailException("assertion")));
+        @DisplayName("FailException wrapped in FrameworkException returns failed with message")
+        void failExceptionWrappedInFrameworkException() {
+            var status = Status.fromThrowable(new FrameworkException(new FailException("assertion")));
 
             assertThat(status.isFailed()).isTrue();
             assertThat(status.message()).contains("assertion");
         }
 
         @Test
-        @DisplayName("SkipException wrapped in RuntimeException returns skipped with message")
-        void skipExceptionWrappedInRuntimeException() {
-            var status = Status.fromThrowable(new RuntimeException(new SkipException("not ready")));
+        @DisplayName("SkipException wrapped in FrameworkException returns skipped with message")
+        void skipExceptionWrappedInFrameworkException() {
+            var status = Status.fromThrowable(new FrameworkException(new SkipException("not ready")));
 
             assertThat(status.isSkipped()).isTrue();
             assertThat(status.message()).contains("not ready");
         }
 
         @Test
-        @DisplayName("AbortedException wrapped in RuntimeException returns aborted with message")
-        void abortedExceptionWrappedInRuntimeException() {
-            var status = Status.fromThrowable(new RuntimeException(new AbortedException("precondition")));
+        @DisplayName("AbortedException wrapped in FrameworkException returns aborted with message")
+        void abortedExceptionWrappedInFrameworkException() {
+            var status = Status.fromThrowable(new FrameworkException(new AbortedException("precondition")));
 
             assertThat(status.isAborted()).isTrue();
             assertThat(status.message()).contains("precondition");
+        }
+
+        @Test
+        @DisplayName("RuntimeException wrapping FailException without FrameworkException is treated as failure")
+        void runtimeExceptionWrappingFailExceptionWithoutFrameworkExceptionIsTreatedAsFailure() {
+            var status = Status.fromThrowable(new RuntimeException(new FailException("assertion")));
+
+            assertThat(status.isFailed()).isTrue();
+            assertThat(status.throwable()).containsInstanceOf(RuntimeException.class);
+        }
+
+        @Test
+        @DisplayName("FrameworkException unwraps checked exception and preserves cause")
+        void frameworkExceptionUnwrapsCheckedExceptionAndPreservesCause() {
+            var cause = new IOException("disk offline");
+            var status = Status.fromThrowable(new FrameworkException(cause));
+
+            assertThat(status.isFailed()).isTrue();
+            assertThat(status.message()).contains("disk offline");
+            assertThat(status.throwable()).containsSame(cause);
+        }
+
+        @Test
+        @DisplayName("plain checked exception is treated as failure with same throwable")
+        void plainCheckedExceptionIsTreatedAsFailureWithSameThrowable() {
+            var cause = new IOException("io failure");
+            var status = Status.fromThrowable(cause);
+
+            assertThat(status.isFailed()).isTrue();
+            assertThat(status.message()).contains("io failure");
+            assertThat(status.throwable()).containsSame(cause);
+        }
+
+        @Test
+        @DisplayName("RuntimeException without FrameworkException is not unwrapped")
+        void runtimeExceptionWithoutFrameworkExceptionIsNotUnwrapped() {
+            var cause = new IOException("inner");
+            var runtimeException = new RuntimeException("outer", cause);
+            var status = Status.fromThrowable(runtimeException);
+
+            assertThat(status.isFailed()).isTrue();
+            assertThat(status.message()).contains("outer");
+            assertThat(status.throwable()).containsSame(runtimeException);
+        }
+
+        @Test
+        @DisplayName("FrameworkException wrapping InterruptedException restores interrupt flag")
+        void frameworkExceptionWrappingInterruptedExceptionRestoresInterruptFlag() {
+            Thread.interrupted();
+            try {
+                var status = Status.fromThrowable(new FrameworkException(new InterruptedException("interrupted")));
+
+                assertThat(status.isFailed()).isTrue();
+                assertThat(status.throwable()).containsInstanceOf(InterruptedException.class);
+                assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            } finally {
+                Thread.interrupted();
+            }
         }
     }
 
