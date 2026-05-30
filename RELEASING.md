@@ -97,7 +97,7 @@ git branch -D release/<VERSION>
 
 ### Step 3 — Deploy to Maven Central
 
-Once CI is green, deploy the release artifacts to Sonatype Central. The deployment remains in a pending state until you explicitly publish it in the next step.
+Once CI is green, deploy the release artifacts to Sonatype Central. The deployment remains pending until you explicitly publish it from the Maven Central Publishing Portal.
 
 ```bash
 # Ensure you are on the release branch
@@ -110,17 +110,15 @@ git checkout release/<VERSION>
 
 > **Maven Central releases are immutable and cannot be undone or overwritten.**
 
-Before proceeding, verify the deployment at [Sonatype Central](https://central.sonatype.com):
+Before proceeding, verify the pending deployment at [Sonatype Central](https://central.sonatype.com):
 
 - Confirm the version number is correct
-- Confirm the artifacts (JAR, sources, javadoc, POM) are present and valid
+- Confirm the expected publishable artifacts are present
+- Confirm each publishable artifact has the required JAR, sources, javadoc, and POM files
 - Confirm GPG signatures are present
+- Confirm Central validation completed successfully
 
-Once verified, publish the deployment:
-
-```bash
-./mvnw -Prelease central-publishing:publish
-```
+Once verified, publish the deployment from the Maven Central Publishing Portal.
 
 ### Step 5 — Tag the release
 
@@ -135,7 +133,7 @@ git push origin v<VERSION>
 
 After tagging, publish the documentation site. This builds the Docusaurus site and deploys it via rsync over SSH.
 
-Requires the `WWW_PARAMIXEL_ORG` environment variable (or pass `--ssh-host`).
+Requires the `WWW_PARAMIXEL_ORG` environment variable, or pass `--ssh-host`.
 
 ```bash
 ./scripts/publish-documentation.sh
@@ -176,13 +174,13 @@ git push
 
 1. **"GPG signing failed"**
    - Verify your GPG key is valid: `gpg --list-secret-keys`
-   - Check the key hasn't expired
-   - Ensure the passphrase is correct (GPG agent may be caching it)
+   - Check the key has not expired
+   - Ensure the passphrase is correct; GPG agent may be caching it
    - Test manually: `echo "test" | gpg --batch --clearsign`
 
 2. **"Maven settings not found: ~/.m2/settings.xml"**
    - Create or update `~/.m2/settings.xml` with your Sonatype Central credentials
-   - Ensure the `<server>` `<id>` matches the `distributionManagement` repository ID in the POM
+   - Ensure the `<server>` `<id>` matches the Central publishing server ID configured in the POM
 
 3. **"main is not synced with origin/main"**
    - Pull or push to sync: `git pull` or `git push`
@@ -200,13 +198,14 @@ git push
    - Verify your Sonatype credentials at https://central.sonatype.com
    - Ensure the GPG public key is published to key servers
    - Check that your account has publishing permissions
+   - Review Maven output for missing sources, javadoc, signatures, or POM metadata
 
 ### Error Recovery
 
 - **CI fails on the release branch:** Fix on the branch or delete it and start over. No tag or deploy has happened yet.
-- **Maven Central deploy fails:** Do not push the tag. Fix the issue and retry the deploy.
-- **Deploy succeeded but publish not yet done:** Retry `./mvnw -Prelease central-publishing:publish`, or drop the deployment with `./mvnw -Prelease central-publishing:drop` to start over.
-- **Publish failed after partial completion:** Check the deployment status at https://central.sonatype.com. If it's still in a publishable state, retry `./mvnw -Prelease central-publishing:publish`.
+- **Maven Central deploy fails:** Do not push the tag. Fix the issue and rerun `./mvnw -Prelease clean deploy`.
+- **Deploy succeeded but publish not yet done:** Review the pending deployment in the Maven Central Publishing Portal. If valid, publish it from the portal. If it should not be published, drop the deployment from the portal, fix the issue locally, and rerun `./mvnw -Prelease clean deploy`.
+- **Publish failed after validation:** Check the deployment status and validation details in the Maven Central Publishing Portal. If it can be retried from the portal, retry there. Otherwise drop the deployment from the portal, fix the issue locally, and rerun `./mvnw -Prelease clean deploy`.
 - **Tag pushed but deploy failed:** Delete the remote tag (`git push origin :refs/tags/vX.Y.Z`), fix the issue, redeploy, then re-tag.
 - **Post-release bump failed on main:** Manually set the version, commit, and push.
 
