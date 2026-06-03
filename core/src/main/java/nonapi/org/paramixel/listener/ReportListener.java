@@ -50,12 +50,11 @@ public final class ReportListener extends AbstractReportFileListener {
     }
 
     private static void write(final Writer writer, final Descriptor descriptor, final int depth) throws IOException {
-        var metadata = descriptor.metadata();
         writer.write("  ".repeat(depth));
-        writer.write(metadata.status().name());
+        writer.write(Listeners.formatStatus(descriptor));
         writer.write(" | ");
-        writer.write(metadata.name());
-        var message = metadata.message();
+        writer.write(descriptor.action().displayName());
+        var message = descriptor.message();
         if (message.isPresent()) {
             writer.write(" | ");
             writer.write(Listeners.sanitizeMessage(message.orElseThrow()));

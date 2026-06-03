@@ -19,18 +19,18 @@ package nonapi.org.paramixel.action;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import nonapi.org.paramixel.ExecutionRequest;
+import java.util.function.Function;
+import nonapi.org.paramixel.ExecutionMode;
 import nonapi.org.paramixel.InstanceHolder;
 import nonapi.org.paramixel.Scheduler;
-import nonapi.org.paramixel.TopLevelParallelThrottle;
+import nonapi.org.paramixel.exception.UserCodeException;
 import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Context;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Context;
-import org.paramixel.api.action.Mode;
 
 /**
  * Concrete execution context for one descriptor invocation.
@@ -42,7 +42,6 @@ public final class ConcreteContext implements Context {
     private final MutableDescriptor descriptor;
     private final Scheduler scheduler;
     private final InstanceHolder instanceHolder;
-    private final TopLevelParallelThrottle topLevelParallelThrottle;
 
     /**
      * Creates an execution context.
@@ -59,32 +58,11 @@ public final class ConcreteContext implements Context {
             final MutableDescriptor descriptor,
             final Scheduler scheduler,
             final InstanceHolder instanceHolder) {
-        this(configuration, listener, descriptor, scheduler, instanceHolder, null);
-    }
-
-    /**
-     * Creates an execution context with an optional top-level parallel throttle.
-     *
-     * @param configuration the run configuration; must not be {@code null}
-     * @param listener the run listener; must not be {@code null}
-     * @param descriptor the active descriptor; must not be {@code null}
-     * @param scheduler the scheduler; must not be {@code null}
-     * @param instanceHolder the instance holder for this scope; must not be {@code null}
-     * @param topLevelParallelThrottle optional root-parallel throttle; may be {@code null}
-     */
-    public ConcreteContext(
-            final Configuration configuration,
-            final Listener listener,
-            final MutableDescriptor descriptor,
-            final Scheduler scheduler,
-            final InstanceHolder instanceHolder,
-            final TopLevelParallelThrottle topLevelParallelThrottle) {
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
         this.listener = Objects.requireNonNull(listener, "listener is null");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor is null");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler is null");
         this.instanceHolder = Objects.requireNonNull(instanceHolder, "instanceHolder is null");
-        this.topLevelParallelThrottle = topLevelParallelThrottle;
     }
 
     @Override
@@ -92,13 +70,21 @@ public final class ConcreteContext implements Context {
         return configuration;
     }
 
-    @Override
+    /**
+     * Returns the listener for this execution context.
+     *
+     * @return the listener; never {@code null}
+     */
     public Listener listener() {
         return listener;
     }
 
-    @Override
-    public Descriptor descriptor() {
+    /**
+     * Returns the active descriptor for this execution context.
+     *
+     * @return the descriptor; never {@code null}
+     */
+    public MutableDescriptor descriptor() {
         return descriptor;
     }
 
@@ -107,51 +93,62 @@ public final class ConcreteContext implements Context {
         return Optional.ofNullable(instanceHolder.get(type));
     }
 
-    @Override
-    public void setStatus(final Status status) {
-        descriptor.setStatus(Objects.requireNonNull(status, "status is null"));
+    /**
+     * Returns the execution context used by the scheduler.
+     *
+     * @param context the public action context; must not be {@code null}
+     * @return the execution context
+     * @throws IllegalArgumentException if the context was not created by this runner
+     */
+    public static ConcreteContext require(final Context context) {
+        Objects.requireNonNull(context, "context is null");
+        if (context instanceof ConcreteContext concreteContext) {
+            return concreteContext;
+        }
+        throw new IllegalArgumentException("context must be a ConcreteContext");
     }
 
     /**
      * Schedules a direct child descriptor asynchronously.
      *
-     * @param request the child execution request; must not be {@code null}
+     * @param child the child descriptor to schedule; must not be {@code null}
      * @return a future completed with the scheduled descriptor after execution
-     * @throws NullPointerException if {@code request} is {@code null}
-     * @throws IllegalArgumentException if the requested descriptor is not directly attached
+     * @throws NullPointerException if {@code child} is {@code null}
+     * @throws IllegalArgumentException if the descriptor is not directly attached
      */
-    public CompletableFuture<Descriptor> scheduleAsync(final ExecutionRequest request) {
-        Objects.requireNonNull(request, "request is null");
-        if (!(request.descriptor() instanceof MutableDescriptor child)) {
-            throw new IllegalArgumentException("descriptor was not created by this runner");
-        }
-        if (child.parent().orElse(null) != descriptor) {
-            throw new IllegalArgumentException("can only schedule directly attached descriptors");
-        }
-        return scheduler.schedule(child, request.mode(), this);
+    public CompletableFuture<Descriptor> scheduleAsync(final Descriptor child) {
+        return scheduleAsync(child, ExecutionMode.RUN);
+    }
+
+    /**
+     * Schedules a direct child descriptor asynchronously.
+     *
+     * @param child the child descriptor to schedule; must not be {@code null}
+     * @param mode the execution mode for the child; must not be {@code null}
+     * @return a future completed with the scheduled descriptor after execution
+     * @throws NullPointerException if {@code child} or {@code mode} is {@code null}
+     * @throws IllegalArgumentException if the descriptor is not directly attached
+     */
+    public CompletableFuture<Descriptor> scheduleAsync(final Descriptor child, final ExecutionMode mode) {
+        return scheduler.schedule(requireDirectChild(child), Objects.requireNonNull(mode, "mode is null"), this);
     }
 
     /**
      * Executes a directly attached descriptor synchronously on the current thread.
      *
-     * @param request the child execution request; must not be {@code null}
+     * @param child the child descriptor to execute; must not be {@code null}
+     * @param mode the execution mode for the child; must not be {@code null}
      * @return the executed descriptor
-     * @throws NullPointerException if {@code request} is {@code null}
-     * @throws IllegalArgumentException if the requested descriptor is not directly attached
+     * @throws NullPointerException if {@code child} or {@code mode} is {@code null}
+     * @throws IllegalArgumentException if the descriptor is not directly attached
      */
-    public Descriptor scheduleSync(final ExecutionRequest request) {
-        Objects.requireNonNull(request, "request is null");
-        if (!(request.descriptor() instanceof MutableDescriptor child)) {
-            throw new IllegalArgumentException("descriptor was not created by this runner");
-        }
-        if (child.parent().orElse(null) != descriptor) {
-            throw new IllegalArgumentException("can only schedule directly attached descriptors");
-        }
-        child.markScheduled(request.mode());
-        var childContext = new ConcreteContext(
-                configuration, listener, child, scheduler, instanceHolder, topLevelParallelThrottle);
-        scheduler.executeDescriptor(child, childContext);
-        return child;
+    public Descriptor scheduleSync(final Descriptor child, final ExecutionMode mode) {
+        var mutableChild = requireDirectChild(child);
+        var executionMode = Objects.requireNonNull(mode, "mode is null");
+        mutableChild.markScheduled();
+        var childContext = new ConcreteContext(configuration, listener, mutableChild, scheduler, instanceHolder);
+        scheduler.executeDescriptor(mutableChild, childContext, executionMode);
+        return mutableChild;
     }
 
     /**
@@ -159,18 +156,29 @@ public final class ConcreteContext implements Context {
      * and interruption.
      *
      * <p>Any non-{@link RuntimeException} cause is wrapped in {@code RuntimeException} before
-     * being thrown. This integrates with {@link nonapi.org.paramixel.FrameworkException#wrap}
+     * being thrown. This integrates with {@link UserCodeException#wrap}
      * at the API boundary, which peels exactly one {@code RuntimeException} layer from the
      * chain produced here, preserving the original semantic cause for {@link Status#fromThrowable}
      * classification.
      *
      * @param child the child descriptor to run; must not be {@code null}
+     * @return the executed child descriptor
+     */
+    public Descriptor runChild(final Descriptor child) {
+        return runChild(child, ExecutionMode.RUN);
+    }
+
+    /**
+     * Schedules a direct child descriptor synchronously, handling unrecoverable errors
+     * and interruption.
+     *
+     * @param child the child descriptor to run; must not be {@code null}
      * @param mode the execution mode for the child; must not be {@code null}
      * @return the executed child descriptor
      */
-    public Descriptor runChild(final Descriptor child, final Mode mode) {
+    public Descriptor runChild(final Descriptor child, final ExecutionMode mode) {
         try {
-            return scheduleSync(ExecutionRequest.of(child, mode));
+            return scheduleSync(child, mode);
         } catch (Throwable t) {
             var cause = Throwables.unwrap(t);
             UnrecoverableErrors.rethrowIfUnrecoverable(cause);
@@ -185,14 +193,42 @@ public final class ConcreteContext implements Context {
      * Schedules all directly attached descriptors of the current descriptor synchronously,
      * including before, body children, and after.
      *
-     * @param mode the execution mode for all descriptors; must not be {@code null}
+     * @param mode the execution mode for each descriptor; must not be {@code null}
      */
-    public void runChildren(final Mode mode) {
-        descriptor.before().ifPresent(b -> runChild(b, mode));
+    public void runChildren(final ExecutionMode mode) {
+        Objects.requireNonNull(mode, "mode is null");
+        runChildren(ignored -> mode);
+    }
+
+    /**
+     * Schedules all directly attached descriptors of the current descriptor synchronously,
+     * including before, body children, and after.
+     *
+     * @param modeFactory the execution mode factory for each descriptor; must not be {@code null}
+     */
+    public void runChildren(final Function<Descriptor, ExecutionMode> modeFactory) {
+        Objects.requireNonNull(modeFactory, "modeFactory is null");
+        descriptor.before().ifPresent(b -> runChild(b, requireMode(modeFactory, b)));
         for (Descriptor child : descriptor.children()) {
-            runChild(child, mode);
+            runChild(child, requireMode(modeFactory, child));
         }
-        descriptor.after().ifPresent(a -> runChild(a, mode));
+        descriptor.after().ifPresent(a -> runChild(a, requireMode(modeFactory, a)));
+    }
+
+    private static ExecutionMode requireMode(
+            final Function<Descriptor, ExecutionMode> modeFactory, final Descriptor child) {
+        return Objects.requireNonNull(modeFactory.apply(child), "mode is null");
+    }
+
+    private MutableDescriptor requireDirectChild(final Descriptor child) {
+        Objects.requireNonNull(child, "child is null");
+        if (!(child instanceof MutableDescriptor mutableChild)) {
+            throw new IllegalArgumentException("descriptor was not created by this runner");
+        }
+        if (mutableChild.parent().orElse(null) != descriptor) {
+            throw new IllegalArgumentException("can only schedule directly attached descriptors");
+        }
+        return mutableChild;
     }
 
     /**
@@ -202,8 +238,7 @@ public final class ConcreteContext implements Context {
      * @return the scoped context
      */
     public ConcreteContext withInstanceHolder(final InstanceHolder newInstanceHolder) {
-        return new ConcreteContext(
-                configuration, listener, descriptor, scheduler, newInstanceHolder, topLevelParallelThrottle);
+        return new ConcreteContext(configuration, listener, descriptor, scheduler, newInstanceHolder);
     }
 
     /**
@@ -223,39 +258,5 @@ public final class ConcreteContext implements Context {
      */
     public Scheduler scheduler() {
         return scheduler;
-    }
-
-    /**
-     * Returns whether this context has a root-parallel throttle.
-     *
-     * @return {@code true} when a throttle is configured
-     */
-    public boolean hasTopLevelParallelThrottle() {
-        return topLevelParallelThrottle != null;
-    }
-
-    /**
-     * Acquires one root-parallel throttle permit.
-     *
-     * @throws IllegalStateException if no top-level throttle is configured
-     * @throws InterruptedException if interrupted while waiting
-     */
-    public void acquireTopLevelParallelPermit() throws InterruptedException {
-        if (topLevelParallelThrottle == null) {
-            throw new IllegalStateException("No top-level parallel throttle configured");
-        }
-        topLevelParallelThrottle.acquire();
-    }
-
-    /**
-     * Releases one root-parallel throttle permit.
-     *
-     * @throws IllegalStateException if no top-level throttle is configured
-     */
-    public void releaseTopLevelParallelPermit() {
-        if (topLevelParallelThrottle == null) {
-            throw new IllegalStateException("No top-level parallel throttle configured");
-        }
-        topLevelParallelThrottle.release();
     }
 }

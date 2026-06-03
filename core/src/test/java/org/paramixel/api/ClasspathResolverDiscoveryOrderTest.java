@@ -41,11 +41,11 @@ class ClasspathResolverDiscoveryOrderTest {
     void actionNameIsNotUsedAsDiscoverySortKey() {
         Selector selector = Selector.classRegex("ClasspathResolverMetadata");
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
-        assertThat(((Parallel<?>) result.orElseThrow()).children())
-                .extracting(Action<?>::name)
+        assertThat(((Parallel) result.orElseThrow()).children())
+                .extracting(Action::displayName)
                 .containsExactly("z-action", "a-action");
     }
 
@@ -64,7 +64,7 @@ class ClasspathResolverDiscoveryOrderTest {
     void stepRunContainsActualWorkAndIsNotExecutedDuringDiscovery() {
         Selector selector = Selector.classRegex("ClasspathResolverFactoryTiming");
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> root = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> root = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(ClasspathResolverFactoryTimingLog.FACTORY_LOG).containsExactly("zeta-factory", "alpha-factory");
         assertThat(ClasspathResolverFactoryTimingLog.RUN_LOG).isEmpty();

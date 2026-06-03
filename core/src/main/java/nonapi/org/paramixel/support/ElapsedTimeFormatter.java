@@ -73,16 +73,13 @@ public final class ElapsedTimeFormatter {
         boolean hasPrevious = false;
 
         if (hours > 0) {
-            if (hasPrevious) {
-                result.append(" ");
-            }
             result.append(hours).append(" h");
             hasPrevious = true;
         }
 
         if (minutes > 0 || hours > 0) {
             if (hasPrevious) {
-                result.append(" ");
+                result.append(' ');
             }
             result.append(minutes).append(" m");
             hasPrevious = true;
@@ -90,14 +87,14 @@ public final class ElapsedTimeFormatter {
 
         if (seconds > 0 || minutes > 0 || hours > 0) {
             if (hasPrevious) {
-                result.append(" ");
+                result.append(' ');
             }
             result.append(seconds).append(" s");
             hasPrevious = true;
         }
 
         if (hasPrevious) {
-            result.append(" ");
+            result.append(' ');
         }
         result.append(ms).append(" ms");
 

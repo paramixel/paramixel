@@ -17,10 +17,10 @@
 package nonapi.org.paramixel.listener;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
@@ -76,9 +76,7 @@ public class StatusListener implements Listener {
 
         if (!excludes.contains(ExcludeTarget.STATUS_FOOTER)) {
             var sb = new StringBuilder();
-            var statusText = ansiEnabled
-                    ? Listeners.formatAnsiStatus(descriptor.metadata().status())
-                    : Listeners.formatStatus(descriptor.metadata().status());
+            var statusText = ansiEnabled ? Listeners.formatAnsiStatus(descriptor) : Listeners.formatStatus(descriptor);
             sb.append(prefix())
                     .append(statusText)
                     .append(" | ")
@@ -86,8 +84,8 @@ public class StatusListener implements Listener {
                     .append(" | ")
                     .append(displayName(descriptor))
                     .append(' ')
-                    .append(formatTiming(descriptor.metadata().runDuration()));
-            var throwable = descriptor.metadata().throwable().orElse(null);
+                    .append(formatTiming(Listeners.elapsedMillis(descriptor)));
+            var throwable = descriptor.throwable().orElse(null);
             if (throwable != null) {
                 sb.append(" | ")
                         .append(throwable.getClass().getName())
@@ -100,7 +98,7 @@ public class StatusListener implements Listener {
                     while ((line = br.readLine()) != null) {
                         sb.append(prefix()).append(line).append(LINE_SEPARATOR);
                     }
-                } catch (java.io.IOException e) {
+                } catch (IOException e) {
                     throw new AssertionError(e);
                 }
             } else {
@@ -108,7 +106,7 @@ public class StatusListener implements Listener {
             }
             System.out.print(sb.toString());
         } else {
-            descriptor.metadata().throwable().ifPresent(throwable -> {
+            descriptor.throwable().ifPresent(throwable -> {
                 var sb = new StringBuilder();
                 var sw = new StringWriter();
                 throwable.printStackTrace(new PrintWriter(sw));
@@ -117,7 +115,7 @@ public class StatusListener implements Listener {
                     while ((line = br.readLine()) != null) {
                         sb.append(prefix()).append(line).append(LINE_SEPARATOR);
                     }
-                } catch (java.io.IOException e) {
+                } catch (IOException e) {
                     throw new AssertionError(e);
                 }
                 System.out.print(sb.toString());
@@ -130,11 +128,10 @@ public class StatusListener implements Listener {
     }
 
     private static String displayName(final Descriptor descriptor) {
-        return Listeners.formatNamePath(descriptor) + " (" + Listeners.formatKind(descriptor) + ")";
+        return Listeners.formatNamePath(descriptor);
     }
 
-    private static String formatTiming(final Duration timing) {
-        Objects.requireNonNull(timing, "timing is null");
-        return timing.toMillis() + " ms";
+    private static String formatTiming(final long elapsedMillis) {
+        return elapsedMillis + " ms";
     }
 }

@@ -17,12 +17,12 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
@@ -31,27 +31,30 @@ import org.paramixel.api.exception.SkipException;
 class CompositeActionPropagationTest {
 
     @Test
-    @DisplayName("lifecycle: before failure skips body, runs after, and aggregates FAILED")
-    void lifecycleBeforeFailurePropagatesSkipAndRunsAfter() {
+    @DisplayName("scope: before failure skips body, runs after, and aggregates FAILED")
+    void scopeBeforeFailurePropagatesSkipAndRunsAfter() {
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Lifecycle.of("lifecycle")
-                .before("before", ignored -> FailException.fail("before failed"))
-                .child("body-1", ignored -> bodyCalls.incrementAndGet())
-                .child("body-2", ignored -> bodyCalls.incrementAndGet())
-                .after("after", ignored -> afterCalls.incrementAndGet())
-                .resolve();
+        var action = Scope.builder("scope")
+                .before(Step.of("before", ignored -> FailException.fail("before failed")))
+                .body(Sequence.builder("body")
+                        .child(Step.of("body-1", ignored -> bodyCalls.incrementAndGet()))
+                        .child(Step.of("body-2", ignored -> bodyCalls.incrementAndGet()))
+                        .build())
+                .after(Step.of("after", ignored -> afterCalls.incrementAndGet()))
+                .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        var children = root.children();
 
-        assertThat(root.metadata().status().isFailed()).isTrue();
-        assertThat(children).hasSize(2);
-        assertThat(root.before().orElseThrow().metadata().status().isFailed()).isTrue();
-        assertThat(children.get(0).metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(body.children().get(0).isSkipped()).isTrue();
+        assertThat(body.children().get(1).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
         assertThat(bodyCalls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -62,23 +65,26 @@ class CompositeActionPropagationTest {
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Static.of("static")
-                .child("body-1", () -> {
-                    bodyCalls.incrementAndGet();
-                    AbortedException.abort("aborted");
-                })
-                .child("body-2", () -> bodyCalls.incrementAndGet())
-                .after("after", () -> afterCalls.incrementAndGet())
-                .resolve();
+        var action = Static.builder("static")
+                .body(Sequence.builder("body")
+                        .child(Step.of("body-1", context -> {
+                            bodyCalls.incrementAndGet();
+                            AbortedException.abort("aborted");
+                        }))
+                        .child(Step.of("body-2", context -> bodyCalls.incrementAndGet()))
+                        .build())
+                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        var children = root.children();
 
-        assertThat(root.metadata().status()).isSameAs(Status.ABORTED);
-        assertThat(children).hasSize(2);
-        assertThat(children.get(0).metadata().status().isAborted()).isTrue();
-        assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isAborted()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isAborted()).isTrue();
+        assertThat(body.children().get(1).isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
         assertThat(bodyCalls.get()).isEqualTo(2);
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -89,20 +95,23 @@ class CompositeActionPropagationTest {
         var secondBodyCalls = new AtomicInteger();
         var closed = new AtomicInteger();
 
-        var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                .child("body-1", fixture -> SkipException.skip("skipped"))
-                .child("body-2", fixture -> secondBodyCalls.incrementAndGet())
-                .resolve();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .child(Step.of("body-1", context -> SkipException.skip("skipped")))
+                        .child(Step.of("body-2", context -> secondBodyCalls.incrementAndGet()))
+                        .build())
+                .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        var children = root.children();
 
-        assertThat(root.metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(children).hasSize(2);
-        assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-        assertThat(children.get(0).metadata().status().isSkipped()).isTrue();
-        assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-        assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isSkipped()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).isSkipped()).isTrue();
+        assertThat(body.children().get(1).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
         assertThat(secondBodyCalls.get()).isZero();
         assertThat(closed.get()).isEqualTo(1);
     }
@@ -118,47 +127,42 @@ class CompositeActionPropagationTest {
     @Test
     @DisplayName("parallel with 0 children completes immediately with PASSED")
     void parallelEmptyChildrenPasses() {
-        var action = Parallel.of("empty").resolve();
+        var action = Parallel.builder("empty").build();
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isPassed()).isTrue();
         assertThat(root.children()).isEmpty();
     }
 
     @Test
     @DisplayName("sequential with 0 children completes immediately with PASSED")
     void sequentialEmptyChildrenPasses() {
-        var action = Sequential.of("empty").resolve();
+        var action = Sequence.builder("empty").build();
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isPassed()).isTrue();
         assertThat(root.children()).isEmpty();
     }
 
     @Test
-    @DisplayName("lifecycle with no before, children, or after completes immediately with PASSED")
-    void lifecycleEmptyBodyPasses() {
-        var action = Lifecycle.of("empty").resolve();
-        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.children()).isEmpty();
+    @DisplayName("scope with no body throws IllegalStateException")
+    void scopeEmptyBodyThrows() {
+        assertThatThrownBy(() -> Scope.builder("empty").build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("body action must be configured");
     }
 
     @Test
-    @DisplayName("static with no before, children, or after completes immediately with PASSED")
-    void staticEmptyBodyPasses() {
-        var action = Static.of("empty").resolve();
-        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.children()).isEmpty();
+    @DisplayName("static with no body throws IllegalStateException")
+    void staticEmptyBodyThrows() {
+        assertThatThrownBy(() -> Static.builder("empty").build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("body action must be configured");
     }
 
     @Test
-    @DisplayName("instance with 0 body children passes with Instantiate and Destroy descriptors")
-    void instanceEmptyBodyPasses() {
-        var action = Instance.of("empty", Object::new).resolve();
-        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.children()).isEmpty();
-        assertThat(root.before().orElseThrow().metadata().name()).isEqualTo("Instantiate");
-        assertThat(root.after().orElseThrow().metadata().name()).isEqualTo("Destroy");
+    @DisplayName("instance with no body throws IllegalStateException")
+    void instanceEmptyBodyThrows() {
+        assertThatThrownBy(() -> Instance.builder("empty", Object::new).build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("body action must be configured");
     }
 }

@@ -34,10 +34,11 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
 
 /**
  * Parameterized integration test that starts Kafka containers using annotation-based
@@ -71,22 +72,26 @@ public class AnnotationKafkaTest {
      * @throws Throwable if environment creation fails
      */
     @Paramixel.Factory
-    public static Spec<?> factory() throws Throwable {
+    public static Action factory() throws Throwable {
         var annotationResolver = AnnotationResolver.create(AnnotationKafkaTest.class);
 
-        var parallel = Parallel.of(AnnotationKafkaTest.class.getName());
+        var parallel = Parallel.builder(AnnotationKafkaTest.class.getName());
         for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
-            var lifecycle = Lifecycle.of(environment.name())
-                    .before(annotationResolver.byId("setUp", "Before"))
-                    .child(annotationResolver.byId("produce"))
-                    .child(annotationResolver.byId("consume"))
-                    .after(annotationResolver.byId("tearDown", "After"));
+            var lifecycle = Scope.builder(environment.name())
+                    .before(annotationResolver.byId("setUp"))
+                    .body(Sequence.builder("tests")
+                            .child(annotationResolver.byId("produce"))
+                            .child(annotationResolver.byId("consume"))
+                            .build())
+                    .after(annotationResolver.byId("tearDown"))
+                    .build();
 
             parallel.parallelism(2)
-                    .child(Instance.of(environment.name(), () -> new AnnotationKafkaTest(environment))
-                            .child(lifecycle));
+                    .child(Instance.builder(environment.name(), () -> new AnnotationKafkaTest(environment))
+                            .body(lifecycle)
+                            .build());
         }
-        return parallel;
+        return parallel.build();
     }
 
     private AnnotationKafkaTest(final KafkaTestEnvironment environment) {

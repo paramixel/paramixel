@@ -26,7 +26,7 @@ import java.util.Objects;
  * {@link nonapi.org.paramixel.action.ConcreteContext} instances so that instance objects are visible
  * to before-actions, body children, and after-actions within the same lifecycle.
  *
- * <p>Instance objects are set by {@code Instance.execute()} and cleared by
+ * <p>Instance objects are set by the scheduler-managed {@code Instance} create phase and cleared by
  * destroy actions via {@link #clear()}. The holder is not part of the public API.
  */
 public final class InstanceHolder {

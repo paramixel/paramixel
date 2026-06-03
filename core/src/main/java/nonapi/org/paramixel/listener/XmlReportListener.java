@@ -54,11 +54,11 @@ public final class XmlReportListener extends AbstractReportFileListener {
             throws IOException {
         writer.write(indent);
         writer.write("<descriptor id=\"");
-        writer.write(escape(descriptor.metadata().id()));
+        writer.write(escape(descriptor.id()));
         writer.write("\" name=\"");
-        writer.write(escape(descriptor.metadata().name()));
+        writer.write(escape(descriptor.action().displayName()));
         writer.write("\" status=\"");
-        writer.write(descriptor.metadata().status().name());
+        writer.write(Listeners.formatStatus(descriptor));
         writer.write("\">");
         writer.write(LINE_SEPARATOR);
         final var childIndent = indent + INDENT;

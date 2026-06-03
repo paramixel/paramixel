@@ -18,9 +18,17 @@ package nonapi.org.paramixel.action;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Repeat;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Static;
+import org.paramixel.api.action.Timeout;
 import org.paramixel.api.exception.CycleDetectedException;
 
 /**
@@ -44,46 +52,71 @@ public final class DescriptorBuilder {
      * @param root the root action; must not be {@code null}
      * @return the root descriptor
      */
-    public MutableDescriptor discover(final Action<?> root) {
+    public MutableDescriptor discover(final Action root) {
         Objects.requireNonNull(root, "root is null");
         var rootDescriptor = new ConcreteDescriptor(null, root);
-        buildDescendants(rootDescriptor, root, new ArrayDeque<>());
+        buildDescendants(rootDescriptor, root, new ArrayDeque<>(), new IdentityHashMap<>());
         return rootDescriptor;
     }
 
     private void buildDescendants(
-            final MutableDescriptor descriptor, final Action<?> action, final Deque<Action<?>> path) {
+            final MutableDescriptor descriptor,
+            final Action action,
+            final Deque<Action> path,
+            final IdentityHashMap<Action, Boolean> visited) {
         path.addLast(action);
-        action.before().ifPresent(b -> descriptor.setBefore(build(descriptor, b, path)));
-        action.children().forEach(c -> descriptor.addChild(build(descriptor, c, path)));
-        action.after().ifPresent(a -> descriptor.setAfter(build(descriptor, a, path)));
+        visited.put(action, Boolean.TRUE);
+        if (action instanceof Scope scope) {
+            scope.before().ifPresent(b -> descriptor.setBefore(build(descriptor, b, path, visited)));
+            if (scope.body() != null) {
+                descriptor.addChild(build(descriptor, scope.body(), path, visited));
+            }
+            scope.after().ifPresent(a -> descriptor.setAfter(build(descriptor, a, path, visited)));
+        } else if (action instanceof Static staticAction) {
+            staticAction.before().ifPresent(b -> descriptor.setBefore(build(descriptor, b, path, visited)));
+            if (staticAction.body() != null) {
+                descriptor.addChild(build(descriptor, staticAction.body(), path, visited));
+            }
+            staticAction.after().ifPresent(a -> descriptor.setAfter(build(descriptor, a, path, visited)));
+        } else if (action instanceof Instance instance) {
+            descriptor.setBefore(build(descriptor, instance.instantiate(), path, visited));
+            if (instance.body() != null) {
+                descriptor.addChild(build(descriptor, instance.body(), path, visited));
+            }
+            descriptor.setAfter(build(descriptor, instance.destroy(), path, visited));
+        } else if (action instanceof Parallel parallel) {
+            parallel.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
+        } else if (action instanceof Sequence sequence) {
+            sequence.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
+        } else if (action instanceof Repeat repeat) {
+            for (int i = 0; i < repeat.iterations(); i++) {
+                descriptor.addChild(build(descriptor, repeat.body(), path, visited));
+            }
+        } else if (action instanceof Timeout timeout) {
+            descriptor.addChild(build(descriptor, timeout.body(), path, visited));
+        }
         path.removeLast();
+        visited.remove(action);
     }
 
     private MutableDescriptor build(
-            final MutableDescriptor parent, final Action<?> action, final Deque<Action<?>> path) {
-        if (containsIdentity(path, action)) {
+            final MutableDescriptor parent,
+            final Action action,
+            final Deque<Action> path,
+            final IdentityHashMap<Action, Boolean> visited) {
+        if (visited.containsKey(action)) {
             throw new CycleDetectedException(buildCycleMessage(path, action));
         }
 
         var descriptor = new ConcreteDescriptor(parent, action);
-        buildDescendants(descriptor, action, path);
+        buildDescendants(descriptor, action, path, visited);
         return descriptor;
     }
 
-    private static boolean containsIdentity(final Deque<Action<?>> path, final Action<?> action) {
-        for (Action<?> current : path) {
-            if (current == action) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String buildCycleMessage(final Deque<Action<?>> path, final Action<?> repeatedAction) {
-        var cycle = new ArrayDeque<Action<?>>();
+    private static String buildCycleMessage(final Deque<Action> path, final Action repeatedAction) {
+        var cycle = new ArrayDeque<Action>();
         var collecting = false;
-        for (Action<?> action : path) {
+        for (Action action : path) {
             if (action == repeatedAction) {
                 collecting = true;
             }
@@ -94,7 +127,8 @@ public final class DescriptorBuilder {
         cycle.addLast(repeatedAction);
         return "Cycle detected in action tree: "
                 + cycle.stream()
-                        .map(action -> action.name() + "[" + action.getClass().getName() + "]")
+                        .map(action ->
+                                action.displayName() + "[" + action.getClass().getName() + "]")
                         .collect(Collectors.joining(" -> "));
     }
 }

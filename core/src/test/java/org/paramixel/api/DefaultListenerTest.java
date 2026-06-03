@@ -32,7 +32,7 @@ class DefaultListenerTest {
     @DisplayName("prints action kind before and after execution")
     void printsActionKindBeforeAndAfterExecution() {
         Listener listener = Listener.defaultListener();
-        var action = Step.of("direct", obj -> {});
+        var action = Step.of("direct", context -> {});
 
         var output = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;

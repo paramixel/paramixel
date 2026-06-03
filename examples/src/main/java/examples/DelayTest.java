@@ -19,12 +19,12 @@ package examples;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import nonapi.org.paramixel.action.ConcreteContext;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Context;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Delay;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 /**
@@ -49,18 +49,21 @@ public class DelayTest {
      * @return the action tree for this test
      */
     @Paramixel.Factory
-    public static Spec<?> factory() {
-        return Sequential.of("delay-example")
+    public static Action factory() {
+        return Sequence.builder("delay-example")
                 .child(Delay.of("fixed-milliseconds", 100))
                 .child(Delay.of("fixed-duration", Duration.ofMillis(100)))
                 .child(Delay.random("random-duration", 50, 150))
                 .child(Delay.of("zero-duration", 0L))
-                .child(Step.of("verify", ctx -> {
-                    var context = (Context) ctx;
-                    var children = context.descriptor().parent().orElseThrow().children();
+                .child(Step.of("verify", context -> {
+                    var children = ConcreteContext.require(context)
+                            .descriptor()
+                            .parent()
+                            .orElseThrow()
+                            .children();
                     assertThat(children).hasSize(5);
-                    assertThat(children.subList(0, 4))
-                            .allMatch(child -> child.metadata().status().isPassed());
-                }));
+                    assertThat(children.subList(0, 4)).allMatch(child -> child.isPassed());
+                }))
+                .build();
     }
 }

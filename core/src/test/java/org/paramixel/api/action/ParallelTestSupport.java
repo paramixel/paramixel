@@ -16,9 +16,10 @@
 
 package org.paramixel.api.action;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 class ParallelTestSupport {
 
-    static final java.util.concurrent.ExecutorService EXECUTOR = Executors.newFixedThreadPool(2);
+    static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(2);
 }

@@ -19,7 +19,6 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
@@ -33,8 +32,7 @@ import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Context;
-import org.paramixel.api.action.Mode;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Context async scheduling")
@@ -57,84 +55,83 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("scheduleAsync returns future completing with descriptor")
     void scheduleAsyncReturnsFuture() {
-        Action<?> child = Step.of("child", obj -> {});
-        Action<?> parent = new CompositeTestAction("parent", child);
+        Action child = Step.of("child", context -> {});
+        Action parent = Sequence.builder("parent").child(child).build();
         MutableDescriptor root = new DescriptorBuilder().discover(parent);
         var childDescriptor = (MutableDescriptor) root.children().get(0);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
-        root.markScheduled(Mode.RUN);
+        root.markScheduled();
 
-        CompletableFuture<Descriptor> future = context.scheduleAsync(ExecutionRequest.run(childDescriptor));
+        CompletableFuture<Descriptor> future = context.scheduleAsync(childDescriptor);
 
         assertThat(future).isNotNull();
-        assertThat(future.join().metadata().status()).isEqualTo(Status.PASSED);
+        assertThat(future.join().isPassed()).isTrue();
     }
 
     @Test
-    @DisplayName("scheduleAsync rejects null request")
-    void scheduleAsyncRejectsNullRequest() {
-        Action<?> leaf = Step.of("leaf", obj -> {});
+    @DisplayName("scheduleAsync rejects null child")
+    void scheduleAsyncRejectsNullChild() {
+        Action leaf = Step.of("leaf", context -> {});
         MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
         assertThatThrownBy(() -> context.scheduleAsync(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("request is null");
+                .hasMessage("child is null");
     }
 
     @Test
-    @DisplayName("scheduleAsync rejects non-direct-child descriptor")
-    void scheduleAsyncRejectsNonDirectChild() {
-        Action<?> grandchild = Step.of("grandchild", obj -> {});
-        Action<?> childAction = new CompositeTestAction("child", grandchild);
-        Action<?> rootAction = new CompositeTestAction("root", childAction);
-        MutableDescriptor root = new DescriptorBuilder().discover(rootAction);
-        var context = new ConcreteContext(
-                Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
-        root.markScheduled(Mode.RUN);
-
+    @DisplayName("scheduleAsync rejects null mode")
+    void scheduleAsyncRejectsNullMode() {
+        Action child = Step.of("child", context -> {});
+        Action parent = Sequence.builder("parent").child(child).build();
+        MutableDescriptor root = new DescriptorBuilder().discover(parent);
         var childDescriptor = (MutableDescriptor) root.children().get(0);
-        var grandchildDescriptor =
-                (MutableDescriptor) childDescriptor.children().get(0);
-
-        assertThatThrownBy(() -> context.scheduleAsync(ExecutionRequest.run(grandchildDescriptor)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("can only schedule directly attached descriptors");
-    }
-
-    @Test
-    @DisplayName("scheduleAsync rejects foreign descriptor")
-    void scheduleAsyncRejectsForeignDescriptor() {
-        Action<?> foreign = Step.of("foreign", obj -> {});
-        MutableDescriptor foreignDescriptor = new DescriptorBuilder().discover(foreign);
-        Action<?> rootAction = Step.of("root", obj -> {});
-        MutableDescriptor root = new DescriptorBuilder().discover(rootAction);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
-        assertThatThrownBy(() -> context.scheduleAsync(ExecutionRequest.run(foreignDescriptor)))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> context.scheduleAsync(childDescriptor, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("mode is null");
     }
 
     @Test
-    @DisplayName("setStatus delegates to descriptor")
-    void setStatusDelegatesToDescriptor() {
-        Action<?> leaf = Step.of("leaf", obj -> {});
+    @DisplayName("scheduleAsync rejects descriptor from foreign context")
+    void scheduleAsyncRejectsForeignDescriptor() {
+        Action leaf = Step.of("leaf", context -> {});
+        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+        var context = new ConcreteContext(
+                Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
+        root.markScheduled();
+
+        Action foreignLeaf = Step.of("foreign", ignored -> {});
+        MutableDescriptor foreignRoot = new DescriptorBuilder().discover(foreignLeaf);
+        foreignRoot.markScheduled();
+
+        var foreignDescriptor = (MutableDescriptor) foreignRoot;
+
+        assertThatThrownBy(() -> context.scheduleAsync(foreignDescriptor)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("descriptor status can be set directly")
+    void descriptorStatusCanBeSetDirectly() {
+        Action leaf = Step.of("leaf", context -> {});
         MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
-        context.setStatus(Status.RUNNING);
+        root.setStatus(Status.RUNNING);
 
-        assertThat(root.metadata().status()).isEqualTo(Status.RUNNING);
+        assertThat(root.status()).isEqualTo(Status.RUNNING);
     }
 
     @Test
     @DisplayName("getInstance returns empty when no instance set")
     void getInstanceReturnsEmptyWhenNoInstance() {
-        Action<?> leaf = Step.of("leaf", obj -> {});
+        Action leaf = Step.of("leaf", context -> {});
         MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
@@ -145,41 +142,12 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("getInstance returns present when instance set")
     void getInstanceReturnsPresentWhenInstanceSet() {
-        Action<?> leaf = Step.of("leaf", obj -> {});
+        Action leaf = Step.of("leaf", context -> {});
         MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         instanceHolder.set("hello");
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
         assertThat(context.instance(String.class)).contains("hello");
-    }
-
-    private static final class CompositeTestAction implements Action<Void> {
-
-        private final String name;
-        private final Action<?>[] children;
-
-        CompositeTestAction(final String name, final Action<?>... children) {
-            this.name = name;
-            this.children = children;
-        }
-
-        @Override
-        public String name() {
-            return name;
-        }
-
-        @Override
-        public String kind() {
-            return "CompositeTestAction";
-        }
-
-        @Override
-        public List<Action<?>> children() {
-            return List.of(children);
-        }
-
-        @Override
-        public void execute(final Context context) {}
     }
 }

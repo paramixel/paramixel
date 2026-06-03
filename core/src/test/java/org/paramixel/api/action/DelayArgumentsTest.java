@@ -50,15 +50,15 @@ class DelayArgumentsTest {
     void ofLongAcceptsZeroMillis() {
         var delay = Delay.of("delay", 0);
         assertThat(delay).isNotNull();
-        assertThat(delay.name()).isEqualTo("delay");
+        assertThat(delay.displayName()).isEqualTo("delay");
     }
 
     @Test
     @DisplayName("of(String, long) creates delay with name")
     void ofLongCreatesDelay() {
         var delay = Delay.of("delay", 100);
-        assertThat(delay.name()).isEqualTo("delay");
-        assertThat(delay.kind()).isEqualTo("Delay");
+        assertThat(delay.displayName()).isEqualTo("delay");
+        assertThat(delay).isInstanceOf(Delay.class);
     }
 
     @Test
@@ -89,7 +89,7 @@ class DelayArgumentsTest {
     @DisplayName("of(String, Duration) creates delay with name")
     void ofDurationCreatesDelay() {
         var delay = Delay.of("delay", ofMillis(100));
-        assertThat(delay.name()).isEqualTo("delay");
+        assertThat(delay.displayName()).isEqualTo("delay");
     }
 
     @Test
@@ -121,14 +121,32 @@ class DelayArgumentsTest {
     void randomAcceptsEqualMinMax() {
         var delay = Delay.random("delay", 5, 5);
         assertThat(delay).isNotNull();
-        assertThat(delay.name()).isEqualTo("delay");
+        assertThat(delay.displayName()).isEqualTo("delay");
+    }
+
+    @Test
+    @DisplayName("random(String, long, long) accepts Long.MAX_VALUE equal bounds")
+    void randomAcceptsLongMaxEqualBounds() {
+        var delay = Delay.random("delay", Long.MAX_VALUE, Long.MAX_VALUE);
+
+        assertThat(delay).isNotNull();
+        assertThat(delay.displayName()).isEqualTo("delay");
+    }
+
+    @Test
+    @DisplayName("random(String, long, long) accepts Long.MAX_VALUE maximum")
+    void randomAcceptsLongMaxMaximum() {
+        var delay = Delay.random("delay", Long.MAX_VALUE - 1, Long.MAX_VALUE);
+
+        assertThat(delay).isNotNull();
+        assertThat(delay.displayName()).isEqualTo("delay");
     }
 
     @Test
     @DisplayName("random(String, long, long) creates delay with name")
     void randomCreatesDelay() {
         var delay = Delay.random("delay", 1, 10);
-        assertThat(delay.name()).isEqualTo("delay");
-        assertThat(delay.kind()).isEqualTo("Delay");
+        assertThat(delay.displayName()).isEqualTo("delay");
+        assertThat(delay).isInstanceOf(Delay.class);
     }
 }

@@ -19,15 +19,15 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
-import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import nonapi.org.paramixel.FrameworkException;
+import nonapi.org.paramixel.exception.UserCodeException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.action.Metadata;
-import org.paramixel.api.action.Mode;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
@@ -44,14 +44,12 @@ class StatusTest {
         assertThat(Status.RUNNING.isFailed()).isFalse();
         assertThat(Status.RUNNING.isSkipped()).isFalse();
         assertThat(Status.RUNNING.isAborted()).isFalse();
-        assertThat(Status.RUNNING.isTerminal()).isFalse();
     }
 
     @Test
-    @DisplayName("PENDING is pending and not terminal")
+    @DisplayName("PENDING is pending")
     void pendingIsPending() {
         assertThat(Status.PENDING.isPending()).isTrue();
-        assertThat(Status.PENDING.isTerminal()).isFalse();
         assertThat(Status.PENDING.isPassed()).isFalse();
         assertThat(Status.PENDING.isFailed()).isFalse();
         assertThat(Status.PENDING.isSkipped()).isFalse();
@@ -60,10 +58,9 @@ class StatusTest {
     }
 
     @Test
-    @DisplayName("PASSED is passed and terminal")
+    @DisplayName("PASSED is passed")
     void passedIsPassed() {
         assertThat(Status.PASSED.isPassed()).isTrue();
-        assertThat(Status.PASSED.isTerminal()).isTrue();
         assertThat(Status.PASSED.isPending()).isFalse();
         assertThat(Status.PASSED.isFailed()).isFalse();
         assertThat(Status.PASSED.isSkipped()).isFalse();
@@ -72,10 +69,9 @@ class StatusTest {
     }
 
     @Test
-    @DisplayName("FAILED is failed and terminal")
+    @DisplayName("FAILED is failed")
     void failedIsFailed() {
         assertThat(Status.FAILED.isFailed()).isTrue();
-        assertThat(Status.FAILED.isTerminal()).isTrue();
         assertThat(Status.FAILED.isPassed()).isFalse();
         assertThat(Status.FAILED.isPending()).isFalse();
         assertThat(Status.FAILED.isSkipped()).isFalse();
@@ -84,10 +80,9 @@ class StatusTest {
     }
 
     @Test
-    @DisplayName("SKIPPED is skipped and terminal")
+    @DisplayName("SKIPPED is skipped")
     void skippedIsSkipped() {
         assertThat(Status.SKIPPED.isSkipped()).isTrue();
-        assertThat(Status.SKIPPED.isTerminal()).isTrue();
         assertThat(Status.SKIPPED.isPassed()).isFalse();
         assertThat(Status.SKIPPED.isPending()).isFalse();
         assertThat(Status.SKIPPED.isFailed()).isFalse();
@@ -96,10 +91,9 @@ class StatusTest {
     }
 
     @Test
-    @DisplayName("ABORTED is aborted and terminal")
+    @DisplayName("ABORTED is aborted")
     void abortedIsAborted() {
         assertThat(Status.ABORTED.isAborted()).isTrue();
-        assertThat(Status.ABORTED.isTerminal()).isTrue();
         assertThat(Status.ABORTED.isPassed()).isFalse();
         assertThat(Status.ABORTED.isPending()).isFalse();
         assertThat(Status.ABORTED.isFailed()).isFalse();
@@ -187,8 +181,7 @@ class StatusTest {
         assertThat(failedWithThrowable1).isNotEqualTo(failedWithThrowable2);
         assertThat(failedWithThrowable1).isNotEqualTo(failedWithMessage);
         assertThat(failedWithThrowable1).isEqualTo(Status.failed("err", exception1));
-        assertThat(failedWithThrowable1).isEqualTo(failedWithThrowable3);
-        assertThat(failedWithThrowable1.hashCode()).isEqualTo(failedWithThrowable3.hashCode());
+        assertThat(failedWithThrowable1).isNotEqualTo(failedWithThrowable3);
         assertThat(failedWithThrowable1).isNotEqualTo(Status.failed("err", new IllegalStateException("boom")));
     }
 
@@ -204,35 +197,35 @@ class StatusTest {
     class FromThrowable {
 
         @Test
-        @DisplayName("FailException wrapped in FrameworkException returns failed with message")
-        void failExceptionWrappedInFrameworkException() {
-            var status = Status.fromThrowable(new FrameworkException(new FailException("assertion")));
+        @DisplayName("FailException wrapped in UserCodeException returns failed with message")
+        void failExceptionWrappedInUserCodeException() {
+            var status = Status.fromThrowable(new UserCodeException(new FailException("assertion")));
 
             assertThat(status.isFailed()).isTrue();
             assertThat(status.message()).contains("assertion");
         }
 
         @Test
-        @DisplayName("SkipException wrapped in FrameworkException returns skipped with message")
-        void skipExceptionWrappedInFrameworkException() {
-            var status = Status.fromThrowable(new FrameworkException(new SkipException("not ready")));
+        @DisplayName("SkipException wrapped in UserCodeException returns skipped with message")
+        void skipExceptionWrappedInUserCodeException() {
+            var status = Status.fromThrowable(new UserCodeException(new SkipException("not ready")));
 
             assertThat(status.isSkipped()).isTrue();
             assertThat(status.message()).contains("not ready");
         }
 
         @Test
-        @DisplayName("AbortedException wrapped in FrameworkException returns aborted with message")
-        void abortedExceptionWrappedInFrameworkException() {
-            var status = Status.fromThrowable(new FrameworkException(new AbortedException("precondition")));
+        @DisplayName("AbortedException wrapped in UserCodeException returns aborted with message")
+        void abortedExceptionWrappedInUserCodeException() {
+            var status = Status.fromThrowable(new UserCodeException(new AbortedException("precondition")));
 
             assertThat(status.isAborted()).isTrue();
             assertThat(status.message()).contains("precondition");
         }
 
         @Test
-        @DisplayName("RuntimeException wrapping FailException without FrameworkException is treated as failure")
-        void runtimeExceptionWrappingFailExceptionWithoutFrameworkExceptionIsTreatedAsFailure() {
+        @DisplayName("RuntimeException wrapping FailException without UserCodeException is treated as failure")
+        void runtimeExceptionWrappingFailExceptionWithoutUserCodeExceptionIsTreatedAsFailure() {
             var status = Status.fromThrowable(new RuntimeException(new FailException("assertion")));
 
             assertThat(status.isFailed()).isTrue();
@@ -240,10 +233,10 @@ class StatusTest {
         }
 
         @Test
-        @DisplayName("FrameworkException unwraps checked exception and preserves cause")
-        void frameworkExceptionUnwrapsCheckedExceptionAndPreservesCause() {
+        @DisplayName("UserCodeException unwraps checked exception and preserves cause")
+        void userCodeExceptionUnwrapsCheckedExceptionAndPreservesCause() {
             var cause = new IOException("disk offline");
-            var status = Status.fromThrowable(new FrameworkException(cause));
+            var status = Status.fromThrowable(new UserCodeException(cause));
 
             assertThat(status.isFailed()).isTrue();
             assertThat(status.message()).contains("disk offline");
@@ -262,8 +255,8 @@ class StatusTest {
         }
 
         @Test
-        @DisplayName("RuntimeException without FrameworkException is not unwrapped")
-        void runtimeExceptionWithoutFrameworkExceptionIsNotUnwrapped() {
+        @DisplayName("RuntimeException without UserCodeException is not unwrapped")
+        void runtimeExceptionWithoutUserCodeExceptionIsNotUnwrapped() {
             var cause = new IOException("inner");
             var runtimeException = new RuntimeException("outer", cause);
             var status = Status.fromThrowable(runtimeException);
@@ -274,11 +267,11 @@ class StatusTest {
         }
 
         @Test
-        @DisplayName("FrameworkException wrapping InterruptedException restores interrupt flag")
-        void frameworkExceptionWrappingInterruptedExceptionRestoresInterruptFlag() {
+        @DisplayName("UserCodeException wrapping InterruptedException restores interrupt flag")
+        void userCodeExceptionWrappingInterruptedExceptionRestoresInterruptFlag() {
             Thread.interrupted();
             try {
-                var status = Status.fromThrowable(new FrameworkException(new InterruptedException("interrupted")));
+                var status = Status.fromThrowable(new UserCodeException(new InterruptedException("interrupted")));
 
                 assertThat(status.isFailed()).isTrue();
                 assertThat(status.throwable()).containsInstanceOf(InterruptedException.class);
@@ -357,40 +350,52 @@ class StatusTest {
         }
 
         private Descriptor stubDescriptor(final Status status) {
-            var metadata = new Metadata() {
+            return new Descriptor() {
+                private final Action action = Step.of("stub", ignored -> {});
+
+                @Override
+                public Optional<Descriptor> parent() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Action action() {
+                    return action;
+                }
+
                 @Override
                 public String id() {
                     return "stub";
                 }
 
                 @Override
-                public String name() {
-                    return "stub";
+                public boolean isPassed() {
+                    return status.isPassed();
                 }
 
                 @Override
-                public String kind() {
-                    return "stub";
+                public boolean isFailed() {
+                    return status.isFailed();
                 }
 
                 @Override
-                public String className() {
-                    return "Stub";
+                public boolean isSkipped() {
+                    return status.isSkipped();
                 }
 
                 @Override
-                public Status status() {
-                    return status;
+                public boolean isAborted() {
+                    return status.isAborted();
                 }
 
                 @Override
-                public Mode mode() {
-                    return Mode.RUN;
+                public Optional<Instant> startedAt() {
+                    return Optional.empty();
                 }
 
                 @Override
-                public Duration runDuration() {
-                    return Duration.ZERO;
+                public Optional<Instant> completedAt() {
+                    return Optional.empty();
                 }
 
                 @Override
@@ -405,18 +410,7 @@ class StatusTest {
 
                 @Override
                 public boolean isCompleted() {
-                    return status.isTerminal();
-                }
-            };
-            return new Descriptor() {
-                @Override
-                public Optional<Descriptor> parent() {
-                    return Optional.empty();
-                }
-
-                @Override
-                public Metadata metadata() {
-                    return metadata;
+                    return !status.isPending() && !status.isRunning();
                 }
 
                 @Override

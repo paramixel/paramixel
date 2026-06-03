@@ -16,97 +16,55 @@
 
 package org.paramixel.api.action;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Stream;
-import nonapi.org.paramixel.FrameworkException;
-import nonapi.org.paramixel.action.ConcreteContext;
-import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.support.Arguments;
-import org.paramixel.api.Descriptor;
-import org.paramixel.api.Status;
-import org.paramixel.api.ThrowingRunnable;
 
 /**
- * An action that executes a before-action, zero or more body actions, and an after-action
+ * An action that executes a before-action, a single body child, and an after-action
  * without managing a test fixture instance.
  *
  * <p>Unlike {@link Instance}, this action does not create or destroy a fixture. It is
  * suitable for standalone test steps that do not require a shared instance. When configured
- * as <em>dependent</em> (the default), a failure in any body child causes remaining body
- * children to be skipped. When configured as <em>independent</em>, all body
- * children run regardless of individual outcomes.
+ * as <em>dependent</em> (the default), a failure in the body child causes the body child
+ * execution to fail. When configured as <em>independent</em>, the body child runs regardless
+ * of its outcome.
+ *
+ * <p>To execute multiple body actions, wrap a {@link Sequence} or {@link Parallel}
+ * in {@link Builder#body(Action)}.
  */
-public final class Static implements Action<Void> {
+public final class Static implements Action {
 
-    private static final String KIND = "Static";
+    private final String displayName;
+    private final Action before;
+    private final Action body;
+    private final Action after;
 
-    private final String name;
-    private final Action<?> before;
-    private final List<Action<?>> children;
-    private final Action<?> after;
-    private final boolean dependent;
-
-    private Static(
-            final String name,
-            final Action<?> before,
-            final List<Action<?>> children,
-            final Action<?> after,
-            final boolean dependent) {
-        Objects.requireNonNull(name, "name is null");
-        this.name = Arguments.requireNonBlank(name, "name is blank");
+    private Static(final String displayName, final Action before, final Action body, final Action after) {
+        Objects.requireNonNull(displayName, "displayName is null");
+        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
         this.before = before;
-        this.children = List.copyOf(children);
+        this.body = Objects.requireNonNull(body, "body is null");
         this.after = after;
-        validateChildren();
-        this.dependent = dependent;
     }
 
     /**
-     * Creates a new spec for a {@code Static} action with the given name.
+     * Creates a new builder for a {@code Static} action with the given display name.
      *
-     * @param name the action name; must not be {@code null} or blank
-     * @return a new spec
-     * @throws NullPointerException if {@code name} is {@code null}
-     * @throws IllegalArgumentException if {@code name} is blank
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    public static Spec of(final String name) {
-        Objects.requireNonNull(name, "name is null");
-        Arguments.requireNonBlank(name, "name is blank");
-        return new Spec(name);
+    public static Builder builder(final String displayName) {
+        Objects.requireNonNull(displayName, "displayName is null");
+        Arguments.requireNonBlank(displayName, "displayName is blank");
+        return new Builder(displayName);
     }
 
     @Override
-    public String name() {
-        return name;
-    }
-
-    @Override
-    public String kind() {
-        return KIND;
-    }
-
-    /**
-     * Returns whether body children are dependent — i.e., a failure in one child causes
-     * remaining children to be skipped.
-     *
-     * @return {@code true} if body children are dependent
-     */
-    public boolean isDependent() {
-        return dependent;
-    }
-
-    /**
-     * Returns whether body children are independent — i.e., all run regardless of
-     * individual outcomes.
-     *
-     * @return {@code true} if body children are independent
-     */
-    public boolean isIndependent() {
-        return !dependent;
+    public String displayName() {
+        return displayName;
     }
 
     /**
@@ -114,14 +72,17 @@ public final class Static implements Action<Void> {
      *
      * @return the before-action, or empty if none is declared
      */
-    @Override
-    public Optional<Action<?>> before() {
+    public Optional<Action> before() {
         return Optional.ofNullable(before);
     }
 
-    @Override
-    public List<Action<?>> children() {
-        return children;
+    /**
+     * Returns the body child action.
+     *
+     * @return the body child action; never {@code null}
+     */
+    public Action body() {
+        return body;
     }
 
     /**
@@ -129,314 +90,103 @@ public final class Static implements Action<Void> {
      *
      * @return the after-action, or empty if none is declared
      */
-    @Override
-    public Optional<Action<?>> after() {
+    public Optional<Action> after() {
         return Optional.ofNullable(after);
     }
 
-    @Override
-    public void execute(final Context context) {
-        Objects.requireNonNull(context, "context is null");
-        var descriptor = context.descriptor();
-        var listener = context.listener();
-        listener.onBeforeExecution(descriptor);
-        context.setStatus(Status.RUNNING);
-        try {
-            var mode = descriptor.metadata().mode();
-            if (mode != Mode.RUN) {
-                runChildren(context, mode);
-                context.setStatus(mode.toStatus());
-            } else {
-                context.setStatus(run(context));
-            }
-        } catch (Throwable t) {
-            context.setStatus(Status.fromThrowable(FrameworkException.wrap(t)));
-        }
-        listener.onAfterExecution(descriptor);
-    }
-
-    private Status run(final Context context) {
-        var descriptor = context.descriptor();
-        var aggregated = new StatusAccumulator();
-        var mode = Mode.RUN;
-
-        try {
-            var beforeDescriptor = descriptor.before().orElse(null);
-            if (beforeDescriptor != null) {
-                var beforeResult = runChild(context, beforeDescriptor, Mode.RUN);
-                aggregated.include(beforeResult);
-                var beforeStatus = beforeResult.metadata().status();
-                if (!beforeStatus.isPassed()) {
-                    mode = Mode.SKIP;
-                }
-            }
-
-            for (var child : descriptor.children()) {
-                var childResult = runChild(context, child, mode);
-                aggregated.include(childResult);
-
-                if (mode != Mode.RUN) {
-                    continue;
-                }
-
-                var childStatus = childResult.metadata().status();
-                if (dependent && !childStatus.isPassed() && !childStatus.isAborted()) {
-                    mode = Mode.fromStatus(childStatus);
-                }
-            }
-        } finally {
-            descriptor
-                    .after()
-                    .ifPresent(afterDescriptor -> aggregated.include(runChild(context, afterDescriptor, Mode.RUN)));
-        }
-
-        return aggregated.status();
-    }
-
-    private void validateChildren() {
-        Arguments.requireTrue(before != this, "action must not add itself as a child");
-        Arguments.requireTrue(after != this, "action must not add itself as a child");
-        for (Action<?> child : children) {
-            Arguments.requireTrue(child != this, "action must not add itself as a child");
-        }
-    }
-
-    private static Descriptor runChild(final Context context, final Descriptor child, final Mode mode) {
-        if (context instanceof ConcreteContext concrete) {
-            return concrete.runChild(child, mode);
-        }
-        throw new IllegalArgumentException("context must be a ConcreteContext");
-    }
-
-    private static void runChildren(final Context context, final Mode mode) {
-        if (context instanceof ConcreteContext concrete) {
-            concrete.runChildren(mode);
-        } else {
-            throw new IllegalArgumentException("context must be a ConcreteContext");
-        }
-    }
-
     /**
-     * Fluent spec for {@link Static} actions.
+     * Fluent builder for {@link Static} actions.
      */
-    public static final class Spec implements org.paramixel.api.action.Spec<Void> {
+    public static final class Builder implements org.paramixel.api.action.Builder {
 
-        private final String name;
-        private Action<?> before;
-        private final List<Action<?>> children = new ArrayList<>();
-        private Action<?> after;
-        private boolean dependent = true;
-        private boolean resolved;
+        private final String displayName;
+        private Action before;
+        private Action body;
+        private Action after;
 
-        private Spec(final String name) {
-            this.name = name;
+        private Builder(final String displayName) {
+            this.displayName = displayName;
         }
 
         /**
-         * Configures the static action as dependent, so that a failure in any body child
-         * causes remaining body children to be skipped or aborted. This is the default.
-         *
-         * @return this spec
-         * @throws IllegalStateException if this spec has already been resolved
-         */
-        public Spec dependent() {
-            ensureNotResolved();
-            dependent = true;
-            return this;
-        }
-
-        /**
-         * Configures the static action as independent, so that all body children run
-         * regardless of individual outcomes.
-         *
-         * @return this spec
-         * @throws IllegalStateException if this spec has already been resolved
-         */
-        public Spec independent() {
-            ensureNotResolved();
-            dependent = false;
-            return this;
-        }
-
-        /**
-         * Adds a before-action resolved from the supplied spec. Calling this method
+         * Sets the before-action. Calling this method
          * again overwrites the previous before-action.
          *
-         * @param spec the spec for the before-action; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code spec} is {@code null}
-         * @throws IllegalStateException if this spec has already been resolved
+         * @param action the before-action; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Spec before(final org.paramixel.api.action.Spec<?> spec) {
-            ensureNotResolved();
-            this.before = Objects.requireNonNull(spec, "spec is null").resolve();
+        public Builder before(final Action action) {
+            this.before = Objects.requireNonNull(action, "action is null");
             return this;
         }
 
         /**
-         * Adds a before-action that invokes the supplied runnable. Calling this method
-         * again overwrites the previous before-action.
+         * Sets the before-action from a builder. The builder is built immediately
+         * and the resulting action snapshot is stored.
          *
-         * @param name the action name; must not be {@code null} or blank
-         * @param runnable the runnable to invoke; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code name} or {@code runnable} is {@code null}
-         * @throws IllegalArgumentException if {@code name} is blank
-         * @throws IllegalStateException if this spec has already been resolved
+         * @param builder the before-action builder; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code builder} is {@code null}
          */
-        public Spec before(final String name, final ThrowingRunnable runnable) {
-            return before(toStep(name, runnable));
-        }
-
-        /**
-         * Adds a before-action with a custom kind that invokes the supplied runnable.
-         * Calling this method again overwrites the previous before-action.
-         *
-         * @param name the action name; must not be {@code null} or blank
-         * @param kind the action kind; must not be {@code null} or blank
-         * @param runnable the runnable to invoke; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code name}, {@code kind}, or {@code runnable} is {@code null}
-         * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
-         * @throws IllegalStateException if this spec has already been resolved
-         */
-        public Spec before(final String name, final String kind, final ThrowingRunnable runnable) {
-            return before(toStep(name, kind, runnable));
-        }
-
-        /**
-         * Adds a body action resolved from the supplied spec.
-         *
-         * @param spec the spec for the child action; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code spec} is {@code null}
-         * @throws IllegalStateException if this spec has already been resolved
-         */
-        public Spec child(final org.paramixel.api.action.Spec<?> spec) {
-            ensureNotResolved();
-            children.add(Objects.requireNonNull(spec, "spec is null").resolve());
+        public Builder before(final org.paramixel.api.action.Builder builder) {
+            Objects.requireNonNull(builder, "builder is null");
+            this.before = Objects.requireNonNull(builder.build(), "builder.build() returned null");
             return this;
         }
 
         /**
-         * Adds a body action that invokes the supplied runnable.
+         * Sets the body action. Calling this method
+         * again overwrites the previous body action.
          *
-         * @param name the action name; must not be {@code null} or blank
-         * @param runnable the runnable to invoke; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code name} or {@code runnable} is {@code null}
-         * @throws IllegalArgumentException if {@code name} is blank
-         * @throws IllegalStateException if this spec has already been resolved
+         * @param action the body action; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Spec child(final String name, final ThrowingRunnable runnable) {
-            return child(toStep(name, runnable));
-        }
-
-        /**
-         * Adds a body action with a custom kind that invokes the supplied runnable.
-         *
-         * @param name the action name; must not be {@code null} or blank
-         * @param kind the action kind; must not be {@code null} or blank
-         * @param runnable the runnable to invoke; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code name}, {@code kind}, or {@code runnable} is {@code null}
-         * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
-         * @throws IllegalStateException if this spec has already been resolved
-         */
-        public Spec child(final String name, final String kind, final ThrowingRunnable runnable) {
-            return child(toStep(name, kind, runnable));
-        }
-
-        /**
-         * Adds a body action for each item in the iterable by applying the supplied mapper function.
-         *
-         * <p>This is a convenience method that produces the same tree as calling
-         * {@link #child(org.paramixel.api.action.Spec) child(Spec)} in a for-loop. The mapper is called for
-         * each item at spec-building time ({@link #resolve()}), not at execution time. An empty
-         * iterable adds no children.</p>
-         *
-         * @param <U> the type of items in the iterable
-         * @param items the items to iterate over; must not be {@code null}
-         * @param mapper the function that maps each item to a child action spec; must not be
-         *     {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
-         * @throws IllegalStateException if this spec has already been resolved
-         */
-        public <U> Spec each(final Iterable<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
-            ensureNotResolved();
-            Objects.requireNonNull(items, "items is null");
-            Objects.requireNonNull(mapper, "mapper is null");
-            for (U item : items) {
-                child(mapper.apply(item));
-            }
+        public Builder body(final Action action) {
+            this.body = Objects.requireNonNull(action, "action is null");
             return this;
         }
 
         /**
-         * Adds a body action for each item in the stream by applying the supplied mapper function.
+         * Sets the body action from a builder. The builder is built immediately
+         * and the resulting action snapshot is stored.
          *
-         * <p>The stream is materialized to a list immediately and then delegated to
-         * {@link #each(Iterable, Function)}. The mapper is called for each item at spec-building time
-         * ({@link #resolve()}), not at execution time. An empty stream adds no children.</p>
-         *
-         * @param <U> the type of items in the stream
-         * @param items the items to iterate over; must not be {@code null}
-         * @param mapper the function that maps each item to a child action spec; must not be
-         *     {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
-         * @throws IllegalStateException if this spec has already been resolved
+         * @param builder the body action builder; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code builder} is {@code null}
          */
-        public <U> Spec each(final Stream<U> items, final Function<U, org.paramixel.api.action.Spec<?>> mapper) {
-            Objects.requireNonNull(items, "items is null");
-            return each(items.toList(), mapper);
+        public Builder body(final org.paramixel.api.action.Builder builder) {
+            Objects.requireNonNull(builder, "builder is null");
+            this.body = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+            return this;
         }
 
         /**
-         * Adds an after-action resolved from the supplied spec. Calling this method
+         * Sets the after-action. Calling this method
          * again overwrites the previous after-action.
          *
-         * @param spec the spec for the after-action; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code spec} is {@code null}
-         * @throws IllegalStateException if this spec has already been resolved
+         * @param action the after-action; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Spec after(final org.paramixel.api.action.Spec<?> spec) {
-            ensureNotResolved();
-            this.after = Objects.requireNonNull(spec, "spec is null").resolve();
+        public Builder after(final Action action) {
+            this.after = Objects.requireNonNull(action, "action is null");
             return this;
         }
 
         /**
-         * Adds an after-action that invokes the supplied runnable. Calling this method
-         * again overwrites the previous after-action.
+         * Sets the after-action from a builder. The builder is built immediately
+         * and the resulting action snapshot is stored.
          *
-         * @param name the action name; must not be {@code null} or blank
-         * @param runnable the runnable to invoke; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code name} or {@code runnable} is {@code null}
-         * @throws IllegalArgumentException if {@code name} is blank
-         * @throws IllegalStateException if this spec has already been resolved
+         * @param builder the after-action builder; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code builder} is {@code null}
          */
-        public Spec after(final String name, final ThrowingRunnable runnable) {
-            return after(toStep(name, runnable));
-        }
-
-        /**
-         * Adds an after-action with a custom kind that invokes the supplied runnable.
-         * Calling this method again overwrites the previous after-action.
-         *
-         * @param name the action name; must not be {@code null} or blank
-         * @param kind the action kind; must not be {@code null} or blank
-         * @param runnable the runnable to invoke; must not be {@code null}
-         * @return this spec
-         * @throws NullPointerException if {@code name}, {@code kind}, or {@code runnable} is {@code null}
-         * @throws IllegalArgumentException if {@code name} or {@code kind} is blank
-         * @throws IllegalStateException if this spec has already been resolved
-         */
-        public Spec after(final String name, final String kind, final ThrowingRunnable runnable) {
-            return after(toStep(name, kind, runnable));
+        public Builder after(final org.paramixel.api.action.Builder builder) {
+            Objects.requireNonNull(builder, "builder is null");
+            this.after = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+            return this;
         }
 
         /**
@@ -444,32 +194,12 @@ public final class Static implements Action<Void> {
          *
          * @return a new static action
          */
-        public Static resolve() {
-            ensureNotResolved();
-            resolved = true;
-            return new Static(name, before, List.copyOf(children), after, dependent);
-        }
-
-        private void ensureNotResolved() {
-            if (resolved) {
-                throw new IllegalStateException("spec already resolved");
+        @Override
+        public Static build() {
+            if (body == null) {
+                throw new IllegalStateException("body action must be configured");
             }
-        }
-
-        private static Action<?> toStep(final String name, final ThrowingRunnable runnable) {
-            Objects.requireNonNull(name, "name is null");
-            Arguments.requireNonBlank(name, "name is blank");
-            Objects.requireNonNull(runnable, "runnable is null");
-            return Step.of(name, ctx -> runnable.run());
-        }
-
-        private static Action<?> toStep(final String name, final String kind, final ThrowingRunnable runnable) {
-            Objects.requireNonNull(name, "name is null");
-            Arguments.requireNonBlank(name, "name is blank");
-            Objects.requireNonNull(kind, "kind is null");
-            Arguments.requireNonBlank(kind, "kind is blank");
-            Objects.requireNonNull(runnable, "runnable is null");
-            return Step.of(name, kind, ctx -> runnable.run());
+            return new Static(displayName, before, body, after);
         }
     }
 }

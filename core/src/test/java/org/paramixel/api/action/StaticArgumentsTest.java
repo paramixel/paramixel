@@ -17,12 +17,10 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.ThrowingRunnable;
 
 @DisplayName("Static arguments")
 class StaticArgumentsTest {
@@ -30,233 +28,138 @@ class StaticArgumentsTest {
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Static.of(null)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Static.of(" ")).isInstanceOf(IllegalArgumentException.class);
-        var action = Static.of("empty").resolve();
-        assertThat(action.before()).isEmpty();
-        assertThat(action.children()).isEmpty();
-        assertThat(action.after()).isEmpty();
+        assertThatThrownBy(() -> Static.builder(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Static.builder(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Static.builder("empty").build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("body action must be configured");
     }
 
     @Test
-    @DisplayName("before(Spec) rejects null spec")
-    void beforeSpecRejectsNull() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.before((Spec<?>) null)).isInstanceOf(NullPointerException.class);
+    @DisplayName("before(Action) rejects null builder")
+    void beforeBuilderRejectsNull() {
+        var builder = Static.builder("static");
+        assertThatThrownBy(() -> builder.before((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("before(String, ThrowingRunnable) rejects null name")
-    void beforeStringRunnableRejectsNullName() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.before(null, () -> {})).isInstanceOf(NullPointerException.class);
+    @DisplayName("after(Action) rejects null builder")
+    void afterBuilderRejectsNull() {
+        var builder = Static.builder("static");
+        assertThatThrownBy(() -> builder.after((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("before(String, ThrowingRunnable) rejects blank name")
-    void beforeStringRunnableRejectsBlankName() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.before(" ", () -> {})).isInstanceOf(IllegalArgumentException.class);
+    @DisplayName("wrap(Action) rejects null builder")
+    void wrapBuilderRejectsNull() {
+        var builder = Static.builder("static");
+        assertThatThrownBy(() -> builder.body((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("before(String, ThrowingRunnable) rejects null runnable")
-    void beforeStringRunnableRejectsNullRunnable() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.before("before", (ThrowingRunnable) null))
-                .isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("after(Spec) rejects null spec")
-    void afterSpecRejectsNull() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.after((Spec<?>) null)).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("after(String, ThrowingRunnable) rejects null name")
-    void afterStringRunnableRejectsNullName() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.after(null, () -> {})).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("after(String, ThrowingRunnable) rejects blank name")
-    void afterStringRunnableRejectsBlankName() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.after(" ", () -> {})).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    @DisplayName("after(String, ThrowingRunnable) rejects null runnable")
-    void afterStringRunnableRejectsNullRunnable() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.after("after", (ThrowingRunnable) null)).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("child(Spec) rejects null spec")
-    void childSpecRejectsNull() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.child((Spec<?>) null)).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("child(Spec) adds child from spec")
-    void childSpecAddsChild() {
-        var action = Static.of("static").child(Step.of("step", ctx -> {})).resolve();
-        assertThat(action.children().stream().filter(a -> "step".equals(a.name())))
-                .hasSize(1);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingRunnable) rejects null name")
-    void childStringRunnableRejectsNullName() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.child(null, () -> {})).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingRunnable) rejects blank name")
-    void childStringRunnableRejectsBlankName() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.child(" ", () -> {})).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingRunnable) rejects null runnable")
-    void childStringRunnableRejectsNullRunnable() {
-        var spec = Static.of("static");
-        assertThatThrownBy(() -> spec.child("child", (ThrowingRunnable) null)).isInstanceOf(NullPointerException.class);
+    @DisplayName("wrap(Action) sets child")
+    void wrapBuilderSetsBody() {
+        var action =
+                Static.builder("static").body(Step.of("step", context -> {})).build();
+        assertThat(action.body()).isNotNull();
+        assertThat(action.body().displayName()).isEqualTo("step");
     }
 
     @Test
     @DisplayName("builder accumulates multiple children")
     void builderAccumulatesMultipleChildren() {
-        var action = Static.of("static")
-                .child("first", () -> {})
-                .child("second", () -> {})
-                .child("third", () -> {})
-                .resolve();
-        assertThat(action.children().stream()
-                        .filter(a -> "first".equals(a.name()) || "second".equals(a.name()) || "third".equals(a.name())))
-                .hasSize(3);
+        var action = Static.builder("static")
+                .body(Sequence.builder("body")
+                        .child(Step.of("first", context -> {}))
+                        .child(Step.of("second", context -> {}))
+                        .child(Step.of("third", context -> {}))
+                        .build())
+                .build();
+        assertThat(action.body()).isNotNull();
+        assertThat(action.body().displayName()).isEqualTo("body");
     }
 
     @Test
-    @DisplayName("builder is one-shot — before(Spec) after resolve throws ISE")
-    void builderOneShotBeforeBuilder() {
-        var spec = Static.of("static");
-        spec.child("test", () -> {});
-        spec.resolve();
-        assertThatIllegalStateException().isThrownBy(() -> spec.before(Step.of("before", ctx -> {})));
+    @DisplayName("before(Action) after build affects future snapshots")
+    void beforeAfterBuildAffectsFutureSnapshots() {
+        var builder = Static.builder("static");
+        builder.body(Step.of("test", context -> {}));
+        var first = builder.build();
+        builder.before(Step.of("before", context -> {}));
+        var second = builder.build();
+
+        assertThat(first.before()).isEmpty();
+        assertThat(second.before()).isPresent();
+        assertThat(second.before().get().displayName()).isEqualTo("before");
     }
 
     @Test
-    @DisplayName("builder is one-shot — after(Spec) after resolve throws ISE")
-    void builderOneShotAfterBuilder() {
-        var spec = Static.of("static");
-        spec.child("test", () -> {});
-        spec.resolve();
-        assertThatIllegalStateException().isThrownBy(() -> spec.after(Step.of("after", ctx -> {})));
+    @DisplayName("after(Action) after build affects future snapshots")
+    void afterAfterBuildAffectsFutureSnapshots() {
+        var builder = Static.builder("static");
+        builder.body(Step.of("test", context -> {}));
+        var first = builder.build();
+        builder.after(Step.of("after", context -> {}));
+        var second = builder.build();
+
+        assertThat(first.after()).isEmpty();
+        assertThat(second.after()).isPresent();
+        assertThat(second.after().get().displayName()).isEqualTo("after");
     }
 
     @Test
-    @DisplayName("builder is one-shot — child(Spec) after resolve throws ISE")
-    void builderOneShotChildBuilder() {
-        var spec = Static.of("static");
-        spec.child("test", () -> {});
-        spec.resolve();
-        assertThatIllegalStateException().isThrownBy(() -> spec.child(Step.of("other", ctx -> {})));
+    @DisplayName("wrap(Action) after build affects future snapshots")
+    void wrapAfterBuildAffectsFutureSnapshots() {
+        var builder = Static.builder("static");
+        builder.body(Step.of("test", context -> {}));
+        var first = builder.build();
+        builder.body(Step.of("other", context -> {}));
+        var second = builder.build();
+
+        assertThat(first.body().displayName()).isEqualTo("test");
+        assertThat(second.body().displayName()).isEqualTo("other");
     }
 
     @Test
-    @DisplayName("before(Spec) overwrites previous before")
+    @DisplayName("before(Action) overwrites previous before")
     void beforeBuilderOverwritesBefore() {
-        var spec = Static.of("static");
-        spec.before(Step.of("first", ctx -> {}));
-        spec.before(Step.of("second", ctx -> {}));
-        var action = spec.child("test", () -> {}).resolve();
+        var builder = Static.builder("static");
+        builder.before(Step.of("first", context -> {}));
+        builder.before(Step.of("second", context -> {}));
+        var action = builder.body(Step.of("test", context -> {})).build();
         assertThat(action).isNotNull();
         assertThat(action.before()).isPresent();
-        assertThat(action.before().get().name()).isEqualTo("second");
+        assertThat(action.before().get().displayName()).isEqualTo("second");
     }
 
     @Test
-    @DisplayName("before(String, ThrowingRunnable) overwrites previous before")
-    void beforeStringRunnableOverwritesBefore() {
-        var spec = Static.of("static");
-        spec.before("first", () -> {});
-        spec.before("second", () -> {});
-        var action = spec.child("test", () -> {}).resolve();
-        assertThat(action).isNotNull();
-        assertThat(action.before()).isPresent();
-        assertThat(action.before().get().name()).isEqualTo("second");
-    }
-
-    @Test
-    @DisplayName("after(Spec) overwrites previous after")
+    @DisplayName("after(Action) overwrites previous after")
     void afterBuilderOverwritesAfter() {
-        var spec = Static.of("static");
-        spec.after(Step.of("first", ctx -> {}));
-        spec.after(Step.of("second", ctx -> {}));
-        var action = spec.child("test", () -> {}).resolve();
+        var builder = Static.builder("static");
+        builder.after(Step.of("first", context -> {}));
+        builder.after(Step.of("second", context -> {}));
+        var action = builder.body(Step.of("test", context -> {})).build();
         assertThat(action).isNotNull();
         assertThat(action.after()).isPresent();
-        assertThat(action.after().get().name()).isEqualTo("second");
+        assertThat(action.after().get().displayName()).isEqualTo("second");
     }
 
     @Test
-    @DisplayName("after(String, ThrowingRunnable) overwrites previous after")
-    void afterStringRunnableOverwritesAfter() {
-        var spec = Static.of("static");
-        spec.after("first", () -> {});
-        spec.after("second", () -> {});
-        var action = spec.child("test", () -> {}).resolve();
-        assertThat(action).isNotNull();
-        assertThat(action.after()).isPresent();
-        assertThat(action.after().get().name()).isEqualTo("second");
-    }
+    @DisplayName("builder can build multiple immutable snapshots")
+    void builderCanBuildMultipleImmutableSnapshots() {
+        var builder = Static.builder("static");
+        builder.body(Step.of("test", context -> {}));
+        var first = builder.build();
+        builder.body(Step.of("other", context -> {}));
+        builder.before(Step.of("before", context -> {}));
+        builder.after(Step.of("after", context -> {}));
+        var second = builder.build();
 
-    @Test
-    @DisplayName("builder is one-shot")
-    void builderOneShotBehavior() {
-        var spec = Static.of("static");
-        spec.child("test", () -> {});
-        spec.resolve();
-        assertThatIllegalStateException().isThrownBy(() -> spec.resolve());
-        assertThatIllegalStateException().isThrownBy(() -> spec.child("other", () -> {}));
-        assertThatIllegalStateException().isThrownBy(() -> spec.before("before", () -> {}));
-        assertThatIllegalStateException().isThrownBy(() -> spec.after("after", () -> {}));
-        assertThatIllegalStateException().isThrownBy(() -> spec.dependent());
-        assertThatIllegalStateException().isThrownBy(() -> spec.independent());
-    }
-
-    @Test
-    @DisplayName("default is dependent")
-    void defaultIsDependent() {
-        var action = Static.of("static").child("test", () -> {}).resolve();
-        assertThat(action.isDependent()).isTrue();
-        assertThat(action.isIndependent()).isFalse();
-    }
-
-    @Test
-    @DisplayName("independent() configures as independent")
-    void independentConfiguresAsIndependent() {
-        var action = Static.of("static").independent().child("test", () -> {}).resolve();
-        assertThat(action.isIndependent()).isTrue();
-        assertThat(action.isDependent()).isFalse();
-    }
-
-    @Test
-    @DisplayName("dependent() after independent() restores dependent")
-    void dependentAfterIndependentRestoresDependent() {
-        var action = Static.of("static")
-                .independent()
-                .dependent()
-                .child("test", () -> {})
-                .resolve();
-        assertThat(action.isDependent()).isTrue();
+        assertThat(first.body().displayName()).isEqualTo("test");
+        assertThat(first.before()).isEmpty();
+        assertThat(first.after()).isEmpty();
+        assertThat(second.body().displayName()).isEqualTo("other");
+        assertThat(second.before()).isPresent();
+        assertThat(second.after()).isPresent();
     }
 }

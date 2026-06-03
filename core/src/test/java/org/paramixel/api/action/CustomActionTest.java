@@ -21,8 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import nonapi.org.paramixel.action.ConcreteContext;
-import nonapi.org.paramixel.support.Arguments;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -30,7 +28,6 @@ import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 
 @DisplayName("Custom action")
 class CustomActionTest {
@@ -42,39 +39,57 @@ class CustomActionTest {
         var events = new ArrayList<String>();
         var listener = new RecordingListener(events);
 
-        Action<?> action = new SimplePrintAction("solo", messages);
+        Action action = Step.of("solo", context -> {
+            messages.add("solo executed");
+        });
         var result = Runner.builder().listener(listener).build().run(action);
         var root = result.descriptor().orElseThrow();
 
         assertThat(root).isNotNull();
-        assertThat(root.metadata().status().isPassed()).isTrue();
+        assertThat(root.isPassed()).isTrue();
         assertThat(messages).containsExactly("solo executed");
         assertThat(events).contains("before: solo", "after: solo [PASSED]");
     }
 
     @Test
     @DisplayName("custom action with five children executes sequentially")
-    void customActionWithFiveChildrenExecutesSequentially() {
+    void customActionWithFiveChildrenExecutesSequencely() {
         var messages = new ArrayList<String>();
         var events = new ArrayList<String>();
         var listener = new RecordingListener(events);
 
-        var children = new ArrayList<Action<?>>();
+        var body = Sequence.builder("body");
         for (int i = 1; i <= 5; i++) {
-            children.add(new SimplePrintAction("child-" + i, messages));
+            final int index = i;
+            body.child(Step.of("child-" + index, context -> {
+                messages.add("child-" + index + " executed");
+            }));
         }
 
-        Action<?> action = new SequentialPrintAction("parent", children, messages);
-        var result = Runner.builder().listener(listener).build().run(action);
-        var root = result.descriptor().orElseThrow();
+        var action = Static.builder("parent")
+                .before(Step.of("parent-setup", context -> {
+                    messages.add("parent before-children");
+                }))
+                .body(body.build())
+                .after(Step.of("parent-teardown", context -> {
+                    messages.add("parent after-children");
+                }))
+                .build();
+
+        var root = Runner.builder()
+                .listener(listener)
+                .build()
+                .run(action)
+                .descriptor()
+                .orElseThrow();
 
         assertThat(root).isNotNull();
-        assertThat(root.metadata().status().isPassed()).isTrue();
-        assertThat(root.children()).hasSize(5);
-
-        for (Descriptor child : root.children()) {
-            assertThat(child.metadata().status().isPassed()).isTrue();
-        }
+        assertThat(root.isPassed()).isTrue();
+        assertThat(root.before()).isPresent();
+        assertThat(root.children()).hasSize(1);
+        var bodyDescriptor = root.children().get(0);
+        assertThat(bodyDescriptor.children()).hasSize(5);
+        assertThat(root.after()).isPresent();
 
         assertThat(events)
                 .contains("before: parent", "after: parent [PASSED]")
@@ -83,9 +98,6 @@ class CustomActionTest {
                 .contains("before: child-3", "after: child-3 [PASSED]")
                 .contains("before: child-4", "after: child-4 [PASSED]")
                 .contains("before: child-5", "after: child-5 [PASSED]");
-
-        assertThat(events.indexOf("before: parent")).isLessThan(events.indexOf("before: child-1"));
-        assertThat(events.indexOf("after: child-5 [PASSED]")).isLessThan(events.indexOf("after: parent [PASSED]"));
 
         assertThat(messages)
                 .containsExactly(
@@ -98,103 +110,17 @@ class CustomActionTest {
                         "parent after-children");
     }
 
-    private static final class SimplePrintAction implements Action<Void> {
-
-        private final String name;
-        private final List<String> messages;
-
-        SimplePrintAction(final String name, final List<String> messages) {
-            Objects.requireNonNull(name, "name is null");
-            this.name = Arguments.requireNonBlank(name, "name is blank");
-            this.messages = Objects.requireNonNull(messages);
+    private static String statusName(final Descriptor descriptor) {
+        if (descriptor.isFailed()) {
+            return "FAILED";
         }
-
-        @Override
-        public String name() {
-            return name;
+        if (descriptor.isAborted()) {
+            return "ABORTED";
         }
-
-        @Override
-        public String kind() {
-            return "SimplePrintAction";
+        if (descriptor.isSkipped()) {
+            return "SKIPPED";
         }
-
-        @Override
-        public void execute(final Context context) {
-            Objects.requireNonNull(context);
-            var descriptor = context.descriptor();
-            var listener = context.listener();
-            listener.onBeforeExecution(descriptor);
-            context.setStatus(Status.RUNNING);
-            try {
-                messages.add(name + " executed");
-                context.setStatus(Status.PASSED);
-            } catch (Throwable t) {
-                context.setStatus(Status.fromThrowable(t));
-            }
-            listener.onAfterExecution(descriptor);
-        }
-    }
-
-    private static final class SequentialPrintAction implements Action<Void> {
-
-        private final String name;
-        private final List<Action<?>> children;
-        private final List<String> messages;
-
-        SequentialPrintAction(final String name, final List<Action<?>> children, final List<String> messages) {
-            Objects.requireNonNull(name, "name is null");
-            this.name = Arguments.requireNonBlank(name, "name is blank");
-            this.children = List.copyOf(Objects.requireNonNull(children));
-            this.messages = Objects.requireNonNull(messages);
-        }
-
-        @Override
-        public String name() {
-            return name;
-        }
-
-        @Override
-        public String kind() {
-            return "SequentialPrintAction";
-        }
-
-        @Override
-        public List<Action<?>> children() {
-            return children;
-        }
-
-        @Override
-        public void execute(final Context context) {
-            Objects.requireNonNull(context);
-            var descriptor = context.descriptor();
-            var listener = context.listener();
-            listener.onBeforeExecution(descriptor);
-            context.setStatus(Status.RUNNING);
-            try {
-                var mode = descriptor.metadata().mode();
-                if (mode != Mode.RUN) {
-                    if (context instanceof ConcreteContext concrete) {
-                        concrete.runChildren(mode);
-                    }
-                    context.setStatus(mode.toStatus());
-                } else {
-                    messages.add(name + " before-children");
-                    var childDescriptors = context.descriptor().children();
-                    var completed = new ArrayList<Descriptor>();
-                    for (Descriptor child : childDescriptors) {
-                        if (context instanceof ConcreteContext concrete) {
-                            completed.add(concrete.runChild(child, Mode.RUN));
-                        }
-                    }
-                    messages.add(name + " after-children");
-                    context.setStatus(Status.aggregate(completed));
-                }
-            } catch (Throwable t) {
-                context.setStatus(Status.fromThrowable(t));
-            }
-            listener.onAfterExecution(descriptor);
-        }
+        return descriptor.isPassed() ? "PASSED" : "RUNNING";
     }
 
     private static final class RecordingListener implements Listener {
@@ -218,18 +144,17 @@ class CustomActionTest {
 
         @Override
         public void onDiscoveryCompleted(final Descriptor root) {
-            events.add("discovery-completed: " + root.metadata().name());
+            events.add("discovery-completed: " + root.action().displayName());
         }
 
         @Override
         public void onBeforeExecution(final Descriptor descriptor) {
-            events.add("before: " + descriptor.metadata().name());
+            events.add("before: " + descriptor.action().displayName());
         }
 
         @Override
         public void onAfterExecution(final Descriptor descriptor) {
-            events.add("after: " + descriptor.metadata().name() + " ["
-                    + descriptor.metadata().status().name() + "]");
+            events.add("after: " + descriptor.action().displayName() + " [" + statusName(descriptor) + "]");
         }
 
         @Override

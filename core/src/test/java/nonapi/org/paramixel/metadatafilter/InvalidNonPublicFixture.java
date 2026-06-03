@@ -19,16 +19,12 @@ package nonapi.org.paramixel.metadatafilter;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 
-/**
- * Fixture with a package-private {@code @Paramixel.Factory} method to verify that the
- * metadata filter rejects non-public factory methods.
- */
 public final class InvalidNonPublicFixture {
 
     private InvalidNonPublicFixture() {}
 
     @Paramixel.Factory
-    static Action<?> factory() {
+    static Action factory() {
         return null;
     }
 }

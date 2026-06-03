@@ -22,8 +22,8 @@ import static org.assertj.core.data.Offset.offset;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 
 @DisplayName("Delay action")
 class DelayTest {
@@ -35,7 +35,7 @@ class DelayTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isPassed()).isTrue();
     }
 
     @Test
@@ -45,7 +45,7 @@ class DelayTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isPassed()).isTrue();
     }
 
     @Test
@@ -57,9 +57,8 @@ class DelayTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.metadata().runDuration().toMillis())
-                .isCloseTo(minimumMilliseconds, offset(maximumMilliseconds));
+        assertThat(root.isPassed()).isTrue();
+        assertThat(elapsedMillis(root)).isCloseTo(minimumMilliseconds, offset(maximumMilliseconds));
     }
 
     @Test
@@ -69,8 +68,8 @@ class DelayTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.metadata().runDuration().toMillis()).isCloseTo(50, offset(50L));
+        assertThat(root.isPassed()).isTrue();
+        assertThat(elapsedMillis(root)).isCloseTo(50, offset(50L));
     }
 
     @Test
@@ -80,8 +79,8 @@ class DelayTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        assertThat(root.metadata().runDuration().toMillis()).isLessThan(100);
+        assertThat(root.isPassed()).isTrue();
+        assertThat(elapsedMillis(root)).isLessThan(100);
     }
 
     @Test
@@ -89,6 +88,13 @@ class DelayTest {
     void getNameReturnsSuppliedName() {
         var action = Delay.of("my-delay", 100);
 
-        assertThat(action.name()).isEqualTo("my-delay");
+        assertThat(action.displayName()).isEqualTo("my-delay");
+    }
+
+    private static long elapsedMillis(final Descriptor descriptor) {
+        return Duration.between(
+                        descriptor.startedAt().orElseThrow(),
+                        descriptor.completedAt().orElseThrow())
+                .toMillis();
     }
 }

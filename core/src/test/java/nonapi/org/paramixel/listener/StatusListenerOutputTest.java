@@ -49,7 +49,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints before-action line with action details")
     void printsBeforeActionLineWithActionDetails() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("my-action", obj -> {});
+        Step noop = Step.of("my-action", context -> {});
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -64,16 +64,15 @@ class StatusListenerOutputTest {
         String result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain("RUN |");
         assertThat(result).contains("my-action");
-        assertThat(result).contains("Step");
     }
 
     @Test
     @DisplayName("suppresses output for root action")
     void suppressesOutputForRoot() {
         StatusListener listener = new StatusListener();
-        Action<?> child = Step.of("child", obj -> {});
-        Parallel<?> parallel =
-                Parallel.of(ROOT_NAME).parallelism(1).child(child).resolve();
+        Action child = Step.of("child", context -> {});
+        Parallel parallel =
+                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -93,7 +92,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints PASSED status with green color")
     void printsSuccessfulStatusWithGreenColor() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("passing-action", obj -> {});
+        Step noop = Step.of("passing-action", context -> {});
         Runner runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.ANSI, "true")))
                 .listener(listener)
@@ -116,7 +115,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints FAILED status with red color")
     void printsFailStatusWithRedColor() {
         StatusListener listener = new StatusListener();
-        Action<?> action = Step.of("failing-action", context -> {
+        Action action = Step.of("failing-action", context -> {
             throw new RuntimeException("fail");
         });
         Runner runner = Runner.builder()
@@ -141,7 +140,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints SKIPPED status with orange color")
     void printsSkipStatusWithOrangeColor() {
         StatusListener listener = new StatusListener();
-        Action<?> action = Step.of("skipping-action", context -> {
+        Action action = Step.of("skipping-action", context -> {
             throw new SkipException("skipped");
         });
         Runner runner = Runner.builder()
@@ -166,10 +165,10 @@ class StatusListenerOutputTest {
     @DisplayName("suppresses output for root in afterAction")
     void suppressesOutputForRootInAfterAction() {
         StatusListener listener = new StatusListener();
-        Parallel<?> parallel = Parallel.of(ROOT_NAME)
+        Parallel parallel = Parallel.builder(ROOT_NAME)
                 .parallelism(1)
-                .child(Step.of("child", obj -> {}))
-                .resolve();
+                .child(Step.of("child", context -> {}))
+                .build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -189,7 +188,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints exception details appended to FAILED status line")
     void printsExceptionDetailsAppendedToFailedStatusLine() {
         StatusListener listener = new StatusListener();
-        Action<?> action = Step.of("error-action", context -> {
+        Action action = Step.of("error-action", context -> {
             throw new RuntimeException("action error");
         });
         Runner runner = Runner.builder().listener(listener).build();
@@ -213,7 +212,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints EXCEPTION stack trace with prefix on each line")
     void printsExceptionStackTraceWithPrefixOnEachLine() {
         StatusListener listener = new StatusListener();
-        Action<?> action = Step.of("error-action", context -> {
+        Action action = Step.of("error-action", context -> {
             throw new RuntimeException("action error");
         });
         Runner runner = Runner.builder().listener(listener).build();
@@ -248,11 +247,11 @@ class StatusListenerOutputTest {
     @DisplayName("suppresses output for root in actionThrowable")
     void suppressesOutputForRootInActionThrowable() {
         StatusListener listener = new StatusListener();
-        Action<?> failingChild = Step.of("child-fail", context -> {
+        Action failingChild = Step.of("child-fail", context -> {
             throw new RuntimeException("child error");
         });
-        Parallel<?> parallel =
-                Parallel.of(ROOT_NAME).parallelism(1).child(failingChild).resolve();
+        Parallel parallel =
+                Parallel.builder(ROOT_NAME).parallelism(1).child(failingChild).build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream outputOut = new ByteArrayOutputStream();

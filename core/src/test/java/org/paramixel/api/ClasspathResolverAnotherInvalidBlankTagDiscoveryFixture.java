@@ -18,26 +18,17 @@ package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture annotated with a whitespace-only {@code @Paramixel.Tag("  ")} to verify that the resolver
- * rejects tags containing only spaces, distinct from single-space blank tags.
- */
 public final class ClasspathResolverAnotherInvalidBlankTagDiscoveryFixture {
 
     private ClasspathResolverAnotherInvalidBlankTagDiscoveryFixture() {}
 
-    /**
-     * Creates a no-op action with a whitespace-only tag for resolver validation tests.
-     *
-     * @return a {@link Step} action with the identifier
-     *     {@code "another-invalid-blank-tag-discovery"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag("  ")
-    public static Action<?> factory() {
-        return Instance.<Object>of("another-invalid-blank-tag-discovery", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("another-invalid-blank-tag-discovery", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

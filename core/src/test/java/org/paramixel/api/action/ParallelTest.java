@@ -29,18 +29,18 @@ class ParallelTest {
     @DisplayName("child RuntimeException preserves instance and stack trace")
     void childRuntimeExceptionPreservesInstance() {
         var exception = new RuntimeException("intentional failure");
-        var action = Parallel.of("failing-parallel")
-                .child("fail-step", ctx -> {
+        var action = Parallel.builder("failing-parallel")
+                .child(Step.of("fail-step", context -> {
                     throw exception;
-                })
-                .resolve();
+                }))
+                .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status().isFailed()).isTrue();
-        var childStatus = root.children().get(0).metadata().status();
-        assertThat(childStatus.isFailed()).isTrue();
-        assertThat(childStatus.throwable()).isPresent();
-        assertThat(childStatus.throwable().get()).isSameAs(exception);
+        assertThat(root.isFailed()).isTrue();
+        var child = root.children().get(0);
+        assertThat(child.isFailed()).isTrue();
+        assertThat(child.throwable()).isPresent();
+        assertThat(child.throwable().get()).isSameAs(exception);
     }
 }

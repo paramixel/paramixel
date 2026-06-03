@@ -30,16 +30,14 @@ import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
-import org.paramixel.api.action.Context;
 import org.paramixel.api.action.Step;
 
 @DisplayName("ConcreteRunner concurrency")
 class ConcreteRunnerConcurrencyTest {
 
     @Test
-    @DisplayName("concurrent run(Spec) calls serialize listener callbacks without interleaving")
-    void concurrentRunSpecCallsSerializeListenerCallbacks() throws Exception {
+    @DisplayName("concurrent run(Action) calls serialize listener callbacks without interleaving")
+    void concurrentRunBuilderCallsSerializeListenerCallbacks() throws Exception {
         var threadCount = 4;
         var barrier = new CyclicBarrier(threadCount);
         var errors = new AtomicInteger();
@@ -50,7 +48,7 @@ class ConcreteRunnerConcurrencyTest {
         var listener = new InterleavingDetectorListener(callbackLog, activeRun, maxConcurrentRuns);
         var runner = createRunner(2, listener);
 
-        var spec = Step.<Context>of("concurrent-step", ctx -> {}).resolve();
+        var builder = Step.of("concurrent-step", context -> {});
 
         var latch = new CountDownLatch(threadCount);
         var threads = new Thread[threadCount];
@@ -60,8 +58,8 @@ class ConcreteRunnerConcurrencyTest {
                     () -> {
                         try {
                             barrier.await();
-                            var result = runner.run(spec);
-                            assertThat(result.status()).isEqualTo(Status.PASSED);
+                            var result = runner.run(builder);
+                            assertThat(result.isPassed()).isTrue();
                         } catch (Throwable t) {
                             errors.incrementAndGet();
                         } finally {
@@ -83,7 +81,7 @@ class ConcreteRunnerConcurrencyTest {
     }
 
     @Test
-    @DisplayName("concurrent runAndReturnExitCode(Spec) calls serialize execution")
+    @DisplayName("concurrent runAndReturnExitCode(Action) calls serialize execution")
     void concurrentRunAndReturnExitCodeCallsSerialize() throws Exception {
         var threadCount = 4;
         var barrier = new CyclicBarrier(threadCount);
@@ -94,7 +92,7 @@ class ConcreteRunnerConcurrencyTest {
         var listener = new ConcurrencyCountingListener(activeRun, maxConcurrentRuns);
         var runner = createRunner(2, listener);
 
-        var spec = Step.<Context>of("exit-code-step", ctx -> {}).resolve();
+        var builder = Step.of("exit-code-step", context -> {});
 
         var latch = new CountDownLatch(threadCount);
         var threads = new Thread[threadCount];
@@ -102,7 +100,7 @@ class ConcreteRunnerConcurrencyTest {
             threads[i] = new Thread(() -> {
                 try {
                     barrier.await();
-                    var exitCode = runner.runAndReturnExitCode(spec);
+                    var exitCode = runner.runAndReturnExitCode(builder);
                     assertThat(exitCode).isZero();
                 } catch (Throwable t) {
                     errors.incrementAndGet();

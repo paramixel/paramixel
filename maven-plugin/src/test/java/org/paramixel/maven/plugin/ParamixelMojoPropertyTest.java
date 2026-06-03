@@ -186,6 +186,27 @@ class ParamixelMojoPropertyTest {
 
             assertThat(a).isNotEqualTo(b);
         }
+
+        @Test
+        @DisplayName("equals returns true for same reference")
+        void equalsReturnsTrueForSameReference() {
+            var property = new Property();
+            property.setKey("key");
+            property.setValue("value");
+
+            assertThat(property.equals(property)).isTrue();
+        }
+
+        @Test
+        @DisplayName("equals returns false for non-Property object")
+        void equalsReturnsFalseForNonPropertyObject() {
+            var property = new Property();
+            property.setKey("key");
+            property.setValue("value");
+
+            assertThat(property.equals("not-a-property")).isFalse();
+            assertThat(property.equals(null)).isFalse();
+        }
     }
 
     @Nested
@@ -349,6 +370,115 @@ class ParamixelMojoPropertyTest {
             assertThatThrownBy(() -> property.setValue("   "))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("value is blank");
+        }
+
+        @Test
+        @DisplayName("blank Maven property key through buildConfiguration throws descriptive exception")
+        void blankMavenPropertyKeyThroughBuildConfigurationThrowsDescriptiveException() throws Exception {
+            var property = new Property();
+            Field keyField = Property.class.getDeclaredField("key");
+            keyField.setAccessible(true);
+            keyField.set(property, "   ");
+            Field valueField = Property.class.getDeclaredField("value");
+            valueField.setAccessible(true);
+            valueField.set(property, "some-value");
+            var mojo = new ParamixelMojo();
+            setField(mojo, "properties", List.of(property));
+
+            assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
+                    .cause()
+                    .isInstanceOf(MojoExecutionException.class)
+                    .hasMessage("Paramixel property key is blank");
+        }
+
+        @Test
+        @DisplayName("duplicate property key logs warning and later value overrides")
+        void duplicatePropertyKeyLogsWarningAndLaterValueOverrides() throws Exception {
+            var originalReportFile = System.getProperty(Configuration.REPORT_FILE);
+            try {
+                System.clearProperty(Configuration.REPORT_FILE);
+
+                var p1 = new Property();
+                p1.setKey("paramixel.custom.key");
+                p1.setValue("first");
+                var p2 = new Property();
+                p2.setKey("paramixel.custom.key");
+                p2.setValue("second");
+
+                var mojo = new ParamixelMojo();
+                setField(mojo, "properties", List.of(p1, p2));
+
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+                assertThat(configuration.getString("paramixel.custom.key")).contains("second");
+            } finally {
+                restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
+            }
+        }
+
+        @Test
+        @DisplayName("blank reportFile is not set in configuration")
+        void blankReportFileIsNotSetInConfiguration() throws Exception {
+            var originalReportFile = System.getProperty(Configuration.REPORT_FILE);
+            try {
+                System.clearProperty(Configuration.REPORT_FILE);
+
+                var mojo = new ParamixelMojo();
+                setField(mojo, "reportFile", "   ");
+
+                var configuration =
+                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+                assertThat(configuration.getString(Configuration.REPORT_FILE)).isEmpty();
+            } finally {
+                restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
+            }
+        }
+
+        @Test
+        @DisplayName("failureOnAbort is always written to configuration")
+        void failureOnAbortIsAlwaysWritten() throws Exception {
+            var mojo = new ParamixelMojo();
+            setField(mojo, "failureOnAbort", true);
+            var configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+            assertThat(configuration.getString(Configuration.FAILURE_ON_ABORT)).contains("true");
+
+            setField(mojo, "failureOnAbort", false);
+            configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+            assertThat(configuration.getString(Configuration.FAILURE_ON_ABORT)).contains("false");
+        }
+
+        @Test
+        @DisplayName("failureOnSkip is written to configuration only when true")
+        void failureOnSkipIsWrittenOnlyWhenTrue() throws Exception {
+            var mojo = new ParamixelMojo();
+            setField(mojo, "failureOnSkip", true);
+            var configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).contains("true");
+
+            setField(mojo, "failureOnSkip", false);
+            configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("failIfNoTests is written to configuration only when true")
+        void failIfNoTestsIsWrittenOnlyWhenTrue() throws Exception {
+            var mojo = new ParamixelMojo();
+            setField(mojo, "failIfNoTests", true);
+            var configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+            assertThat(configuration.getString(Configuration.FAIL_IF_NO_TESTS)).contains("true");
+
+            setField(mojo, "failIfNoTests", false);
+            configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+            assertThat(configuration.getString(Configuration.FAIL_IF_NO_TESTS)).isEmpty();
         }
     }
 

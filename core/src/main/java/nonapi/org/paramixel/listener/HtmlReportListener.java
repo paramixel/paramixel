@@ -53,9 +53,9 @@ public final class HtmlReportListener extends AbstractReportFileListener {
     private static void writeDescriptor(final Writer writer, final Descriptor descriptor, final String indent)
             throws IOException {
         writer.write(indent);
-        writer.write(escape(descriptor.metadata().status().name()));
+        writer.write(escape(Listeners.formatStatus(descriptor)));
         writer.write(" | ");
-        writer.write(escape(descriptor.metadata().name()));
+        writer.write(escape(descriptor.action().displayName()));
         writer.write(LINE_SEPARATOR);
         final var childIndent = indent + INDENT;
         if (descriptor.before().isPresent()) {

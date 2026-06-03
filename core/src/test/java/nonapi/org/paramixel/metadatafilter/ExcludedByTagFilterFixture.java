@@ -19,26 +19,17 @@ package nonapi.org.paramixel.metadatafilter;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture tagged {@code "slow"} to verify that the metadata filter excludes actions whose tags do
- * not match the active tag filter.
- */
 public final class ExcludedByTagFilterFixture {
 
     private ExcludedByTagFilterFixture() {}
 
-    /**
-     * Creates a no-op action tagged {@code "slow"} that should be excluded by a {@code "smoke"}
-     * tag filter.
-     *
-     * @return a {@link Step} action with the identifier {@code "excluded-by-tag-action"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag("slow")
-    public static Action<?> factory() {
-        return Instance.<Object>of("excluded-by-tag-action", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("excluded-by-tag-action", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

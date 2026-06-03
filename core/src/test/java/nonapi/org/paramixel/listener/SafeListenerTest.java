@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,8 +33,8 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
-import org.paramixel.api.Status;
-import org.paramixel.api.action.Metadata;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
 
 @DisplayName("SafeListener")
 class SafeListenerTest {
@@ -228,14 +229,66 @@ class SafeListenerTest {
 
     private static Descriptor stubDescriptor() {
         return new Descriptor() {
-            @Override
-            public Metadata metadata() {
-                return null;
-            }
+            private final Action action = Step.of("stub", ignored -> {});
 
             @Override
             public Optional<Descriptor> parent() {
                 return Optional.empty();
+            }
+
+            @Override
+            public Action action() {
+                return action;
+            }
+
+            @Override
+            public String id() {
+                return "stub";
+            }
+
+            @Override
+            public boolean isPassed() {
+                return true;
+            }
+
+            @Override
+            public boolean isFailed() {
+                return false;
+            }
+
+            @Override
+            public boolean isSkipped() {
+                return false;
+            }
+
+            @Override
+            public boolean isAborted() {
+                return false;
+            }
+
+            @Override
+            public Optional<Instant> startedAt() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<Instant> completedAt() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> message() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<Throwable> throwable() {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean isCompleted() {
+                return true;
             }
 
             @Override
@@ -248,8 +301,33 @@ class SafeListenerTest {
     private static Result stubResult() {
         return new Result() {
             @Override
-            public Status status() {
-                return Status.PASSED;
+            public boolean isPassed() {
+                return true;
+            }
+
+            @Override
+            public boolean isFailed() {
+                return false;
+            }
+
+            @Override
+            public boolean isSkipped() {
+                return false;
+            }
+
+            @Override
+            public boolean isAborted() {
+                return false;
+            }
+
+            @Override
+            public Optional<Instant> startedAt() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<Instant> completedAt() {
+                return Optional.empty();
             }
 
             @Override

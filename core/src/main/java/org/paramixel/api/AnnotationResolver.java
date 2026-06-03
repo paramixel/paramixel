@@ -80,7 +80,7 @@ public final class AnnotationResolver<T> {
      *     multiple methods share the same identifier, or the annotated method has an
      *     unsupported signature
      */
-    public Action<T> byId(final String id) {
+    public Action byId(final String id) {
         Objects.requireNonNull(id, "id is null");
         Arguments.requireNonBlank(id, "id is blank");
 
@@ -99,42 +99,6 @@ public final class AnnotationResolver<T> {
     }
 
     /**
-     * Resolves an instance method annotated with {@link Paramixel.Id @Paramixel.Id} by
-     * identifier and returns a named step action with a custom kind that invokes it.
-     *
-     * <p>The identifier is used to discover the annotated method and as the action display
-     * name. The kind overrides the default {@code "Step"} kind in the returned action.
-     * Resolution occurs eagerly at invocation time.
-     *
-     * @param id the method identifier; must not be {@code null} or blank
-     * @param kind the action kind; must not be {@code null} or blank
-     * @return a step action that invokes the resolved method on the instance; never {@code null}
-     * @throws NullPointerException if {@code id} or {@code kind} is {@code null}
-     * @throws IllegalArgumentException if {@code id} or {@code kind} is blank, no matching
-     *     method is found, multiple methods share the same identifier, or the annotated
-     *     method has an unsupported signature
-     */
-    public Action<T> byId(final String id, final String kind) {
-        Objects.requireNonNull(id, "id is null");
-        Arguments.requireNonBlank(id, "id is blank");
-        Objects.requireNonNull(kind, "kind is null");
-        Arguments.requireNonBlank(kind, "kind is blank");
-
-        Map<String, Method> methods = CACHE.get(type);
-        if (methods == null) {
-            methods = discover(type);
-            CACHE.put(type, methods);
-        }
-        Method method = methods.get(id);
-        if (method == null) {
-            throw new IllegalArgumentException(
-                    "no method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
-        }
-
-        return Step.of(id, kind, reflectingConsumer(method));
-    }
-
-    /**
      * Resolves a static method annotated with {@link Paramixel.Id @Paramixel.Id} by
      * identifier and returns a named step action that invokes it.
      *
@@ -148,7 +112,7 @@ public final class AnnotationResolver<T> {
      *     multiple methods share the same identifier, or the annotated method has an
      *     unsupported signature
      */
-    public Action<?> staticById(final String id) {
+    public Action staticById(final String id) {
         Objects.requireNonNull(id, "id is null");
         Arguments.requireNonBlank(id, "id is blank");
 
@@ -165,45 +129,7 @@ public final class AnnotationResolver<T> {
 
         ThrowingRunnable runnable = reflectingStaticInvocation(method);
 
-        return Step.of(id, ctx -> runnable.run());
-    }
-
-    /**
-     * Resolves a static method annotated with {@link Paramixel.Id @Paramixel.Id} by
-     * identifier and returns a named step action with a custom kind that invokes it.
-     *
-     * <p>The identifier is used to discover the annotated static method and as the action
-     * display name. The kind overrides the default {@code "Step"} kind in the returned
-     * action. Resolution occurs eagerly at invocation time.
-     *
-     * @param id the method identifier; must not be {@code null} or blank
-     * @param kind the action kind; must not be {@code null} or blank
-     * @return a step action that invokes the resolved static method; never {@code null}
-     * @throws NullPointerException if {@code id} or {@code kind} is {@code null}
-     * @throws IllegalArgumentException if {@code id} or {@code kind} is blank, no matching
-     *     method is found, multiple methods share the same identifier, or the annotated
-     *     method has an unsupported signature
-     */
-    public Action<?> staticById(final String id, final String kind) {
-        Objects.requireNonNull(id, "id is null");
-        Arguments.requireNonBlank(id, "id is blank");
-        Objects.requireNonNull(kind, "kind is null");
-        Arguments.requireNonBlank(kind, "kind is blank");
-
-        Map<String, Method> methods = STATIC_CACHE.get(type);
-        if (methods == null) {
-            methods = discoverStatic(type);
-            STATIC_CACHE.put(type, methods);
-        }
-        Method method = methods.get(id);
-        if (method == null) {
-            throw new IllegalArgumentException(
-                    "no static method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
-        }
-
-        ThrowingRunnable runnable = reflectingStaticInvocation(method);
-
-        return Step.of(id, kind, ctx -> runnable.run());
+        return Step.of(id, context -> runnable.run());
     }
 
     /**
@@ -321,9 +247,11 @@ public final class AnnotationResolver<T> {
         }
     }
 
-    private static <T> ThrowingConsumer<T> reflectingConsumer(final Method method) {
-        return instance -> {
+    private static ContextConsumer reflectingConsumer(final Method method) {
+        var owner = method.getDeclaringClass();
+        return context -> {
             try {
+                var instance = context.requireInstance(owner);
                 method.invoke(instance);
             } catch (InvocationTargetException e) {
                 Throwable cause = e.getCause();

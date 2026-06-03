@@ -35,22 +35,21 @@ import nonapi.org.paramixel.listener.support.Constants;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Builder;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.ResolverException;
-import org.paramixel.api.exception.SkipException;
 import org.paramixel.api.selector.Selector;
 
 /**
  * Scans the classpath for {@link org.paramixel.api.Paramixel.Factory} methods, validates them,
- * invokes them to produce {@link Spec} or {@link Action} instances, resolves specs to actions,
- * and collapses the results into a single root {@link org.paramixel.api.action.Parallel} action.
+ * invokes them to produce {@link Action} instances, and collapses the results into a single
+ * root {@link org.paramixel.api.action.Parallel} action.
  *
  * <p>Discovery applies package, class, and tag filters from the {@link Selector}. Invalid factory methods
  * throw {@link org.paramixel.api.exception.ResolverException} at resolution time; blank tag values are
  * collected as validation-failure actions rather than failing the entire scan. Factory methods that return
- * {@code null} produce skipped actions rather than failing discovery.
+ * {@code null} are skipped without producing an action.
  */
 public final class ClasspathResolver {
 
@@ -77,7 +76,7 @@ public final class ClasspathResolver {
      *
      * @return the resolved root action, or an empty {@link Optional} when no factories match
      */
-    public Optional<Action<?>> resolveActions() {
+    public Optional<Action> resolveActions() {
         final var parallelism = resolveParallelism();
         return scan(new ClassGraph(), parallelism);
     }
@@ -95,7 +94,7 @@ public final class ClasspathResolver {
      * @param parallelism the parallelism of the root parallel action
      * @return the root action, or an empty {@link Optional} when no factories match
      */
-    Optional<Action<?>> scan(final ClassGraph classGraph, final int parallelism) {
+    Optional<Action> scan(final ClassGraph classGraph, final int parallelism) {
         var candidates = new ArrayList<ActionCandidate>();
         var failures = new ArrayList<DiscoveryValidationFailure>();
         try (ScanResult scanResult = classGraph
@@ -121,6 +120,7 @@ public final class ClasspathResolver {
                         .thenComparing(ActionCandidate::className)
                         .thenComparing(ActionCandidate::methodName))
                 .map(this::resolveActionFromMethod)
+                .flatMap(Optional::stream)
                 .toList();
 
         var allActions = Stream.concat(actions.stream(), discoveryFailureActions(failures).stream())
@@ -213,7 +213,7 @@ public final class ClasspathResolver {
         return priority == null ? 0 : priority.value();
     }
 
-    private List<? extends Action<?>> discoveryFailureActions(final List<DiscoveryValidationFailure> failures) {
+    private List<? extends Action> discoveryFailureActions(final List<DiscoveryValidationFailure> failures) {
         if (failures.isEmpty()) {
             return List.of();
         }
@@ -236,15 +236,15 @@ public final class ClasspathResolver {
                 .toList();
     }
 
-    private Optional<Action<?>> collapse(final List<? extends Action<?>> actions, final int parallelism) {
+    private Optional<Action> collapse(final List<? extends Action> actions, final int parallelism) {
         if (actions.isEmpty()) {
             return Optional.empty();
         }
-        var spec = Parallel.of(ROOT_NAME).parallelism(parallelism);
-        for (Action<?> action : actions) {
+        var spec = Parallel.builder(ROOT_NAME).parallelism(parallelism);
+        for (Action action : actions) {
             spec.child(action);
         }
-        return Optional.of(spec.resolve());
+        return Optional.of(spec.build());
     }
 
     private String locationOf(final Method method) {
@@ -261,14 +261,15 @@ public final class ClasspathResolver {
             throw new ResolverException(
                     "Invalid @Paramixel.Factory method on " + location + ": method must have no parameters");
         }
-        if (!Spec.class.isAssignableFrom(method.getReturnType())) {
+        if (!Action.class.isAssignableFrom(method.getReturnType())
+                && !Builder.class.isAssignableFrom(method.getReturnType())) {
             throw new ResolverException(
-                    "Invalid @Paramixel.Factory method on " + location + ": return type must be Spec or Action");
+                    "Invalid @Paramixel.Factory method on " + location + ": return type must be Action or Builder");
         }
     }
 
     @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
-    private Action<?> resolveActionFromMethod(final ActionCandidate candidate) {
+    private Optional<Action> resolveActionFromMethod(final ActionCandidate candidate) {
         final var method = candidate.method();
         final var location = candidate.location();
         try {
@@ -284,11 +285,22 @@ public final class ClasspathResolver {
                 }
             }
             if (result == null) {
-                return Step.of("Skipped factory: " + location, context -> {
-                    throw new SkipException("factory returned null: " + location);
-                });
+                return Optional.empty();
             }
-            return ((Spec<?>) result).resolve();
+            Action action;
+            if (result instanceof Action a) {
+                action = a;
+            } else if (result instanceof Builder b) {
+                action = b.build();
+                if (action == null) {
+                    throw new ResolverException(
+                            "Invalid @Paramixel.Factory method on " + location + ": build() returned null");
+                }
+            } else {
+                throw new ResolverException(
+                        "Invalid @Paramixel.Factory method on " + location + ": return type must be Action or Builder");
+            }
+            return Optional.of(action);
         } catch (InvocationTargetException e) {
             var cause = e.getCause() != null ? e.getCause() : e;
             if (cause instanceof Error error) {

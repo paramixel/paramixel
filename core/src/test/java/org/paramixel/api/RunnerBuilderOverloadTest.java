@@ -17,94 +17,81 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Runner Builder overloads")
 class RunnerBuilderOverloadTest {
 
     @Test
-    @DisplayName("run(Spec<?>) resolves and runs a Lifecycle spec")
-    void runSpecResolvesAndRunsLifecycle() {
+    @DisplayName("run(Action) resolves and runs a Lifecycle action")
+    void runActionResolvesAndRunsLifecycle() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        Spec<?> spec = Lifecycle.of("lifecycle").before("step", obj -> {});
+        Action action =
+                Scope.builder("lifecycle").body(Step.of("step", context -> {})).build();
 
-        Result result = runner.run(spec);
+        Result result = runner.run(action);
 
         assertThat(result.descriptor()).isPresent();
-        assertThat(result.status()).isEqualTo(Status.PASSED);
+        assertThat(result.isPassed()).isTrue();
     }
 
     @Test
-    @DisplayName("run(Spec<?>) returns same result for pre-built action passed as spec")
-    void runSpecWithPreBuiltAction() {
+    @DisplayName("run(Action) returns same result for pre-built action")
+    void runActionWithPreBuiltAction() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        Step<?> step = Step.of("step", obj -> {});
+        Step step = Step.of("step", context -> {});
 
-        Result specResult = runner.run((Spec<?>) step);
-        Result actionResult = runner.run(step);
+        Result result = runner.run(step);
 
-        assertThat(specResult.status()).isEqualTo(actionResult.status());
+        assertThat(result.isPassed()).isTrue();
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Spec<?>) resolves and returns exit code for passing action")
-    void runAndReturnExitCodeSpecReturnsZeroForPassingAction() {
+    @DisplayName("runAndReturnExitCode(Action) resolves and returns exit code for passing action")
+    void runAndReturnExitCodeActionReturnsZeroForPassingAction() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        Spec<?> spec = Lifecycle.of("lifecycle").before("step", obj -> {});
+        Action action =
+                Scope.builder("lifecycle").body(Step.of("step", context -> {})).build();
 
-        int exitCode = runner.runAndReturnExitCode(spec);
+        int exitCode = runner.runAndReturnExitCode(action);
 
         assertThat(exitCode).isZero();
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Spec<?>) returns non-zero for failing action")
-    void runAndReturnExitCodeSpecReturnsNonZeroForFailingAction() {
+    @DisplayName("runAndReturnExitCode(Action) returns non-zero for failing action")
+    void runAndReturnExitCodeActionReturnsNonZeroForFailingAction() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        org.paramixel.api.action.Spec<?> spec = Lifecycle.of("lifecycle").before("failing", obj -> {
-            throw new RuntimeException("failure");
-        });
+        Action action = Scope.builder("lifecycle")
+                .body(Step.of("failing", context -> {
+                    throw new RuntimeException("failure");
+                }))
+                .build();
 
-        int exitCode = runner.runAndReturnExitCode(spec);
+        int exitCode = runner.runAndReturnExitCode(action);
 
         assertThat(exitCode).isNotZero();
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Spec<?>) returns same exit code for pre-built action and spec overload")
-    void runAndReturnExitCodeSpecWithPreBuiltAction() {
+    @DisplayName("run(Action) with accumulating builder leaves builder reusable")
+    void runActionLeavesAccumulatingBuilderReusable() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        Step<?> step = Step.of("step", obj -> {});
+        var builder = Scope.builder("lifecycle").body(Step.of("step", context -> {}));
 
-        int specCode = runner.runAndReturnExitCode((Spec<?>) step);
-        int actionCode = runner.runAndReturnExitCode(step);
+        runner.run(builder.build());
 
-        assertThat(specCode).isEqualTo(actionCode);
-    }
-
-    @Test
-    @DisplayName("run(Spec<?>) with accumulating spec consumes it on first call")
-    void runSpecConsumesAccumulatingSpec() {
-        var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
-        var spec = Lifecycle.of("lifecycle").child("step", obj -> {});
-
-        runner.run(spec);
-
-        assertThatThrownBy(spec::resolve)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("spec already resolved");
+        assertThat(builder.build().body()).isNotNull();
     }
 
     private static final class NoOpListener implements Listener {
@@ -116,10 +103,10 @@ class RunnerBuilderOverloadTest {
         public void onDiscoveryStarted() {}
 
         @Override
-        public void onRunStarted() {}
+        public void onDiscoveryCompleted(final Descriptor root) {}
 
         @Override
-        public void onDiscoveryCompleted(final Descriptor root) {}
+        public void onRunStarted() {}
 
         @Override
         public void onBeforeExecution(final Descriptor descriptor) {}

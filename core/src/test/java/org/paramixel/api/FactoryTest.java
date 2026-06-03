@@ -122,7 +122,7 @@ class FactoryTest {
                         Configuration.of(Map.of(Configuration.REPORT_FILE, reportFile.toString()))))
                 .build();
 
-        runner.run(Step.of("unknown-extension-action", obj -> {}));
+        runner.run(Step.of("unknown-extension-action", context -> {}));
 
         assertThat(reportFile).exists();
         String report = Files.readString(reportFile, StandardCharsets.UTF_8);
@@ -168,6 +168,7 @@ class FactoryTest {
     @DisplayName("defaultListener with paramixel.ansi=true enables ANSI in StatusListener")
     void defaultListenerWithAnsiTrueEnablesStatusListenerAnsi() throws Exception {
         Listener listener = Listener.defaultListener(Configuration.of(Map.of(Configuration.ANSI, "true")));
+        listener.initialize(Configuration.of(Map.of()));
 
         List<Listener> inner = extractListeners(listener);
         Field ansiField = StatusListener.class.getDeclaredField("ansiEnabled");
@@ -180,6 +181,7 @@ class FactoryTest {
     @DisplayName("defaultListener with paramixel.ansi=false disables ANSI in StatusListener")
     void defaultListenerWithAnsiFalseDisablesStatusListenerAnsi() throws Exception {
         Listener listener = Listener.defaultListener(Configuration.of(Map.of(Configuration.ANSI, "false")));
+        listener.initialize(Configuration.of(Map.of()));
 
         List<Listener> inner = extractListeners(listener);
         Field ansiField = StatusListener.class.getDeclaredField("ansiEnabled");

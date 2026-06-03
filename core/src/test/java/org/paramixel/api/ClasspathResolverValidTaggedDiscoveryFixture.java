@@ -18,25 +18,17 @@ package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture tagged {@code "smoke"} with a valid, non-blank tag to verify that the resolver accepts
- * properly annotated discovery fixtures.
- */
 public final class ClasspathResolverValidTaggedDiscoveryFixture {
 
     private ClasspathResolverValidTaggedDiscoveryFixture() {}
 
-    /**
-     * Creates a no-op action tagged {@code "smoke"} for valid tag discovery tests.
-     *
-     * @return a {@link Step} action with the identifier {@code "valid-tagged-discovery"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
-    public static Action<?> factory() {
-        return Instance.<Object>of("valid-tagged-discovery", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("valid-tagged-discovery", Object::new)
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

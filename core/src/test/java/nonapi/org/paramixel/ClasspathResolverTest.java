@@ -29,9 +29,8 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
@@ -44,12 +43,12 @@ class ClasspathResolverTest {
     void findsSingleFactory() {
         Selector selector = Selector.classOf(ClasspathResolverSmokeFixture.class);
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
-        Parallel<?> root = (Parallel<?>) result.orElseThrow();
+        Parallel root = (Parallel) result.orElseThrow();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).name()).isEqualTo("smoke-action");
+        assertThat(root.children().get(0).displayName()).isEqualTo("smoke-action");
     }
 
     @Test
@@ -59,12 +58,12 @@ class ClasspathResolverTest {
                 Selector.and(Selector.classOf(ClasspathResolverMultiTagFixture.class), Selector.tagRegex("smoke"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
-        Parallel<?> root = (Parallel<?>) result.orElseThrow();
+        Parallel root = (Parallel) result.orElseThrow();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).name()).isEqualTo("multi-tag-action");
+        assertThat(root.children().get(0).displayName()).isEqualTo("multi-tag-action");
     }
 
     @Test
@@ -74,7 +73,7 @@ class ClasspathResolverTest {
                 Selector.and(Selector.classOf(ClasspathResolverMultiTagFixture.class), Selector.tagRegex("missing"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isEmpty();
     }
@@ -132,34 +131,26 @@ class ClasspathResolverTest {
     }
 
     @Test
-    @DisplayName("null-returning factory produces skipped action")
-    void nullReturningFactoryProducesSkippedAction() {
+    @DisplayName("null-returning factory is skipped")
+    void nullReturningFactoryIsSkipped() {
         Selector selector = Selector.classOf(NullReturningFactory.class);
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
-        assertThat(result).isPresent();
-        Runner runner = Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "1")))
-                .build();
-        var runResult = runner.run(result.orElseThrow());
-        assertThat(runResult.status().isSkipped()).isTrue();
-        var root = runResult.descriptor().orElseThrow();
-        assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).metadata().status().isSkipped()).isTrue();
+        assertThat(result).isEmpty();
     }
 
     @Test
-    @DisplayName("resolves Spec-returning factory")
-    void resolvesSpecReturningFactory() {
-        Selector selector = Selector.classOf(SpecReturningFactory.class);
+    @DisplayName("resolves Action-returning factory")
+    void resolvesBuilderReturningFactory() {
+        Selector selector = Selector.classOf(BuilderReturningFactory.class);
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
-        Parallel<?> root = (Parallel<?>) result.orElseThrow();
+        Parallel root = (Parallel) result.orElseThrow();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).name()).isEqualTo("spec-action");
+        assertThat(root.children().get(0).displayName()).isEqualTo("scope");
     }
 
     @Test
@@ -169,7 +160,7 @@ class ClasspathResolverTest {
                 Selector.and(Selector.classRegex("ClasspathResolverSmokeFixture"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow()).isInstanceOf(Parallel.class);
@@ -193,15 +184,15 @@ class ClasspathResolverTest {
                 "ClasspathResolverValidTaggedDiscoveryFixture|ClasspathResolverInvalidBlankTagDiscoveryFixture");
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
-        Parallel<?> root = (Parallel<?>) result.orElseThrow();
+        Parallel root = (Parallel) result.orElseThrow();
         assertThat(root.children()).hasSize(2);
         assertThat(root.children())
-                .anySatisfy(action -> assertThat(action.name()).isEqualTo("valid-tagged-discovery"));
+                .anySatisfy(action -> assertThat(action.displayName()).isEqualTo("valid-tagged-discovery"));
         assertThat(root.children())
-                .anySatisfy(action -> assertThat(action.name()).startsWith("Discovery validation failure:"));
+                .anySatisfy(action -> assertThat(action.displayName()).startsWith("Discovery validation failure:"));
     }
 
     @Test
@@ -211,21 +202,21 @@ class ClasspathResolverTest {
                 "ClasspathResolverValidTaggedDiscoveryFixture|ClasspathResolverInvalidBlankTagDiscoveryFixture");
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
         Runner runner = Runner.builder()
                 .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "1")))
                 .build();
         var rootResult = runner.run(result.orElseThrow()).descriptor().orElseThrow();
-        assertThat(rootResult.metadata().status().isFailed()).isTrue();
+        assertThat(rootResult.isFailed()).isTrue();
         assertThat(rootResult.children()).anySatisfy(child -> {
-            assertThat(child.metadata().status().isPassed()).isTrue();
+            assertThat(child.isPassed()).isTrue();
         });
         assertThat(rootResult.children()).anySatisfy(child -> {
-            assertThat(child.metadata().status().isFailed()).isTrue();
-            assertThat(child.metadata().name()).startsWith("Discovery validation failure:");
-            Throwable throwable = child.metadata().throwable().orElseThrow();
+            assertThat(child.isFailed()).isTrue();
+            assertThat(child.action().displayName()).startsWith("Discovery validation failure:");
+            Throwable throwable = child.throwable().orElseThrow();
             assertThat(throwable).isInstanceOf(ResolverException.class);
             assertThat(throwable.getMessage()).contains("Invalid @Paramixel.Tag on");
             assertThat(throwable.getMessage()).contains("tag value is blank");
@@ -241,41 +232,41 @@ class ClasspathResolverTest {
                         + "|ClasspathResolverAnotherInvalidBlankTagDiscoveryFixture");
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
-        Parallel<?> root = (Parallel<?>) result.orElseThrow();
+        Parallel root = (Parallel) result.orElseThrow();
         assertThat(root.children())
-                .anySatisfy(action ->
-                        assertThat(action.name()).contains("ClasspathResolverInvalidBlankTagDiscoveryFixture#factory"));
+                .anySatisfy(action -> assertThat(action.displayName())
+                        .contains("ClasspathResolverInvalidBlankTagDiscoveryFixture#factory"));
         assertThat(root.children())
-                .anySatisfy(action -> assertThat(action.name())
+                .anySatisfy(action -> assertThat(action.displayName())
                         .contains("ClasspathResolverAnotherInvalidBlankTagDiscoveryFixture#factory"));
     }
 
     static class ParentFactory {
         @Paramixel.Factory
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("parent-action", context -> {});
         }
     }
 
     static class ChildOverridesWithoutFactory extends ParentFactory {
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("child-action", context -> {});
         }
     }
 
     static class ParentFactoryTwo {
         @Paramixel.Factory
-        public static Action<?> parentAction() {
+        public static Action parentAction() {
             return Step.of("parent-action", context -> {});
         }
     }
 
     static class ChildDeclaresOwnFactory extends ParentFactoryTwo {
         @Paramixel.Factory
-        public static Action<?> childAction() {
+        public static Action childAction() {
             return Step.of("child-action", context -> {});
         }
     }
@@ -283,14 +274,14 @@ class ClasspathResolverTest {
     static class BlankTagFactory {
         @Paramixel.Factory
         @Paramixel.Tag(" ")
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("blank-tag-action", context -> {});
         }
     }
 
     static class ErrorThrowingFactory {
         @Paramixel.Factory
-        public static Action<?> factory() {
+        public static Action factory() {
             throw new TestError("factory error");
         }
     }
@@ -298,7 +289,7 @@ class ClasspathResolverTest {
     static class DisabledFactory {
         @Paramixel.Factory
         @Paramixel.Disabled
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("disabled-action", context -> {});
         }
     }
@@ -306,29 +297,29 @@ class ClasspathResolverTest {
     static class DisabledWithReasonFactory {
         @Paramixel.Factory
         @Paramixel.Disabled("pending fix for BUG-123")
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("disabled-with-reason", context -> {});
         }
     }
 
     static class NonPublicFactory {
         @Paramixel.Factory
-        static Action<?> factory() {
-            return Step.of("non-public", obj -> {});
+        static Action factory() {
+            return Step.of("non-public", context -> {});
         }
     }
 
     static class NonStaticFactory {
         @Paramixel.Factory
-        public Action<?> factory() {
-            return Step.of("non-static", obj -> {});
+        public Action factory() {
+            return Step.of("non-static", context -> {});
         }
     }
 
     static class ParameterizedFactory {
         @Paramixel.Factory
-        public static Action<?> factory(final String arg) {
-            return Step.of("parameterized", obj -> {});
+        public static Action factory(final String arg) {
+            return Step.of("parameterized", context -> {});
         }
     }
 
@@ -341,22 +332,22 @@ class ClasspathResolverTest {
 
     static class NullReturningFactory {
         @Paramixel.Factory
-        public static Action<?> factory() {
+        public static Action factory() {
             return null;
         }
     }
 
     static class RuntimeExceptionThrowingFactory {
         @Paramixel.Factory
-        public static Action<?> factory() {
+        public static Action factory() {
             throw new RuntimeException("factory runtime error");
         }
     }
 
-    static class SpecReturningFactory {
+    static class BuilderReturningFactory {
         @Paramixel.Factory
-        public static Spec<?> factory() {
-            return Lifecycle.of("spec-action").before("step", context -> {});
+        public static Action factory() {
+            return Scope.builder("scope").body(Step.of("step", context -> {})).build();
         }
     }
 

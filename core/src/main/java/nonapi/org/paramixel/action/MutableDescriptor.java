@@ -19,10 +19,11 @@ package nonapi.org.paramixel.action;
 import java.util.concurrent.CompletableFuture;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Mode;
+import org.paramixel.api.action.Assert;
+import org.paramixel.api.action.Delay;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequential;
+import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Step;
 
 /**
  * Internal mutable extension of {@link Descriptor} for framework use during
@@ -50,13 +51,6 @@ public interface MutableDescriptor extends Descriptor {
      * @param schedulerPriorityKey the scheduler priority key; must not be {@code null}
      */
     void setSchedulerPriorityKey(SchedulerPriorityKey schedulerPriorityKey);
-
-    /**
-     * Returns the action definition bound to this descriptor occurrence.
-     *
-     * @return the action; never {@code null}
-     */
-    Action<?> action();
 
     /**
      * Sets the before-child descriptor during discovery.
@@ -108,11 +102,10 @@ public interface MutableDescriptor extends Descriptor {
     /**
      * Prepares this descriptor for scheduling.
      *
-     * @param requestedMode the requested execution mode; must not be {@code null}
      * @return a future associated with this scheduled descriptor
      * @throws IllegalStateException if already scheduled
      */
-    CompletableFuture<Descriptor> markScheduled(Mode requestedMode);
+    CompletableFuture<Descriptor> markScheduled();
 
     /**
      * Returns whether this descriptor has already been scheduled.
@@ -120,6 +113,13 @@ public interface MutableDescriptor extends Descriptor {
      * @return {@code true} when scheduled
      */
     boolean isScheduled();
+
+    /**
+     * Returns this descriptor's internal execution status.
+     *
+     * @return the execution status; never {@code null}
+     */
+    Status status();
 
     /**
      * Sets this descriptor's local execution status.
@@ -176,8 +176,8 @@ public interface MutableDescriptor extends Descriptor {
      * @return {@code true} when the wrapped action is coordination-only
      */
     default boolean isCoordinationAction() {
-        return action() instanceof Parallel<?>
-                || action() instanceof Sequential<?>
+        return action() instanceof Parallel
+                || action() instanceof Sequence
                 || before().isPresent()
                 || after().isPresent()
                 || !children().isEmpty();
@@ -189,6 +189,6 @@ public interface MutableDescriptor extends Descriptor {
      * @return {@code true} when the wrapped action is leaf work
      */
     default boolean isLeafAction() {
-        return !isCoordinationAction();
+        return action() instanceof Step || action() instanceof Assert || action() instanceof Delay;
     }
 }

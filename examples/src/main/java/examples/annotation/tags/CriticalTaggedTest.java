@@ -16,9 +16,12 @@
 
 package examples.annotation.tags;
 
+import static org.paramixel.api.Context.withInstance;
+
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Step;
 
 /**
  * Example test class annotated with multiple tags ({@code "smoke-fast"} and
@@ -34,8 +37,10 @@ public class CriticalTaggedTest {
     @Paramixel.Factory
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
-    public static Spec<?> factory() {
-        return Instance.of("CriticalTaggedTest", CriticalTaggedTest::new).child("test()", CriticalTaggedTest::test);
+    public static Action factory() {
+        return Instance.builder("CriticalTaggedTest", CriticalTaggedTest::new)
+                .body(Step.of("test()", withInstance(CriticalTaggedTest.class, CriticalTaggedTest::test)))
+                .build();
     }
 
     public CriticalTaggedTest() {

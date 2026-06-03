@@ -28,8 +28,11 @@ import java.util.Objects;
 public final class SchedulerPriorityKey implements Comparable<SchedulerPriorityKey> {
 
     private static final SchedulerPriorityKey ROOT = new SchedulerPriorityKey();
+    private static final int ARRAY_CACHE_SIZE = 16;
 
     private final int[] path;
+    private final SchedulerPriorityKey[] arrayCache = new SchedulerPriorityKey[ARRAY_CACHE_SIZE];
+    private volatile SchedulerPriorityKey[] overflowCache;
 
     private SchedulerPriorityKey(final int... path) {
         this.path = path;
@@ -47,6 +50,10 @@ public final class SchedulerPriorityKey implements Comparable<SchedulerPriorityK
     /**
      * Returns a new key for a child at {@code childIndex}.
      *
+     * <p>Child keys are cached for reuse. The same key is returned for the same
+     * {@code childIndex} on subsequent calls, eliminating redundant allocations
+     * during descriptor tree construction.</p>
+     *
      * @param childIndex the child index in parent order (must be non-negative)
      * @return child key; never {@code null}
      */
@@ -54,9 +61,35 @@ public final class SchedulerPriorityKey implements Comparable<SchedulerPriorityK
         if (childIndex < 0) {
             throw new IllegalArgumentException("childIndex must be non-negative, was: " + childIndex);
         }
+        if (childIndex < ARRAY_CACHE_SIZE) {
+            var cached = arrayCache[childIndex];
+            if (cached != null) {
+                return cached;
+            }
+            var childPath = Arrays.copyOf(path, path.length + 1);
+            childPath[path.length] = childIndex;
+            var key = new SchedulerPriorityKey(childPath);
+            arrayCache[childIndex] = key;
+            return key;
+        }
+        return computeOverflow(childIndex);
+    }
+
+    private synchronized SchedulerPriorityKey computeOverflow(final int childIndex) {
+        if (overflowCache == null) {
+            overflowCache = new SchedulerPriorityKey[childIndex + 1];
+        } else if (childIndex >= overflowCache.length) {
+            overflowCache = Arrays.copyOf(overflowCache, childIndex + 1);
+        }
+        var cached = overflowCache[childIndex];
+        if (cached != null) {
+            return cached;
+        }
         var childPath = Arrays.copyOf(path, path.length + 1);
         childPath[path.length] = childIndex;
-        return new SchedulerPriorityKey(childPath);
+        var key = new SchedulerPriorityKey(childPath);
+        overflowCache[childIndex] = key;
+        return key;
     }
 
     @Override

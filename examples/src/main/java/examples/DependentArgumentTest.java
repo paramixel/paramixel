@@ -17,14 +17,15 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Context.withInstance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 /**
@@ -62,32 +63,38 @@ public class DependentArgumentTest {
      * @return the action tree for this test
      */
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         resetCounts();
 
         var testName = DependentArgumentTest.class.getName();
 
-        var arguments = Sequential.of(testName).dependent();
+        var arguments = Sequence.builder(testName).dependent();
 
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             int argumentIndex = i;
             String argumentValue = "string-" + i;
 
-            var tests = Sequential.<DependentArgumentTest>of(argumentValue)
-                    .child("test()", DependentArgumentTest::test)
-                    .child("test()", DependentArgumentTest::test)
-                    .child("test()", DependentArgumentTest::test);
+            var tests = Sequence.<DependentArgumentTest>builder(argumentValue)
+                    .child(Step.of("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)))
+                    .child(Step.of("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)))
+                    .child(Step.of("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)));
 
-            arguments.child(Instance.of(argumentValue, () -> new DependentArgumentTest(argumentIndex))
-                    .dependent()
-                    .child(Lifecycle.<DependentArgumentTest>of("lifecycle")
-                            .before("before()", DependentArgumentTest::before)
-                            .child(tests)
-                            .after("after()", DependentArgumentTest::after)
-                            .resolve()));
+            arguments.child(Instance.builder(argumentValue, () -> new DependentArgumentTest(argumentIndex))
+                    .body(Scope.builder("lifecycle")
+                            .before(Step.of(
+                                    "before()",
+                                    withInstance(DependentArgumentTest.class, DependentArgumentTest::before)))
+                            .body(tests.build())
+                            .after(Step.of(
+                                    "after()", withInstance(DependentArgumentTest.class, DependentArgumentTest::after)))
+                            .build())
+                    .build());
         }
 
-        return Lifecycle.of(testName).child(arguments).after(Step.of("validate", ignored -> validate()));
+        return Scope.builder(testName)
+                .body(arguments.build())
+                .after(Step.of("validate", ignored -> validate()))
+                .build();
     }
 
     private DependentArgumentTest(final int argumentIndex) {

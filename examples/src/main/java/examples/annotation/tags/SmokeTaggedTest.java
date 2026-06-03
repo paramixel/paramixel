@@ -16,9 +16,12 @@
 
 package examples.annotation.tags;
 
+import static org.paramixel.api.Context.withInstance;
+
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Step;
 
 /**
  * Example test class annotated with {@code @Paramixel.Tag("smoke")} to demonstrate
@@ -33,8 +36,10 @@ public class SmokeTaggedTest {
      */
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
-    public static Spec<?> factory() {
-        return Instance.of("SmokeTaggedTest", SmokeTaggedTest::new).child("test()", SmokeTaggedTest::test);
+    public static Action factory() {
+        return Instance.builder("SmokeTaggedTest", SmokeTaggedTest::new)
+                .body(Step.of("test()", withInstance(SmokeTaggedTest.class, SmokeTaggedTest::test)))
+                .build();
     }
 
     public SmokeTaggedTest() {

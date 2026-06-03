@@ -53,12 +53,12 @@ class ClasspathResolverArgumentsTest {
         Selector selector = Selector.classOf(ClasspathResolverTest.BlankTagFactory.class);
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
-        Parallel<?> root = (Parallel<?>) result.orElseThrow();
+        Parallel root = (Parallel) result.orElseThrow();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).name()).startsWith("Discovery validation failure:");
+        assertThat(root.children().get(0).displayName()).startsWith("Discovery validation failure:");
     }
 
     @Test
@@ -113,21 +113,18 @@ class ClasspathResolverArgumentsTest {
 
         assertThatThrownBy(() -> new ClasspathResolver(configuration, selector).resolveActions())
                 .isInstanceOf(ResolverException.class)
-                .hasMessageContaining("return type must be Spec or Action");
+                .hasMessageContaining("return type must be Action");
     }
 
     @Test
-    @DisplayName("accepts factory that returns null as skipped")
-    void acceptsFactoryThatReturnsNullAsSkipped() {
+    @DisplayName("skips factory that returns null")
+    void skipsFactoryThatReturnsNull() {
         Selector selector = Selector.classOf(ClasspathResolverTest.NullReturningFactory.class);
         var configuration = Configuration.defaultConfiguration();
 
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
-        assertThat(result).isPresent();
-        Parallel<?> root = (Parallel<?>) result.orElseThrow();
-        assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).name()).startsWith("Skipped factory:");
+        assertThat(result).isEmpty();
     }
 
     @Test

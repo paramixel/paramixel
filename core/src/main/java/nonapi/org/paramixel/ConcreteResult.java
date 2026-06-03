@@ -16,8 +16,11 @@
 
 package nonapi.org.paramixel;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Optional;
+import nonapi.org.paramixel.action.MutableDescriptor;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Result;
@@ -77,6 +80,40 @@ public final class ConcreteResult implements Result {
     }
 
     @Override
+    public boolean isPassed() {
+        return status().isPassed();
+    }
+
+    @Override
+    public boolean isFailed() {
+        return status().isFailed();
+    }
+
+    @Override
+    public boolean isSkipped() {
+        return status().isSkipped();
+    }
+
+    @Override
+    public boolean isAborted() {
+        return status().isAborted();
+    }
+
+    @Override
+    public Optional<Instant> startedAt() {
+        return root == null ? Optional.empty() : earliestStartedAt(root);
+    }
+
+    @Override
+    public Optional<Instant> completedAt() {
+        return root == null ? Optional.empty() : latestCompletedAt(root);
+    }
+
+    /**
+     * Returns the effective internal status for framework code.
+     *
+     * @return the effective status; never {@code null}
+     */
     public Status status() {
         if (statusOverride != null) {
             return statusOverride;
@@ -86,7 +123,7 @@ public final class ConcreteResult implements Result {
                     configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(false);
             return failIfNoTests ? Status.FAILED : Status.SKIPPED;
         }
-        return promote(root.metadata().status());
+        return promote(statusOf(root));
     }
 
     private Status promote(final Status status) {
@@ -105,5 +142,68 @@ public final class ConcreteResult implements Result {
             }
         }
         return status;
+    }
+
+    private static Status statusOf(final Descriptor descriptor) {
+        if (descriptor instanceof MutableDescriptor mutableDescriptor) {
+            return mutableDescriptor.status();
+        }
+        if (descriptor.isFailed()) {
+            return Status.FAILED;
+        }
+        if (descriptor.isAborted()) {
+            return Status.ABORTED;
+        }
+        if (!descriptor.isCompleted()) {
+            return Status.RUNNING;
+        }
+        if (descriptor.isSkipped()) {
+            return Status.SKIPPED;
+        }
+        return Status.PASSED;
+    }
+
+    private static Optional<Instant> earliestStartedAt(final Descriptor descriptor) {
+        var earliest = descriptor.startedAt();
+        for (Descriptor child : structuralChildren(descriptor)) {
+            earliest = min(earliest, earliestStartedAt(child));
+        }
+        return earliest;
+    }
+
+    private static Optional<Instant> latestCompletedAt(final Descriptor descriptor) {
+        var latest = descriptor.completedAt();
+        for (Descriptor child : structuralChildren(descriptor)) {
+            latest = max(latest, latestCompletedAt(child));
+        }
+        return latest;
+    }
+
+    private static Iterable<Descriptor> structuralChildren(final Descriptor descriptor) {
+        var children = new ArrayList<Descriptor>();
+        descriptor.before().ifPresent(children::add);
+        children.addAll(descriptor.children());
+        descriptor.after().ifPresent(children::add);
+        return children;
+    }
+
+    private static Optional<Instant> min(final Optional<Instant> left, final Optional<Instant> right) {
+        if (left.isEmpty()) {
+            return right;
+        }
+        if (right.isEmpty()) {
+            return left;
+        }
+        return left.orElseThrow().isAfter(right.orElseThrow()) ? right : left;
+    }
+
+    private static Optional<Instant> max(final Optional<Instant> left, final Optional<Instant> right) {
+        if (left.isEmpty()) {
+            return right;
+        }
+        if (right.isEmpty()) {
+            return left;
+        }
+        return left.orElseThrow().isBefore(right.orElseThrow()) ? right : left;
     }
 }

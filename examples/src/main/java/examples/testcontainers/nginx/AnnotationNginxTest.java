@@ -26,10 +26,10 @@ import java.net.URI;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
 
 /**
  * Parameterized integration test that starts Nginx containers using annotation-based
@@ -59,20 +59,22 @@ public class AnnotationNginxTest {
      * @throws Throwable if environment creation fails
      */
     @Paramixel.Factory
-    public static Spec<?> factory() throws Throwable {
+    public static Action factory() throws Throwable {
         var annotationResolver = AnnotationResolver.create(AnnotationNginxTest.class);
 
-        var parallel = Parallel.of(AnnotationNginxTest.class.getName());
+        var parallel = Parallel.builder(AnnotationNginxTest.class.getName());
         for (NginxTestEnvironment environment : NginxTestEnvironment.createTestEnvironments()) {
-            var lifecycle = Lifecycle.of(environment.name())
-                    .before(annotationResolver.byId("setUp", "Before"))
-                    .child(annotationResolver.byId("testGet"))
-                    .after(annotationResolver.byId("tearDown", "After"));
+            var lifecycle = Scope.builder(environment.name())
+                    .before(annotationResolver.byId("setUp"))
+                    .body(annotationResolver.byId("testGet"))
+                    .after(annotationResolver.byId("tearDown"))
+                    .build();
 
-            parallel.child(Instance.of(environment.name(), () -> new AnnotationNginxTest(environment))
-                    .child(lifecycle));
+            parallel.child(Instance.builder(environment.name(), () -> new AnnotationNginxTest(environment))
+                    .body(lifecycle)
+                    .build());
         }
-        return parallel;
+        return parallel.build();
     }
 
     private AnnotationNginxTest(final NginxTestEnvironment environment) {

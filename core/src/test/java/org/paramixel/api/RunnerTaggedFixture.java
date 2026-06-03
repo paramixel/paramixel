@@ -18,27 +18,19 @@ package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture tagged {@code "smoke"} used to verify that the runner selects actions by tag when a tag
- * filter is active.
- */
 public final class RunnerTaggedFixture {
 
     private RunnerTaggedFixture() {
         // Intentionally empty
     }
 
-    /**
-     * Creates a no-op action tagged {@code "smoke"} for runner tag-filtering tests.
-     *
-     * @return a {@link Step} action with the identifier {@code "runner-tagged-fixture"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
-    public static Action<?> factory() {
-        return Instance.<Object>of("runner-tagged-fixture", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("runner-tagged-fixture", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

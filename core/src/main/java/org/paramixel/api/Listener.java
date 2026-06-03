@@ -19,7 +19,7 @@ package org.paramixel.api;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import nonapi.org.paramixel.listener.CompositeListener;
+import nonapi.org.paramixel.listener.ConfiguredCompositeListener;
 import nonapi.org.paramixel.listener.HtmlReportListener;
 import nonapi.org.paramixel.listener.JsonReportListener;
 import nonapi.org.paramixel.listener.ReportListener;
@@ -28,7 +28,7 @@ import nonapi.org.paramixel.listener.StatusListener;
 import nonapi.org.paramixel.listener.SummaryListener;
 import nonapi.org.paramixel.listener.XmlReportListener;
 import nonapi.org.paramixel.support.AnsiDetector;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Action;
 
 /**
  * Receives run, discovery, and descriptor execution callbacks.
@@ -61,38 +61,28 @@ public interface Listener {
         final var statusListener = new StatusListener();
         final var summaryListener = new SummaryListener();
 
-        statusListener.initialize(configuration);
-        summaryListener.initialize(configuration);
-
         final var reportFile =
                 configuration.getString(Configuration.REPORT_FILE).orElse(null);
         if (isBlank(reportFile)) {
             return new SafeListener(
-                    new CompositeListener(List.of(statusListener, summaryListener), ansiEnabled), ansiEnabled);
+                    new ConfiguredCompositeListener(
+                            configuration, List.of(statusListener, summaryListener), ansiEnabled),
+                    ansiEnabled);
         }
 
         final var format = resolveReportFormat(reportFile);
         final var reportListener = createReportListener(format);
-        reportListener.initialize(configuration);
         return new SafeListener(
-                new CompositeListener(List.of(statusListener, summaryListener, reportListener), ansiEnabled),
+                new ConfiguredCompositeListener(
+                        configuration, List.of(statusListener, summaryListener, reportListener), ansiEnabled),
                 ansiEnabled);
-    }
-
-    /**
-     * Invoked after discovery creates the descriptor tree.
-     *
-     * @param root the discovered root descriptor; never {@code null}
-     */
-    default void onDiscoveryCompleted(final Descriptor root) {
-        // Intentionally empty
     }
 
     /**
      * Invoked once before the run begins, allowing listeners to configure themselves based on the
      * supplied configuration.
      *
-     * <p>This method is called exactly once per {@link Runner#run(Spec)} invocation, before any other
+     * <p>This method is called exactly once per {@link Runner#run(Action)} invocation, before any other
      * listener callbacks. It is called from a synchronized context ({@code Runner.run()}).
      *
      * <p>Implementations are responsible for thread-safety if they maintain mutable state.
@@ -107,7 +97,7 @@ public interface Listener {
     /**
      * Invoked once before run discovery begins.
      *
-     * <p>This method is called exactly once per {@link Runner#run(Spec)} invocation, after
+     * <p>This method is called exactly once per {@link Runner#run(Action)} invocation, after
      * {@link #initialize(Configuration)} and {@link #onRunStarted()}, but before the discovery phase.
      *
      * <p>Implementations are responsible for thread-safety if they maintain mutable state.
@@ -115,6 +105,15 @@ public interface Listener {
      * @see SafeListener
      */
     default void onDiscoveryStarted() {
+        // Intentionally empty
+    }
+
+    /**
+     * Invoked after discovery creates the descriptor tree.
+     *
+     * @param root the discovered root descriptor; never {@code null}
+     */
+    default void onDiscoveryCompleted(final Descriptor root) {
         // Intentionally empty
     }
 

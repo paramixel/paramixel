@@ -19,24 +19,13 @@ package org.paramixel.api;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
-/**
- * Fixture with {@code @Paramixel.Priority(-1)} that records factory-creation and execution timing
- * into {@link ClasspathResolverFactoryTimingLog} to verify that factory invocation respects priority order.
- */
 @Paramixel.Priority(-1)
 public final class ClasspathResolverFactoryTimingAlphaFixture {
 
     private ClasspathResolverFactoryTimingAlphaFixture() {}
 
-    /**
-     * Creates a step that logs its factory invocation and execution, then returns a
-     * {@code "alpha-action"} step.
-     *
-     * @return a {@link Step} that records entries in {@link ClasspathResolverFactoryTimingLog} on
-     *     creation and execution
-     */
     @Paramixel.Factory
-    public static Action<?> factory() {
+    public static Action factory() {
         ClasspathResolverFactoryTimingLog.FACTORY_LOG.add("alpha-factory");
         return Step.of("alpha-action", context -> ClasspathResolverFactoryTimingLog.RUN_LOG.add("alpha-run"));
     }

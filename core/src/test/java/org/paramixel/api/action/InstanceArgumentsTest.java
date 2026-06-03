@@ -17,13 +17,11 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.ThrowingConsumer;
 
 @DisplayName("Instance arguments")
 class InstanceArgumentsTest {
@@ -31,119 +29,91 @@ class InstanceArgumentsTest {
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Instance.of(null, (Supplier<?>) () -> "")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Instance.of(" ", (Supplier<?>) () -> "")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Instance.of("instance", (Supplier<?>) null)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Instance.of(null, String.class)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Instance.of(" ", String.class)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Instance.of("instance", (Class<?>) null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.builder(null, (Supplier<?>) () -> ""))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.builder(" ", (Supplier<?>) () -> ""))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Instance.builder("instance", (Supplier<?>) null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.builder(null, String.class)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.builder(" ", String.class)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Instance.builder("instance", (Class<?>) null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("builder(Class<T>) rejects class without public no-arg constructor")
     void builderClassRejectsNoPublicConstructor() {
-        assertThatThrownBy(() -> Instance.of(Integer.class)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Instance.builder(Integer.class)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("builder(Class<T>) uses simple name as action name")
     void builderClassUsesSimpleName() {
-        var instance = Instance.of(String.class).child("test", s -> {}).resolve();
-        assertThat(instance.name()).isEqualTo("String");
+        var instance =
+                Instance.builder(String.class).body(Step.of("test", s -> {})).build();
+        assertThat(instance.displayName()).isEqualTo("String");
     }
 
     @Test
-    @DisplayName("child(Spec) rejects null spec")
-    void childSpecRejectsNull() {
-        var spec = Instance.of("instance", Object::new);
-        assertThatThrownBy(() -> spec.child((Spec<?>) null)).isInstanceOf(NullPointerException.class);
+    @DisplayName("wrap(Action) rejects null builder")
+    void wrapBuilderRejectsNull() {
+        var builder = Instance.builder("instance", Object::new);
+        assertThatThrownBy(() -> builder.body((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("child(Spec) adds child from spec")
-    void childSpecAddsChild() {
-        var instance = Instance.of("instance", Object::new)
-                .child(Step.of("step", s -> {}))
-                .resolve();
-        assertThat(instance.children().stream().filter(a -> "step".equals(a.name())))
-                .hasSize(1);
+    @DisplayName("wrap(Action) sets child")
+    void wrapBuilderSetsBody() {
+        var instance = Instance.builder("instance", Object::new)
+                .body(Step.of("step", s -> {}))
+                .build();
+        assertThat(instance.body()).isNotNull();
+        assertThat(instance.body().displayName()).isEqualTo("step");
     }
 
     @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects null name")
-    void childStringConsumerRejectsNullName() {
-        var spec = Instance.of("instance", Object::new);
-        assertThatThrownBy(() -> spec.child(null, s -> {})).isInstanceOf(NullPointerException.class);
+    @DisplayName("Step.of() rejects null name")
+    void stepOfRejectsNullName() {
+        assertThatThrownBy(() -> Step.of(null, s -> {})).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects blank name")
-    void childStringConsumerRejectsBlankName() {
-        var spec = Instance.of("instance", Object::new);
-        assertThatThrownBy(() -> spec.child(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
+    @DisplayName("Step.of() rejects blank name")
+    void stepOfRejectsBlankName() {
+        assertThatThrownBy(() -> Step.of(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects null consumer")
-    void childStringConsumerRejectsNullConsumer() {
-        var spec = Instance.of("instance", Object::new);
-        assertThatThrownBy(() -> spec.child("child", (ThrowingConsumer<Object>) null))
-                .isInstanceOf(NullPointerException.class);
+    @DisplayName("Step.of() rejects null consumer")
+    void stepOfRejectsNullConsumer() {
+        assertThatThrownBy(() -> Step.of("child", null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("builder accumulates multiple children")
     void builderAccumulatesMultipleChildren() {
-        var instance = Instance.of("instance", Object::new)
-                .child("first", s -> {})
-                .child("second", s -> {})
-                .child("third", s -> {})
-                .resolve();
-        assertThat(instance.children().stream()
-                        .filter(a -> "first".equals(a.name()) || "second".equals(a.name()) || "third".equals(a.name())))
-                .hasSize(3);
+        var instance = Instance.builder("instance", Object::new)
+                .body(Sequence.builder("body")
+                        .child(Step.of("first", s -> {}))
+                        .child(Step.of("second", s -> {}))
+                        .child(Step.of("third", s -> {}))
+                        .build())
+                .build();
+        assertThat(instance.body()).isNotNull();
+        assertThat(instance.body().displayName()).isEqualTo("body");
     }
 
     @Test
-    @DisplayName("builder is one-shot")
-    void builderOneShotBehavior() {
-        var spec = Instance.of("instance", Object::new);
-        spec.child("test", s -> {});
-        spec.resolve();
-        assertThatIllegalStateException().isThrownBy(() -> spec.resolve());
-        assertThatIllegalStateException().isThrownBy(() -> spec.child("other", s -> {}));
-        assertThatIllegalStateException().isThrownBy(() -> spec.dependent());
-        assertThatIllegalStateException().isThrownBy(() -> spec.independent());
-    }
+    @DisplayName("builder can build multiple immutable snapshots")
+    void builderCanBuildMultipleImmutableSnapshots() {
+        var builder = Instance.builder("instance", Object::new);
+        builder.body(Step.of("test", s -> {}));
+        var first = builder.build();
+        builder.body(Step.of("other", s -> {}));
+        var second = builder.build();
 
-    @Test
-    @DisplayName("default is dependent")
-    void defaultIsDependent() {
-        var instance =
-                Instance.of("instance", Object::new).child("test", s -> {}).resolve();
-        assertThat(instance.isDependent()).isTrue();
-        assertThat(instance.isIndependent()).isFalse();
-    }
-
-    @Test
-    @DisplayName("independent() configures as independent")
-    void independentConfiguresAsIndependent() {
-        var instance = Instance.of("instance", Object::new)
-                .independent()
-                .child("test", s -> {})
-                .resolve();
-        assertThat(instance.isIndependent()).isTrue();
-        assertThat(instance.isDependent()).isFalse();
-    }
-
-    @Test
-    @DisplayName("dependent() after independent() restores dependent")
-    void dependentAfterIndependentRestoresDependent() {
-        var instance = Instance.of("instance", Object::new)
-                .independent()
-                .dependent()
-                .child("test", s -> {})
-                .resolve();
-        assertThat(instance.isDependent()).isTrue();
+        assertThat(first.body().displayName()).isEqualTo("test");
+        assertThat(second.body().displayName()).isEqualTo("other");
     }
 }

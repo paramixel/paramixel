@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -31,8 +32,7 @@ class ParamixelArgumentsTest {
     void constructorIsPrivate() throws NoSuchMethodException {
         Constructor<Paramixel> constructor = Paramixel.class.getDeclaredConstructor();
 
-        assertThat(java.lang.reflect.Modifier.isPrivate(constructor.getModifiers()))
-                .isTrue();
+        assertThat(Modifier.isPrivate(constructor.getModifiers())).isTrue();
     }
 
     @Test

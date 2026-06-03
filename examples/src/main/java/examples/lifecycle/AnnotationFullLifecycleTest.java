@@ -23,9 +23,10 @@ import java.util.List;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Static;
 
 public class AnnotationFullLifecycleTest {
@@ -37,24 +38,31 @@ public class AnnotationFullLifecycleTest {
     }
 
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         var annotationResolver = AnnotationResolver.create(AnnotationFullLifecycleTest.class);
 
-        return Static.of(AnnotationFullLifecycleTest.class.getName())
+        return Static.builder(AnnotationFullLifecycleTest.class.getName())
                 .before(annotationResolver.staticById("staticSetUp"))
-                .child(Instance.of(AnnotationFullLifecycleTest.class)
-                        .child(Lifecycle.of("lifecycle")
+                .body(Instance.builder(AnnotationFullLifecycleTest.class)
+                        .body(Scope.builder("[scenario]")
                                 .before(annotationResolver.byId("setUp"))
-                                .child(Lifecycle.of("testOne")
-                                        .before(annotationResolver.byId("beforeEach"))
-                                        .child(annotationResolver.byId("testOne"))
-                                        .after(annotationResolver.byId("afterEach")))
-                                .child(Lifecycle.of("testTwo")
-                                        .before(annotationResolver.byId("beforeEach"))
-                                        .child(annotationResolver.byId("testTwo"))
-                                        .after(annotationResolver.byId("afterEach")))
-                                .after(annotationResolver.byId("tearDown"))))
-                .after(annotationResolver.staticById("staticTearDown"));
+                                .body(Sequence.builder("tests")
+                                        .child(Scope.builder("testOne")
+                                                .before(annotationResolver.byId("beforeEach"))
+                                                .body(annotationResolver.byId("testOne"))
+                                                .after(annotationResolver.byId("afterEach"))
+                                                .build())
+                                        .child(Scope.builder("testTwo")
+                                                .before(annotationResolver.byId("beforeEach"))
+                                                .body(annotationResolver.byId("testTwo"))
+                                                .after(annotationResolver.byId("afterEach"))
+                                                .build())
+                                        .build())
+                                .after(annotationResolver.byId("tearDown"))
+                                .build())
+                        .build())
+                .after(annotationResolver.staticById("staticTearDown"))
+                .build();
     }
 
     public AnnotationFullLifecycleTest() {

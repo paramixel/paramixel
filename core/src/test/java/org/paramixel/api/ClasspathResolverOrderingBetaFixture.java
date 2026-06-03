@@ -17,11 +17,8 @@
 package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture discovered by the resolver with a default-valued {@code @Paramixel.Priority} (no value)
- * to assert ordering behavior when priority is specified but not customized.
- */
 @Paramixel.Priority
 public final class ClasspathResolverOrderingBetaFixture {
 
@@ -29,13 +26,10 @@ public final class ClasspathResolverOrderingBetaFixture {
         // Intentionally empty
     }
 
-    /**
-     * Creates an action labeled {@code "beta"} for resolver ordering verification.
-     *
-     * @return a {@link ResolverOrderingAction} with the {@code "beta"} identifier
-     */
     @Paramixel.Factory
-    public static Action<?> factory() {
-        return new ResolverOrderingAction("beta");
+    public static Action factory() {
+        return Step.of("beta", context -> {
+            throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
+        });
     }
 }

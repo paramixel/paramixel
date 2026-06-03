@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequential;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("StatusListener path")
@@ -39,7 +39,7 @@ class StatusListenerPathTest {
     @DisplayName("shows simple name for core action classes")
     void showsSimpleNameForCoreActionClasses() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("simple", obj -> {});
+        Step noop = Step.of("simple", context -> {});
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -52,14 +52,14 @@ class StatusListenerPathTest {
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains("(Step)");
+        assertThat(result).contains("simple");
     }
 
     @Test
     @DisplayName("shows FQCN for non-core package action classes")
     void showsFQCNForNonCorePackageActionClasses() {
         StatusListener listener = new StatusListener();
-        Action<?> custom = Step.of("custom", obj -> {});
+        Action custom = Step.of("custom", context -> {});
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -72,16 +72,16 @@ class StatusListenerPathTest {
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains("Step");
+        assertThat(result).contains("custom");
     }
 
     @Test
     @DisplayName("id path excludes root ancestors")
     void idPathExcludesRootAncestors() {
         StatusListener listener = new StatusListener();
-        Action<?> child = Step.of("visible-child", obj -> {});
-        Parallel<?> parallel =
-                Parallel.of(ROOT_NAME).parallelism(1).child(child).resolve();
+        Action child = Step.of("visible-child", context -> {});
+        Parallel parallel =
+                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -99,7 +99,7 @@ class StatusListenerPathTest {
                 .filter(line -> line.contains("visible-child"))
                 .findFirst()
                 .orElse("");
-        assertThat(childLine).contains(child.name());
+        assertThat(childLine).contains(child.displayName());
         assertThat(childLine).doesNotContain(ROOT_NAME);
     }
 
@@ -107,9 +107,9 @@ class StatusListenerPathTest {
     @DisplayName("action path excludes root ancestors")
     void actionPathExcludesRootAncestors() {
         StatusListener listener = new StatusListener();
-        Action<?> child = Step.of("visible-child", obj -> {});
-        Parallel<?> parallel =
-                Parallel.of(ROOT_NAME).parallelism(1).child(child).resolve();
+        Action child = Step.of("visible-child", context -> {});
+        Parallel parallel =
+                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -130,8 +130,8 @@ class StatusListenerPathTest {
     @DisplayName("nested action display path includes parent name")
     void nestedActionDisplayPathIncludesParentName() {
         StatusListener listener = new StatusListener();
-        Action<?> child = Step.of("child", obj -> {});
-        Sequential<?> parent = Sequential.of("parent").child(child).resolve();
+        Action child = Step.of("child", context -> {});
+        Sequence parent = Sequence.builder("parent").child(child).build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -144,15 +144,15 @@ class StatusListenerPathTest {
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains("parent / child (Step)");
+        assertThat(result).contains("parent / child");
     }
 
     @Test
     @DisplayName("nested action path includes parent name")
     void nestedActionPathIncludesParentName() {
         StatusListener listener = new StatusListener();
-        Action<?> child = Step.of("child", obj -> {});
-        Sequential<?> parent = Sequential.of("parent").child(child).resolve();
+        Action child = Step.of("child", context -> {});
+        Sequence parent = Sequence.builder("parent").child(child).build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -165,16 +165,16 @@ class StatusListenerPathTest {
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains("parent / child (Step)");
+        assertThat(result).contains("parent / child");
     }
 
     @Test
     @DisplayName("deep nesting produces full hierarchical display path")
     void deepNestingProducesFullHierarchicalPath() {
         StatusListener listener = new StatusListener();
-        Action<?> leaf = Step.of("leaf", obj -> {});
-        Action<?> mid = Sequential.of("mid").child(leaf).resolve();
-        Action<?> top = Sequential.of("top").child(mid).resolve();
+        Action leaf = Step.of("leaf", context -> {});
+        Action mid = Sequence.builder("mid").child(leaf).build();
+        Action top = Sequence.builder("top").child(mid).build();
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -187,14 +187,14 @@ class StatusListenerPathTest {
         }
 
         String result = output.toString(StandardCharsets.UTF_8);
-        assertThat(result).contains("top / mid / leaf (Step)");
+        assertThat(result).contains("top / mid / leaf");
     }
 
     @Test
     @DisplayName("timing shows milliseconds")
     void timingShowsMilliseconds() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("timed-action", obj -> {});
+        Step noop = Step.of("timed-action", context -> {});
         Runner runner = Runner.builder().listener(listener).build();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();

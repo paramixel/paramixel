@@ -17,11 +17,8 @@
 package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture discovered by the resolver with a high {@code @Paramixel.Priority(10)} to assert that
- * ordering metadata controls action resolution order.
- */
 @Paramixel.Priority(10)
 public final class ClasspathResolverOrderingHighFixture {
 
@@ -29,13 +26,10 @@ public final class ClasspathResolverOrderingHighFixture {
         // Intentionally empty
     }
 
-    /**
-     * Creates an action labeled {@code "high"} for resolver ordering verification.
-     *
-     * @return a {@link ResolverOrderingAction} with the {@code "high"} identifier
-     */
     @Paramixel.Factory
-    public static Action<?> factory() {
-        return new ResolverOrderingAction("high");
+    public static Action factory() {
+        return Step.of("high", context -> {
+            throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
+        });
     }
 }

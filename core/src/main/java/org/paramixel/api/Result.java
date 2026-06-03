@@ -16,32 +16,70 @@
 
 package org.paramixel.api;
 
+import java.time.Instant;
 import java.util.Optional;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Action;
 
 /**
  * Represents the outcome of a Paramixel run, providing access to the root descriptor
- * and the effective aggregate status derived from the descriptor tree and configuration.
+ * and effective aggregate state derived from the descriptor tree and configuration.
  *
- * <p>The effective status is the most-severe status found across the entire descriptor tree,
+ * <p>The effective outcome is the most-severe outcome found across the descriptor tree,
  * with configuration-based promotion rules applied:
  * <ul>
- *   <li>{@link Status#SKIPPED} is promoted to {@link Status#FAILED} when
- *       {@link Configuration#FAILURE_ON_SKIP} is {@code true}</li>
- *   <li>{@link Status#ABORTED} is promoted to {@link Status#FAILED} when
- *       {@link Configuration#FAILURE_ON_ABORT} is {@code true} (the default)</li>
- *   <li>When no descriptor was discovered, the effective status is {@link Status#FAILED}
- *       when {@link Configuration#FAIL_IF_NO_TESTS} is {@code true},
- *       otherwise {@link Status#SKIPPED}</li>
+ *   <li>skipped is promoted to failed when {@link Configuration#FAILURE_ON_SKIP} is {@code true}</li>
+ *   <li>aborted is promoted to failed when {@link Configuration#FAILURE_ON_ABORT} is {@code true} (the default)</li>
+ *   <li>when no descriptor was discovered, the effective outcome is failed when
+ *       {@link Configuration#FAIL_IF_NO_TESTS} is {@code true}, otherwise skipped</li>
  * </ul>
  *
- * <p>Severity ordering for tree aggregation: {@code FAILED} > {@code ABORTED} >
- * {@code PENDING}/{@code RUNNING} > {@code SKIPPED} > {@code PASSED}.
+ * <p>Severity ordering for tree aggregation: failed &gt; aborted &gt; pending/running &gt; skipped &gt; passed.
  *
- * @see Runner#run(Spec)
- * @see Status
+ * @see Runner#run(Action)
  */
 public interface Result {
+
+    /**
+     * Returns whether the effective run outcome completed successfully.
+     *
+     * @return {@code true} when the effective outcome is passed
+     */
+    boolean isPassed();
+
+    /**
+     * Returns whether the effective run outcome is failed.
+     *
+     * @return {@code true} when the effective outcome is failed
+     */
+    boolean isFailed();
+
+    /**
+     * Returns whether the effective run outcome is skipped.
+     *
+     * @return {@code true} when the effective outcome is skipped
+     */
+    boolean isSkipped();
+
+    /**
+     * Returns whether the effective run outcome is aborted.
+     *
+     * @return {@code true} when the effective outcome is aborted
+     */
+    boolean isAborted();
+
+    /**
+     * Returns the earliest start instant found in the descriptor tree.
+     *
+     * @return the earliest descriptor start instant, or empty when no descriptor has started
+     */
+    Optional<Instant> startedAt();
+
+    /**
+     * Returns the latest completion instant found in the descriptor tree.
+     *
+     * @return the latest descriptor completion instant, or empty when no descriptor has completed
+     */
+    Optional<Instant> completedAt();
 
     /**
      * Returns the root descriptor of the executed action tree.
@@ -52,20 +90,4 @@ public interface Result {
      * @return the root descriptor, or empty when no descriptor was discovered
      */
     Optional<Descriptor> descriptor();
-
-    /**
-     * Returns the effective aggregate status derived from the descriptor tree and configuration.
-     *
-     * <p>The aggregate status is the most-severe status found by walking the entire descriptor tree.
-     * Configuration promotion rules are then applied: {@link Status#SKIPPED} may be promoted to
-     * {@link Status#FAILED} when {@link Configuration#FAILURE_ON_SKIP} is {@code true},
-     * and {@link Status#ABORTED} may be promoted to {@link Status#FAILED} when
-     * {@link Configuration#FAILURE_ON_ABORT} is {@code true}.
-     *
-     * <p>When no descriptor was discovered, returns {@link Status#FAILED} when
-     * {@link Configuration#FAIL_IF_NO_TESTS} is {@code true}, otherwise {@link Status#SKIPPED}.
-     *
-     * @return the effective aggregate status; never {@code null}
-     */
-    Status status();
 }

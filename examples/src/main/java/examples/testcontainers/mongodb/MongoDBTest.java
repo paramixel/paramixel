@@ -17,16 +17,18 @@
 package examples.testcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Context.withInstance;
 
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
 import org.bson.Document;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Step;
 
 /**
  * Parameterized integration test that starts MongoDB containers for each Docker image
@@ -57,17 +59,20 @@ public class MongoDBTest {
      * @throws Throwable if environment creation fails
      */
     @Paramixel.Factory
-    public static Spec<?> factory() throws Throwable {
-        var parallel = Parallel.of(MongoDBTest.class.getName());
+    public static Action factory() throws Throwable {
+        var parallel = Parallel.builder(MongoDBTest.class.getName());
         for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            parallel.child(Instance.of(environment.name(), () -> new MongoDBTest(environment))
-                    .child(Lifecycle.<MongoDBTest>of("lifecycle")
-                            .before("setUp()", "Before", MongoDBTest::setUp)
-                            .child("testInsertAndQuery()", MongoDBTest::testInsertAndQuery)
-                            .after("tearDown()", "After", MongoDBTest::tearDown)
-                            .resolve()));
+            parallel.child(Instance.builder(environment.name(), () -> new MongoDBTest(environment))
+                    .body(Scope.builder("[scenario]")
+                            .before(Step.of("setUp()", withInstance(MongoDBTest.class, MongoDBTest::setUp)))
+                            .body(Step.of(
+                                    "testInsertAndQuery()",
+                                    withInstance(MongoDBTest.class, MongoDBTest::testInsertAndQuery)))
+                            .after(Step.of("tearDown()", withInstance(MongoDBTest.class, MongoDBTest::tearDown)))
+                            .build())
+                    .build());
         }
-        return parallel;
+        return parallel.build();
     }
 
     private MongoDBTest(final MongoDBTestEnvironment environment) {

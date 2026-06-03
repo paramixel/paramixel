@@ -22,9 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
 
 /**
  * Verifies that {@code @Paramixel.Disabled} prevents the annotated action factory
@@ -50,10 +50,12 @@ public class AnnotationDisabledTest {
      * @return a single-step action that checks the disabled flag
      */
     @Paramixel.Factory
-    public static Spec<?> disabledVerificationFactory() {
+    public static Action disabledVerificationFactory() {
         var annotationResolver = AnnotationResolver.create(AnnotationDisabledTest.class);
 
-        return Instance.of(AnnotationDisabledTest.class).child(annotationResolver.byId("verify"));
+        return Instance.builder(AnnotationDisabledTest.class)
+                .body(annotationResolver.byId("verify"))
+                .build();
     }
 
     /**
@@ -64,17 +66,18 @@ public class AnnotationDisabledTest {
      */
     @Paramixel.Disabled("covered by resolver skip behavior")
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         factoryInvoked.set(true);
 
         var annotationResolver = AnnotationResolver.create(AnnotationDisabledTest.class);
 
-        return Instance.of(AnnotationDisabledTest.class)
-                .child(Lifecycle.of("lifecycle")
+        return Instance.builder(AnnotationDisabledTest.class)
+                .body(Scope.builder("[scenario]")
                         .before(annotationResolver.byId("before"))
-                        .child(annotationResolver.byId("disabledLeaf"))
+                        .body(annotationResolver.byId("disabledLeaf"))
                         .after(annotationResolver.byId("after"))
-                        .resolve());
+                        .build())
+                .build();
     }
 
     public AnnotationDisabledTest() {

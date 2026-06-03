@@ -23,7 +23,12 @@ import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.action.SchedulerPriorityKey;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.action.Assert;
+import org.paramixel.api.action.Delay;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("MutableDescriptor")
@@ -36,7 +41,7 @@ class MutableDescriptorTest {
         MutableDescriptor descriptor = new ConcreteDescriptor(action);
 
         assertThat(descriptor.action()).isSameAs(action);
-        assertThat(descriptor.metadata().name()).isEqualTo("test");
+        assertThat(descriptor.action().displayName()).isEqualTo("test");
     }
 
     @Test
@@ -46,7 +51,7 @@ class MutableDescriptorTest {
         var child = new ConcreteDescriptor(parent, Step.of("child", v -> {}));
 
         assertThat(child.parent()).containsSame(parent);
-        assertThat(child.metadata().name()).isEqualTo("child");
+        assertThat(child.action().displayName()).isEqualTo("child");
     }
 
     @Test
@@ -172,5 +177,135 @@ class MutableDescriptorTest {
         assertThatThrownBy(() -> root.setAfter(new ConcreteDescriptor(Step.of("late-after", v -> {}))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Descriptor is frozen:");
+    }
+
+    @Nested
+    @DisplayName("depth()")
+    class DepthTests {
+
+        @Test
+        @DisplayName("root descriptor has depth 0")
+        void rootDescriptorHasDepthZero() {
+            MutableDescriptor root = new ConcreteDescriptor(Step.of("root", v -> {}));
+
+            assertThat(root.depth()).isZero();
+        }
+
+        @Test
+        @DisplayName("direct child has depth 1")
+        void directChildHasDepthOne() {
+            MutableDescriptor root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            MutableDescriptor child = new ConcreteDescriptor(root, Step.of("child", v -> {}));
+
+            assertThat(child.depth()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("grandchild has depth 2")
+        void grandchildHasDepthTwo() {
+            MutableDescriptor root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            MutableDescriptor child = new ConcreteDescriptor(root, Step.of("child", v -> {}));
+            MutableDescriptor grandchild = new ConcreteDescriptor(child, Step.of("grandchild", v -> {}));
+
+            assertThat(grandchild.depth()).isEqualTo(2);
+        }
+    }
+
+    @Nested
+    @DisplayName("isCoordinationAction()")
+    class IsCoordinationActionTests {
+
+        @Test
+        @DisplayName("returns true when wrapping a Parallel action")
+        void returnsTrueWhenWrappingParallel() {
+            MutableDescriptor descriptor =
+                    new ConcreteDescriptor(Parallel.builder("parallel").build());
+
+            assertThat(descriptor.isCoordinationAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true when wrapping a Sequence action")
+        void returnsTrueWhenWrappingSequence() {
+            MutableDescriptor descriptor =
+                    new ConcreteDescriptor(Sequence.builder("sequence").build());
+
+            assertThat(descriptor.isCoordinationAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true when before slot is present")
+        void returnsTrueWhenBeforeSlotIsPresent() {
+            MutableDescriptor parent = new ConcreteDescriptor(Step.of("parent", v -> {}));
+            MutableDescriptor before = new ConcreteDescriptor(parent, Step.of("before", v -> {}));
+            parent.setBefore(before);
+
+            assertThat(parent.isCoordinationAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true when after slot is present")
+        void returnsTrueWhenAfterSlotIsPresent() {
+            MutableDescriptor parent = new ConcreteDescriptor(Step.of("parent", v -> {}));
+            MutableDescriptor after = new ConcreteDescriptor(parent, Step.of("after", v -> {}));
+            parent.setAfter(after);
+
+            assertThat(parent.isCoordinationAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true when children list is non-empty")
+        void returnsTrueWhenChildrenListIsNonEmpty() {
+            MutableDescriptor parent = new ConcreteDescriptor(Step.of("parent", v -> {}));
+            parent.addChild(new ConcreteDescriptor(parent, Step.of("child", v -> {})));
+
+            assertThat(parent.isCoordinationAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns false for leaf Step with no children or slots")
+        void returnsFalseForLeafStepWithNoChildrenOrSlots() {
+            MutableDescriptor leaf = new ConcreteDescriptor(Step.of("leaf", v -> {}));
+
+            assertThat(leaf.isCoordinationAction()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("isLeafAction()")
+    class IsLeafActionTests {
+
+        @Test
+        @DisplayName("returns true for Step action")
+        void returnsTrueForStepAction() {
+            MutableDescriptor descriptor = new ConcreteDescriptor(Step.of("step", v -> {}));
+
+            assertThat(descriptor.isLeafAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true for Assert action")
+        void returnsTrueForAssertAction() {
+            MutableDescriptor descriptor = new ConcreteDescriptor(Assert.of("assert", true, true));
+
+            assertThat(descriptor.isLeafAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true for Delay action")
+        void returnsTrueForDelayAction() {
+            MutableDescriptor descriptor = new ConcreteDescriptor(Delay.of("delay", 1L));
+
+            assertThat(descriptor.isLeafAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns false for Parallel action")
+        void returnsFalseForParallelAction() {
+            MutableDescriptor descriptor =
+                    new ConcreteDescriptor(Parallel.builder("parallel").build());
+
+            assertThat(descriptor.isLeafAction()).isFalse();
+        }
     }
 }

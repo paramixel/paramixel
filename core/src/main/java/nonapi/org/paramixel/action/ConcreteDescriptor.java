@@ -16,36 +16,37 @@
 
 package nonapi.org.paramixel.action;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import nonapi.org.paramixel.ConcreteMetadata;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.FastId;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Metadata;
-import org.paramixel.api.action.Mode;
 
 /**
  * Mutable descriptor for all action occurrences in a descriptor tree.
  *
  * <p>Structurally mirrors {@link Action}: {@link #before()} and {@link #after()} are
- * separate slots, not included in {@link #children()}. Tree structure and identity are
- * held directly. Execution state is delegated to the enclosed {@link ConcreteMetadata}
- * instance.
+ * separate slots, not included in {@link #children()}. Tree structure, occurrence identity,
+ * and execution state are held directly.
  */
 public final class ConcreteDescriptor implements MutableDescriptor {
 
-    private final Action<?> action;
-    private final ConcreteMetadata metadata;
+    private final Action action;
+    private final String id;
+    private volatile Status status = Status.PENDING;
+    private volatile Instant startedAt;
+    private volatile Instant completedAt;
     private volatile MutableDescriptor before;
     private final List<MutableDescriptor> children = new ArrayList<>();
     private volatile MutableDescriptor after;
-    private volatile List<Descriptor> frozenChildren;
+    private volatile List<Descriptor> childrenView;
+    private volatile boolean frozen;
     private volatile SchedulerPriorityKey schedulerPriorityKey = SchedulerPriorityKey.root();
     private volatile Thread executingThread;
     private CompletableFuture<Descriptor> scheduledFuture;
@@ -56,7 +57,7 @@ public final class ConcreteDescriptor implements MutableDescriptor {
      *
      * @param action the action bound to the descriptor; must not be {@code null}
      */
-    public ConcreteDescriptor(final Action<?> action) {
+    public ConcreteDescriptor(final Action action) {
         this(null, action);
     }
 
@@ -66,22 +67,70 @@ public final class ConcreteDescriptor implements MutableDescriptor {
      * @param parent the parent descriptor, or {@code null} for root
      * @param action the action bound to the descriptor; must not be {@code null}
      */
-    public ConcreteDescriptor(final MutableDescriptor parent, final Action<?> action) {
+    public ConcreteDescriptor(final MutableDescriptor parent, final Action action) {
         this.parent = parent;
         this.action = Objects.requireNonNull(action, "action is null");
-        var id = FastId.generateId();
-        this.metadata =
-                new ConcreteMetadata(id, action.name(), action.getClass().getName(), action.kind());
+        this.id = FastId.generateId();
     }
 
     @Override
-    public Action<?> action() {
+    public Action action() {
         return action;
     }
 
     @Override
-    public Metadata metadata() {
-        return metadata;
+    public String id() {
+        return id;
+    }
+
+    @Override
+    public Status status() {
+        return status;
+    }
+
+    @Override
+    public boolean isPassed() {
+        return status.isPassed();
+    }
+
+    @Override
+    public boolean isFailed() {
+        return status.isFailed();
+    }
+
+    @Override
+    public boolean isSkipped() {
+        return status.isSkipped();
+    }
+
+    @Override
+    public boolean isAborted() {
+        return status.isAborted();
+    }
+
+    @Override
+    public Optional<Instant> startedAt() {
+        return Optional.ofNullable(startedAt);
+    }
+
+    @Override
+    public Optional<Instant> completedAt() {
+        return Optional.ofNullable(completedAt);
+    }
+
+    @Override
+    public Optional<String> message() {
+        return status.message();
+    }
+
+    @Override
+    public Optional<Throwable> throwable() {
+        return status.throwable();
+    }
+
+    @Override
+    public boolean isCompleted() {
+        return !status.isPending() && !status.isRunning();
     }
 
     @Override
@@ -96,16 +145,15 @@ public final class ConcreteDescriptor implements MutableDescriptor {
 
     @Override
     public List<Descriptor> children() {
-        var cachedChildren = frozenChildren;
-        if (cachedChildren != null) {
-            return cachedChildren;
+        var view = childrenView;
+        if (view != null) {
+            return view;
         }
         synchronized (this) {
-            cachedChildren = frozenChildren;
-            if (cachedChildren != null) {
-                return cachedChildren;
+            if (childrenView == null) {
+                childrenView = List.copyOf(children);
             }
-            return List.copyOf(children);
+            return childrenView;
         }
     }
 
@@ -144,6 +192,7 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         var offset = this.before != null ? 1 : 0;
         child.setSchedulerPriorityKey(schedulerPriorityKey.child(offset + children.size()));
         children.add(child);
+        childrenView = null;
     }
 
     @Override
@@ -181,12 +230,13 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         MutableDescriptor afterSnapshot;
         synchronized (this) {
             beforeSnapshot = before;
-            if (frozenChildren != null) {
-                childrenSnapshot = frozenChildren;
+            if (childrenView != null) {
+                childrenSnapshot = childrenView;
             } else {
-                frozenChildren = List.copyOf(children);
-                childrenSnapshot = frozenChildren;
+                childrenView = List.copyOf(children);
+                childrenSnapshot = childrenView;
             }
+            frozen = true;
             afterSnapshot = after;
         }
 
@@ -204,22 +254,20 @@ public final class ConcreteDescriptor implements MutableDescriptor {
 
     @Override
     public boolean isFrozen() {
-        return frozenChildren != null;
+        return frozen;
     }
 
     private void ensureNotFrozen() {
-        if (frozenChildren != null) {
-            throw new IllegalStateException("Descriptor is frozen: " + metadata.id());
+        if (frozen) {
+            throw new IllegalStateException("Descriptor is frozen: " + id);
         }
     }
 
     @Override
-    public synchronized CompletableFuture<Descriptor> markScheduled(final Mode requestedMode) {
-        Objects.requireNonNull(requestedMode, "requestedMode is null");
+    public synchronized CompletableFuture<Descriptor> markScheduled() {
         if (scheduledFuture != null) {
-            throw new IllegalStateException("Descriptor already scheduled: " + metadata.id());
+            throw new IllegalStateException("Descriptor already scheduled: " + id);
         }
-        metadata.setMode(requestedMode);
         scheduledFuture = new CompletableFuture<>();
         return scheduledFuture;
     }
@@ -231,7 +279,28 @@ public final class ConcreteDescriptor implements MutableDescriptor {
 
     @Override
     public synchronized void setStatus(final Status newStatus) {
-        metadata.setStatus(Objects.requireNonNull(newStatus, "status is null"));
+        Objects.requireNonNull(newStatus, "status is null");
+        if (newStatus.isPending()) {
+            throw new IllegalArgumentException("Cannot set PENDING status");
+        }
+        if (status.isPending()) {
+            if (!newStatus.isRunning()) {
+                throw new IllegalStateException("Descriptor must transition from PENDING to RUNNING");
+            }
+            status = Status.RUNNING;
+            startedAt = Instant.now();
+            completedAt = null;
+            return;
+        }
+        if (status.isRunning()) {
+            if (newStatus.isPending() || newStatus.isRunning()) {
+                throw new IllegalStateException("Descriptor must transition from RUNNING to terminal status");
+            }
+            status = newStatus;
+            completedAt = Instant.now();
+            return;
+        }
+        throw new IllegalStateException("Descriptor already completed with status " + status.name());
     }
 
     @Override

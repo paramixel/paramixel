@@ -18,32 +18,13 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.selector.Selector;
 
 @DisplayName("Runner arguments")
 class RunnerArgumentsTest {
-
-    @Test
-    @DisplayName("rejects mutation after build")
-    void rejectsMutationAfterBuild() {
-        Runner.Builder builder = Runner.builder();
-
-        builder.build();
-
-        assertThatThrownBy(() -> builder.configuration(Configuration.of(Map.of())))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("builder already built");
-        assertThatThrownBy(() -> builder.listener(new Listener() {}))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("builder already built");
-        assertThatThrownBy(builder::build)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("builder already built");
-    }
 
     @Test
     @DisplayName("run(Selector) rejects null selector")
@@ -62,19 +43,19 @@ class RunnerArgumentsTest {
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Spec<?>) rejects null spec")
-    void runAndReturnExitCodeRejectsNullSpec() {
-        assertThatThrownBy(() -> Runner.defaultRunner().runAndReturnExitCode((Spec<?>) null))
+    @DisplayName("runAndReturnExitCode(Action) rejects null action")
+    void runAndReturnExitCodeRejectsNullAction() {
+        assertThatThrownBy(() -> Runner.defaultRunner().runAndReturnExitCode((Action) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec is null");
+                .hasMessage("action is null");
     }
 
     @Test
-    @DisplayName("runAndExit(Spec<?>) rejects null spec")
-    void runAndExitRejectsNullSpec() {
-        assertThatThrownBy(() -> Runner.defaultRunner().runAndExit((Spec<?>) null))
+    @DisplayName("runAndExit(Action) rejects null action")
+    void runAndExitRejectsNullAction() {
+        assertThatThrownBy(() -> Runner.defaultRunner().runAndExit((Action) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec is null");
+                .hasMessage("action is null");
     }
 
     @Test
@@ -85,20 +66,20 @@ class RunnerArgumentsTest {
     }
 
     @Test
-    @DisplayName("run(Spec<?>) rejects null spec")
-    void runRejectsNullSpec() {
-        assertThatThrownBy(() -> Runner.defaultRunner().run((Spec<?>) null))
+    @DisplayName("run(Action) rejects null action")
+    void runRejectsNullAction() {
+        assertThatThrownBy(() -> Runner.defaultRunner().run((Action) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec is null");
+                .hasMessage("action is null");
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Spec<?>) null spec throws NPE")
-    void runAndReturnExitCodeNullSpecThrowsNPE() {
+    @DisplayName("runAndReturnExitCode(Action) null action throws NPE")
+    void runAndReturnExitCodeNullActionThrowsNPE() {
         Runner runner = Runner.builder().build();
-        assertThatThrownBy(() -> runner.runAndReturnExitCode((Spec<?>) null))
+        assertThatThrownBy(() -> runner.runAndReturnExitCode((Action) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec is null");
+                .hasMessage("action is null");
     }
 
     @Test
@@ -111,11 +92,11 @@ class RunnerArgumentsTest {
     }
 
     @Test
-    @DisplayName("runAndExit(Spec<?>) null spec throws NPE")
-    void runAndExitNullSpecThrowsNPE() {
-        assertThatThrownBy(() -> Runner.builder().build().runAndExit((Spec<?>) null))
+    @DisplayName("runAndExit(Action) null action throws NPE")
+    void runAndExitNullActionThrowsNPE() {
+        assertThatThrownBy(() -> Runner.builder().build().runAndExit((Action) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("spec is null");
+                .hasMessage("action is null");
     }
 
     @Test
@@ -148,15 +129,5 @@ class RunnerArgumentsTest {
         assertThatThrownBy(() -> Runner.builder().listener(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("listener is null");
-    }
-
-    @Test
-    @DisplayName("build() twice throws ISE")
-    void buildTwiceThrowsISE() {
-        Runner.Builder builder = Runner.builder();
-        builder.build();
-        assertThatThrownBy(builder::build)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("builder already built");
     }
 }

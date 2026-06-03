@@ -38,7 +38,7 @@ class RunnerClassDiscoveryTest {
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
         assertThat(children).hasSize(1);
-        assertThat(children.get(0).metadata().name()).isEqualTo("smoke-action");
+        assertThat(children.get(0).action().displayName()).isEqualTo("smoke-action");
     }
 
     @Test
@@ -52,7 +52,7 @@ class RunnerClassDiscoveryTest {
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
         assertThat(children).hasSize(1);
-        assertThat(children.get(0).metadata().name()).isEqualTo("multi-tag-action");
+        assertThat(children.get(0).action().displayName()).isEqualTo("multi-tag-action");
     }
 
     @Test
@@ -74,7 +74,7 @@ class RunnerClassDiscoveryTest {
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
         assertThat(children).hasSize(1);
-        assertThat(children.get(0).metadata().name()).startsWith("Discovery validation failure:");
+        assertThat(children.get(0).action().displayName()).startsWith("Discovery validation failure:");
     }
 
     @Test
@@ -107,27 +107,27 @@ class RunnerClassDiscoveryTest {
 
     static class ParentFactory {
         @Paramixel.Factory
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("parent-action", context -> {});
         }
     }
 
     static class ChildOverridesWithoutFactory extends ParentFactory {
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("child-action", context -> {});
         }
     }
 
     static class ParentFactoryTwo {
         @Paramixel.Factory
-        public static Action<?> parentAction() {
+        public static Action parentAction() {
             return Step.of("parent-action", context -> {});
         }
     }
 
     static class ChildDeclaresOwnFactory extends ParentFactoryTwo {
         @Paramixel.Factory
-        public static Action<?> childAction() {
+        public static Action childAction() {
             return Step.of("child-action", context -> {});
         }
     }
@@ -135,14 +135,14 @@ class RunnerClassDiscoveryTest {
     static class BlankTagFactory {
         @Paramixel.Factory
         @Paramixel.Tag(" ")
-        public static Action<?> factory() {
+        public static Action factory() {
             return Step.of("blank-tag-action", context -> {});
         }
     }
 
     static class ErrorThrowingFactory {
         @Paramixel.Factory
-        public static Action<?> factory() {
+        public static Action factory() {
             throw new TestError("factory error");
         }
     }

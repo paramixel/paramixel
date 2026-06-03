@@ -38,7 +38,7 @@ class ClasspathResolverMetadataFilterTest {
         Selector selector = Selector.and(Selector.classRegex("IncludedSmokeFixture$"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow()).isInstanceOf(Parallel.class);
@@ -51,7 +51,7 @@ class ClasspathResolverMetadataFilterTest {
                 Selector.and(Selector.packageRegex("^org\\.paramixel\\.api$"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
     }
@@ -62,7 +62,7 @@ class ClasspathResolverMetadataFilterTest {
         Selector selector = Selector.and(Selector.classRegex("ExcludedByTagFilter"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isEmpty();
     }
@@ -73,7 +73,7 @@ class ClasspathResolverMetadataFilterTest {
         Selector selector = Selector.and(Selector.classRegex("IncludedSmokeFixture"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isPresent();
     }
@@ -84,7 +84,7 @@ class ClasspathResolverMetadataFilterTest {
         Selector selector = Selector.classRegex("DisabledOnlyFixture");
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action<?>> result = new ClasspathResolver(configuration, selector).resolveActions();
+        Optional<Action> result = new ClasspathResolver(configuration, selector).resolveActions();
 
         assertThat(result).isEmpty();
     }
