@@ -16,23 +16,22 @@
 
 package org.paramixel.api;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import org.paramixel.api.action.Metadata;
+import org.paramixel.api.action.Action;
 
 /**
  * Describes one bound occurrence of an action in a run descriptor tree.
  *
  * <p>Descriptors are read-only through this public interface. The framework creates and
- * mutates concrete descriptors during discovery and execution. Reusing the same {@link org.paramixel.api.action.Action}
+ * mutates concrete descriptors during discovery and execution. Reusing the same {@link Action}
  * instance in multiple locations creates distinct descriptors with independent execution state.
  *
- * <p>Structurally mirrors {@link org.paramixel.api.action.Action}: {@link #before()} and
- * {@link #after()} are separate structural slots, not included in {@link #children()}.
- * The descriptor provides tree navigation ({@link #parent()}, {@link #before()},
- * {@link #children()}, {@link #after()}) and live execution-occurrence metadata
- * ({@link #metadata()}). Execution state (status, mode, run duration, message, throwable)
- * is accessed via {@link #metadata()} rather than directly on the descriptor.
+ * <p>Structurally mirrors {@link Action}: {@link #before()} and {@link #after()} are
+ * separate structural slots, not included in {@link #children()}. The descriptor provides
+ * access to the bound {@link #action()}, tree navigation ({@link #parent()}, {@link #before()},
+ * {@link #children()}, {@link #after()}), and live execution-occurrence state.
  */
 public interface Descriptor {
 
@@ -44,22 +43,89 @@ public interface Descriptor {
     Optional<Descriptor> parent();
 
     /**
-     * Returns metadata for this descriptor execution occurrence.
+     * Returns the generated execution-occurrence identifier, unique across the current run.
      *
-     * <p>The metadata carries the execution-occurrence identifier, display name, kind,
-     * class name, and live execution state (status, mode, run duration, message, throwable).
-     *
-     * @return the metadata; never {@code null}
+     * @return the execution-occurrence identifier; never {@code null} or blank
      */
-    Metadata metadata();
+    String id();
+
+    /**
+     * Returns the action bound to this descriptor occurrence.
+     *
+     * @return the action; never {@code null}
+     */
+    Action action();
+
+    /**
+     * Returns whether this descriptor execution completed successfully.
+     *
+     * @return {@code true} when this descriptor passed
+     */
+    boolean isPassed();
+
+    /**
+     * Returns whether this descriptor execution completed with a failure.
+     *
+     * @return {@code true} when this descriptor failed
+     */
+    boolean isFailed();
+
+    /**
+     * Returns whether this descriptor execution was skipped.
+     *
+     * @return {@code true} when this descriptor was skipped
+     */
+    boolean isSkipped();
+
+    /**
+     * Returns whether this descriptor execution was aborted.
+     *
+     * @return {@code true} when this descriptor was aborted
+     */
+    boolean isAborted();
+
+    /**
+     * Returns the instant when this descriptor started running.
+     *
+     * @return the start instant, or empty when this descriptor has not started
+     */
+    Optional<Instant> startedAt();
+
+    /**
+     * Returns the instant when this descriptor reached a terminal outcome.
+     *
+     * @return the completed instant, or empty when this descriptor has not completed
+     */
+    Optional<Instant> completedAt();
+
+    /**
+     * Returns the optional outcome message associated with this descriptor's current status.
+     *
+     * @return the current status message, or empty when the current status has no message
+     */
+    Optional<String> message();
+
+    /**
+     * Returns the optional throwable associated with this descriptor's current status.
+     *
+     * @return the current status throwable, or empty when the current status has no throwable
+     */
+    Optional<Throwable> throwable();
+
+    /**
+     * Returns whether this descriptor has reached a terminal outcome.
+     *
+     * @return {@code true} when the descriptor outcome is terminal
+     */
+    boolean isCompleted();
 
     /**
      * Returns the before-child descriptor, if this descriptor's action declares one.
      *
      * <p>The before-child is a separate structural slot and is not included in
-     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Lifecycle},
+     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Scope},
      * {@link org.paramixel.api.action.Static}, and {@link org.paramixel.api.action.Instance}
-     * override this method to return their before-child. Leaf and decorator descriptors
+     * override this method to return their before-child. Terminal and decorator descriptors
      * inherit the default, which returns an empty optional.
      *
      * @return the before-child descriptor, or empty if none
@@ -82,9 +148,9 @@ public interface Descriptor {
      * Returns the after-child descriptor, if this descriptor's action declares one.
      *
      * <p>The after-child is a separate structural slot and is not included in
-     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Lifecycle},
+     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Scope},
      * {@link org.paramixel.api.action.Static}, and {@link org.paramixel.api.action.Instance}
-     * override this method to return their after-child. Leaf and decorator descriptors
+     * override this method to return their after-child. Terminal and decorator descriptors
      * inherit the default, which returns an empty optional.
      *
      * @return the after-child descriptor, or empty if none

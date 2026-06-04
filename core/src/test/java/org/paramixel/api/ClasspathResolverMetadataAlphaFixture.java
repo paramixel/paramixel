@@ -19,21 +19,12 @@ package org.paramixel.api;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
-/**
- * Fixture with a {@code "z-action"} step discovered by the resolver to verify that action metadata
- * (name, id) is resolved correctly regardless of lexical ordering of fixture class names.
- */
 public final class ClasspathResolverMetadataAlphaFixture {
 
     private ClasspathResolverMetadataAlphaFixture() {}
 
-    /**
-     * Creates a no-op step action with the identifier {@code "z-action"}.
-     *
-     * @return a {@link Step} that performs no work on execution
-     */
     @Paramixel.Factory
-    public static Action<?> factory() {
+    public static Action factory() {
         return Step.of("z-action", context -> {});
     }
 }

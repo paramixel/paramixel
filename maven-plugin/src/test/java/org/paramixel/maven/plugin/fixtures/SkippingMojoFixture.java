@@ -19,6 +19,7 @@ package org.paramixel.maven.plugin.fixtures;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.SkipException;
 
 /**
@@ -36,10 +37,10 @@ public final class SkippingMojoFixture {
      */
     @Paramixel.Factory
     public static Action action() {
-        return Instance.<Object>of("mojo-skip", Object::new)
-                .child("skip", obj -> {
+        return Instance.builder("mojo-skip", Object::new)
+                .body(Step.of("skip", context -> {
                     throw new SkipException("skip requested");
-                })
-                .resolve();
+                }))
+                .build();
     }
 }

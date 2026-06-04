@@ -16,19 +16,17 @@
 
 package nonapi.org.paramixel.listener;
 
-import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import nonapi.org.paramixel.listener.support.Constants;
 import org.paramixel.api.Descriptor;
-import org.paramixel.api.Status;
 
 /**
- * Renders a descriptor tree as a tree-style summary with connectors, kind, timing, and failure information.
+ * Renders a descriptor tree as a tree-style summary with connectors, timing, and failure information.
  *
- * <p>Each line includes the action status, name, kind, timing, and failure or skip detail when available.
+ * <p>Each line includes the action status, name, timing, and failure or skip detail when available.
  *
  * <p>The renderer does <em>not</em> add the {@code [PARAMIXEL]} line prefix; that responsibility belongs to
  * {@link SummaryListener}.
@@ -147,38 +145,34 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
 
     private void renderNodeLine(
             final Descriptor descriptor, final String prefix, final boolean isLast, final StringBuilder sb) {
-        String status = formatStatus(descriptor.metadata().status());
-        String actionName = descriptor.metadata().name();
-        String kind = Listeners.formatKind(descriptor);
-        String timing = formatTiming(descriptor.metadata().runDuration());
+        String status = formatStatus(descriptor);
+        String actionName = descriptor.action().displayName();
+        String timing = formatTiming(Listeners.elapsedMillis(descriptor));
         String failureInfo = formatFailureInfo(descriptor);
 
         String connector = ConnectorStyle.STANDARD.connector(isLast);
-        String line = prefix + connector + status + " " + actionName + " (" + kind + ") " + timing + failureInfo;
+        String line = prefix + connector + status + " " + actionName + " " + timing + failureInfo;
         sb.append(line.stripTrailing()).append(System.lineSeparator());
     }
 
-    private String formatStatus(final Status status) {
-        return ansiEnabled ? Listeners.formatAnsiStatus(status) : Listeners.formatStatus(status);
+    private String formatStatus(final Descriptor descriptor) {
+        return ansiEnabled ? Listeners.formatAnsiStatus(descriptor) : Listeners.formatStatus(descriptor);
     }
 
     private String formatFailureInfo(final Descriptor descriptor) {
-        if (descriptor.metadata().status().isFailed()) {
+        if (descriptor.isFailed()) {
             return descriptor
-                    .metadata()
                     .throwable()
                     .map(f -> " \u2192 " + f.getClass().getName() + ": " + Listeners.sanitizeMessage(f.getMessage()))
-                    .or(() -> descriptor.metadata().message().map(m -> " \u2192 " + Listeners.sanitizeMessage(m)))
+                    .or(() -> descriptor.message().map(m -> " \u2192 " + Listeners.sanitizeMessage(m)))
                     .orElse("");
-        } else if (descriptor.metadata().status().isAborted()) {
+        } else if (descriptor.isAborted()) {
             return descriptor
-                    .metadata()
                     .message()
                     .map(reason -> " \u2192 " + Listeners.sanitizeMessage(reason))
                     .orElse("");
-        } else if (descriptor.metadata().status().isSkipped()) {
+        } else if (descriptor.isSkipped()) {
             return descriptor
-                    .metadata()
                     .message()
                     .map(reason -> " \u2192 " + Listeners.sanitizeMessage(reason))
                     .orElse("");
@@ -186,8 +180,8 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
         return "";
     }
 
-    private static String formatTiming(final Duration timing) {
-        return timing.toMillis() + " ms";
+    private static String formatTiming(final long elapsedMillis) {
+        return elapsedMillis + " ms";
     }
 
     private record RenderFrame(Descriptor descriptor, String prefix, boolean isLast, RenderMode mode) {}

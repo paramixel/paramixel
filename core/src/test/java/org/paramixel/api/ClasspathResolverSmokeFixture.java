@@ -18,27 +18,19 @@ package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture tagged {@code "smoke"} providing a minimal no-op action for resolver smoke-test
- * discovery scenarios.
- */
 public final class ClasspathResolverSmokeFixture {
 
     private ClasspathResolverSmokeFixture() {
         // Intentionally empty
     }
 
-    /**
-     * Creates a no-op action tagged {@code "smoke"} for resolver discovery tests.
-     *
-     * @return a {@link Step} action with the identifier {@code "smoke-action"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
-    public static Action<?> factory() {
-        return Instance.<Object>of("smoke-action", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("smoke-action", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

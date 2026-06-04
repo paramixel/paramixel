@@ -73,6 +73,7 @@ import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Step;
 
 public class MyTest {
 
@@ -84,8 +85,8 @@ public class MyTest {
     public static Action<?> factory() {
         return Lifecycle.of(MyTest.class.getName())
                 .before("setUp()", ctx -> { /* setup */ })
-                .child("test1()", ctx -> { /* test something */ })
-                .child("test2()", ctx -> { /* test something else */ })
+                .child(Step.of("test1()", ctx -> { /* test something */ }))
+                .child(Step.of("test2()", ctx -> { /* test something else */ }))
                 .after("tearDown()", ctx -> { /* teardown */ })
                 .resolve();
     }
@@ -149,4 +150,4 @@ and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.
 
 ---
 
-Copyright 2026-present Douglas Hoard
+Copyright (c) 2026-present Douglas Hoard

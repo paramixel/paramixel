@@ -64,7 +64,7 @@ class FastIdTest {
 
     @Test
     @DisplayName("consecutive IDs are not sequential")
-    void consecutiveIdsAreNotSequential() {
+    void consecutiveIdsAreNotSequence() {
         int count = 1000;
         String[] ids = new String[count];
         for (int i = 0; i < count; i++) {
@@ -73,7 +73,7 @@ class FastIdTest {
 
         int sequentialCount = 0;
         for (int i = 1; i < count; i++) {
-            if (isSequential(ids[i - 1], ids[i])) {
+            if (isSequence(ids[i - 1], ids[i])) {
                 sequentialCount++;
             }
         }
@@ -97,7 +97,7 @@ class FastIdTest {
         assertThatThrownBy(() -> FastId.generateId(-1)).isInstanceOf(IllegalArgumentException.class);
     }
 
-    private static boolean isSequential(final String prev, final String next) {
+    private static boolean isSequence(final String prev, final String next) {
         long prevVal = decode(prev);
         long nextVal = decode(next);
         long diff = nextVal - prevVal;

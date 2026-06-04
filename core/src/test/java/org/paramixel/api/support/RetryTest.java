@@ -601,4 +601,117 @@ class RetryTest {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("unexpected");
     }
+
+    @Test
+    @DisplayName("retryOn throws IllegalStateException when called after run")
+    void retryOnThrowsIllegalStateExceptionWhenCalledAfterRun() {
+        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        retry.run(() -> {});
+
+        assertThatThrownBy(() -> retry.retryOn(t -> true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("retryOn is called after run");
+    }
+
+    @Test
+    @DisplayName("run stops when Policy returns null from getMaximumDuration")
+    void runStopsWhenPolicyReturnsNullFromGetMaximumDuration() {
+        Policy policy = new Policy() {
+            @Override
+            public Duration waitDuration(int attempt, Throwable cause) {
+                return Duration.ZERO;
+            }
+
+            @Override
+            public Duration maximumDuration() {
+                return null;
+            }
+        };
+        Retry retry = Retry.of(policy).retryOn(t -> false);
+
+        Result result = retry.run(() -> {
+            throw new RuntimeException("fail");
+        });
+
+        assertThat(result.isSuccessful()).isFalse();
+        assertThat(result.maximumDuration()).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    @DisplayName("run stops when Policy returns negative from getMaximumDuration")
+    void runStopsWhenPolicyReturnsNegativeFromGetMaximumDuration() {
+        Policy policy = new Policy() {
+            @Override
+            public Duration waitDuration(int attempt, Throwable cause) {
+                return Duration.ZERO;
+            }
+
+            @Override
+            public Duration maximumDuration() {
+                return Duration.ofMillis(-1);
+            }
+        };
+        Retry retry = Retry.of(policy).retryOn(t -> false);
+
+        Result result = retry.run(() -> {
+            throw new RuntimeException("fail");
+        });
+
+        assertThat(result.isSuccessful()).isFalse();
+        assertThat(result.maximumDuration()).isEqualTo(Duration.ZERO);
+    }
+
+    @Test
+    @DisplayName("run uses zero wait when Policy returns null from waitDuration")
+    void runUsesZeroWaitWhenPolicyReturnsNullFromWaitDuration() {
+        Policy policy = new Policy() {
+            @Override
+            public Duration waitDuration(int attempt, Throwable cause) {
+                return null;
+            }
+
+            @Override
+            public Duration maximumDuration() {
+                return Duration.ofSeconds(1);
+            }
+        };
+        Retry retry = Retry.of(policy);
+
+        AtomicInteger attempt = new AtomicInteger(0);
+        Result result = retry.run(() -> {
+            if (attempt.incrementAndGet() == 1) {
+                throw new RuntimeException("fail");
+            }
+        });
+
+        assertThat(result.isSuccessful()).isTrue();
+        assertThat(result.attemptCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("run uses zero wait when Policy returns negative from waitDuration")
+    void runUsesZeroWaitWhenPolicyReturnsNegativeFromWaitDuration() {
+        Policy policy = new Policy() {
+            @Override
+            public Duration waitDuration(int attempt, Throwable cause) {
+                return Duration.ofMillis(-1);
+            }
+
+            @Override
+            public Duration maximumDuration() {
+                return Duration.ofSeconds(1);
+            }
+        };
+        Retry retry = Retry.of(policy);
+
+        AtomicInteger attempt = new AtomicInteger(0);
+        Result result = retry.run(() -> {
+            if (attempt.incrementAndGet() == 1) {
+                throw new RuntimeException("fail");
+            }
+        });
+
+        assertThat(result.isSuccessful()).isTrue();
+        assertThat(result.attemptCount()).isEqualTo(2);
+    }
 }

@@ -17,19 +17,21 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Context.withInstance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Each;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 /**
- * Demonstrates {@code Parallel.each()} as syntactic sugar over a hand-rolled
+ * Demonstrates {@code Each.parallel()} as syntactic sugar over a hand-rolled
  * parameterization for-loop. Produces the same action tree as
  * {@link ParallelArgumentTest} but with less boilerplate.
  */
@@ -54,31 +56,55 @@ public class ParallelEachExample {
     }
 
     /**
-     * Builds a parallel argument tree using {@code Parallel.each()} instead of
+     * Builds a parallel argument tree using {@code Each.parallel()} instead of
      * a for-loop.
      *
      * @return the action tree for this test
      */
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         resetCounts();
         var testName = ParallelEachExample.class.getName();
         var arguments =
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
-        return Lifecycle.of(testName)
-                .child(Parallel.of("arguments")
-                        .parallelism(PARALLELISM)
-                        .each(
+        return Scope.builder(testName)
+                .body(Each.parallel(
+                                "arguments",
                                 arguments,
-                                value -> Instance.of(value, ParallelEachExample::new)
-                                        .child(Lifecycle.<ParallelEachExample>of("lifecycle")
-                                                .before("before()", ParallelEachExample::before)
-                                                .child("test()", ParallelEachExample::test)
-                                                .child("test()", ParallelEachExample::test)
-                                                .child("test()", ParallelEachExample::test)
-                                                .after("after()", ParallelEachExample::after))))
-                .after(Step.of("validate", ignored -> validate()));
+                                value -> Instance.builder(value, ParallelEachExample::new)
+                                        .body(Scope.<ParallelEachExample>builder("lifecycle")
+                                                .before(Step.of(
+                                                        "before()",
+                                                        withInstance(
+                                                                ParallelEachExample.class,
+                                                                ParallelEachExample::before)))
+                                                .body(Sequence.builder("tests")
+                                                        .child(Step.of(
+                                                                "test()",
+                                                                withInstance(
+                                                                        ParallelEachExample.class,
+                                                                        ParallelEachExample::test)))
+                                                        .child(Step.of(
+                                                                "test()",
+                                                                withInstance(
+                                                                        ParallelEachExample.class,
+                                                                        ParallelEachExample::test)))
+                                                        .child(Step.of(
+                                                                "test()",
+                                                                withInstance(
+                                                                        ParallelEachExample.class,
+                                                                        ParallelEachExample::test)))
+                                                        .build())
+                                                .after(Step.of(
+                                                        "after()",
+                                                        withInstance(
+                                                                ParallelEachExample.class, ParallelEachExample::after)))
+                                                .build())
+                                        .build())
+                        .parallelism(PARALLELISM))
+                .after(Step.of("validate", ignored -> validate()))
+                .build();
     }
 
     public ParallelEachExample() {

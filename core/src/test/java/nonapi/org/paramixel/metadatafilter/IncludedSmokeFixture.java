@@ -19,25 +19,17 @@ package nonapi.org.paramixel.metadatafilter;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture tagged {@code "smoke"} that should pass both tag and class filters, used to verify
- * inclusion logic in the metadata filter.
- */
 public final class IncludedSmokeFixture {
 
     private IncludedSmokeFixture() {}
 
-    /**
-     * Creates a no-op action tagged {@code "smoke"} for metadata filter inclusion tests.
-     *
-     * @return a {@link Step} action with the identifier {@code "smoke-action"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
-    public static Action<?> factory() {
-        return Instance.<Object>of("smoke-action", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("smoke-action", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

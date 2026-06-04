@@ -23,7 +23,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Builder;
 import org.paramixel.api.selector.Selector;
 
 /**
@@ -42,15 +42,14 @@ public final class Paramixel {
     /**
      * Marks a method as a factory discovered by classpath scanning.
      *
-     * <p>Factory methods must produce {@link Spec} or {@link Action} instances,
-     * or {@code null} to indicate that the factory should be skipped.
-     * Returning {@code null} produces a skipped action outcome at runtime,
-     * which is useful when a test's validity depends on the environment.
-     * Accumulating specs are resolved automatically. The framework invokes
-     * these methods during discovery to build the root action tree.
+     * <p>Factory methods must produce {@link Action} or {@link Builder} instances, or
+     * {@code null} to indicate that the factory should be skipped. When a {@link Builder}
+     * is returned, it is built immediately to produce an {@link Action}. The framework
+     * invokes these methods during discovery to build the root action tree.
      *
      * @see Runner
-     * @see Spec
+     * @see Action
+     * @see Builder
      */
     @Documented
     @Retention(RetentionPolicy.RUNTIME)

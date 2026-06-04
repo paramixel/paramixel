@@ -18,28 +18,20 @@ package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture annotated with multiple {@code @Paramixel.Tag} values ({@code "smoke-fast"} and
- * {@code "critical"}) to verify that the resolver supports repeatable tag declarations.
- */
 public final class ClasspathResolverMultiTagFixture {
 
     private ClasspathResolverMultiTagFixture() {
         // Intentionally empty
     }
 
-    /**
-     * Creates a no-op action with two tags for multi-tag resolver tests.
-     *
-     * @return a {@link Step} action with the identifier {@code "multi-tag-action"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
-    public static Action<?> factory() {
-        return Instance.<Object>of("multi-tag-action", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("multi-tag-action", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

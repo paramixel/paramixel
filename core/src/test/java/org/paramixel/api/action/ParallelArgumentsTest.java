@@ -17,12 +17,10 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.ThrowingConsumer;
 
 @DisplayName("Parallel arguments")
 class ParallelArgumentsTest {
@@ -30,115 +28,95 @@ class ParallelArgumentsTest {
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Parallel.of(null)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Parallel.of(" ")).isInstanceOf(IllegalArgumentException.class);
-        var parallel = Parallel.of("empty").resolve();
+        assertThatThrownBy(() -> Parallel.builder(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Parallel.builder(" ")).isInstanceOf(IllegalArgumentException.class);
+        var parallel = Parallel.builder("empty").build();
         assertThat(parallel.children()).isEmpty();
     }
 
     @Test
-    @DisplayName("child(Spec) rejects null spec")
-    void childSpecRejectsNull() {
-        var spec = Parallel.of("parallel");
-        assertThatThrownBy(() -> spec.child((Spec<?>) null)).isInstanceOf(NullPointerException.class);
+    @DisplayName("child(Action) rejects null builder")
+    void childBuilderRejectsNull() {
+        var builder = Parallel.builder("parallel");
+        assertThatThrownBy(() -> builder.child((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects null name")
-    void childStringConsumerRejectsNullName() {
-        var spec = Parallel.of("parallel");
-        assertThatThrownBy(() -> spec.child(null, s -> {})).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects blank name")
-    void childStringConsumerRejectsBlankName() {
-        var spec = Parallel.of("parallel");
-        assertThatThrownBy(() -> spec.child(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects null consumer")
-    void childStringConsumerRejectsNullConsumer() {
-        var spec = Parallel.of("parallel");
-        assertThatThrownBy(() -> spec.child("child", (ThrowingConsumer<Object>) null))
-                .isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("child(Spec) adds child from spec")
-    void childSpecAddsChild() {
-        var parallel = Parallel.of("parallel").child(Step.of("step", s -> {})).resolve();
+    @DisplayName("child(Action) adds child from builder")
+    void childBuilderAddsChild() {
+        var parallel =
+                Parallel.builder("parallel").child(Step.of("step", s -> {})).build();
         assertThat(parallel.children()).hasSize(1);
-        assertThat(parallel.children().get(0).name()).isEqualTo("step");
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) adds child step")
-    void childStringConsumerAddsChild() {
-        var parallel = Parallel.of("parallel").child("step", s -> {}).resolve();
-        assertThat(parallel.children()).hasSize(1);
-        assertThat(parallel.children().get(0).name()).isEqualTo("step");
+        assertThat(parallel.children().get(0).displayName()).isEqualTo("step");
     }
 
     @Test
     @DisplayName("builder accumulates multiple children")
     void builderAccumulatesMultipleChildren() {
-        var parallel = Parallel.of("parallel")
-                .child("first", s -> {})
-                .child("second", s -> {})
-                .child("third", s -> {})
-                .resolve();
+        var parallel = Parallel.builder("parallel")
+                .child(Step.of("first", s -> {}))
+                .child(Step.of("second", s -> {}))
+                .child(Step.of("third", s -> {}))
+                .build();
         assertThat(parallel.children()).hasSize(3);
-        assertThat(parallel.children().get(0).name()).isEqualTo("first");
-        assertThat(parallel.children().get(1).name()).isEqualTo("second");
-        assertThat(parallel.children().get(2).name()).isEqualTo("third");
+        assertThat(parallel.children().get(0).displayName()).isEqualTo("first");
+        assertThat(parallel.children().get(1).displayName()).isEqualTo("second");
+        assertThat(parallel.children().get(2).displayName()).isEqualTo("third");
     }
 
     @Test
     @DisplayName("parallelism() rejects zero")
     void parallelismRejectsZero() {
-        var spec = Parallel.of("parallel");
-        assertThatThrownBy(() -> spec.parallelism(0)).isInstanceOf(IllegalArgumentException.class);
+        var builder = Parallel.builder("parallel");
+        assertThatThrownBy(() -> builder.parallelism(0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("parallelism() rejects negative")
     void parallelismRejectsNegative() {
-        var spec = Parallel.of("parallel");
-        assertThatThrownBy(() -> spec.parallelism(-1)).isInstanceOf(IllegalArgumentException.class);
+        var builder = Parallel.builder("parallel");
+        assertThatThrownBy(() -> builder.parallelism(-1)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("parallelism() sets parallelism")
     void parallelismSetsParallelism() {
-        var parallel =
-                Parallel.of("parallel").parallelism(4).child("step", s -> {}).resolve();
+        var parallel = Parallel.builder("parallel")
+                .parallelism(4)
+                .child(Step.of("step", s -> {}))
+                .build();
         assertThat(parallel.parallelism()).isEqualTo(4);
     }
 
     @Test
     @DisplayName("default parallelism is Integer.MAX_VALUE")
     void defaultParallelismIsMaxValue() {
-        var parallel = Parallel.of("parallel").child("step", s -> {}).resolve();
+        var parallel =
+                Parallel.builder("parallel").child(Step.of("step", s -> {})).build();
         assertThat(parallel.parallelism()).isEqualTo(Integer.MAX_VALUE);
     }
 
     @Test
-    @DisplayName("builder is one-shot")
-    void builderOneShotBehavior() {
-        var spec = Parallel.of("parallel");
-        spec.child("test", s -> {});
-        spec.resolve();
-        assertThatIllegalStateException().isThrownBy(() -> spec.resolve());
-        assertThatIllegalStateException().isThrownBy(() -> spec.child("other", s -> {}));
-        assertThatIllegalStateException().isThrownBy(() -> spec.parallelism(2));
+    @DisplayName("builder can build multiple immutable snapshots")
+    void builderCanBuildMultipleImmutableSnapshots() {
+        var builder = Parallel.builder("parallel");
+        builder.child(Step.of("test", s -> {}));
+        var first = builder.build();
+        builder.child(Step.of("other", s -> {}));
+        builder.parallelism(2);
+        var second = builder.build();
+
+        assertThat(first.children()).extracting(Action::displayName).containsExactly("test");
+        assertThat(first.parallelism()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(second.children()).extracting(Action::displayName).containsExactly("test", "other");
+        assertThat(second.parallelism()).isEqualTo(2);
     }
 
     @Test
     @DisplayName("Parallel does not have dependent/independent")
     void parallelHasNoDependentIndependent() {
-        var parallel = Parallel.of("parallel").child("test", s -> {}).resolve();
+        var parallel =
+                Parallel.builder("parallel").child(Step.of("test", s -> {})).build();
         assertThat(parallel.getClass().getDeclaredFields())
                 .anyMatch(f -> !f.getName().equals("dependent"));
     }

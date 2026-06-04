@@ -21,18 +21,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates that nested Parallel actions complete without deadlock.
  *
- * <p>This test verifies that the scheduler's managedJoin mechanism correctly handles
- * deeply nested Parallel structures by executing queued work inline during join operations.
- * Without proper inline execution slot management, nested Parallel actions can deadlock
- * when all scheduler workers become blocked waiting for child completion.</p>
+ * <p>This test verifies that the scheduler correctly handles deeply nested Parallel
+ * structures. The scheduler uses a single shared {@link java.util.concurrent.ThreadPoolExecutor}
+ * with semaphore-based admission control (see {@link nonapi.org.paramixel.Scheduler}).
+ * When a thread blocks waiting for a child Parallel to complete, it releases its semaphore
+ * permit, allowing other leaf actions at any depth to proceed. This prevents deadlock even
+ * with multiple levels of nested Parallels sharing the same executor thread pool.</p>
  *
  * <p>Test structure:
  * <ul>
@@ -40,7 +42,7 @@ import org.paramixel.api.action.Step;
  *   <li>Two mid-level Parallels (parallelism=2 each)</li>
  *   <li>Four leaf Parallels with 2 children each</li>
  * </ul>
- * This creates three levels of nesting that stress the managedJoin inline execution path.</p>
+ * This creates three levels of nesting, all sharing the single scheduler executor.</p>
  */
 public class NestedParallelDeadlockTest {
 
@@ -63,58 +65,63 @@ public class NestedParallelDeadlockTest {
      * @return the action tree for this test
      */
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         executedCount.set(0);
 
         var testName = NestedParallelDeadlockTest.class.getName();
 
-        var leaf1 = Parallel.of("leaf1")
-                .child("l1-1", ctx -> {
+        var leaf1 = Parallel.builder("leaf1")
+                .child(Step.of("l1-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                })
-                .child("l1-2", ctx -> {
+                }))
+                .child(Step.of("l1-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                });
+                }));
 
-        var leaf2 = Parallel.of("leaf2")
-                .child("l2-1", ctx -> {
+        var leaf2 = Parallel.builder("leaf2")
+                .child(Step.of("l2-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                })
-                .child("l2-2", ctx -> {
+                }))
+                .child(Step.of("l2-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                });
+                }));
 
-        var mid1 = Parallel.of("mid1").parallelism(2).child(leaf1).child(leaf2);
+        var mid1 = Parallel.builder("mid1").parallelism(2).child(leaf1.build()).child(leaf2.build());
 
-        var leaf3 = Parallel.of("leaf3")
-                .child("l3-1", ctx -> {
+        var leaf3 = Parallel.builder("leaf3")
+                .child(Step.of("l3-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                })
-                .child("l3-2", ctx -> {
+                }))
+                .child(Step.of("l3-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                });
+                }));
 
-        var leaf4 = Parallel.of("leaf4")
-                .child("l4-1", ctx -> {
+        var leaf4 = Parallel.builder("leaf4")
+                .child(Step.of("l4-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                })
-                .child("l4-2", ctx -> {
+                }))
+                .child(Step.of("l4-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
-                });
+                }));
 
-        var mid2 = Parallel.of("mid2").parallelism(2).child(leaf3).child(leaf4);
+        var mid2 = Parallel.builder("mid2").parallelism(2).child(leaf3.build()).child(leaf4.build());
 
-        return Lifecycle.of(testName)
-                .child(Parallel.of("root").parallelism(2).child(mid1).child(mid2))
-                .after(Step.of("validate", ignored -> validate()));
+        return Scope.builder(testName)
+                .body(Parallel.builder("root")
+                        .parallelism(2)
+                        .child(mid1.build())
+                        .child(mid2.build())
+                        .build())
+                .after(Step.of("validate", ignored -> validate()))
+                .build();
     }
 
     /**

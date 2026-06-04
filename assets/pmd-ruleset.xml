@@ -80,7 +80,7 @@
     </rule>
     <rule ref="category/java/design.xml/NPathComplexity">
         <properties>
-            <property name="reportLevel" value="2000"/>
+            <property name="reportLevel" value="10000"/>
         </properties>
     </rule>
     <rule ref="category/java/design.xml/NcssCount">

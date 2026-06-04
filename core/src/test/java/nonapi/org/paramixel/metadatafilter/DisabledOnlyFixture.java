@@ -19,25 +19,17 @@ package nonapi.org.paramixel.metadatafilter;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture annotated with {@code @Paramixel.Disabled} to verify that the metadata filter excludes
- * actions marked as disabled regardless of other metadata.
- */
 public final class DisabledOnlyFixture {
 
     private DisabledOnlyFixture() {}
 
-    /**
-     * Creates a no-op action marked as disabled for metadata filter exclusion tests.
-     *
-     * @return a {@link Step} action with the identifier {@code "disabled-action"}
-     */
     @Paramixel.Factory
     @Paramixel.Disabled
-    public static Action<?> factory() {
-        return Instance.<Object>of("disabled-action", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("disabled-action", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

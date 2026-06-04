@@ -17,15 +17,17 @@
 package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Context.withInstance;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Step;
 
 public class MixedArgumentTest {
 
@@ -97,26 +99,44 @@ public class MixedArgumentTest {
     }
 
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         resetCounts();
 
-        var arguments = Sequential.of("MixedArgumentTest").independent();
+        var arguments = Sequence.builder("MixedArgumentTest").independent();
 
         for (TestArgument testArgument :
                 List.of(new StringArgument("paramixel"), new IntegerArgument(42), new PointArgument(new Point(3, 7)))) {
-            arguments.child(Instance.of(testArgument.name(), () -> new MixedArgumentTest(testArgument))
-                    .child(Lifecycle.<MixedArgumentTest>of("lifecycle")
-                            .before("setUp()", MixedArgumentTest::setUp)
-                            .child(Lifecycle.<MixedArgumentTest>of("testOne")
-                                    .before("beforeEach()", MixedArgumentTest::beforeEach)
-                                    .child("testOne()", MixedArgumentTest::testOne)
-                                    .after("afterEach()", MixedArgumentTest::afterEach))
-                            .after("tearDown()", MixedArgumentTest::tearDown)));
+            arguments.child(Instance.builder(testArgument.name(), () -> new MixedArgumentTest(testArgument))
+                    .body(Scope.<MixedArgumentTest>builder("lifecycle")
+                            .before(Step.of("setUp()", withInstance(MixedArgumentTest.class, MixedArgumentTest::setUp)))
+                            .body(Scope.<MixedArgumentTest>builder("testOne")
+                                    .before(Step.of(
+                                            "beforeEach()",
+                                            withInstance(MixedArgumentTest.class, MixedArgumentTest::beforeEach)))
+                                    .body(Step.of(
+                                            "testOne()",
+                                            withInstance(MixedArgumentTest.class, MixedArgumentTest::testOne)))
+                                    .after(Step.of(
+                                            "afterEach()",
+                                            withInstance(MixedArgumentTest.class, MixedArgumentTest::afterEach)))
+                                    .build())
+                            .after(Step.of(
+                                    "tearDown()", withInstance(MixedArgumentTest.class, MixedArgumentTest::tearDown)))
+                            .build())
+                    .build());
         }
 
-        return Instance.of("MixedArgumentTest", MixedArgumentTest::new)
-                .child(arguments)
-                .child(Lifecycle.<MixedArgumentTest>of("lifecycle").after("validate()", MixedArgumentTest::validate));
+        return Instance.builder("MixedArgumentTest", MixedArgumentTest::new)
+                .body(Sequence.builder("body")
+                        .child(arguments.build())
+                        .child(Scope.<MixedArgumentTest>builder("lifecycle")
+                                .body(Step.of("[validate-ready]", context -> {}))
+                                .after(Step.of(
+                                        "validate()",
+                                        withInstance(MixedArgumentTest.class, MixedArgumentTest::validate)))
+                                .build())
+                        .build())
+                .build();
     }
 
     public MixedArgumentTest() {

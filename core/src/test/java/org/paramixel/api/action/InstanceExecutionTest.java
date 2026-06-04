@@ -17,14 +17,15 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.paramixel.api.Context.withInstance;
 
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
@@ -48,439 +49,432 @@ class InstanceExecutionTest {
         }
     }
 
-    @Nested
-    @DisplayName("dependent mode")
-    class Dependent {
+    @Test
+    @DisplayName("all pass")
+    void allPass() {
+        var closed = new AtomicInteger();
 
-        @Test
-        @DisplayName("all pass")
-        void allPass() {
-            var closed = new AtomicInteger();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Step.of("child", context -> {}))
+                .build();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> {})
-                    .child("child-2", fixture -> {})
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        assertThat(root.isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(closed.get()).isEqualTo(1);
-        }
+    @Test
+    @DisplayName("instantiate fails skips body and runs destroy")
+    void instantiateFailsSkipsBodyAndRunsDestroy() {
+        var childCalls = new AtomicInteger();
 
-        @Test
-        @DisplayName("instantiate fails skips body and runs destroy")
-        void instantiateFailsSkipsBodyAndRunsDestroy() {
-            var childCalls = new AtomicInteger();
+        var action = Instance.builder("instance", () -> {
+                    throw new RuntimeException("instantiate failed");
+                })
+                .body(Step.of("child", context -> childCalls.incrementAndGet()))
+                .build();
 
-            var action = Instance.of("instance", () -> {
-                        throw new RuntimeException("instantiate failed");
-                    })
-                    .child("child-1", fixture -> childCalls.incrementAndGet())
-                    .child("child-2", fixture -> childCalls.incrementAndGet())
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(childCalls.get()).isZero();
+    }
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status().isFailed())
-                    .isTrue();
-            assertThat(children.get(0).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(childCalls.get()).isZero();
-        }
+    @Test
+    @DisplayName("null factory result fails instantiate and skips body")
+    void nullFactoryResultFailsInstantiateAndSkipsBody() {
+        var childCalls = new AtomicInteger();
 
-        @Test
-        @DisplayName("instantiate aborts skips body and runs destroy")
-        void instantiateAbortsSkipsBodyAndRunsDestroy() {
-            var childCalls = new AtomicInteger();
+        var action = Instance.builder("instance", () -> null)
+                .body(Step.of("child", context -> childCalls.incrementAndGet()))
+                .build();
 
-            var action = Instance.of("instance", () -> {
-                        AbortedException.abort("instantiate aborted");
-                        return new Object();
-                    })
-                    .child("child-1", fixture -> childCalls.incrementAndGet())
-                    .child("child-2", fixture -> childCalls.incrementAndGet())
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().message()).contains("factory returned null");
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(childCalls.get()).isZero();
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.ABORTED);
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status().isAborted())
-                    .isTrue();
-            assertThat(children.get(0).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(childCalls.get()).isZero();
-        }
+    @Test
+    @DisplayName("instantiate aborts skips body and runs destroy")
+    void instantiateAbortsSkipsBodyAndRunsDestroy() {
+        var childCalls = new AtomicInteger();
 
-        @Test
-        @DisplayName("first child fails skips remaining and runs destroy")
-        void firstChildFailsSkipsRemainingAndRunsDestroy() {
-            var child2Calls = new AtomicInteger();
-            var closed = new AtomicInteger();
+        var action = Instance.builder("instance", () -> {
+                    AbortedException.abort("instantiate aborted");
+                    return new Object();
+                })
+                .body(Step.of("child", context -> childCalls.incrementAndGet()))
+                .build();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> FailException.fail("child failed"))
-                    .child("child-2", fixture -> child2Calls.incrementAndGet())
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        assertThat(root.isAborted()).isTrue();
+        assertThat(root.before().orElseThrow().isAborted()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(childCalls.get()).isZero();
+    }
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status().isFailed()).isTrue();
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(child2Calls.get()).isZero();
-            assertThat(closed.get()).isEqualTo(1);
-        }
+    @Test
+    @DisplayName("body child fails, remaining skipped via dependent Sequence, destroy runs")
+    void bodyBodyFailsRemainingSkippedDestroyRuns() {
+        var child2Calls = new AtomicInteger();
+        var closed = new AtomicInteger();
 
-        @Test
-        @DisplayName("first child aborts aborts remaining and runs destroy")
-        void firstChildAbortsAbortsRemainingAndRunsDestroy() {
-            var child2Calls = new AtomicInteger();
-            var closed = new AtomicInteger();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .child(Step.of("child-1", context -> FailException.fail("child failed")))
+                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .build())
+                .build();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> AbortedException.abort("child aborted"))
-                    .child("child-2", fixture -> child2Calls.incrementAndGet())
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isFailed()).isTrue();
+        assertThat(body.children().get(1).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(child2Calls.get()).isZero();
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.ABORTED);
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status().isAborted()).isTrue();
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(child2Calls.get()).isEqualTo(1);
-            assertThat(closed.get()).isEqualTo(1);
-        }
+    @Test
+    @DisplayName("body child aborts, remaining skipped via dependent Sequence, destroy runs")
+    void bodyBodyAbortsRemainingSkippedDestroyRuns() {
+        var child2Calls = new AtomicInteger();
+        var closed = new AtomicInteger();
 
-        @Test
-        @DisplayName("first child skips skips remaining and runs destroy")
-        void firstChildSkipsSkipsRemainingAndRunsDestroy() {
-            var child2Calls = new AtomicInteger();
-            var closed = new AtomicInteger();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .child(Step.of("child-1", context -> AbortedException.abort("child aborted")))
+                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .build())
+                .build();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> SkipException.skip("child skipped"))
-                    .child("child-2", fixture -> child2Calls.incrementAndGet())
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        assertThat(root.isAborted()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isAborted()).isTrue();
+        assertThat(body.children().get(1).isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(child2Calls.get()).isEqualTo(1);
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status().isSkipped()).isTrue();
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(child2Calls.get()).isZero();
-            assertThat(closed.get()).isEqualTo(1);
-        }
+    @Test
+    @DisplayName("body child skips, remaining skipped via dependent Sequence, destroy runs")
+    void bodyBodySkipsRemainingSkippedDestroyRuns() {
+        var child2Calls = new AtomicInteger();
+        var closed = new AtomicInteger();
 
-        @Test
-        @DisplayName("first child runtime exception skips remaining and runs destroy")
-        void firstChildRuntimeExceptionSkipsRemainingAndRunsDestroy() {
-            var child2Calls = new AtomicInteger();
-            var closed = new AtomicInteger();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .child(Step.of("child-1", context -> SkipException.skip("child skipped")))
+                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .build())
+                .build();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> {
-                        throw new RuntimeException("runtime error");
-                    })
-                    .child("child-2", fixture -> child2Calls.incrementAndGet())
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        assertThat(root.isSkipped()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isSkipped()).isTrue();
+        assertThat(body.children().get(1).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(child2Calls.get()).isZero();
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status().isFailed()).isTrue();
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(child2Calls.get()).isZero();
-            assertThat(closed.get()).isEqualTo(1);
-        }
+    @Test
+    @DisplayName("body child runtime exception, remaining skipped via dependent Sequence, destroy runs")
+    void bodyBodyRuntimeExceptionRemainingSkippedDestroyRuns() {
+        var child2Calls = new AtomicInteger();
+        var closed = new AtomicInteger();
 
-        @Test
-        @DisplayName("destroy fails via AutoCloseable aggregates FAILED")
-        void destroyFailsViaAutoCloseableAggregatesFailed() {
-            var action = Instance.of("instance", FailingFixture::new)
-                    .child("child-1", fixture -> {})
-                    .child("child-2", fixture -> {})
-                    .resolve();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .child(Step.of("child-1", context -> {
+                            throw new RuntimeException("runtime error");
+                        }))
+                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .build())
+                .build();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status().isFailed())
-                    .isTrue();
-        }
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isFailed()).isTrue();
+        assertThat(body.children().get(1).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(child2Calls.get()).isZero();
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-        @Test
-        @DisplayName("empty body instantiates and destroys only")
-        void emptyBodyInstantiatesAndDestroysOnly() {
-            var closed = new AtomicInteger();
+    @Test
+    @DisplayName("body child fails, all still run via independent Sequence, destroy runs")
+    void bodyBodyFailsAllStillRunDestroyRuns() {
+        var child2Calls = new AtomicInteger();
+        var closed = new AtomicInteger();
 
-            var action =
-                    Instance.of("instance", () -> new CloseableFixture(closed)).resolve();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .independent()
+                        .child(Step.of("child-1", context -> FailException.fail("child failed")))
+                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .build())
+                .build();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children).hasSize(0);
-            assertThat(root.before().orElseThrow().metadata().name()).isEqualTo("Instantiate");
-            assertThat(root.after().orElseThrow().metadata().name()).isEqualTo("Destroy");
-            assertThat(closed.get()).isEqualTo(1);
-        }
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isFailed()).isTrue();
+        assertThat(body.children().get(1).isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(child2Calls.get()).isEqualTo(1);
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-        @Test
-        @DisplayName("AutoCloseable closed exactly once")
-        void autoCloseableClosedExactlyOnce() {
-            var closed = new AtomicInteger();
+    @Test
+    @DisplayName("body child aborts, all still run via independent Sequence, destroy runs")
+    void bodyBodyAbortsAllStillRunDestroyRuns() {
+        var child2Calls = new AtomicInteger();
+        var closed = new AtomicInteger();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> {})
-                    .child("child-2", fixture -> {})
-                    .resolve();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .independent()
+                        .child(Step.of("child-1", context -> AbortedException.abort("child aborted")))
+                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .build())
+                .build();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(closed.get()).isEqualTo(1);
-        }
+        assertThat(root.isAborted()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isAborted()).isTrue();
+        assertThat(body.children().get(1).isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(child2Calls.get()).isEqualTo(1);
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-        @Test
-        @DisplayName("instance available to children")
-        void instanceAvailableToChildren() {
-            var instanceRef = new AtomicReference<Object>();
-            var closed = new AtomicInteger();
+    @Test
+    @DisplayName("body child skips, all still run via independent Sequence, destroy runs")
+    void bodyBodySkipsAllStillRunDestroyRuns() {
+        var child2Calls = new AtomicInteger();
+        var closed = new AtomicInteger();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> instanceRef.set(fixture))
-                    .resolve();
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .independent()
+                        .child(Step.of("child-1", context -> SkipException.skip("child skipped")))
+                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .build())
+                .build();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(instanceRef.get()).isNotNull();
-            assertThat(instanceRef.get()).isInstanceOf(CloseableFixture.class);
-        }
+        assertThat(root.isSkipped()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isSkipped()).isTrue();
+        assertThat(body.children().get(1).isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(child2Calls.get()).isEqualTo(1);
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-        @Test
-        @DisplayName("instance holder cleared after destroy")
-        void instanceHolderClearedAfterDestroy() {
-            var closed = new AtomicInteger();
-            var instanceDuringBody = new AtomicReference<Object>();
+    @Test
+    @DisplayName("destroy fails via AutoCloseable aggregates FAILED")
+    void destroyFailsViaAutoCloseableAggregatesFailed() {
+        var action = Instance.builder("instance", FailingFixture::new)
+                .body(Step.of("child", context -> {}))
+                .build();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("child-1", fixture -> instanceDuringBody.set(fixture))
-                    .child("child-2", fixture -> {})
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().isFailed()).isTrue();
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(instanceDuringBody.get()).isNotNull();
-            assertThat(closed.get()).isEqualTo(1);
-        }
+    @Test
+    @DisplayName("empty body throws IllegalStateException")
+    void emptyBodyThrowsIllegalStateException() {
+        assertThatThrownBy(() -> Instance.builder("instance", Object::new).build())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("body action must be configured");
+    }
 
-        @Test
-        @DisplayName("mixed child types execute in call order")
-        void mixedChildTypesExecuteInCallOrder() {
-            var closed = new AtomicInteger();
-            var executionOrder = new java.util.ArrayList<String>();
+    @Test
+    @DisplayName("AutoCloseable closed exactly once")
+    void autoCloseableClosedExactlyOnce() {
+        var closed = new AtomicInteger();
 
-            var childSpec = Instance.of("child-c", () -> new CloseableFixture(closed))
-                    .child("c-action", fixture -> executionOrder.add("c"));
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Step.of("child", context -> {}))
+                .build();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .child("a", fixture -> executionOrder.add("a"))
-                    .child("b", "kind", fixture -> executionOrder.add("b"))
-                    .child(childSpec)
-                    .resolve();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+        assertThat(root.isPassed()).isTrue();
+        assertThat(closed.get()).isEqualTo(1);
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(executionOrder).containsExactly("a", "b", "c");
+    @Test
+    @DisplayName("instance available to children")
+    void instanceAvailableToChildren() {
+        var instanceRef = new AtomicReference();
+        var closed = new AtomicInteger();
+
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Step.of("child", withInstance(CloseableFixture.class, instanceRef::set)))
+                .build();
+
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+
+        assertThat(root.isPassed()).isTrue();
+        assertThat(instanceRef.get()).isNotNull();
+        assertThat(instanceRef.get()).isInstanceOf(CloseableFixture.class);
+    }
+
+    @Test
+    @DisplayName("instance holder cleared after destroy")
+    void instanceHolderClearedAfterDestroy() {
+        var closed = new AtomicInteger();
+        var instanceDuringBody = new AtomicReference();
+
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Step.of("child", withInstance(CloseableFixture.class, instanceDuringBody::set)))
+                .build();
+
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+
+        assertThat(root.isPassed()).isTrue();
+        assertThat(instanceDuringBody.get()).isNotNull();
+        assertThat(closed.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("mixed child types execute in call order")
+    void mixedBodyTypesExecuteInCallOrder() {
+        var closed = new AtomicInteger();
+        var executionOrder = new ArrayList<String>();
+
+        var childBuilder = Instance.builder("child-c", () -> new CloseableFixture(closed))
+                .body(Step.of("c-action", context -> executionOrder.add("c")));
+
+        var action = Instance.builder("instance", () -> new CloseableFixture(closed))
+                .body(Sequence.builder("body")
+                        .child(Step.of("a", context -> executionOrder.add("a")))
+                        .child(Step.of("b", context -> executionOrder.add("b")))
+                        .child(childBuilder.build()))
+                .build();
+
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+
+        assertThat(root.isPassed()).isTrue();
+        assertThat(executionOrder).containsExactly("a", "b", "c");
+    }
+
+    static final class SimpleFixture {
+
+        SimpleFixture() {}
+    }
+
+    static final class NoArgConstructorFixture {
+
+        NoArgConstructorFixture(int value) {
+            throw new RuntimeException("should not be called");
         }
     }
 
-    @Nested
-    @DisplayName("independent mode")
-    class Independent {
+    @Test
+    @DisplayName("builder(Class) uses simple name and default constructor")
+    void builderClassUsesSimpleNameAndDefaultConstructor() {
+        var action = Instance.builder(Object.class)
+                .body(Step.of(
+                        "child",
+                        context -> assertThat(context.instance(Object.class)).isPresent()))
+                .build();
 
-        @Test
-        @DisplayName("all pass")
-        void allPass() {
-            var closed = new AtomicInteger();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .independent()
-                    .child("child-1", fixture -> {})
-                    .child("child-2", fixture -> {})
-                    .resolve();
+        assertThat(root.isPassed()).isTrue();
+        assertThat(root.action().displayName()).isEqualTo("Object");
+    }
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
+    @Test
+    @DisplayName("builder(String, Class) uses provided display name and default constructor")
+    void builderStringClassUsesProvidedNameAndDefaultConstructor() {
+        var action = Instance.builder("my-fixture", Object.class)
+                .body(Step.of(
+                        "child",
+                        context -> assertThat(context.instance(Object.class)).isPresent()))
+                .build();
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(closed.get()).isEqualTo(1);
-        }
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("instantiate fails still skips body and runs destroy")
-        void instantiateFailsStillSkipsBodyAndRunsDestroy() {
-            var childCalls = new AtomicInteger();
+        assertThat(root.isPassed()).isTrue();
+        assertThat(root.action().displayName()).isEqualTo("my-fixture");
+    }
 
-            var action = Instance.of("instance", () -> {
-                        throw new RuntimeException("instantiate failed");
-                    })
-                    .independent()
-                    .child("child-1", fixture -> childCalls.incrementAndGet())
-                    .child("child-2", fixture -> childCalls.incrementAndGet())
-                    .resolve();
+    @Test
+    @DisplayName("builder(String, Class) throws IllegalArgumentException when class has no no-arg constructor")
+    void builderStringClassThrowsWhenNoNoArgConstructor() {
+        assertThatThrownBy(() -> Instance.builder("fixture", NoArgConstructorFixture.class))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not have a public no-argument constructor");
+    }
 
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
-
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status().isFailed())
-                    .isTrue();
-            assertThat(children.get(0).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(childCalls.get()).isZero();
-        }
-
-        @Test
-        @DisplayName("first child fails all children still run")
-        void firstChildFailsAllChildrenStillRun() {
-            var child2Calls = new AtomicInteger();
-            var closed = new AtomicInteger();
-
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .independent()
-                    .child("child-1", fixture -> FailException.fail("child failed"))
-                    .child("child-2", fixture -> child2Calls.incrementAndGet())
-                    .resolve();
-
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
-
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status().isFailed()).isTrue();
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(child2Calls.get()).isEqualTo(1);
-            assertThat(closed.get()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("first child aborts all children still run")
-        void firstChildAbortsAllChildrenStillRun() {
-            var child2Calls = new AtomicInteger();
-            var closed = new AtomicInteger();
-
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .independent()
-                    .child("child-1", fixture -> AbortedException.abort("child aborted"))
-                    .child("child-2", fixture -> child2Calls.incrementAndGet())
-                    .resolve();
-
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
-
-            assertThat(root.metadata().status()).isSameAs(Status.ABORTED);
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status().isAborted()).isTrue();
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(child2Calls.get()).isEqualTo(1);
-            assertThat(closed.get()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("first child skips all children still run")
-        void firstChildSkipsAllChildrenStillRun() {
-            var child2Calls = new AtomicInteger();
-            var closed = new AtomicInteger();
-
-            var action = Instance.of("instance", () -> new CloseableFixture(closed))
-                    .independent()
-                    .child("child-1", fixture -> SkipException.skip("child skipped"))
-                    .child("child-2", fixture -> child2Calls.incrementAndGet())
-                    .resolve();
-
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
-
-            assertThat(root.metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status().isSkipped()).isTrue();
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(child2Calls.get()).isEqualTo(1);
-            assertThat(closed.get()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("destroy fails via AutoCloseable aggregates FAILED")
-        void destroyFailsViaAutoCloseableAggregatesFailed() {
-            var action = Instance.of("instance", FailingFixture::new)
-                    .independent()
-                    .child("child-1", fixture -> {})
-                    .child("child-2", fixture -> {})
-                    .resolve();
-
-            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
-            var children = root.children();
-
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(children).hasSize(2);
-            assertThat(root.before().orElseThrow().metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(0).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(children.get(1).metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.after().orElseThrow().metadata().status().isFailed())
-                    .isTrue();
-        }
+    @Test
+    @DisplayName("builder(String, Class) throws IllegalArgumentException when display name is blank")
+    void builderStringClassThrowsWhenDisplayNameBlank() {
+        assertThatThrownBy(() -> Instance.builder("   ", SimpleFixture.class))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("displayName is blank");
     }
 }

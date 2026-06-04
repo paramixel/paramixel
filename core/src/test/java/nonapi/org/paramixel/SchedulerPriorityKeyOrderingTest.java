@@ -27,9 +27,9 @@ import nonapi.org.paramixel.action.MutableDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequential;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Scheduler priority key ordering")
@@ -38,21 +38,21 @@ class SchedulerPriorityKeyOrderingTest {
     @Test
     @DisplayName("precomputed keys preserve legacy scheduler ordering")
     void precomputedKeysPreserveLegacySchedulerOrdering() {
-        Action<?> branch = Sequential.of("branch")
-                .child(Step.of("branch-step-0", ctx -> {}))
-                .child(Parallel.of("branch-parallel")
+        Action branch = Sequence.builder("branch")
+                .child(Step.of("branch-step-0", context -> {}))
+                .child(Parallel.builder("branch-parallel")
                         .parallelism(2)
-                        .child(Step.of("parallel-left", ctx -> {}))
-                        .child(Step.of("parallel-right", ctx -> {}))
-                        .resolve())
-                .child(Step.of("branch-step-2", ctx -> {}))
-                .resolve();
+                        .child(Step.of("parallel-left", context -> {}))
+                        .child(Step.of("parallel-right", context -> {}))
+                        .build())
+                .child(Step.of("branch-step-2", context -> {}))
+                .build();
 
-        Action<?> rootAction = Lifecycle.of("root")
-                .before(Step.of("before", ctx -> {}))
-                .child(branch)
-                .after(Step.of("after", ctx -> {}))
-                .resolve();
+        Action rootAction = Scope.builder("root")
+                .before(Step.of("before", context -> {}))
+                .body(branch)
+                .after(Step.of("after", context -> {}))
+                .build();
 
         MutableDescriptor descriptorTree = new DescriptorBuilder().discover(rootAction);
 

@@ -19,6 +19,7 @@ package org.paramixel.api;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import nonapi.org.paramixel.exception.UserCodeException;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.FailException;
@@ -35,6 +36,9 @@ import org.paramixel.api.exception.SkipException;
  * on this class. Terminal statuses carrying a message or throwable can be created via
  * the named factory methods {@link #failed(String)}, {@link #skipped(String)}, and
  * {@link #aborted(String)}.
+ *
+ * <p>Outcome detail carried by a status is exposed through {@link #message()} and
+ * {@link #throwable()}.
  */
 public final class Status {
 
@@ -186,7 +190,7 @@ public final class Status {
      * @return {@code true} when pending
      */
     public boolean isPending() {
-        return "PENDING".equals(statusName);
+        return this == PENDING || "PENDING".equals(statusName);
     }
 
     /**
@@ -195,16 +199,7 @@ public final class Status {
      * @return {@code true} when running
      */
     public boolean isRunning() {
-        return "RUNNING".equals(statusName);
-    }
-
-    /**
-     * Returns whether this status is terminal.
-     *
-     * @return {@code true} when this status is not pending or running
-     */
-    public boolean isTerminal() {
-        return !isPending() && !isRunning();
+        return this == RUNNING || "RUNNING".equals(statusName);
     }
 
     /**
@@ -213,7 +208,7 @@ public final class Status {
      * @return {@code true} when passed
      */
     public boolean isPassed() {
-        return "PASSED".equals(statusName);
+        return this == PASSED || "PASSED".equals(statusName);
     }
 
     /**
@@ -222,7 +217,7 @@ public final class Status {
      * @return {@code true} when failed
      */
     public boolean isFailed() {
-        return "FAILED".equals(statusName);
+        return this == FAILED || "FAILED".equals(statusName);
     }
 
     /**
@@ -231,7 +226,7 @@ public final class Status {
      * @return {@code true} when skipped
      */
     public boolean isSkipped() {
-        return "SKIPPED".equals(statusName);
+        return this == SKIPPED || "SKIPPED".equals(statusName);
     }
 
     /**
@@ -240,7 +235,7 @@ public final class Status {
      * @return {@code true} when aborted
      */
     public boolean isAborted() {
-        return "ABORTED".equals(statusName);
+        return this == ABORTED || "ABORTED".equals(statusName);
     }
 
     /**
@@ -277,17 +272,16 @@ public final class Status {
         boolean hasNonTerminal = false;
         boolean hasSkipped = false;
         for (Descriptor descriptor : descriptors) {
-            Status s = descriptor.metadata().status();
-            if (s.isFailed()) {
+            if (descriptor.isFailed()) {
                 hasFailed = true;
             }
-            if (s.isAborted()) {
+            if (descriptor.isAborted()) {
                 hasAborted = true;
             }
-            if (!s.isTerminal()) {
+            if (!descriptor.isCompleted()) {
                 hasNonTerminal = true;
             }
-            if (s.isSkipped()) {
+            if (descriptor.isSkipped()) {
                 hasSkipped = true;
             }
         }
@@ -320,8 +314,8 @@ public final class Status {
      */
     public static Status fromThrowable(final Throwable throwable) {
         var t = throwable;
-        if (t instanceof nonapi.org.paramixel.FrameworkException frameworkException) {
-            t = frameworkException.getCause();
+        if (t instanceof UserCodeException userCodeException) {
+            t = userCodeException.getCause();
         }
         UnrecoverableErrors.rethrowIfUnrecoverable(t);
         if (t instanceof InterruptedException) {
@@ -354,25 +348,11 @@ public final class Status {
         }
         return statusName.equals(other.statusName)
                 && Objects.equals(message, other.message)
-                && throwableClassMessageEquals(throwable, other.throwable);
-    }
-
-    private static boolean throwableClassMessageEquals(Throwable a, Throwable b) {
-        if (a == b) {
-            return true;
-        }
-        if (a == null || b == null) {
-            return false;
-        }
-        return a.getClass().equals(b.getClass()) && Objects.equals(a.getMessage(), b.getMessage());
+                && throwable == other.throwable;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(
-                statusName,
-                message,
-                throwable != null ? throwable.getClass().getName() : null,
-                throwable != null ? throwable.getMessage() : null);
+        return Objects.hash(statusName, message, System.identityHashCode(throwable));
     }
 }

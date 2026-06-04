@@ -158,4 +158,4 @@ Feel free to open an issue for questions about contributing or the codebase.
 
 ---
 
-Copyright 2026-present Douglas Hoard
+Copyright (c) 2026-present Douglas Hoard

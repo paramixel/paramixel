@@ -19,6 +19,7 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
@@ -131,6 +132,24 @@ class ConfigurationArgumentsTest {
     void ofMapReturnsNonNull() {
         Configuration config = Configuration.of(Map.of());
         assertThat(config).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Configuration.of(Map) rejects null key")
+    void ofMapRejectsNullKey() {
+        var properties = new HashMap<String, String>();
+        properties.put(null, "value");
+
+        assertThatThrownBy(() -> Configuration.of(properties)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("Configuration.of(Map) rejects null value")
+    void ofMapRejectsNullValue() {
+        var properties = new HashMap<String, String>();
+        properties.put("key", null);
+
+        assertThatThrownBy(() -> Configuration.of(properties)).isInstanceOf(NullPointerException.class);
     }
 
     @Test

@@ -374,6 +374,60 @@ class ParamixelMojoExecuteTest {
                 testCl.close();
             }
         }
+
+        @Test
+        @DisplayName("warns when lingering threads detected with strictThreadLifecycle disabled")
+        void warnsWhenLingeringThreadsDetectedWithStrictThreadLifecycleDisabled() throws Exception {
+            ParamixelMojo mojo = new ParamixelMojo();
+            setField(mojo, "strictThreadLifecycle", false);
+
+            URLClassLoader testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
+            Thread dummyThread = new Thread(
+                    () -> {
+                        try {
+                            Thread.sleep(30_000);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    },
+                    "test-warning-lingering-thread");
+            dummyThread.setDaemon(false);
+            dummyThread.setContextClassLoader(testCl);
+            try {
+                dummyThread.start();
+
+                Method snapshotMethod = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+                snapshotMethod.setAccessible(true);
+
+                @SuppressWarnings("unchecked")
+                Set<Thread> baseline = (Set<Thread>) snapshotMethod.invoke(mojo);
+                baseline.remove(dummyThread);
+
+                Method warnMethod = ParamixelMojo.class.getDeclaredMethod("warnOrErrorLingeringThreads", Set.class);
+                warnMethod.setAccessible(true);
+
+                assertThatCode(() -> warnMethod.invoke(mojo, baseline)).doesNotThrowAnyException();
+            } finally {
+                dummyThread.interrupt();
+                dummyThread.join(5000);
+                testCl.close();
+            }
+        }
+
+        @Test
+        @DisplayName("snapshotNonDaemonThreads excludes daemon threads")
+        void snapshotNonDaemonThreadsExcludesDaemonThreads() throws Exception {
+            ParamixelMojo mojo = new ParamixelMojo();
+            Method method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+            method.setAccessible(true);
+
+            @SuppressWarnings("unchecked")
+            Set<Thread> threads = (Set<Thread>) method.invoke(mojo);
+
+            for (Thread t : threads) {
+                assertThat(t.isDaemon()).isFalse();
+            }
+        }
     }
 
     private ParamixelMojo newMojo(Path targetDir, String classMatch) throws Exception {

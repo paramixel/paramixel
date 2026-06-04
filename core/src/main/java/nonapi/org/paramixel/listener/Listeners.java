@@ -16,6 +16,7 @@
 
 package nonapi.org.paramixel.listener;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.EnumSet;
 import java.util.Locale;
@@ -24,6 +25,7 @@ import java.util.regex.Pattern;
 import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.AnsiColor;
 import org.paramixel.api.Descriptor;
+import org.paramixel.api.Result;
 import org.paramixel.api.Status;
 
 /**
@@ -58,14 +60,47 @@ public final class Listeners {
      */
     public static String formatAnsiStatus(final Status status) {
         Objects.requireNonNull(status, "status is null");
-        return switch (status.name()) {
-            case "PASSED" -> AnsiColor.BOLD_GREEN_TEXT.format(status.name());
-            case "FAILED" -> AnsiColor.BOLD_RED_TEXT.format(status.name());
-            case "SKIPPED" -> AnsiColor.BOLD_YELLOW_TEXT.format(status.name());
-            case "ABORTED" -> AnsiColor.BOLD_ORANGE_TEXT.format(status.name());
-            case "RUNNING" -> AnsiColor.BOLD_BLUE_TEXT.format(status.name());
-            default -> status.name();
-        };
+        return formatAnsiStatusName(status.name());
+    }
+
+    /**
+     * Formats a descriptor's current outcome without ANSI color.
+     *
+     * @param descriptor the descriptor to format; must not be {@code null}
+     * @return the outcome text
+     */
+    public static String formatStatus(final Descriptor descriptor) {
+        return statusName(Objects.requireNonNull(descriptor, "descriptor is null"));
+    }
+
+    /**
+     * Formats a descriptor's current outcome with ANSI color.
+     *
+     * @param descriptor the descriptor to format; must not be {@code null}
+     * @return the colored outcome text
+     */
+    public static String formatAnsiStatus(final Descriptor descriptor) {
+        return formatAnsiStatusName(formatStatus(descriptor));
+    }
+
+    /**
+     * Formats a result's effective outcome without ANSI color.
+     *
+     * @param result the result to format; must not be {@code null}
+     * @return the outcome text
+     */
+    public static String formatStatus(final Result result) {
+        return statusName(Objects.requireNonNull(result, "result is null"));
+    }
+
+    /**
+     * Formats a result's effective outcome with ANSI color.
+     *
+     * @param result the result to format; must not be {@code null}
+     * @return the colored outcome text
+     */
+    public static String formatAnsiStatus(final Result result) {
+        return formatAnsiStatusName(formatStatus(result));
     }
 
     /**
@@ -78,7 +113,7 @@ public final class Listeners {
         Objects.requireNonNull(descriptor, "descriptor is null");
         var names = new ArrayDeque<String>();
         for (var d = descriptor; d != null; d = d.parent().orElse(null)) {
-            var name = d.metadata().name();
+            var name = d.action().displayName();
             if (!Constants.ROOT_NAME.equals(name)) {
                 names.addFirst(name);
             }
@@ -96,20 +131,9 @@ public final class Listeners {
         Objects.requireNonNull(descriptor, "descriptor is null");
         var ids = new ArrayDeque<String>();
         for (var d = descriptor; d != null; d = d.parent().orElse(null)) {
-            ids.addFirst(d.metadata().id());
+            ids.addFirst(d.id());
         }
         return String.join("-", ids);
-    }
-
-    /**
-     * Formats the action kind for a descriptor.
-     *
-     * @param descriptor the descriptor; must not be {@code null}
-     * @return the kind label
-     */
-    public static String formatKind(final Descriptor descriptor) {
-        Objects.requireNonNull(descriptor, "descriptor is null");
-        return descriptor.metadata().kind();
     }
 
     /**
@@ -120,11 +144,10 @@ public final class Listeners {
      */
     public static String formatException(final Descriptor descriptor) {
         Objects.requireNonNull(descriptor, "descriptor is null");
-        if (!descriptor.metadata().status().isFailed()) {
+        if (!descriptor.isFailed()) {
             return null;
         }
         return descriptor
-                .metadata()
                 .throwable()
                 .map(throwable -> {
                     var message = sanitizeMessage(throwable.getMessage());
@@ -132,8 +155,66 @@ public final class Listeners {
                             ? throwable.getClass().getName()
                             : throwable.getClass().getName() + ": " + message;
                 })
-                .or(() -> descriptor.metadata().message().map(Listeners::sanitizeMessage))
+                .or(() -> descriptor.message().map(Listeners::sanitizeMessage))
                 .orElse(null);
+    }
+
+    private static String statusName(final Descriptor descriptor) {
+        if (descriptor.isFailed()) {
+            return "FAILED";
+        }
+        if (descriptor.isAborted()) {
+            return "ABORTED";
+        }
+        if (!descriptor.isCompleted()) {
+            return "RUNNING";
+        }
+        if (descriptor.isSkipped()) {
+            return "SKIPPED";
+        }
+        return "PASSED";
+    }
+
+    private static String statusName(final Result result) {
+        if (result.isFailed()) {
+            return "FAILED";
+        }
+        if (result.isAborted()) {
+            return "ABORTED";
+        }
+        if (result.isSkipped()) {
+            return "SKIPPED";
+        }
+        return "PASSED";
+    }
+
+    private static String formatAnsiStatusName(final String statusName) {
+        return switch (statusName) {
+            case "PASSED" -> AnsiColor.BOLD_GREEN_TEXT.format(statusName);
+            case "FAILED" -> AnsiColor.BOLD_RED_TEXT.format(statusName);
+            case "SKIPPED" -> AnsiColor.BOLD_YELLOW_TEXT.format(statusName);
+            case "ABORTED" -> AnsiColor.BOLD_ORANGE_TEXT.format(statusName);
+            case "RUNNING" -> AnsiColor.BOLD_BLUE_TEXT.format(statusName);
+            default -> statusName;
+        };
+    }
+
+    /**
+     * Returns the elapsed milliseconds between a descriptor's start and completion timestamps.
+     *
+     * @param descriptor the descriptor; must not be {@code null}
+     * @return elapsed milliseconds, or {@code 0} when either timestamp is not available
+     */
+    public static long elapsedMillis(final Descriptor descriptor) {
+        Objects.requireNonNull(descriptor, "descriptor is null");
+        var start = descriptor.startedAt();
+        var completed = descriptor.completedAt();
+        if (start.isEmpty() || completed.isEmpty()) {
+            return 0L;
+        }
+        return Math.max(
+                0L,
+                Duration.between(start.orElseThrow(), completed.orElseThrow()).toMillis());
     }
 
     /**

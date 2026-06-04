@@ -19,40 +19,29 @@ package org.paramixel.api.action;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Runner;
 
-/**
- * Tests verifying that Parallel actions do not deadlock under high-concurrency scenarios.
- *
- * <p>These tests verify the backpressure mechanism that prevents scheduler thread exhaustion
- * when executing many children or nested Parallel actions. The scheduler implements automatic
- * queue capacity checking to avoid blocking all worker threads.
- */
 @DisplayName("Parallel deadlock prevention")
 class ParallelDeadlockPreventionTest {
 
-    /**
-     * Verifies that Parallel actions with many children (2000) complete without deadlock.
-     *
-     * <p>This test exercises the backpressure mechanism that pauses child scheduling when
-     * the scheduler's ready queue reaches 90% capacity, allowing completion callbacks to
-     * drain the queue naturally.
-     */
     @Test
     @DisplayName("Parallel with many children does not deadlock")
     void parallelWithManyChildrenDoesNotDeadlock() {
         int childCount = 2000;
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        var parallel = Parallel.of("many-children").parallelism(50);
+        var parallel = Parallel.builder("many-children").parallelism(50);
 
         for (int i = 0; i < childCount; i++) {
             int index = i;
-            parallel.child(Step.of("child-" + index, ctx -> {
+            parallel.child(Step.of("child-" + index, context -> {
                 executionCount.incrementAndGet();
                 try {
                     Thread.sleep(1);
@@ -62,19 +51,13 @@ class ParallelDeadlockPreventionTest {
             }));
         }
 
-        var result = Runner.defaultRunner().run(parallel);
+        var result = Runner.defaultRunner().run(parallel.build());
 
-        assertThat(result.status().isTerminal()).isTrue();
+        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
+                .isTrue();
         assertThat(executionCount.get()).isEqualTo(childCount);
     }
 
-    /**
-     * Verifies that nested Parallel actions (50×50 = 2500 total children) complete without deadlock.
-     *
-     * <p>This test exercises hierarchical scheduling where inner Parallel actions compete for
-     * scheduler slots while outer Parallel actions continue scheduling. The backpressure mechanism
-     * prevents all scheduler threads from blocking on queue capacity.
-     */
     @Test
     @DisplayName("Nested Parallel actions do not deadlock")
     void nestedParallelActionsDoNotDeadlock() {
@@ -84,15 +67,15 @@ class ParallelDeadlockPreventionTest {
         int outerChildren = 50;
         int innerChildren = 50;
 
-        var outer = Parallel.of("nested-parallel").parallelism(outerParallelism);
+        var outer = Parallel.builder("nested-parallel").parallelism(outerParallelism);
 
         for (int i = 0; i < outerChildren; i++) {
             int outerIndex = i;
-            var inner = Parallel.of("outer-" + outerIndex).parallelism(innerParallelism);
+            var inner = Parallel.builder("outer-" + outerIndex).parallelism(innerParallelism);
 
             for (int j = 0; j < innerChildren; j++) {
                 int innerIndex = j;
-                inner.child(Step.of("inner-" + innerIndex, ctx -> {
+                inner.child(Step.of("inner-" + innerIndex, context -> {
                     executionCount.incrementAndGet();
                     try {
                         Thread.sleep(1);
@@ -102,34 +85,27 @@ class ParallelDeadlockPreventionTest {
                 }));
             }
 
-            outer.child(inner);
+            outer.child(inner.build());
         }
 
-        var result = Runner.defaultRunner().run(outer);
+        var result = Runner.defaultRunner().run(outer.build());
 
-        assertThat(result.status().isTerminal()).isTrue();
+        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
+                .isTrue();
         assertThat(executionCount.get()).isEqualTo(outerChildren * innerChildren);
     }
 
-    /**
-     * Verifies that Parallel actions with constrained parallelism complete without deadlock.
-     *
-     * <p>This test exercises the backpressure mechanism with a runner configured for
-     * 10 parallelism slots and a Parallel action requesting 20, verifying that queue
-     * capacity checking works correctly when the scheduler is more constrained than
-     * the action's parallelism.
-     */
     @Test
     @DisplayName("Parallel with constrained scheduler does not deadlock")
     void parallelWithConstrainedSchedulerDoesNotDeadlock() {
         int childCount = 500;
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        var parallel = Parallel.of("constrained-scheduler").parallelism(20);
+        var parallel = Parallel.builder("constrained-scheduler").parallelism(20);
 
         for (int i = 0; i < childCount; i++) {
             int index = i;
-            parallel.child(Step.of("child-" + index, ctx -> {
+            parallel.child(Step.of("child-" + index, context -> {
                 executionCount.incrementAndGet();
                 try {
                     Thread.sleep(1);
@@ -142,35 +118,37 @@ class ParallelDeadlockPreventionTest {
         var result = Runner.builder()
                 .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "10")))
                 .build()
-                .run(parallel);
+                .run(parallel.build());
 
-        assertThat(result.status().isTerminal()).isTrue();
+        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
+                .isTrue();
         assertThat(executionCount.get()).isEqualTo(childCount);
     }
 
-    /**
-     * Verifies that Parallel actions fully utilize global parallelism slots.
-     *
-     * <p>This test verifies that when Parallel parallelism is higher than global parallelism,
-     * all global slots are utilized. The execution callback mechanism ensures that Parallel
-     * tracks actually executing tasks rather than queued tasks.
-     */
     @Test
     @DisplayName("Parallel fully utilizes global parallelism")
-    void parallelFullyUtilizesGlobalParallelism() {
+    void parallelFullyUtilizesGlobalParallelism() throws Exception {
         int childCount = 50;
         AtomicInteger executionCount = new AtomicInteger(0);
         AtomicInteger active = new AtomicInteger(0);
         AtomicInteger maxActive = new AtomicInteger(0);
+        CountDownLatch allStarted = new CountDownLatch(8);
+        CountDownLatch mayProceed = new CountDownLatch(1);
 
-        var parallel = Parallel.of("parallelism-test").parallelism(50);
+        var parallel = Parallel.builder("parallelism-test").parallelism(50);
 
         for (int i = 0; i < childCount; i++) {
             int index = i;
-            parallel.child(Step.of("child-" + index, ctx -> {
+            parallel.child(Step.of("child-" + index, context -> {
                 executionCount.incrementAndGet();
                 int current = active.incrementAndGet();
                 maxActive.accumulateAndGet(current, Math::max);
+                allStarted.countDown();
+                try {
+                    mayProceed.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
                 try {
                     Thread.sleep(5);
                 } catch (InterruptedException e) {
@@ -181,13 +159,19 @@ class ParallelDeadlockPreventionTest {
             }));
         }
 
-        var result = Runner.builder()
+        var runnerFuture = CompletableFuture.supplyAsync(() -> Runner.builder()
                 .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "8")))
                 .build()
-                .run(parallel);
+                .run(parallel.build()));
 
-        assertThat(result.status().isTerminal()).isTrue();
-        assertThat(executionCount.get()).isEqualTo(childCount);
+        assertThat(allStarted.await(10, TimeUnit.SECONDS)).isTrue();
         assertThat(maxActive.get()).isEqualTo(8);
+        mayProceed.countDown();
+
+        var result = runnerFuture.get(10, TimeUnit.SECONDS);
+
+        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
+                .isTrue();
+        assertThat(executionCount.get()).isEqualTo(childCount);
     }
 }

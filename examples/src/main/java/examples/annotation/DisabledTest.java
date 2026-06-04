@@ -17,13 +17,15 @@
 package examples.annotation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Context.withInstance;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Step;
 
 /**
  * Verifies that {@code @Paramixel.Disabled} prevents the annotated action factory
@@ -49,8 +51,10 @@ public class DisabledTest {
      * @return a single-step action that checks the disabled flag
      */
     @Paramixel.Factory
-    public static Spec<?> disabledVerificationFactory() {
-        return Instance.of("DisabledVerification", DisabledTest::new).child("verify()", DisabledTest::verify);
+    public static Action disabledVerificationFactory() {
+        return Instance.builder("DisabledVerification", DisabledTest::new)
+                .body(Step.of("verify()", withInstance(DisabledTest.class, DisabledTest::verify)))
+                .build();
     }
 
     /**
@@ -61,15 +65,16 @@ public class DisabledTest {
      */
     @Paramixel.Disabled("covered by resolver skip behavior")
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         factoryInvoked.set(true);
 
-        return Instance.of("DisabledTest", DisabledTest::new)
-                .child(Lifecycle.<DisabledTest>of("lifecycle")
-                        .before("before()", DisabledTest::before)
-                        .child("disabledLeaf()", DisabledTest::disabledLeaf)
-                        .after("after()", DisabledTest::after)
-                        .resolve());
+        return Instance.builder("DisabledTest", DisabledTest::new)
+                .body(Scope.<DisabledTest>builder("lifecycle")
+                        .before(Step.of("before()", withInstance(DisabledTest.class, DisabledTest::before)))
+                        .body(Step.of("disabledLeaf()", withInstance(DisabledTest.class, DisabledTest::disabledLeaf)))
+                        .after(Step.of("after()", withInstance(DisabledTest.class, DisabledTest::after)))
+                        .build())
+                .build();
     }
 
     public DisabledTest() {

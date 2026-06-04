@@ -51,11 +51,11 @@ public final class JsonReportListener extends AbstractReportFileListener {
 
     private static void writeDescriptor(final Writer writer, final Descriptor descriptor) throws IOException {
         writer.write("{\"id\":\"");
-        writer.write(escape(descriptor.metadata().id()));
+        writer.write(escape(descriptor.id()));
         writer.write("\",\"name\":\"");
-        writer.write(escape(descriptor.metadata().name()));
+        writer.write(escape(descriptor.action().displayName()));
         writer.write("\",\"status\":\"");
-        writer.write(escape(descriptor.metadata().status().name()));
+        writer.write(escape(Listeners.formatStatus(descriptor)));
         writer.write("\",\"children\":[");
         var first = true;
         if (descriptor.before().isPresent()) {

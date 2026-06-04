@@ -23,8 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Spec;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.support.Retry;
 import org.paramixel.api.support.Retry.Policy;
@@ -54,10 +54,12 @@ public class AnnotationRetryTest {
      * @return the action tree for this test
      */
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         var annotationResolver = AnnotationResolver.create(AnnotationRetryTest.class);
 
-        return Instance.of(AnnotationRetryTest.class).child(annotationResolver.byId("retry"));
+        return Instance.builder(AnnotationRetryTest.class)
+                .body(annotationResolver.byId("retry"))
+                .build();
     }
 
     public AnnotationRetryTest() {

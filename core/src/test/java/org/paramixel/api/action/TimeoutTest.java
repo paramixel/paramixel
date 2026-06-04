@@ -19,10 +19,12 @@ package org.paramixel.api.action;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Timeout action")
@@ -30,45 +32,44 @@ class TimeoutTest {
 
     @Test
     @DisplayName("child completes within timeout — child's status propagates")
-    void childCompletesWithinTimeout() {
-        var action = Timeout.of("fast-child")
+    void bodyCompletesWithinTimeout() {
+        var action = Timeout.builder("fast-child")
+                .body(Step.of("step", context -> {}))
                 .timeout(Duration.ofSeconds(5))
-                .child("step", ctx -> {})
-                .resolve();
+                .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).metadata().status()).isSameAs(Status.PASSED);
+        assertThat(root.children().get(0).isPassed()).isTrue();
     }
 
     @Test
     @DisplayName("child exceeds timeout — action FAILED, child FAILED")
-    void childExceedsTimeout() {
-        var action = Timeout.of("slow-child")
-                .timeout(Duration.ofMillis(50))
-                .child("blocking-step", ctx -> {
+    void bodyExceedsTimeout() {
+        var action = Timeout.builder("slow-child")
+                .body(Step.of("blocking-step", context -> {
                     Thread.sleep(5000);
-                })
-                .resolve();
+                }))
+                .timeout(Duration.ofMillis(50))
+                .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status().isFailed()).isTrue();
+        assertThat(root.isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).metadata().status().isFailed()).isTrue();
+        assertThat(root.children().get(0).isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("child thread is interrupted on timeout")
-    void childThreadIsInterruptedOnTimeout() throws Exception {
-        var interrupted = new java.util.concurrent.atomic.AtomicBoolean(false);
-        var latch = new java.util.concurrent.CountDownLatch(1);
+    void bodyThreadIsInterruptedOnTimeout() throws Exception {
+        var interrupted = new AtomicBoolean(false);
+        var latch = new CountDownLatch(1);
 
-        var action = Timeout.of("interrupt-child")
-                .timeout(Duration.ofMillis(50))
-                .child("sleep-step", ctx -> {
+        var action = Timeout.builder("interrupt-child")
+                .body(Step.of("sleep-step", context -> {
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException e) {
@@ -77,101 +78,97 @@ class TimeoutTest {
                     } finally {
                         latch.countDown();
                     }
-                })
-                .resolve();
+                }))
+                .timeout(Duration.ofMillis(50))
+                .build();
 
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(latch.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
         assertThat(interrupted.get()).isTrue();
-        assertThat(root.metadata().status().isFailed()).isTrue();
+        assertThat(root.isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("child fails on its own within timeout — child's FAILED propagates")
-    void childFailsWithinTimeout() {
-        var action = Timeout.of("failing-child")
-                .timeout(Duration.ofSeconds(5))
-                .child("fail-step", ctx -> {
+    void bodyFailsWithinTimeout() {
+        var action = Timeout.builder("failing-child")
+                .body(Step.of("fail-step", context -> {
                     throw new RuntimeException("intentional failure");
-                })
-                .resolve();
+                }))
+                .timeout(Duration.ofSeconds(5))
+                .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status().isFailed()).isTrue();
-        assertThat(root.children().get(0).metadata().status().isFailed()).isTrue();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.children().get(0).isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("child RuntimeException preserves instance and stack trace")
-    void childRuntimeExceptionPreservesInstance() {
+    void bodyRuntimeExceptionPreservesInstance() {
         var exception = new RuntimeException("intentional failure");
-        var action = Timeout.of("failing-child")
-                .timeout(Duration.ofSeconds(5))
-                .child("fail-step", ctx -> {
+        var action = Timeout.builder("failing-child")
+                .body(Step.of("fail-step", context -> {
                     throw exception;
-                })
-                .resolve();
+                }))
+                .timeout(Duration.ofSeconds(5))
+                .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status().isFailed()).isTrue();
-        var childStatus = root.children().get(0).metadata().status();
-        assertThat(childStatus.isFailed()).isTrue();
-        assertThat(childStatus.throwable()).isPresent();
-        assertThat(childStatus.throwable().get()).isSameAs(exception);
+        assertThat(root.isFailed()).isTrue();
+        var child = root.children().get(0);
+        assertThat(child.isFailed()).isTrue();
+        assertThat(child.throwable()).isPresent();
+        assertThat(child.throwable().get()).isSameAs(exception);
     }
 
     @Test
     @DisplayName("child throws SkipException within timeout — SKIPPED propagates")
-    void childSkipsWithinTimeout() {
-        var action = Timeout.of("skipping-child")
+    void bodySkipsWithinTimeout() {
+        var action = Timeout.builder("skipping-child")
+                .body(Step.of("skip-step", context -> {
+                    SkipException.skip("skip reason");
+                }))
                 .timeout(Duration.ofSeconds(5))
-                .child("skip-step", ctx -> {
-                    throw new SkipException("intentional skip");
-                })
-                .resolve();
+                .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.metadata().status().isSkipped()).isTrue();
-        assertThat(root.children().get(0).metadata().status().isSkipped()).isTrue();
+        assertThat(root.isSkipped()).isTrue();
+        assertThat(root.children().get(0).isSkipped()).isTrue();
     }
 
     @Test
-    @DisplayName("getName returns the supplied name")
-    void getNameReturnsSuppliedName() {
-        var action = Timeout.of("my-timeout")
-                .timeout(Duration.ofSeconds(1))
-                .child("step", ctx -> {})
-                .resolve();
+    @DisplayName("accessors return configured values")
+    void accessorsReturnConfiguredValues() {
+        var child = Step.of("child", context -> {});
+        var duration = Duration.ofMillis(123);
 
-        assertThat(action.name()).isEqualTo("my-timeout");
-    }
+        var action =
+                Timeout.builder("accessor-test").body(child).timeout(duration).build();
 
-    @Test
-    @DisplayName("child() and getTimeout() accessors return expected values")
-    void accessorsReturnExpectedValues() {
-        var child = Step.of("step", ctx -> {});
-        var duration = Duration.ofSeconds(5);
-        var action = Timeout.of("accessor-test").timeout(duration).child(child).resolve();
-
-        assertThat(action.child()).isSameAs(child);
+        assertThat(action.displayName()).isEqualTo("accessor-test");
+        assertThat(action.body()).isSameAs(child);
         assertThat(action.timeout()).isEqualTo(duration);
     }
 
     @Test
-    @DisplayName("descriptor tree has 1 child discovered")
-    void descriptorTreeHasOneChild() {
-        var action = Timeout.of("tree-test")
-                .timeout(Duration.ofSeconds(1))
-                .child("step", ctx -> {})
-                .resolve();
+    @DisplayName("descriptor tree contains timed child")
+    void descriptorTreeContainsTimedBody() {
+        var action = Timeout.builder("tree-test")
+                .body(Step.of("leaf", context -> {}))
+                .timeout(Duration.ofSeconds(5))
+                .build();
+
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
+        assertThat(root.action().displayName()).isEqualTo("tree-test");
         assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).action().displayName()).isEqualTo("leaf");
     }
 }

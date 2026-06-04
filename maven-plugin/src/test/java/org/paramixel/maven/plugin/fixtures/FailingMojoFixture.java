@@ -19,6 +19,7 @@ package org.paramixel.maven.plugin.fixtures;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.FailException;
 
 /**
@@ -36,10 +37,10 @@ public final class FailingMojoFixture {
      */
     @Paramixel.Factory
     public static Action action() {
-        return Instance.<Object>of("mojo-fail", Object::new)
-                .child("fail", obj -> {
+        return Instance.builder("mojo-fail", Object::new)
+                .body(Step.of("fail", context -> {
                     throw new RuntimeException("boom");
-                })
-                .resolve();
+                }))
+                .build();
     }
 }

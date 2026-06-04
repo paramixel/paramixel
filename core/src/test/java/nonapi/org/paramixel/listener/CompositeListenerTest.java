@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,71 +35,69 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
-import org.paramixel.api.Status;
-import org.paramixel.api.action.Metadata;
-import org.paramixel.api.action.Mode;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
 
 @DisplayName("CompositeListener")
 class CompositeListenerTest {
 
     private static final Descriptor STUB_DESCRIPTOR = new Descriptor() {
 
-        private final Metadata metadata = new Metadata() {
-
-            @Override
-            public String id() {
-                return "test-id";
-            }
-
-            @Override
-            public String name() {
-                return "test-action";
-            }
-
-            @Override
-            public String kind() {
-                return "Step";
-            }
-
-            @Override
-            public String className() {
-                return "TestAction";
-            }
-
-            @Override
-            public Status status() {
-                return Status.PASSED;
-            }
-
-            @Override
-            public Mode mode() {
-                return Mode.RUN;
-            }
-
-            @Override
-            public Duration runDuration() {
-                return Duration.ZERO;
-            }
-
-            @Override
-            public Optional<String> message() {
-                return Optional.empty();
-            }
-
-            @Override
-            public Optional<Throwable> throwable() {
-                return Optional.empty();
-            }
-
-            @Override
-            public boolean isCompleted() {
-                return true;
-            }
-        };
+        private final Action action = Step.of("test-action", ignored -> {});
 
         @Override
-        public Metadata metadata() {
-            return metadata;
+        public Action action() {
+            return action;
+        }
+
+        @Override
+        public String id() {
+            return "test-id";
+        }
+
+        @Override
+        public boolean isPassed() {
+            return true;
+        }
+
+        @Override
+        public boolean isFailed() {
+            return false;
+        }
+
+        @Override
+        public boolean isSkipped() {
+            return false;
+        }
+
+        @Override
+        public boolean isAborted() {
+            return false;
+        }
+
+        @Override
+        public Optional<Instant> startedAt() {
+            return Optional.of(Instant.ofEpochMilli(1L));
+        }
+
+        @Override
+        public Optional<Instant> completedAt() {
+            return Optional.of(Instant.ofEpochMilli(1L));
+        }
+
+        @Override
+        public Optional<String> message() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<Throwable> throwable() {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isCompleted() {
+            return true;
         }
 
         @Override
@@ -121,8 +119,33 @@ class CompositeListenerTest {
         }
 
         @Override
-        public Status status() {
-            return Status.PASSED;
+        public boolean isPassed() {
+            return true;
+        }
+
+        @Override
+        public boolean isFailed() {
+            return false;
+        }
+
+        @Override
+        public boolean isSkipped() {
+            return false;
+        }
+
+        @Override
+        public boolean isAborted() {
+            return false;
+        }
+
+        @Override
+        public Optional<Instant> startedAt() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<Instant> completedAt() {
+            return Optional.empty();
         }
     };
 

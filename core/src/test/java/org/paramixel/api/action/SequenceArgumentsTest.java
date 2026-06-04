@@ -1,0 +1,111 @@
+/*
+ * Copyright (c) 2026-present Douglas Hoard
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.paramixel.api.action;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+@DisplayName("Sequence arguments")
+class SequenceArgumentsTest {
+
+    @Test
+    @DisplayName("builder validates required inputs")
+    void builderValidatesRequiredInputs() {
+        assertThatThrownBy(() -> Sequence.builder(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Sequence.builder(" ")).isInstanceOf(IllegalArgumentException.class);
+        var seq = Sequence.builder("empty").build();
+        assertThat(seq.children()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("child(Action) rejects null builder")
+    void childBuilderRejectsNull() {
+        var builder = Sequence.builder("seq");
+        assertThatThrownBy(() -> builder.child((Action) null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("child(Action) adds child from builder")
+    void childBuilderAddsChild() {
+        var seq = Sequence.builder("seq").child(Step.of("step", s -> {})).build();
+        assertThat(seq.children()).hasSize(1);
+        assertThat(seq.children().get(0).displayName()).isEqualTo("step");
+    }
+
+    @Test
+    @DisplayName("builder accumulates multiple children")
+    void builderAccumulatesMultipleChildren() {
+        var seq = Sequence.builder("seq")
+                .child(Step.of("first", s -> {}))
+                .child(Step.of("second", s -> {}))
+                .child(Step.of("third", s -> {}))
+                .build();
+        assertThat(seq.children()).hasSize(3);
+        assertThat(seq.children().get(0).displayName()).isEqualTo("first");
+        assertThat(seq.children().get(1).displayName()).isEqualTo("second");
+        assertThat(seq.children().get(2).displayName()).isEqualTo("third");
+    }
+
+    @Test
+    @DisplayName("builder can build multiple immutable snapshots")
+    void builderCanBuildMultipleImmutableSnapshots() {
+        var builder = Sequence.builder("seq");
+        builder.child(Step.of("test", s -> {}));
+        var first = builder.build();
+        builder.child(Step.of("other", s -> {}));
+        builder.independent();
+        var second = builder.build();
+
+        assertThat(first.children()).extracting(Action::displayName).containsExactly("test");
+        assertThat(first.isDependent()).isTrue();
+        assertThat(second.children()).extracting(Action::displayName).containsExactly("test", "other");
+        assertThat(second.isIndependent()).isTrue();
+    }
+
+    @Test
+    @DisplayName("default is dependent")
+    void defaultIsDependent() {
+        var seq = Sequence.builder("seq").child(Step.of("test", s -> {})).build();
+        assertThat(seq.isDependent()).isTrue();
+        assertThat(seq.isIndependent()).isFalse();
+    }
+
+    @Test
+    @DisplayName("independent() configures as independent")
+    void independentConfiguresAsIndependent() {
+        var seq = Sequence.builder("seq")
+                .independent()
+                .child(Step.of("test", s -> {}))
+                .build();
+        assertThat(seq.isIndependent()).isTrue();
+        assertThat(seq.isDependent()).isFalse();
+    }
+
+    @Test
+    @DisplayName("dependent() after independent() restores dependent")
+    void dependentAfterIndependentRestoresDependent() {
+        var seq = Sequence.builder("seq")
+                .independent()
+                .dependent()
+                .child(Step.of("test", s -> {}))
+                .build();
+        assertThat(seq.isDependent()).isTrue();
+    }
+}

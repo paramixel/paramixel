@@ -98,7 +98,7 @@ class RunnerDiscoveryTest {
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().descriptor().orElseThrow().children())
-                .extracting(child -> child.metadata().name())
+                .extracting(child -> child.action().displayName())
                 .containsExactly("high", "alpha", "beta", "negative");
     }
 
@@ -138,9 +138,10 @@ class RunnerDiscoveryTest {
         var children = result.orElseThrow().descriptor().orElseThrow().children();
         assertThat(children).hasSize(2);
         assertThat(children)
-                .anySatisfy(child -> assertThat(child.metadata().name()).isEqualTo("valid-tagged-discovery"));
+                .anySatisfy(child -> assertThat(child.action().displayName()).isEqualTo("valid-tagged-discovery"));
         assertThat(children)
-                .anySatisfy(child -> assertThat(child.metadata().name()).startsWith("Discovery validation failure:"));
+                .anySatisfy(
+                        child -> assertThat(child.action().displayName()).startsWith("Discovery validation failure:"));
     }
 
     @Test
@@ -155,10 +156,10 @@ class RunnerDiscoveryTest {
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
         assertThat(children)
-                .anySatisfy(child -> assertThat(child.metadata().name())
+                .anySatisfy(child -> assertThat(child.action().displayName())
                         .contains("ClasspathResolverInvalidBlankTagDiscoveryFixture#factory"));
         assertThat(children)
-                .anySatisfy(child -> assertThat(child.metadata().name())
+                .anySatisfy(child -> assertThat(child.action().displayName())
                         .contains("ClasspathResolverAnotherInvalidBlankTagDiscoveryFixture#factory"));
     }
 
@@ -259,6 +260,6 @@ class RunnerDiscoveryTest {
         assertThat(calls).containsExactly("onRunStarted", "onRunCompleted");
         var result = capturedResult.get();
         assertThat(result.descriptor()).isEmpty();
-        assertThat(result.status()).isEqualTo(Status.FAILED);
+        assertThat(result.isFailed()).isTrue();
     }
 }

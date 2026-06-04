@@ -1,42 +1,42 @@
 # Paramixel Agent Instructions
 
-## Build & Test Commands
+Provider-neutral instructions for coding agents working in the Paramixel repository. These rules apply regardless of LLM provider, model family, editor, or automation runtime.
 
-**Always run `./mvnw spotless:apply` before any `./mvnw` or `./gradlew` build step.** Formatting issues will cause builds to fail; applying Spotless first prevents this.
+## Critical Rules
 
-```bash
-# Format code (REQUIRED before any build)
-./mvnw spotless:apply
+- Before any Maven or Gradle validation/build command (`test`, `check`, `package`, `install`, `verify`, `javadoc`, etc.), run `./mvnw spotless:apply`. The only exception is an explicitly requested read-only formatting check with `./mvnw spotless:check`.
+- If modifying code in `examples/`, validate with `./mvnw test -pl examples`; do **not** use `-DskipTests` or `-Dparamixel.skipTests` for that validation.
+- Preserve Java 17 compatibility and existing public API/exception semantics unless the user explicitly asks for a breaking change.
+- Do not weaken Spotless, strict Javadoc, PMD, test, or build configuration to make validation pass.
+- Prefer the smallest safe change and report the commands run with pass/fail results.
 
-# Full build with static analysis
-./mvnw clean verify
+## Standard Agent Workflow
 
-# Run core module JUnit tests only (skips Paramixel tests in examples/)
-./mvnw test -Dparamixel.skipTests
+1. Inspect the relevant source, tests, build files, and repository guidance before changing files.
+2. Make the smallest focused change that satisfies the request.
+3. Run `./mvnw spotless:apply` before Maven or Gradle validation.
+4. Run the narrowest relevant validation command from the table below.
+5. Prefer `./mvnw clean verify` when touching shared/core behavior or build configuration.
+6. Summarize changed files, validation commands, results, and any remaining risks.
 
-# Run Paramixel tests in examples/ (requires Docker)
-./mvnw test -pl examples
+## Validation Commands
 
-# Build without running any tests
-./mvnw clean install -DskipTests -Dparamixel.skipTests
+Run `./mvnw spotless:apply` first for validation/build commands unless the task is a read-only formatting check.
 
-# Check formatting
-./mvnw spotless:check
+| Task | Command |
+| --- | --- |
+| Format code | `./mvnw spotless:apply` |
+| Full Maven validation with static analysis | `./mvnw clean verify` |
+| Core module JUnit tests only | `./mvnw test -Dparamixel.skipTests` |
+| Paramixel tests in `examples/` (requires Docker) | `./mvnw test -pl examples` |
+| Build without running any tests | `./mvnw clean install -DskipTests -Dparamixel.skipTests` |
+| Check formatting only | `./mvnw spotless:check` |
+| Check Javadoc only (Maven) | `./mvnw javadoc:javadoc` |
+| Check Javadoc only (Gradle) | `./gradlew javadoc --no-daemon` |
+| Build Maven project | `./mvnw clean install` |
+| Build Gradle project | `./gradlew clean check --no-daemon` |
 
-# Check javadoc only (Maven)
-./mvnw javadoc:javadoc
-
-# Check javadoc only (Gradle)
-./gradlew javadoc --no-daemon
-
-# Build Maven project
-./mvnw clean install
-
-# Build Gradle project
-./gradlew clean check --no-daemon
-```
-
-**`-DskipTests`** skips Surefire JUnit tests (core module). **`-Dparamixel.skipTests`** skips the Paramixel Maven plugin execution (examples/ module). They are independent — use both to skip all tests. If modifying code in `examples/`, do NOT use `-Dparamixel.skipTests` or `-DskipTests` or you will skip the tests you're trying to validate.
+`-DskipTests` skips Surefire JUnit tests in standard test sources. `-Dparamixel.skipTests` skips the Paramixel Maven plugin execution in `examples/`. They are independent; use both only when intentionally skipping all tests.
 
 ## Module Structure
 
@@ -46,64 +46,82 @@
 - `website/` — Docusaurus documentation site
 - `assets/` — License header template, PMD rules
 
-## Test Location Quirk
+## Testing Rules
 
 Paramixel tests in `examples/` live under `src/main/java/` (not `src/test/java/`) because they are executed by the Paramixel Maven plugin during the `test` phase, not by JUnit directly. The `core` module has standard JUnit 5 tests under `src/test/java/`.
 
 See `examples/README.md` for the package hierarchy, `__ParamixelRunner__` convention, and Testcontainers integration details.
 
-## Code Style
+## Code Style and Java 17 Guardrails
 
-- Spotless with Palantir Java Format runs automatically on `verify` phase
-- License header from `assets/license-header.txt` required on all Java files
-- Run `./mvnw spotless:apply` before any build step and before committing
-- Check formatting with `./mvnw spotless:check`
-- When modifying Java code, follow the guidelines in `.ai/prompts/java-17-idioms.md` and the guardrails below (## Java 17 Idiom Guardrails)
+- Spotless with Palantir Java Format runs automatically on `verify` phase.
+- License header from `assets/license-header.txt` is required on all Java files.
+- Run `./mvnw spotless:apply` before validation and before committing.
+- Check formatting with `./mvnw spotless:check` when a read-only formatting check is needed.
+- When modifying Java code, follow `.ai/prompts/java-17-review.md` and these guardrails:
+  - Prefer clear, immutable post-build state over ad-hoc mutation.
+  - Keep synchronization minimal and explicit.
+  - Avoid novelty refactors; optimize only measurable hot paths.
+  - Preserve null-safety contracts and existing exception semantics.
 
-## Java 17 Idiom Guardrails
-
-These guardrails apply to all Java code changes in this project:
-
-- Prefer clear, immutable post-build state over ad-hoc mutation.
-- Keep synchronization minimal and explicit.
-- Avoid novelty refactors; optimize only measurable hot paths.
-- Preserve null-safety contracts and existing exception semantics.
-
-Prompt files reference this section as the canonical source. See `.ai/prompts/java-17-idioms.md` for the full review checklist and modernization audit workflow.
+Repository guidance files reference these guardrails as the canonical source. See `.ai/prompts/java-17-review.md` for the full review checklist and modernization audit workflow.
 
 ## Javadoc
 
-- Strict javadoc is enforced in both Maven and Gradle builds
-- Maven: `doclint:all` + `-Werror` on `maven-javadoc-plugin` (runs during `package` phase)
-- Gradle: `Xdoclint:all` + `Werror` on `javadoc` task (runs during `check`)
-- Record compact constructors require their own `@param` tags (separate from record component `@param` tags)
-- Missing `@param`, `@return`, or `@throws` tags will fail the build
-- The `examples/` module skips javadoc generation entirely (`maven.javadoc.skip=true`)
+- Strict Javadoc is enforced in both Maven and Gradle builds.
+- Maven: `doclint:all` + `-Werror` on `maven-javadoc-plugin` (runs during `package` phase).
+- Gradle: `Xdoclint:all` + `Werror` on `javadoc` task (runs during `check`).
+- Record compact constructors require their own `@param` tags, separate from record component `@param` tags.
+- Missing `@param`, `@return`, or `@throws` tags will fail the build.
+- The `examples/` module skips Javadoc generation entirely (`maven.javadoc.skip=true`).
 
 ## Planning
 
-Plans go in `.ai/plans/`.
+Plans go in `.ai/plans/`. See `.ai/prompts/planning-workflow.md` for naming conventions.
 
 ## Static Analysis
 
 PMD runs on `verify` phase:
-- PMD remains report-only (`failOnViolation=false`)
-- Custom rules: `assets/pmd-ruleset.xml`
-- CI skips on Java 25: `-Dpmd.skip=true`
+
+- PMD remains report-only (`failOnViolation=false`).
+- Custom rules: `assets/pmd-ruleset.xml`.
+- CI skips on Java 25: `-Dpmd.skip=true`.
 
 ## Commit Requirements
 
-- DCO: All commits must be signed off with `git commit -s`
-- Conventional commit prefixes: `feature:`, `fix:`, `refactor:`, `chore:`, `performance:`, `polish:`
-- Dependency updates use scoped prefix: `chore(deps):` or `fix(deps):`
+- DCO: All commits must be signed off with `git commit -s`.
+- Conventional commit prefixes: `feature:`, `fix:`, `refactor:`, `chore:`, `performance:`, `polish:`.
+- Dependency updates use scoped prefix: `chore(deps):` or `fix(deps):`.
 
 ## Release
 
-Manual release with CI validation. See `RELEASING.md` for full details and `.ai/prompts/release.md` for an AI-oriented workflow. Requires `~/.m2/settings.xml` (Maven Central credentials) and GPG signing key.
+Manual release with CI validation. See `RELEASING.md` for the release source of truth. Requires `~/.m2/settings.xml` (Maven Central credentials) and GPG signing key.
+
+## JMH Benchmarks
+
+Build and run JMH benchmarks for performance regression testing:
+
+```bash
+# Build benchmark fat JAR
+./mvnw package -pl benchmarks -DskipTests -Dparamixel.skipTests
+
+# Run all benchmarks
+java -jar benchmarks/target/benchmarks.jar
+
+# Run specific benchmark
+java -jar benchmarks/target/benchmarks.jar SchedulerBenchmark
+
+# Run with specific params
+java -jar benchmarks/target/benchmarks.jar SchedulerBenchmark -p size=100,1000
+
+# Quick mode (fewer iterations)
+java -jar benchmarks/target/benchmarks.jar -f 1 -wi 3 -i 5
+```
 
 ## Stress Testing
 
 Run tests multiple times to check for flaky tests:
+
 ```bash
 ./scripts/stress-test.sh <number-of-iterations>
 ```

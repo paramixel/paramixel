@@ -22,10 +22,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 /**
@@ -64,33 +64,38 @@ public class AnnotationDependentArgumentTest {
      * @return the action tree for this test
      */
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         resetCounts();
 
         var annotationResolver = AnnotationResolver.create(AnnotationDependentArgumentTest.class);
 
         var testName = AnnotationDependentArgumentTest.class.getName();
 
-        var arguments = Sequential.of(testName).dependent();
+        var arguments = Sequence.builder(testName).dependent();
 
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             int argumentIndex = i;
             String argumentValue = "string-" + i;
 
-            var lifecycle = Lifecycle.of(argumentValue)
+            var lifecycle = Scope.builder(argumentValue)
                     .before(annotationResolver.byId("before"))
-                    .child(Sequential.of("tests")
+                    .body(Sequence.builder("tests")
                             .child(annotationResolver.byId("test"))
                             .child(annotationResolver.byId("test"))
-                            .child(annotationResolver.byId("test")))
-                    .after(annotationResolver.byId("after"));
+                            .child(annotationResolver.byId("test"))
+                            .build())
+                    .after(annotationResolver.byId("after"))
+                    .build();
 
-            arguments.child(Instance.of(argumentValue, () -> new AnnotationDependentArgumentTest(argumentIndex))
-                    .dependent()
-                    .child(lifecycle));
+            arguments.child(Instance.builder(argumentValue, () -> new AnnotationDependentArgumentTest(argumentIndex))
+                    .body(lifecycle)
+                    .build());
         }
 
-        return Lifecycle.of(testName).child(arguments).after(Step.of("validate", ignored -> validate()));
+        return Scope.builder(testName)
+                .body(arguments.build())
+                .after(Step.of("validate", ignored -> validate()))
+                .build();
     }
 
     private AnnotationDependentArgumentTest(final int argumentIndex) {

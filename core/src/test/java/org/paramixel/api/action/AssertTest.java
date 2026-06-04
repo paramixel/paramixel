@@ -19,350 +19,230 @@ package org.paramixel.api.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Configuration;
+import org.paramixel.api.Context;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 import org.paramixel.api.exception.FailException;
 
-@DisplayName("Assert actions")
+@DisplayName("Assert")
 class AssertTest {
 
-    @Nested
-    @DisplayName("AssertTrue")
-    class AssertTrueTests {
-
-        @Test
-        @DisplayName("of(String, boolean) with true passes")
-        void ofBooleanPasses() {
-            var action = AssertTrue.of("assert-true", true);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
+    private static final Context context = new Context() {
+        @Override
+        public Configuration configuration() {
+            return Configuration.of(Map.of());
         }
 
-        @Test
-        @DisplayName("of(String, boolean) with false fails")
-        void ofBooleanFails() {
-            var action = AssertTrue.of("assert-false", false);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status()).isSameAs(Status.FAILED);
-            assertThat(root.metadata().message()).isEmpty();
+        @Override
+        public <T> Optional<T> instance(final Class<T> type) {
+            return Optional.empty();
         }
+    };
 
-        @Test
-        @DisplayName("of(String, boolean, String) with true passes and ignores message")
-        void ofBooleanWithMessagePasses() {
-            var action = AssertTrue.of("assert-true-msg", true, "should not appear");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+    @Test
+    @DisplayName("expected true and actual true passes")
+    void expectedTrueActualTruePasses() {
+        var action = Assert.of("assert-true", true, true);
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.metadata().message()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("of(String, boolean, String) with false fails with message")
-        void ofBooleanWithMessageFails() {
-            var action = AssertTrue.of("assert-false-msg", false, "expected true");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().message()).contains("expected true");
-        }
-
-        @Test
-        @DisplayName("of(String, BooleanSupplier) with true passes")
-        void ofSupplierPasses() {
-            var action = AssertTrue.of("assert-supplier-true", () -> true);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        }
-
-        @Test
-        @DisplayName("of(String, BooleanSupplier) with false fails")
-        void ofSupplierFails() {
-            var action = AssertTrue.of("assert-supplier-false", () -> false);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status()).isSameAs(Status.FAILED);
-            assertThat(root.metadata().message()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("of(String, BooleanSupplier, String) with true passes and ignores message")
-        void ofSupplierWithMessagePasses() {
-            var action = AssertTrue.of("assert-supplier-true-msg", () -> true, "should not appear");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.metadata().message()).isEmpty();
-        }
-
-        @Test
-        @DisplayName("of(String, BooleanSupplier, String) with false fails with message")
-        void ofSupplierWithMessageFails() {
-            var action = AssertTrue.of("assert-supplier-false-msg", () -> false, "expected true");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().message()).contains("expected true");
-        }
-
-        @Test
-        @DisplayName("of(String, BooleanSupplier) with throwing supplier fails with throwable")
-        void ofSupplierThrows() {
-            var action = AssertTrue.of("assert-throws", () -> {
-                throw new RuntimeException("boom");
-            });
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().throwable()).isPresent();
-            assertThat(root.metadata().throwable().get()).isInstanceOf(RuntimeException.class);
-            assertThat(root.metadata().throwable().get().getMessage()).isEqualTo("boom");
-        }
-
-        @Test
-        @DisplayName(
-                "of(String, BooleanSupplier, String) with throwing supplier fails with throwable, message not used")
-        void ofSupplierWithMessageThrows() {
-            var action = AssertTrue.of(
-                    "assert-throws-msg",
-                    () -> {
-                        throw new RuntimeException("boom");
-                    },
-                    "expected true");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().throwable()).isPresent();
-            assertThat(root.metadata().throwable().get()).isInstanceOf(RuntimeException.class);
-            assertThat(root.metadata().throwable().get().getMessage()).isEqualTo("boom");
-        }
-
-        @Test
-        @DisplayName("non-RUN mode short-circuits without evaluating condition")
-        void nonRunModeSkipsAssertion() {
-            var evaluated = new AtomicBoolean();
-            var action = Static.of("static")
-                    .child("before", () -> FailException.fail("before failed"))
-                    .child(AssertTrue.of("assert-skip", () -> {
-                        evaluated.set(true);
-                        return true;
-                    }))
-                    .resolve();
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-            var assertChild = root.children().get(1);
-
-            assertThat(assertChild.metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(evaluated.get()).isFalse();
-        }
-
-        @Test
-        @DisplayName("execute with null context throws NullPointerException")
-        void executeWithNullContextThrows() {
-            var action = AssertTrue.of("assert-null-context", true);
-
-            assertThatThrownBy(() -> action.execute(null)).isInstanceOf(NullPointerException.class);
-        }
-
-        @Test
-        @DisplayName("getName returns the supplied name")
-        void getNameReturnsSuppliedName() {
-            var action = AssertTrue.of("my-assert-true", true);
-
-            assertThat(action.name()).isEqualTo("my-assert-true");
-        }
-
-        @Test
-        @DisplayName("getKind returns AssertTrue")
-        void getKindReturnsAssertTrue() {
-            var action = AssertTrue.of("kind-test", true);
-
-            assertThat(action.kind()).isEqualTo("AssertTrue");
-        }
+        assertThat(root.isPassed()).isTrue();
     }
 
-    @Nested
-    @DisplayName("AssertFalse")
-    class AssertFalseTests {
+    @Test
+    @DisplayName("expected true and actual false fails")
+    void expectedTrueActualFalseFails() {
+        var action = Assert.of("assert-false", true, false);
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, boolean) with false passes")
-        void ofBooleanPasses() {
-            var action = AssertFalse.of("assert-false", false);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.message()).contains("failed");
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        }
+    @Test
+    @DisplayName("expected false and actual false passes")
+    void expectedFalseActualFalsePasses() {
+        var action = Assert.of("assert-false", false, false);
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, boolean) with true fails")
-        void ofBooleanFails() {
-            var action = AssertFalse.of("assert-true", true);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isPassed()).isTrue();
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.FAILED);
-            assertThat(root.metadata().message()).isEmpty();
-        }
+    @Test
+    @DisplayName("expected false and actual true fails")
+    void expectedFalseActualTrueFails() {
+        var action = Assert.of("assert-true", false, true);
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, boolean, String) with false passes and ignores message")
-        void ofBooleanWithMessagePasses() {
-            var action = AssertFalse.of("assert-false-msg", false, "should not appear");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.message()).contains("failed");
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.metadata().message()).isEmpty();
-        }
+    @Test
+    @DisplayName("message-bearing passing assertion ignores message")
+    void messageBearingPassingAssertionIgnoresMessage() {
+        var action = Assert.of("assert-true-msg", true, true, "should not appear");
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, boolean, String) with true fails with message")
-        void ofBooleanWithMessageFails() {
-            var action = AssertFalse.of("assert-true-msg", true, "expected false");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isPassed()).isTrue();
+        assertThat(root.message()).isEmpty();
+    }
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().message()).contains("expected false");
-        }
+    @Test
+    @DisplayName("message-bearing failing assertion includes message")
+    void messageBearingFailingAssertionIncludesMessage() {
+        var action = Assert.of("assert-false-msg", true, false, "expected true");
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, BooleanSupplier) with false passes")
-        void ofSupplierPasses() {
-            var action = AssertFalse.of("assert-supplier-false", () -> false);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.message()).contains("expected true");
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-        }
+    @Test
+    @DisplayName("supplier assertion passes when actual equals expected")
+    void supplierAssertionPassesWhenActualEqualsExpected() {
+        var action = Assert.of("assert-supplier-true", true, () -> true);
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, BooleanSupplier) with true fails")
-        void ofSupplierFails() {
-            var action = AssertFalse.of("assert-supplier-true", () -> true);
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isPassed()).isTrue();
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.FAILED);
-            assertThat(root.metadata().message()).isEmpty();
-        }
+    @Test
+    @DisplayName("supplier assertion fails when actual differs from expected")
+    void supplierAssertionFailsWhenActualDiffersFromExpected() {
+        var action = Assert.of("assert-supplier-false", true, () -> false);
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, BooleanSupplier, String) with false passes and ignores message")
-        void ofSupplierWithMessagePasses() {
-            var action = AssertFalse.of("assert-supplier-false-msg", () -> false, "should not appear");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.message()).contains("failed");
+    }
 
-            assertThat(root.metadata().status()).isSameAs(Status.PASSED);
-            assertThat(root.metadata().message()).isEmpty();
-        }
+    @Test
+    @DisplayName("supplier assertion with message passes and ignores message")
+    void supplierAssertionWithMessagePassesAndIgnoresMessage() {
+        var action = Assert.of("assert-supplier-true-msg", true, () -> true, "should not appear");
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, BooleanSupplier, String) with true fails with message")
-        void ofSupplierWithMessageFails() {
-            var action = AssertFalse.of("assert-supplier-true-msg", () -> true, "expected false");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isPassed()).isTrue();
+        assertThat(root.message()).isEmpty();
+    }
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().message()).contains("expected false");
-        }
+    @Test
+    @DisplayName("supplier assertion with message fails with message")
+    void supplierAssertionWithMessageFailsWithMessage() {
+        var action = Assert.of("assert-supplier-false-msg", true, () -> false, "expected true");
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("of(String, BooleanSupplier) with throwing supplier fails with throwable")
-        void ofSupplierThrows() {
-            var action = AssertFalse.of("assert-throws", () -> {
-                throw new RuntimeException("boom");
-            });
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.message()).contains("expected true");
+    }
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().throwable()).isPresent();
-            assertThat(root.metadata().throwable().get()).isInstanceOf(RuntimeException.class);
-            assertThat(root.metadata().throwable().get().getMessage()).isEqualTo("boom");
-        }
+    @Test
+    @DisplayName("throwing supplier fails with throwable")
+    void throwingSupplierFailsWithThrowable() {
+        var action = Assert.of("assert-throws", true, () -> {
+            throw new RuntimeException("boom");
+        });
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName(
-                "of(String, BooleanSupplier, String) with throwing supplier fails with throwable, message not used")
-        void ofSupplierWithMessageThrows() {
-            var action = AssertFalse.of(
-                    "assert-throws-msg",
-                    () -> {
-                        throw new RuntimeException("boom");
-                    },
-                    "expected false");
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.throwable()).isPresent();
+        assertThat(root.throwable().get()).isInstanceOf(RuntimeException.class);
+        assertThat(root.throwable().get().getMessage()).isEqualTo("boom");
+    }
 
-            assertThat(root.metadata().status().isFailed()).isTrue();
-            assertThat(root.metadata().throwable()).isPresent();
-            assertThat(root.metadata().throwable().get()).isInstanceOf(RuntimeException.class);
-            assertThat(root.metadata().throwable().get().getMessage()).isEqualTo("boom");
-        }
+    @Test
+    @DisplayName("throwing supplier with message fails with throwable, message not used")
+    void throwingSupplierWithMessageFailsWithThrowable() {
+        var action = Assert.of(
+                "assert-throws-msg",
+                true,
+                () -> {
+                    throw new RuntimeException("boom");
+                },
+                "expected true");
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("non-RUN mode short-circuits without evaluating condition")
-        void nonRunModeSkipsAssertion() {
-            var evaluated = new AtomicBoolean();
-            var action = Static.of("static")
-                    .child("before", () -> FailException.fail("before failed"))
-                    .child(AssertFalse.of("assert-skip", () -> {
-                        evaluated.set(true);
-                        return false;
-                    }))
-                    .resolve();
-            var result = Runner.builder().build().run(action);
-            var root = result.descriptor().orElseThrow();
-            var assertChild = root.children().get(1);
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.throwable()).isPresent();
+        assertThat(root.throwable().get()).isInstanceOf(RuntimeException.class);
+        assertThat(root.throwable().get().getMessage()).isEqualTo("boom");
+    }
 
-            assertThat(assertChild.metadata().status()).isSameAs(Status.SKIPPED);
-            assertThat(evaluated.get()).isFalse();
-        }
+    @Test
+    @DisplayName("direct throwableConsumer fails without message")
+    void directThrowableConsumerFailsWithoutMessage() {
+        var action = Assert.of("assert-false-direct", true, false);
 
-        @Test
-        @DisplayName("execute with null context throws NullPointerException")
-        void executeWithNullContextThrows() {
-            var action = AssertFalse.of("assert-null-context", false);
+        assertThatThrownBy(() -> action.throwableConsumer().accept(context)).isInstanceOf(FailException.class);
+    }
 
-            assertThatThrownBy(() -> action.execute(null)).isInstanceOf(NullPointerException.class);
-        }
+    @Test
+    @DisplayName("direct throwableConsumer fails with message")
+    void directThrowableConsumerFailsWithMessage() {
+        var action = Assert.of("assert-false-msg-direct", true, false, "expected true");
 
-        @Test
-        @DisplayName("getName returns the supplied name")
-        void getNameReturnsSuppliedName() {
-            var action = AssertFalse.of("my-assert-false", false);
+        assertThatThrownBy(() -> action.throwableConsumer().accept(context))
+                .isInstanceOf(FailException.class)
+                .hasMessage("expected true");
+    }
 
-            assertThat(action.name()).isEqualTo("my-assert-false");
-        }
+    @Test
+    @DisplayName("non-RUN mode short-circuits without evaluating actual supplier")
+    void nonRunModeSkipsAssertion() {
+        var evaluated = new AtomicBoolean();
+        var action = Static.builder("static")
+                .before(Step.of("before", context -> FailException.fail("before failed")))
+                .body(Assert.of("assert-skip", true, () -> {
+                    evaluated.set(true);
+                    return true;
+                }))
+                .build();
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
 
-        @Test
-        @DisplayName("getKind returns AssertFalse")
-        void getKindReturnsAssertFalse() {
-            var action = AssertFalse.of("kind-test", false);
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(evaluated.get()).isFalse();
+    }
 
-            assertThat(action.kind()).isEqualTo("AssertFalse");
-        }
+    @Test
+    @DisplayName("throwableConsumer with null context throws NullPointerException")
+    void throwableConsumerWithNullContextThrows() {
+        var action = Assert.of("assert-null-context", true, true);
+
+        assertThatThrownBy(() -> action.throwableConsumer().accept(null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("getName returns the supplied name")
+    void getNameReturnsSuppliedName() {
+        var action = Assert.of("my-assert", true, true);
+
+        assertThat(action.displayName()).isEqualTo("my-assert");
+    }
+
+    @Test
+    @DisplayName("action is instance of Assert")
+    void actionIsInstanceOfAssert() {
+        var action = Assert.of("kind-test", true, true);
+
+        assertThat(action).isInstanceOf(Assert.class);
     }
 }

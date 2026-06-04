@@ -41,7 +41,7 @@ class NoDiscoveryRunReturnsNullTest {
     void directActionRunReturnsNonNull() {
         var listener = new NoOpListener();
         Runner runner = Runner.builder().listener(listener).build();
-        var result = runner.run(Step.of("test", obj -> {}));
+        var result = runner.run(Step.of("test", context -> {}));
 
         assertThat(result.descriptor()).isPresent();
     }

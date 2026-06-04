@@ -51,9 +51,18 @@ public final class StatusAccumulator {
      */
     public void include(final Descriptor descriptor) {
         var nonNullDescriptor = Objects.requireNonNull(descriptor, "descriptor is null");
-        var metadata = Objects.requireNonNull(nonNullDescriptor.metadata(), "descriptor metadata is null");
-        var status = Objects.requireNonNull(metadata.status(), "descriptor status is null");
-        include(status);
+        if (nonNullDescriptor.isFailed()) {
+            hasFailed = true;
+        }
+        if (nonNullDescriptor.isAborted()) {
+            hasAborted = true;
+        }
+        if (!nonNullDescriptor.isCompleted()) {
+            hasNonTerminal = true;
+        }
+        if (nonNullDescriptor.isSkipped()) {
+            hasSkipped = true;
+        }
     }
 
     /**
@@ -69,7 +78,7 @@ public final class StatusAccumulator {
         if (current.isAborted()) {
             hasAborted = true;
         }
-        if (!current.isTerminal()) {
+        if (current.isPending() || current.isRunning()) {
             hasNonTerminal = true;
         }
         if (current.isSkipped()) {

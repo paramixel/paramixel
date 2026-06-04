@@ -24,10 +24,10 @@ import org.bson.Document;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
 
 /**
  * Parameterized integration test that starts MongoDB containers using annotation-based
@@ -57,20 +57,22 @@ public class AnnotationMongoDBTest {
      * @throws Throwable if environment creation fails
      */
     @Paramixel.Factory
-    public static Spec<?> factory() throws Throwable {
+    public static Action factory() throws Throwable {
         var annotationResolver = AnnotationResolver.create(AnnotationMongoDBTest.class);
 
-        var parallel = Parallel.of(AnnotationMongoDBTest.class.getName());
+        var parallel = Parallel.builder(AnnotationMongoDBTest.class.getName());
         for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            var lifecycle = Lifecycle.of(environment.name())
-                    .before(annotationResolver.byId("setUp", "Before"))
-                    .child(annotationResolver.byId("testInsertAndQuery"))
-                    .after(annotationResolver.byId("tearDown", "After"));
+            var lifecycle = Scope.builder(environment.name())
+                    .before(annotationResolver.byId("setUp"))
+                    .body(annotationResolver.byId("testInsertAndQuery"))
+                    .after(annotationResolver.byId("tearDown"))
+                    .build();
 
-            parallel.child(Instance.of(environment.name(), () -> new AnnotationMongoDBTest(environment))
-                    .child(lifecycle));
+            parallel.child(Instance.builder(environment.name(), () -> new AnnotationMongoDBTest(environment))
+                    .body(lifecycle)
+                    .build());
         }
-        return parallel;
+        return parallel.build();
     }
 
     private AnnotationMongoDBTest(final MongoDBTestEnvironment environment) {

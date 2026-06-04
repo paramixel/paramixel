@@ -18,25 +18,17 @@ package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture annotated with a blank {@code @Paramixel.Tag(" ")} to verify that the resolver rejects
- * tags containing only whitespace.
- */
 public final class ClasspathResolverInvalidBlankTagDiscoveryFixture {
 
     private ClasspathResolverInvalidBlankTagDiscoveryFixture() {}
 
-    /**
-     * Creates a no-op action with an invalid blank tag for resolver validation tests.
-     *
-     * @return a {@link Step} action with the identifier {@code "invalid-blank-tag-discovery"}
-     */
     @Paramixel.Factory
     @Paramixel.Tag(" ")
-    public static Action<?> factory() {
-        return Instance.<Object>of("invalid-blank-tag-discovery", () -> new Object())
-                .child("test", obj -> {})
-                .resolve();
+    public static Action factory() {
+        return Instance.builder("invalid-blank-tag-discovery", () -> new Object())
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

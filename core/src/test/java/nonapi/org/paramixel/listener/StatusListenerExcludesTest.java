@@ -50,7 +50,7 @@ class StatusListenerExcludesTest {
     @DisplayName("prints normal output when excludes is empty")
     void normalOutputWhenNoExcludes() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("normal-action", obj -> {});
+        Step noop = Step.of("normal-action", context -> {});
         Runner runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of()))
                 .listener(listener)
@@ -73,7 +73,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses onBeforeExecution and onAfterExecution when STATUS excluded")
     void suppressesStatusLinesWhenStatusExcluded() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("silent-action", obj -> {});
+        Step noop = Step.of("silent-action", context -> {});
         Runner runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status")))
                 .listener(listener)
@@ -96,7 +96,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses status lines but prints exception when STATUS excluded")
     void suppressesStatusLinesButPrintsExceptionWhenStatusExcluded() {
         StatusListener listener = new StatusListener();
-        Action<?> action = Step.of("test-action", context -> {
+        Action action = Step.of("test-action", context -> {
             throw new RuntimeException("test error");
         });
         Runner runner = Runner.builder()
@@ -124,7 +124,7 @@ class StatusListenerExcludesTest {
     @DisplayName("prints stack trace to stdout when STATUS_FOOTER excluded")
     void printsStackTraceToStdoutWhenStatusFooterExcluded() {
         StatusListener listener = new StatusListener();
-        Action<?> action = Step.of("error-action", context -> {
+        Action action = Step.of("error-action", context -> {
             throw new RuntimeException("expected error");
         });
         Runner runner = Runner.builder()
@@ -150,7 +150,7 @@ class StatusListenerExcludesTest {
     @DisplayName("quiet shorthand suppresses status lines")
     void quietShorthandSuppressesStatus() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("quiet-action", obj -> {});
+        Step noop = Step.of("quiet-action", context -> {});
         Runner runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "quiet")))
                 .listener(listener)
@@ -173,7 +173,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses onBeforeExecution but keeps onAfterExecution when STATUS_HEADER excluded")
     void suppressesBeforeButNotAfterWhenStatusHeaderExcluded() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("header-split", obj -> {});
+        Step noop = Step.of("header-split", context -> {});
         Runner runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.header")))
                 .listener(listener)
@@ -197,7 +197,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses onAfterExecution but keeps onBeforeExecution when STATUS_FOOTER excluded")
     void suppressesAfterButNotBeforeWhenStatusFooterExcluded() {
         StatusListener listener = new StatusListener();
-        Step<?> noop = Step.of("footer-split", obj -> {});
+        Step noop = Step.of("footer-split", context -> {});
         Runner runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.footer")))
                 .listener(listener)

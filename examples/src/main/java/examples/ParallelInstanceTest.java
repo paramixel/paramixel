@@ -17,6 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Context.withInstance;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,10 +26,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Step;
 
 /**
@@ -67,25 +68,31 @@ public class ParallelInstanceTest {
      * @return the action tree for this test
      */
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         resetCounts();
 
         var testName = ParallelInstanceTest.class.getName();
 
-        var parallelMethods = Parallel.<ParallelInstanceTest>of("parallel-methods")
+        var parallelMethods = Parallel.<ParallelInstanceTest>builder("parallel-methods")
                 .parallelism(PARALLELISM)
-                .child("method1()", ParallelInstanceTest::method1)
-                .child("method2()", ParallelInstanceTest::method2)
-                .child("method3()", ParallelInstanceTest::method3);
+                .child(Step.of("method1()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method1)))
+                .child(Step.of("method2()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method2)))
+                .child(Step.of("method3()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method3)));
 
-        return Lifecycle.of(testName)
-                .child(Instance.of(testName, ParallelInstanceTest::new)
-                        .child(Lifecycle.<ParallelInstanceTest>of("lifecycle")
-                                .before("before()", ParallelInstanceTest::before)
-                                .child(parallelMethods)
-                                .after("after()", ParallelInstanceTest::after)
-                                .resolve()))
-                .after(Step.of("validate", ignored -> validate()));
+        return Scope.builder(testName)
+                .body(Instance.builder(testName, ParallelInstanceTest::new)
+                        .body(Scope.<ParallelInstanceTest>builder("lifecycle")
+                                .before(Step.of(
+                                        "before()",
+                                        withInstance(ParallelInstanceTest.class, ParallelInstanceTest::before)))
+                                .body(parallelMethods.build())
+                                .after(Step.of(
+                                        "after()",
+                                        withInstance(ParallelInstanceTest.class, ParallelInstanceTest::after)))
+                                .build())
+                        .build())
+                .after(Step.of("validate", ignored -> validate()))
+                .build();
     }
 
     public ParallelInstanceTest() {

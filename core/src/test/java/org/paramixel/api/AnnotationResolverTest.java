@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
 @DisplayName("AnnotationResolver")
 class AnnotationResolverTest {
@@ -45,20 +46,18 @@ class AnnotationResolverTest {
     @Test
     @DisplayName("byId returns action for instance method")
     void byId_returnsActionForInstanceMethod() {
-        Action<ResolveFixture> action =
-                AnnotationResolver.create(ResolveFixture.class).byId("foo");
+        Action action = AnnotationResolver.create(ResolveFixture.class).byId("foo");
         assertThat(action).isNotNull();
-        assertThat(action.name()).isEqualTo("foo");
+        assertThat(action.displayName()).isEqualTo("foo");
     }
 
     @Test
-    @DisplayName("byId with kind returns action with custom kind")
-    void byId_withKind_returnsActionWithCustomKind() {
-        Action<ResolveFixture> action =
-                AnnotationResolver.create(ResolveFixture.class).byId("foo", "SetUp");
+    @DisplayName("byId returns action with name")
+    void byId_returnsActionWithName() {
+        Action action = AnnotationResolver.create(ResolveFixture.class).byId("foo");
         assertThat(action).isNotNull();
-        assertThat(action.name()).isEqualTo("foo");
-        assertThat(action.kind()).isEqualTo("SetUp");
+        assertThat(action.displayName()).isEqualTo("foo");
+        assertThat(action).isInstanceOf(Step.class);
     }
 
     static class MissingFixture {}
@@ -102,10 +101,10 @@ class AnnotationResolverTest {
     @Test
     @DisplayName("byId returns action for inherited method")
     void byId_returnsActionForInheritedMethod() {
-        Action<ChildInheritsAnnotatedMethod> action =
+        Action action =
                 AnnotationResolver.create(ChildInheritsAnnotatedMethod.class).byId("parent");
         assertThat(action).isNotNull();
-        assertThat(action.name()).isEqualTo("parent");
+        assertThat(action.displayName()).isEqualTo("parent");
     }
 
     private static class ThrowingFixture {
@@ -120,8 +119,8 @@ class AnnotationResolverTest {
     void byIdUnwrapsInvocationTargetException() {
         Descriptor descriptor = runById(ThrowingFixture.class, ThrowingFixture::new, "throw");
 
-        assertThat(descriptor.metadata().status().isFailed()).isTrue();
-        Throwable throwable = descriptor.metadata().throwable().orElseThrow();
+        assertThat(descriptor.isFailed()).isTrue();
+        Throwable throwable = descriptor.throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(RuntimeException.class).hasMessage("boom");
         assertThat(throwable.getCause()).isNull();
     }
@@ -166,8 +165,8 @@ class AnnotationResolverTest {
     void byIdUnwrapsErrorFromInvocationTargetException() {
         Descriptor descriptor = runById(ErrorThrowingFixture.class, ErrorThrowingFixture::new, "errorMethod");
 
-        assertThat(descriptor.metadata().status().isFailed()).isTrue();
-        Throwable throwable = descriptor.metadata().throwable().orElseThrow();
+        assertThat(descriptor.isFailed()).isTrue();
+        Throwable throwable = descriptor.throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(AssertionError.class).hasMessage("test error");
         assertThat(throwable.getCause()).isNull();
     }
@@ -184,8 +183,8 @@ class AnnotationResolverTest {
     void byIdWrapsCheckedExceptionInRuntimeException() {
         Descriptor descriptor = runById(CheckedThrowingFixture.class, CheckedThrowingFixture::new, "checkedMethod");
 
-        assertThat(descriptor.metadata().status().isFailed()).isTrue();
-        assertThat(descriptor.metadata().throwable().orElseThrow())
+        assertThat(descriptor.isFailed()).isTrue();
+        assertThat(descriptor.throwable().orElseThrow())
                 .isInstanceOf(Exception.class)
                 .hasMessage("checked exception");
     }
@@ -224,8 +223,8 @@ class AnnotationResolverTest {
     void staticByIdUnwrapsInvocationTargetException() {
         Descriptor descriptor = runStaticById(StaticThrowingFixture.class, "staticThrow");
 
-        assertThat(descriptor.metadata().status().isFailed()).isTrue();
-        Throwable throwable = descriptor.metadata().throwable().orElseThrow();
+        assertThat(descriptor.isFailed()).isTrue();
+        Throwable throwable = descriptor.throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(RuntimeException.class).hasMessage("static boom");
         assertThat(throwable.getCause()).isNull();
     }
@@ -242,8 +241,8 @@ class AnnotationResolverTest {
     void staticByIdUnwrapsErrorFromInvocationTargetException() {
         Descriptor descriptor = runStaticById(StaticErrorThrowingFixture.class, "staticErrorMethod");
 
-        assertThat(descriptor.metadata().status().isFailed()).isTrue();
-        Throwable throwable = descriptor.metadata().throwable().orElseThrow();
+        assertThat(descriptor.isFailed()).isTrue();
+        Throwable throwable = descriptor.throwable().orElseThrow();
         assertThat(throwable).isInstanceOf(AssertionError.class).hasMessage("static test error");
         assertThat(throwable.getCause()).isNull();
     }
@@ -260,8 +259,8 @@ class AnnotationResolverTest {
     void staticByIdWrapsCheckedExceptionInRuntimeException() {
         Descriptor descriptor = runStaticById(StaticCheckedThrowingFixture.class, "staticCheckedMethod");
 
-        assertThat(descriptor.metadata().status().isFailed()).isTrue();
-        assertThat(descriptor.metadata().throwable().orElseThrow())
+        assertThat(descriptor.isFailed()).isTrue();
+        assertThat(descriptor.throwable().orElseThrow())
                 .isInstanceOf(Exception.class)
                 .hasMessage("static checked exception");
     }
@@ -286,18 +285,18 @@ class AnnotationResolverTest {
     @Test
     @DisplayName("staticById returns action for static method")
     void staticById_returnsActionForStaticMethod() {
-        Action<?> action = AnnotationResolver.create(StaticResolveFixture.class).staticById("staticFoo");
+        Action action = AnnotationResolver.create(StaticResolveFixture.class).staticById("staticFoo");
         assertThat(action).isNotNull();
-        assertThat(action.name()).isEqualTo("staticFoo");
+        assertThat(action.displayName()).isEqualTo("staticFoo");
     }
 
     @Test
-    @DisplayName("staticById with kind returns action with custom kind")
-    void staticById_withKind_returnsActionWithCustomKind() {
-        Action<?> action = AnnotationResolver.create(StaticResolveFixture.class).staticById("staticFoo", "BeforeAll");
+    @DisplayName("staticById returns action with name")
+    void staticById_returnsActionWithName() {
+        Action action = AnnotationResolver.create(StaticResolveFixture.class).staticById("staticFoo");
         assertThat(action).isNotNull();
-        assertThat(action.name()).isEqualTo("staticFoo");
-        assertThat(action.kind()).isEqualTo("BeforeAll");
+        assertThat(action.displayName()).isEqualTo("staticFoo");
+        assertThat(action).isInstanceOf(Step.class);
     }
 
     @Test
@@ -323,21 +322,21 @@ class AnnotationResolverTest {
         AnnotationResolver.create(StaticCacheFixture.class).staticById("staticCache");
     }
 
-    private static <T> Descriptor runById(final Class<T> type, final Supplier<T> supplier, final String id) {
-        Action<T> action = AnnotationResolver.create(type).byId(id);
+    private static Descriptor runById(final Class<?> type, final Supplier<?> supplier, final String id) {
+        Action action = AnnotationResolver.create(type).byId(id);
         Descriptor root = Runner.builder()
                 .build()
-                .run(Instance.of("wrapper", supplier).child(action))
+                .run(Instance.builder("wrapper", supplier).body(action).build())
                 .descriptor()
                 .orElseThrow();
         return root.children().stream()
-                .filter(child -> child.metadata().name().equals(id))
+                .filter(child -> child.action().displayName().equals(id))
                 .findFirst()
                 .orElse(root);
     }
 
     private static Descriptor runStaticById(final Class<?> type, final String id) {
-        Action<?> action = AnnotationResolver.create(type).staticById(id);
+        Action action = AnnotationResolver.create(type).staticById(id);
         return Runner.builder().build().run(action).descriptor().orElseThrow();
     }
 }

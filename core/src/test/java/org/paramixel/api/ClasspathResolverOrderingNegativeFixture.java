@@ -17,11 +17,8 @@
 package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture discovered by the resolver with a negative {@code @Paramixel.Priority(-1)} to assert that
- * negative priority values sort before default and positive-priority fixtures.
- */
 @Paramixel.Priority(-1)
 public final class ClasspathResolverOrderingNegativeFixture {
 
@@ -29,13 +26,10 @@ public final class ClasspathResolverOrderingNegativeFixture {
         // Intentionally empty
     }
 
-    /**
-     * Creates an action labeled {@code "negative"} for resolver ordering verification.
-     *
-     * @return a {@link ResolverOrderingAction} with the {@code "negative"} identifier
-     */
     @Paramixel.Factory
-    public static Action<?> factory() {
-        return new ResolverOrderingAction("negative");
+    public static Action factory() {
+        return Step.of("negative", context -> {
+            throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
+        });
     }
 }

@@ -211,4 +211,4 @@ git push
 
 ---
 
-Copyright 2026-present Douglas Hoard
+Copyright (c) 2026-present Douglas Hoard

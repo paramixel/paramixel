@@ -19,6 +19,7 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Field;
+import java.util.concurrent.ThreadPoolExecutor;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
@@ -27,7 +28,6 @@ import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Mode;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Scheduler close behavior")
@@ -40,7 +40,7 @@ class SchedulerCloseBehaviorTest {
         try {
             setClosingTrue(scheduler);
 
-            Action<?> leaf = Step.of("leaf", context -> {});
+            Action leaf = Step.of("leaf", context -> {});
             MutableDescriptor root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
@@ -49,7 +49,7 @@ class SchedulerCloseBehaviorTest {
                     scheduler,
                     new InstanceHolder());
 
-            var future = scheduler.schedule(root, Mode.RUN, context);
+            var future = scheduler.schedule(root, ExecutionMode.RUN, context);
             assertThat(future.isCompletedExceptionally()).isTrue();
         } finally {
             scheduler.close();
@@ -62,7 +62,7 @@ class SchedulerCloseBehaviorTest {
         var scheduler = new Scheduler(1);
         scheduler.close();
 
-        Action<?> leaf = Step.of("leaf", context -> {});
+        Action leaf = Step.of("leaf", context -> {});
         MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(),
@@ -71,18 +71,18 @@ class SchedulerCloseBehaviorTest {
                 scheduler,
                 new InstanceHolder());
 
-        var future = scheduler.schedule(root, Mode.RUN, context);
+        var future = scheduler.schedule(root, ExecutionMode.RUN, context);
         assertThat(future.isCompletedExceptionally()).isTrue();
     }
 
     @Test
-    @DisplayName("depthExecutor does not create executor when closing is true")
-    void depthExecutorDoesNotCreateExecutorWhenClosing() throws Exception {
+    @DisplayName("schedule does not enqueue work when closing is true")
+    void scheduleDoesNotEnqueueWorkWhenClosing() throws Exception {
         var scheduler = new Scheduler(1);
         try {
             setClosingTrue(scheduler);
 
-            Action<?> leaf = Step.of("leaf", context -> {});
+            Action leaf = Step.of("leaf", context -> {});
             MutableDescriptor root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
@@ -91,25 +91,20 @@ class SchedulerCloseBehaviorTest {
                     scheduler,
                     new InstanceHolder());
 
-            scheduler.schedule(root, Mode.RUN, context);
+            scheduler.schedule(root, ExecutionMode.RUN, context);
 
-            Field depthExecutorsField = Scheduler.class.getDeclaredField("depthExecutors");
-            depthExecutorsField.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            var depthExecutors = (java.util.Map<Integer, java.util.concurrent.ThreadPoolExecutor>)
-                    depthExecutorsField.get(scheduler);
-            assertThat(depthExecutors).isEmpty();
+            assertThat(scheduler.readyQueueSize()).isZero();
         } finally {
             scheduler.close();
         }
     }
 
     @Test
-    @DisplayName("close shuts down all depth executors")
-    void closeShutsDownAllDepthExecutors() throws Exception {
+    @DisplayName("close shuts down global executor")
+    void closeShutsDownGlobalExecutor() throws Exception {
         var scheduler = new Scheduler(1);
 
-        Action<?> leaf = Step.of("leaf", context -> sleep(100));
+        Action leaf = Step.of("leaf", context -> sleep(100));
         MutableDescriptor root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(),
@@ -118,15 +113,13 @@ class SchedulerCloseBehaviorTest {
                 scheduler,
                 new InstanceHolder());
 
-        scheduler.schedule(root, Mode.RUN, context);
+        scheduler.schedule(root, ExecutionMode.RUN, context);
         scheduler.close();
 
-        Field depthExecutorsField = Scheduler.class.getDeclaredField("depthExecutors");
-        depthExecutorsField.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        var depthExecutors =
-                (java.util.Map<Integer, java.util.concurrent.ThreadPoolExecutor>) depthExecutorsField.get(scheduler);
-        assertThat(depthExecutors).isEmpty();
+        Field executorField = Scheduler.class.getDeclaredField("executor");
+        executorField.setAccessible(true);
+        var executor = (ThreadPoolExecutor) executorField.get(scheduler);
+        assertThat(executor.isShutdown()).isTrue();
     }
 
     private static void setClosingTrue(Scheduler scheduler) throws Exception {

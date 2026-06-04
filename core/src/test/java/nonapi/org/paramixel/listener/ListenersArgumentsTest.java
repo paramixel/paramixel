@@ -21,22 +21,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Descriptor;
+import org.paramixel.api.Status;
 
 @DisplayName("Listeners arguments")
 class ListenersArgumentsTest {
 
     @Test
-    @DisplayName("formatKind rejects null descriptor")
-    void formatKindRejectsNullDescriptor() {
-        assertThatThrownBy(() -> Listeners.formatKind((Descriptor) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("descriptor is null");
-    }
-
-    @Test
     @DisplayName("formatStatus rejects null status")
     void formatStatusRejectsNullStatus() {
-        assertThatThrownBy(() -> Listeners.formatStatus(null))
+        assertThatThrownBy(() -> Listeners.formatStatus((Status) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("status is null");
     }
@@ -44,7 +37,7 @@ class ListenersArgumentsTest {
     @Test
     @DisplayName("formatAnsiStatus rejects null status")
     void formatAnsiStatusRejectsNullStatus() {
-        assertThatThrownBy(() -> Listeners.formatAnsiStatus(null))
+        assertThatThrownBy(() -> Listeners.formatAnsiStatus((Status) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("status is null");
     }

@@ -98,7 +98,7 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <configuration>
                     <excludes>
-                        <exclude>org/paramixel/api/internal/classgraph/**</exclude>
+                        <exclude>nonapi/org/paramixel/classgraph/**</exclude>
                     </excludes>
                 </configuration>
             </plugin>

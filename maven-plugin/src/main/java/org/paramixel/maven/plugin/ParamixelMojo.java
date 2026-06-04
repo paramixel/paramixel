@@ -44,7 +44,6 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.ResolverException;
@@ -55,10 +54,10 @@ import org.paramixel.api.selector.Selector;
  * during the {@link LifecyclePhase#TEST} phase with {@link ResolutionScope#TEST} dependency resolution.
  *
  * <p>The mojo resolves action factories from the test classpath using the runner's internal classpath scanner,
- * executes them with a {@link Runner}, and fails the build when {{@link Result#status()}}
- * returns {@link Status#FAILED} or {@link Status#PENDING}. Configuration-based promotion
- * rules ({@code failureOnSkip}, {@code failureOnAbort}) are applied by the runner result,
- * so SKIPPED and ABORTED are promoted to FAILED when the corresponding flags are enabled.
+ * executes them with a {@link Runner}, and fails the build when {@link Result#isFailed()}
+ * is {@code true}. Configuration-based promotion rules ({@code failureOnSkip},
+ * {@code failureOnAbort}) are applied by the runner result, so skipped and aborted
+ * outcomes are promoted to failed when the corresponding flags are enabled.
  *
  * <p>The action tree is executed exactly once. The result is returned directly from the runner,
  * avoiding redundant re-execution.
@@ -187,15 +186,13 @@ public class ParamixelMojo extends AbstractMojo {
      * non-daemon threads that retain a reference to the test classloader and warns or fails depending
      * on {@code strictThreadLifecycle}.
      *
-     * <p>Fails the build when {{@link Result#status()}} returns {@link Status#FAILED}
-     * or {@link Status#PENDING}. Configuration-based promotion rules ({@code failureOnSkip},
-     * {@code failureOnAbort}) are applied by the runner result.
+     * <p>Fails the build when {@link Result#isFailed()} is {@code true}. Configuration-based
+     * promotion rules ({@code failureOnSkip}, {@code failureOnAbort}) are applied by the runner result.
      *
      * @throws MojoExecutionException when configuration is invalid, action resolution fails,
      *     lingering threads are detected with {@code strictThreadLifecycle} enabled,
      *     or an unexpected error occurs during execution
-     * @throws MojoFailureException when {{@link Result#status()}} returns {@link Status#FAILED}
-     *     or {@link Status#PENDING}
+     * @throws MojoFailureException when {@link Result#isFailed()} is {@code true}
      */
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -215,7 +212,7 @@ public class ParamixelMojo extends AbstractMojo {
                 final var configuration = buildConfiguration(testClassLoader);
                 final var selector = buildSelector();
 
-                Optional<Action<?>> optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
+                Optional<Action> optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
 
                 if (optionalAction.isEmpty()) {
                     if (failIfNoTests) {
@@ -231,10 +228,9 @@ public class ParamixelMojo extends AbstractMojo {
                         .listener(Listener.defaultListener(configuration))
                         .build();
 
-                Action<?> action = optionalAction.get();
+                Action action = optionalAction.get();
                 Result result = runner.run(action);
-                var status = result.status();
-                if (status.isFailed() || status.isPending()) {
+                if (result.isFailed()) {
                     throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                 }
             } finally {

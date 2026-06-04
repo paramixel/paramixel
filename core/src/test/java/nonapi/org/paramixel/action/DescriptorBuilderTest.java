@@ -19,14 +19,19 @@ package nonapi.org.paramixel.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Collections;
-import java.util.List;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Context;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Repeat;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Step;
-import org.paramixel.api.exception.CycleDetectedException;
+import org.paramixel.api.action.Timeout;
 
 @DisplayName("DescriptorBuilder")
 class DescriptorBuilderTest {
@@ -36,7 +41,7 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("discovers single leaf action")
     void discoversSingleLeafAction() {
-        Action<?> action = Step.of("leaf", obj -> {});
+        Action action = Step.of("leaf", context -> {});
         MutableDescriptor root = builder.discover(action);
 
         assertThat(root).isNotNull();
@@ -47,9 +52,9 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("discovers composite action with children")
     void discoversCompositeWithChildren() {
-        Action<?> child1 = Step.of("child1", obj -> {});
-        Action<?> child2 = Step.of("child2", obj -> {});
-        Action<?> parent = new CompositeAction("parent", child1, child2);
+        Action child1 = Step.of("child1", context -> {});
+        Action child2 = Step.of("child2", context -> {});
+        Action parent = Sequence.builder("parent").child(child1).child(child2).build();
         MutableDescriptor root = builder.discover(parent);
 
         assertThat(root.children()).hasSize(2);
@@ -60,8 +65,8 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("child descriptors have parent reference")
     void childDescriptorsHaveParent() {
-        Action<?> child = Step.of("child", obj -> {});
-        Action<?> parent = new CompositeAction("parent", child);
+        Action child = Step.of("child", context -> {});
+        Action parent = Sequence.builder("parent").child(child).build();
         MutableDescriptor root = builder.discover(parent);
 
         assertThat(root.children()).hasSize(1);
@@ -77,24 +82,10 @@ class DescriptorBuilderTest {
     }
 
     @Test
-    @DisplayName("detects direct self-cycle")
-    void detectsDirectSelfCycle() {
-        var cyclic = new CyclicAction("cyclic");
-        assertThatThrownBy(() -> builder.discover(cyclic)).isInstanceOf(CycleDetectedException.class);
-    }
-
-    @Test
-    @DisplayName("detects indirect cycle")
-    void detectsIndirectCycle() {
-        var cyclic = new IndirectCyclicAction("indirect");
-        assertThatThrownBy(() -> builder.discover(cyclic)).isInstanceOf(CycleDetectedException.class);
-    }
-
-    @Test
     @DisplayName("same action instance reused in multiple positions produces independent descriptors")
     void sameActionInstanceReusedProducesIndependentDescriptors() {
-        Action<?> shared = Step.of("shared", obj -> {});
-        Action<?> parent = new CompositeAction("parent", shared, shared);
+        Action shared = Step.of("shared", context -> {});
+        Action parent = Sequence.builder("parent").child(shared).child(shared).build();
         MutableDescriptor root = builder.discover(parent);
 
         assertThat(root.children()).hasSize(2);
@@ -104,25 +95,20 @@ class DescriptorBuilderTest {
     }
 
     @Test
-    @DisplayName("rejects null child in discover")
-    void rejectsNullChildInDiscover() {
-        Action<?> parent = new NullDiscoveringAction("bad");
-        assertThatThrownBy(() -> builder.discover(parent)).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
     @DisplayName("root descriptor starts with PENDING status")
     void rootDescriptorStartsPending() {
-        Action<?> action = Step.of("leaf", obj -> {});
+        Action action = Step.of("leaf", context -> {});
         MutableDescriptor root = builder.discover(action);
 
-        assertThat(root.metadata().status().isPending()).isTrue();
+        assertThat(root.status().isPending()).isTrue();
     }
 
     @Test
     @DisplayName("discover leaves descriptor tree mutable until frozen")
     void discoverLeavesDescriptorTreeMutableUntilFrozen() {
-        Action<?> parent = new CompositeAction("parent", Step.of("child", obj -> {}));
+        Action parent = Sequence.builder("parent")
+                .child(Step.of("child", context -> {}))
+                .build();
         MutableDescriptor root = builder.discover(parent);
         MutableDescriptor child = (MutableDescriptor) root.children().get(0);
 
@@ -133,7 +119,9 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("freeze caches immutable children view")
     void freezeCachesImmutableChildrenView() {
-        Action<?> parent = new CompositeAction("parent", Step.of("child", obj -> {}));
+        Action parent = Sequence.builder("parent")
+                .child(Step.of("child", context -> {}))
+                .build();
         MutableDescriptor root = builder.discover(parent);
         MutableDescriptor child = (MutableDescriptor) root.children().get(0);
         root.freeze();
@@ -145,10 +133,10 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("freeze rejects post-freeze structural mutations")
     void freezeRejectsPostFreezeStructuralMutations() {
-        MutableDescriptor root = builder.discover(Step.of("leaf", obj -> {}));
+        MutableDescriptor root = builder.discover(Step.of("leaf", context -> {}));
         root.freeze();
 
-        assertThatThrownBy(() -> root.addChild(new ConcreteDescriptor(Step.of("late-child", obj -> {}))))
+        assertThatThrownBy(() -> root.addChild(new ConcreteDescriptor(Step.of("late-child", context -> {}))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Descriptor is frozen:");
         assertThatThrownBy(() ->
@@ -157,133 +145,283 @@ class DescriptorBuilderTest {
                 .hasMessageContaining("Descriptor is frozen:");
     }
 
-    private static final class CompositeAction implements Action<Void> {
+    @Nested
+    @DisplayName("Scope action")
+    class ScopeAction {
 
-        private final String name;
-        private final Action<?>[] children;
+        @Test
+        @DisplayName("discovers scope with before, body, and after")
+        void discoversScopeWithBeforeBodyAfter() {
+            var before = Step.of("before", context -> {});
+            var body = Step.of("body", context -> {});
+            var after = Step.of("after", context -> {});
+            var scope = Scope.builder("scope")
+                    .before(before)
+                    .body(body)
+                    .after(after)
+                    .build();
+            var root = builder.discover(scope);
 
-        CompositeAction(final String name, final Action<?>... children) {
-            this.name = name;
-            this.children = children;
+            assertThat(root.before()).isPresent();
+            assertThat(((MutableDescriptor) root.before().orElseThrow()).action())
+                    .isSameAs(before);
+            assertThat(root.children()).hasSize(1);
+            assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(body);
+            assertThat(root.after()).isPresent();
+            assertThat(((MutableDescriptor) root.after().orElseThrow()).action())
+                    .isSameAs(after);
         }
 
-        @Override
-        public String name() {
-            return name;
+        @Test
+        @DisplayName("discovers scope with body only")
+        void discoversScopeWithBodyOnly() {
+            var body = Step.of("body", context -> {});
+            var scope = Scope.builder("scope").body(body).build();
+            var root = builder.discover(scope);
+
+            assertThat(root.before()).isEmpty();
+            assertThat(root.children()).hasSize(1);
+            assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(body);
+            assertThat(root.after()).isEmpty();
         }
 
-        @Override
-        public String kind() {
-            return "CompositeAction";
-        }
+        @Test
+        @DisplayName("discovers scope with body and before only")
+        void discoversScopeWithBodyAndBefore() {
+            var before = Step.of("before", context -> {});
+            var body = Step.of("body", context -> {});
+            var scope = Scope.builder("scope").before(before).body(body).build();
+            var root = builder.discover(scope);
 
-        @Override
-        public List<Action<?>> children() {
-            return List.of(children);
+            assertThat(root.before()).isPresent();
+            assertThat(root.children()).hasSize(1);
+            assertThat(root.after()).isEmpty();
         }
-
-        @Override
-        public void execute(final Context context) {}
     }
 
-    private static final class CyclicAction implements Action<Void> {
+    @Nested
+    @DisplayName("Static action")
+    class StaticAction {
 
-        private final String name;
+        @Test
+        @DisplayName("discovers static with before, body, and after")
+        void discoversStaticWithBeforeBodyAfter() {
+            var before = Step.of("before", context -> {});
+            var body = Step.of("body", context -> {});
+            var after = Step.of("after", context -> {});
+            var staticAction = Static.builder("static")
+                    .before(before)
+                    .body(body)
+                    .after(after)
+                    .build();
+            var root = builder.discover(staticAction);
 
-        CyclicAction(final String name) {
-            this.name = name;
+            assertThat(root.before()).isPresent();
+            assertThat(((MutableDescriptor) root.before().orElseThrow()).action())
+                    .isSameAs(before);
+            assertThat(root.children()).hasSize(1);
+            assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(body);
+            assertThat(root.after()).isPresent();
+            assertThat(((MutableDescriptor) root.after().orElseThrow()).action())
+                    .isSameAs(after);
         }
 
-        @Override
-        public String name() {
-            return name;
+        @Test
+        @DisplayName("discovers static with body only")
+        void discoversStaticWithBodyOnly() {
+            var body = Step.of("body", context -> {});
+            var staticAction = Static.builder("static").body(body).build();
+            var root = builder.discover(staticAction);
+
+            assertThat(root.before()).isEmpty();
+            assertThat(root.children()).hasSize(1);
+            assertThat(root.after()).isEmpty();
         }
 
-        @Override
-        public String kind() {
-            return "CyclicAction";
-        }
+        @Test
+        @DisplayName("discovers static with body and after only")
+        void discoversStaticWithBodyAndAfter() {
+            var body = Step.of("body", context -> {});
+            var after = Step.of("after", context -> {});
+            var staticAction = Static.builder("static").body(body).after(after).build();
+            var root = builder.discover(staticAction);
 
-        @Override
-        public List<Action<?>> children() {
-            return List.of(this);
+            assertThat(root.before()).isEmpty();
+            assertThat(root.children()).hasSize(1);
+            assertThat(root.after()).isPresent();
+            assertThat(((MutableDescriptor) root.after().orElseThrow()).action())
+                    .isSameAs(after);
         }
-
-        @Override
-        public void execute(final Context context) {}
     }
 
-    private static final class IndirectCyclicAction implements Action<Void> {
+    @Nested
+    @DisplayName("Instance action")
+    class InstanceAction {
 
-        private final String name;
-        private final Action<?> wrapper;
+        @Test
+        @DisplayName("discovers instance with instantiate, body, and destroy descriptors")
+        void discoversInstanceWithLifecycleDescriptors() {
+            var body = Step.of("body", context -> {});
+            var instance = Instance.builder("instance", Object::new).body(body).build();
+            var root = builder.discover(instance);
 
-        IndirectCyclicAction(final String name) {
-            this.name = name;
-            this.wrapper = new Action<Void>() {
-                @Override
-                public String name() {
-                    return "wrapper";
-                }
-
-                @Override
-                public String kind() {
-                    return "Wrapper";
-                }
-
-                @Override
-                public List<Action<?>> children() {
-                    return List.of(IndirectCyclicAction.this);
-                }
-
-                @Override
-                public void execute(final Context ctx) {}
-            };
+            assertThat(root.before()).isPresent();
+            assertThat(root.before().orElseThrow().action().displayName()).isEqualTo("[instantiate]");
+            assertThat(root.children()).hasSize(1);
+            assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(body);
+            assertThat(root.after()).isPresent();
+            assertThat(root.after().orElseThrow().action().displayName()).isEqualTo("[destroy]");
         }
-
-        @Override
-        public String name() {
-            return name;
-        }
-
-        @Override
-        public String kind() {
-            return "IndirectCyclicAction";
-        }
-
-        @Override
-        public List<Action<?>> children() {
-            return List.of(wrapper);
-        }
-
-        @Override
-        public void execute(final Context context) {}
     }
 
-    private static final class NullDiscoveringAction implements Action<Void> {
+    @Nested
+    @DisplayName("Parallel action")
+    class ParallelAction {
 
-        private final String name;
+        @Test
+        @DisplayName("discovers parallel with multiple children")
+        void discoversParallelWithMultipleChildren() {
+            var child1 = Step.of("child1", context -> {});
+            var child2 = Step.of("child2", context -> {});
+            var child3 = Step.of("child3", context -> {});
+            var parallel = Parallel.builder("parallel")
+                    .child(child1)
+                    .child(child2)
+                    .child(child3)
+                    .build();
+            var root = builder.discover(parallel);
 
-        NullDiscoveringAction(final String name) {
-            this.name = name;
+            assertThat(root.before()).isEmpty();
+            assertThat(root.children()).hasSize(3);
+            assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(child1);
+            assertThat(((MutableDescriptor) root.children().get(1)).action()).isSameAs(child2);
+            assertThat(((MutableDescriptor) root.children().get(2)).action()).isSameAs(child3);
+            assertThat(root.after()).isEmpty();
         }
 
-        @Override
-        public String name() {
-            return name;
+        @Test
+        @DisplayName("discovers empty parallel")
+        void discoversEmptyParallel() {
+            var parallel = Parallel.builder("parallel").build();
+            var root = builder.discover(parallel);
+
+            assertThat(root.children()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("Repeat action")
+    class RepeatAction {
+
+        @Test
+        @DisplayName("discovers repeat with multiple iterations")
+        void discoversRepeatWithMultipleIterations() {
+            var body = Step.of("step", context -> {});
+            var repeat = Repeat.builder("repeat").body(body).iterations(3).build();
+            var root = builder.discover(repeat);
+
+            assertThat(root.children()).hasSize(3);
+            assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(body);
+            assertThat(((MutableDescriptor) root.children().get(1)).action()).isSameAs(body);
+            assertThat(((MutableDescriptor) root.children().get(2)).action()).isSameAs(body);
         }
 
-        @Override
-        public String kind() {
-            return "NullDiscoveringAction";
+        @Test
+        @DisplayName("discovers repeat with single iteration")
+        void discoversRepeatWithSingleIteration() {
+            var body = Step.of("step", context -> {});
+            var repeat = Repeat.builder("repeat").body(body).iterations(1).build();
+            var root = builder.discover(repeat);
+
+            assertThat(root.children()).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("Timeout action")
+    class TimeoutAction {
+
+        @Test
+        @DisplayName("discovers timeout with body")
+        void discoversTimeoutWithBody() {
+            var body = Step.of("body", context -> {});
+            var timeout = Timeout.builder("timeout")
+                    .body(body)
+                    .timeout(Duration.ofSeconds(1))
+                    .build();
+            var root = builder.discover(timeout);
+
+            assertThat(root.children()).hasSize(1);
+            assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(body);
+        }
+    }
+
+    @Nested
+    @DisplayName("deeply nested composites")
+    class DeeplyNestedComposites {
+
+        @Test
+        @DisplayName("discovers Sequence within Sequence")
+        void discoversSequenceWithinSequence() {
+            var leaf = Step.of("leaf", context -> {});
+            var inner = Sequence.builder("inner").child(leaf).build();
+            var outer = Sequence.builder("outer").child(inner).build();
+            var root = builder.discover(outer);
+
+            assertThat(root.children()).hasSize(1);
+            var outerChild = (MutableDescriptor) root.children().get(0);
+            assertThat(outerChild.action()).isSameAs(inner);
+            assertThat(outerChild.children()).hasSize(1);
+            assertThat(((MutableDescriptor) outerChild.children().get(0)).action())
+                    .isSameAs(leaf);
         }
 
-        @Override
-        public List<Action<?>> children() {
-            return Collections.singletonList(null);
+        @Test
+        @DisplayName("discovers Parallel within Sequence")
+        void discoversParallelWithinSequence() {
+            var leaf1 = Step.of("leaf1", context -> {});
+            var leaf2 = Step.of("leaf2", context -> {});
+            var parallel =
+                    Parallel.builder("parallel").child(leaf1).child(leaf2).build();
+            var sequence = Sequence.builder("sequence").child(parallel).build();
+            var root = builder.discover(sequence);
+
+            assertThat(root.children()).hasSize(1);
+            var seqChild = (MutableDescriptor) root.children().get(0);
+            assertThat(seqChild.action()).isSameAs(parallel);
+            assertThat(seqChild.children()).hasSize(2);
         }
 
-        @Override
-        public void execute(final Context context) {}
+        @Test
+        @DisplayName("discovers Repeat within Scope")
+        void discoversRepeatWithinScope() {
+            var step = Step.of("step", context -> {});
+            var repeat = Repeat.builder("repeat").body(step).iterations(2).build();
+            var scope = Scope.builder("scope").body(repeat).build();
+            var root = builder.discover(scope);
+
+            assertThat(root.children()).hasSize(1);
+            var repeatDesc = (MutableDescriptor) root.children().get(0);
+            assertThat(repeatDesc.action()).isSameAs(repeat);
+            assertThat(repeatDesc.children()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("discovers Timeout within Instance")
+        void discoversTimeoutWithinInstance() {
+            var step = Step.of("step", context -> {});
+            var timeout = Timeout.builder("timeout")
+                    .body(step)
+                    .timeout(Duration.ofSeconds(5))
+                    .build();
+            var instance =
+                    Instance.builder("instance", Object::new).body(timeout).build();
+            var root = builder.discover(instance);
+
+            assertThat(root.children()).hasSize(1);
+            var timeoutDesc = (MutableDescriptor) root.children().get(0);
+            assertThat(timeoutDesc.action()).isSameAs(timeout);
+            assertThat(timeoutDesc.children()).hasSize(1);
+        }
     }
 }

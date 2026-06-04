@@ -16,90 +16,27 @@
 
 package org.paramixel.api.action;
 
-import java.util.List;
-import java.util.Optional;
-import org.paramixel.api.Runner;
+import org.paramixel.api.Context;
 
 /**
- * Defines a reusable execution unit processed by a {@link Runner}.
+ * Defines a reusable execution unit processed by the Paramixel scheduler.
  *
  * <p>Actions are reusable definitions. Discovery binds an action occurrence to a descriptor,
- * and execution uses a {@link Context} for descriptor state, listener access, and
- * fixture instances.
+ * and execution uses a {@link Context} for action-facing runtime services such as
+ * configuration and fixture instances.
  *
- * @param <T> the type consumed by the action
+ * <p>The scheduler owns all traversal, status aggregation, and listener callbacks.
+ *
+ * <p>For actions with mutable configuration, use the corresponding {@link Builder} to
+ * construct an immutable action snapshot via {@link Builder#build()}.
  */
-public interface Action<T> extends Spec<T> {
+public sealed interface Action
+        permits Assert, Delay, Instance, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout {
 
     /**
      * Returns the display name used in console output and reports.
      *
      * @return the action display name
      */
-    String name();
-
-    /**
-     * Returns the kind for this action, used as the human-readable category in
-     * console output and reports.
-     *
-     * <p>Built-in actions return their simple name (e.g. {@code "Step"},
-     * {@code "Lifecycle"}). Custom actions must implement this method to declare
-     * their own kind.
-     *
-     * @return the action kind; never {@code null} or blank
-     */
-    String kind();
-
-    /**
-     * Returns the before-action, if this action declares one.
-     *
-     * <p>Composite actions such as {@link Lifecycle}, {@link Static}, and {@link Instance}
-     * override this method to return their before-action. Leaf and decorator actions
-     * inherit the default, which returns an empty optional.
-     *
-     * @return the before-action, or empty if none
-     */
-    default Optional<Action<?>> before() {
-        return Optional.empty();
-    }
-
-    /**
-     * Returns the body or contained child actions.
-     *
-     * <p>Composite actions override this method to return their children. Leaf actions
-     * inherit the default, which returns an empty list.
-     *
-     * @return the child actions; never {@code null}
-     */
-    default List<Action<?>> children() {
-        return List.of();
-    }
-
-    /**
-     * Returns the after-action, if this action declares one.
-     *
-     * <p>Composite actions such as {@link Lifecycle}, {@link Static}, and {@link Instance}
-     * override this method to return their after-action. Leaf and decorator actions
-     * inherit the default, which returns an empty optional.
-     *
-     * @return the after-action, or empty if none
-     */
-    default Optional<Action<?>> after() {
-        return Optional.empty();
-    }
-
-    /**
-     * Executes this action using the supplied execution context.
-     *
-     * <p>Implementations are responsible for descriptor status transitions and before/after
-     * listener callbacks for their own execution boundary.
-     *
-     * @param context the active execution context; must not be {@code null}
-     */
-    void execute(Context context);
-
-    @Override
-    default Action<T> resolve() {
-        return this;
-    }
+    String displayName();
 }

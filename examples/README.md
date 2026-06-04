@@ -27,7 +27,7 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 
 ## `__ParamixelRunner__` Convention
 
-Most top-level runnable example packages contain a `__ParamixelRunner__` class that serves as an entry point to run all tests in that package from the console or IDE. Leaf Testcontainers packages are run through `examples.testcontainers.__ParamixelRunner__`. The double-underscore naming (`__`) sorts the file to the top of the package in IDE file trees, making the runner immediately visible.
+Most top-level runnable example packages contain a `__ParamixelRunner__` class that serves as an entry point to run all tests in that package from the console or IDE. Nested Testcontainers packages are run through `examples.testcontainers.__ParamixelRunner__`. The double-underscore naming (`__`) sorts the file to the top of the package in IDE file trees, making the runner immediately visible.
 
 ```java
 public class __ParamixelRunner__ {
@@ -40,7 +40,7 @@ public class __ParamixelRunner__ {
 
 Key details:
 
-- **Scope**: `Selector.packageTreeOf()` selects all classes in the specified package and its subpackages. For example, running `examples.annotation.__ParamixelRunner__` executes `DisabledTest` in `examples.annotation` as well as `CriticalTaggedTest` and `SmokeTaggedTest` in `examples.annotation.tags`.
+- **Selection**: `Selector.packageTreeOf()` selects all classes in the specified package and its subpackages. For example, running `examples.annotation.__ParamixelRunner__` executes `DisabledTest` in `examples.annotation` as well as `CriticalTaggedTest` and `SmokeTaggedTest` in `examples.annotation.tags`.
 - **PMD violations**: The `__ParamixelRunner__` name intentionally violates PMD's `ClassNamingConventions` rule. These are tooling entry points, not application classes.
 - **`examples.support`** has no runner because it contains only utility classes, not test classes.
 

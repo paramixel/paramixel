@@ -23,10 +23,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Lifecycle;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Step;
 
 public class AnnotationMixedArgumentTest {
 
@@ -98,30 +99,39 @@ public class AnnotationMixedArgumentTest {
     }
 
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         resetCounts();
 
         var annotationResolver = AnnotationResolver.create(AnnotationMixedArgumentTest.class);
 
-        var arguments = Sequential.of("AnnotationMixedArgumentTest").independent();
+        var arguments = Sequence.builder("AnnotationMixedArgumentTest").independent();
 
         for (TestArgument testArgument :
                 List.of(new StringArgument("paramixel"), new IntegerArgument(42), new PointArgument(new Point(3, 7)))) {
-            var lifecycle = Lifecycle.of(testArgument.name())
+            var lifecycle = Scope.builder(testArgument.name())
                     .before(annotationResolver.byId("setUp"))
-                    .child(Lifecycle.of("testOne")
+                    .body(Scope.builder("testOne")
                             .before(annotationResolver.byId("beforeEach"))
-                            .child(annotationResolver.byId("testOne"))
-                            .after(annotationResolver.byId("afterEach")))
-                    .after(annotationResolver.byId("tearDown"));
+                            .body(annotationResolver.byId("testOne"))
+                            .after(annotationResolver.byId("afterEach"))
+                            .build())
+                    .after(annotationResolver.byId("tearDown"))
+                    .build();
 
-            arguments.child(Instance.of(testArgument.name(), () -> new AnnotationMixedArgumentTest(testArgument))
-                    .child(lifecycle));
+            arguments.child(Instance.builder(testArgument.name(), () -> new AnnotationMixedArgumentTest(testArgument))
+                    .body(lifecycle)
+                    .build());
         }
 
-        return Instance.of(AnnotationMixedArgumentTest.class)
-                .child(arguments)
-                .child(Lifecycle.of("lifecycle").after(annotationResolver.byId("validate")));
+        return Instance.builder(AnnotationMixedArgumentTest.class)
+                .body(Sequence.builder("body")
+                        .child(arguments.build())
+                        .child(Scope.builder("[scenario]")
+                                .body(Step.of("[validate-ready]", context -> {}))
+                                .after(annotationResolver.byId("validate"))
+                                .build())
+                        .build())
+                .build();
     }
 
     public AnnotationMixedArgumentTest() {

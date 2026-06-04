@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
 
 @DisplayName("Parallel depth 10")
 class ParallelDepthTest {
@@ -37,28 +37,27 @@ class ParallelDepthTest {
 
     private static final int LEAF_COUNT = (int) Math.pow(BRANCHING_FACTOR, DEPTH);
 
-    private static org.paramixel.api.action.Spec<?> buildTree(
-            final int remainingDepth, final AtomicInteger executionCount) {
+    private static Action buildTree(final int remainingDepth, final AtomicInteger executionCount) {
         if (remainingDepth == 0) {
-            return Step.of("leaf", ctx -> executionCount.incrementAndGet());
+            return Step.of("leaf", context -> executionCount.incrementAndGet());
         }
         var depthFromRoot = DEPTH - remainingDepth;
-        var spec = Parallel.of("depth-" + depthFromRoot).parallelism(BRANCHING_FACTOR);
+        var builder = Parallel.builder("depth-" + depthFromRoot).parallelism(BRANCHING_FACTOR);
         for (var i = 0; i < BRANCHING_FACTOR; i++) {
-            spec.child(buildTree(remainingDepth - 1, executionCount));
+            builder.child(buildTree(remainingDepth - 1, executionCount));
         }
-        return spec;
+        return builder.build();
     }
 
     @Test
     @DisplayName("full-branching tree of depth 10 completes and executes all leaves")
     void fullBranchingTreeCompletes() {
         var executionCount = new AtomicInteger();
-        var root = buildTree(DEPTH, executionCount).resolve();
+        var root = buildTree(DEPTH, executionCount);
 
         var result = Runner.defaultRunner().run(root);
 
-        assertThat(result.status()).isEqualTo(Status.PASSED);
+        assertThat(result.isPassed()).isTrue();
         assertThat(executionCount.get()).isEqualTo(LEAF_COUNT);
     }
 
@@ -66,7 +65,7 @@ class ParallelDepthTest {
     @DisplayName("full-branching tree of depth 10 completes with constrained scheduler")
     void fullBranchingTreeConstrainedScheduler() {
         var executionCount = new AtomicInteger();
-        var root = buildTree(DEPTH, executionCount).resolve();
+        var root = buildTree(DEPTH, executionCount);
 
         var runner = Runner.builder()
                 .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "2")))
@@ -74,7 +73,7 @@ class ParallelDepthTest {
 
         var result = assertTimeoutPreemptively(Duration.ofMinutes(2), () -> runner.run(root));
 
-        assertThat(result.status()).isEqualTo(Status.PASSED);
+        assertThat(((Result) result).isPassed()).isTrue();
         assertThat(executionCount.get()).isEqualTo(LEAF_COUNT);
     }
 
@@ -82,7 +81,7 @@ class ParallelDepthTest {
     @DisplayName("full-branching tree of depth 10 completes with bounded parallelism and constrained scheduler")
     void fullBranchingTreeBoundedParallelism() {
         var executionCount = new AtomicInteger();
-        var root = buildTree(DEPTH, executionCount).resolve();
+        var root = buildTree(DEPTH, executionCount);
 
         var runner = Runner.builder()
                 .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "2")))
@@ -90,7 +89,7 @@ class ParallelDepthTest {
 
         var result = assertTimeoutPreemptively(Duration.ofMinutes(2), () -> runner.run(root));
 
-        assertThat(result.status()).isEqualTo(Status.PASSED);
+        assertThat(((Result) result).isPassed()).isTrue();
         assertThat(executionCount.get()).isEqualTo(LEAF_COUNT);
     }
 }

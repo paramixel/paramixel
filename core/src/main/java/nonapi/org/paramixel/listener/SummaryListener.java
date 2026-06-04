@@ -28,7 +28,6 @@ import nonapi.org.paramixel.support.ElapsedTimeFormatter;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
-import org.paramixel.api.Status;
 import org.paramixel.api.Version;
 
 /**
@@ -68,21 +67,6 @@ public final class SummaryListener implements Listener {
         this.renderer = new TreeSummaryRenderer(ansiEnabled);
         this.excludes = Listeners.parseExcludes(
                 configuration.getString(Configuration.LISTENER_EXCLUDE).orElse(null));
-    }
-
-    private PrintWriter getWriter() {
-        var w = out.get();
-        if (w == null) {
-            var newWriter = new PrintWriter(System.out, true);
-            if (!out.compareAndSet(null, newWriter)) {
-                newWriter.close();
-            }
-        }
-        return out.get();
-    }
-
-    private String getPrefix() {
-        return ansiEnabled ? Constants.PARAMIXEL_ANSI : Constants.PARAMIXEL_PLAIN;
     }
 
     /**
@@ -141,12 +125,10 @@ public final class SummaryListener implements Listener {
         }
 
         if (!excludeFooter) {
-            String statusLine = "Status      : " + Listeners.formatStatus(result.status());
+            String statusLine = "Status      : " + Listeners.formatStatus(result);
             String finishedLine =
                     "Finished at : " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String timeLine = "Total time  : "
-                    + ElapsedTimeFormatter.formatElapsedTime(
-                            root.metadata().runDuration().toMillis());
+            String timeLine = "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root));
 
             int maxLineLength = Math.max(
                     Math.max(versionLine.length(), statusLine.length()),
@@ -156,17 +138,31 @@ public final class SummaryListener implements Listener {
             writer.println(prefix + dashes);
             writer.println(prefix + versionLine);
             writer.println(prefix + dashes);
-            writer.println(prefix + "Status      : " + formatStatus(result.status()));
+            writer.println(prefix + "Status      : " + formatStatus(result));
             writer.println(prefix + "Finished at : "
                     + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            writer.println(prefix + "Total time  : "
-                    + ElapsedTimeFormatter.formatElapsedTime(
-                            root.metadata().runDuration().toMillis()));
+            writer.println(
+                    prefix + "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root)));
             writer.println(prefix + dashes);
         }
     }
 
-    private String formatStatus(final Status status) {
-        return ansiEnabled ? Listeners.formatAnsiStatus(status) : Listeners.formatStatus(status);
+    private String getPrefix() {
+        return ansiEnabled ? Constants.PARAMIXEL_ANSI : Constants.PARAMIXEL_PLAIN;
+    }
+
+    private PrintWriter getWriter() {
+        var w = out.get();
+        if (w == null) {
+            var newWriter = new PrintWriter(System.out, true);
+            if (!out.compareAndSet(null, newWriter)) {
+                newWriter.close();
+            }
+        }
+        return out.get();
+    }
+
+    private String formatStatus(final Result result) {
+        return ansiEnabled ? Listeners.formatAnsiStatus(result) : Listeners.formatStatus(result);
     }
 }

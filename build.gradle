@@ -33,6 +33,11 @@ sourceSets {
             srcDir 'examples/src/main/resources'
         }
     }
+    benchmarks {
+        java {
+            srcDir 'benchmarks/src/main/java'
+        }
+    }
 }
 
 dependencies {
@@ -50,6 +55,12 @@ dependencies {
     paramixelImplementation libs.testcontainers.mongodb
     paramixelImplementation libs.testcontainers.nginx
     paramixelImplementation libs.testcontainers
+}
+
+dependencies {
+    benchmarksImplementation sourceSets.main.output
+    benchmarksImplementation libs.jmh.core
+    benchmarksAnnotationProcessor libs.jmh.generator.annprocess
 }
 
 pmd {

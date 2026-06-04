@@ -308,7 +308,7 @@ public final class JsonBuilder {
      * <ul>
      *   <li>The eight JSON-mandated escapes: {@code "}, {@code \}, {@code \n}, {@code \r}, {@code \t}, {@code \b},
      *       {@code \f}, and the line separators U+2028 and U+2029.</li>
-     *   <li>Control characters (U+0000–U+001F) are escaped as Unicode escapes ({@code \\uXXXX}) using a pre-computed
+     *   <li>Unicode control characters (U+0000–U+001F) are escaped as Unicode escapes ({@code \\uXXXX}) using a pre-computed
      *       lookup table.</li>
      *   <li>When {@code escapeForHtmlScript} is enabled, the sequence {@code </} is escaped as {@code <\\/} to prevent
      *       premature {@code </script>} termination.</li>

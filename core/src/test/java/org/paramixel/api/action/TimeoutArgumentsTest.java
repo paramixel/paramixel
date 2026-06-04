@@ -24,164 +24,95 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.ThrowingConsumer;
 
 @DisplayName("Timeout arguments")
 class TimeoutArgumentsTest {
 
+    private static final Action STEP = Step.of("step", s -> {});
+
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Timeout.of(null)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Timeout.of(" ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatIllegalStateException()
-                .isThrownBy(() -> Timeout.of("empty").resolve())
-                .withMessage("timeout must contain a child action");
-    }
-
-    @Test
-    @DisplayName("resolve without timeout throws ISE")
-    void resolveWithoutTimeoutThrowsISE() {
-        var spec = Timeout.of("timeout").child("step", s -> {});
-        assertThatIllegalStateException().isThrownBy(spec::resolve).withMessage("timeout duration must be configured");
-    }
-
-    @Test
-    @DisplayName("child(Spec) rejects null spec")
-    void childSpecRejectsNull() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.child((Spec<?>) null)).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects null name")
-    void childStringConsumerRejectsNullName() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.child(null, s -> {})).isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects blank name")
-    void childStringConsumerRejectsBlankName() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.child(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) rejects null consumer")
-    void childStringConsumerRejectsNullConsumer() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.child("child", (ThrowingConsumer<?>) null))
+        assertThatThrownBy(() -> Timeout.builder(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Timeout.builder(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Timeout.builder("timeout").body((Action) null))
                 .isInstanceOf(NullPointerException.class);
+        assertThatIllegalStateException()
+                .isThrownBy(() -> Timeout.builder("empty").body(STEP).build())
+                .withMessage("timeout duration must be configured");
     }
 
     @Test
-    @DisplayName("child(Spec) adds child from spec")
-    void childSpecAddsChild() {
-        var timeout = Timeout.of("timeout")
-                .timeout(ofMillis(100))
-                .child(Step.of("step", s -> {}))
-                .resolve();
-        assertThat(timeout.child()).isNotNull();
-        assertThat(timeout.child().name()).isEqualTo("step");
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) adds child step")
-    void childStringConsumerAddsChild() {
-        var timeout = Timeout.of("timeout")
-                .timeout(ofMillis(100))
-                .child("step", s -> {})
-                .resolve();
-        assertThat(timeout.child()).isNotNull();
-        assertThat(timeout.child().name()).isEqualTo("step");
-    }
-
-    @Test
-    @DisplayName("child(Spec) overwrites previous child")
-    void childBuilderOverwritesChild() {
-        var timeout = Timeout.of("timeout")
-                .timeout(ofMillis(100))
-                .child(Step.of("first", s -> {}))
-                .child(Step.of("second", s -> {}))
-                .resolve();
-        assertThat(timeout.child().name()).isEqualTo("second");
-    }
-
-    @Test
-    @DisplayName("child(String, ThrowingConsumer) overwrites previous child")
-    void childStringConsumerOverwritesChild() {
-        var timeout = Timeout.of("timeout")
-                .timeout(ofMillis(100))
-                .child("first", s -> {})
-                .child("second", s -> {})
-                .resolve();
-        assertThat(timeout.child().name()).isEqualTo("second");
+    @DisplayName("of(String, Action) adds child from builder")
+    void ofStringActionAddsBody() {
+        var timeout =
+                Timeout.builder("timeout").body(STEP).timeout(ofMillis(100)).build();
+        assertThat(timeout.body()).isNotNull();
+        assertThat(timeout.body().displayName()).isEqualTo("step");
     }
 
     @Test
     @DisplayName("timeout(Duration) rejects null")
     void timeoutDurationRejectsNull() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.timeout(null)).isInstanceOf(NullPointerException.class);
+        var builder = Timeout.builder("timeout").body(STEP);
+        assertThatThrownBy(() -> builder.timeout(null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("timeout(Duration) rejects zero")
     void timeoutDurationRejectsZero() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.timeout(Duration.ZERO)).isInstanceOf(IllegalArgumentException.class);
+        var builder = Timeout.builder("timeout").body(STEP);
+        assertThatThrownBy(() -> builder.timeout(Duration.ZERO)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("timeout(Duration) rejects negative")
     void timeoutDurationRejectsNegative() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.timeout(ofMillis(-1))).isInstanceOf(IllegalArgumentException.class);
+        var builder = Timeout.builder("timeout").body(STEP);
+        assertThatThrownBy(() -> builder.timeout(ofMillis(-1))).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("timeout(Duration) sets timeout")
     void timeoutDurationSetsTimeout() {
-        var timeout = Timeout.of("timeout")
-                .timeout(ofMillis(500))
-                .child("step", s -> {})
-                .resolve();
+        var timeout =
+                Timeout.builder("timeout").body(STEP).timeout(ofMillis(500)).build();
         assertThat(timeout.timeout()).isEqualTo(ofMillis(500));
     }
 
     @Test
     @DisplayName("timeoutMillis() rejects zero")
     void timeoutMillisRejectsZero() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.timeoutMillis(0)).isInstanceOf(IllegalArgumentException.class);
+        var builder = Timeout.builder("timeout").body(STEP);
+        assertThatThrownBy(() -> builder.timeoutMillis(0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("timeoutMillis() rejects negative")
     void timeoutMillisRejectsNegative() {
-        var spec = Timeout.of("timeout");
-        assertThatThrownBy(() -> spec.timeoutMillis(-1)).isInstanceOf(IllegalArgumentException.class);
+        var builder = Timeout.builder("timeout").body(STEP);
+        assertThatThrownBy(() -> builder.timeoutMillis(-1)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("timeoutMillis() sets timeout")
     void timeoutMillisSetsTimeout() {
-        var timeout =
-                Timeout.of("timeout").timeoutMillis(500).child("step", s -> {}).resolve();
+        var timeout = Timeout.builder("timeout").body(STEP).timeoutMillis(500).build();
         assertThat(timeout.timeout()).isEqualTo(ofMillis(500));
     }
 
     @Test
-    @DisplayName("builder is one-shot")
-    void builderOneShotBehavior() {
-        var spec = Timeout.of("timeout");
-        spec.child("test", s -> {});
-        spec.timeout(ofMillis(100));
-        spec.resolve();
-        assertThatIllegalStateException().isThrownBy(() -> spec.resolve());
-        assertThatIllegalStateException().isThrownBy(() -> spec.child("other", s -> {}));
-        assertThatIllegalStateException().isThrownBy(() -> spec.timeout(ofMillis(200)));
-        assertThatIllegalStateException().isThrownBy(() -> spec.timeoutMillis(200));
+    @DisplayName("builder can build multiple immutable snapshots")
+    void builderCanBuildMultipleImmutableSnapshots() {
+        var builder = Timeout.builder("timeout").body(Step.of("test", s -> {}));
+        builder.timeout(ofMillis(100));
+        var first = builder.build();
+        builder.timeout(ofMillis(200));
+        var second = builder.build();
+
+        assertThat(first.body().displayName()).isEqualTo("test");
+        assertThat(first.timeout()).isEqualTo(ofMillis(100));
+        assertThat(second.body().displayName()).isEqualTo("test");
+        assertThat(second.timeout()).isEqualTo(ofMillis(200));
     }
 }

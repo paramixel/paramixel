@@ -22,8 +22,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Sequence;
 
 public class AnnotationTestLifecycleTest implements AutoCloseable {
 
@@ -36,14 +37,17 @@ public class AnnotationTestLifecycleTest implements AutoCloseable {
     }
 
     @Paramixel.Factory
-    public static Spec<?> factory() {
+    public static Action factory() {
         resetCounts();
 
         var annotationResolver = AnnotationResolver.create(AnnotationTestLifecycleTest.class);
 
-        return Instance.of(AnnotationTestLifecycleTest.class)
-                .child(annotationResolver.byId("testOne"))
-                .child(annotationResolver.byId("testTwo"));
+        return Instance.builder(AnnotationTestLifecycleTest.class)
+                .body(Sequence.builder("tests")
+                        .child(annotationResolver.byId("testOne"))
+                        .child(annotationResolver.byId("testTwo"))
+                        .build())
+                .build();
     }
 
     public AnnotationTestLifecycleTest() {

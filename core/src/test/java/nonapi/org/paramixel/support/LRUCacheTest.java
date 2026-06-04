@@ -425,4 +425,32 @@ class LRUCacheTest {
 
         cache.close();
     }
+
+    @Test
+    @DisplayName("getExpiredEntryBeforeReaper: get removes expired entry before reaper runs")
+    void getExpiredEntryBeforeReaper() throws InterruptedException {
+        var cache = new LRUCache<String, String>(10, 50);
+
+        cache.put("key", "value");
+
+        Thread.sleep(100);
+
+        assertThat(cache.get("key")).isNull();
+
+        cache.close();
+    }
+
+    @Test
+    @DisplayName("getNonExpiredEntryReturnsValue: accessing entry before expiration returns value")
+    void getNonExpiredEntryReturnsValue() throws InterruptedException {
+        var cache = new LRUCache<String, String>(10, 200);
+
+        cache.put("key", "value");
+
+        Thread.sleep(50);
+
+        assertThat(cache.get("key")).isEqualTo("value");
+
+        cache.close();
+    }
 }

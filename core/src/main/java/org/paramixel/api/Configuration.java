@@ -21,7 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import nonapi.org.paramixel.ConfigurationFactory;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
 
 /**
@@ -89,7 +89,7 @@ public interface Configuration {
      *
      * <p>The value is trimmed and compared case-insensitively; only {@code "true"} enables this option (see
      * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it.
-     * When {@code true}, skipped results are treated as failures by {@link Runner#runAndReturnExitCode(Spec)} and
+     * When {@code true}, skipped results are treated as failures by {@link Runner#runAndReturnExitCode(Action)} and
      * related methods.
      */
     String FAILURE_ON_SKIP = "paramixel.failureOnSkip";
@@ -99,7 +99,7 @@ public interface Configuration {
      *
      * <p>The value is trimmed and compared case-insensitively; only {@code "true"} enables this option (see
      * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it.
-     * When {@code true}, aborted results are treated as failures by {@link Runner#runAndReturnExitCode(Spec)} and
+     * When {@code true}, aborted results are treated as failures by {@link Runner#runAndReturnExitCode(Action)} and
      * related methods. Default is {@code "true"} (aborted is treated as failure by default, more severe than skip).
      */
     String FAILURE_ON_ABORT = "paramixel.failureOnAbort";
@@ -328,11 +328,11 @@ public interface Configuration {
      * Creates a configuration from the supplied map.
      *
      * <p>The supplied map is defensively copied; subsequent changes to the map are not reflected
-     * in the returned configuration.
+     * in the returned configuration. Null keys and null values are rejected.
      *
      * @param properties the configuration properties; must not be {@code null}
      * @return a new configuration backed by the supplied properties; never {@code null}
-     * @throws NullPointerException if {@code properties} is {@code null}
+     * @throws NullPointerException if {@code properties}, any key, or any value is {@code null}
      */
     static Configuration of(Map<String, String> properties) {
         return ConfigurationFactory.fromMap(properties);

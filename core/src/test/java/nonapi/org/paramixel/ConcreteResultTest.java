@@ -19,13 +19,18 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
 @DisplayName("ConcreteResult")
@@ -133,21 +138,21 @@ class ConcreteResultTest {
         @DisplayName("returns SKIPPED when FAIL_IF_NO_TESTS is absent")
         void skippedWhenFailIfNoTestsAbsent() {
             var result = new ConcreteResult(config());
-            assertThat(result.status()).isEqualTo(Status.SKIPPED);
+            assertThat(result.isSkipped()).isTrue();
         }
 
         @Test
         @DisplayName("returns SKIPPED when FAIL_IF_NO_TESTS is false")
         void skippedWhenFailIfNoTestsFalse() {
             var result = new ConcreteResult(config(Configuration.FAIL_IF_NO_TESTS, "false"));
-            assertThat(result.status()).isEqualTo(Status.SKIPPED);
+            assertThat(result.isSkipped()).isTrue();
         }
 
         @Test
         @DisplayName("returns FAILED when FAIL_IF_NO_TESTS is true")
         void failedWhenFailIfNoTestsTrue() {
             var result = new ConcreteResult(config(Configuration.FAIL_IF_NO_TESTS, "true"));
-            assertThat(result.status()).isEqualTo(Status.FAILED);
+            assertThat(result.isFailed()).isTrue();
         }
     }
 
@@ -159,28 +164,28 @@ class ConcreteResultTest {
         @DisplayName("returns PASSED when root has PASSED status")
         void passedRoot() {
             var result = new ConcreteResult(passedDescriptor(), config());
-            assertThat(result.status()).isEqualTo(Status.PASSED);
+            assertThat(result.isPassed()).isTrue();
         }
 
         @Test
         @DisplayName("returns FAILED when root has FAILED status")
         void failedRoot() {
             var result = new ConcreteResult(failedDescriptor(), config());
-            assertThat(result.status()).isEqualTo(Status.FAILED);
+            assertThat(result.isFailed()).isTrue();
         }
 
         @Test
         @DisplayName("returns SKIPPED when root has SKIPPED status and FAILURE_ON_SKIP is absent")
         void skippedRootNoPromotion() {
             var result = new ConcreteResult(skippedDescriptor(), config());
-            assertThat(result.status()).isEqualTo(Status.SKIPPED);
+            assertThat(result.isSkipped()).isTrue();
         }
 
         @Test
         @DisplayName("returns ABORTED when root has ABORTED status and FAILURE_ON_ABORT is false")
         void abortedRootNoPromotion() {
             var result = new ConcreteResult(abortedDescriptor(), config(Configuration.FAILURE_ON_ABORT, "false"));
-            assertThat(result.status()).isEqualTo(Status.ABORTED);
+            assertThat(result.isAborted()).isTrue();
         }
 
         @Test
@@ -191,7 +196,7 @@ class ConcreteResultTest {
             root.addChild(skippedDescriptor());
 
             var result = new ConcreteResult(root, config());
-            assertThat(result.status()).isEqualTo(Status.PASSED);
+            assertThat(result.isPassed()).isTrue();
         }
 
         @Test
@@ -210,49 +215,308 @@ class ConcreteResultTest {
         @DisplayName("SKIPPED is promoted to FAILED when FAILURE_ON_SKIP is true")
         void skippedPromotedToFailed() {
             var result = new ConcreteResult(skippedDescriptor(), config(Configuration.FAILURE_ON_SKIP, "true"));
-            assertThat(result.status()).isEqualTo(Status.FAILED);
+            assertThat(result.isFailed()).isTrue();
         }
 
         @Test
         @DisplayName("SKIPPED is not promoted when FAILURE_ON_SKIP is false")
         void skippedNotPromotedWhenFalse() {
             var result = new ConcreteResult(skippedDescriptor(), config(Configuration.FAILURE_ON_SKIP, "false"));
-            assertThat(result.status()).isEqualTo(Status.SKIPPED);
+            assertThat(result.isSkipped()).isTrue();
         }
 
         @Test
         @DisplayName("ABORTED is promoted to FAILED when FAILURE_ON_ABORT is true")
         void abortedPromotedToFailed() {
             var result = new ConcreteResult(abortedDescriptor(), config(Configuration.FAILURE_ON_ABORT, "true"));
-            assertThat(result.status()).isEqualTo(Status.FAILED);
+            assertThat(result.isFailed()).isTrue();
         }
 
         @Test
         @DisplayName("ABORTED is not promoted when FAILURE_ON_ABORT is false")
         void abortedNotPromotedWhenFalse() {
             var result = new ConcreteResult(abortedDescriptor(), config(Configuration.FAILURE_ON_ABORT, "false"));
-            assertThat(result.status()).isEqualTo(Status.ABORTED);
+            assertThat(result.isAborted()).isTrue();
         }
 
         @Test
         @DisplayName("ABORTED is promoted to FAILED by default when FAILURE_ON_ABORT is absent")
         void abortedPromotedByDefault() {
             var result = new ConcreteResult(abortedDescriptor(), config());
-            assertThat(result.status()).isEqualTo(Status.FAILED);
+            assertThat(result.isFailed()).isTrue();
         }
 
         @Test
         @DisplayName("PASSED is not promoted regardless of configuration")
         void passedNotPromoted() {
             var result = new ConcreteResult(passedDescriptor(), config(Configuration.FAILURE_ON_SKIP, "true"));
-            assertThat(result.status()).isEqualTo(Status.PASSED);
+            assertThat(result.isPassed()).isTrue();
         }
 
         @Test
         @DisplayName("FAILED is not promoted regardless of configuration")
         void failedNotPromoted() {
             var result = new ConcreteResult(failedDescriptor(), config(Configuration.FAILURE_ON_ABORT, "true"));
-            assertThat(result.status()).isEqualTo(Status.FAILED);
+            assertThat(result.isFailed()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("isPassed()")
+    class IsPassed {
+
+        @Test
+        @DisplayName("returns true when effective status is PASSED")
+        void trueWhenPassed() {
+            var result = new ConcreteResult(passedDescriptor(), config());
+            assertThat(result.isPassed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns false when effective status is not PASSED")
+        void falseWhenNotPassed() {
+            var result = new ConcreteResult(failedDescriptor(), config());
+            assertThat(result.isPassed()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("timing")
+    class Timing {
+
+        @Test
+        @DisplayName("returns empty timestamps when root is null")
+        void emptyWhenRootIsNull() {
+            var result = new ConcreteResult(config());
+
+            assertThat(result.startedAt()).isEmpty();
+            assertThat(result.completedAt()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("derives earliest start and latest completion from whole tree")
+        void derivesWholeTreeTiming() throws InterruptedException {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            var before = passedDescriptor();
+            sleepForTimestampOrdering();
+            root.setStatus(Status.RUNNING);
+            sleepForTimestampOrdering();
+            var child = passedDescriptor();
+            sleepForTimestampOrdering();
+            root.setStatus(Status.PASSED);
+            sleepForTimestampOrdering();
+            var after = passedDescriptor();
+            root.setBefore(before);
+            root.addChild(child);
+            root.setAfter(after);
+
+            var result = new ConcreteResult(root, config());
+
+            assertThat(result.startedAt()).isEqualTo(before.startedAt());
+            assertThat(result.completedAt()).isEqualTo(after.completedAt());
+        }
+
+        @Test
+        @DisplayName("derives timing from children-only tree without before or after")
+        void derivesTimingFromChildrenOnlyTree() throws InterruptedException {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            var child1 = passedDescriptor();
+            sleepForTimestampOrdering();
+            root.setStatus(Status.RUNNING);
+            sleepForTimestampOrdering();
+            var child2 = passedDescriptor();
+            sleepForTimestampOrdering();
+            var child3 = passedDescriptor();
+            sleepForTimestampOrdering();
+            root.setStatus(Status.PASSED);
+            root.addChild(child1);
+            root.addChild(child2);
+            root.addChild(child3);
+
+            var result = new ConcreteResult(root, config());
+
+            assertThat(result.startedAt()).isPresent();
+            assertThat(result.completedAt()).isPresent();
+            assertThat(result.startedAt().orElseThrow())
+                    .isBefore(result.completedAt().orElseThrow());
+        }
+
+        @Test
+        @DisplayName("derives timing from tree with before and children but no after")
+        void derivesTimingFromBeforeAndChildrenTree() throws InterruptedException {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            var before = passedDescriptor();
+            sleepForTimestampOrdering();
+            root.setStatus(Status.RUNNING);
+            sleepForTimestampOrdering();
+            var child = passedDescriptor();
+            sleepForTimestampOrdering();
+            root.setStatus(Status.PASSED);
+            root.setBefore(before);
+            root.addChild(child);
+
+            var result = new ConcreteResult(root, config());
+
+            assertThat(result.startedAt()).isEqualTo(before.startedAt());
+            assertThat(result.completedAt()).isEqualTo(root.completedAt());
+        }
+
+        @Test
+        @DisplayName("disregards descriptors without timestamps")
+        void disregardsDescriptorsWithoutTimestamps() throws InterruptedException {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            root.setStatus(Status.RUNNING);
+            sleepForTimestampOrdering();
+            root.setStatus(Status.PASSED);
+
+            var result = new ConcreteResult(root, config());
+
+            assertThat(result.startedAt()).isEqualTo(root.startedAt());
+            assertThat(result.completedAt()).isEqualTo(root.completedAt());
+        }
+
+        private void sleepForTimestampOrdering() throws InterruptedException {
+            Thread.sleep(2L);
+        }
+    }
+
+    @Nested
+    @DisplayName("status resolution for non-MutableDescriptor")
+    class StatusResolutionNonMutable {
+
+        @Test
+        @DisplayName("returns PASSED for passed non-mutable descriptor")
+        void passedNonMutableDescriptor() {
+            var descriptor = descriptorWithStatus(Status.PASSED);
+            var result = new ConcreteResult(descriptor, config());
+            assertThat(result.isPassed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns FAILED for failed non-mutable descriptor")
+        void failedNonMutableDescriptor() {
+            var descriptor = descriptorWithStatus(Status.FAILED);
+            var result = new ConcreteResult(descriptor, config());
+            assertThat(result.isFailed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns ABORTED for aborted non-mutable descriptor")
+        void abortedNonMutableDescriptor() {
+            var descriptor = descriptorWithStatus(Status.ABORTED);
+            var result = new ConcreteResult(descriptor, config(Configuration.FAILURE_ON_ABORT, "false"));
+            assertThat(result.isAborted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns SKIPPED for skipped non-mutable descriptor")
+        void skippedNonMutableDescriptor() {
+            var descriptor = descriptorWithStatus(Status.SKIPPED);
+            var result = new ConcreteResult(descriptor, config());
+            assertThat(result.isSkipped()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns RUNNING for pending non-mutable descriptor")
+        void runningForPendingNonMutableDescriptor() {
+            var descriptor = descriptorWithIncompleteStatus(false, false, false, false);
+            var result = new ConcreteResult(descriptor, config());
+            assertThat(result.status()).isEqualTo(Status.RUNNING);
+        }
+
+        @Test
+        @DisplayName("promotion from SKIPPED to FAILED for non-mutable descriptor")
+        void promotedSkippedNonMutable() {
+            var descriptor = descriptorWithStatus(Status.SKIPPED);
+            var result = new ConcreteResult(descriptor, config(Configuration.FAILURE_ON_SKIP, "true"));
+            assertThat(result.isFailed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("default ABORTED promotes to FAILED for non-mutable descriptor")
+        void defaultAbortedPromotedNonMutable() {
+            var descriptor = descriptorWithStatus(Status.ABORTED);
+            var result = new ConcreteResult(descriptor, config());
+            assertThat(result.isFailed()).isTrue();
+        }
+
+        private Descriptor descriptorWithStatus(final Status status) {
+            boolean isPassed = status.isPassed();
+            boolean isFailed = status.isFailed();
+            boolean isAborted = status.isAborted();
+            boolean isSkipped = status.isSkipped();
+            return descriptorWithIncompleteStatus(isPassed, isFailed, isAborted, isSkipped);
+        }
+
+        private Descriptor descriptorWithIncompleteStatus(
+                final boolean isPassed, final boolean isFailed, final boolean isAborted, final boolean isSkipped) {
+            boolean completed = isPassed || isFailed || isAborted || isSkipped;
+            return new Descriptor() {
+                @Override
+                public Optional<Descriptor> parent() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public String id() {
+                    return "stub";
+                }
+
+                @Override
+                public Action action() {
+                    return Step.of("stub", v -> {});
+                }
+
+                @Override
+                public boolean isPassed() {
+                    return isPassed;
+                }
+
+                @Override
+                public boolean isFailed() {
+                    return isFailed;
+                }
+
+                @Override
+                public boolean isSkipped() {
+                    return isSkipped;
+                }
+
+                @Override
+                public boolean isAborted() {
+                    return isAborted;
+                }
+
+                @Override
+                public Optional<Instant> startedAt() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<Instant> completedAt() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<String> message() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<Throwable> throwable() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public boolean isCompleted() {
+                    return completed;
+                }
+
+                @Override
+                public List<Descriptor> children() {
+                    return List.of();
+                }
+            };
         }
     }
 }

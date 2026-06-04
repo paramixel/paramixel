@@ -19,6 +19,7 @@ package org.paramixel.maven.plugin.fixtures;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Step;
 
 /**
  * Fixture whose action completes successfully, used to verify that the Maven mojo completes without
@@ -35,8 +36,8 @@ public final class PassingMojoFixture {
      */
     @Paramixel.Factory
     public static Action action() {
-        return Instance.<Object>of("mojo-pass", Object::new)
-                .child("test", obj -> {})
-                .resolve();
+        return Instance.builder("mojo-pass", Object::new)
+                .body(Step.of("test", context -> {}))
+                .build();
     }
 }

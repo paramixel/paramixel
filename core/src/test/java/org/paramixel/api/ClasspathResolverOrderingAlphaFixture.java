@@ -17,24 +17,18 @@
 package org.paramixel.api;
 
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Step;
 
-/**
- * Fixture discovered by the resolver with no explicit priority to assert default ordering among
- * alpha, beta, negative, and high-priority fixtures.
- */
 public final class ClasspathResolverOrderingAlphaFixture {
 
     private ClasspathResolverOrderingAlphaFixture() {
         // Intentionally empty
     }
 
-    /**
-     * Creates an action labeled {@code "alpha"} for resolver ordering verification.
-     *
-     * @return a {@link ResolverOrderingAction} with the {@code "alpha"} identifier
-     */
     @Paramixel.Factory
-    public static Action<?> factory() {
-        return new ResolverOrderingAction("alpha");
+    public static Action factory() {
+        return Step.of("alpha", context -> {
+            throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
+        });
     }
 }

@@ -40,10 +40,11 @@
         <module>core</module>
         <module>maven-plugin</module>
         <module>examples</module>
+        <module>benchmarks</module>
     </modules>
 
     <properties>
-        <revision>5.1.1</revision>
+        <revision>6.0.0</revision>
         <!-- Build settings -->
         <jacoco.skip>false</jacoco.skip>
         <maven.compiler.release>17</maven.compiler.release>
@@ -61,9 +62,10 @@
         <kafka-clients.version>4.3.0</kafka-clients.version>
         <maven.version>3.9.16</maven.version>
         <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
-        <mongodb-driver-sync.version>5.7.0</mongodb-driver-sync.version>
-        <palantir-java-format.version>2.90.0</palantir-java-format.version>
-        <pmd.version>7.24.0</pmd.version>
+        <mongodb-driver-sync.version>5.8.0</mongodb-driver-sync.version>
+        <palantir-java-format.version>2.91.0</palantir-java-format.version>
+        <pmd.version>7.25.0</pmd.version>
+        <jmh.version>1.37</jmh.version>
         <slf4j.version>2.0.18</slf4j.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
@@ -84,7 +86,7 @@
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
         <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
-        <maven-surefire-plugin.version>3.5.5</maven-surefire-plugin.version>
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
         <spotless-maven-plugin.version>3.5.1</spotless-maven-plugin.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     </properties>
@@ -135,6 +137,16 @@
                 <groupId>org.apache.maven</groupId>
                 <artifactId>maven-model</artifactId>
                 <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-core</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-generator-annprocess</artifactId>
+                <version>${jmh.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -506,6 +518,7 @@
                             <autoPublish>false</autoPublish>
                             <excludeArtifacts>
                                 <excludeArtifact>examples</excludeArtifact>
+                                <excludeArtifact>benchmarks</excludeArtifact>
                             </excludeArtifacts>
                         </configuration>
                     </plugin>

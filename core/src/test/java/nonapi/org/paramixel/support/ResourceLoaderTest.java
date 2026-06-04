@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.InputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("ResourceLoader")
@@ -63,5 +64,42 @@ class ResourceLoaderTest {
     void returnsNullStreamForNonexistentResource() {
         InputStream stream = ResourceLoader.getResourceAsStream("nonexistent.resource.that.does.not.exist");
         assertThat(stream).isNull();
+    }
+
+    @Nested
+    @DisplayName("getResourceAsStream with explicit ClassLoader")
+    class GetResourceAsStreamWithClassLoaderTests {
+
+        @Test
+        @DisplayName("finds resource through provided class loader")
+        void findsResourceThroughProvidedClassLoader() {
+            ClassLoader classLoader = getClass().getClassLoader();
+            InputStream stream = ResourceLoader.getResourceAsStream("version.properties", classLoader);
+            assertThat(stream).isNotNull();
+        }
+
+        @Test
+        @DisplayName("falls back to defining class loader when provided class loader cannot find resource")
+        void fallsBackWhenProvidedClassLoaderCannotFindResource() {
+            ClassLoader emptyLoader = new ClassLoader(null) {};
+            InputStream stream = ResourceLoader.getResourceAsStream("version.properties", emptyLoader);
+            assertThat(stream).isNotNull();
+        }
+
+        @Test
+        @DisplayName("returns null when no class loader finds the resource")
+        void returnsNullWhenNoClassLoaderFindsResource() {
+            ClassLoader emptyLoader = new ClassLoader(null) {};
+            InputStream stream =
+                    ResourceLoader.getResourceAsStream("nonexistent.resource.that.does.not.exist", emptyLoader);
+            assertThat(stream).isNull();
+        }
+
+        @Test
+        @DisplayName("works with null class loader via defining/system fallback")
+        void worksWithNullClassLoader() {
+            InputStream stream = ResourceLoader.getResourceAsStream("version.properties", (ClassLoader) null);
+            assertThat(stream).isNotNull();
+        }
     }
 }

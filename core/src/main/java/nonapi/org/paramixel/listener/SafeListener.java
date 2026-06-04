@@ -63,13 +63,13 @@ public final class SafeListener implements Listener {
     }
 
     @Override
-    public void onRunStarted() {
-        invoke("onRunStarted", delegate::onRunStarted);
+    public void onDiscoveryCompleted(final Descriptor root) {
+        invoke("onDiscoveryCompleted", () -> delegate.onDiscoveryCompleted(root));
     }
 
     @Override
-    public void onDiscoveryCompleted(final Descriptor root) {
-        invoke("onDiscoveryCompleted", () -> delegate.onDiscoveryCompleted(root));
+    public void onRunStarted() {
+        invoke("onRunStarted", delegate::onRunStarted);
     }
 
     @Override

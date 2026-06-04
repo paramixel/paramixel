@@ -30,8 +30,7 @@ import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Mode;
-import org.paramixel.api.action.Spec;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.selector.Selector;
 
@@ -68,18 +67,17 @@ public final class ConcreteRunner implements Runner {
     }
 
     @Override
-    public Result run(final Spec<?> spec) {
+    public Result run(final Action action) {
         lock.lock();
         try {
-            return runInternal(spec);
+            return runInternal(action);
         } finally {
             lock.unlock();
         }
     }
 
-    private Result runInternal(final Spec<?> spec) {
-        Objects.requireNonNull(spec, "spec is null");
-        final var action = spec.resolve();
+    private Result runInternal(final Action action) {
+        Objects.requireNonNull(action, "action is null");
         safeListener.initialize(configuration);
         safeListener.onRunStarted();
         safeListener.onDiscoveryStarted();
@@ -89,11 +87,9 @@ public final class ConcreteRunner implements Runner {
             root = new DescriptorBuilder().discover(action);
             safeListener.onDiscoveryCompleted(root);
             scheduler = new Scheduler(parallelism, schedulerQueueCapacity);
-            var topLevelParallelThrottle = new TopLevelParallelThrottle(parallelism);
-            var context = new ConcreteContext(
-                    configuration, safeListener, root, scheduler, new InstanceHolder(), topLevelParallelThrottle);
-            root.markScheduled(Mode.RUN);
-            scheduler.executeDescriptor(root, context);
+            var context = new ConcreteContext(configuration, safeListener, root, scheduler, new InstanceHolder());
+            root.markScheduled();
+            scheduler.executeDescriptor(root, context, ExecutionMode.RUN);
             var result = new ConcreteResult(root, configuration);
             safeListener.onRunCompleted(result);
             return result;
@@ -103,7 +99,7 @@ public final class ConcreteRunner implements Runner {
             }
             final String message = t.getMessage() != null ? t.getMessage() : "Runner failed";
             if (root != null) {
-                var status = root.metadata().status();
+                var status = root.status();
                 if (status.isPending()) {
                     root.setStatus(Status.RUNNING);
                 }
@@ -164,11 +160,11 @@ public final class ConcreteRunner implements Runner {
     }
 
     @Override
-    public int runAndReturnExitCode(final Spec<?> spec) {
+    public int runAndReturnExitCode(final Action action) {
         lock.lock();
         try {
-            Objects.requireNonNull(spec, "spec is null");
-            return exitCode(runInternal(spec));
+            Objects.requireNonNull(action, "action is null");
+            return exitCode(runInternal(action));
         } finally {
             lock.unlock();
         }
@@ -187,12 +183,12 @@ public final class ConcreteRunner implements Runner {
     }
 
     @Override
-    public void runAndExit(final Spec<?> spec) {
+    public void runAndExit(final Action action) {
         final int exitCode;
         lock.lock();
         try {
-            Objects.requireNonNull(spec, "spec is null");
-            exitCode = exitCode(runInternal(spec));
+            Objects.requireNonNull(action, "action is null");
+            exitCode = exitCode(runInternal(action));
         } finally {
             lock.unlock();
         }
@@ -230,8 +226,8 @@ public final class ConcreteRunner implements Runner {
         }
     }
 
-    private int runAndReturnExitCodeInternal(final Spec<?> spec) {
-        return exitCode(runInternal(spec));
+    private int runAndReturnExitCodeInternal(final Action action) {
+        return exitCode(runInternal(action));
     }
 
     private static Selector buildSelector(final Configuration config) {
@@ -279,16 +275,15 @@ public final class ConcreteRunner implements Runner {
     }
 
     private int exitCode(final Result result) {
-        final var status = result.status();
-        if (status.isPassed()) {
+        if (result.isPassed()) {
             return 0;
         }
-        if (status.isSkipped()) {
+        if (result.isSkipped()) {
             final var failureOnSkip =
                     configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(false);
             return failureOnSkip ? 1 : 0;
         }
-        if (status.isAborted()) {
+        if (result.isAborted()) {
             final var failureOnAbort =
                     configuration.getBoolean(Configuration.FAILURE_ON_ABORT).orElse(true);
             return failureOnAbort ? 1 : 0;

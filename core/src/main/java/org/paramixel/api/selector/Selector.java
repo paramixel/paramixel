@@ -21,13 +21,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import nonapi.org.paramixel.ConcreteAllSelector;
-import nonapi.org.paramixel.ConcreteAndSelector;
-import nonapi.org.paramixel.ConcreteClassRegexSelector;
-import nonapi.org.paramixel.ConcreteNotSelector;
-import nonapi.org.paramixel.ConcreteOrSelector;
-import nonapi.org.paramixel.ConcretePackageRegexSelector;
-import nonapi.org.paramixel.ConcreteTagRegexSelector;
+import nonapi.org.paramixel.selector.ConcreteAllSelector;
+import nonapi.org.paramixel.selector.ConcreteAndSelector;
+import nonapi.org.paramixel.selector.ConcreteClassRegexSelector;
+import nonapi.org.paramixel.selector.ConcreteNotSelector;
+import nonapi.org.paramixel.selector.ConcreteOrSelector;
+import nonapi.org.paramixel.selector.ConcretePackageRegexSelector;
+import nonapi.org.paramixel.selector.ConcreteTagRegexSelector;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
