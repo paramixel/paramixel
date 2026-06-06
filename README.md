@@ -24,7 +24,7 @@ Annotation-based frameworks force you to express test logic through declarations
 
 ## Documentation
 
-For the full documentation, visit: **https://paramixel.github.io/paramixel**
+For the full documentation, visit: **https://www.paramixel.org**
 
 ## Quick Start
 
