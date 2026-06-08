@@ -255,8 +255,12 @@ public final class AnnotationResolver<T> {
                 method.invoke(instance);
             } catch (InvocationTargetException e) {
                 Throwable cause = e.getCause();
-                if (cause instanceof Error error) throw error;
-                if (cause instanceof RuntimeException re) throw re;
+                if (cause instanceof Error error) {
+                    throw error;
+                }
+                if (cause instanceof RuntimeException re) {
+                    throw re;
+                }
                 throw new RuntimeException(cause);
             }
         };
@@ -268,8 +272,12 @@ public final class AnnotationResolver<T> {
                 method.invoke(null);
             } catch (InvocationTargetException e) {
                 Throwable cause = e.getCause();
-                if (cause instanceof Error error) throw error;
-                if (cause instanceof RuntimeException re) throw re;
+                if (cause instanceof Error error) {
+                    throw error;
+                }
+                if (cause instanceof RuntimeException re) {
+                    throw re;
+                }
                 throw new RuntimeException(cause);
             }
         };

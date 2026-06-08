@@ -22,7 +22,9 @@ import java.util.IdentityHashMap;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Conditional;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
@@ -94,6 +96,10 @@ public final class DescriptorBuilder {
             }
         } else if (action instanceof Timeout timeout) {
             descriptor.addChild(build(descriptor, timeout.body(), path, visited));
+        } else if (action instanceof Isolated isolated) {
+            descriptor.addChild(build(descriptor, isolated.body(), path, visited));
+        } else if (action instanceof Conditional conditional) {
+            descriptor.addChild(build(descriptor, conditional.body(), path, visited));
         }
         path.removeLast();
         visited.remove(action);

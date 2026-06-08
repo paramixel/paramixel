@@ -202,10 +202,10 @@ class EachTest {
     }
 
     @Test
-    @DisplayName("parallel rejects null mapper result")
-    void parallelRejectsNullMapperResult() {
-        assertThatThrownBy(() -> Each.parallel("test", List.of("a"), value -> null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("action is null");
+    @DisplayName("sequential rejects unsupported mapper return type")
+    void sequentialRejectsUnsupportedMapperReturnType() {
+        assertThatThrownBy(() -> Each.sequential("test", List.of("a"), value -> "not an action"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unsupported action type");
     }
 }

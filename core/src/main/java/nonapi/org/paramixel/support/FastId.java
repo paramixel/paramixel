@@ -99,11 +99,11 @@ public class FastId {
         }
 
         int chunks = (length + 3) / 4;
-        StringBuilder sb = new StringBuilder(length);
+        StringBuilder stringBuilder = new StringBuilder(length);
         for (int i = 0; i < chunks; i++) {
-            sb.append(generateLcgChunk());
+            stringBuilder.append(generateLcgChunk());
         }
-        return sb.substring(0, length);
+        return stringBuilder.substring(0, length);
     }
 
     /**

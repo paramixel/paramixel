@@ -108,4 +108,115 @@ class SequenceArgumentsTest {
                 .build();
         assertThat(seq.isDependent()).isTrue();
     }
+
+    @Test
+    @DisplayName("default isShuffled is false, seed is 0")
+    void defaultNotShuffled() {
+        var seq = Sequence.builder("seq").child(Step.of("a", s -> {})).build();
+        assertThat(seq.isShuffled()).isFalse();
+        assertThat(seq.seed()).isZero();
+    }
+
+    @Test
+    @DisplayName("shuffle() sets isShuffled and non-zero seed")
+    void shuffleSetsShuffledAndSeed() {
+        var seq = Sequence.builder("seq")
+                .shuffle()
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .build();
+        assertThat(seq.isShuffled()).isTrue();
+        assertThat(seq.seed()).isNotZero();
+    }
+
+    @Test
+    @DisplayName("shuffle(long seed) stores explicit seed")
+    void shuffleWithSeedStoresSeed() {
+        var seq = Sequence.builder("seq")
+                .shuffle(42L)
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .build();
+        assertThat(seq.isShuffled()).isTrue();
+        assertThat(seq.seed()).isEqualTo(42L);
+    }
+
+    @Test
+    @DisplayName("shuffle with known seed produces predictable order")
+    void shuffleWithKnownSeedProducesPredictableOrder() {
+        var seq = Sequence.builder("seq")
+                .shuffle(42L)
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .child(Step.of("c", s -> {}))
+                .build();
+        var names = seq.children().stream().map(Action::displayName).toList();
+        var seq2 = Sequence.builder("seq")
+                .shuffle(42L)
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .child(Step.of("c", s -> {}))
+                .build();
+        assertThat(seq2.children().stream().map(Action::displayName).toList()).isEqualTo(names);
+    }
+
+    @Test
+    @DisplayName("shuffle with 0 children still reports shuffled")
+    void shuffleWithZeroChildrenStillShuffled() {
+        var seq = Sequence.builder("seq").shuffle().build();
+        assertThat(seq.isShuffled()).isTrue();
+        assertThat(seq.seed()).isNotZero();
+        assertThat(seq.children()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("shuffle with 1 child is no-op but still shuffled")
+    void shuffleSingleChildStillShuffled() {
+        var seq = Sequence.builder("seq").shuffle().child(Step.of("a", s -> {})).build();
+        assertThat(seq.isShuffled()).isTrue();
+        assertThat(seq.seed()).isNotZero();
+        assertThat(seq.children()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("shuffle preserves immutability/reusability of builder")
+    void shufflePreservesImmutability() {
+        var builder = Sequence.builder("seq").shuffle(42L).child(Step.of("a", s -> {}));
+        var first = builder.build();
+        builder.child(Step.of("b", s -> {}));
+        var second = builder.build();
+        assertThat(first.children()).hasSize(1);
+        assertThat(second.children()).hasSize(2);
+        assertThat(first.isShuffled()).isTrue();
+        assertThat(second.isShuffled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("shuffle works with dependent")
+    void shuffleWorksWithDependent() {
+        var seq = Sequence.builder("seq").shuffle().child(Step.of("a", s -> {})).build();
+        assertThat(seq.isDependent()).isTrue();
+        assertThat(seq.isShuffled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("shuffle works with independent")
+    void shuffleWorksWithIndependent() {
+        var seq = Sequence.builder("seq")
+                .independent()
+                .shuffle()
+                .child(Step.of("a", s -> {}))
+                .build();
+        assertThat(seq.isIndependent()).isTrue();
+        assertThat(seq.isShuffled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("shuffle with seed 0 is valid")
+    void shuffleWithSeedZeroIsValid() {
+        var seq =
+                Sequence.builder("seq").shuffle(0L).child(Step.of("a", s -> {})).build();
+        assertThat(seq.isShuffled()).isTrue();
+        assertThat(seq.seed()).isZero();
+    }
 }

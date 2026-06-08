@@ -18,6 +18,7 @@ package org.paramixel.api;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import nonapi.org.paramixel.ConcreteRunner;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
@@ -139,6 +140,8 @@ public interface Runner {
         private Configuration configuration;
         private Listener listener;
         private boolean explicitListener;
+        private boolean shuffled;
+        private long shuffleSeed;
 
         private Builder() {
             // Intentionally empty
@@ -168,6 +171,37 @@ public interface Runner {
         }
 
         /**
+         * Configures discovered action ordering to be shuffled randomly at build time.
+         *
+         * <p>The seed is generated from {@link ThreadLocalRandom} when {@link #build()} is called
+         * and applies only to discovery-based execution ({@code run(Selector)} and {@code run()}).
+         * Direct execution via {@code run(Action)} is unaffected — users control their own
+         * builder shuffle for direct trees. For reproducible shuffling, use {@link #shuffle(long)}.
+         *
+         * @return this builder
+         */
+        public Builder shuffle() {
+            this.shuffled = true;
+            this.shuffleSeed = ThreadLocalRandom.current().nextLong();
+            return this;
+        }
+
+        /**
+         * Configures discovered action ordering to be shuffled with the supplied seed at build time.
+         *
+         * <p>Applies only to discovery-based execution ({@code run(Selector)} and {@code run()}).
+         * Using the same seed produces the same ordering, enabling reproducible flaky-test investigations.
+         *
+         * @param seed the PRNG seed for reproducible shuffling
+         * @return this builder
+         */
+        public Builder shuffle(final long seed) {
+            this.shuffled = true;
+            this.shuffleSeed = seed;
+            return this;
+        }
+
+        /**
          * Builds the runner.
          *
          * @return a new runner
@@ -176,9 +210,10 @@ public interface Runner {
             final var effectiveConfiguration =
                     configuration == null ? Configuration.defaultConfiguration() : configuration;
             if (explicitListener) {
-                return new ConcreteRunner(effectiveConfiguration, listener);
+                return new ConcreteRunner(effectiveConfiguration, listener, shuffled, shuffleSeed);
             }
-            return new ConcreteRunner(effectiveConfiguration, Listener.defaultListener(effectiveConfiguration));
+            return new ConcreteRunner(
+                    effectiveConfiguration, Listener.defaultListener(effectiveConfiguration), shuffled, shuffleSeed);
         }
     }
 

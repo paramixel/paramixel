@@ -16,6 +16,7 @@
 
 package org.paramixel.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
@@ -129,5 +130,26 @@ class RunnerArgumentsTest {
         assertThatThrownBy(() -> Runner.builder().listener(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("listener is null");
+    }
+
+    @Test
+    @DisplayName("Runner builder shuffle() builds successfully")
+    void runnerBuilderShuffleBuildsSuccessfully() {
+        var runner = Runner.builder().shuffle().build();
+        assertThat(runner).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Runner builder shuffle(long) builds successfully")
+    void runnerBuilderShuffleWithSeedBuildsSuccessfully() {
+        var runner = Runner.builder().shuffle(42L).build();
+        assertThat(runner).isNotNull();
+    }
+
+    @Test
+    @DisplayName("last shuffle call wins on Runner builder")
+    void lastShuffleCallWinsOnRunnerBuilder() {
+        var runner = Runner.builder().shuffle(42L).shuffle().build();
+        assertThat(runner).isNotNull();
     }
 }

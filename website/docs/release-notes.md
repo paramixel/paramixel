@@ -5,6 +5,9 @@ description: Current documentation-facing release notes.
 
 # Release Notes
 
+## Unreleased
+(No unreleased changes)
+
 ## 6.0.0 documentation baseline
 
 These docs reflect the current source tree:

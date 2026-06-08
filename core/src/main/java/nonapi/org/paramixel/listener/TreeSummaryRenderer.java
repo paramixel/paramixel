@@ -20,8 +20,15 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import nonapi.org.paramixel.listener.support.Constants;
 import org.paramixel.api.Descriptor;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Conditional;
+import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Isolated;
+import org.paramixel.api.action.Repeat;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Static;
+import org.paramixel.api.action.Timeout;
 
 /**
  * Renders a descriptor tree as a tree-style summary with connectors, timing, and failure information.
@@ -56,85 +63,55 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
         if (root == null) {
             return Constants.PARAMIXEL_PLAIN + "No Paramixel tests found" + System.lineSeparator();
         }
-        var sb = new StringBuilder();
+        var stringBuilder = new StringBuilder();
         Deque<RenderFrame> stack = new ArrayDeque<>();
-        stack.push(new RenderFrame(root, "", true, RenderMode.SUBTREE));
+        if (isSyntheticRoot(root)) {
+            renderRunLine(root, stringBuilder);
+            pushInReverse(stack, buildChildFrames(root, ""));
+        } else {
+            stack.push(new RenderFrame(root, "", true, null));
+        }
         while (!stack.isEmpty()) {
             var frame = stack.pop();
-            renderNodeLine(frame.descriptor(), frame.prefix(), frame.isLast(), sb);
-            if (frame.mode() == RenderMode.LINE_ONLY) {
-                continue;
-            }
+            renderNodeLine(frame, stringBuilder);
 
-            var children = frame.descriptor().children();
-            var hasBefore = frame.descriptor().before().isPresent();
-            var hasAfter = frame.descriptor().after().isPresent();
-            if (children.isEmpty() && !hasBefore && !hasAfter) {
-                continue;
-            }
-
-            String continuation = ConnectorStyle.STANDARD.continuation(frame.isLast());
-            String childPrefix = frame.prefix() + continuation;
-            var childFrames = buildChildFrames(frame.descriptor(), children, childPrefix);
+            var childFrames = buildChildFrames(
+                    frame.descriptor(), frame.prefix() + ConnectorStyle.STANDARD.continuation(frame.isLast()));
             pushInReverse(stack, childFrames);
         }
-        return sb.toString();
+        return stringBuilder.toString();
     }
 
-    private List<RenderFrame> buildChildFrames(
-            final Descriptor descriptor, final List<Descriptor> children, final String childPrefix) {
-        boolean hasBefore = descriptor.before().isPresent();
-        boolean hasAfter = descriptor.after().isPresent();
-        if (hasBefore || hasAfter) {
-            return buildStructuredChildFrames(descriptor, children, childPrefix);
-        }
+    private static boolean isSyntheticRoot(final Descriptor descriptor) {
+        return Constants.ROOT_NAME.equals(descriptor.action().displayName());
+    }
+
+    private List<RenderFrame> buildChildFrames(final Descriptor descriptor, final String childPrefix) {
+        var children = new ArrayList<ChildFrame>();
+        descriptor.before().ifPresent(child -> children.add(new ChildFrame(child, "before")));
+        String bodySlot = supportsBody(descriptor.action()) ? "body" : null;
+        descriptor.children().forEach(child -> children.add(new ChildFrame(child, bodySlot)));
+        descriptor.after().ifPresent(child -> children.add(new ChildFrame(child, "after")));
         return buildFlatChildFrames(children, childPrefix);
     }
 
-    private List<RenderFrame> buildFlatChildFrames(final List<Descriptor> children, final String childPrefix) {
+    private List<RenderFrame> buildFlatChildFrames(final List<ChildFrame> children, final String childPrefix) {
         var frames = new ArrayList<RenderFrame>(children.size());
         for (var i = 0; i < children.size(); i++) {
-            frames.add(new RenderFrame(children.get(i), childPrefix, i == children.size() - 1, RenderMode.SUBTREE));
+            var child = children.get(i);
+            frames.add(new RenderFrame(child.descriptor(), childPrefix, i == children.size() - 1, child.slot()));
         }
         return frames;
     }
 
-    private List<RenderFrame> buildStructuredChildFrames(
-            final Descriptor descriptor, final List<Descriptor> bodyChildren, final String childPrefix) {
-        var beforeChild = descriptor.before().orElse(null);
-        var afterChild = descriptor.after().orElse(null);
-
-        var frames = new ArrayList<RenderFrame>();
-        if (beforeChild != null) {
-            boolean beforeIsLast = (afterChild == null) && bodyChildren.isEmpty();
-            frames.add(new RenderFrame(beforeChild, childPrefix, beforeIsLast, RenderMode.LINE_ONLY));
-
-            var beforeChildren = beforeChild.children();
-            if (!beforeIsLast || !beforeChildren.isEmpty()) {
-                String beforeContinuation = ConnectorStyle.STANDARD.continuation(beforeIsLast);
-                String nestedPrefix = childPrefix + beforeContinuation;
-
-                var nestedChildren = new ArrayList<Descriptor>(beforeChildren.size() + bodyChildren.size());
-                nestedChildren.addAll(beforeChildren);
-                nestedChildren.addAll(bodyChildren);
-
-                for (var i = 0; i < nestedChildren.size(); i++) {
-                    frames.add(new RenderFrame(
-                            nestedChildren.get(i), nestedPrefix, i == nestedChildren.size() - 1, RenderMode.SUBTREE));
-                }
-            }
-        } else {
-            boolean hasAfter = afterChild != null;
-            for (var i = 0; i < bodyChildren.size(); i++) {
-                boolean isLast = !hasAfter && (i == bodyChildren.size() - 1);
-                frames.add(new RenderFrame(bodyChildren.get(i), childPrefix, isLast, RenderMode.SUBTREE));
-            }
-        }
-
-        if (afterChild != null) {
-            frames.add(new RenderFrame(afterChild, childPrefix, true, RenderMode.SUBTREE));
-        }
-        return frames;
+    private static boolean supportsBody(final Action action) {
+        return action instanceof Conditional
+                || action instanceof Instance
+                || action instanceof Isolated
+                || action instanceof Repeat
+                || action instanceof Scope
+                || action instanceof Static
+                || action instanceof Timeout;
     }
 
     private static void pushInReverse(final Deque<RenderFrame> stack, final List<RenderFrame> frames) {
@@ -143,16 +120,41 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
         }
     }
 
-    private void renderNodeLine(
-            final Descriptor descriptor, final String prefix, final boolean isLast, final StringBuilder sb) {
+    private void renderRunLine(final Descriptor descriptor, final StringBuilder stringBuilder) {
+        String status = formatStatus(descriptor);
+        String timing = formatTiming(Listeners.elapsedMillis(descriptor));
+        String failureInfo = formatFailureInfo(descriptor);
+        String line = status + " Run " + timing + failureInfo;
+        stringBuilder.append(line.stripTrailing()).append(System.lineSeparator());
+    }
+
+    private void renderNodeLine(final RenderFrame frame, final StringBuilder stringBuilder) {
+        var descriptor = frame.descriptor();
         String status = formatStatus(descriptor);
         String actionName = descriptor.action().displayName();
         String timing = formatTiming(Listeners.elapsedMillis(descriptor));
         String failureInfo = formatFailureInfo(descriptor);
 
-        String connector = ConnectorStyle.STANDARD.connector(isLast);
-        String line = prefix + connector + status + " " + actionName + " " + timing + failureInfo;
-        sb.append(line.stripTrailing()).append(System.lineSeparator());
+        String connector = ConnectorStyle.STANDARD.connector(frame.isLast());
+        String line = frame.prefix() + connector + formatLabel(frame.slot(), descriptor.action()) + status + " "
+                + actionName + " " + timing + failureInfo;
+        stringBuilder.append(line.stripTrailing()).append(System.lineSeparator());
+    }
+
+    private static String formatLabel(final String slot, final Action action) {
+        String actionType = actionType(action);
+        if (slot == null) {
+            return actionType + ": ";
+        }
+        return slot + "[" + actionType + "]: ";
+    }
+
+    private static String actionType(final Action action) {
+        String simpleName = action.getClass().getSimpleName();
+        if (simpleName.isBlank()) {
+            return "action";
+        }
+        return simpleName.toLowerCase(java.util.Locale.ROOT);
     }
 
     private String formatStatus(final Descriptor descriptor) {
@@ -184,12 +186,9 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
         return elapsedMillis + " ms";
     }
 
-    private record RenderFrame(Descriptor descriptor, String prefix, boolean isLast, RenderMode mode) {}
+    private record ChildFrame(Descriptor descriptor, String slot) {}
 
-    private enum RenderMode {
-        SUBTREE,
-        LINE_ONLY
-    }
+    private record RenderFrame(Descriptor descriptor, String prefix, boolean isLast, String slot) {}
 
     private enum ConnectorStyle {
         STANDARD("\u251C\u2500 ", "\u2514\u2500 ", "\u2502  ", "   ");

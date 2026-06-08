@@ -22,7 +22,6 @@ import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
-import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.AnsiColor;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Result;

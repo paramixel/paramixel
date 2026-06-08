@@ -42,15 +42,138 @@ gpg --keyserver pgp.mit.edu --send-keys XXXXXXXXXXXXXXXX
 echo "test" | gpg --batch --clearsign >/dev/null
 ```
 
+### Documentation Publishing
+
+The `WWW_PARAMIXEL_ORG` environment variable must be set to your SSH host alias for documentation publishing.
+
+## Automated Release
+
+The `./scripts/release.sh` script automates the entire release process except for publishing from the Maven Central Portal, which requires manual verification.
+
+The script is **idempotent** — each step detects if it has already been completed and skips accordingly. It is safe to re-run if a step fails partway through.
+
+### Usage
+
+```bash
+# Dry run (default) — prints all commands without executing
+./scripts/release.sh 1.2.3
+
+# Execute the release
+./scripts/release.sh 1.2.3 --execute
+
+# Skip Gradle validation
+./scripts/release.sh 1.2.3 --execute --skip-gradle
+
+# Skip documentation build (use if docs already built)
+./scripts/release.sh 1.2.3 --execute --skip-docs-build
+```
+
+### Options
+
+| Option | Description |
+| ------ | ----------- |
+| `--execute` | Execute the release (default is dry-run) |
+| `--skip-gradle` | Skip Gradle build validation |
+| `--skip-docs-build` | Skip documentation build (pass `--skip-build` to publish script) |
+| `-h`, `--help` | Show help text |
+
+### What the script does
+
+| Step | Action | Automated |
+| ---- | ------ | --------- |
+| Pre-flight | Validates version format, clean tree, branch sync, executables, GPG, settings.xml, env vars | Yes |
+| 1 | Create release branch, set version, build, push | Yes |
+| 2 | Wait for CI to pass | Pause for user confirmation |
+| 3 | Deploy artifacts to Sonatype Central | Yes |
+| 4 | Verify and publish at Maven Central Portal | **Manual** — user publishes from the portal |
+| 5 | Tag and push tag | Yes (after Step 4 confirmed) |
+| 6 | Publish documentation | Yes |
+| 7 | Bump main to development version (`<VERSION>-POST`) | Yes |
+
+The script prompts before every push and tag operation. Answering **N** at Step 4 triggers a full rollback (deletes the release branch locally and remotely, reminds user to drop the Sonatype deployment).
+
+### Steps the script performs
+
+#### Step 1 — Prepare the release branch
+
+From `main`, creates the release branch, sets the version, validates the build, then pushes:
+
+```bash
+git checkout -b release/<VERSION>
+./mvnw versions:set-property -Dproperty=revision -DnewVersion=<VERSION> -DgenerateBackupPoms=false
+./mvnw spotless:apply
+./mvnw clean install
+./gradlew clean check --no-daemon
+./scripts/build-documentation.sh
+git add -A
+git commit -s -m "release: Release <VERSION>"
+git push -u origin release/<VERSION>
+```
+
+#### Step 2 — Wait for CI to pass
+
+CI runs automatically on the release branch. The script pauses and asks for confirmation.
+
+#### Step 3 — Deploy to Maven Central
+
+```bash
+./mvnw -Prelease clean deploy
+```
+
+#### Step 4 — Verify and publish to Maven Central
+
+> **Maven Central releases are immutable and cannot be undone or overwritten.**
+
+Before proceeding, verify the pending deployment at [Sonatype Central](https://central.sonatype.com):
+
+- Confirm the version number is correct
+- Confirm the expected publishable artifacts are present
+- Confirm each publishable artifact has the required JAR, sources, javadoc, and POM files
+- Confirm GPG signatures are present
+- Confirm Central validation completed successfully
+
+Once verified, publish the deployment from the Maven Central Publishing Portal.
+
+The script pauses for user confirmation. If you answer **N**, the script rolls back (deletes the release branch and reminds you to drop the Sonatype deployment).
+
+#### Step 5 — Tag the release
+
+```bash
+git tag -a v<VERSION> -m "Release <VERSION>"
+git push origin v<VERSION>
+```
+
+#### Step 6 — Publish documentation
+
+```bash
+./scripts/publish-documentation.sh
+```
+
+#### Step 7 — Bump main to the next development version
+
+```bash
+git checkout main
+git pull --ff-only
+./mvnw versions:set-property -Dproperty=revision -DnewVersion=<VERSION>-POST -DgenerateBackupPoms=false
+./mvnw spotless:apply
+./mvnw clean install
+./gradlew clean check --no-daemon
+git add -A
+git commit -s -m "chore: Prepare for development"
+git push
+```
+
 ## Conventions
 
 - Release tag: `v<VERSION>`
 - Release branch: `release/<VERSION>`
 - Post-release development version: `<VERSION>-POST`
-- Accepted version format: `MAJOR.MINOR.PATCH` or `MAJOR.MINOR.PATCH-label`
+- Accepted version format for the release script: `x.y.z` (e.g. `1.2.3`)
 - The release version must not already end in `-POST`
 
-## Release Process
+## Manual Release
+
+If the script cannot be used, follow the steps below manually.
 
 ### Step 1 — Prepare the release branch
 
@@ -208,6 +331,8 @@ git push
 - **Publish failed after validation:** Check the deployment status and validation details in the Maven Central Publishing Portal. If it can be retried from the portal, retry there. Otherwise drop the deployment from the portal, fix the issue locally, and rerun `./mvnw -Prelease clean deploy`.
 - **Tag pushed but deploy failed:** Delete the remote tag (`git push origin :refs/tags/vX.Y.Z`), fix the issue, redeploy, then re-tag.
 - **Post-release bump failed on main:** Manually set the version, commit, and push.
+- **Script answered N at Step 4:** The script rolls back automatically. Drop the pending deployment in the Maven Central Publishing Portal if you do not intend to publish.
+- **Script interrupted partway through:** Re-run the script. It is idempotent — each step detects if it has already been completed and skips accordingly.
 
 ---
 

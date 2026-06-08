@@ -19,7 +19,7 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 | `examples.retry` | Retry support class demonstration | Yes |
 | `examples.store` | Store context and operations | Yes |
 | `examples.support` | Shared utilities (Logger, Resource, NetworkFactory, Debug) | N/A |
-| `examples.testcontainers` | Testcontainers integration tests | Yes |
+| `examples.isolated` | Named-lock serialized execution with Instance isolation | Yes |
 | `examples.testcontainers.kafka` | Kafka integration test + environment + wait strategy | N/A |
 | `examples.testcontainers.mongodb` | MongoDB integration test + environment | N/A |
 | `examples.testcontainers.nginx` | Nginx integration test + environment | N/A |

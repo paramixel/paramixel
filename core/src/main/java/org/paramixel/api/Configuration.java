@@ -115,6 +115,18 @@ public interface Configuration {
     String FAIL_IF_NO_TESTS = "paramixel.failIfNoTests";
 
     /**
+     * Configuration key controlling whether the scheduler skips remaining unscheduled root children
+     * after the first failed or aborted action.
+     *
+     * <p>The value is trimmed and compared case-insensitively; only {@code "true"} enables this option (see
+     * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it.
+     * When {@code true}, the scheduler stops scheduling new direct children of the root descriptor
+     * once a failure or abort is detected. Already-running subtrees complete normally. Skipped children
+     * are aggregated into the result with {@link Status#SKIPPED} status.
+     */
+    String FAIL_FAST = "paramixel.failFast";
+
+    /**
      * Configuration key controlling the file used for the summary report.
      *
      * <p>Recognized file extensions: {@code .json}, {@code .xml}, {@code .html}. Plain text is used for {@code .log},

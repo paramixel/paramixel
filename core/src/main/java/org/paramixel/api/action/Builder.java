@@ -24,7 +24,9 @@ package org.paramixel.api.action;
  * for deferred building.
  */
 public sealed interface Builder
-        permits Instance.Builder,
+        permits Conditional.Builder,
+                Instance.Builder,
+                Isolated.Builder,
                 Parallel.Builder,
                 Repeat.Builder,
                 Scope.Builder,

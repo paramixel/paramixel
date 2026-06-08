@@ -83,4 +83,12 @@ class AnsiDetectorTest {
     void detectReturnsFalseWhenNoColorIsWhitespaceOnly() {
         assertThat(AnsiDetector.detect(true, "   ", null)).isFalse();
     }
+
+    @Test
+    @DisplayName("isAnsiAvailable delegates to current process environment")
+    void isAnsiAvailableDelegatesToCurrentProcessEnvironment() {
+        assertThat(AnsiDetector.isAnsiAvailable())
+                .isEqualTo(AnsiDetector.detect(
+                        System.console() != null, System.getenv("NO_COLOR"), System.getenv("TERM")));
+    }
 }

@@ -54,7 +54,7 @@ class RunnerDiscoveryArgumentsTest {
                 .isTrue();
         assertThat(selector.matchesClass(RunnerDiscoveryArgumentsTest.class.getName()))
                 .isTrue();
-        assertThat(selector.matchesClass(ClasspathResolverSmokeFixture.class.getName()))
+        assertThat(selector.matchesClass(ActionResolverSmokeFixture.class.getName()))
                 .isFalse();
     }
 
@@ -81,11 +81,11 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("classOf matches exact class")
     void classOfMatchesExactClass() {
-        Selector selector = Selector.classOf(ClasspathResolverSmokeFixture.class);
+        Selector selector = Selector.classOf(ActionResolverSmokeFixture.class);
 
-        assertThat(selector.matchesClass(ClasspathResolverSmokeFixture.class.getName()))
+        assertThat(selector.matchesClass(ActionResolverSmokeFixture.class.getName()))
                 .isTrue();
-        assertThat(selector.matchesClass(ClasspathResolverMultiTagFixture.class.getName()))
+        assertThat(selector.matchesClass(ActionResolverMultiTagFixture.class.getName()))
                 .isFalse();
     }
 

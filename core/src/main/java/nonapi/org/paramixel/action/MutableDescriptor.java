@@ -21,6 +21,7 @@ import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Assert;
 import org.paramixel.api.action.Delay;
+import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
@@ -178,6 +179,7 @@ public interface MutableDescriptor extends Descriptor {
     default boolean isCoordinationAction() {
         return action() instanceof Parallel
                 || action() instanceof Sequence
+                || action() instanceof Isolated
                 || before().isPresent()
                 || after().isPresent()
                 || !children().isEmpty();

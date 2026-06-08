@@ -113,6 +113,7 @@ Check for:
 - Inconsistent coding style
 - Hidden side effects
 - Deep nesting
+- Missing braces on control flow statements (`if`, `else`, `while`, `for`, `do-while`, `switch`, `case` blocks)
 - Excessive abstraction
 - Feature envy
 - God classes

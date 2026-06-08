@@ -367,7 +367,7 @@ class InstanceExecutionTest {
     @Test
     @DisplayName("instance available to children")
     void instanceAvailableToChildren() {
-        var instanceRef = new AtomicReference();
+        var instanceRef = new AtomicReference<CloseableFixture>();
         var closed = new AtomicInteger();
 
         var action = Instance.builder("instance", () -> new CloseableFixture(closed))
@@ -385,7 +385,7 @@ class InstanceExecutionTest {
     @DisplayName("instance holder cleared after destroy")
     void instanceHolderClearedAfterDestroy() {
         var closed = new AtomicInteger();
-        var instanceDuringBody = new AtomicReference();
+        var instanceDuringBody = new AtomicReference<CloseableFixture>();
 
         var action = Instance.builder("instance", () -> new CloseableFixture(closed))
                 .body(Step.of("child", withInstance(CloseableFixture.class, instanceDuringBody::set)))

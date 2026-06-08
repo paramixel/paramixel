@@ -24,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
-import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.AnsiColor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -81,14 +80,64 @@ class TreeSummaryRendererTest {
     }
 
     @Test
-    @DisplayName("root node name appears in output")
-    void rootNodeNameAppearsInOutput() {
+    @DisplayName("synthetic root node is hidden")
+    void syntheticRootNodeIsHidden() {
         Action child = Step.of("visible-child", context -> {});
         Parallel parallel =
                 Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
-        String output = runAndCaptureOutput(parallel);
+        String output = runAndCapturePlainOutput(parallel);
 
         assertThat(output).contains("visible-child");
+        assertThat(output).doesNotContain("PASSED " + ROOT_NAME);
+    }
+
+    @Test
+    @DisplayName("synthetic root renders lifecycle slots as top-level siblings")
+    void syntheticRootRendersLifecycleSlotsAsTopLevelSiblings() {
+        Scope root = Scope.builder(ROOT_NAME)
+                .before(Sequence.builder("BeforeAll hooks")
+                        .child(Step.of("beforeOne", context -> {}))
+                        .child(Step.of("beforeTwo", context -> {}))
+                        .build())
+                .body(Step.of("testOne()", context -> {}))
+                .after(Sequence.builder("AfterAll hooks")
+                        .child(Step.of("afterOne", context -> {}))
+                        .child(Step.of("afterTwo", context -> {}))
+                        .build())
+                .build();
+        String output = runAndCapturePlainOutput(root);
+
+        assertThat(output).doesNotContain("PASSED " + ROOT_NAME);
+        assertThat(output).contains("PASSED Run");
+        assertThat(output).contains("\u251C\u2500 before[sequence]: PASSED BeforeAll hooks");
+        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED beforeOne");
+        assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED beforeTwo");
+        assertThat(output).contains("\u251C\u2500 body[step]: PASSED testOne()");
+        assertThat(output).contains("\u2514\u2500 after[sequence]: PASSED AfterAll hooks");
+        assertThat(output).contains("   \u251C\u2500 step: PASSED afterOne");
+        assertThat(output).contains("   \u2514\u2500 step: PASSED afterTwo");
+    }
+
+    @Test
+    @DisplayName("synthetic root labels parallel body action type")
+    void syntheticRootLabelsParallelBodyActionType() {
+        Scope root = Scope.builder(ROOT_NAME)
+                .before(Step.of("before", context -> {}))
+                .body(Parallel.builder("actions")
+                        .parallelism(1)
+                        .child(Step.of("FullLifecycleTest", context -> {}))
+                        .child(Step.of("FakeTest", context -> {}))
+                        .build())
+                .after(Step.of("after", context -> {}))
+                .build();
+        String output = runAndCapturePlainOutput(root);
+
+        assertThat(output).contains("PASSED Run");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED before");
+        assertThat(output).contains("\u251C\u2500 body[parallel]: PASSED actions");
+        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED FullLifecycleTest");
+        assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED FakeTest");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED after");
     }
 
     @Test
@@ -229,14 +278,14 @@ class TreeSummaryRendererTest {
                 .build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED before");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED body");
-        assertThat(output).contains("\u2514\u2500 PASSED after");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED before");
+        assertThat(output).contains("\u251C\u2500 body[step]: PASSED body");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED after");
     }
 
     @Test
-    @DisplayName("lifecycle with before, body, and after nests body under before")
-    void lifecycleWithBeforeBodyAfterNestsBodyUnderBefore() {
+    @DisplayName("lifecycle with before, body, and after renders as siblings")
+    void lifecycleWithBeforeBodyAfterRendersAsSiblings() {
         Action before = Step.of("setUp()", context -> {});
         Action body = Step.of("testGet()", context -> {});
         Action after = Step.of("tearDown()", context -> {});
@@ -247,14 +296,14 @@ class TreeSummaryRendererTest {
                 .build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED setUp()");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED testGet()");
-        assertThat(output).contains("\u2514\u2500 PASSED tearDown()");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
+        assertThat(output).contains("\u251C\u2500 body[step]: PASSED testGet()");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED tearDown()");
     }
 
     @Test
-    @DisplayName("lifecycle with before, multiple body, and after nests all body under before")
-    void lifecycleWithBeforeMultipleBodyAfterNestsAllBodyUnderBefore() {
+    @DisplayName("lifecycle with before, multiple body, and after renders as siblings")
+    void lifecycleWithBeforeMultipleBodyAfterRendersAsSiblings() {
         Action before = Step.of("setUp()", context -> {});
         Action body1 = Step.of("testA()", context -> {});
         Action body2 = Step.of("testB()", context -> {});
@@ -266,11 +315,11 @@ class TreeSummaryRendererTest {
                 .build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED setUp()");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED body");
-        assertThat(output).contains("\u2502     \u251C\u2500 PASSED testA()");
-        assertThat(output).contains("\u2502     \u2514\u2500 PASSED testB()");
-        assertThat(output).contains("\u2514\u2500 PASSED tearDown()");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
+        assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
+        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED testA()");
+        assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED testB()");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED tearDown()");
     }
 
     @Test
@@ -281,20 +330,20 @@ class TreeSummaryRendererTest {
         Scope scope = Scope.builder("myLifecycle").before(before).body(body).build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED before");
-        assertThat(output).contains("\u2514\u2500 PASSED body");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED before");
+        assertThat(output).contains("\u2514\u2500 body[step]: PASSED body");
     }
 
     @Test
-    @DisplayName("lifecycle with before, body, and no after nests body under before")
-    void lifecycleWithBeforeBodyNoAfterNestsBodyUnderBefore() {
+    @DisplayName("lifecycle with before, body, and no after renders as siblings")
+    void lifecycleWithBeforeBodyNoAfterRendersAsSiblings() {
         Action before = Step.of("setUp()", context -> {});
         Action body = Step.of("testGet()", context -> {});
         Scope scope = Scope.builder("myLifecycle").before(before).body(body).build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED setUp()");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED testGet()");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
+        assertThat(output).contains("\u2514\u2500 body[step]: PASSED testGet()");
     }
 
     @Test
@@ -305,8 +354,8 @@ class TreeSummaryRendererTest {
         Scope scope = Scope.builder("myLifecycle").body(body).after(after).build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED body");
-        assertThat(output).contains("\u2514\u2500 PASSED after");
+        assertThat(output).contains("\u251C\u2500 body[step]: PASSED body");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED after");
     }
 
     @Test
@@ -317,8 +366,8 @@ class TreeSummaryRendererTest {
         Scope scope = Scope.builder("myLifecycle").body(body).after(after).build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED testGet()");
-        assertThat(output).contains("\u2514\u2500 PASSED tearDown()");
+        assertThat(output).contains("\u251C\u2500 body[step]: PASSED testGet()");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED tearDown()");
     }
 
     @Test
@@ -334,14 +383,14 @@ class TreeSummaryRendererTest {
                 .build();
         String output = runAndCapturePlainOutput(scope);
 
-        assertThat(output).contains("\u251C\u2500 PASSED setUp()");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED body");
-        assertThat(output).contains("\u2514\u2500 PASSED tearDown()");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
+        assertThat(output).contains("\u251C\u2500 body[step]: PASSED body");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED tearDown()");
     }
 
     @Test
-    @DisplayName("instance with lifecycle body child renders deeply nested tree")
-    void instanceWithLifecycleBodyChildRendersDeeplyNestedTree() {
+    @DisplayName("instance with lifecycle body child renders lifecycle slots as siblings")
+    void instanceWithLifecycleBodyChildRendersLifecycleSlotsAsSiblings() {
         Action lifecycleBefore = Step.of("setUp()", context -> {});
         Action lifecycleBody = Step.of("testGet()", context -> {});
         Action lifecycleAfter = Step.of("tearDown()", context -> {});
@@ -356,17 +405,17 @@ class TreeSummaryRendererTest {
                 Parallel.builder("root").parallelism(1).child(instance).build();
         String output = runAndCapturePlainOutput(parallel);
 
-        assertThat(output).contains("\u251C\u2500 PASSED [instantiate]");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED lifecycle");
-        assertThat(output).contains("\u2502     \u251C\u2500 PASSED setUp()");
-        assertThat(output).contains("\u2502     \u2502  \u2514\u2500 PASSED testGet()");
-        assertThat(output).contains("\u2502     \u2514\u2500 PASSED tearDown()");
-        assertThat(output).contains("\u2514\u2500 PASSED [destroy]");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED [instantiate]");
+        assertThat(output).contains("\u251C\u2500 body[scope]: PASSED lifecycle");
+        assertThat(output).contains("\u2502  \u251C\u2500 before[step]: PASSED setUp()");
+        assertThat(output).contains("\u2502  \u251C\u2500 body[step]: PASSED testGet()");
+        assertThat(output).contains("\u2502  \u2514\u2500 after[step]: PASSED tearDown()");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED [destroy]");
     }
 
     @Test
-    @DisplayName("static with before and after nests body children under before")
-    void staticWithBeforeAndAfterNestsBodyUnderBefore() {
+    @DisplayName("static with before and after renders body as sibling")
+    void staticWithBeforeAndAfterRendersBodyAsSibling() {
         Action staticAction = Static.builder("myStatic")
                 .before(Step.of("staticSetUp", context -> {}))
                 .body(Sequence.builder("body")
@@ -377,16 +426,16 @@ class TreeSummaryRendererTest {
                 .build();
         String output = runAndCapturePlainOutput(staticAction);
 
-        assertThat(output).contains("\u251C\u2500 PASSED staticSetUp");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED body");
-        assertThat(output).contains("\u2502     \u251C\u2500 PASSED testOne");
-        assertThat(output).contains("\u2502     \u2514\u2500 PASSED testTwo");
-        assertThat(output).contains("\u2514\u2500 PASSED staticTearDown");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED staticSetUp");
+        assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
+        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED testOne");
+        assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED testTwo");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED staticTearDown");
     }
 
     @Test
-    @DisplayName("instance renders instantiate and destroy with nested body children")
-    void instanceRendersWithNestedBodyChildren() {
+    @DisplayName("instance renders instantiate, body, and destroy as siblings")
+    void instanceRendersInstantiateBodyAndDestroyAsSiblings() {
         Instance instance = Instance.builder("myInstance", () -> "instance")
                 .body(Sequence.builder("body")
                         .child(Step.of("setUp", s -> {}))
@@ -406,13 +455,13 @@ class TreeSummaryRendererTest {
         assertThat(output).contains("test consume");
         assertThat(output).contains("tearDown");
         assertThat(output).contains("[destroy]");
-        assertThat(output).contains("\u251C\u2500 PASSED [instantiate]");
-        assertThat(output).contains("\u2502  \u2514\u2500 PASSED body");
-        assertThat(output).contains("\u2502     \u251C\u2500 PASSED setUp");
-        assertThat(output).contains("\u2502     \u251C\u2500 PASSED test produce");
-        assertThat(output).contains("\u2502     \u251C\u2500 PASSED test consume");
-        assertThat(output).contains("\u2502     \u2514\u2500 PASSED tearDown");
-        assertThat(output).contains("\u2514\u2500 PASSED [destroy]");
+        assertThat(output).contains("\u251C\u2500 before[step]: PASSED [instantiate]");
+        assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
+        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED setUp");
+        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED test produce");
+        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED test consume");
+        assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED tearDown");
+        assertThat(output).contains("\u2514\u2500 after[step]: PASSED [destroy]");
     }
 
     @Test

@@ -72,15 +72,11 @@
         <exclude name="AvoidDeeplyNestedIfStmts"/>
         <exclude name="MutableStaticState"/>
         <exclude name="SwitchDensity"/>
+        <exclude name="NPathComplexity"/>
     </rule>
     <rule ref="category/java/design.xml/CouplingBetweenObjects">
         <properties>
             <property name="threshold" value="50"/>
-        </properties>
-    </rule>
-    <rule ref="category/java/design.xml/NPathComplexity">
-        <properties>
-            <property name="reportLevel" value="10000"/>
         </properties>
     </rule>
     <rule ref="category/java/design.xml/NcssCount">

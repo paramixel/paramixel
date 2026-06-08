@@ -62,21 +62,18 @@ public final class ElapsedTimeFormatter {
      */
     public static String formatDuration(long milliseconds) {
         Arguments.requireFalse(milliseconds < 0, "milliseconds is negative");
-        long hours = milliseconds / 3_600_000;
-        milliseconds %= 3_600_000;
-        long minutes = milliseconds / 60_000;
-        milliseconds %= 60_000;
-        long seconds = milliseconds / 1_000;
-        long ms = milliseconds % 1_000;
 
         StringBuilder result = new StringBuilder();
         boolean hasPrevious = false;
 
+        long hours = milliseconds / 3_600_000;
         if (hours > 0) {
             result.append(hours).append(" h");
             hasPrevious = true;
         }
+        milliseconds %= 3_600_000;
 
+        long minutes = milliseconds / 60_000;
         if (minutes > 0 || hours > 0) {
             if (hasPrevious) {
                 result.append(' ');
@@ -84,7 +81,9 @@ public final class ElapsedTimeFormatter {
             result.append(minutes).append(" m");
             hasPrevious = true;
         }
+        milliseconds %= 60_000;
 
+        long seconds = milliseconds / 1_000;
         if (seconds > 0 || minutes > 0 || hours > 0) {
             if (hasPrevious) {
                 result.append(' ');
@@ -96,7 +95,7 @@ public final class ElapsedTimeFormatter {
         if (hasPrevious) {
             result.append(' ');
         }
-        result.append(ms).append(" ms");
+        result.append(milliseconds % 1_000).append(" ms");
 
         return result.toString();
     }

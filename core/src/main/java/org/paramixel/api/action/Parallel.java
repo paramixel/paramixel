@@ -17,8 +17,11 @@
 package org.paramixel.api.action;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
@@ -43,12 +46,21 @@ public final class Parallel implements Action {
     private final String displayName;
     private final List<Action> children;
     private final int parallelism;
+    private final long seed;
+    private final boolean shuffled;
 
-    private Parallel(final String displayName, final int parallelism, final List<Action> children) {
+    private Parallel(
+            final String displayName,
+            final int parallelism,
+            final List<Action> children,
+            final long seed,
+            final boolean shuffled) {
         Objects.requireNonNull(displayName, "displayName is null");
         this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
         this.children = validateChildren(children);
         this.parallelism = parallelism;
+        this.seed = seed;
+        this.shuffled = shuffled;
     }
 
     /**
@@ -104,6 +116,33 @@ public final class Parallel implements Action {
         return children;
     }
 
+    /**
+     * Returns whether children were shuffled at build time.
+     *
+     * <p>When {@code true}, the {@link #children()} list reflects the shuffled order,
+     * and {@link #seed()} returns the PRNG seed that produced it. When {@code false},
+     * children are in insertion order.
+     *
+     * @return {@code true} if children were shuffled
+     */
+    public boolean isShuffled() {
+        return shuffled;
+    }
+
+    /**
+     * Returns the PRNG seed used to shuffle children.
+     *
+     * <p>Returns {@code 0} when this action was not shuffled. When
+     * {@link #isShuffled()} returns {@code true}, this value is the seed
+     * passed to {@code new Random(seed)} before shuffling, enabling
+     * reproducible reordering.
+     *
+     * @return the shuffle seed, or {@code 0} when not shuffled
+     */
+    public long seed() {
+        return seed;
+    }
+
     private static List<Action> validateChildren(final List<Action> children) {
         Objects.requireNonNull(children, "children is null");
         var validated = new ArrayList<Action>(children.size());
@@ -126,6 +165,8 @@ public final class Parallel implements Action {
         private final String displayName;
         private final List<Action> children = new ArrayList<>();
         private int parallelism = Integer.MAX_VALUE;
+        private boolean shuffled;
+        private long shuffleSeed;
 
         private Builder(final String displayName) {
             Objects.requireNonNull(displayName, "displayName is null");
@@ -179,13 +220,48 @@ public final class Parallel implements Action {
         }
 
         /**
+         * Configures children to be shuffled randomly at build time.
+         *
+         * <p>A seed is generated from {@link ThreadLocalRandom} at build time and
+         * stored on the resulting action for reporting. For reproducible shuffling,
+         * use {@link #shuffle(long)}.
+         *
+         * @return this builder
+         */
+        public Builder shuffle() {
+            this.shuffled = true;
+            this.shuffleSeed = ThreadLocalRandom.current().nextLong();
+            return this;
+        }
+
+        /**
+         * Configures children to be shuffled with the supplied seed at build time.
+         *
+         * <p>Using the same seed on an identical tree produces the same shuffled
+         * order, enabling reproducible flaky-test investigations. The seed value
+         * {@code 0} is valid and will produce a consistent shuffle.
+         *
+         * @param seed the PRNG seed for reproducible shuffling
+         * @return this builder
+         */
+        public Builder shuffle(final long seed) {
+            this.shuffled = true;
+            this.shuffleSeed = seed;
+            return this;
+        }
+
+        /**
          * Builds an immutable {@link Parallel} action from this builder's configuration.
          *
          * @return a new Parallel action
          */
         @Override
         public Parallel build() {
-            return new Parallel(displayName, parallelism, List.copyOf(children));
+            final var mutableChildren = new ArrayList<>(children);
+            if (shuffled) {
+                Collections.shuffle(mutableChildren, new Random(shuffleSeed));
+            }
+            return new Parallel(displayName, parallelism, List.copyOf(mutableChildren), shuffleSeed, shuffled);
         }
     }
 }

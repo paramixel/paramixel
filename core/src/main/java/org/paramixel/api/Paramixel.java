@@ -57,6 +57,43 @@ public final class Paramixel {
     public @interface Factory {}
 
     /**
+     * Marks a method that executes once before any discovered test actions
+     * within a runner invocation.
+     *
+     * <p>The method must be {@code public static}, take zero parameters, and
+     * return {@link Action} or {@link Builder}. Multiple {@code @BeforeAll}
+     * methods are ordered by {@link Priority @Priority} on the declaring
+     * class, then by package, class, and method name.
+     *
+     * <p>A failing or skipped {@code @BeforeAll} method causes the body of
+     * the run (all discovered factory actions) to be skipped. Any
+     * {@code @AfterAll} methods still execute.
+     *
+     * @see AfterAll
+     */
+    @Documented
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface BeforeAll {}
+
+    /**
+     * Marks a method that executes once after all discovered test actions
+     * within a runner invocation.
+     *
+     * <p>The method must be {@code public static}, take zero parameters, and
+     * return {@link Action} or {@link Builder}. Multiple {@code @AfterAll}
+     * methods are ordered in reverse of {@code @BeforeAll} ordering. Every
+     * {@code @AfterAll} method executes regardless of whether preceding
+     * hooks or test actions failed.
+     *
+     * @see BeforeAll
+     */
+    @Documented
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface AfterAll {}
+
+    /**
      * Declares discovery ordering priority for a discovered action factory class.
      *
      * <p>Higher priority classes are ordered earlier when the framework builds the discovered

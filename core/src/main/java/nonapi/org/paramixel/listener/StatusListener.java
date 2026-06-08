@@ -24,7 +24,6 @@ import java.io.StringWriter;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
-import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.AnsiDetector;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
@@ -59,15 +58,18 @@ public class StatusListener implements Listener {
 
     @Override
     public void onBeforeExecution(final Descriptor descriptor) {
-        if (excludes.contains(ExcludeTarget.STATUS_HEADER)) return;
+        if (excludes.contains(ExcludeTarget.STATUS_HEADER)) {
+            return;
+        }
         Objects.requireNonNull(descriptor, "descriptor is null");
-        var sb = new StringBuilder();
-        sb.append(prefix())
-                .append(Listeners.formatIdPath(descriptor))
+        var stringBuilder = new StringBuilder();
+        stringBuilder
+                .append(prefix())
+                .append(Thread.currentThread().getName())
                 .append(" | ")
                 .append(displayName(descriptor))
                 .append(LINE_SEPARATOR);
-        System.out.print(sb.toString());
+        System.out.print(stringBuilder);
     }
 
     @Override
@@ -75,19 +77,21 @@ public class StatusListener implements Listener {
         Objects.requireNonNull(descriptor, "descriptor is null");
 
         if (!excludes.contains(ExcludeTarget.STATUS_FOOTER)) {
-            var sb = new StringBuilder();
+            var stringBuilder = new StringBuilder();
             var statusText = ansiEnabled ? Listeners.formatAnsiStatus(descriptor) : Listeners.formatStatus(descriptor);
-            sb.append(prefix())
+            stringBuilder
+                    .append(prefix())
                     .append(statusText)
                     .append(" | ")
-                    .append(Listeners.formatIdPath(descriptor))
+                    .append(Thread.currentThread().getName())
                     .append(" | ")
                     .append(displayName(descriptor))
                     .append(' ')
                     .append(formatTiming(Listeners.elapsedMillis(descriptor)));
             var throwable = descriptor.throwable().orElse(null);
             if (throwable != null) {
-                sb.append(" | ")
+                stringBuilder
+                        .append(" | ")
                         .append(throwable.getClass().getName())
                         .append(": ")
                         .append(throwable.getMessage());
@@ -96,29 +100,29 @@ public class StatusListener implements Listener {
                 try (var br = new BufferedReader(new StringReader(sw.toString()))) {
                     String line;
                     while ((line = br.readLine()) != null) {
-                        sb.append(prefix()).append(line).append(LINE_SEPARATOR);
+                        stringBuilder.append(prefix()).append(line).append(LINE_SEPARATOR);
                     }
                 } catch (IOException e) {
                     throw new AssertionError(e);
                 }
             } else {
-                sb.append(LINE_SEPARATOR);
+                stringBuilder.append(LINE_SEPARATOR);
             }
-            System.out.print(sb.toString());
+            System.out.print(stringBuilder);
         } else {
             descriptor.throwable().ifPresent(throwable -> {
-                var sb = new StringBuilder();
+                var stringBuilder = new StringBuilder();
                 var sw = new StringWriter();
                 throwable.printStackTrace(new PrintWriter(sw));
                 try (var br = new BufferedReader(new StringReader(sw.toString()))) {
                     String line;
                     while ((line = br.readLine()) != null) {
-                        sb.append(prefix()).append(line).append(LINE_SEPARATOR);
+                        stringBuilder.append(prefix()).append(line).append(LINE_SEPARATOR);
                     }
                 } catch (IOException e) {
                     throw new AssertionError(e);
                 }
-                System.out.print(sb.toString());
+                System.out.print(stringBuilder);
             });
         }
     }

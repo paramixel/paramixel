@@ -142,7 +142,7 @@ public final class ConcreteConfiguration implements Configuration {
     }
 
     /**
-     * Returns the underlying property map for internal use by Resolver and ClasspathResolver.
+     * Returns the underlying property map for internal use by Resolver and ActionResolver.
      *
      * <p>This method exists solely to bridge the transition period where internal components
      * still accept {@code Map<String, String>}. It is not part of the public API.

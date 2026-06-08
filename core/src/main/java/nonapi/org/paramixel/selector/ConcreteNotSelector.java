@@ -64,8 +64,12 @@ public final class ConcreteNotSelector implements NotSelector {
 
     @Override
     public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (!(o instanceof ConcreteNotSelector other)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ConcreteNotSelector other)) {
+            return false;
+        }
         return selector.equals(other.selector);
     }
 

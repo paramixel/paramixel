@@ -18,6 +18,8 @@ package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
@@ -42,5 +44,19 @@ class ParallelTest {
         assertThat(child.isFailed()).isTrue();
         assertThat(child.throwable()).isPresent();
         assertThat(child.throwable().get()).isSameAs(exception);
+    }
+
+    @Test
+    @DisplayName("shuffled parallel children execute")
+    void shuffledParallelChildrenExecute() {
+        var executionOrder = Collections.synchronizedList(new ArrayList<String>());
+        var action = Parallel.builder("p")
+                .shuffle(123L)
+                .child(Step.of("a", ctx -> executionOrder.add("a")))
+                .child(Step.of("b", ctx -> executionOrder.add("b")))
+                .child(Step.of("c", ctx -> executionOrder.add("c")))
+                .build();
+        Runner.builder().build().run(action);
+        assertThat(executionOrder).containsExactlyInAnyOrder("a", "b", "c");
     }
 }

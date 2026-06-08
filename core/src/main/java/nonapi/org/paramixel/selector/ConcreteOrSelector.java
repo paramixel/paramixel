@@ -79,8 +79,12 @@ public final class ConcreteOrSelector implements OrSelector {
 
     @Override
     public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (!(o instanceof ConcreteOrSelector other)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ConcreteOrSelector other)) {
+            return false;
+        }
         return selectors.equals(other.selectors);
     }
 

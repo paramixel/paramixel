@@ -33,7 +33,7 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("finds single factory via run with classOf selector")
     void findsSingleFactory() {
-        Selector selector = Selector.classOf(ClasspathResolverSmokeFixture.class);
+        Selector selector = Selector.classOf(ActionResolverSmokeFixture.class);
         Optional<Result> result = Runner.builder().build().run(selector);
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
@@ -45,7 +45,7 @@ class RunnerClassDiscoveryTest {
     @DisplayName("applies selector tag filter via matchesTag")
     void appliesTagFiltersWithAndSemantics() {
         Selector selector =
-                Selector.and(Selector.classOf(ClasspathResolverMultiTagFixture.class), Selector.tagRegex("smoke"));
+                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke"));
 
         Optional<Result> result = Runner.builder().build().run(selector);
 
@@ -59,7 +59,7 @@ class RunnerClassDiscoveryTest {
     @DisplayName("returns empty when tag filter does not match")
     void returnsEmptyWhenTagFiltersDoNotBothMatch() {
         Selector selector =
-                Selector.and(Selector.classOf(ClasspathResolverMultiTagFixture.class), Selector.tagRegex("missing"));
+                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("missing"));
 
         assertThat(Runner.builder().build().run(selector)).isEmpty();
     }

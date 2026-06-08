@@ -77,23 +77,23 @@ public final class XmlReportListener extends AbstractReportFileListener {
     }
 
     private static String escape(final String value) {
-        var sb = new StringBuilder(value.length());
+        var stringBuilder = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             switch (c) {
-                case '&' -> sb.append("&amp;");
-                case '<' -> sb.append("&lt;");
-                case '>' -> sb.append("&gt;");
-                case '"' -> sb.append("&quot;");
-                case '\'' -> sb.append("&apos;");
-                case '\t', '\n', '\r' -> sb.append(c);
+                case '&' -> stringBuilder.append("&amp;");
+                case '<' -> stringBuilder.append("&lt;");
+                case '>' -> stringBuilder.append("&gt;");
+                case '"' -> stringBuilder.append("&quot;");
+                case '\'' -> stringBuilder.append("&apos;");
+                case '\t', '\n', '\r' -> stringBuilder.append(c);
                 default -> {
                     if (c >= ' ') {
-                        sb.append(c);
+                        stringBuilder.append(c);
                     }
                 }
             }
         }
-        return sb.toString();
+        return stringBuilder.toString();
     }
 }
