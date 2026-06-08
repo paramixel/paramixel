@@ -27,7 +27,7 @@ usage() {
     cat <<'EOF'
 Usage: ./scripts/stress-test.sh <number-of-iterations>
 
-Run Paramixel tests multiple times to check for flaky tests.
+Run core unit tests and Paramixel examples tests multiple times to check for flaky tests.
 
 Arguments:
   <number-of-iterations>    Number of times to run the test suite.
@@ -86,10 +86,19 @@ main() {
         start_time="${SECONDS}"
         log "Iteration ${iteration}/${iterations} started"
 
+        local core_start core_elapsed
+        core_start="${SECONDS}"
+        if ! (cd "${PROJECT_DIR}" && ./mvnw -B test -pl core) |& tee -a "${LOG_FILE}"; then
+            core_elapsed=$((SECONDS - core_start))
+            fail "Core unit tests iteration ${iteration}/${iterations} failed after ${core_elapsed}s. See ${LOG_FILE} for details."
+        fi
+        core_elapsed=$((SECONDS - core_start))
+        log "Core unit tests passed (${core_elapsed}s)"
+
         if ! (cd "${PROJECT_DIR}" && ./mvnw -B test -pl examples) |& tee -a "${LOG_FILE}"; then
             end_time="${SECONDS}"
             elapsed_time=$((end_time - start_time))
-            fail "Iteration ${iteration}/${iterations} failed after ${elapsed_time}s. See ${LOG_FILE} for details."
+            fail "Examples tests iteration ${iteration}/${iterations} failed after ${elapsed_time}s. See ${LOG_FILE} for details."
         fi
 
         end_time="${SECONDS}"
