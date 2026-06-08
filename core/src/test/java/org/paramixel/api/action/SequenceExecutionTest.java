@@ -18,6 +18,7 @@ package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -409,6 +410,92 @@ class SequenceExecutionTest {
             assertThat(children.get(1).isFailed()).isTrue();
             assertThat(children.get(2).isPassed()).isTrue();
             assertThat(child3Calls.get()).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("shuffled sequence")
+    class Shuffled {
+
+        @Test
+        @DisplayName("shuffled children execute")
+        void shuffledChildrenExecute() {
+            var executionOrder = new ArrayList<String>();
+            var action = Sequence.builder("seq")
+                    .shuffle(789L)
+                    .child(Step.of("a", ctx -> executionOrder.add("a")))
+                    .child(Step.of("b", ctx -> executionOrder.add("b")))
+                    .child(Step.of("c", ctx -> executionOrder.add("c")))
+                    .build();
+            Runner.builder().build().run(action);
+            assertThat(executionOrder).containsExactlyInAnyOrder("a", "b", "c");
+        }
+
+        @Test
+        @DisplayName("shuffled order is reproducible")
+        void shuffledOrderIsReproducible() {
+            var executionOrder = new ArrayList<String>();
+            var action = Sequence.builder("seq")
+                    .shuffle(789L)
+                    .child(Step.of("a", ctx -> executionOrder.add("a")))
+                    .child(Step.of("b", ctx -> executionOrder.add("b")))
+                    .child(Step.of("c", ctx -> executionOrder.add("c")))
+                    .build();
+            Runner.builder().build().run(action);
+            var executionOrder2 = new ArrayList<String>();
+            var action2 = Sequence.builder("seq")
+                    .shuffle(789L)
+                    .child(Step.of("a", ctx -> executionOrder2.add("a")))
+                    .child(Step.of("b", ctx -> executionOrder2.add("b")))
+                    .child(Step.of("c", ctx -> executionOrder2.add("c")))
+                    .build();
+            Runner.builder().build().run(action2);
+            assertThat(executionOrder2).isEqualTo(executionOrder);
+        }
+
+        @Test
+        @DisplayName("shuffled dependent skips after first failure")
+        void shuffledDependentSkipsAfterFirstFailure() {
+            var action = Sequence.builder("seq")
+                    .shuffle(42L)
+                    .child(Step.of("child-1", ignored -> {
+                        throw new RuntimeException("child-1 failed");
+                    }))
+                    .child(Step.of("child-2", ignored -> {}))
+                    .child(Step.of("child-3", ignored -> {}))
+                    .build();
+            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+            assertThat(root.isFailed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("shuffled independent runs all despite failure")
+        void shuffledIndependentRunsAllDespiteFailure() {
+            var childCallCount = new AtomicInteger();
+            var action = Sequence.builder("seq")
+                    .independent()
+                    .shuffle(42L)
+                    .child(Step.of("child-1", ignored -> {
+                        throw new RuntimeException("child-1 failed");
+                    }))
+                    .child(Step.of("child-2", ignored -> childCallCount.incrementAndGet()))
+                    .child(Step.of("child-3", ignored -> {}))
+                    .build();
+            var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+            assertThat(root.isFailed()).isTrue();
+            assertThat(childCallCount.get()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("single child shuffled no-op")
+        void singleChildShuffledNoOp() {
+            var executionOrder = new ArrayList<String>();
+            var action = Sequence.builder("seq")
+                    .shuffle()
+                    .child(Step.of("a", ctx -> executionOrder.add("a")))
+                    .build();
+            Runner.builder().build().run(action);
+            assertThat(executionOrder).containsExactly("a");
         }
     }
 }

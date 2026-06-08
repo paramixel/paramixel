@@ -21,6 +21,7 @@ import java.util.Comparator;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
@@ -37,14 +38,18 @@ import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.action.SchedulerPriorityKey;
 import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.exception.UserCodeException;
+import nonapi.org.paramixel.listener.Listeners;
 import nonapi.org.paramixel.support.Arguments;
+import nonapi.org.paramixel.support.StackTracePruner;
 import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Assert;
+import org.paramixel.api.action.Conditional;
 import org.paramixel.api.action.Delay;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
@@ -130,7 +135,10 @@ public final class Scheduler implements AutoCloseable {
     private final ThreadLocal<Boolean> schedulerWorker = ThreadLocal.withInitial(() -> false);
 
     private volatile boolean closing;
+    private volatile boolean failFast;
+    private volatile boolean failureOccurred;
     private final ReentrantLock closingLock = new ReentrantLock();
+    private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     /**
      * Creates a scheduler with the given parallelism.
@@ -192,6 +200,19 @@ public final class Scheduler implements AutoCloseable {
         this.queuePermits = new Semaphore(queueCapacity);
         this.leafPermits = new Semaphore(parallelism);
         this.executor = createExecutor();
+    }
+
+    /**
+     * Sets the fail-fast policy for this scheduler.
+     *
+     * <p>When {@code true} and a failure or abort occurs during execution,
+     * subsequent {@link #schedule} calls for direct children of the root
+     * descriptor are skipped.
+     *
+     * @param failFast whether to enable fail-fast behavior
+     */
+    void setFailFast(final boolean failFast) {
+        this.failFast = failFast;
     }
 
     /**
@@ -349,6 +370,22 @@ public final class Scheduler implements AutoCloseable {
     }
 
     /**
+     * Returns the fair re-entrant lock associated with the given name, creating it
+     * if it does not already exist.
+     *
+     * <p>The lock is used by {@link org.paramixel.api.action.Isolated} actions to
+     * serialize execution of actions that share the same lock name.
+     *
+     * @param lockName the lock name; must not be {@code null}
+     * @return a fair re-entrant lock for the given name; never {@code null}
+     * @throws NullPointerException if {@code lockName} is {@code null}
+     */
+    ReentrantLock getLock(final String lockName) {
+        Objects.requireNonNull(lockName, "lockName is null");
+        return locks.computeIfAbsent(lockName, k -> new ReentrantLock(true));
+    }
+
+    /**
      * Blocks until the given future completes.
      *
      * @param <T> the future result type
@@ -471,19 +508,43 @@ public final class Scheduler implements AutoCloseable {
             }
 
             executed = true;
-            context.listener().onBeforeExecution(descriptor);
-            descriptor.setStatus(Status.RUNNING);
+            var originalThreadName = Thread.currentThread().getName();
             try {
-                descriptor.setStatus(executeAction(descriptor, context, mode));
-            } catch (Throwable t) {
-                var cause = Throwables.unwrap(t);
-                if (cause instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
+                Thread.currentThread().setName(Listeners.formatIdPath(descriptor));
+                context.listener().onBeforeExecution(descriptor);
+                descriptor.setStatus(Status.RUNNING);
+                var skipExecution = false;
+                if (failFast
+                        && context.descriptor()
+                                .parent()
+                                .filter(p -> p.parent().isEmpty())
+                                .isPresent()) {
+                    closingLock.lock();
+                    try {
+                        if (failureOccurred) {
+                            descriptor.setStatus(Status.skipped("fail fast"));
+                            skipExecution = true;
+                        }
+                    } finally {
+                        closingLock.unlock();
+                    }
                 }
-                UnrecoverableErrors.rethrowIfUnrecoverable(cause);
-                descriptor.setStatus(Status.fromThrowable(UserCodeException.wrap(cause)));
-            } finally {
+                if (!skipExecution) {
+                    try {
+                        descriptor.setStatus(executeAction(descriptor, context, mode));
+                    } catch (Throwable t) {
+                        var cause = Throwables.unwrap(t);
+                        if (cause instanceof InterruptedException) {
+                            Thread.currentThread().interrupt();
+                        }
+                        UnrecoverableErrors.rethrowIfUnrecoverable(cause);
+                        StackTracePruner.prune(cause);
+                        descriptor.setStatus(Status.fromThrowable(UserCodeException.wrap(cause)));
+                    }
+                }
                 context.listener().onAfterExecution(descriptor);
+            } finally {
+                Thread.currentThread().setName(originalThreadName);
             }
         } catch (Throwable t) {
             executionError = Throwables.unwrap(t);
@@ -506,6 +567,15 @@ public final class Scheduler implements AutoCloseable {
 
         if (executionError == null) {
             executionError = extractPostExecutionError(context);
+        }
+
+        if (failFast && executionError != null) {
+            closingLock.lock();
+            try {
+                failureOccurred = true;
+            } finally {
+                closingLock.unlock();
+            }
         }
 
         if (callback != null) {
@@ -585,6 +655,12 @@ public final class Scheduler implements AutoCloseable {
         }
         if (action instanceof Instance) {
             return runInstance(context);
+        }
+        if (action instanceof Isolated) {
+            return runIsolated(context);
+        }
+        if (action instanceof Conditional conditional) {
+            return runConditional(conditional, context);
         }
         return runDependentChildren(context, true);
     }
@@ -686,6 +762,46 @@ public final class Scheduler implements AutoCloseable {
 
     private static Status runInstance(final ConcreteContext context) {
         return runLifecycle(context.withInstanceHolder(new InstanceHolder()));
+    }
+
+    private static Status runIsolated(final ConcreteContext context) {
+        var isolated = (Isolated) context.descriptor().action();
+        var lock = context.scheduler().getLock(isolated.lockName());
+        lock.lock();
+        try {
+            var child = Arguments.requireInstanceOf(
+                    context.descriptor().children().get(0),
+                    MutableDescriptor.class,
+                    "child descriptor must be a MutableDescriptor");
+            context.runChild(child, ExecutionMode.RUN);
+            return child.status();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private static Status runConditional(final Conditional conditional, final ConcreteContext context) {
+        boolean conditionResult;
+        try {
+            conditionResult = conditional.condition().test(context);
+        } catch (Throwable t) {
+            context.descriptor().setStatus(Status.failed("condition evaluation failed: " + t.getMessage(), t));
+            context.runChildren(ExecutionMode.SKIP);
+            return Status.FAILED;
+        }
+
+        if (!conditionResult) {
+            context.descriptor().setStatus(Status.skipped(conditional.reason()));
+            context.runChildren(ExecutionMode.SKIP);
+            return Status.SKIPPED;
+        }
+
+        var child = Arguments.requireInstanceOf(
+                context.descriptor().children().get(0),
+                MutableDescriptor.class,
+                "child descriptor must be a MutableDescriptor");
+        context.runChild(child, ExecutionMode.RUN);
+        return child.status();
     }
 
     private static Status runRepeat(final ConcreteContext context) {
@@ -807,6 +923,7 @@ public final class Scheduler implements AutoCloseable {
 
     private static Status failedStatus(final Throwable throwable) {
         var failure = throwable != null ? throwable : new IllegalStateException("execution failed before action work");
+        StackTracePruner.prune(failure);
         return Status.failed(failure.getMessage() != null ? failure.getMessage() : "action failed", failure);
     }
 

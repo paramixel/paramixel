@@ -52,8 +52,12 @@ public final class ConcreteTagRegexSelector implements TagRegexSelector {
 
     @Override
     public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (!(o instanceof ConcreteTagRegexSelector other)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ConcreteTagRegexSelector other)) {
+            return false;
+        }
         return pattern.pattern().equals(other.pattern.pattern()) && pattern.flags() == other.pattern.flags();
     }
 

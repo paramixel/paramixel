@@ -9,11 +9,11 @@ A tree-based test framework for Java 17+ with composable action trees.
 
 ## Why Paramixel?
 
-Annotation-based frameworks force you to express test logic through declarations that can't branch, loop, or compose. Paramixel replaces annotations with plain Java — test plans are built as composable code, giving you the full power of the language at definition time.
+Most test frameworks center execution around fixed declarations that are hard to branch, loop, or compose. Paramixel keeps annotations focused on discovery and lightweight metadata while the test plan itself is plain Java — an explicit action tree built with the full power of the language at definition time.
 
 **Key Benefits:**
 - **Composable action trees built with code** — setup/teardown, sequential and parallel children compose to arbitrary depth, making test topology explicit
-- **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) instead of declarative annotations
+- **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) while using annotations only where they add value
 - **Explicit teardown** — configured `after` actions run even when setup or body actions fail or skip; `CleanUp.runAndThrow()` can aggregate teardown failures with suppressed exceptions
 - **Parallel execution at any depth** — embed parallel children anywhere in the tree with per-node parallelism control
 - **Fail-fast or run-all semantics** — choose per-node whether children stop on first failure or run all regardless
@@ -21,6 +21,17 @@ Annotation-based frameworks force you to express test logic through declarations
 - **Single factory method produces the entire test plan** — one static method returns the full action tree; no per-method reflection at test time
 - **Optional managed instances** — use `Instance` actions when tests need fixture objects; otherwise actions run without test-class instantiation
 - **Result tree mirrors the action tree** — walk the result tree for aggregated or granular reporting at any level
+
+### How Paramixel complements JUnit
+
+Paramixel can run alongside JUnit in the same project and build. Use JUnit for conventional unit tests and method-level parameterized tests. Use Paramixel when the test plan is an execution graph: global setup/teardown, nested sequential and parallel branches, per-branch lifecycle, generated environments, retries, timeouts, isolation, and reports that mirror the structure being executed.
+
+In short:
+
+- JUnit parameterized tests parameterize test invocations.
+- Paramixel composes and schedules test execution graphs.
+
+A Kafka compatibility test is a good example. A single Paramixel factory can build a matrix of Kafka versions, run version-specific environments in parallel, wrap each environment with its own setup and teardown, run nested producer/consumer checks inside each environment, and wrap the whole run with global hooks. JUnit can approximate parts of this with extensions or custom engines, but Paramixel exposes the execution graph directly as the core model.
 
 ## Documentation
 

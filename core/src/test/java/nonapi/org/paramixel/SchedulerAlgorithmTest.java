@@ -29,6 +29,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import nonapi.org.paramixel.listener.Listeners;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -415,6 +416,68 @@ class SchedulerAlgorithmTest {
         assertThat(result.isPassed()).isTrue();
         assertThat(before).containsExactlyInAnyOrder("root", "one", "two");
         assertThat(after).containsExactlyInAnyOrder("root", "one", "two");
+    }
+
+    @Test
+    @DisplayName("thread name matches formatIdPath during listener callbacks")
+    void threadNameMatchesFormatIdPathDuringExecution() {
+        var threadNames = Collections.synchronizedList(new ArrayList<String>());
+        var expectedPaths = Collections.synchronizedList(new ArrayList<String>());
+        var listener = new Listener() {
+            @Override
+            public void onBeforeExecution(final Descriptor descriptor) {
+                threadNames.add(Thread.currentThread().getName());
+                expectedPaths.add(Listeners.formatIdPath(descriptor));
+            }
+
+            @Override
+            public void onAfterExecution(final Descriptor descriptor) {
+                threadNames.add(Thread.currentThread().getName());
+                expectedPaths.add(Listeners.formatIdPath(descriptor));
+            }
+        };
+
+        runner(1, listener).run(Step.of("test", ctx -> {}));
+
+        assertThat(threadNames).isNotEmpty();
+        assertThat(threadNames).containsExactlyElementsOf(expectedPaths);
+    }
+
+    @Test
+    @DisplayName("thread name is restored after execution")
+    void threadNameRestoredAfterExecution() {
+        var originalName = Thread.currentThread().getName();
+
+        runner(1).run(Step.of("test", ctx -> {}));
+
+        assertThat(Thread.currentThread().getName()).isEqualTo(originalName);
+    }
+
+    @Test
+    @DisplayName("thread name matches formatIdPath during nested execution")
+    void threadNameMatchesFormatIdPathInNestedExecution() {
+        var threadNames = Collections.synchronizedList(new ArrayList<String>());
+        var expectedPaths = Collections.synchronizedList(new ArrayList<String>());
+        var listener = new Listener() {
+            @Override
+            public void onBeforeExecution(final Descriptor descriptor) {
+                threadNames.add(Thread.currentThread().getName());
+                expectedPaths.add(Listeners.formatIdPath(descriptor));
+            }
+
+            @Override
+            public void onAfterExecution(final Descriptor descriptor) {
+                threadNames.add(Thread.currentThread().getName());
+                expectedPaths.add(Listeners.formatIdPath(descriptor));
+            }
+        };
+        var action =
+                Sequence.builder("parent").child(Step.of("child", ctx -> {})).build();
+
+        runner(1, listener).run(action);
+
+        assertThat(threadNames).isNotEmpty();
+        assertThat(threadNames).containsExactlyElementsOf(expectedPaths);
     }
 
     private static Runner runner(final int parallelism) {

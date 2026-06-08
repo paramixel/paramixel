@@ -23,7 +23,6 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import nonapi.org.paramixel.ConcreteConfiguration;
-import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.AnsiColor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -238,8 +237,22 @@ class StatusListenerOutputTest {
         assertThat(failedLineIndex).isNotEqualTo(-1);
         for (int i = failedLineIndex + 1; i < lines.length; i++) {
             String line = lines[i];
-            if (line.isBlank()) continue;
+            if (line.isBlank()) {
+                continue;
+            }
             assertThat(line).as("Stack trace line should start with prefix").startsWith(Constants.PARAMIXEL_PLAIN);
+        }
+        for (int i = failedLineIndex + 1; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.isBlank()) {
+                continue;
+            }
+            assertThat(line)
+                    .as("Stack trace line should not contain nonapi.org.paramixel")
+                    .doesNotContain("nonapi.org.paramixel.");
+            assertThat(line)
+                    .as("Stack trace line should not contain org.paramixel")
+                    .doesNotContain("org.paramixel.");
         }
     }
 

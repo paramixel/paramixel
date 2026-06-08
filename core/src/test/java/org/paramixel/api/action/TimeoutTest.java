@@ -17,12 +17,14 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
 import org.paramixel.api.exception.SkipException;
@@ -170,5 +172,34 @@ class TimeoutTest {
         assertThat(root.action().displayName()).isEqualTo("tree-test");
         assertThat(root.children()).hasSize(1);
         assertThat(root.children().get(0).action().displayName()).isEqualTo("leaf");
+    }
+
+    @Nested
+    @DisplayName("Builder")
+    class Builder {
+
+        @Test
+        @DisplayName("build throws when body not configured")
+        void buildThrowsWhenBodyNotConfigured() {
+            assertThatThrownBy(() -> Timeout.builder("bad-timeout")
+                            .timeout(Duration.ofSeconds(1))
+                            .build())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("child action must be configured");
+        }
+
+        @Test
+        @DisplayName("body accepts another Builder")
+        void bodyAcceptsAnotherBuilder() {
+            var child = Step.of("inner-step", context -> {});
+            var timeout = Timeout.builder("from-builder")
+                    .body(Instance.builder("inner", Object::new).body(child))
+                    .timeout(Duration.ofSeconds(5))
+                    .build();
+
+            assertThat(timeout.displayName()).isEqualTo("from-builder");
+            assertThat(timeout.timeout()).isEqualTo(Duration.ofSeconds(5));
+            assertThat(timeout.body()).isNotNull();
+        }
     }
 }

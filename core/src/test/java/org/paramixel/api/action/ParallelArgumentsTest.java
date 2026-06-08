@@ -120,4 +120,123 @@ class ParallelArgumentsTest {
         assertThat(parallel.getClass().getDeclaredFields())
                 .anyMatch(f -> !f.getName().equals("dependent"));
     }
+
+    @Test
+    @DisplayName("default isShuffled is false, seed is 0")
+    void defaultNotShuffled() {
+        var parallel = Parallel.builder("p").child(Step.of("a", s -> {})).build();
+        assertThat(parallel.isShuffled()).isFalse();
+        assertThat(parallel.seed()).isZero();
+    }
+
+    @Test
+    @DisplayName("shuffle() sets isShuffled and non-zero seed")
+    void shuffleSetsShuffledAndSeed() {
+        var parallel = Parallel.builder("p")
+                .shuffle()
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .build();
+        assertThat(parallel.isShuffled()).isTrue();
+        assertThat(parallel.seed()).isNotZero();
+    }
+
+    @Test
+    @DisplayName("shuffle(long seed) stores explicit seed")
+    void shuffleWithSeedStoresSeed() {
+        var parallel = Parallel.builder("p")
+                .shuffle(42L)
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .build();
+        assertThat(parallel.isShuffled()).isTrue();
+        assertThat(parallel.seed()).isEqualTo(42L);
+    }
+
+    @Test
+    @DisplayName("shuffle with known seed produces predictable order")
+    void shuffleWithKnownSeedProducesPredictableOrder() {
+        var parallel = Parallel.builder("p")
+                .shuffle(42L)
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .child(Step.of("c", s -> {}))
+                .build();
+        var names = parallel.children().stream().map(Action::displayName).toList();
+        var parallel2 = Parallel.builder("p")
+                .shuffle(42L)
+                .child(Step.of("a", s -> {}))
+                .child(Step.of("b", s -> {}))
+                .child(Step.of("c", s -> {}))
+                .build();
+        assertThat(parallel2.children().stream().map(Action::displayName).toList())
+                .isEqualTo(names);
+    }
+
+    @Test
+    @DisplayName("shuffle with 0 children still reports shuffled")
+    void shuffleWithZeroChildrenStillShuffled() {
+        var parallel = Parallel.builder("p").shuffle().build();
+        assertThat(parallel.isShuffled()).isTrue();
+        assertThat(parallel.seed()).isNotZero();
+        assertThat(parallel.children()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("shuffle with 1 child is no-op but still shuffled")
+    void shuffleSingleChildStillShuffled() {
+        var parallel =
+                Parallel.builder("p").shuffle().child(Step.of("a", s -> {})).build();
+        assertThat(parallel.isShuffled()).isTrue();
+        assertThat(parallel.seed()).isNotZero();
+        assertThat(parallel.children()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("shuffle preserves immutability/reusability of builder")
+    void shufflePreservesImmutability() {
+        var builder = Parallel.builder("p").shuffle(42L).child(Step.of("a", s -> {}));
+        var first = builder.build();
+        builder.child(Step.of("b", s -> {}));
+        var second = builder.build();
+        assertThat(first.children()).hasSize(1);
+        assertThat(second.children()).hasSize(2);
+        assertThat(first.isShuffled()).isTrue();
+        assertThat(second.isShuffled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("last shuffle call wins")
+    void lastShuffleCallWins() {
+        var parallel = Parallel.builder("p")
+                .shuffle(42L)
+                .shuffle()
+                .child(Step.of("a", s -> {}))
+                .build();
+        assertThat(parallel.seed()).isNotEqualTo(42L);
+        var parallel2 = Parallel.builder("p")
+                .shuffle()
+                .shuffle(42L)
+                .child(Step.of("a", s -> {}))
+                .build();
+        assertThat(parallel2.seed()).isEqualTo(42L);
+    }
+
+    @Test
+    @DisplayName("shuffle with seed 0 is valid")
+    void shuffleWithSeedZeroIsValid() {
+        var parallel =
+                Parallel.builder("p").shuffle(0L).child(Step.of("a", s -> {})).build();
+        assertThat(parallel.isShuffled()).isTrue();
+        assertThat(parallel.seed()).isZero();
+    }
+
+    @Test
+    @DisplayName("shuffle with negative seed is valid")
+    void shuffleWithNegativeSeedIsValid() {
+        var parallel =
+                Parallel.builder("p").shuffle(-1L).child(Step.of("a", s -> {})).build();
+        assertThat(parallel.isShuffled()).isTrue();
+        assertThat(parallel.seed()).isEqualTo(-1L);
+    }
 }

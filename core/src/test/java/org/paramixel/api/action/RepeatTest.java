@@ -17,9 +17,11 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
 import org.paramixel.api.exception.FailException;
@@ -106,5 +108,32 @@ class RepeatTest {
         var root = result.descriptor().orElseThrow();
 
         assertThat(root.children()).hasSize(4);
+    }
+
+    @Nested
+    @DisplayName("Builder")
+    class Builder {
+
+        @Test
+        @DisplayName("build throws when child not configured")
+        void buildThrowsWhenChildNotConfigured() {
+            assertThatThrownBy(() -> Repeat.builder("bad-repeat").build())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("child action must be configured");
+        }
+
+        @Test
+        @DisplayName("body accepts another Builder")
+        void bodyAcceptsAnotherBuilder() {
+            var child = Step.of("inner-step", context -> {});
+            var repeat = Repeat.builder("from-builder")
+                    .body(Instance.builder("inner", child::getClass).body(child))
+                    .iterations(2)
+                    .build();
+
+            assertThat(repeat.displayName()).isEqualTo("from-builder");
+            assertThat(repeat.iterations()).isEqualTo(2);
+            assertThat(repeat.body()).isNotNull();
+        }
     }
 }

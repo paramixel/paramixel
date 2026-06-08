@@ -24,6 +24,7 @@ import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.listener.SafeListener;
+import nonapi.org.paramixel.support.StackTracePruner;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
@@ -46,6 +47,8 @@ public final class ConcreteRunner implements Runner {
     private final Configuration configuration;
     private final int parallelism;
     private final int schedulerQueueCapacity;
+    private final boolean shuffled;
+    private final long seed;
 
     /**
      * Creates a runner with the supplied configuration and listener.
@@ -54,11 +57,31 @@ public final class ConcreteRunner implements Runner {
      * @param listener the listener; must not be {@code null}
      */
     public ConcreteRunner(final Configuration configuration, final Listener listener) {
+        this(configuration, listener, false, 0L);
+    }
+
+    /**
+     * Creates a runner with the supplied configuration, listener, and shuffle settings.
+     *
+     * <p>When {@code shuffled} is {@code true}, discovered actions are shuffled using
+     * {@code seed} at resolution time. The existing two-argument constructor delegates
+     * to this one with {@code shuffled = false} and {@code seed = 0L}.
+     *
+     * @param configuration the configuration, or {@code null} to load defaults
+     * @param listener the listener; must not be {@code null}
+     * @param shuffled whether to shuffle discovered actions
+     * @param seed the PRNG seed when {@code shuffled} is {@code true}
+     * @throws NullPointerException if {@code listener} is {@code null}
+     */
+    public ConcreteRunner(
+            final Configuration configuration, final Listener listener, final boolean shuffled, final long seed) {
         Objects.requireNonNull(listener, "listener is null");
         this.safeListener = listener instanceof SafeListener safe ? safe : new SafeListener(listener);
         this.configuration = configuration != null ? configuration : Configuration.defaultConfiguration();
         this.parallelism = resolveParallelism(this.configuration);
         this.schedulerQueueCapacity = resolveSchedulerQueueCapacity(this.configuration);
+        this.shuffled = shuffled;
+        this.seed = seed;
     }
 
     @Override
@@ -70,7 +93,9 @@ public final class ConcreteRunner implements Runner {
     public Result run(final Action action) {
         lock.lock();
         try {
-            return runInternal(action);
+            Objects.requireNonNull(action, "action is null");
+            var effective = new ActionResolver(configuration, Selector.all(), shuffled, seed).resolveRootAction(action);
+            return runInternal(effective.orElseThrow());
         } finally {
             lock.unlock();
         }
@@ -87,6 +112,8 @@ public final class ConcreteRunner implements Runner {
             root = new DescriptorBuilder().discover(action);
             safeListener.onDiscoveryCompleted(root);
             scheduler = new Scheduler(parallelism, schedulerQueueCapacity);
+            scheduler.setFailFast(
+                    configuration.getBoolean(Configuration.FAIL_FAST).orElse(false));
             var context = new ConcreteContext(configuration, safeListener, root, scheduler, new InstanceHolder());
             root.markScheduled();
             scheduler.executeDescriptor(root, context, ExecutionMode.RUN);
@@ -97,6 +124,7 @@ public final class ConcreteRunner implements Runner {
             if (UnrecoverableErrors.isUnrecoverable(t) && t instanceof Error error) {
                 throw error;
             }
+            StackTracePruner.prune(t);
             final String message = t.getMessage() != null ? t.getMessage() : "Runner failed";
             if (root != null) {
                 var status = root.status();
@@ -152,7 +180,7 @@ public final class ConcreteRunner implements Runner {
         lock.lock();
         try {
             Objects.requireNonNull(selector, "selector is null");
-            var optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
+            var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
             return optionalAction.map(this::runInternal);
         } finally {
             lock.unlock();
@@ -164,7 +192,8 @@ public final class ConcreteRunner implements Runner {
         lock.lock();
         try {
             Objects.requireNonNull(action, "action is null");
-            return exitCode(runInternal(action));
+            var effective = new ActionResolver(configuration, Selector.all(), shuffled, seed).resolveRootAction(action);
+            return exitCode(runInternal(effective.orElseThrow()));
         } finally {
             lock.unlock();
         }
@@ -175,7 +204,7 @@ public final class ConcreteRunner implements Runner {
         lock.lock();
         try {
             Objects.requireNonNull(selector, "selector is null");
-            var optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
+            var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
             return optionalAction.map(this::runAndReturnExitCodeInternal).orElseGet(this::noTestsExitCode);
         } finally {
             lock.unlock();
@@ -188,7 +217,8 @@ public final class ConcreteRunner implements Runner {
         lock.lock();
         try {
             Objects.requireNonNull(action, "action is null");
-            exitCode = exitCode(runInternal(action));
+            var effective = new ActionResolver(configuration, Selector.all(), shuffled, seed).resolveRootAction(action);
+            exitCode = exitCode(runInternal(effective.orElseThrow()));
         } finally {
             lock.unlock();
         }
@@ -201,7 +231,7 @@ public final class ConcreteRunner implements Runner {
         lock.lock();
         try {
             Objects.requireNonNull(selector, "selector is null");
-            var optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
+            var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
             exitCode = optionalAction.map(this::runAndReturnExitCodeInternal).orElseGet(this::noTestsExitCode);
         } finally {
             lock.unlock();
@@ -213,7 +243,8 @@ public final class ConcreteRunner implements Runner {
     public int run() {
         lock.lock();
         try {
-            var optionalAction = new ClasspathResolver(configuration, buildSelector(configuration)).resolveActions();
+            var optionalAction =
+                    new ActionResolver(configuration, buildSelector(configuration), shuffled, seed).resolveRootAction();
             if (optionalAction.isEmpty()) {
                 safeListener.onRunStarted();
                 var result = new ConcreteResult(configuration);

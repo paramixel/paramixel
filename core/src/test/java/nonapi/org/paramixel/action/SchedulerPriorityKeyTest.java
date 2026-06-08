@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("SchedulerPriorityKey")
@@ -51,5 +52,76 @@ class SchedulerPriorityKeyTest {
         assertThatThrownBy(() -> SchedulerPriorityKey.root().child(-1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("childIndex must be non-negative");
+    }
+
+    @Nested
+    @DisplayName("equals")
+    class Equals {
+
+        @Test
+        @DisplayName("root key is reflexively equal")
+        void rootKeyIsReflexivelyEqual() {
+            var root = SchedulerPriorityKey.root();
+            assertThat(root.equals(root)).isTrue();
+        }
+
+        @Test
+        @DisplayName("identical child paths are equal")
+        void identicalChildPathsAreEqual() {
+            var a = SchedulerPriorityKey.root().child(0).child(1);
+            var b = SchedulerPriorityKey.root().child(0).child(1);
+            assertThat(a).isEqualTo(b);
+        }
+
+        @Test
+        @DisplayName("different child indices are not equal")
+        void differentChildIndicesAreNotEqual() {
+            var a = SchedulerPriorityKey.root().child(0);
+            var b = SchedulerPriorityKey.root().child(1);
+            assertThat(a).isNotEqualTo(b);
+        }
+
+        @Test
+        @DisplayName("different depth paths are not equal")
+        void differentDepthPathsAreNotEqual() {
+            var a = SchedulerPriorityKey.root().child(0);
+            var b = SchedulerPriorityKey.root().child(0).child(0);
+            assertThat(a).isNotEqualTo(b);
+        }
+
+        @Test
+        @DisplayName("not equal to different type")
+        void notEqualToDifferentType() {
+            var key = SchedulerPriorityKey.root().child(0);
+            assertThat(key).isNotEqualTo("not a key");
+        }
+
+        @Test
+        @DisplayName("not equal to null")
+        void notEqualToNull() {
+            var key = SchedulerPriorityKey.root().child(0);
+            assertThat(key).isNotEqualTo(null);
+        }
+    }
+
+    @Nested
+    @DisplayName("hashCode")
+    class HashCode {
+
+        @Test
+        @DisplayName("equal keys have equal hash codes")
+        void equalKeysHaveEqualHashCodes() {
+            var a = SchedulerPriorityKey.root().child(0).child(2);
+            var b = SchedulerPriorityKey.root().child(0).child(2);
+            assertThat(a.hashCode()).isEqualTo(b.hashCode());
+        }
+
+        @Test
+        @DisplayName("different paths have different hash codes")
+        void differentPathsHaveDifferentHashCodes() {
+            var a = SchedulerPriorityKey.root().child(0);
+            var b = SchedulerPriorityKey.root().child(1);
+            assertThat(a.hashCode()).isNotEqualTo(b.hashCode());
+        }
     }
 }

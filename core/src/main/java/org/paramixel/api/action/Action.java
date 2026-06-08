@@ -31,7 +31,18 @@ import org.paramixel.api.Context;
  * construct an immutable action snapshot via {@link Builder#build()}.
  */
 public sealed interface Action
-        permits Assert, Delay, Instance, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout {
+        permits Assert,
+                Conditional,
+                Delay,
+                Instance,
+                Isolated,
+                Parallel,
+                Repeat,
+                Scope,
+                Sequence,
+                Static,
+                Step,
+                Timeout {
 
     /**
      * Returns the display name used in console output and reports.

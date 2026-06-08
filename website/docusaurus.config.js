@@ -47,15 +47,20 @@ const config = {
           routeBasePath: '/',
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl: 'https://github.com/paramixel/paramixel/tree/main/website/',
-          lastVersion: '6.0.0',
+          lastVersion: '6.1.0',
           versions: {
             current: {
               label: 'Unreleased',
               path: 'unreleased',
               banner: 'unreleased',
             },
-            '6.0.0': {
+            '6.1.0': {
               banner: 'none',
+            },
+            '6.0.0': {
+              banner: 'unmaintained',
+              label: '6.0.0 (Legacy)',
+              className: 'notice-legacy',
             },
             '5.1.1': {
               banner: 'unmaintained',

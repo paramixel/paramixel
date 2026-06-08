@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import nonapi.org.paramixel.ClasspathResolver;
 import nonapi.org.paramixel.support.AnsiColor;
 import nonapi.org.paramixel.support.Arguments;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
@@ -44,7 +43,6 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
@@ -116,6 +114,13 @@ public class ParamixelMojo extends AbstractMojo {
      */
     @Parameter(property = "paramixel.failureOnAbort", defaultValue = "true")
     private boolean failureOnAbort;
+
+    /**
+     * When {@code true}, the scheduler skips remaining unscheduled root children after the first
+     * failed or aborted action.
+     */
+    @Parameter(property = "paramixel.failFast", defaultValue = "false")
+    private boolean failFast;
 
     /**
      * Path to the per-run summary report; when unset, no report file is generated.
@@ -212,9 +217,13 @@ public class ParamixelMojo extends AbstractMojo {
                 final var configuration = buildConfiguration(testClassLoader);
                 final var selector = buildSelector();
 
-                Optional<Action> optionalAction = new ClasspathResolver(configuration, selector).resolveActions();
+                Runner runner = Runner.builder()
+                        .configuration(configuration)
+                        .listener(Listener.defaultListener(configuration))
+                        .build();
 
-                if (optionalAction.isEmpty()) {
+                Optional<Result> optionalResult = runner.run(selector);
+                if (optionalResult.isEmpty()) {
                     if (failIfNoTests) {
                         throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
                     }
@@ -223,13 +232,7 @@ public class ParamixelMojo extends AbstractMojo {
                     return;
                 }
 
-                Runner runner = Runner.builder()
-                        .configuration(configuration)
-                        .listener(Listener.defaultListener(configuration))
-                        .build();
-
-                Action action = optionalAction.get();
-                Result result = runner.run(action);
+                Result result = optionalResult.orElseThrow();
                 if (result.isFailed()) {
                     throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                 }
@@ -390,6 +393,11 @@ public class ParamixelMojo extends AbstractMojo {
             configMap.put(Configuration.FAIL_IF_NO_TESTS, "true");
         }
 
+        // <configuration><failFast> overrides POM properties
+        if (failFast) {
+            configMap.put(Configuration.FAIL_FAST, "true");
+        }
+
         // System properties always win (matches JUnit Platform precedence)
         var systemProps = System.getProperties();
         List<Map.Entry<Object, Object>> snapshot;
@@ -529,8 +537,12 @@ public class ParamixelMojo extends AbstractMojo {
          */
         @Override
         public boolean equals(final Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Property property)) return false;
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof Property property)) {
+                return false;
+            }
             return Objects.equals(key, property.key) && Objects.equals(value, property.value);
         }
 

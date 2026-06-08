@@ -23,7 +23,6 @@ const sidebars = {
         'core-concepts/actions',
         'core-concepts/elements',
         'core-concepts/discovery',
-        'core-concepts/assertions',
         'core-concepts/data-driven-testing',
       ],
     },

@@ -22,7 +22,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
-import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.AnsiDetector;
 import nonapi.org.paramixel.support.ElapsedTimeFormatter;
 import org.paramixel.api.Configuration;
@@ -74,7 +73,9 @@ public final class SummaryListener implements Listener {
      */
     @Override
     public void onRunStarted() {
-        if (excludes.contains(ExcludeTarget.SUMMARY_HEADER)) return;
+        if (excludes.contains(ExcludeTarget.SUMMARY_HEADER)) {
+            return;
+        }
         var writer = getWriter();
         var prefix = getPrefix();
         var version = Version.version();

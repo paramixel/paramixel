@@ -1,0 +1,157 @@
+/*
+ * Copyright (c) 2026-present Douglas Hoard
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package nonapi.org.paramixel;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.Optional;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.paramixel.api.Configuration;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Parallel;
+import org.paramixel.api.exception.ResolverException;
+import org.paramixel.api.selector.Selector;
+
+@DisplayName("ActionResolver arguments")
+class ActionResolverArgumentsTest {
+
+    @Test
+    @DisplayName("rejects null configuration")
+    void rejectsNullConfiguration() {
+        assertThatThrownBy(() -> new ActionResolver(null, Selector.all()))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("configuration is null");
+    }
+
+    @Test
+    @DisplayName("rejects null selector")
+    void rejectsNullSelector() {
+        assertThatThrownBy(() -> new ActionResolver(Configuration.defaultConfiguration(), null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("selector is null");
+    }
+
+    @Test
+    @DisplayName("blank tag values produce discovery validation failure action")
+    void rejectsBlankTagValues() {
+        Selector selector = Selector.classOf(ActionResolverTest.BlankTagFactory.class);
+
+        var configuration = Configuration.defaultConfiguration();
+        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+
+        assertThat(result).isPresent();
+        Parallel root = (Parallel) result.orElseThrow();
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).displayName()).startsWith("Discovery validation failure:");
+    }
+
+    @Test
+    @DisplayName("rejects non-public factory method")
+    void rejectsNonPublicFactoryMethod() {
+        Selector selector = Selector.classOf(ActionResolverTest.NonPublicFactory.class);
+        var configuration = Configuration.defaultConfiguration();
+
+        assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining("method must be public static");
+    }
+
+    @Test
+    @DisplayName("tag selector excludes invalid factory before signature validation")
+    void tagSelectorExcludesInvalidFactoryBeforeSignatureValidation() {
+        Selector selector =
+                Selector.and(Selector.classOf(ActionResolverTest.NonPublicFactory.class), Selector.tagRegex("^smoke$"));
+        var configuration = Configuration.defaultConfiguration();
+
+        assertThat(new ActionResolver(configuration, selector).resolveRootAction())
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("rejects non-static factory method")
+    void rejectsNonStaticFactoryMethod() {
+        Selector selector = Selector.classOf(ActionResolverTest.NonStaticFactory.class);
+        var configuration = Configuration.defaultConfiguration();
+
+        assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining("method must be public static");
+    }
+
+    @Test
+    @DisplayName("rejects parameterized factory method")
+    void rejectsParameterizedFactoryMethod() {
+        Selector selector = Selector.classOf(ActionResolverTest.ParameterizedFactory.class);
+        var configuration = Configuration.defaultConfiguration();
+
+        assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining("method must have no parameters");
+    }
+
+    @Test
+    @DisplayName("rejects factory with wrong return type")
+    void rejectsFactoryWithWrongReturnType() {
+        Selector selector = Selector.classOf(ActionResolverTest.WrongReturnTypeFactory.class);
+        var configuration = Configuration.defaultConfiguration();
+
+        assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining("return type must be Action");
+    }
+
+    @Test
+    @DisplayName("skips factory that returns null")
+    void skipsFactoryThatReturnsNull() {
+        Selector selector = Selector.classOf(ActionResolverTest.NullReturningFactory.class);
+        var configuration = Configuration.defaultConfiguration();
+
+        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("wraps RuntimeException from factory method in ResolverException")
+    void wrapsRuntimeExceptionFromFactoryMethodInResolverException() {
+        Selector selector = Selector.classOf(ActionResolverTest.RuntimeExceptionThrowingFactory.class);
+        var configuration = Configuration.defaultConfiguration();
+
+        assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining("Failed to invoke @Paramixel.Factory method")
+                .hasCauseInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    @DisplayName("4-arg constructor stores shuffle params")
+    void fourArgConstructorStoresShuffleParams() {
+        var configuration = Configuration.defaultConfiguration();
+        var resolver = new ActionResolver(configuration, Selector.all(), true, 42L);
+        assertThat(resolver).isNotNull();
+    }
+
+    @Test
+    @DisplayName("2-arg constructor defaults to no shuffle")
+    void twoArgConstructorDefaultsToNoShuffle() {
+        var configuration = Configuration.defaultConfiguration();
+        var resolver = new ActionResolver(configuration, Selector.all());
+        assertThat(resolver).isNotNull();
+    }
+}

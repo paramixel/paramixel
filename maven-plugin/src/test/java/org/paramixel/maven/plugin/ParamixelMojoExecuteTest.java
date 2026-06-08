@@ -142,6 +142,41 @@ class ParamixelMojoExecuteTest {
     }
 
     @Nested
+    @DisplayName("failFast")
+    class FailFast {
+
+        @Test
+        @DisplayName("execute throws MojoFailureException for failing fixture with failFast")
+        void executeThrowsForFailingFixtureWithFailFast() throws Exception {
+            ParamixelMojo mojo = newMojo(tempDir, "FailingMojoFixture");
+            setField(mojo, "failFast", true);
+
+            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            try {
+                assertThatThrownBy(mojo::execute).isInstanceOf(MojoFailureException.class);
+                assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
+            } finally {
+                Thread.currentThread().setContextClassLoader(original);
+            }
+        }
+
+        @Test
+        @DisplayName("execute succeeds for passing fixture with failFast")
+        void executeSucceedsForPassingFixtureWithFailFast() throws Exception {
+            ParamixelMojo mojo = newMojo(tempDir, "PassingMojoFixture");
+            setField(mojo, "failFast", true);
+
+            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            try {
+                assertThatCode(mojo::execute).doesNotThrowAnyException();
+                assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
+            } finally {
+                Thread.currentThread().setContextClassLoader(original);
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("staged status check")
     class StagedStatusCheck {
 

@@ -19,7 +19,6 @@ package nonapi.org.paramixel.listener;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
-import nonapi.org.paramixel.listener.support.Constants;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;

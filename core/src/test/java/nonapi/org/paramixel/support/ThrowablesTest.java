@@ -107,5 +107,12 @@ class ThrowablesTest {
             var runtime = new RuntimeException();
             assertThat(Throwables.unwrap(runtime)).isSameAs(runtime);
         }
+
+        @Test
+        @DisplayName("does not unwrap CompletionException when cause is null")
+        void doesNotUnwrapCompletionExceptionWhenCauseIsNull() {
+            var completion = new CompletionException((Throwable) null);
+            assertThat(Throwables.unwrap(completion)).isSameAs(completion);
+        }
     }
 }

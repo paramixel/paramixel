@@ -91,6 +91,14 @@ class DelayTest {
         assertThat(action.displayName()).isEqualTo("my-delay");
     }
 
+    @Test
+    @DisplayName("random delay with zero min and Long.MAX_VALUE max")
+    void randomDelayWithZeroMinAndLongMaxValue() {
+        var action = Delay.random("max-boundary", 0L, Long.MAX_VALUE);
+
+        assertThat(action.displayName()).isEqualTo("max-boundary");
+    }
+
     private static long elapsedMillis(final Descriptor descriptor) {
         return Duration.between(
                         descriptor.startedAt().orElseThrow(),
