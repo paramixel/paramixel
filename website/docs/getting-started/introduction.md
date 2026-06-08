@@ -9,8 +9,8 @@ Paramixel builds tests from action trees. Instead of hiding execution in a metho
 
 ## Core model
 
-- An `Action` is an immutable execution unit with a `displayName()`. The sealed interface has 12 permitted subtypes.
-- A `Builder` is a mutable builder that produces an `Action` via `build()`. Nine subtypes correspond to configurable action types.
+- An `Action` is an immutable execution unit with a `displayName()`. The sealed interface has 13 permitted subtypes.
+- A `Builder` is a mutable builder that produces an `Action` via `build()`. Ten subtypes correspond to configurable action types.
 - A `Descriptor` represents one execution occurrence of an action.
 - A `Status` is one of `PENDING`, `RUNNING`, `PASSED`, `FAILED`, `SKIPPED`, or `ABORTED`.
 - Discovery finds public static factory methods annotated with `@Paramixel.Factory`.

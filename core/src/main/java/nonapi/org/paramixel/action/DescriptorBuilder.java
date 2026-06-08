@@ -31,6 +31,7 @@ import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Timeout;
+import org.paramixel.api.action.Until;
 import org.paramixel.api.exception.CycleDetectedException;
 
 /**
@@ -93,6 +94,10 @@ public final class DescriptorBuilder {
         } else if (action instanceof Repeat repeat) {
             for (int i = 0; i < repeat.iterations(); i++) {
                 descriptor.addChild(build(descriptor, repeat.body(), path, visited));
+            }
+        } else if (action instanceof Until until) {
+            for (int i = 0; i < until.maxIterations(); i++) {
+                descriptor.addChild(build(descriptor, until.body(), path, visited));
             }
         } else if (action instanceof Timeout timeout) {
             descriptor.addChild(build(descriptor, timeout.body(), path, visited));

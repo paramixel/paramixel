@@ -17,7 +17,8 @@ public sealed interface Builder
                 Scope.Builder,
                 Sequence.Builder,
                 Static.Builder,
-                Timeout.Builder {
+                Timeout.Builder,
+                Until.Builder {
 
     Action build();
 }
@@ -40,6 +41,7 @@ Each `Action` subtype that requires configuration exposes a corresponding `Build
 | `Repeat.Builder` | `Repeat` | Executes child action N times. |
 | `Timeout.Builder` | `Timeout` | Executes child action with wall-clock deadline. |
 | `Conditional.Builder` | `Conditional` | Evaluates a runtime predicate and gates body execution. |
+| `Until.Builder` | `Until` | Executes child repeatedly until predicate satisfied, body passes, or iterations exhausted; `.until(Predicate)` optional. Without `.until()`, the loop stops when the body passes and reports `PASSED`. |
 
 ## Usage
 

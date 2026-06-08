@@ -42,7 +42,8 @@ public sealed interface Action
                 Sequence,
                 Static,
                 Step,
-                Timeout {
+                Timeout,
+                Until {
 
     /**
      * Returns the display name used in console output and reports.

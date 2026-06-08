@@ -29,6 +29,7 @@ import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Timeout;
+import org.paramixel.api.action.Until;
 
 /**
  * Renders a descriptor tree as a tree-style summary with connectors, timing, and failure information.
@@ -111,7 +112,8 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
                 || action instanceof Repeat
                 || action instanceof Scope
                 || action instanceof Static
-                || action instanceof Timeout;
+                || action instanceof Timeout
+                || action instanceof Until;
     }
 
     private static void pushInReverse(final Deque<RenderFrame> stack, final List<RenderFrame> frames) {

@@ -9,7 +9,7 @@ description: The sealed interface for all Paramixel action types.
 
 ```java
 public sealed interface Action
-        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout {
+        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout, Until {
 
     String displayName();
 }
@@ -37,6 +37,7 @@ All action subtypes are immutable after construction. For configurable actions, 
 | `Repeat` | Decorator: executes a child action N times. |
 | `Timeout` | Decorator: executes a child action with a wall-clock deadline. |
 | `Conditional` | Composite: evaluates a `Predicate<Context>`; runs body when true, skips entire subtree when false. |
+| `Until` | Decorator: executes child repeatedly until predicate satisfied, body passes, or iterations exhausted. |
 
 ## Composition
 

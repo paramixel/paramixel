@@ -11,7 +11,8 @@ description: Current documentation-facing release notes.
 - **`@BeforeAll` and `@AfterAll` annotations** — New runner lifecycle hooks discovered during classpath scanning. `@BeforeAll` methods execute once before any discovered test actions; `@AfterAll` methods execute once after all tests complete. Both return `Action`/`Builder`, same signature as `@Factory`. Hooks are ordered by `@Priority` on their declaring class. When hooks are present, the root action is wrapped in a `Static` with before/after sequences.
 
 ## Unreleased
-(No unreleased changes)
+
+- **`Until` action** -- A new decorator action that executes a body repeatedly until a `Predicate<Context>` returns `true`, the body passes, or `maxIterations` is exhausted. Individual iteration failures do not terminate the loop. When `until()` is configured, only `ABORTED` or predicate satisfaction causes early termination; exhaustion reports `FAILED`. When `until()` is absent, the loop stops when the body passes and reports `PASSED`. Build with `Until.builder(name).body(action).until(predicate).maxIterations(n).build()`.
 
 ## 6.1.0 documentation baseline
 

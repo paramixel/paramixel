@@ -7,7 +7,7 @@ description: How to compose actions and access fixtures through Context.
 
 Paramixel composes tests from action classes under `org.paramixel.api.action`. Each action type is built through a `Builder` (or a static factory for terminal action types) and produces an immutable `Action` that composes into trees.
 
-See [Actions](actions) for the complete list of 12 built-in action subtypes.
+See [Actions](actions) for the complete list of 13 built-in action subtypes.
 
 ## Fixture access
 

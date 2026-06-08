@@ -5,11 +5,11 @@ description: Built-in action types and composition.
 
 # Actions
 
-`Action` is a sealed interface in `org.paramixel.api.action` with 12 permitted subtypes. Each action is an immutable, reusable definition. The runner and scheduler own all traversal, execution, status transitions, and listener callbacks.
+`Action` is a sealed interface in `org.paramixel.api.action` with 13 permitted subtypes. Each action is an immutable, reusable definition. The runner and scheduler own all traversal, execution, status transitions, and listener callbacks.
 
 ```java
 public sealed interface Action
-        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout {
+        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout, Until {
 
     String displayName();
 }
@@ -29,6 +29,7 @@ public sealed interface Action
 - `Repeat` executes a child action a configurable number of times.
 - `Timeout` executes a child action with a wall-clock deadline.
 - `Conditional` evaluates a runtime predicate and gates body execution. False predicates skip the body subtree.
+- `Until` executes a child action repeatedly until a `Predicate<Context>` returns `true`, the body action passes, or `maxIterations` is exhausted. Individual iteration failures continue the loop. When `until()` is configured, only `ABORTED` or predicate satisfaction stops early; exhaustion reports `FAILED`. When `until()` is absent, the loop stops when the body passes and reports `PASSED`.
 
 ## Composition example
 
