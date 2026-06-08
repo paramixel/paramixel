@@ -57,6 +57,7 @@ import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.action.Timeout;
+import org.paramixel.api.action.Until;
 import org.paramixel.api.exception.FailException;
 
 /**
@@ -647,6 +648,9 @@ public final class Scheduler implements AutoCloseable {
         if (action instanceof Repeat) {
             return runRepeat(context);
         }
+        if (action instanceof Until) {
+            return runUntil(context);
+        }
         if (action instanceof Scope) {
             return runLifecycle(context);
         }
@@ -810,6 +814,49 @@ public final class Scheduler implements AutoCloseable {
             aggregated.include(context.runChild(child));
         }
         return aggregated.status();
+    }
+
+    private static Status runUntil(final ConcreteContext context) {
+        var descriptor = context.descriptor();
+        var untilAction = (Until) descriptor.action();
+        var children = descriptor.children();
+
+        for (int i = 0; i < children.size(); i++) {
+            var child = children.get(i);
+            var childResult = context.runChild(child, ExecutionMode.RUN);
+
+            if (childResult.isAborted()) {
+                for (int j = i + 1; j < children.size(); j++) {
+                    context.runChild(children.get(j), ExecutionMode.SKIP);
+                }
+                return Status.ABORTED;
+            }
+
+            boolean satisfied;
+            if (untilAction.until().isPresent()) {
+                satisfied = evaluateUntilPredicate(untilAction.until().get(), context);
+            } else {
+                satisfied = childResult.isPassed();
+            }
+
+            if (satisfied) {
+                for (int j = i + 1; j < children.size(); j++) {
+                    context.runChild(children.get(j), ExecutionMode.SKIP);
+                }
+                return Status.PASSED;
+            }
+        }
+
+        return Status.FAILED;
+    }
+
+    private static boolean evaluateUntilPredicate(
+            final java.util.function.Predicate<org.paramixel.api.Context> predicate, final ConcreteContext context) {
+        try {
+            return predicate.test(context);
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private static Status runParallel(final Parallel parallel, final ConcreteContext context) {

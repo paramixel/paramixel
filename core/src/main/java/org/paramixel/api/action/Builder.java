@@ -32,7 +32,8 @@ public sealed interface Builder
                 Scope.Builder,
                 Sequence.Builder,
                 Static.Builder,
-                Timeout.Builder {
+                Timeout.Builder,
+                Until.Builder {
 
     /**
      * Builds an immutable action snapshot from this builder's current configuration.
