@@ -8,7 +8,7 @@ const baseUrl = '/';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Paramixel',
-  tagline: 'A tree-based test framework for Java 17+ with composable action trees.',
+  tagline: 'Paramixel turns complex Java tests into readable, composable execution trees.',
   favicon: 'img/favicon.ico',
 
   url: 'https://www.paramixel.org',
@@ -181,7 +181,7 @@ const config = {
             title: 'Documentation',
             items: [
               { label: 'Getting Started', to: '/getting-started/introduction' },
-              { label: 'Core Concepts', to: '/core-concepts/actions' },
+              { label: 'Core Concepts', to: '/core-concepts' },
               { label: 'API Reference', to: '/api/intro' },
             ],
           },

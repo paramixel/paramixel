@@ -1,51 +1,79 @@
 ---
 title: Paramixel
-description: Composable action trees for Java testing.
+description: Paramixel turns complex Java tests into readable, composable execution trees.
 slug: /
 ---
 
-# Composable action trees for Java testing
+# Paramixel
 
-Paramixel is a Java 17+ test framework for building tests as explicit, composable action trees. A tree can run sequential work, parallel work, lifecycle setup and teardown, fixture-scoped instance work, assertions, delays, repeats, and timeouts.
+Paramixel is a Java 17+ test orchestration framework built around executable action trees.
 
-Paramixel complements JUnit. Use JUnit for conventional unit tests and method-level parameterized tests; use Paramixel when the test plan is an execution graph with global lifecycle, nested parallelism, generated environments, and structure-aware reporting. JUnit parameterized tests parameterize invocations. Paramixel composes and schedules execution graphs.
+Instead of forcing complex workflows into flat method-shaped tests, Paramixel lets Java code define the test plan directly. The tree describes what runs, what runs in order, what may run in parallel, and where setup and teardown belong.
 
-The implementation is centered on a small public API:
+```text
+Java code builds the tree
+        │
+        ▼
+Paramixel executes the tree
+        │
+        ▼
+Paramixel returns a result tree
+        │
+        ▼
+Reports and callers inspect the same structure
+```
 
-- `org.paramixel.api.Runner` executes actions or discovered factories.
-- `org.paramixel.api.action.Builder` produces immutable `Action` trees.
-- `org.paramixel.api.action.Action` is the sealed reusable execution unit.
-- `org.paramixel.api.Paramixel` contains discovery annotations.
-- `org.paramixel.api.Configuration`, `Listener`, `Result`, `Context`, `Status`, and `Descriptor` expose runtime configuration, callbacks, and execution state.
+The result tree mirrors the action tree, so reports and callers can inspect the same structure that was executed.
 
-## Quick start
+## A small execution tree
 
 ```java
-package examples;
-
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Assert;
 import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
-public final class SmokeTest {
+public final class LoginSmokeTest {
     @Paramixel.Factory
-    public static Action smoke() {
-        return Sequence.builder("smoke")
-                .child(Step.of("open", ctx -> System.out.println("open")))
-                .child(Step.of("assert", ctx -> System.out.println("assert")))
+    public static Action test() {
+        return Sequence.builder("login smoke")
+                .child(Step.of("open login page", ctx -> openLoginPage()))
+                .child(Step.of("submit credentials", ctx -> submitCredentials()))
+                .child(Assert.of("user is signed in", true, true))
                 .build();
     }
 }
 ```
 
+```text
+LoginSmokeTest
+└── login smoke
+    ├── open login page
+    ├── submit credentials
+    └── user is signed in
+```
+
 Run discovered factories with the Maven plugin goal `paramixel:test`, or run programmatically with `Runner.defaultRunner()`.
+
+## Where Paramixel fits
+
+Use JUnit for ordinary unit tests and method-level parameterized tests. Use Paramixel when the structure of the test matters: integration workflows, compatibility scenarios, generated test plans, lifecycle-heavy tests, mixed sequential and parallel branches, and result trees that mirror execution.
+
+## Core API, after the model
+
+- `org.paramixel.api.Runner` executes actions or discovered factories.
+- `org.paramixel.api.action.Builder` produces immutable action trees.
+- `org.paramixel.api.action.Action` is the sealed reusable execution unit.
+- `org.paramixel.api.Paramixel` contains discovery annotations.
+- `org.paramixel.api.Configuration`, `Listener`, `Result`, `Context`, `Status`, and `Descriptor` expose runtime configuration, callbacks, and execution state.
 
 ## Learn next
 
-- [Introduction](getting-started/introduction)
-- [Installation](getting-started/installation)
-- [First Test](getting-started/first-test)
-- [Actions](core-concepts/actions)
+- [When to Use Paramixel](getting-started/when-to-use)
+- [Quick Start: Your First Execution Tree](getting-started/first-test)
+- [Core Concepts](core-concepts)
+- [Test Shapes](test-shapes)
+- [Built-in Actions](core-concepts/actions)
 - [Maven Plugin](integrations/maven-plugin)
 - [API Overview](api/intro)

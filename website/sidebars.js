@@ -10,20 +10,32 @@ const sidebars = {
       collapsed: false,
       items: [
         'getting-started/introduction',
-        'getting-started/installation',
+        'getting-started/when-to-use',
         'getting-started/first-test',
+        'getting-started/installation',
         'getting-started/project-setup',
       ],
     },
     {
       type: 'category',
-      label: 'Core Concepts',
+      label: 'Concepts',
       collapsed: false,
       items: [
-        'core-concepts/actions',
+        'core-concepts',
         'core-concepts/elements',
+        'core-concepts/actions',
         'core-concepts/discovery',
         'core-concepts/data-driven-testing',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Patterns',
+      collapsed: false,
+      items: [
+        'test-shapes',
+        'guides/parallel-execution',
+        'guides/best-practices',
       ],
     },
     {
@@ -53,8 +65,6 @@ const sidebars = {
       collapsed: true,
       items: [
         'guides/quick-reference',
-        'guides/parallel-execution',
-        'guides/best-practices',
         'guides/troubleshooting',
         'guides/examples',
         'guides/migration-5.1-to-6',

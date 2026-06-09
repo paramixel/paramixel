@@ -5,33 +5,72 @@
 
 # Paramixel
 
-A tree-based test framework for Java 17+ with composable action trees.
+Paramixel turns complex Java tests into readable, composable execution trees.
+
+It is a Java 17+ test orchestration framework for integration tests, compatibility scenarios, lifecycle-heavy workflows, and test plans that are awkward to express as flat annotation-driven test methods.
 
 ## Why Paramixel?
 
-Most test frameworks center execution around fixed declarations that are hard to branch, loop, or compose. Paramixel keeps annotations focused on discovery and lightweight metadata while the test plan itself is plain Java — an explicit action tree built with the full power of the language at definition time.
+Most Java testing frameworks are method-based. That is a great fit for ordinary unit tests.
 
-**Key Benefits:**
-- **Composable action trees built with code** — setup/teardown, sequential and parallel children compose to arbitrary depth, making test topology explicit
-- **Programmatic test definition** — build test plans with Java code (loops, conditionals, dynamic generation) while using annotations only where they add value
+Some tests, however, are naturally structured:
+
+- setup must wrap a group of related checks
+- teardown must run even when setup or body steps fail
+- some branches must run sequentially
+- some branches may run in parallel
+- scenarios are generated from plain Java code
+- the final result should show the same structure that was executed
+
+Paramixel models those tests as executable action trees. The tree you build is the tree Paramixel runs, and the result tree mirrors that same structure.
+
+**Key benefits:**
+
+- **Composable execution trees built with plain Java** — setup/teardown, sequential children, and parallel branches compose to arbitrary depth, making execution structure explicit
+- **Dynamic test definition** — build test plans with Java loops, conditionals, and generated data while using annotations only where they add value
 - **Explicit teardown** — configured `after` actions run even when setup or body actions fail or skip; `CleanUp.runAndThrow()` can aggregate teardown failures with suppressed exceptions
 - **Parallel execution at any depth** — embed parallel children anywhere in the tree with per-node parallelism control
 - **Fail-fast or run-all semantics** — choose per-node whether children stop on first failure or run all regardless
 - **Write custom actions** — implement your own execution semantics; custom actions compose alongside built-in primitives with zero framework changes
 - **Single factory method produces the entire test plan** — one static method returns the full action tree; no per-method reflection at test time
 - **Optional managed instances** — use `Instance` actions when tests need fixture objects; otherwise actions run without test-class instantiation
-- **Result tree mirrors the action tree** — walk the result tree for aggregated or granular reporting at any level
+- **Inspectable results** — walk the result tree for aggregated or granular reporting at any level
 
-### How Paramixel complements JUnit
+## When to use Paramixel
 
-Paramixel can run alongside JUnit in the same project and build. Use JUnit for conventional unit tests and method-level parameterized tests. Use Paramixel when the test plan is an execution graph: global setup/teardown, nested sequential and parallel branches, per-branch lifecycle, generated environments, retries, timeouts, isolation, and reports that mirror the structure being executed.
+Use Paramixel when the structure of the test matters as much as the assertions.
 
-In short:
+Good fits include:
 
-- JUnit parameterized tests parameterize test invocations.
-- Paramixel composes and schedules test execution graphs.
+- integration test workflows
+- compatibility testing across versions, configurations, or environments
+- dynamically generated test plans
+- lifecycle-heavy tests with nested setup and teardown
+- tests that mix sequential and parallel execution
+- test suites where the result should be inspectable as a tree
 
-A Kafka compatibility test is a good example. A single Paramixel factory can build a matrix of Kafka versions, run version-specific environments in parallel, wrap each environment with its own setup and teardown, run nested producer/consumer checks inside each environment, and wrap the whole run with global hooks. JUnit can approximate parts of this with extensions or custom engines, but Paramixel exposes the execution graph directly as the core model.
+Paramixel is probably unnecessary when:
+
+- the test is a simple unit test
+- one test method clearly expresses the behavior
+- JUnit parameterized tests are sufficient
+- no explicit lifecycle or execution structure is needed
+
+## How Paramixel complements JUnit
+
+JUnit is excellent for ordinary method-based tests. Paramixel can run alongside JUnit in the same project and build, and is designed for cases where a test is better represented as a tree: global setup/teardown, nested sequential and parallel branches, per-branch lifecycle, generated environments, retries, timeouts, isolation, and reports that mirror the structure being executed.
+
+| Need | JUnit-style method tests | Paramixel |
+| --- | --- | --- |
+| Simple unit test | Excellent fit | Usually unnecessary |
+| Annotation-driven discovery | Excellent fit | Optional factory discovery |
+| Complex workflow | Possible, but can become awkward | Natural fit |
+| Nested setup/teardown | Usually indirect | Explicit in the tree |
+| Dynamic test generation | Supported, but framework-shaped | Plain Java code |
+| Sequential + parallel sections | Usually externalized | Built into the action tree |
+| Result mirrors execution structure | Limited | Core model |
+
+A Kafka compatibility test is a good example. A single Paramixel factory can build a matrix of Kafka versions, run version-specific environments in parallel, wrap each environment with its own setup and teardown, run nested producer/consumer checks inside each environment, and wrap the whole run with global hooks. JUnit can approximate parts of this with extensions or custom engines, but Paramixel exposes the execution tree directly as the core model.
 
 ## Documentation
 
@@ -39,11 +78,15 @@ For the full documentation, visit: **https://www.paramixel.org**
 
 ## Quick Start
 
+This quick start creates a small Paramixel execution tree with setup, two test steps, and teardown.
+
+The important idea is that the Java code builds the same structure that Paramixel executes and reports.
+
 ### Add Dependency
 
 ```xml
 <properties>
-    <paramixel.version>5.1.1</paramixel.version>
+    <paramixel.version>6.1.0</paramixel.version>
 </properties>
 
 <dependency>
@@ -83,28 +126,44 @@ See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel)
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Lifecycle;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
-public class MyTest {
+public final class MyTest {
 
     public static void main(String[] args) {
         Runner.defaultRunner().runAndExit(factory());
     }
 
     @Paramixel.Factory
-    public static Action<?> factory() {
-        return Lifecycle.of(MyTest.class.getName())
-                .before("setUp()", ctx -> { /* setup */ })
-                .child(Step.of("test1()", ctx -> { /* test something */ }))
-                .child(Step.of("test2()", ctx -> { /* test something else */ }))
-                .after("tearDown()", ctx -> { /* teardown */ })
-                .resolve();
+    public static Action factory() {
+        return Scope.builder(MyTest.class.getName())
+                .before(Step.of("setUp()", ctx -> { /* setup */ }))
+                .body(Sequence.builder("tests")
+                        .child(Step.of("test1()", ctx -> { /* test something */ }))
+                        .child(Step.of("test2()", ctx -> { /* test something else */ }))
+                        .build())
+                .after(Step.of("tearDown()", ctx -> { /* teardown */ }))
+                .build();
     }
 }
 ```
 
-> **Note:** Action trees are built with `private static` methods so each action is easily discoverable from the IDE outline or structure view.
+This creates the following execution tree:
+
+```text
+MyTest
+├── before: setUp()
+├── body: tests
+│   ├── test1()
+│   └── test2()
+└── after: tearDown()
+```
+
+Paramixel executes the tree and returns a result tree with the same shape.
+
+> **Note:** Keep factory methods public and static for discovery. Use small private helper methods when that makes each action easy to find from the IDE outline or structure view.
 
 ### Other Examples
 
