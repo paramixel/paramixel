@@ -11,7 +11,7 @@ The Maven plugin artifact is `org.paramixel:maven-plugin`. Its goal prefix is `p
 <plugin>
   <groupId>org.paramixel</groupId>
   <artifactId>maven-plugin</artifactId>
-  <version>6.0.0</version>
+  <version>6.1.0</version>
   <executions>
     <execution>
       <goals>

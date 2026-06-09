@@ -13,7 +13,7 @@ Paramixel requires Java 17 or newer.
 <dependency>
   <groupId>org.paramixel</groupId>
   <artifactId>core</artifactId>
-  <version>6.0.0</version>
+  <version>6.1.0</version>
 </dependency>
 ```
 
@@ -25,7 +25,7 @@ Use the core dependency when running action trees programmatically or when compi
 <plugin>
   <groupId>org.paramixel</groupId>
   <artifactId>maven-plugin</artifactId>
-  <version>6.0.0</version>
+  <version>6.1.0</version>
   <executions>
     <execution>
       <goals>

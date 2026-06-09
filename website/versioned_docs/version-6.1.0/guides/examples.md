@@ -1,9 +1,9 @@
 ---
-title: Examples
+title: Real-World Test Shapes
 description: Source-backed example patterns.
 ---
 
-# Examples
+# Real-World Test Shapes
 
 The repository's examples live under `examples/src/main/java`. They demonstrate factory discovery, annotations, lifecycle composition, retry support, and Testcontainers integration.
 
@@ -65,7 +65,7 @@ public static Action temporarilyDisabled() {
 
 ## Kafka compatibility matrix
 
-Testcontainers examples show where Paramixel's execution-graph model is useful. A Kafka compatibility test is not just a parameterized method over Kafka versions. The graph can run version-specific environments in parallel, wrap each environment in its own setup/body/teardown lifecycle, run nested producer/consumer checks inside each environment, and wrap the whole matrix with global hooks.
+Testcontainers examples show where Paramixel's execution-tree model is useful. A Kafka compatibility test is not just a parameterized method over Kafka versions. The tree can run version-specific environments in parallel, wrap each environment in its own setup/body/teardown lifecycle, run nested producer/consumer checks inside each environment, and wrap the whole matrix with global hooks.
 
 ```text
 before[sequence]: global hooks
@@ -81,4 +81,4 @@ body[parallel]: Kafka compatibility matrix
 after[sequence]: global cleanup
 ```
 
-This is the kind of topology Paramixel is designed to make explicit: the lifecycle and parallelism are part of the test model, not incidental behavior around a parameterized invocation. See the repository's Kafka Testcontainers examples under `examples/src/main/java/examples/testcontainers/kafka`.
+This is the kind of execution tree Paramixel is designed to make explicit: the lifecycle and parallelism are part of the test model, not incidental behavior around a parameterized invocation. See the repository's Kafka Testcontainers examples under `examples/src/main/java/examples/testcontainers/kafka`.

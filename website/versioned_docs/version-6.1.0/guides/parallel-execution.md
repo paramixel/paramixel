@@ -8,6 +8,7 @@ description: Run independent action branches concurrently.
 Use `Parallel` for independent work that is safe to run concurrently.
 
 ```java
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Step;
 
@@ -19,11 +20,18 @@ Action spec = Parallel.builder("browser matrix")
         .build();
 ```
 
+```text
+browser matrix
+├── chrome
+├── firefox
+└── webkit
+```
+
 ## Runner parallelism
 
 `paramixel.parallelism` controls runner-wide parallel capacity. `Parallel.builder(...).parallelism(n)` controls a specific parallel action's child concurrency.
 
-These two levels compose. The runner provides global scheduling capacity for the whole execution graph, while each nested `Parallel` action defines the local concurrency window for its children. This lets one test plan express a parallel top-level matrix and nested parallel work inside each branch without flattening everything into one parameterized method.
+These two levels compose. The runner provides global scheduling capacity for the whole execution tree, while each nested `Parallel` action defines the local concurrency window for its children. This lets one test plan express a parallel top-level matrix and nested parallel work inside each branch without flattening everything into one parameterized method.
 
 ## Best practices
 
@@ -35,11 +43,10 @@ These two levels compose. The runner provides global scheduling capacity for the
 
 ## Serializing subgroups with Isolated
 
-`Isolated` serializes its body under a named lock, allowing controlled
-serialization within a `Parallel`. Combine with `Parallel.parallelism()`
-to bound concurrent execution of the body's children:
+`Isolated` serializes its body under a named lock, allowing controlled serialization within a `Parallel`. Combine with `Parallel.parallelism()` to bound concurrent execution of the body's children:
 
 ```java
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Sequence;
@@ -63,14 +70,23 @@ Action spec = Parallel.builder("suite")
         .build();
 ```
 
-Two Isolated nodes share `"db-lock"` — only one body executes at a time.
-Each body internally controls its own parallelism via
-`Parallel.parallelism()`.
+```text
+suite
+├── database-tests   (uses db-lock)
+│   └── db
+│       ├── queryTest1
+│       └── queryTest2
+└── api-tests        (uses db-lock)
+    └── api
+        ├── createUser
+        └── updateUser
+```
+
+Two `Isolated` nodes share `"db-lock"`; only one body executes at a time. Each body internally controls its own parallelism via `Parallel.parallelism()`.
 
 ## Shuffled execution order
 
-Use `.shuffle()` on `Parallel.Builder` to randomize the order children enter the rolling window,
-helping surface race conditions that depend on scheduling order:
+Use `.shuffle()` on `Parallel.Builder` to randomize the order children enter the rolling window, helping surface race conditions that depend on scheduling order:
 
 ```java
 Action spec = Parallel.builder("matrix")
