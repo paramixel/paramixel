@@ -115,4 +115,23 @@ class TimeoutArgumentsTest {
         assertThat(second.body().displayName()).isEqualTo("test");
         assertThat(second.timeout()).isEqualTo(ofMillis(200));
     }
+
+    @Test
+    @DisplayName("body(Builder) builds and sets child action")
+    void bodyBuilderBuildsAndSetsChildAction() {
+        var timeout = Timeout.builder("timeout")
+                .body(Sequence.builder("body-seq").child(Step.of("step", context -> {})))
+                .timeout(ofMillis(100))
+                .build();
+        assertThat(timeout.body()).isNotNull();
+        assertThat(timeout.body().displayName()).isEqualTo("body-seq");
+    }
+
+    @Test
+    @DisplayName("body(Builder) rejects null builder")
+    void bodyBuilderOverloadRejectsNull() {
+        var builder = Timeout.builder("timeout");
+        assertThatThrownBy(() -> builder.body((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }

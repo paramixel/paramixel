@@ -210,4 +210,20 @@ class ConfigurationTest {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("classLoader is null");
     }
+
+    @Test
+    @DisplayName("defaultConfiguration(ClassLoader) loads with explicit classloader")
+    void defaultConfigurationWithExplicitClassloader() {
+        Configuration config = Configuration.defaultConfiguration(getClass().getClassLoader());
+        assertThat(config).isNotNull();
+        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+    }
+
+    @Test
+    @DisplayName("ConcreteConfiguration.toMap() returns backing properties")
+    void concreteConfigurationToMapReturnsProperties() {
+        Map<String, String> props = Map.of("key", "value");
+        var config = new nonapi.org.paramixel.ConcreteConfiguration(props);
+        assertThat(config.toMap()).containsEntry("key", "value");
+    }
 }

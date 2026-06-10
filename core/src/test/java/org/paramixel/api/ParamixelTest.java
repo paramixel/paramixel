@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 class ParamixelTest {
 
     @Test
-    @DisplayName("@Factory has RUNTIME retention")
+    @DisplayName("@Paranixel.Factory has RUNTIME retention")
     void factoryHasRuntimeRetention() {
         Retention retention = Paramixel.Factory.class.getAnnotation(Retention.class);
 
@@ -38,7 +38,7 @@ class ParamixelTest {
     }
 
     @Test
-    @DisplayName("@Factory targets METHOD")
+    @DisplayName("@Paramixel.Factory targets METHOD")
     void factoryTargetsMethod() {
         Target target = Paramixel.Factory.class.getAnnotation(Target.class);
 
@@ -46,7 +46,7 @@ class ParamixelTest {
     }
 
     @Test
-    @DisplayName("@Priority default value is 0")
+    @DisplayName("@Paramixel.Priority default value is 0")
     void priorityDefaultValueIsZero() throws NoSuchMethodException {
         var method = Paramixel.Priority.class.getDeclaredMethod("value");
 
@@ -54,7 +54,7 @@ class ParamixelTest {
     }
 
     @Test
-    @DisplayName("@Disabled default value is empty string")
+    @DisplayName("@Paramixel.Disabled default value is empty string")
     void disabledDefaultValueIsEmptyString() throws NoSuchMethodException {
         var method = Paramixel.Disabled.class.getDeclaredMethod("value");
 
@@ -62,7 +62,7 @@ class ParamixelTest {
     }
 
     @Test
-    @DisplayName("@Tag is Repeatable with Tags container")
+    @DisplayName("@Paramixel.Tag is Repeatable with Tags container")
     void tagIsRepeatableWithTagsContainer() {
         Repeatable repeatable = Paramixel.Tag.class.getAnnotation(Repeatable.class);
 
@@ -71,7 +71,7 @@ class ParamixelTest {
     }
 
     @Test
-    @DisplayName("@Tags value is Tag array")
+    @DisplayName("@Paramixel.Tags value is Tag array")
     void tagsValueIsTagArray() throws NoSuchMethodException {
         var method = Paramixel.Tags.class.getDeclaredMethod("value");
 
@@ -79,7 +79,7 @@ class ParamixelTest {
     }
 
     @Test
-    @DisplayName("@Id targets METHOD")
+    @DisplayName("@Paramixel.Id targets METHOD")
     void idTargetsMethod() {
         Target target = Paramixel.Id.class.getAnnotation(Target.class);
 
@@ -87,7 +87,7 @@ class ParamixelTest {
     }
 
     @Test
-    @DisplayName("@Id has RUNTIME retention")
+    @DisplayName("@Paramixel.Id has RUNTIME retention")
     void idHasRuntimeRetention() {
         Retention retention = Paramixel.Id.class.getAnnotation(Retention.class);
 
