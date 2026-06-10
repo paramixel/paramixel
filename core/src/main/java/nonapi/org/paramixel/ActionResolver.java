@@ -44,7 +44,7 @@ import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Scans the classpath for {@link org.paramixel.api.Paramixel.Factory @Factory}
+ * Scans the classpath for {@link org.paramixel.api.Paramixel.Factory}
  * methods, validates them, invokes them to produce {@link Action} instances, and
  * collapses the results into a root {@link Parallel} action.
  *
@@ -134,7 +134,7 @@ public final class ActionResolver {
     /**
      * Performs a classpath scan and returns the root action for all discovered and validated factories.
      *
-     * <p>When {@code body} is {@code null}, factory methods annotated with {@link Paramixel.Factory @Factory}
+     * <p>When {@code body} is {@code null}, factory methods annotated with {@link Paramixel.Factory}
      * are discovered and collapsed into a {@link Parallel} body action. When {@code body} is non-null,
      * factory scanning is skipped and the supplied action is used as the body.
      *
@@ -321,8 +321,10 @@ public final class ActionResolver {
                 }
                 if (method.isAnnotationPresent(Paramixel.BeforeAll.class)
                         || method.isAnnotationPresent(Paramixel.AfterAll.class)) {
-                    failures.add(new DiscoveryValidationFailure(
-                            locationOf(method), "method cannot be both @Factory and a hook annotation"));
+                    failures.add(
+                            new DiscoveryValidationFailure(
+                                    locationOf(method),
+                                    "method cannot be both @@Paramixel.Factory and a hook annotation (@Paramixel.BeforeAll, @Paramixel.AfterAll)"));
                     continue;
                 }
                 if (method.isAnnotationPresent(Paramixel.Disabled.class)) {

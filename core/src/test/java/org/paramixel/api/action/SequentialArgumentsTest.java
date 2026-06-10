@@ -223,4 +223,23 @@ class SequentialArgumentsTest {
         assertThat(seq.isShuffled()).isTrue();
         assertThat(seq.seed()).isZero();
     }
+
+    @Test
+    @DisplayName("child(Builder) builds and adds child action")
+    void childBuilderBuildsAndAddsChildAction() {
+        var seq = Sequential.builder("seq")
+                .child(Step.of("a", s -> {}))
+                .child(Sequence.builder("nested").child(Step.of("b", s -> {})))
+                .build();
+        assertThat(seq.children()).hasSize(2);
+        assertThat(seq.children().get(1).displayName()).isEqualTo("nested");
+    }
+
+    @Test
+    @DisplayName("child(Builder) rejects null builder")
+    void childBuilderOverloadRejectsNull() {
+        var builder = Sequential.builder("seq");
+        assertThatThrownBy(() -> builder.child((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }

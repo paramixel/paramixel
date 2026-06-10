@@ -163,4 +163,60 @@ class StaticArgumentsTest {
         assertThat(second.before()).isPresent();
         assertThat(second.after()).isPresent();
     }
+
+    @Test
+    @DisplayName("before(Builder) builds and sets before action")
+    void beforeBuilderBuildsAndSetsBeforeAction() {
+        var action = Static.builder("static")
+                .before(Sequence.builder("before-seq").child(Step.of("step", context -> {})))
+                .body(Step.of("body", context -> {}))
+                .build();
+        assertThat(action.before()).isPresent();
+        assertThat(action.before().get().displayName()).isEqualTo("before-seq");
+    }
+
+    @Test
+    @DisplayName("body(Builder) builds and sets body action")
+    void bodyBuilderBuildsAndSetsBodyAction() {
+        var action = Static.builder("static")
+                .body(Sequence.builder("body-seq").child(Step.of("step", context -> {})))
+                .build();
+        assertThat(action.body()).isNotNull();
+        assertThat(action.body().displayName()).isEqualTo("body-seq");
+    }
+
+    @Test
+    @DisplayName("after(Builder) builds and sets after action")
+    void afterBuilderBuildsAndSetsAfterAction() {
+        var action = Static.builder("static")
+                .body(Step.of("body", context -> {}))
+                .after(Sequence.builder("after-seq").child(Step.of("step", context -> {})))
+                .build();
+        assertThat(action.after()).isPresent();
+        assertThat(action.after().get().displayName()).isEqualTo("after-seq");
+    }
+
+    @Test
+    @DisplayName("before(Builder) rejects null builder")
+    void beforeBuilderOverloadRejectsNull() {
+        var builder = Static.builder("static");
+        assertThatThrownBy(() -> builder.before((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("body(Builder) rejects null builder")
+    void bodyBuilderOverloadRejectsNull() {
+        var builder = Static.builder("static");
+        assertThatThrownBy(() -> builder.body((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("after(Builder) rejects null builder")
+    void afterBuilderOverloadRejectsNull() {
+        var builder = Static.builder("static");
+        assertThatThrownBy(() -> builder.after((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }

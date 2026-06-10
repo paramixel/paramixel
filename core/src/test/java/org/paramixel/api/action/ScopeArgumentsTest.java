@@ -140,4 +140,60 @@ class ScopeArgumentsTest {
         assertThat(second.after()).isPresent();
         assertThat(second.after().get().displayName()).isEqualTo("after");
     }
+
+    @Test
+    @DisplayName("before(Builder) builds and sets before action")
+    void beforeBuilderBuildsAndSetsBeforeAction() {
+        var action = Scope.builder("scope")
+                .before(Sequence.builder("before-seq").child(Step.of("step", context -> {})))
+                .body(Step.of("body", context -> {}))
+                .build();
+        assertThat(action.before()).isPresent();
+        assertThat(action.before().get().displayName()).isEqualTo("before-seq");
+    }
+
+    @Test
+    @DisplayName("body(Builder) builds and sets body action")
+    void bodyBuilderBuildsAndSetsBodyAction() {
+        var action = Scope.builder("scope")
+                .body(Sequence.builder("body-seq").child(Step.of("step", context -> {})))
+                .build();
+        assertThat(action.body()).isNotNull();
+        assertThat(action.body().displayName()).isEqualTo("body-seq");
+    }
+
+    @Test
+    @DisplayName("after(Builder) builds and sets after action")
+    void afterBuilderBuildsAndSetsAfterAction() {
+        var action = Scope.builder("scope")
+                .body(Step.of("body", context -> {}))
+                .after(Sequence.builder("after-seq").child(Step.of("step", context -> {})))
+                .build();
+        assertThat(action.after()).isPresent();
+        assertThat(action.after().get().displayName()).isEqualTo("after-seq");
+    }
+
+    @Test
+    @DisplayName("before(Builder) rejects null builder")
+    void beforeBuilderOverloadRejectsNull() {
+        var builder = Scope.builder("scope");
+        assertThatThrownBy(() -> builder.before((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("body(Builder) rejects null builder")
+    void bodyBuilderOverloadRejectsNull() {
+        var builder = Scope.builder("scope");
+        assertThatThrownBy(() -> builder.body((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("after(Builder) rejects null builder")
+    void afterBuilderOverloadRejectsNull() {
+        var builder = Scope.builder("scope");
+        assertThatThrownBy(() -> builder.after((org.paramixel.api.action.Builder) null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }
