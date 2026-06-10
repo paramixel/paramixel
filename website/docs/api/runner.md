@@ -38,7 +38,7 @@ var runner = Runner.builder()
         .build();
 ```
 
-Runner shuffle applies only to discovery-based execution via `run(Selector)` and `run()`. Direct execution via `run(Action)` is unaffected — use `Parallel.builder(...).shuffle()` or `Sequence.builder(...).shuffle()` on individual action trees instead.
+Runner shuffle applies only to discovery-based execution via `run(Selector)` and `run()`. Direct execution via `run(Action)` is unaffected — use `Parallel.parallel(...).shuffle()` or `Sequential.sequential(...).shuffle()` on individual action trees instead.
 
 ## Run methods
 

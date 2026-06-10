@@ -18,24 +18,25 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Static;
-import org.paramixel.api.action.Step;
 
+@SuppressWarnings("removal")
 public class NestedTest {
 
     public static void main(final String[] args) {
         Runner.defaultRunner()
-                .runAndExit(Parallel.<NestedTest>builder(NestedTest.class.getName())
+                .runAndExit(parallel(NestedTest.class.getName())
                         .child(Nested1.factory())
                         .child(Nested2.factory())
                         .build());
@@ -52,36 +53,31 @@ public class NestedTest {
         @Paramixel.Factory
         public static Action factory() {
             return Static.builder(Nested1.class.getName())
-                    .before(Step.of("staticSetUp()", context -> Nested1.staticSetUp()))
-                    .body(Instance.builder("Nested1", Nested1::new)
-                            .body(Scope.<Nested1>builder("lifecycle")
-                                    .before(Step.of("setUp()", withInstance(Nested1.class, Nested1::setUp)))
-                                    .body(Sequence.builder("tests")
-                                            .child(Scope.<Nested1>builder("testOne")
-                                                    .before(Step.of(
+                    .before(step("staticSetUp()", context -> Nested1.staticSetUp()))
+                    .body(instance("Nested1", Nested1::new)
+                            .body(scope("lifecycle")
+                                    .before(step("setUp()", withInstance(Nested1.class, Nested1::setUp)))
+                                    .body(sequential("tests")
+                                            .child(scope("testOne")
+                                                    .before(step(
                                                             "beforeEach()",
                                                             withInstance(Nested1.class, Nested1::beforeEach)))
-                                                    .body(Step.of(
+                                                    .body(step(
                                                             "testOne()", withInstance(Nested1.class, Nested1::testOne)))
-                                                    .after(Step.of(
+                                                    .after(step(
                                                             "afterEach()",
-                                                            withInstance(Nested1.class, Nested1::afterEach)))
-                                                    .build())
-                                            .child(Scope.<Nested1>builder("testTwo")
-                                                    .before(Step.of(
+                                                            withInstance(Nested1.class, Nested1::afterEach))))
+                                            .child(scope("testTwo")
+                                                    .before(step(
                                                             "beforeEach()",
                                                             withInstance(Nested1.class, Nested1::beforeEach)))
-                                                    .body(Step.of(
+                                                    .body(step(
                                                             "testTwo()", withInstance(Nested1.class, Nested1::testTwo)))
-                                                    .after(Step.of(
+                                                    .after(step(
                                                             "afterEach()",
-                                                            withInstance(Nested1.class, Nested1::afterEach)))
-                                                    .build())
-                                            .build())
-                                    .after(Step.of("tearDown()", withInstance(Nested1.class, Nested1::tearDown)))
-                                    .build())
-                            .build())
-                    .after(Step.of("staticTearDown()", context -> Nested1.staticTearDown()))
+                                                            withInstance(Nested1.class, Nested1::afterEach)))))
+                                    .after(step("tearDown()", withInstance(Nested1.class, Nested1::tearDown)))))
+                    .after(step("staticTearDown()", context -> Nested1.staticTearDown()))
                     .build();
         }
 
@@ -147,36 +143,31 @@ public class NestedTest {
         @Paramixel.Factory
         public static Action factory() {
             return Static.builder(Nested2.class.getName())
-                    .before(Step.of("staticSetUp()", context -> Nested2.staticSetUp()))
-                    .body(Instance.builder("Nested2", Nested2::new)
-                            .body(Scope.<Nested2>builder("lifecycle")
-                                    .before(Step.of("setUp()", withInstance(Nested2.class, Nested2::setUp)))
-                                    .body(Sequence.builder("tests")
-                                            .child(Scope.<Nested2>builder("testOne")
-                                                    .before(Step.of(
+                    .before(step("staticSetUp()", context -> Nested2.staticSetUp()))
+                    .body(instance("Nested2", Nested2::new)
+                            .body(scope("lifecycle")
+                                    .before(step("setUp()", withInstance(Nested2.class, Nested2::setUp)))
+                                    .body(sequential("tests")
+                                            .child(scope("testOne")
+                                                    .before(step(
                                                             "beforeEach()",
                                                             withInstance(Nested2.class, Nested2::beforeEach)))
-                                                    .body(Step.of(
+                                                    .body(step(
                                                             "testOne()", withInstance(Nested2.class, Nested2::testOne)))
-                                                    .after(Step.of(
+                                                    .after(step(
                                                             "afterEach()",
-                                                            withInstance(Nested2.class, Nested2::afterEach)))
-                                                    .build())
-                                            .child(Scope.<Nested2>builder("testTwo")
-                                                    .before(Step.of(
+                                                            withInstance(Nested2.class, Nested2::afterEach))))
+                                            .child(scope("testTwo")
+                                                    .before(step(
                                                             "beforeEach()",
                                                             withInstance(Nested2.class, Nested2::beforeEach)))
-                                                    .body(Step.of(
+                                                    .body(step(
                                                             "testTwo()", withInstance(Nested2.class, Nested2::testTwo)))
-                                                    .after(Step.of(
+                                                    .after(step(
                                                             "afterEach()",
-                                                            withInstance(Nested2.class, Nested2::afterEach)))
-                                                    .build())
-                                            .build())
-                                    .after(Step.of("tearDown()", withInstance(Nested2.class, Nested2::tearDown)))
-                                    .build())
-                            .build())
-                    .after(Step.of("staticTearDown()", context -> Nested2.staticTearDown()))
+                                                            withInstance(Nested2.class, Nested2::afterEach)))))
+                                    .after(step("tearDown()", withInstance(Nested2.class, Nested2::tearDown)))))
+                    .after(step("staticTearDown()", context -> Nested2.staticTearDown()))
                     .build();
         }
 

@@ -18,14 +18,14 @@ package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Step.step;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.support.Retry;
 import org.paramixel.api.support.Retry.Policy;
@@ -56,8 +56,8 @@ public class RetryTest {
      */
     @Paramixel.Factory
     public static Action factory() {
-        return Instance.builder("retry-example", RetryTest::new)
-                .body(Step.of("retry()", withInstance(RetryTest.class, RetryTest::retry)))
+        return instance("retry-example", RetryTest::new)
+                .body(step("retry()", withInstance(RetryTest.class, RetryTest::retry)))
                 .build();
     }
 

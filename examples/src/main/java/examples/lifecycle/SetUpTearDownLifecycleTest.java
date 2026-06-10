@@ -18,15 +18,15 @@ package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 public class SetUpTearDownLifecycleTest {
 
@@ -44,25 +44,24 @@ public class SetUpTearDownLifecycleTest {
     public static Action factory() {
         resetCounts();
 
-        return Instance.builder("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
-                .body(Scope.<SetUpTearDownLifecycleTest>builder("lifecycle")
-                        .before(Step.of(
+        return instance("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
+                .body(scope("lifecycle")
+                        .before(step(
                                 "setUp()",
                                 withInstance(SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::setUp)))
-                        .body(Sequence.builder("tests")
-                                .child(Step.of(
+                        .body(sequential("tests")
+                                .child(step(
                                         "testOne()",
                                         withInstance(
                                                 SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::testOne)))
-                                .child(Step.of(
+                                .child(step(
                                         "testTwo()",
                                         withInstance(
-                                                SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::testTwo)))
-                                .build())
-                        .after(Step.of(
+                                                SetUpTearDownLifecycleTest.class,
+                                                SetUpTearDownLifecycleTest::testTwo))))
+                        .after(step(
                                 "tearDown()",
-                                withInstance(SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::tearDown)))
-                        .build())
+                                withInstance(SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::tearDown))))
                 .build();
     }
 

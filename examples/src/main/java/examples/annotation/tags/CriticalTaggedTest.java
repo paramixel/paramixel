@@ -17,11 +17,11 @@
 package examples.annotation.tags;
 
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Step.step;
 
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Step;
 
 /**
  * Example test class annotated with multiple tags ({@code "smoke-fast"} and
@@ -38,8 +38,8 @@ public class CriticalTaggedTest {
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
     public static Action factory() {
-        return Instance.builder("CriticalTaggedTest", CriticalTaggedTest::new)
-                .body(Step.of("test()", withInstance(CriticalTaggedTest.class, CriticalTaggedTest::test)))
+        return instance("CriticalTaggedTest", CriticalTaggedTest::new)
+                .body(step("test()", withInstance(CriticalTaggedTest.class, CriticalTaggedTest::test)))
                 .build();
     }
 

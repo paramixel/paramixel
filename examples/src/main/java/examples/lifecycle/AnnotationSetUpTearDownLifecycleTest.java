@@ -17,15 +17,15 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
 
 public class AnnotationSetUpTearDownLifecycleTest {
 
@@ -45,15 +45,13 @@ public class AnnotationSetUpTearDownLifecycleTest {
 
         var annotationResolver = AnnotationResolver.create(AnnotationSetUpTearDownLifecycleTest.class);
 
-        return Instance.builder(AnnotationSetUpTearDownLifecycleTest.class)
-                .body(Scope.builder("[scenario]")
+        return instance(AnnotationSetUpTearDownLifecycleTest.class)
+                .body(scope("[scenario]")
                         .before(annotationResolver.byId("setUp"))
-                        .body(Sequence.builder("tests")
+                        .body(sequential("tests")
                                 .child(annotationResolver.byId("testOne"))
-                                .child(annotationResolver.byId("testTwo"))
-                                .build())
-                        .after(annotationResolver.byId("tearDown"))
-                        .build())
+                                .child(annotationResolver.byId("testTwo")))
+                        .after(annotationResolver.byId("tearDown")))
                 .build();
     }
 

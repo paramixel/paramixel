@@ -55,6 +55,22 @@ public final class Step implements Action {
         return new Step(displayName, consumer);
     }
 
+    /**
+     * Creates a step with the supplied name and consumer.
+     *
+     * <p>This is a named alternative to {@link #of(String, ContextConsumer)} for
+     * use with static imports in action tree definitions.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param consumer the consumer to invoke; must not be {@code null}
+     * @return the step action
+     * @throws NullPointerException if {@code name} or {@code consumer} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static Step step(final String name, final ContextConsumer consumer) {
+        return of(name, consumer);
+    }
+
     @Override
     public String displayName() {
         return displayName;

@@ -16,9 +16,10 @@
 
 package examples;
 
+import static org.paramixel.api.action.Step.step;
+
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Step;
 
 public class ParamixelHooks {
 
@@ -28,14 +29,14 @@ public class ParamixelHooks {
 
     @Paramixel.BeforeAll
     public static Action beforeAll() {
-        return Step.of(ParamixelHooks.class.getSimpleName() + ".beforeAll", context -> {
+        return step(ParamixelHooks.class.getSimpleName() + ".beforeAll", context -> {
             System.out.println(ParamixelHooks.class.getSimpleName() + ".beforeAll");
         });
     }
 
     @Paramixel.AfterAll
     public static Action afterAll() {
-        return Step.of(ParamixelHooks.class.getSimpleName() + ".afterAll", context -> {
+        return step(ParamixelHooks.class.getSimpleName() + ".afterAll", context -> {
             System.out.println(ParamixelHooks.class.getSimpleName() + ".afterAll");
         });
     }

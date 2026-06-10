@@ -17,6 +17,9 @@
 package examples.testcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
 
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
@@ -25,9 +28,6 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
 
 /**
  * Parameterized integration test that starts MongoDB containers using annotation-based
@@ -60,17 +60,15 @@ public class AnnotationMongoDBTest {
     public static Action factory() throws Throwable {
         var annotationResolver = AnnotationResolver.create(AnnotationMongoDBTest.class);
 
-        var parallel = Parallel.builder(AnnotationMongoDBTest.class.getName());
+        var parallel = parallel(AnnotationMongoDBTest.class.getName());
         for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            var lifecycle = Scope.builder(environment.name())
+            var lifecycle = scope(environment.name())
                     .before(annotationResolver.byId("setUp"))
                     .body(annotationResolver.byId("testInsertAndQuery"))
-                    .after(annotationResolver.byId("tearDown"))
-                    .build();
+                    .after(annotationResolver.byId("tearDown"));
 
-            parallel.child(Instance.builder(environment.name(), () -> new AnnotationMongoDBTest(environment))
-                    .body(lifecycle)
-                    .build());
+            parallel.child(instance(environment.name(), () -> new AnnotationMongoDBTest(environment))
+                    .body(lifecycle));
         }
         return parallel.build();
     }

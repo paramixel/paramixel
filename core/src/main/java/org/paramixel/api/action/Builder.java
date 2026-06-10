@@ -23,6 +23,7 @@ package org.paramixel.api.action;
  * an immutable snapshot from the builder's current configuration. Builder inputs are not retained
  * for deferred building.
  */
+@SuppressWarnings("removal")
 public sealed interface Builder
         permits Conditional.Builder,
                 Instance.Builder,
@@ -31,6 +32,7 @@ public sealed interface Builder
                 Repeat.Builder,
                 Scope.Builder,
                 Sequence.Builder,
+                Sequential.Builder,
                 Static.Builder,
                 Timeout.Builder,
                 Until.Builder {

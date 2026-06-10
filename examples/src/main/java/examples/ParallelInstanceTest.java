@@ -18,6 +18,10 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,10 +31,6 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates parallel method execution on a single instance to verify thread safety.
@@ -73,25 +73,23 @@ public class ParallelInstanceTest {
 
         var testName = ParallelInstanceTest.class.getName();
 
-        var parallelMethods = Parallel.<ParallelInstanceTest>builder("parallel-methods")
+        var parallelMethods = parallel("parallel-methods")
                 .parallelism(PARALLELISM)
-                .child(Step.of("method1()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method1)))
-                .child(Step.of("method2()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method2)))
-                .child(Step.of("method3()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method3)));
+                .child(step("method1()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method1)))
+                .child(step("method2()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method2)))
+                .child(step("method3()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method3)));
 
-        return Scope.builder(testName)
-                .body(Instance.builder(testName, ParallelInstanceTest::new)
-                        .body(Scope.<ParallelInstanceTest>builder("lifecycle")
-                                .before(Step.of(
+        return scope(testName)
+                .body(instance(testName, ParallelInstanceTest::new)
+                        .body(scope("lifecycle")
+                                .before(step(
                                         "before()",
                                         withInstance(ParallelInstanceTest.class, ParallelInstanceTest::before)))
-                                .body(parallelMethods.build())
-                                .after(Step.of(
+                                .body(parallelMethods)
+                                .after(step(
                                         "after()",
-                                        withInstance(ParallelInstanceTest.class, ParallelInstanceTest::after)))
-                                .build())
-                        .build())
-                .after(Step.of("validate", ignored -> validate()))
+                                        withInstance(ParallelInstanceTest.class, ParallelInstanceTest::after)))))
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 

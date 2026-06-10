@@ -20,7 +20,7 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * An action that executes a single body child under the protection of a named
+ * An action that executes a single body action under the protection of a named
  * re-entrant lock.
  *
  * <p>Two {@code Isolated} nodes with the same {@link #lockName()} serialize even
@@ -71,6 +71,21 @@ public final class Isolated implements Action {
         return new Builder(displayName, lockName);
     }
 
+    /**
+     * Creates a new builder for an {@code Isolated} action with the given display name
+     * and lock name.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @param lockName the name of the re-entrant lock; must not be {@code null} or blank
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} or {@code lockName} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} or {@code lockName} is blank
+     * @see Builder
+     */
+    public static Builder isolated(final String displayName, final String lockName) {
+        return builder(displayName, lockName);
+    }
+
     @Override
     public String displayName() {
         return displayName;
@@ -87,9 +102,9 @@ public final class Isolated implements Action {
     }
 
     /**
-     * Returns the body child action.
+     * Returns the body action.
      *
-     * @return the body child action; never {@code null}
+     * @return the body action; never {@code null}
      */
     public Action body() {
         return body;

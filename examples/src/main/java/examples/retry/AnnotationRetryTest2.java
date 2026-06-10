@@ -17,6 +17,7 @@
 package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,14 +25,13 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
 import org.paramixel.api.support.Retry;
 import org.paramixel.api.support.Retry.Policy;
 
 /**
  * Demonstrates the {@link Retry} support using annotation-based method references
  * when the flaky operation throws a plain {@link RuntimeException} instead of
- * {@link FailException}. Verifies that retry still works and the result reports
+ * {@link org.paramixel.api.exception.FailException}. Verifies that retry still works and the result reports
  * pass with an attempt count of 3.
  */
 public class AnnotationRetryTest2 {
@@ -56,7 +56,7 @@ public class AnnotationRetryTest2 {
     public static Action factory() {
         var annotationResolver = AnnotationResolver.create(AnnotationRetryTest2.class);
 
-        return Instance.builder(AnnotationRetryTest2.class)
+        return instance(AnnotationRetryTest2.class)
                 .body(annotationResolver.byId("retry"))
                 .build();
     }
@@ -66,8 +66,7 @@ public class AnnotationRetryTest2 {
     }
 
     /**
-     * Retries a flaky operation that fails the first two times with
-     * {@link RuntimeException}.
+     * Retries a flaky operation that fails the first two times with {@link RuntimeException}.
      */
     @Paramixel.Id("retry")
     public void retry() {

@@ -12,7 +12,7 @@ import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Step;
 
-Action spec = Parallel.builder("browser matrix")
+Action spec = Parallel.parallel("browser matrix")
         .parallelism(3)
         .child(Step.of("chrome", ctx -> runChrome()))
         .child(Step.of("firefox", ctx -> runFirefox()))
@@ -29,7 +29,7 @@ browser matrix
 
 ## Runner parallelism
 
-`paramixel.parallelism` controls runner-wide parallel capacity. `Parallel.builder(...).parallelism(n)` controls a specific parallel action's child concurrency.
+`paramixel.parallelism` controls runner-wide parallel capacity. `Parallel.parallel(...).parallelism(n)` controls a specific parallel action's child concurrency.
 
 These two levels compose. The runner provides global scheduling capacity for the whole execution tree, while each nested `Parallel` action defines the local concurrency window for its children. This lets one test plan express a parallel top-level matrix and nested parallel work inside each branch without flattening everything into one parameterized method.
 
@@ -49,20 +49,20 @@ These two levels compose. The runner provides global scheduling capacity for the
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
-Action spec = Parallel.builder("suite")
+Action spec = Parallel.parallel("suite")
         .parallelism(4)
-        .child(Isolated.builder("database-tests", "db-lock")
-                .body(Parallel.builder("db")
+        .child(Isolated.isolated("database-tests", "db-lock")
+                .body(Parallel.parallel("db")
                         .parallelism(2)
                         .child(queryTest1())
                         .child(queryTest2())
                         .build())
                 .build())
-        .child(Isolated.builder("api-tests", "db-lock")
-                .body(Sequence.builder("api")
+        .child(Isolated.isolated("api-tests", "db-lock")
+                .body(Sequential.sequential("api")
                         .child(createUser())
                         .child(updateUser())
                         .build())
@@ -89,7 +89,7 @@ Two `Isolated` nodes share `"db-lock"`; only one body executes at a time. Each b
 Use `.shuffle()` on `Parallel.Builder` to randomize the order children enter the rolling window, helping surface race conditions that depend on scheduling order:
 
 ```java
-Action spec = Parallel.builder("matrix")
+Action spec = Parallel.parallel("matrix")
         .parallelism(3)
         .shuffle()
         .child(Step.of("chrome", ctx -> runChrome()))
@@ -101,7 +101,7 @@ Action spec = Parallel.builder("matrix")
 For reproducible flaky-test investigations, supply an explicit seed:
 
 ```java
-Action spec = Parallel.builder("matrix")
+Action spec = Parallel.parallel("matrix")
         .parallelism(3)
         .shuffle(42L)
         .child(Step.of("chrome", ctx -> runChrome()))

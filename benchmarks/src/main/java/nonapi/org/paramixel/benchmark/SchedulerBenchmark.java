@@ -33,7 +33,6 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.Context;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Step;
@@ -112,7 +111,7 @@ public class SchedulerBenchmark {
                 final int index = i;
                 // Mix of fast (1ms) and slow (20ms) children
                 long sleepMs = (index % 4 == 0) ? 20 : 1;
-                parallel.child(Step.<Context>of("child-" + index, context -> {
+                parallel.child(Step.of("child-" + index, context -> {
                     Blackhole.consumeCPU(1);
                     try {
                         Thread.sleep(sleepMs);
@@ -151,7 +150,7 @@ public class SchedulerBenchmark {
             runner = createRunner(parallelism);
             var parallel = Parallel.builder("root").parallelism(parallelism);
             for (var i = 0; i < taskCount; i++) {
-                parallel.child(Step.<Context>of("task-" + i, context -> Blackhole.consumeCPU(1)));
+                parallel.child(Step.of("task-" + i, context -> Blackhole.consumeCPU(1)));
             }
             root = parallel.build();
         }
@@ -183,7 +182,7 @@ public class SchedulerBenchmark {
             runner = createRunner(parallelism);
             var parallel = Parallel.builder("root").parallelism(parallelism);
             for (var i = 0; i < childCount; i++) {
-                parallel.child(Step.<Context>of("child-" + i, context -> {
+                parallel.child(Step.of("child-" + i, context -> {
                     Blackhole.consumeCPU(1);
                     try {
                         Thread.sleep(5);

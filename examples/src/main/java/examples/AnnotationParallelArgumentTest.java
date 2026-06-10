@@ -17,17 +17,17 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates parallel argument execution using annotation-based method references.
@@ -67,29 +67,26 @@ public class AnnotationParallelArgumentTest {
 
         var testName = AnnotationParallelArgumentTest.class.getName();
 
-        var parallel = Parallel.builder(testName).parallelism(PARALLELISM);
+        var parallel = parallel(testName).parallelism(PARALLELISM);
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             String argumentValue = "string-" + i;
 
-            var lifecycle = Scope.builder(argumentValue)
+            var lifecycle = scope(argumentValue)
                     .before(annotationResolver.byId("before"))
-                    .body(Sequence.builder("tests")
+                    .body(sequential("tests")
                             .independent()
                             .child(annotationResolver.byId("test"))
                             .child(annotationResolver.byId("test"))
-                            .child(annotationResolver.byId("test"))
-                            .build())
-                    .after(annotationResolver.byId("after"))
-                    .build();
+                            .child(annotationResolver.byId("test")))
+                    .after(annotationResolver.byId("after"));
 
-            parallel.child(Instance.builder(argumentValue, AnnotationParallelArgumentTest::new)
-                    .body(lifecycle)
-                    .build());
+            parallel.child(
+                    instance(argumentValue, AnnotationParallelArgumentTest::new).body(lifecycle));
         }
 
-        return Scope.builder(testName)
-                .body(parallel.build())
-                .after(Step.of("validate", ignored -> validate()))
+        return scope(testName)
+                .body(parallel)
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 

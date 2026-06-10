@@ -17,14 +17,14 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates that nested Parallel actions complete without deadlock.
@@ -70,57 +70,53 @@ public class NestedParallelDeadlockTest {
 
         var testName = NestedParallelDeadlockTest.class.getName();
 
-        var leaf1 = Parallel.builder("leaf1")
-                .child(Step.of("l1-1", context -> {
+        var leaf1 = parallel("leaf1")
+                .child(step("l1-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }))
-                .child(Step.of("l1-2", context -> {
+                .child(step("l1-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }));
 
-        var leaf2 = Parallel.builder("leaf2")
-                .child(Step.of("l2-1", context -> {
+        var leaf2 = parallel("leaf2")
+                .child(step("l2-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }))
-                .child(Step.of("l2-2", context -> {
+                .child(step("l2-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }));
 
-        var mid1 = Parallel.builder("mid1").parallelism(2).child(leaf1.build()).child(leaf2.build());
+        var mid1 = parallel("mid1").parallelism(2).child(leaf1).child(leaf2);
 
-        var leaf3 = Parallel.builder("leaf3")
-                .child(Step.of("l3-1", context -> {
+        var leaf3 = parallel("leaf3")
+                .child(step("l3-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }))
-                .child(Step.of("l3-2", context -> {
+                .child(step("l3-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }));
 
-        var leaf4 = Parallel.builder("leaf4")
-                .child(Step.of("l4-1", context -> {
+        var leaf4 = parallel("leaf4")
+                .child(step("l4-1", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }))
-                .child(Step.of("l4-2", context -> {
+                .child(step("l4-2", context -> {
                     executedCount.incrementAndGet();
                     sleep(10);
                 }));
 
-        var mid2 = Parallel.builder("mid2").parallelism(2).child(leaf3.build()).child(leaf4.build());
+        var mid2 = parallel("mid2").parallelism(2).child(leaf3).child(leaf4);
 
-        return Scope.builder(testName)
-                .body(Parallel.builder("root")
-                        .parallelism(2)
-                        .child(mid1.build())
-                        .child(mid2.build())
-                        .build())
-                .after(Step.of("validate", ignored -> validate()))
+        return scope(testName)
+                .body(parallel("root").parallelism(2).child(mid1).child(mid2))
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 

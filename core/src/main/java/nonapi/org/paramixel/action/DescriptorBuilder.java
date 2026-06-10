@@ -29,6 +29,7 @@ import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Timeout;
 import org.paramixel.api.action.Until;
@@ -38,10 +39,11 @@ import org.paramixel.api.exception.CycleDetectedException;
  * Binds reusable action definitions into a per-run descriptor tree using
  * a pull-based stack walk with cycle detection.
  *
- * <p>Structurally mirrors the action tree: before, body children, and after
+ * <p>Structurally mirrors the action tree: before, child actions, and after
  * are assigned to separate descriptor slots rather than flattened into the
  * children list.
  */
+@SuppressWarnings("removal")
 public final class DescriptorBuilder {
 
     /**
@@ -91,6 +93,8 @@ public final class DescriptorBuilder {
             parallel.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
         } else if (action instanceof Sequence sequence) {
             sequence.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
+        } else if (action instanceof Sequential sequential) {
+            sequential.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
         } else if (action instanceof Repeat repeat) {
             for (int i = 0; i < repeat.iterations(); i++) {
                 descriptor.addChild(build(descriptor, repeat.body(), path, visited));

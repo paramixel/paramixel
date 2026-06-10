@@ -17,13 +17,13 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
 
 public class AnnotationSimpleTest implements AutoCloseable {
 
@@ -41,7 +41,7 @@ public class AnnotationSimpleTest implements AutoCloseable {
 
         var annotationResolver = AnnotationResolver.create(AnnotationSimpleTest.class);
 
-        return Instance.builder(AnnotationSimpleTest.class)
+        return instance(AnnotationSimpleTest.class)
                 .body(annotationResolver.byId("testOne"))
                 .build();
     }

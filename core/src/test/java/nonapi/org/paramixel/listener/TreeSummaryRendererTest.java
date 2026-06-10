@@ -40,6 +40,7 @@ import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("TreeSummaryRenderer")
+@SuppressWarnings("removal")
 class TreeSummaryRendererTest {
 
     private static final String ROOT_NAME = Constants.ROOT_NAME;

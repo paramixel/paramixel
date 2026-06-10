@@ -17,6 +17,7 @@
 package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,7 +25,6 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.support.Retry;
 import org.paramixel.api.support.Retry.Policy;
@@ -57,7 +57,7 @@ public class AnnotationRetryTest {
     public static Action factory() {
         var annotationResolver = AnnotationResolver.create(AnnotationRetryTest.class);
 
-        return Instance.builder(AnnotationRetryTest.class)
+        return instance(AnnotationRetryTest.class)
                 .body(annotationResolver.byId("retry"))
                 .build();
     }

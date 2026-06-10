@@ -18,15 +18,15 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates independent sequential argument execution where arguments run one at a time.
@@ -62,35 +62,30 @@ public class IndependentArgumentTest {
 
         var testName = IndependentArgumentTest.class.getName();
 
-        var arguments = Sequence.builder(testName).independent();
+        var arguments = sequential(testName).independent();
 
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             String argumentValue = "string-" + i;
 
-            var tests = Sequence.<IndependentArgumentTest>builder(argumentValue)
-                    .child(Step.of(
-                            "test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)))
-                    .child(Step.of(
-                            "test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)))
-                    .child(Step.of(
-                            "test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)));
+            var tests = sequential(argumentValue)
+                    .child(step("test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)))
+                    .child(step("test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)))
+                    .child(step("test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)));
 
-            arguments.child(Instance.builder(argumentValue, IndependentArgumentTest::new)
-                    .body(Scope.<IndependentArgumentTest>builder("lifecycle")
-                            .before(Step.of(
+            arguments.child(instance(argumentValue, IndependentArgumentTest::new)
+                    .body(scope("lifecycle")
+                            .before(step(
                                     "before()",
                                     withInstance(IndependentArgumentTest.class, IndependentArgumentTest::before)))
-                            .body(tests.build())
-                            .after(Step.of(
+                            .body(tests)
+                            .after(step(
                                     "after()",
-                                    withInstance(IndependentArgumentTest.class, IndependentArgumentTest::after)))
-                            .build())
-                    .build());
+                                    withInstance(IndependentArgumentTest.class, IndependentArgumentTest::after)))));
         }
 
-        return Scope.builder(testName)
-                .body(arguments.build())
-                .after(Step.of("validate", ignored -> validate()))
+        return scope(testName)
+                .body(arguments)
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 

@@ -18,6 +18,10 @@ package examples.testcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Step.step;
 
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
@@ -25,10 +29,6 @@ import org.bson.Document;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Step;
 
 /**
  * Parameterized integration test that starts MongoDB containers for each Docker image
@@ -60,17 +60,15 @@ public class MongoDBTest {
      */
     @Paramixel.Factory
     public static Action factory() throws Throwable {
-        var parallel = Parallel.builder(MongoDBTest.class.getName());
+        var parallel = parallel(MongoDBTest.class.getName());
         for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            parallel.child(Instance.builder(environment.name(), () -> new MongoDBTest(environment))
-                    .body(Scope.builder("[scenario]")
-                            .before(Step.of("setUp()", withInstance(MongoDBTest.class, MongoDBTest::setUp)))
-                            .body(Step.of(
+            parallel.child(instance(environment.name(), () -> new MongoDBTest(environment))
+                    .body(scope("[scenario]")
+                            .before(step("setUp()", withInstance(MongoDBTest.class, MongoDBTest::setUp)))
+                            .body(step(
                                     "testInsertAndQuery()",
                                     withInstance(MongoDBTest.class, MongoDBTest::testInsertAndQuery)))
-                            .after(Step.of("tearDown()", withInstance(MongoDBTest.class, MongoDBTest::tearDown)))
-                            .build())
-                    .build());
+                            .after(step("tearDown()", withInstance(MongoDBTest.class, MongoDBTest::tearDown)))));
         }
         return parallel.build();
     }

@@ -12,10 +12,10 @@ Paramixel is useful when a test has a shape that should be visible in code, exec
 Use a sequence when steps must run in order.
 
 ```java
-Action spec = Sequence.builder("login smoke")
+Action spec = Sequential.sequential("login smoke")
         .child(Step.of("open login page", ctx -> openLoginPage()))
         .child(Step.of("submit credentials", ctx -> submitCredentials()))
-        .child(Assert.of("user is signed in", true, true))
+        .child(Assert.assertTrue("user is signed in", true))
         .build();
 ```
 
@@ -31,9 +31,9 @@ login smoke
 Use a lifecycle shape when setup and cleanup belong to a specific subtree.
 
 ```java
-Action spec = Scope.builder("database workflow")
+Action spec = Scope.scope("database workflow")
         .before(Step.of("start database", ctx -> startDatabase()))
-        .body(Sequence.builder("checks")
+        .body(Sequential.sequential("checks")
                 .child(Step.of("migrate schema", ctx -> migrateSchema()))
                 .child(Step.of("verify query", ctx -> verifyQuery()))
                 .build())
@@ -55,7 +55,7 @@ database workflow
 Use parallel branches when independent scenarios can run concurrently.
 
 ```java
-Action spec = Parallel.builder("browser matrix")
+Action spec = Parallel.parallel("browser matrix")
         .parallelism(3)
         .child(Step.of("chrome", ctx -> runChrome()))
         .child(Step.of("firefox", ctx -> runFirefox()))
@@ -78,7 +78,7 @@ Use generated scenarios when plain Java code should create many related actions.
 var users = List.of("ada", "grace", "linus");
 
 Action spec = Each.sequential("user checks", users,
-        user -> Sequence.builder("check " + user)
+        user -> Sequential.sequential("check " + user)
                 .child(Step.of("load", ctx -> loadUser(user)))
                 .child(Step.of("verify", ctx -> verifyUser(user))))
         .build();
@@ -105,9 +105,9 @@ Use a compatibility shape when the same behavior must be checked across versions
 var versions = List.of("Java 17", "Java 21", "Java 25");
 
 Action spec = Each.parallel("compatibility matrix", versions,
-        version -> Scope.builder(version + " scenario")
+        version -> Scope.scope(version + " scenario")
                 .before(Step.of("start " + version, ctx -> start(version)))
-                .body(Sequence.builder("checks")
+                .body(Sequential.sequential("checks")
                         .child(Step.of("write", ctx -> write(version)))
                         .child(Step.of("read", ctx -> read(version))))
                 .after(Step.of("stop " + version, ctx -> stop(version))))
@@ -132,13 +132,13 @@ compatibility matrix
 Use the default dependent sequence when later steps should stop after an earlier failure. Use an independent sequence when all children should run so the result tree can collect every outcome.
 
 ```java
-Action failFast = Sequence.builder("checkout")
+Action failFast = Sequential.sequential("checkout")
         .child(Step.of("create cart", ctx -> createCart()))
         .child(Step.of("submit payment", ctx -> submitPayment()))
         .child(Step.of("verify receipt", ctx -> verifyReceipt()))
         .build();
 
-Action collectAll = Sequence.builder("cleanup checks")
+Action collectAll = Sequential.sequential("cleanup checks")
         .independent()
         .child(Step.of("delete user", ctx -> deleteUser()))
         .child(Step.of("delete cart", ctx -> deleteCart()))

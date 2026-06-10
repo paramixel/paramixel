@@ -31,7 +31,7 @@ import org.paramixel.api.Context;
  * available to all child actions via {@link Context#instance(Class)}. If the
  * instance implements {@link AutoCloseable}, it is closed in the after phase.
  *
- * <p>To execute multiple body actions, wrap a {@link Sequence} or {@link Parallel}
+ * <p>To execute multiple body actions, wrap a {@link Sequential} or {@link Parallel}
  * in {@link Builder#body(Action)}.
  */
 public final class Instance implements Action {
@@ -68,6 +68,21 @@ public final class Instance implements Action {
     }
 
     /**
+     * Creates a new builder for an {@code Instance} that uses the supplied factory
+     * to create the test fixture.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @param factory the supplier that creates the test fixture; must not be {@code null}
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} or {@code factory} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
+     * @see Builder
+     */
+    public static Builder instance(final String displayName, final Supplier<?> factory) {
+        return builder(displayName, factory);
+    }
+
+    /**
      * Creates a new builder for an {@code Instance} that uses the class's simple name as the
      * action display name and its default constructor as the factory.
      *
@@ -78,6 +93,20 @@ public final class Instance implements Action {
      */
     public static Builder builder(final Class<?> type) {
         return builder(type.getSimpleName(), type);
+    }
+
+    /**
+     * Creates a new builder for an {@code Instance} that uses the class's simple name
+     * as the action display name and its default constructor as the factory.
+     *
+     * @param type the class of the test fixture; must have a public no-argument constructor
+     * @return a new builder
+     * @throws NullPointerException if {@code type} is {@code null}
+     * @throws IllegalArgumentException if {@code type} does not have a public no-argument constructor
+     * @see Builder
+     */
+    public static Builder instance(final Class<?> type) {
+        return builder(type);
     }
 
     /**
@@ -96,6 +125,22 @@ public final class Instance implements Action {
         Arguments.requireNonBlank(displayName, "displayName is blank");
         Objects.requireNonNull(type, "type is null");
         return new Builder(displayName, defaultConstructorSupplier(type));
+    }
+
+    /**
+     * Creates a new builder for an {@code Instance} with the given display name
+     * that uses the class's default constructor as the factory.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @param type the class of the test fixture; must have a public no-argument constructor
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} or {@code type} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank or {@code type} does not
+     *     have a public no-argument constructor
+     * @see Builder
+     */
+    public static Builder instance(final String displayName, final Class<?> type) {
+        return builder(displayName, type);
     }
 
     private static Supplier<?> defaultConstructorSupplier(final Class<?> type) {
@@ -129,9 +174,9 @@ public final class Instance implements Action {
     }
 
     /**
-     * Returns the body child action.
+     * Returns the body action.
      *
-     * @return the body child action; never {@code null}
+     * @return the body action; never {@code null}
      */
     public Action body() {
         return body;

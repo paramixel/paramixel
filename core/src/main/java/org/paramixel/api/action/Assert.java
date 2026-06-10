@@ -137,6 +137,121 @@ public final class Assert implements Action {
         return new Assert(displayName, expected, actualSupplier, message);
     }
 
+    /**
+     * Creates an assert action with a static actual value.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param expected the expected value
+     * @param actual the actual value
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static Assert assertThat(final String name, final boolean expected, final boolean actual) {
+        return of(name, expected, actual);
+    }
+
+    /**
+     * Creates an assert action with a static actual value and a failure message.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param expected the expected value
+     * @param actual the actual value
+     * @param message the message included in the failed status when values differ; must not be
+     *     {@code null} or blank
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name} or {@code message} is {@code null}
+     * @throws IllegalArgumentException if {@code name} or {@code message} is blank
+     */
+    public static Assert assertThat(
+            final String name, final boolean expected, final boolean actual, final String message) {
+        return of(name, expected, actual, message);
+    }
+
+    /**
+     * Creates an assert action with a lazy actual value supplier.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param expected the expected value
+     * @param actualSupplier the supplier that provides the actual value; must not be {@code null}
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name} or {@code actualSupplier} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static Assert assertThat(final String name, final boolean expected, final BooleanSupplier actualSupplier) {
+        return of(name, expected, actualSupplier);
+    }
+
+    /**
+     * Creates an assert action with a lazy actual value supplier and a failure message.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param expected the expected value
+     * @param actualSupplier the supplier that provides the actual value; must not be {@code null}
+     * @param message the message included in the failed status when values differ; must not be
+     *     {@code null} or blank
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name}, {@code actualSupplier}, or {@code message}
+     *     is {@code null}
+     * @throws IllegalArgumentException if {@code name} or {@code message} is blank
+     */
+    public static Assert assertThat(
+            final String name, final boolean expected, final BooleanSupplier actualSupplier, final String message) {
+        return of(name, expected, actualSupplier, message);
+    }
+
+    /**
+     * Shorthand for {@code assertThat(name, true, actual)}.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param actual the actual value
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static Assert assertTrue(final String name, final boolean actual) {
+        return assertThat(name, true, actual);
+    }
+
+    /**
+     * Shorthand for {@code assertThat(name, true, actualSupplier)}.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param actualSupplier the supplier that provides the actual value; must not be {@code null}
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name} or {@code actualSupplier} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static Assert assertTrue(final String name, final BooleanSupplier actualSupplier) {
+        return assertThat(name, true, actualSupplier);
+    }
+
+    /**
+     * Shorthand for {@code assertThat(name, false, actual)}.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param actual the actual value
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static Assert assertFalse(final String name, final boolean actual) {
+        return assertThat(name, false, actual);
+    }
+
+    /**
+     * Shorthand for {@code assertThat(name, false, actualSupplier)}.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param actualSupplier the supplier that provides the actual value; must not be {@code null}
+     * @return a new assert action; never {@code null}
+     * @throws NullPointerException if {@code name} or {@code actualSupplier} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static Assert assertFalse(final String name, final BooleanSupplier actualSupplier) {
+        return assertThat(name, false, actualSupplier);
+    }
+
     @Override
     public String displayName() {
         return displayName;

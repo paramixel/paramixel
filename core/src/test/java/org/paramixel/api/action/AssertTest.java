@@ -30,6 +30,7 @@ import org.paramixel.api.Runner;
 import org.paramixel.api.exception.FailException;
 
 @DisplayName("Assert")
+@SuppressWarnings("removal")
 class AssertTest {
 
     private static final Context context = new Context() {

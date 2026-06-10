@@ -10,7 +10,7 @@ Use this plan when upgrading a Paramixel 5.0.x project directly to 6.0.0.
 ## Migration focus
 
 - Keep the action-tree model and verify imports match the 6.0.0 public packages.
-- Replace `Spec` with `Action`; replace `Sequential.of()` with `Sequence.builder()`.
+- Replace `Spec` with `Action`; replace `Sequential.of()` with `Sequential.sequential()`.
 - Use `Context` for fixture/configuration access and `Descriptor` for execution state.
 - Adopt 6.0.0 configuration keys, especially `paramixel.listener.exclude` for listener output suppression.
 
@@ -19,7 +19,7 @@ Use this plan when upgrading a Paramixel 5.0.x project directly to 6.0.0.
 - Use Java 17+ and imports from `org.paramixel.api`, `org.paramixel.api.action`, `org.paramixel.api.selector`, and `org.paramixel.api.support`.
 - Define discovery entry points as public static methods annotated with `@Paramixel.Factory`.
 - Return `Action`, `Builder`, or `null` from factories; `null` produces a skipped outcome.
-- Build action trees with `Sequence`, `Parallel`, `Scope`, `Static`, `Instance`, `Repeat`, `Timeout`, `Step`, and `Assert`.
+- Build action trees with `Sequential`, `Parallel`, `Scope`, `Instance`, `Repeat`, `Timeout`, `Step`, and `Assert` (`Static` is deprecated since 6.2 — use `Scope` instead).
 - Read execution state from `Result.descriptor()` and the descriptor tree.
 - Configure runs with `paramixel.properties`, JVM system properties, or programmatic `Configuration` objects.
 - Use `paramixel.match.package.regex`, `paramixel.match.class.regex`, and `paramixel.match.tag.regex` for discovery filtering.
@@ -38,14 +38,14 @@ Use this plan when upgrading a Paramixel 5.0.x project directly to 6.0.0.
 ```java
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 public final class SmokeTest {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Action smoke() {
-        return Sequence.builder("smoke")
+        return Sequential.sequential("smoke")
                 .child(Step.of("arrange", ctx -> arrange()))
                 .child(Step.of("act", ctx -> act()))
                 .child(Step.of("assert", ctx -> assertResult()))

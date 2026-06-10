@@ -85,6 +85,7 @@ const sidebars = {
         'api/result',
         'api/action',
         'api/builder',
+        'api/named-builders',
         'api/descriptor-and-metadata',
         'api/runner',
         'api/configuration',

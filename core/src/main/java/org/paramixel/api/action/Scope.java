@@ -21,15 +21,13 @@ import java.util.Optional;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * An action that executes a before-action, a single body child, and an after-action
+ * An action that executes a before action, a single body action, and an after action
  * in sequence, with lifecycle-style guarantees.
  *
- * <p>When configured as <em>dependent</em> (the default), a failure in the body child
- * causes the body child execution to fail. When configured as <em>independent</em>,
- * the body child runs regardless of its outcome. The after-action always runs,
- * regardless of earlier outcomes.
+ * <p>A before action runs first. If the before action fails, the body action is
+ * skipped. The after action always runs, regardless of earlier outcomes.
  *
- * <p>To execute multiple body actions, wrap a {@link Sequence} or {@link Parallel}
+ * <p>To execute multiple body actions, wrap a {@link Sequential} or {@link Parallel}
  * in {@link Builder#body(Action)}.
  */
 public final class Scope implements Action {
@@ -57,6 +55,19 @@ public final class Scope implements Action {
         return new Builder(displayName);
     }
 
+    /**
+     * Creates a new builder for a {@code Scope} with the given display name.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
+     * @see Builder
+     */
+    public static Builder scope(final String displayName) {
+        return builder(displayName);
+    }
+
     @Override
     public String displayName() {
         return displayName;
@@ -72,9 +83,9 @@ public final class Scope implements Action {
     }
 
     /**
-     * Returns the body child action.
+     * Returns the body action.
      *
-     * @return the body child action; never {@code null}
+     * @return the body action; never {@code null}
      */
     public Action body() {
         return body;
@@ -106,10 +117,10 @@ public final class Scope implements Action {
         }
 
         /**
-         * Sets the before-action. Calling this method
-         * again overwrites the previous before-action.
+         * Sets the before action. Calling this method
+         * again overwrites the previous before action.
          *
-         * @param action the before-action; must not be {@code null}
+         * @param action the before action; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
@@ -119,10 +130,10 @@ public final class Scope implements Action {
         }
 
         /**
-         * Sets the before-action from a builder. The builder is built immediately
+         * Sets the before action from a builder. The builder is built immediately
          * and the resulting action snapshot is stored.
          *
-         * @param builder the before-action builder; must not be {@code null}
+         * @param builder the before action builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code builder} is {@code null}
          */
@@ -160,10 +171,10 @@ public final class Scope implements Action {
         }
 
         /**
-         * Sets the after-action. Calling this method
-         * again overwrites the previous after-action.
+         * Sets the after action. Calling this method
+         * again overwrites the previous after action.
          *
-         * @param action the after-action; must not be {@code null}
+         * @param action the after action; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
@@ -173,10 +184,10 @@ public final class Scope implements Action {
         }
 
         /**
-         * Sets the after-action from a builder. The builder is built immediately
+         * Sets the after action from a builder. The builder is built immediately
          * and the resulting action snapshot is stored.
          *
-         * @param builder the after-action builder; must not be {@code null}
+         * @param builder the after action builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code builder} is {@code null}
          */

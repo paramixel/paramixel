@@ -17,17 +17,17 @@
 package examples;
 
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.Objects;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
- * Demonstrates using provided {@link Step} actions with a fixture instance managed by {@link Instance}.
+ * Demonstrates using provided {@link Step} actions with a fixture instance managed by {@link org.paramixel.api.action.Instance}.
  */
 public class CustomActionTest {
 
@@ -54,11 +54,10 @@ public class CustomActionTest {
     public static Action factory() {
         var testName = CustomActionTest.class.getName();
 
-        return Instance.builder(testName, CustomActionTest::new)
-                .body(Sequence.builder("body")
-                        .child(Step.of("test", withInstance(CustomActionTest.class, CustomActionTest::setValue)))
-                        .child(Step.of("validate", withInstance(CustomActionTest.class, CustomActionTest::validate)))
-                        .build())
+        return instance(testName, CustomActionTest::new)
+                .body(sequential("body")
+                        .child(step("test", withInstance(CustomActionTest.class, CustomActionTest::setValue)))
+                        .child(step("validate", withInstance(CustomActionTest.class, CustomActionTest::validate))))
                 .build();
     }
 

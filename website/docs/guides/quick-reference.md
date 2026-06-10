@@ -10,16 +10,36 @@ description: Common APIs, annotations, and configuration keys.
 ```java
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 @Paramixel.Factory
 public static Action smoke() {
-    return Sequence.builder("smoke")
+    return Sequential.sequential("smoke")
             .child(Step.of("step", ctx -> doWork()))
             .build();
 }
 ```
+
+## Using named builders
+
+For shorter action tree definitions, use the named builder factories:
+
+```java
+import static org.paramixel.api.action.Sequential.sequential;
+
+@Paramixel.Factory
+public static Action smoke() {
+    return sequence("smoke")
+        .child(Step.of("arrange", ctx -> arrange()))
+        .child(Step.of("act", ctx -> act()))
+        .child(Step.of("assert", ctx -> assertResult()))
+        .build();
+}
+```
+
+See [Named Builders](../api/named-builders) for the full method reference.
+
 
 ## Annotations
 

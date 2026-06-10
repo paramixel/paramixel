@@ -10,7 +10,7 @@ description: Practical guidance for maintainable Paramixel suites.
 Name every meaningful action so console output, reports, and descriptors are readable.
 
 ```java
-Sequence.builder("checkout")
+Sequential.sequential("checkout")
         .child(Step.of("add item", ctx -> addItem()))
         .child(Step.of("submit payment", ctx -> submitPayment()));
 ```

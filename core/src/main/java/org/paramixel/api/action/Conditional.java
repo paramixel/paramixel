@@ -23,18 +23,18 @@ import org.paramixel.api.Context;
 
 /**
  * An action that evaluates a {@link Predicate}{@code <Context>} before executing a single
- * body child.
+ * body action.
  *
- * <p>When the predicate returns {@code true}, the body child executes normally and its
+ * <p>When the predicate returns {@code true}, the body action executes normally and its
  * status propagates to this node. When the predicate returns {@code false}, this node is
- * set to {@code SKIPPED} with the configured {@link #reason()} message and the body child
+ * set to {@code SKIPPED} with the configured {@link #reason()} message and the body action
  * — together with all descendants — is executed in {@code SKIP} mode, so the entire
  * subtree appears as skipped in reports.
  *
  * <p>If the predicate throws, this node is set to {@code FAILED} with a descriptive
- * message that includes the exception, and the body child is skipped.
+ * message that includes the exception, and the body action is skipped.
  *
- * <p>The body child is always present in the descriptor tree regardless of the condition
+ * <p>The body action is always present in the descriptor tree regardless of the condition
  * outcome — only statuses change at runtime. This preserves structural invariants that
  * listeners and report formats depend on.
  *
@@ -79,6 +79,21 @@ public final class Conditional implements Action {
         return new Builder(displayName, condition);
     }
 
+    /**
+     * Creates a new builder for a {@code Conditional} action with the given display name
+     * and condition predicate.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @param condition the predicate evaluated before the body; must not be {@code null}
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} or {@code condition} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
+     * @see Builder
+     */
+    public static Builder conditional(final String displayName, final Predicate<Context> condition) {
+        return builder(displayName, condition);
+    }
+
     @Override
     public String displayName() {
         return displayName;
@@ -103,9 +118,9 @@ public final class Conditional implements Action {
     }
 
     /**
-     * Returns the body child action.
+     * Returns the body action.
      *
-     * @return the body child action; never {@code null}
+     * @return the body action; never {@code null}
      */
     public Action body() {
         return body;
