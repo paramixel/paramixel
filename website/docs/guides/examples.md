@@ -12,14 +12,14 @@ The repository's examples live under `examples/src/main/java`. They demonstrate 
 ```java
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 @Paramixel.Factory
 @Paramixel.Tag("smoke")
 @Paramixel.Tag("critical")
 public static Action smoke() {
-    return Sequence.builder("smoke")
+    return Sequential.sequential("smoke")
             .child(Step.of("arrange", ctx -> arrange()))
             .child(Step.of("act", ctx -> act()))
             .child(Step.of("assert", ctx -> assertResult()))
@@ -34,7 +34,7 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 
 final class LoginFixture {
     @Paramixel.Id("open")
@@ -45,8 +45,8 @@ final class LoginFixture {
 }
 
 var resolver = AnnotationResolver.create(LoginFixture.class);
-Action fixture = Instance.builder(LoginFixture.class)
-        .body(Sequence.builder("login")
+Action fixture = Instance.instance(LoginFixture.class)
+        .body(Sequential.sequential("login")
                 .child(resolver.byId("open"))
                 .child(resolver.byId("submit"))
                 .build())
@@ -59,9 +59,46 @@ Action fixture = Instance.builder(LoginFixture.class)
 @Paramixel.Factory
 @Paramixel.Disabled("under investigation")
 public static Action temporarilyDisabled() {
-    return Sequence.builder("disabled").build();
+    return Sequential.sequential("disabled").build();
 }
 ```
+
+## Named builders
+
+The `ActionsExample` in the repository demonstrates the named builder factories:
+
+```java
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Assert.assertTrue;
+
+@Paramixel.Factory
+public static Action factory() {
+    return scope("root")
+        .body(sequence("tests")
+            .child(Step.of("step-demo", ctx -> {}))
+            .child(parallel("parallel-demo")
+                .child(Step.of("branch-1", ctx -> {}))
+                .child(Step.of("branch-2", ctx -> {}))
+                .child(Step.of("branch-3", ctx -> {}))
+                .build())
+            .child(repeat("repeat-demo")
+                .body(Step.of("repeated", ctx -> {}))
+                .iterations(3)
+                .build())
+            .child(timeout("timeout-demo")
+                .timeout(Duration.ofSeconds(1))
+                .body(Step.of("within-timeout", ctx -> {}))
+                .build())
+            .child(assertTrue("true-is-true", true))
+            .build())
+        .build();
+}
+```
+
+See [Named Builders](../api/named-builders) for the complete method reference.
+
 
 ## Kafka compatibility matrix
 

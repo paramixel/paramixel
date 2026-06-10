@@ -63,6 +63,19 @@ public final class Timeout implements Action {
         return new Builder(displayName);
     }
 
+    /**
+     * Creates a new builder for a {@code Timeout} action with the given display name.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
+     * @see Builder
+     */
+    public static Builder timeout(final String displayName) {
+        return builder(displayName);
+    }
+
     @Override
     public String displayName() {
         return displayName;

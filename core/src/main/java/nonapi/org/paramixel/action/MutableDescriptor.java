@@ -24,6 +24,7 @@ import org.paramixel.api.action.Delay;
 import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 /**
@@ -68,7 +69,7 @@ public interface MutableDescriptor extends Descriptor {
     void setAfter(MutableDescriptor after);
 
     /**
-     * Adds a body child descriptor during discovery.
+     * Adds a child action descriptor during discovery.
      *
      * @param child the child descriptor; must not be {@code null}
      * @throws NullPointerException if {@code child} is {@code null}
@@ -179,6 +180,7 @@ public interface MutableDescriptor extends Descriptor {
     default boolean isCoordinationAction() {
         return action() instanceof Parallel
                 || action() instanceof Sequence
+                || action() instanceof Sequential
                 || action() instanceof Isolated
                 || before().isPresent()
                 || after().isPresent()

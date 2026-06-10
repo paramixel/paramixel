@@ -28,6 +28,7 @@ import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Composite action propagation")
+@SuppressWarnings("removal")
 class CompositeActionPropagationTest {
 
     @Test

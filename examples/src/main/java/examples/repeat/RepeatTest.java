@@ -17,19 +17,17 @@
 package examples.repeat;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Repeat.repeat;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Repeat;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
- * Demonstrates the {@link Repeat} action with dependent and independent
+ * Demonstrates the {@link org.paramixel.api.action.Repeat} action with dependent and independent
  * repetitions. Verifies that the child action executes exactly the
  * configured number of times.
  */
@@ -56,38 +54,18 @@ public class RepeatTest {
     @Paramixel.Factory
     public static Action factory() {
         resetCounts();
-        return Instance.builder("repeat-example", RepeatTest::new)
-                .body(Sequence.builder("body")
-                        .child(Step.of(
-                                "dependent-repeat()", withInstance(RepeatTest.class, RepeatTest::dependentRepeat)))
-                        .child(Step.of(
-                                "independent-repeat()", withInstance(RepeatTest.class, RepeatTest::independentRepeat)))
-                        .build())
+        return sequential("repeat-example")
+                .child(repeat("dependent-repeat")
+                        .body(step("step", context -> dependentCount.incrementAndGet()))
+                        .iterations(3))
+                .child(repeat("independent-repeat")
+                        .body(step("step", context -> independentCount.incrementAndGet()))
+                        .iterations(3))
+                .child(step("validate", context -> {
+                    assertThat(dependentCount.get()).isEqualTo(3);
+                    assertThat(independentCount.get()).isEqualTo(3);
+                }))
                 .build();
-    }
-
-    public RepeatTest() {
-        // Intentionally empty
-    }
-
-    public void dependentRepeat() {
-        var spec = Repeat.builder("dependent-repeat")
-                .body(Step.of("step", context -> dependentCount.incrementAndGet()))
-                .iterations(3)
-                .build();
-        var result = Runner.builder().build().run(spec);
-        assertThat(result.descriptor().orElseThrow().isPassed()).isTrue();
-        assertThat(dependentCount.get()).isEqualTo(3);
-    }
-
-    public void independentRepeat() {
-        var spec = Repeat.builder("independent-repeat")
-                .body(Step.of("step", context -> independentCount.incrementAndGet()))
-                .iterations(3)
-                .build();
-        var result = Runner.builder().build().run(spec);
-        assertThat(result.descriptor().orElseThrow().isPassed()).isTrue();
-        assertThat(independentCount.get()).isEqualTo(3);
     }
 
     private static void resetCounts() {

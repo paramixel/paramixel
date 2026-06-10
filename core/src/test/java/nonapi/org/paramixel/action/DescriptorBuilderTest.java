@@ -34,6 +34,7 @@ import org.paramixel.api.action.Step;
 import org.paramixel.api.action.Timeout;
 
 @DisplayName("DescriptorBuilder")
+@SuppressWarnings("removal")
 class DescriptorBuilderTest {
 
     private final DescriptorBuilder builder = new DescriptorBuilder();

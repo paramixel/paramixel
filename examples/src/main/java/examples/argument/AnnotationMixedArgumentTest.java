@@ -17,6 +17,10 @@
 package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,10 +28,6 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 public class AnnotationMixedArgumentTest {
 
@@ -104,33 +104,28 @@ public class AnnotationMixedArgumentTest {
 
         var annotationResolver = AnnotationResolver.create(AnnotationMixedArgumentTest.class);
 
-        var arguments = Sequence.builder("AnnotationMixedArgumentTest").independent();
+        var arguments = sequential("AnnotationMixedArgumentTest").independent();
 
         for (TestArgument testArgument :
                 List.of(new StringArgument("paramixel"), new IntegerArgument(42), new PointArgument(new Point(3, 7)))) {
-            var lifecycle = Scope.builder(testArgument.name())
+            var lifecycle = scope(testArgument.name())
                     .before(annotationResolver.byId("setUp"))
-                    .body(Scope.builder("testOne")
+                    .body(scope("testOne")
                             .before(annotationResolver.byId("beforeEach"))
                             .body(annotationResolver.byId("testOne"))
-                            .after(annotationResolver.byId("afterEach"))
-                            .build())
-                    .after(annotationResolver.byId("tearDown"))
-                    .build();
+                            .after(annotationResolver.byId("afterEach")))
+                    .after(annotationResolver.byId("tearDown"));
 
-            arguments.child(Instance.builder(testArgument.name(), () -> new AnnotationMixedArgumentTest(testArgument))
-                    .body(lifecycle)
-                    .build());
+            arguments.child(instance(testArgument.name(), () -> new AnnotationMixedArgumentTest(testArgument))
+                    .body(lifecycle));
         }
 
-        return Instance.builder(AnnotationMixedArgumentTest.class)
-                .body(Sequence.builder("body")
-                        .child(arguments.build())
-                        .child(Scope.builder("[scenario]")
-                                .body(Step.of("[validate-ready]", context -> {}))
-                                .after(annotationResolver.byId("validate"))
-                                .build())
-                        .build())
+        return instance(AnnotationMixedArgumentTest.class)
+                .body(sequential("body")
+                        .child(arguments)
+                        .child(scope("[scenario]")
+                                .body(step("[validate-ready]", context -> {}))
+                                .after(annotationResolver.byId("validate"))))
                 .build();
     }
 

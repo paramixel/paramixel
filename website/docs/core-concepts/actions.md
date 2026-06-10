@@ -9,7 +9,7 @@ description: Built-in action types, their roles, and composition examples.
 
 ```java
 public sealed interface Action
-        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout, Until {
+        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequential, Static, Step, Timeout, Until {
 
     String displayName();
 }
@@ -18,13 +18,13 @@ public sealed interface Action
 ## Built-in actions
 
 - `Step` wraps a `ContextConsumer` for user logic.
-- `Sequence` runs children one after another in dependent or independent mode, optionally shuffled.
+- `Sequential` runs children one after another in dependent or independent mode, optionally shuffled.
 - `Parallel` runs children concurrently with configurable parallelism, optionally shuffled.
 - `Scope` provides before-body-after execution with lifecycle guarantee; the after action always runs.
-- `Static` provides before-body-after without a fixture instance.
+- `Static` provides before-body-after without a fixture instance. _(Deprecated since 6.2 — use `Scope` instead.)_
 - `Instance` creates a fixture instance, runs the body, and destroys it.
-- `Assert` evaluates a boolean condition against an expected value. Passes when the actual value equals the expected value; fails with `FailException` otherwise. Created via static factories, not a builder: `Assert.of(name, expected, actual)`, `Assert.of(name, expected, () -> compute(), "message")`.
-- `Delay` pauses execution for a fixed or random duration. Created via static factories: `Delay.of(name, millis)` or `Delay.of(name, Duration)`.
+- `Assert` evaluates a boolean condition against an expected value. Passes when the actual value equals the expected value; fails with `FailException` otherwise. Created via static factories, not a builder: `Assert.assertTrue(name, actual)`, `Assert.assertFalse(name, actual)`, `Assert.assertThat(name, expected, actual)`, `Assert.assertThat(name, expected, () -> compute(), "message")`.
+- `Delay` pauses execution for a fixed or random duration. Created via static factories: `Delay.delay(name, millis)` or `Delay.delay(name, Duration)`.
 - `Isolated` executes its body under a named re-entrant lock. Same-named nodes serialize. Nested same-name nodes are re-entrant.
 - `Repeat` executes a child action a configurable number of times.
 - `Timeout` executes a child action with a wall-clock deadline.
@@ -37,9 +37,9 @@ public sealed interface Action
 | --- | --- |
 | Run one piece of user code | `Step` |
 | Check a boolean condition | `Assert` |
-| Run children in order | `Sequence` |
+| Run children in order | `Sequential` |
 | Run independent branches concurrently | `Parallel` |
-| Attach setup and teardown to a subtree | `Scope` or `Static` |
+| Attach setup and teardown to a subtree | `Scope` _(was `Static` — deprecated since 6.2)_ |
 | Create and use a fixture instance | `Instance` |
 | Serialize access to a shared resource | `Isolated` |
 | Retry or repeat a child | `Repeat` or `Until` |
@@ -51,12 +51,12 @@ public sealed interface Action
 ```java
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
-Action test = Scope.builder("browser test")
+Action test = Scope.scope("browser test")
         .before(Step.of("start browser", ctx -> startBrowser()))
-        .body(Sequence.builder("scenario")
+        .body(Sequential.sequential("scenario")
                 .child(Step.of("open page", ctx -> openPage()))
                 .child(Step.of("verify", ctx -> verifyPage()))
                 .build())
@@ -76,3 +76,5 @@ browser test
 Use `Scope` when setup and teardown belong to a specific action tree. Use [`@Paramixel.BeforeAll` and `@Paramixel.AfterAll`](discovery#beforeall-and-afterall-hooks) only for runner-wide lifecycle around all discovered factory actions.
 
 Use the corresponding `Builder` nested class for each action type. See [Builder](../api/builder) for details.
+
+For a more concise syntax, see the [Named Builders](../api/named-builders) reference.

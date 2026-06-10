@@ -191,7 +191,7 @@ public final class ConcreteContext implements Context {
 
     /**
      * Schedules all directly attached descriptors of the current descriptor synchronously,
-     * including before, body children, and after.
+     * including before, child actions, and after.
      *
      * @param mode the execution mode for each descriptor; must not be {@code null}
      */
@@ -202,7 +202,7 @@ public final class ConcreteContext implements Context {
 
     /**
      * Schedules all directly attached descriptors of the current descriptor synchronously,
-     * including before, body children, and after.
+     * including before, child actions, and after.
      *
      * @param modeFactory the execution mode factory for each descriptor; must not be {@code null}
      */

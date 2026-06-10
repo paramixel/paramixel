@@ -16,105 +16,54 @@
 
 package examples.annotation;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
+import org.paramixel.api.exception.FailException;
+import org.paramixel.api.selector.Selector;
 
 /**
  * Verifies that {@code @Paramixel.Disabled} prevents the annotated action factory
- * from being invoked by the runner. A separate verification factory asserts the
- * disabled factory was never called. Uses annotation-based method references.
+ * from being invoked by the runner. Uses annotation-based method references.
  */
 public class AnnotationDisabledTest {
 
-    private static final AtomicBoolean factoryInvoked = new AtomicBoolean();
-
     /**
-     * Runs the verification factory and exits the JVM.
+     * Discovers and executes all action factories in this package, then exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(disabledVerificationFactory());
-    }
-
-    /**
-     * Verification factory that asserts the disabled factory was never invoked.
-     *
-     * @return a single-step action that checks the disabled flag
-     */
-    @Paramixel.Factory
-    public static Action disabledVerificationFactory() {
-        var annotationResolver = AnnotationResolver.create(AnnotationDisabledTest.class);
-
-        return Instance.builder(AnnotationDisabledTest.class)
-                .body(annotationResolver.byId("verify"))
-                .build();
+        Runner.defaultRunner().runAndExit(Selector.packageTreeOf(AnnotationDisabledTest.class));
     }
 
     /**
      * Action factory annotated with {@code @Paramixel.Disabled} — must not be
-     * invoked by the runner.
+     * invoked by the runner. If this factory is ever called, the test fails.
+     * Uses an {@link AnnotationResolver} to prove the annotation-based path is
+     * also guarded by {@code @Disabled}.
      *
      * @return a flow that would fail if ever executed
      */
     @Paramixel.Disabled("covered by resolver skip behavior")
     @Paramixel.Factory
     public static Action factory() {
-        factoryInvoked.set(true);
-
         var annotationResolver = AnnotationResolver.create(AnnotationDisabledTest.class);
 
-        return Instance.builder(AnnotationDisabledTest.class)
-                .body(Scope.builder("[scenario]")
-                        .before(annotationResolver.byId("before"))
-                        .body(annotationResolver.byId("disabledLeaf"))
-                        .after(annotationResolver.byId("after"))
-                        .build())
+        return instance(AnnotationDisabledTest.class)
+                .body(annotationResolver.byId("shouldNotRun"))
                 .build();
     }
 
-    public AnnotationDisabledTest() {
-        // Intentionally empty
-    }
-
     /**
-     * Verifies that the disabled factory was never invoked.
+     * Should never execute — uses {@link FailException} because if the factory
+     * is incorrectly invoked, this step must fail the test suite.
      */
-    @Paramixel.Id("verify")
-    public void verify() {
-        assertThat(factoryInvoked.get())
-                .as("@Paramixel.Disabled must prevent the action factory from being invoked")
-                .isFalse();
-    }
-
-    /**
-     * Should never execute — throws if called.
-     */
-    @Paramixel.Id("before")
-    public void before() {
-        throw new AssertionError("Disabled action must not execute");
-    }
-
-    /**
-     * Should never execute — throws if called.
-     */
-    @Paramixel.Id("disabledLeaf")
-    public void disabledLeaf() {
-        throw new AssertionError("Disabled action must not execute");
-    }
-
-    /**
-     * Should never execute — throws if called.
-     */
-    @Paramixel.Id("after")
-    public void after() {
-        throw new AssertionError("Disabled action must not execute");
+    @Paramixel.Id("shouldNotRun")
+    public void shouldNotRun() {
+        FailException.fail("@Paramixel.Disabled action factory was invoked");
     }
 }

@@ -17,18 +17,20 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Delay.delay;
+import static org.paramixel.api.action.Delay.delayRandom;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.time.Duration;
 import nonapi.org.paramixel.action.ConcreteContext;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Delay;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
- * Demonstrates the {@link Delay} action with fixed and random durations.
+ * Demonstrates the {@link org.paramixel.api.action.Delay} action with fixed and random durations.
  * Verifies that each delay action completes with PASSED status and that
  * random delays respect their configured bounds.
  */
@@ -50,19 +52,19 @@ public class DelayTest {
      */
     @Paramixel.Factory
     public static Action factory() {
-        return Sequence.builder("delay-example")
-                .child(Delay.of("fixed-milliseconds", 100))
-                .child(Delay.of("fixed-duration", Duration.ofMillis(100)))
-                .child(Delay.random("random-duration", 50, 150))
-                .child(Delay.of("zero-duration", 0L))
-                .child(Step.of("verify", context -> {
+        return sequential("delay-example")
+                .child(delay("fixed-milliseconds", 100))
+                .child(delay("fixed-duration", Duration.ofMillis(100)))
+                .child(delayRandom("random-duration", 50, 150))
+                .child(delay("zero-duration", 0L))
+                .child(step("verify", context -> {
                     var children = ConcreteContext.require(context)
                             .descriptor()
                             .parent()
                             .orElseThrow()
                             .children();
                     assertThat(children).hasSize(5);
-                    assertThat(children.subList(0, 4)).allMatch(child -> child.isPassed());
+                    assertThat(children.subList(0, 4)).allMatch(Descriptor::isPassed);
                 }))
                 .build();
     }

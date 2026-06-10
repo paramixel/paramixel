@@ -28,10 +28,8 @@ import nonapi.org.paramixel.support.Arguments;
  * This is the test author's responsibility to ensure; {@code Repeat} does not
  * clone or reset the child between repetitions.
  *
- * <p>When configured as <em>dependent</em> (the default), a failure in any
- * repetition causes remaining repetitions to be skipped or aborted. When
- * configured as <em>independent</em>, all repetitions run regardless of
- * individual outcomes.
+ * <p>All repetitions run regardless of individual outcomes. A failure in a single
+ * repetition does not prevent subsequent repetitions from running.
  */
 public final class Repeat implements Action {
 
@@ -58,6 +56,19 @@ public final class Repeat implements Action {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
         return new Builder(displayName);
+    }
+
+    /**
+     * Creates a new builder for a {@code Repeat} action with the given display name.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
+     * @see Builder
+     */
+    public static Builder repeat(final String displayName) {
+        return builder(displayName);
     }
 
     @Override

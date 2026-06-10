@@ -72,8 +72,8 @@ public final class Each {
     /**
      * Creates a sequential grouping action with one child per iterable item.
      *
-     * <p>The returned builder uses the same defaults as {@link Sequence#builder(String)}. Callers
-     * may further configure it, for example with {@link Sequence.Builder#independent()}. Mapper
+     * <p>The returned builder uses the same defaults as {@link Sequential#builder(String)}. Callers
+     * may further configure it, for example with {@link Sequential.Builder#independent()}. Mapper
      * results may be immutable {@link Action} instances or Paramixel-owned {@link Builder} instances.
      * Builder results are built immediately.
      *
@@ -87,11 +87,11 @@ public final class Each {
      * @throws IllegalArgumentException if {@code displayName} is blank or a mapped result is neither an
      *     {@link Action} nor a {@link Builder}
      */
-    public static <T> Sequence.Builder sequential(
+    public static <T> Sequential.Builder sequential(
             final String displayName, final Iterable<T> items, final ActionMapper<? super T, ?> mapper) {
         Objects.requireNonNull(items, "items is null");
         Objects.requireNonNull(mapper, "mapper is null");
-        var builder = Sequence.builder(displayName);
+        var builder = Sequential.builder(displayName);
         for (T item : items) {
             builder.child(toAction(mapper.apply(item)));
         }
@@ -116,7 +116,7 @@ public final class Each {
      * @throws IllegalArgumentException if {@code displayName} is blank or a mapped result is neither an
      *     {@link Action} nor a {@link Builder}
      */
-    public static <T> Sequence.Builder sequential(
+    public static <T> Sequential.Builder sequential(
             final String displayName, final Stream<T> items, final ActionMapper<? super T, ?> mapper) {
         Objects.requireNonNull(items, "items is null");
         return sequential(displayName, items.toList(), mapper);

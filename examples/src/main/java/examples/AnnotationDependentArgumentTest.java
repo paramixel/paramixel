@@ -17,16 +17,16 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates dependent argument execution using annotation-based method references.
@@ -71,30 +71,27 @@ public class AnnotationDependentArgumentTest {
 
         var testName = AnnotationDependentArgumentTest.class.getName();
 
-        var arguments = Sequence.builder(testName).dependent();
+        var arguments = sequential(testName).dependent();
 
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             int argumentIndex = i;
             String argumentValue = "string-" + i;
 
-            var lifecycle = Scope.builder(argumentValue)
+            var lifecycle = scope(argumentValue)
                     .before(annotationResolver.byId("before"))
-                    .body(Sequence.builder("tests")
+                    .body(sequential("tests")
                             .child(annotationResolver.byId("test"))
                             .child(annotationResolver.byId("test"))
-                            .child(annotationResolver.byId("test"))
-                            .build())
-                    .after(annotationResolver.byId("after"))
-                    .build();
+                            .child(annotationResolver.byId("test")))
+                    .after(annotationResolver.byId("after"));
 
-            arguments.child(Instance.builder(argumentValue, () -> new AnnotationDependentArgumentTest(argumentIndex))
-                    .body(lifecycle)
-                    .build());
+            arguments.child(instance(argumentValue, () -> new AnnotationDependentArgumentTest(argumentIndex))
+                    .body(lifecycle));
         }
 
-        return Scope.builder(testName)
-                .body(arguments.build())
-                .after(Step.of("validate", ignored -> validate()))
+        return scope(testName)
+                .body(arguments)
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 

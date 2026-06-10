@@ -9,7 +9,7 @@ description: The sealed interface for all Paramixel action types.
 
 ```java
 public sealed interface Action
-        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequence, Static, Step, Timeout, Until {
+        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequential, Static, Step, Timeout, Until {
 
     String displayName();
 }
@@ -27,10 +27,10 @@ All action subtypes are immutable after construction. For configurable actions, 
 |------|-------------|
 | `Step` | Terminal action wrapping a `ContextConsumer`. |
 | `Assert` | Terminal action evaluating a boolean condition. |
-| `Sequence` | Composite: executes children sequentially. Dependent/independent modes. |
+| `Sequential` | Composite: executes children sequentially. Dependent/independent modes. |
 | `Parallel` | Composite: executes children concurrently with bounded admission. |
 | `Scope` | Composite: before-body-after with lifecycle guarantee (after always runs). |
-| `Static` | Composite: before-body-after without a fixture instance. |
+| `Static` | Composite: before-body-after without a fixture instance. _(Deprecated since 6.2 — use `Scope` instead.)_ |
 | `Instance` | Composite: creates a fixture instance, runs body, destroys instance. |
 | `Isolated` | Composite: executes body under a named re-entrant lock. Compose with Instance for state isolation. |
 | `Delay` | Terminal: pauses for a duration. |
@@ -46,12 +46,12 @@ Build action trees by nesting actions through builders:
 ```java
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
-Action test = Scope.builder("browser test")
+Action test = Scope.scope("browser test")
         .before(Step.of("start browser", ctx -> startBrowser()))
-        .body(Sequence.builder("scenario")
+        .body(Sequential.sequential("scenario")
                 .child(Step.of("open page", ctx -> openPage()))
                 .child(Step.of("verify", ctx -> verifyPage()))
                 .build())
@@ -60,3 +60,15 @@ Action test = Scope.builder("browser test")
 ```
 
 See [Builder](builder) for the `Builder` sealed interface and its subtypes.
+
+## Named builders
+
+Most composite actions provide a public static method named after the action
+(e.g., `Scope.scope(name)`) that returns the corresponding `Builder`. Import
+these statically for concise action tree definitions.
+
+Terminal actions `Step` and `Delay` also provide named factory methods
+(`step(name, consumer)`, `delay(name, ms)`, `delayRandom(name, min, max)`) that
+return the action directly.
+
+For details and usage examples, see [Named Builders](named-builders).

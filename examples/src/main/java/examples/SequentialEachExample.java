@@ -18,24 +18,24 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Each.sequential;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Each;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates {@code Each.sequential()} as syntactic sugar over a hand-rolled
  * parameterization for-loop. Produces the same action tree as
  * {@link DependentArgumentTest} but with less boilerplate.
  */
-public class SequenceEachExample {
+public class SequentialEachExample {
 
     private static final int ARGUMENT_COUNT = 5;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
@@ -68,40 +68,40 @@ public class SequenceEachExample {
     @Paramixel.Factory
     public static Action factory() {
         resetCounts();
-        var testName = SequenceEachExample.class.getName();
+        var testName = SequentialEachExample.class.getName();
         var arguments =
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
-        return Scope.builder(testName)
-                .body(Each.sequential("arguments", arguments, value -> {
+        return scope(testName)
+                .body(sequential("arguments", arguments, value -> {
                     int index = Integer.parseInt(value.substring("string-".length()));
-                    return Instance.builder(value, () -> new SequenceEachExample(index))
-                            .body(Scope.<SequenceEachExample>builder("lifecycle")
-                                    .before(Step.of(
+                    return instance(value, () -> new SequentialEachExample(index))
+                            .body(scope("lifecycle")
+                                    .before(step(
                                             "before()",
-                                            withInstance(SequenceEachExample.class, SequenceEachExample::before)))
-                                    .body(Sequence.builder("tests")
-                                            .child(Step.of(
+                                            withInstance(SequentialEachExample.class, SequentialEachExample::before)))
+                                    .body(sequential("tests")
+                                            .child(step(
                                                     "test()",
-                                                    withInstance(SequenceEachExample.class, SequenceEachExample::test)))
-                                            .child(Step.of(
+                                                    withInstance(
+                                                            SequentialEachExample.class, SequentialEachExample::test)))
+                                            .child(step(
                                                     "test()",
-                                                    withInstance(SequenceEachExample.class, SequenceEachExample::test)))
-                                            .child(Step.of(
+                                                    withInstance(
+                                                            SequentialEachExample.class, SequentialEachExample::test)))
+                                            .child(step(
                                                     "test()",
-                                                    withInstance(SequenceEachExample.class, SequenceEachExample::test)))
-                                            .build())
-                                    .after(Step.of(
+                                                    withInstance(
+                                                            SequentialEachExample.class, SequentialEachExample::test))))
+                                    .after(step(
                                             "after()",
-                                            withInstance(SequenceEachExample.class, SequenceEachExample::after)))
-                                    .build())
-                            .build();
+                                            withInstance(SequentialEachExample.class, SequentialEachExample::after))));
                 }))
-                .after(Step.of("validate", ignored -> validate()))
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 
-    private SequenceEachExample(final int argumentIndex) {
+    private SequentialEachExample(final int argumentIndex) {
         this.argumentIndex = argumentIndex;
     }
 

@@ -18,16 +18,16 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates parallel argument execution with bounded parallelism. Verifies that
@@ -65,30 +65,29 @@ public class ParallelArgumentTest {
 
         var testName = ParallelArgumentTest.class.getName();
 
-        var parallel = Parallel.builder(testName).parallelism(PARALLELISM);
+        var parallel = parallel(testName).parallelism(PARALLELISM);
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             String argumentValue = "string-" + i;
 
-            var tests = Sequence.<ParallelArgumentTest>builder(argumentValue)
+            var tests = sequential(argumentValue)
                     .independent()
-                    .child(Step.of("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)))
-                    .child(Step.of("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)))
-                    .child(Step.of("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)));
+                    .child(step("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)))
+                    .child(step("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)))
+                    .child(step("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)));
 
-            parallel.child(Instance.builder(argumentValue, ParallelArgumentTest::new)
-                    .body(Scope.<ParallelArgumentTest>builder("lifecycle")
-                            .before(Step.of(
+            parallel.child(instance(argumentValue, ParallelArgumentTest::new)
+                    .body(scope("lifecycle")
+                            .before(step(
                                     "before()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::before)))
-                            .body(tests.build())
-                            .after(Step.of(
-                                    "after()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::after)))
-                            .build())
-                    .build());
+                            .body(tests)
+                            .after(step(
+                                    "after()",
+                                    withInstance(ParallelArgumentTest.class, ParallelArgumentTest::after)))));
         }
 
-        return Scope.builder(testName)
-                .body(parallel.build())
-                .after(Step.of("validate", ignored -> validate()))
+        return scope(testName)
+                .body(parallel)
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 

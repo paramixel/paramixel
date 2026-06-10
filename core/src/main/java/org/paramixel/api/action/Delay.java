@@ -115,6 +115,61 @@ public final class Delay implements Action {
                 displayName, () -> ThreadLocalRandom.current().nextLong(minimumMilliseconds - 1, Long.MAX_VALUE) + 1);
     }
 
+    /**
+     * Creates a delay action with a fixed duration in milliseconds.
+     *
+     * <p>This is a named alternative to {@link #of(String, long)} for use with
+     * static imports in action tree definitions.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param milliseconds the duration to delay; must not be negative
+     * @return the delay action
+     * @throws NullPointerException if {@code name} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank or {@code milliseconds} is negative
+     */
+    public static Delay delay(final String name, final long milliseconds) {
+        return of(name, milliseconds);
+    }
+
+    /**
+     * Creates a delay action with a fixed duration.
+     *
+     * <p>This is a named alternative to {@link #of(String, Duration)} for use
+     * with static imports in action tree definitions.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param duration the duration to delay; must not be {@code null} or negative
+     * @return the delay action
+     * @throws NullPointerException if {@code name} or {@code duration} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank or {@code duration} is negative
+     */
+    public static Delay delay(final String name, final Duration duration) {
+        return of(name, duration);
+    }
+
+    /**
+     * Creates a delay action that pauses for a random duration between
+     * {@code minimumMilliseconds} and {@code maximumMilliseconds} (inclusive)
+     * on each execution.
+     *
+     * <p>Named {@code delayRandom} rather than {@code delay} to avoid overload
+     * ambiguity with {@link #delay(String, long)}.
+     *
+     * <p>This is a named alternative to {@link #random(String, long, long)} for
+     * use with static imports in action tree definitions.
+     *
+     * @param name the action display name; must not be {@code null} or blank
+     * @param minimumMilliseconds the minimum duration; must not be negative
+     * @param maximumMilliseconds the maximum duration; must not be less than {@code minimumMilliseconds}
+     * @return the delay action
+     * @throws NullPointerException if {@code name} is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank, {@code minimumMilliseconds} is negative,
+     *     or {@code maximumMilliseconds} is less than {@code minimumMilliseconds}
+     */
+    public static Delay delayRandom(final String name, final long minimumMilliseconds, final long maximumMilliseconds) {
+        return random(name, minimumMilliseconds, maximumMilliseconds);
+    }
+
     @Override
     public String displayName() {
         return displayName;

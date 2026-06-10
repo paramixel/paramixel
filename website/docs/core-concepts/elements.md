@@ -32,13 +32,13 @@ Use `context.instance(Type.class)` for an `Optional` or `context.requireInstance
 import java.util.List;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Each;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 var users = List.of("ada", "grace", "linus");
 
 Action spec = Each.sequential("user checks", users,
-        user -> Sequence.builder("check " + user)
+        user -> Sequential.sequential("check " + user)
                 .child(Step.of("load", ctx -> loadUser(user)))
                 .child(Step.of("verify", ctx -> verifyUser(user))))
         .build();

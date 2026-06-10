@@ -54,6 +54,7 @@ import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.action.Timeout;
@@ -71,6 +72,7 @@ import org.paramixel.api.exception.FailException;
  * ({@link SchedulerPriorityKey}), yielding deterministic DFS-like subtree preference
  * (continuations before lateral siblings) while preserving global and local parallelism caps.
  */
+@SuppressWarnings("removal")
 public final class Scheduler implements AutoCloseable {
 
     /**
@@ -644,6 +646,9 @@ public final class Scheduler implements AutoCloseable {
         }
         if (action instanceof Sequence sequence) {
             return runDependentChildren(context, sequence.isDependent());
+        }
+        if (action instanceof Sequential sequential) {
+            return runDependentChildren(context, sequential.isDependent());
         }
         if (action instanceof Repeat) {
             return runRepeat(context);

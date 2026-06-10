@@ -135,12 +135,12 @@ public interface Descriptor {
     }
 
     /**
-     * Returns this descriptor's direct body children in discovery order.
+     * Returns this descriptor's direct child actions in discovery order.
      *
      * <p>Body children do not include the {@link #before()} or {@link #after()}
      * descriptors — those are separate structural slots.
      *
-     * @return immutable ordered body child descriptors; never {@code null} and contains no {@code null} elements
+     * @return immutable ordered child action descriptors; never {@code null} and contains no {@code null} elements
      */
     List<Descriptor> children();
 

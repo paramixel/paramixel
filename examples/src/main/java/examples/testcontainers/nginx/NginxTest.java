@@ -18,6 +18,10 @@ package examples.testcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Step.step;
 
 import examples.support.Logger;
 import java.io.BufferedReader;
@@ -27,10 +31,6 @@ import java.net.URI;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Step;
 
 /**
  * Parameterized integration test that starts Nginx containers for each Docker image
@@ -62,15 +62,13 @@ public class NginxTest {
      */
     @Paramixel.Factory
     public static Action factory() throws Throwable {
-        var parallel = Parallel.builder(NginxTest.class.getName());
+        var parallel = parallel(NginxTest.class.getName());
         for (NginxTestEnvironment environment : NginxTestEnvironment.createTestEnvironments()) {
-            parallel.child(Instance.builder(environment.name(), () -> new NginxTest(environment))
-                    .body(Scope.builder("[scenario]")
-                            .before(Step.of("setUp()", withInstance(NginxTest.class, NginxTest::setUp)))
-                            .body(Step.of("testGet()", withInstance(NginxTest.class, NginxTest::testGet)))
-                            .after(Step.of("tearDown()", withInstance(NginxTest.class, NginxTest::tearDown)))
-                            .build())
-                    .build());
+            parallel.child(instance(environment.name(), () -> new NginxTest(environment))
+                    .body(scope("[scenario]")
+                            .before(step("setUp()", withInstance(NginxTest.class, NginxTest::setUp)))
+                            .body(step("testGet()", withInstance(NginxTest.class, NginxTest::testGet)))
+                            .after(step("tearDown()", withInstance(NginxTest.class, NginxTest::tearDown)))));
         }
         return parallel.build();
     }

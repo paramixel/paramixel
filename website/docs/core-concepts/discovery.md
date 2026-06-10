@@ -10,14 +10,14 @@ Classpath discovery finds public static methods annotated with `@Paramixel.Facto
 ```java
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 public final class CheckoutTest {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Action checkout() {
-        return Sequence.builder("checkout")
+        return Sequential.sequential("checkout")
                 .child(Step.of("add item", ctx -> addItem()))
                 .child(Step.of("pay", ctx -> pay()))
                 .build();
@@ -46,14 +46,14 @@ Hooks are `public static` methods returning `Action` or `Builder`, discovered al
 ```java
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 public final class SetupTeardown {
 
     @Paramixel.BeforeAll
     public static Action setup() {
-        return Sequence.builder("setup")
+        return Sequential.sequential("setup")
                 .child(Step.of("start server", ctx -> startServer()))
                 .child(Step.of("seed data", ctx -> seedData()))
                 .build();
@@ -61,7 +61,7 @@ public final class SetupTeardown {
 
     @Paramixel.AfterAll
     public static Action teardown() {
-        return Sequence.builder("teardown")
+        return Sequential.sequential("teardown")
                 .child(Step.of("clean data", ctx -> cleanData()))
                 .child(Step.of("stop server", ctx -> stopServer()))
                 .build();

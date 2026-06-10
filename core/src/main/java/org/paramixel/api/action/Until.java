@@ -24,7 +24,7 @@ import org.paramixel.api.Context;
 import org.paramixel.api.exception.AbortedException;
 
 /**
- * An action that executes a body child repeatedly until a termination condition
+ * An action that executes a body action repeatedly until a termination condition
  * is satisfied or {@link #maxIterations()} is exhausted.
  *
  * <p>Individual iteration failures do not terminate the loop — they are treated
@@ -75,6 +75,19 @@ public final class Until implements Action {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
         return new Builder(displayName);
+    }
+
+    /**
+     * Creates a new builder for an {@code Until} action with the given display name.
+     *
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @return a new builder
+     * @throws NullPointerException if {@code displayName} is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
+     * @see Builder
+     */
+    public static Builder until(final String displayName) {
+        return builder(displayName);
     }
 
     @Override
@@ -160,14 +173,15 @@ public final class Until implements Action {
          * Sets the termination predicate.
          *
          * <p>When configured, the predicate is evaluated after each iteration; a return
-         * value of {@code true} signals satisfaction and stops the loop. When {@code null}
-         * or not configured, the loop stops when the body action passes.
+         * value of {@code true} signals satisfaction and stops the loop. When not
+         * configured, the loop stops when the body action passes.
          *
-         * @param predicate the termination predicate; {@code null} to clear a previously configured predicate
+         * @param predicate the termination predicate; must not be {@code null}
          * @return this builder
+         * @throws NullPointerException if {@code predicate} is {@code null}
          */
         public Builder until(final Predicate<Context> predicate) {
-            this.until = predicate;
+            this.until = Objects.requireNonNull(predicate, "predicate is null");
             return this;
         }
 

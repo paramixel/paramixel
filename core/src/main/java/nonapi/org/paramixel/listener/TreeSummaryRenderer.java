@@ -39,6 +39,7 @@ import org.paramixel.api.action.Until;
  * <p>The renderer does <em>not</em> add the {@code [PARAMIXEL]} line prefix; that responsibility belongs to
  * {@link SummaryListener}.
  */
+@SuppressWarnings("removal")
 public final class TreeSummaryRenderer implements SummaryRenderer {
 
     private final boolean ansiEnabled;

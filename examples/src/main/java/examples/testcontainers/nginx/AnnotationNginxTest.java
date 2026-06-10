@@ -17,6 +17,9 @@
 package examples.testcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
 
 import examples.support.Logger;
 import java.io.BufferedReader;
@@ -27,9 +30,6 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
 
 /**
  * Parameterized integration test that starts Nginx containers using annotation-based
@@ -62,17 +62,15 @@ public class AnnotationNginxTest {
     public static Action factory() throws Throwable {
         var annotationResolver = AnnotationResolver.create(AnnotationNginxTest.class);
 
-        var parallel = Parallel.builder(AnnotationNginxTest.class.getName());
+        var parallel = parallel(AnnotationNginxTest.class.getName());
         for (NginxTestEnvironment environment : NginxTestEnvironment.createTestEnvironments()) {
-            var lifecycle = Scope.builder(environment.name())
+            var lifecycle = scope(environment.name())
                     .before(annotationResolver.byId("setUp"))
                     .body(annotationResolver.byId("testGet"))
-                    .after(annotationResolver.byId("tearDown"))
-                    .build();
+                    .after(annotationResolver.byId("tearDown"));
 
-            parallel.child(Instance.builder(environment.name(), () -> new AnnotationNginxTest(environment))
-                    .body(lifecycle)
-                    .build());
+            parallel.child(instance(environment.name(), () -> new AnnotationNginxTest(environment))
+                    .body(lifecycle));
         }
         return parallel.build();
     }

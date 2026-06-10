@@ -17,19 +17,17 @@
 package examples.until;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.action.Until.until;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
-import org.paramixel.api.action.Until;
 
 /**
- * Demonstrates the {@link Until} action with retry and polling patterns.
+ * Demonstrates the {@link org.paramixel.api.action.Until} action with retry and polling patterns.
  * Verifies that the loop stops when satisfied or when maxIterations is exhausted.
  */
 public class UntilTest {
@@ -55,40 +53,24 @@ public class UntilTest {
     @Paramixel.Factory
     public static Action factory() {
         resetCounts();
-        return Instance.builder("until-example", UntilTest::new)
-                .body(Sequence.builder("body")
-                        .child(Step.of("retry()", withInstance(UntilTest.class, UntilTest::retry)))
-                        .child(Step.of("poll()", withInstance(UntilTest.class, UntilTest::poll)))
-                        .build())
-                .build();
-    }
-
-    public UntilTest() {}
-
-    public void retry() {
-        var spec = Until.builder("retry")
-                .body(Step.of("attempt", context -> {
-                    int attempt = retryCount.incrementAndGet();
-                    if (attempt < 3) {
-                        throw new RuntimeException("not yet (attempt " + attempt + ")");
-                    }
+        return sequential("until-example")
+                .child(until("retry")
+                        .body(step("attempt", context -> {
+                            int attempt = retryCount.incrementAndGet();
+                            if (attempt < 3) {
+                                throw new RuntimeException("not yet (attempt " + attempt + ")");
+                            }
+                        }))
+                        .maxIterations(5))
+                .child(until("poll")
+                        .body(step("check", context -> pollCount.incrementAndGet()))
+                        .until(context -> pollCount.get() >= 4)
+                        .maxIterations(10))
+                .child(step("validate", context -> {
+                    assertThat(retryCount.get()).isEqualTo(3);
+                    assertThat(pollCount.get()).isEqualTo(4);
                 }))
-                .maxIterations(5)
                 .build();
-        var result = Runner.builder().build().run(spec);
-        assertThat(result.descriptor().orElseThrow().isPassed()).isTrue();
-        assertThat(retryCount.get()).isEqualTo(3);
-    }
-
-    public void poll() {
-        var spec = Until.builder("poll")
-                .body(Step.of("check", context -> pollCount.incrementAndGet()))
-                .until(context -> pollCount.get() >= 4)
-                .maxIterations(10)
-                .build();
-        var result = Runner.builder().build().run(spec);
-        assertThat(result.descriptor().orElseThrow().isPassed()).isTrue();
-        assertThat(pollCount.get()).isEqualTo(4);
     }
 
     private static void resetCounts() {

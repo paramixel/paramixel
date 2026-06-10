@@ -66,15 +66,12 @@ class UntilArgumentsTest {
     }
 
     @Test
-    @DisplayName("until() accepts null")
-    void untilAcceptsNull() {
-        var until = Until.builder("until")
-                .body(STEP)
-                .until(ctx -> true)
-                .until(null)
-                .maxIterations(1)
-                .build();
-        assertThat(until.until()).isEmpty();
+    @DisplayName("until() rejects null")
+    void untilRejectsNull() {
+        var builder = Until.builder("until").body(STEP);
+        assertThatThrownBy(() -> builder.until(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("predicate is null");
     }
 
     @Test

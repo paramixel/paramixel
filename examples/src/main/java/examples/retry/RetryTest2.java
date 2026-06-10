@@ -18,21 +18,21 @@ package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Step.step;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Step;
 import org.paramixel.api.support.Retry;
 import org.paramixel.api.support.Retry.Policy;
 
 /**
  * Demonstrates the {@link Retry} support with a fixed-delay policy when the
  * flaky operation throws a plain {@link RuntimeException} instead of
- * {@link FailException}. Verifies that retry still works and the result reports
+ * {@link org.paramixel.api.exception.FailException}. Verifies that retry still works and the result reports
  * pass with an attempt count of 3.
  */
 public class RetryTest2 {
@@ -56,8 +56,8 @@ public class RetryTest2 {
      */
     @Paramixel.Factory
     public static Action factory() {
-        return Instance.builder("retry-example", RetryTest2::new)
-                .body(Step.of("retry()", withInstance(RetryTest2.class, RetryTest2::retry)))
+        return instance("retry-example", RetryTest2::new)
+                .body(step("retry()", withInstance(RetryTest2.class, RetryTest2::retry)))
                 .build();
     }
 

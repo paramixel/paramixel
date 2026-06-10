@@ -21,18 +21,24 @@ import java.util.Optional;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * An action that executes a before-action, a single body child, and an after-action
+ * An action that executes a before action, a single body action, and an after action
  * without managing a test fixture instance.
  *
- * <p>Unlike {@link Instance}, this action does not create or destroy a fixture. It is
- * suitable for standalone test steps that do not require a shared instance. When configured
- * as <em>dependent</em> (the default), a failure in the body child causes the body child
- * execution to fail. When configured as <em>independent</em>, the body child runs regardless
- * of its outcome.
+ * <p>This action is deprecated. It is functionally identical to {@link Scope}. Use
+ * {@link Scope} instead.
  *
- * <p>To execute multiple body actions, wrap a {@link Sequence} or {@link Parallel}
+ * <p>Unlike {@link Instance}, this action does not create or destroy a fixture. It is
+ * suitable for standalone test steps that do not require a shared instance. A before action
+ * runs first. If the before action fails, the body action is skipped. The after action
+ * always runs, regardless of earlier outcomes.
+ *
+ * <p>To execute multiple body actions, wrap a {@link Sequential} or {@link Parallel}
  * in {@link Builder#body(Action)}.
+ *
+ * @deprecated since 6.2.0, for removal — use {@link Scope} instead, which provides
+ *     identical semantics and lifecycle guarantees.
  */
+@Deprecated(forRemoval = true, since = "6.2.0")
 public final class Static implements Action {
 
     private final String displayName;
@@ -56,6 +62,7 @@ public final class Static implements Action {
      * @throws NullPointerException if {@code displayName} is {@code null}
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
+    @Deprecated(forRemoval = true, since = "6.2.0")
     public static Builder builder(final String displayName) {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
@@ -68,27 +75,27 @@ public final class Static implements Action {
     }
 
     /**
-     * Returns the before-action, if one is declared.
+     * Returns the before action, if one is declared.
      *
-     * @return the before-action, or empty if none is declared
+     * @return the before action, or empty if none is declared
      */
     public Optional<Action> before() {
         return Optional.ofNullable(before);
     }
 
     /**
-     * Returns the body child action.
+     * Returns the body action.
      *
-     * @return the body child action; never {@code null}
+     * @return the body action; never {@code null}
      */
     public Action body() {
         return body;
     }
 
     /**
-     * Returns the after-action, if one is declared.
+     * Returns the after action, if one is declared.
      *
-     * @return the after-action, or empty if none is declared
+     * @return the after action, or empty if none is declared
      */
     public Optional<Action> after() {
         return Optional.ofNullable(after);
@@ -96,7 +103,10 @@ public final class Static implements Action {
 
     /**
      * Fluent builder for {@link Static} actions.
+     *
+     * @deprecated since 6.2.0, for removal — use {@link Scope.Builder} instead.
      */
+    @Deprecated(forRemoval = true, since = "6.2.0")
     public static final class Builder implements org.paramixel.api.action.Builder {
 
         private final String displayName;
@@ -109,10 +119,10 @@ public final class Static implements Action {
         }
 
         /**
-         * Sets the before-action. Calling this method
-         * again overwrites the previous before-action.
+         * Sets the before action. Calling this method
+         * again overwrites the previous before action.
          *
-         * @param action the before-action; must not be {@code null}
+         * @param action the before action; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
@@ -122,10 +132,10 @@ public final class Static implements Action {
         }
 
         /**
-         * Sets the before-action from a builder. The builder is built immediately
+         * Sets the before action from a builder. The builder is built immediately
          * and the resulting action snapshot is stored.
          *
-         * @param builder the before-action builder; must not be {@code null}
+         * @param builder the before action builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code builder} is {@code null}
          */
@@ -163,10 +173,10 @@ public final class Static implements Action {
         }
 
         /**
-         * Sets the after-action. Calling this method
-         * again overwrites the previous after-action.
+         * Sets the after action. Calling this method
+         * again overwrites the previous after action.
          *
-         * @param action the after-action; must not be {@code null}
+         * @param action the after action; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
@@ -176,10 +186,10 @@ public final class Static implements Action {
         }
 
         /**
-         * Sets the after-action from a builder. The builder is built immediately
+         * Sets the after action from a builder. The builder is built immediately
          * and the resulting action snapshot is stored.
          *
-         * @param builder the after-action builder; must not be {@code null}
+         * @param builder the after action builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code builder} is {@code null}
          */

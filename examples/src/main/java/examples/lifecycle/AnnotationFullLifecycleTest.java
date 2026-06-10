@@ -17,6 +17,9 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,11 +27,9 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Static;
 
+@SuppressWarnings("removal")
 public class AnnotationFullLifecycleTest {
 
     private static final List<String> callOrder = new ArrayList<>();
@@ -43,24 +44,19 @@ public class AnnotationFullLifecycleTest {
 
         return Static.builder(AnnotationFullLifecycleTest.class.getName())
                 .before(annotationResolver.staticById("staticSetUp"))
-                .body(Instance.builder(AnnotationFullLifecycleTest.class)
-                        .body(Scope.builder("[scenario]")
+                .body(instance(AnnotationFullLifecycleTest.class)
+                        .body(scope("[scenario]")
                                 .before(annotationResolver.byId("setUp"))
-                                .body(Sequence.builder("tests")
-                                        .child(Scope.builder("testOne")
+                                .body(sequential("tests")
+                                        .child(scope("testOne")
                                                 .before(annotationResolver.byId("beforeEach"))
                                                 .body(annotationResolver.byId("testOne"))
-                                                .after(annotationResolver.byId("afterEach"))
-                                                .build())
-                                        .child(Scope.builder("testTwo")
+                                                .after(annotationResolver.byId("afterEach")))
+                                        .child(scope("testTwo")
                                                 .before(annotationResolver.byId("beforeEach"))
                                                 .body(annotationResolver.byId("testTwo"))
-                                                .after(annotationResolver.byId("afterEach"))
-                                                .build())
-                                        .build())
-                                .after(annotationResolver.byId("tearDown"))
-                                .build())
-                        .build())
+                                                .after(annotationResolver.byId("afterEach"))))
+                                .after(annotationResolver.byId("tearDown"))))
                 .after(annotationResolver.staticById("staticTearDown"))
                 .build();
     }

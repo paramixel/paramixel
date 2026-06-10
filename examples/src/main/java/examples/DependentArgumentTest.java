@@ -18,15 +18,15 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Step;
 
 /**
  * Demonstrates dependent argument execution where arguments run one at a time.
@@ -68,32 +68,31 @@ public class DependentArgumentTest {
 
         var testName = DependentArgumentTest.class.getName();
 
-        var arguments = Sequence.builder(testName).dependent();
+        var arguments = sequential(testName).dependent();
 
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             int argumentIndex = i;
             String argumentValue = "string-" + i;
 
-            var tests = Sequence.<DependentArgumentTest>builder(argumentValue)
-                    .child(Step.of("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)))
-                    .child(Step.of("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)))
-                    .child(Step.of("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)));
+            var tests = sequential(argumentValue)
+                    .child(step("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)))
+                    .child(step("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)))
+                    .child(step("test()", withInstance(DependentArgumentTest.class, DependentArgumentTest::test)));
 
-            arguments.child(Instance.builder(argumentValue, () -> new DependentArgumentTest(argumentIndex))
-                    .body(Scope.builder("lifecycle")
-                            .before(Step.of(
+            arguments.child(instance(argumentValue, () -> new DependentArgumentTest(argumentIndex))
+                    .body(scope("lifecycle")
+                            .before(step(
                                     "before()",
                                     withInstance(DependentArgumentTest.class, DependentArgumentTest::before)))
-                            .body(tests.build())
-                            .after(Step.of(
-                                    "after()", withInstance(DependentArgumentTest.class, DependentArgumentTest::after)))
-                            .build())
-                    .build());
+                            .body(tests)
+                            .after(step(
+                                    "after()",
+                                    withInstance(DependentArgumentTest.class, DependentArgumentTest::after)))));
         }
 
-        return Scope.builder(testName)
-                .body(arguments.build())
-                .after(Step.of("validate", ignored -> validate()))
+        return scope(testName)
+                .body(arguments)
+                .after(step("validate", ignored -> validate()))
                 .build();
     }
 

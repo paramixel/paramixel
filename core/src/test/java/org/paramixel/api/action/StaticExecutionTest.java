@@ -28,6 +28,7 @@ import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Static execution")
+@SuppressWarnings("removal")
 class StaticExecutionTest {
 
     @Test

@@ -18,25 +18,25 @@ package examples.isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Isolated.isolated;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Isolated;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Step;
 
 /**
- * Demonstrates {@link Isolated} as a serialization boundary inside a
- * {@link Parallel}. Two Isolated nodes share a lock name so their bodies
+ * Demonstrates {@link org.paramixel.api.action.Isolated} as a serialization boundary inside a
+ * {@link org.paramixel.api.action.Parallel}. Two Isolated nodes share a lock name so their bodies
  * never execute concurrently, while unrelated actions run in parallel.
  *
- * <p>Each body wraps a {@link Scope} with setup, test, and teardown.
- * State isolation is provided by composing {@link Isolated} with
- * {@link Instance}.
+ * <p>Each body wraps a {@link org.paramixel.api.action.Scope} with setup, test, and teardown.
+ * State isolation is provided by composing {@link org.paramixel.api.action.Isolated} with
+ * {@link org.paramixel.api.action.Instance}.
  */
 public class IsolatedTest {
 
@@ -58,66 +58,54 @@ public class IsolatedTest {
      */
     @Paramixel.Factory
     public static Action factory() {
-        return Parallel.builder(IsolatedTest.class.getName())
+        return parallel(IsolatedTest.class.getName())
                 .parallelism(4)
-                .child(Isolated.builder("serialized-group-1", "db-lock")
-                        .body(Parallel.builder("group-1-tests")
+                .child(isolated("serialized-group-1", "db-lock")
+                        .body(parallel("group-1-tests")
                                 .parallelism(2)
-                                .child(Instance.builder("test-1a", IsolatedTest::new)
-                                        .body(Scope.<IsolatedTest>builder("scenario")
-                                                .before(Step.of(
+                                .child(instance("test-1a", IsolatedTest::new)
+                                        .body(scope("scenario")
+                                                .before(step(
                                                         "setup()",
                                                         withInstance(IsolatedTest.class, IsolatedTest::setup)))
-                                                .body(Step.of(
+                                                .body(step(
                                                         "run()", withInstance(IsolatedTest.class, IsolatedTest::run)))
-                                                .after(Step.of(
+                                                .after(step(
                                                         "teardown()",
-                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))
-                                                .build())
-                                        .build())
-                                .child(Instance.builder("test-1b", IsolatedTest::new)
-                                        .body(Scope.<IsolatedTest>builder("scenario")
-                                                .before(Step.of(
+                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))))
+                                .child(instance("test-1b", IsolatedTest::new)
+                                        .body(scope("scenario")
+                                                .before(step(
                                                         "setup()",
                                                         withInstance(IsolatedTest.class, IsolatedTest::setup)))
-                                                .body(Step.of(
+                                                .body(step(
                                                         "run()", withInstance(IsolatedTest.class, IsolatedTest::run)))
-                                                .after(Step.of(
+                                                .after(step(
                                                         "teardown()",
-                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))
-                                                .build())
-                                        .build())
-                                .build())
-                        .build())
-                .child(Isolated.builder("serialized-group-2", "db-lock")
-                        .body(Parallel.builder("group-2-tests")
+                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))))))
+                .child(isolated("serialized-group-2", "db-lock")
+                        .body(parallel("group-2-tests")
                                 .parallelism(2)
-                                .child(Instance.builder("test-2a", IsolatedTest::new)
-                                        .body(Scope.<IsolatedTest>builder("scenario")
-                                                .before(Step.of(
+                                .child(instance("test-2a", IsolatedTest::new)
+                                        .body(scope("scenario")
+                                                .before(step(
                                                         "setup()",
                                                         withInstance(IsolatedTest.class, IsolatedTest::setup)))
-                                                .body(Step.of(
+                                                .body(step(
                                                         "run()", withInstance(IsolatedTest.class, IsolatedTest::run)))
-                                                .after(Step.of(
+                                                .after(step(
                                                         "teardown()",
-                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))
-                                                .build())
-                                        .build())
-                                .child(Instance.builder("test-2b", IsolatedTest::new)
-                                        .body(Scope.<IsolatedTest>builder("scenario")
-                                                .before(Step.of(
+                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))))
+                                .child(instance("test-2b", IsolatedTest::new)
+                                        .body(scope("scenario")
+                                                .before(step(
                                                         "setup()",
                                                         withInstance(IsolatedTest.class, IsolatedTest::setup)))
-                                                .body(Step.of(
+                                                .body(step(
                                                         "run()", withInstance(IsolatedTest.class, IsolatedTest::run)))
-                                                .after(Step.of(
+                                                .after(step(
                                                         "teardown()",
-                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))
-                                                .build())
-                                        .build())
-                                .build())
-                        .build())
+                                                        withInstance(IsolatedTest.class, IsolatedTest::teardown)))))))
                 .build();
     }
 

@@ -10,9 +10,9 @@ Use this plan when upgrading a Paramixel 5.1.x project directly to 6.0.0.
 ## Migration focus
 
 - Replace `Spec` with `Action` and `Builder` concepts.
-- Replace `Sequential.of()` with `Sequence.builder()`, `Parallel.of()` with `Parallel.builder()`.
-- Replace `Lifecycle` with `Scope` or `Static`.
-- Replace `AssertTrue`/`AssertFalse` with `Assert.of()`.
+- Replace `Sequential.of()` with `Sequential.sequential()`, `Parallel.of()` with `Parallel.parallel()`.
+- Replace `Lifecycle` with `Scope` (`Static` is available but deprecated since 6.2 — prefer `Scope`).
+- Replace `AssertTrue`/`AssertFalse` with `Assert.assertTrue()`.
 - Replace `.each()` on actions with the `Each` utility.
 - Refresh examples to use the 6.0.0 API.
 
@@ -21,7 +21,7 @@ Use this plan when upgrading a Paramixel 5.1.x project directly to 6.0.0.
 - Use Java 17+ and imports from `org.paramixel.api`, `org.paramixel.api.action`, `org.paramixel.api.selector`, and `org.paramixel.api.support`.
 - Define discovery entry points as public static methods annotated with `@Paramixel.Factory`.
 - Return `Action`, `Builder`, or `null` from factories; `null` produces a skipped outcome.
-- Build action trees with `Sequence`, `Parallel`, `Scope`, `Static`, `Instance`, `Repeat`, `Timeout`, `Step`, and `Assert`.
+- Build action trees with `Sequential`, `Parallel`, `Scope`, `Instance`, `Repeat`, `Timeout`, `Step`, and `Assert` (`Static` is deprecated since 6.2 — use `Scope` instead).
 - Use `Step.of(name, ContextConsumer)` for user logic.
 - Read execution state from `Result.descriptor()` and the descriptor tree.
 - Configure runs with `paramixel.properties`, JVM system properties, or programmatic `Configuration` objects.
@@ -41,14 +41,14 @@ Use this plan when upgrading a Paramixel 5.1.x project directly to 6.0.0.
 ```java
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 public final class SmokeTest {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Action smoke() {
-        return Sequence.builder("smoke")
+        return Sequential.sequential("smoke")
                 .child(Step.of("arrange", ctx -> arrange()))
                 .child(Step.of("act", ctx -> act()))
                 .child(Step.of("assert", ctx -> assertResult()))

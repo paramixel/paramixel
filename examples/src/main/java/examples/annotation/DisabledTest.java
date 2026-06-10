@@ -16,86 +16,43 @@
 
 package examples.annotation;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Step.step;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.exception.FailException;
+import org.paramixel.api.selector.Selector;
 
 /**
  * Verifies that {@code @Paramixel.Disabled} prevents the annotated action factory
- * from being invoked by the runner. A separate verification factory asserts the
- * disabled factory was never called.
+ * from being invoked by the runner.
  */
 public class DisabledTest {
 
-    private static final AtomicBoolean factoryInvoked = new AtomicBoolean();
-
     /**
-     * Runs the verification factory and exits the JVM.
+     * Discovers and executes all action factories in this package, then exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(disabledVerificationFactory());
-    }
-
-    /**
-     * Verification factory that asserts the disabled factory was never invoked.
-     *
-     * @return a single-step action that checks the disabled flag
-     */
-    @Paramixel.Factory
-    public static Action disabledVerificationFactory() {
-        return Instance.builder("DisabledVerification", DisabledTest::new)
-                .body(Step.of("verify()", withInstance(DisabledTest.class, DisabledTest::verify)))
-                .build();
+        Runner.defaultRunner().runAndExit(Selector.packageTreeOf(DisabledTest.class));
     }
 
     /**
      * Action factory annotated with {@code @Paramixel.Disabled} — must not be
-     * invoked by the runner.
+     * invoked by the runner. If this factory is ever called, the test fails.
      *
      * @return a flow that would fail if ever executed
      */
     @Paramixel.Disabled("covered by resolver skip behavior")
     @Paramixel.Factory
     public static Action factory() {
-        factoryInvoked.set(true);
-
-        return Instance.builder("DisabledTest", DisabledTest::new)
-                .body(Scope.<DisabledTest>builder("lifecycle")
-                        .before(Step.of("before()", withInstance(DisabledTest.class, DisabledTest::before)))
-                        .body(Step.of("disabledLeaf()", withInstance(DisabledTest.class, DisabledTest::disabledLeaf)))
-                        .after(Step.of("after()", withInstance(DisabledTest.class, DisabledTest::after)))
-                        .build())
+        return scope("[scenario]")
+                .body(step("should-not-run", context -> {
+                    FailException.fail("@Paramixel.Disabled action factory was invoked");
+                }))
                 .build();
-    }
-
-    public DisabledTest() {
-        // Intentionally empty
-    }
-
-    public void verify() {
-        assertThat(factoryInvoked.get())
-                .as("@Paramixel.Disabled must prevent the action factory from being invoked")
-                .isFalse();
-    }
-
-    public void before() {
-        throw new AssertionError("Disabled action must not execute");
-    }
-
-    public void disabledLeaf() {
-        throw new AssertionError("Disabled action must not execute");
-    }
-
-    public void after() {
-        throw new AssertionError("Disabled action must not execute");
     }
 }

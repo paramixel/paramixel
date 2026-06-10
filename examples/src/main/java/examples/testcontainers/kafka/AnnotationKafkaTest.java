@@ -17,6 +17,10 @@
 package examples.testcontainers.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Parallel.parallel;
+import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Sequential.sequential;
 
 import examples.support.Logger;
 import examples.testcontainers.util.RandomUtil;
@@ -35,10 +39,6 @@ import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
 
 /**
  * Parameterized integration test that starts Kafka containers using annotation-based
@@ -75,21 +75,18 @@ public class AnnotationKafkaTest {
     public static Action factory() throws Throwable {
         var annotationResolver = AnnotationResolver.create(AnnotationKafkaTest.class);
 
-        var parallel = Parallel.builder(AnnotationKafkaTest.class.getName());
+        var parallel = parallel(AnnotationKafkaTest.class.getName());
         for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
-            var lifecycle = Scope.builder(environment.name())
+            var lifecycle = scope(environment.name())
                     .before(annotationResolver.byId("setUp"))
-                    .body(Sequence.builder("tests")
+                    .body(sequential("tests")
                             .child(annotationResolver.byId("produce"))
-                            .child(annotationResolver.byId("consume"))
-                            .build())
-                    .after(annotationResolver.byId("tearDown"))
-                    .build();
+                            .child(annotationResolver.byId("consume")))
+                    .after(annotationResolver.byId("tearDown"));
 
             parallel.parallelism(2)
-                    .child(Instance.builder(environment.name(), () -> new AnnotationKafkaTest(environment))
-                            .body(lifecycle)
-                            .build());
+                    .child(instance(environment.name(), () -> new AnnotationKafkaTest(environment))
+                            .body(lifecycle));
         }
         return parallel.build();
     }

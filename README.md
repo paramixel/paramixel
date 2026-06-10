@@ -127,7 +127,7 @@ import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 public final class MyTest {
@@ -138,9 +138,9 @@ public final class MyTest {
 
     @Paramixel.Factory
     public static Action factory() {
-        return Scope.builder(MyTest.class.getName())
+        return Scope.scope(MyTest.class.getName())
                 .before(Step.of("setUp()", ctx -> { /* setup */ }))
-                .body(Sequence.builder("tests")
+                .body(Sequential.sequential("tests")
                         .child(Step.of("test1()", ctx -> { /* test something */ }))
                         .child(Step.of("test2()", ctx -> { /* test something else */ }))
                         .build())

@@ -88,6 +88,31 @@ class EachTest {
     }
 
     @Test
+    @DisplayName("sequential(Iterable) with explicit BuilderMapper uses builder results")
+    void sequentialIterableWithBuilderMapper() {
+        Each.BuilderMapper<String> mapper =
+                value -> Instance.builder(value, Object::new).body(Step.of("inner", s -> {}));
+        var sequential = Each.sequential("test", List.of("a", "b"), mapper).build();
+
+        assertThat(sequential.children()).hasSize(2);
+        assertThat(sequential.children().get(0)).isInstanceOf(Instance.class);
+        assertThat(sequential.children().get(0).displayName()).isEqualTo("a");
+        assertThat(sequential.children().get(1).displayName()).isEqualTo("b");
+    }
+
+    @Test
+    @DisplayName("sequential(Stream) with explicit BuilderMapper uses builder results")
+    void sequentialStreamWithBuilderMapper() {
+        Each.BuilderMapper<String> mapper =
+                value -> Instance.builder(value, Object::new).body(Step.of("inner", s -> {}));
+        var sequential = Each.sequential("test", Stream.of("x", "y"), mapper).build();
+
+        assertThat(sequential.children()).hasSize(2);
+        assertThat(sequential.children().get(0).displayName()).isEqualTo("x");
+        assertThat(sequential.children().get(1).displayName()).isEqualTo("y");
+    }
+
+    @Test
     @DisplayName("parallel(Iterable) adds children")
     void parallelIterableAddsChildren() {
         var parallel = Each.parallel("test", List.of("/a", "/b", "/c"), value -> Step.of(value, s -> {}))
@@ -146,6 +171,31 @@ class EachTest {
     }
 
     @Test
+    @DisplayName("parallel(Iterable) with explicit BuilderMapper uses builder results")
+    void parallelIterableWithBuilderMapper() {
+        Each.BuilderMapper<String> mapper =
+                value -> Instance.builder(value, Object::new).body(Step.of("inner", s -> {}));
+        var parallel = Each.parallel("test", List.of("p", "q"), mapper).build();
+
+        assertThat(parallel.children()).hasSize(2);
+        assertThat(parallel.children().get(0)).isInstanceOf(Instance.class);
+        assertThat(parallel.children().get(0).displayName()).isEqualTo("p");
+        assertThat(parallel.children().get(1).displayName()).isEqualTo("q");
+    }
+
+    @Test
+    @DisplayName("parallel(Stream) with explicit BuilderMapper uses builder results")
+    void parallelStreamWithBuilderMapper() {
+        Each.BuilderMapper<String> mapper =
+                value -> Instance.builder(value, Object::new).body(Step.of("inner", s -> {}));
+        var parallel = Each.parallel("test", Stream.of("m", "n"), mapper).build();
+
+        assertThat(parallel.children()).hasSize(2);
+        assertThat(parallel.children().get(0).displayName()).isEqualTo("m");
+        assertThat(parallel.children().get(1).displayName()).isEqualTo("n");
+    }
+
+    @Test
     @DisplayName("sequential rejects null iterable items")
     void sequentialRejectsNullIterableItems() {
         assertThatThrownBy(() -> Each.sequential("test", (Iterable<String>) null, value -> Step.of("x", s -> {})))
@@ -197,6 +247,15 @@ class EachTest {
     @DisplayName("sequential rejects null mapper result")
     void sequentialRejectsNullMapperResult() {
         assertThatThrownBy(() -> Each.sequential("test", List.of("a"), value -> null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("action is null");
+    }
+
+    @Test
+    @DisplayName("sequential BuilderMapper returning null is rejected")
+    void sequentialBuilderMapperReturnsNull() {
+        Each.BuilderMapper<String> nullMapper = value -> null;
+        assertThatThrownBy(() -> Each.sequential("test", List.of("a"), nullMapper))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("action is null");
     }

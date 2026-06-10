@@ -30,6 +30,7 @@ import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
 
 @DisplayName("Custom action")
+@SuppressWarnings("removal")
 class CustomActionTest {
 
     @Test

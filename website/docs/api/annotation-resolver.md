@@ -37,7 +37,7 @@ import org.paramixel.api.action.Step;
 
 var resolver = AnnotationResolver.create(LoginFixture.class);
 
-Action fixture = Instance.builder(LoginFixture.class)
+Action fixture = Instance.instance(LoginFixture.class)
         .body(Step.of("login", ctx -> {
             ctx.requireInstance(LoginFixture.class).open();
             ctx.requireInstance(LoginFixture.class).submit();

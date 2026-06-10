@@ -30,6 +30,7 @@ import org.paramixel.api.Context;
  * <p>For actions with mutable configuration, use the corresponding {@link Builder} to
  * construct an immutable action snapshot via {@link Builder#build()}.
  */
+@SuppressWarnings("removal")
 public sealed interface Action
         permits Assert,
                 Conditional,
@@ -40,6 +41,7 @@ public sealed interface Action
                 Repeat,
                 Scope,
                 Sequence,
+                Sequential,
                 Static,
                 Step,
                 Timeout,
