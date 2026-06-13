@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Parallel arguments")
+@SuppressWarnings("removal")
 class ParallelArgumentsTest {
 
     @Test

@@ -45,7 +45,10 @@ import org.paramixel.api.exception.AbortedException;
  * therefore be stateless or designed for repeated execution. This is the test
  * author's responsibility to ensure; {@code Until} does not clone or reset
  * the body between iterations.
+ *
+ * @deprecated Use {@link Loop} instead.
  */
+@Deprecated(forRemoval = true, since = "6.2.0")
 public final class Until implements Action {
 
     private final String displayName;

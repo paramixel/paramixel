@@ -67,7 +67,7 @@ class ArgumentsCollectionValidationTest {
     @Test
     @DisplayName("requireNoNullElements(Collection, String) rejects collection with null element")
     void requireNoNullElementsCollectionRejectsCollectionWithNullElement() {
-        ArrayList<String> list = new ArrayList<>();
+        var list = new ArrayList<>();
         list.add(null);
         assertThatThrownBy(() -> Arguments.requireNoNullElements(list, "no nulls"))
                 .isInstanceOf(NullPointerException.class)

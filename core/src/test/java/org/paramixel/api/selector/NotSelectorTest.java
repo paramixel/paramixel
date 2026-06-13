@@ -28,7 +28,7 @@ class NotSelectorTest {
     @Test
     @DisplayName("negates matchesPackage")
     void negatesMatchesPackage() {
-        Selector selector = Selector.not(Selector.packageRegex("org\\.paramixel"));
+        var selector = Selector.not(Selector.packageRegex("org\\.paramixel"));
 
         assertThat(selector.matchesPackage("com.example")).isTrue();
         assertThat(selector.matchesPackage("org.paramixel")).isFalse();
@@ -37,7 +37,7 @@ class NotSelectorTest {
     @Test
     @DisplayName("negates matchesClass")
     void negatesMatchesClass() {
-        Selector selector = Selector.not(Selector.classRegex("Test"));
+        var selector = Selector.not(Selector.classRegex("Test"));
 
         assertThat(selector.matchesClass("com.example.Runner")).isTrue();
         assertThat(selector.matchesClass("com.example.Test")).isFalse();
@@ -46,7 +46,7 @@ class NotSelectorTest {
     @Test
     @DisplayName("negates matchesTag")
     void negatesMatchesTag() {
-        Selector selector = Selector.not(Selector.tagRegex("smoke"));
+        var selector = Selector.not(Selector.tagRegex("smoke"));
 
         assertThat(selector.matchesTag("integration")).isTrue();
         assertThat(selector.matchesTag("smoke")).isFalse();
@@ -55,8 +55,8 @@ class NotSelectorTest {
     @Test
     @DisplayName("strictly negates all three matches* methods")
     void strictlyNegatesAllThreeMethods() {
-        Selector packageSelector = Selector.packageRegex("org\\.paramixel");
-        Selector notSelector = Selector.not(packageSelector);
+        var packageSelector = Selector.packageRegex("org\\.paramixel");
+        var notSelector = Selector.not(packageSelector);
 
         assertThat(notSelector.matchesPackage("org.paramixel.api"))
                 .isEqualTo(!packageSelector.matchesPackage("org.paramixel.api"));
@@ -69,7 +69,7 @@ class NotSelectorTest {
     @Test
     @DisplayName("preserves double negation (no simplification)")
     void preservesDoubleNegation() {
-        Selector selector = Selector.not(Selector.not(Selector.tagRegex("smoke")));
+        var selector = Selector.not(Selector.not(Selector.tagRegex("smoke")));
 
         assertThat(selector).isInstanceOf(NotSelector.class);
         assertThat(((NotSelector) selector).selector()).isInstanceOf(NotSelector.class);
@@ -78,8 +78,8 @@ class NotSelectorTest {
     @Test
     @DisplayName("double negation preserves semantics")
     void doubleNegationPreservesSemantics() {
-        Selector tagSelector = Selector.tagRegex("smoke");
-        Selector doubleNegated = Selector.not(Selector.not(tagSelector));
+        var tagSelector = Selector.tagRegex("smoke");
+        var doubleNegated = Selector.not(Selector.not(tagSelector));
 
         assertThat(doubleNegated.matchesTag("smoke")).isTrue();
         assertThat(doubleNegated.matchesTag("integration")).isFalse();
@@ -88,7 +88,7 @@ class NotSelectorTest {
     @Test
     @DisplayName("not(all()) matches nothing")
     void notAllMatchesNothing() {
-        Selector selector = Selector.not(Selector.all());
+        var selector = Selector.not(Selector.all());
 
         assertThat(selector.matchesPackage("org.paramixel")).isFalse();
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isFalse();
@@ -104,7 +104,7 @@ class NotSelectorTest {
     @Test
     @DisplayName("is instance of NotSelector")
     void isInstanceOfNotSelector() {
-        Selector selector = Selector.not(Selector.tagRegex("smoke"));
+        var selector = Selector.not(Selector.tagRegex("smoke"));
 
         assertThat(selector).isInstanceOf(NotSelector.class);
         assertThat(((NotSelector) selector).selector()).isInstanceOf(TagRegexSelector.class);
@@ -113,8 +113,8 @@ class NotSelectorTest {
     @Test
     @DisplayName("no De Morgan transformation: not(and(a, b)) is preserved")
     void noDeMorganTransformation() {
-        Selector andSelector = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
-        Selector notSelector = Selector.not(andSelector);
+        var andSelector = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
+        var notSelector = Selector.not(andSelector);
 
         assertThat(notSelector).isInstanceOf(NotSelector.class);
         assertThat(((NotSelector) notSelector).selector()).isSameAs(andSelector);

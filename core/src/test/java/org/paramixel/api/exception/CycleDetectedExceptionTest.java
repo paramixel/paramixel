@@ -27,7 +27,7 @@ class CycleDetectedExceptionTest {
     @Test
     @DisplayName("constructor creates exception with message")
     void constructorCreatesExceptionWithMessage() {
-        CycleDetectedException exception = new CycleDetectedException("cycle found");
+        var exception = new CycleDetectedException("cycle found");
         assertThat(exception).hasMessage("cycle found");
     }
 }

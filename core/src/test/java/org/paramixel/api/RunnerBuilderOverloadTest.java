@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Step;
 
@@ -31,11 +30,11 @@ class RunnerBuilderOverloadTest {
     @DisplayName("run(Action) resolves and runs a Lifecycle action")
     void runActionResolvesAndRunsLifecycle() {
         var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
-        Action action =
+        var runner = Runner.builder().listener(listener).build();
+        var action =
                 Scope.builder("lifecycle").body(Step.of("step", context -> {})).build();
 
-        Result result = runner.run(action);
+        var result = runner.run(action);
 
         assertThat(result.descriptor()).isPresent();
         assertThat(result.isPassed()).isTrue();
@@ -45,10 +44,10 @@ class RunnerBuilderOverloadTest {
     @DisplayName("run(Action) returns same result for pre-built action")
     void runActionWithPreBuiltAction() {
         var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
-        Step step = Step.of("step", context -> {});
+        var runner = Runner.builder().listener(listener).build();
+        var step = Step.of("step", context -> {});
 
-        Result result = runner.run(step);
+        var result = runner.run(step);
 
         assertThat(result.isPassed()).isTrue();
     }
@@ -57,8 +56,8 @@ class RunnerBuilderOverloadTest {
     @DisplayName("runAndReturnExitCode(Action) resolves and returns exit code for passing action")
     void runAndReturnExitCodeActionReturnsZeroForPassingAction() {
         var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
-        Action action =
+        var runner = Runner.builder().listener(listener).build();
+        var action =
                 Scope.builder("lifecycle").body(Step.of("step", context -> {})).build();
 
         int exitCode = runner.runAndReturnExitCode(action);
@@ -70,8 +69,8 @@ class RunnerBuilderOverloadTest {
     @DisplayName("runAndReturnExitCode(Action) returns non-zero for failing action")
     void runAndReturnExitCodeActionReturnsNonZeroForFailingAction() {
         var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
-        Action action = Scope.builder("lifecycle")
+        var runner = Runner.builder().listener(listener).build();
+        var action = Scope.builder("lifecycle")
                 .body(Step.of("failing", context -> {
                     throw new RuntimeException("failure");
                 }))
@@ -86,7 +85,7 @@ class RunnerBuilderOverloadTest {
     @DisplayName("run(Action) with accumulating builder leaves builder reusable")
     void runActionLeavesAccumulatingBuilderReusable() {
         var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder().listener(listener).build();
         var builder = Scope.builder("lifecycle").body(Step.of("step", context -> {}));
 
         runner.run(builder.build());

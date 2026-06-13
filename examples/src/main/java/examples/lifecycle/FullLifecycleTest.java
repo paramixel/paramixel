@@ -44,7 +44,7 @@ public class FullLifecycleTest {
         return Static.builder(FullLifecycleTest.class.getName())
                 .before(step("staticSetUp()", context -> staticSetUp()))
                 .body(instance("FullLifecycleTest", FullLifecycleTest::new)
-                        .body(scope("lifecycle")
+                        .body(scope("scope")
                                 .before(step(
                                         "setUp()", withInstance(FullLifecycleTest.class, FullLifecycleTest::setUp)))
                                 .body(sequential("tests")

@@ -18,7 +18,6 @@ package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,8 +30,8 @@ class ConcreteRunnerBuildSelectorTest {
     @Test
     @DisplayName("invalid package regex throws ConfigurationException with descriptive message")
     void invalidPackageRegexThrowsConfigurationExceptionWithDescriptiveMessage() throws Exception {
-        var config = Configuration.of(Map.of(Configuration.MATCH_PACKAGE_REGEX, "[invalid"));
-        var exception = callBuildSelector(config);
+        var configuration = Configuration.of(Map.of(Configuration.MATCH_PACKAGE_REGEX, "[invalid"));
+        var exception = callBuildSelector(configuration);
         assertThat(exception)
                 .isInstanceOf(ConfigurationException.class)
                 .hasMessageContaining("Invalid package regex pattern")
@@ -42,8 +41,8 @@ class ConcreteRunnerBuildSelectorTest {
     @Test
     @DisplayName("invalid class regex throws ConfigurationException with descriptive message")
     void invalidClassRegexThrowsConfigurationExceptionWithDescriptiveMessage() throws Exception {
-        var config = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "[invalid"));
-        var exception = callBuildSelector(config);
+        var configuration = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "[invalid"));
+        var exception = callBuildSelector(configuration);
         assertThat(exception)
                 .isInstanceOf(ConfigurationException.class)
                 .hasMessageContaining("Invalid class regex pattern")
@@ -53,8 +52,8 @@ class ConcreteRunnerBuildSelectorTest {
     @Test
     @DisplayName("invalid tag regex throws ConfigurationException with descriptive message")
     void invalidTagRegexThrowsConfigurationExceptionWithDescriptiveMessage() throws Exception {
-        var config = Configuration.of(Map.of(Configuration.MATCH_TAG_REGEX, "[invalid"));
-        var exception = callBuildSelector(config);
+        var configuration = Configuration.of(Map.of(Configuration.MATCH_TAG_REGEX, "[invalid"));
+        var exception = callBuildSelector(configuration);
         assertThat(exception)
                 .isInstanceOf(ConfigurationException.class)
                 .hasMessageContaining("Invalid tag regex pattern")
@@ -64,19 +63,19 @@ class ConcreteRunnerBuildSelectorTest {
     @Test
     @DisplayName("valid regex patterns do not throw")
     void validRegexPatternsDoNotThrow() throws Exception {
-        var config = Configuration.of(Map.of(
+        var configuration = Configuration.of(Map.of(
                 Configuration.MATCH_PACKAGE_REGEX, "org\\.paramixel",
                 Configuration.MATCH_CLASS_REGEX, "Test",
                 Configuration.MATCH_TAG_REGEX, "smoke"));
-        var exception = callBuildSelector(config);
+        var exception = callBuildSelector(configuration);
         assertThat(exception).isNull();
     }
 
-    private static ConfigurationException callBuildSelector(final Configuration config) {
+    private static ConfigurationException callBuildSelector(final Configuration configuration) {
         try {
-            Method method = ConcreteRunner.class.getDeclaredMethod("buildSelector", Configuration.class);
+            var method = ConcreteRunner.class.getDeclaredMethod("buildSelector", Configuration.class);
             method.setAccessible(true);
-            method.invoke(null, config);
+            method.invoke(null, configuration);
             return null;
         } catch (Exception e) {
             Throwable current = e;

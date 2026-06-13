@@ -47,9 +47,9 @@ public class Resource {
      * @throws IOException if the resource cannot be found on the classpath
      */
     public static List<String> load(final Class<?> clazz, final String relativeResourceName) throws IOException {
-        String packagePath = clazz.getPackage().getName().replace('.', '/');
+        var packagePath = clazz.getPackage().getName().replace('.', '/');
 
-        try (InputStream in = getInputStream(relativeResourceName, packagePath);
+        try (var in = getInputStream(relativeResourceName, packagePath);
                 var reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
 
             return reader.lines()
@@ -68,8 +68,8 @@ public class Resource {
             qualifiedResourceName = packageName + "/" + relativeResourceName;
         }
 
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        InputStream inputStream = classLoader.getResourceAsStream(qualifiedResourceName);
+        var classLoader = Thread.currentThread().getContextClassLoader();
+        var inputStream = classLoader.getResourceAsStream(qualifiedResourceName);
         if (inputStream == null) {
             throw new IOException("Classpath resource not found: " + qualifiedResourceName);
         }

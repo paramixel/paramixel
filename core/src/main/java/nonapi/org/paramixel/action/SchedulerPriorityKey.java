@@ -18,6 +18,7 @@ package nonapi.org.paramixel.action;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 /**
  * Immutable scheduler ordering key derived from a descriptor's tree path.
@@ -31,7 +32,7 @@ public final class SchedulerPriorityKey implements Comparable<SchedulerPriorityK
     private static final int ARRAY_CACHE_SIZE = 16;
 
     private final int[] path;
-    private final SchedulerPriorityKey[] arrayCache = new SchedulerPriorityKey[ARRAY_CACHE_SIZE];
+    private final AtomicReferenceArray<SchedulerPriorityKey> arrayCache = new AtomicReferenceArray<>(ARRAY_CACHE_SIZE);
     private volatile SchedulerPriorityKey[] overflowCache;
 
     private SchedulerPriorityKey(final int... path) {
@@ -62,15 +63,15 @@ public final class SchedulerPriorityKey implements Comparable<SchedulerPriorityK
             throw new IllegalArgumentException("childIndex must be non-negative, was: " + childIndex);
         }
         if (childIndex < ARRAY_CACHE_SIZE) {
-            var cached = arrayCache[childIndex];
+            var cached = arrayCache.get(childIndex);
             if (cached != null) {
                 return cached;
             }
             var childPath = Arrays.copyOf(path, path.length + 1);
             childPath[path.length] = childIndex;
             var key = new SchedulerPriorityKey(childPath);
-            arrayCache[childIndex] = key;
-            return key;
+            arrayCache.compareAndSet(childIndex, null, key);
+            return arrayCache.get(childIndex);
         }
         return computeOverflow(childIndex);
     }

@@ -20,7 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import nonapi.org.paramixel.exception.UserCodeException;
 import org.junit.jupiter.api.DisplayName;
@@ -192,6 +195,79 @@ class StatusTest {
         assertThat(Status.failed("err").toString()).isEqualTo("FAILED");
     }
 
+    private static final class EquatableThrowable extends Throwable {
+        EquatableThrowable(String message) {
+            super(message);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (!(obj instanceof EquatableThrowable other)) return false;
+            return Objects.equals(getMessage(), other.getMessage());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(getMessage());
+        }
+    }
+
+    @Test
+    @DisplayName("equals respects Throwable subclass equality")
+    void equalsWithEqualThrowableInstances() {
+        var s1 = Status.failed("boom", new EquatableThrowable("same"));
+        var s2 = Status.failed("boom", new EquatableThrowable("same"));
+
+        assertThat(s1).isEqualTo(s2);
+        assertThat(s1.hashCode()).isEqualTo(s2.hashCode());
+    }
+
+    @Test
+    @DisplayName("equals respects Throwable subclass inequality")
+    void equalsWithDifferentThrowableInstances() {
+        var s1 = Status.failed("boom", new EquatableThrowable("one"));
+        var s2 = Status.failed("boom", new EquatableThrowable("two"));
+
+        assertThat(s1).isNotEqualTo(s2);
+    }
+
+    @Test
+    @DisplayName("hashCode is consistent with Throwable subclass equality")
+    void hashCodeConsistencyWithEqualThrowables() {
+        var s1 = Status.failed("boom", new EquatableThrowable("same"));
+        var s2 = Status.failed("boom", new EquatableThrowable("same"));
+
+        assertThat(s1.hashCode()).isEqualTo(s2.hashCode());
+    }
+
+    @Test
+    @DisplayName("HashSet deduplicates Status with equal Throwable instances")
+    void hashSetBehavior() {
+        var s1 = Status.failed("boom", new EquatableThrowable("same"));
+        var s2 = Status.failed("boom", new EquatableThrowable("same"));
+
+        var set = new HashSet<Status>();
+        set.add(s1);
+        set.add(s2);
+
+        assertThat(set).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("HashMap keys deduplicate Status with equal Throwable instances")
+    void hashMapKeyBehavior() {
+        var s1 = Status.failed("boom", new EquatableThrowable("same"));
+        var s2 = Status.failed("boom", new EquatableThrowable("same"));
+
+        var map = new HashMap<Status, String>();
+        map.put(s1, "first");
+        map.put(s2, "second");
+
+        assertThat(map).hasSize(1);
+        assertThat(map.get(s2)).isEqualTo("second");
+    }
+
     @Nested
     @DisplayName("fromThrowable()")
     class FromThrowable {
@@ -279,6 +355,21 @@ class StatusTest {
             } finally {
                 Thread.interrupted();
             }
+        }
+
+        @Test
+        @DisplayName("UserCodeException with null cause falls back to original wrapper")
+        void userCodeExceptionWithNullCauseFallsBackToOriginalWrapper() throws Exception {
+            var wrapper = new UserCodeException(new RuntimeException("original"));
+            var causeField = UserCodeException.class.getDeclaredField("cause");
+            causeField.setAccessible(true);
+            causeField.set(wrapper, null);
+
+            var status = Status.fromThrowable(wrapper);
+
+            assertThat(status.isFailed()).isTrue();
+            assertThat(status.throwable()).containsSame(wrapper);
+            assertThat(status.message()).contains("original");
         }
     }
 

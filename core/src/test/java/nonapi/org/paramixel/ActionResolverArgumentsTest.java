@@ -19,11 +19,9 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
@@ -50,13 +48,13 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("blank tag values produce discovery validation failure action")
     void rejectsBlankTagValues() {
-        Selector selector = Selector.classOf(ActionResolverTest.BlankTagFactory.class);
+        var selector = Selector.classOf(ActionResolverTest.BlankTagFactory.class);
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+        var result = new ActionResolver(configuration, selector).resolveRootAction();
 
         assertThat(result).isPresent();
-        Parallel root = (Parallel) result.orElseThrow();
+        var root = (Parallel) result.orElseThrow();
         assertThat(root.children()).hasSize(1);
         assertThat(root.children().get(0).displayName()).startsWith("Discovery validation failure:");
     }
@@ -64,7 +62,7 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("rejects non-public factory method")
     void rejectsNonPublicFactoryMethod() {
-        Selector selector = Selector.classOf(ActionResolverTest.NonPublicFactory.class);
+        var selector = Selector.classOf(ActionResolverTest.NonPublicFactory.class);
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
@@ -75,7 +73,7 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("tag selector excludes invalid factory before signature validation")
     void tagSelectorExcludesInvalidFactoryBeforeSignatureValidation() {
-        Selector selector =
+        var selector =
                 Selector.and(Selector.classOf(ActionResolverTest.NonPublicFactory.class), Selector.tagRegex("^smoke$"));
         var configuration = Configuration.defaultConfiguration();
 
@@ -86,7 +84,7 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("rejects non-static factory method")
     void rejectsNonStaticFactoryMethod() {
-        Selector selector = Selector.classOf(ActionResolverTest.NonStaticFactory.class);
+        var selector = Selector.classOf(ActionResolverTest.NonStaticFactory.class);
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
@@ -97,7 +95,7 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("rejects parameterized factory method")
     void rejectsParameterizedFactoryMethod() {
-        Selector selector = Selector.classOf(ActionResolverTest.ParameterizedFactory.class);
+        var selector = Selector.classOf(ActionResolverTest.ParameterizedFactory.class);
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
@@ -108,7 +106,7 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("rejects factory with wrong return type")
     void rejectsFactoryWithWrongReturnType() {
-        Selector selector = Selector.classOf(ActionResolverTest.WrongReturnTypeFactory.class);
+        var selector = Selector.classOf(ActionResolverTest.WrongReturnTypeFactory.class);
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
@@ -119,10 +117,10 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("skips factory that returns null")
     void skipsFactoryThatReturnsNull() {
-        Selector selector = Selector.classOf(ActionResolverTest.NullReturningFactory.class);
+        var selector = Selector.classOf(ActionResolverTest.NullReturningFactory.class);
         var configuration = Configuration.defaultConfiguration();
 
-        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+        var result = new ActionResolver(configuration, selector).resolveRootAction();
 
         assertThat(result).isEmpty();
     }
@@ -130,7 +128,7 @@ class ActionResolverArgumentsTest {
     @Test
     @DisplayName("wraps RuntimeException from factory method in ResolverException")
     void wrapsRuntimeExceptionFromFactoryMethodInResolverException() {
-        Selector selector = Selector.classOf(ActionResolverTest.RuntimeExceptionThrowingFactory.class);
+        var selector = Selector.classOf(ActionResolverTest.RuntimeExceptionThrowingFactory.class);
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())

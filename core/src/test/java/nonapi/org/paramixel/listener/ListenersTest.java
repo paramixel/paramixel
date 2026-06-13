@@ -19,7 +19,6 @@ package nonapi.org.paramixel.listener;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import nonapi.org.paramixel.action.ConcreteDescriptor;
-import nonapi.org.paramixel.action.MutableDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Status;
@@ -31,42 +30,42 @@ class ListenersTest {
     @Test
     @DisplayName("formatAnsiStatus formats ABORTED with orange")
     void formatAnsiStatusAborted() {
-        String result = Listeners.formatAnsiStatus(Status.ABORTED);
+        var result = Listeners.formatAnsiStatus(Status.ABORTED);
         assertThat(result).contains("ABORTED");
     }
 
     @Test
     @DisplayName("formatAnsiStatus formats RUNNING with bold blue")
     void formatAnsiStatusRunning() {
-        String result = Listeners.formatAnsiStatus(Status.RUNNING);
+        var result = Listeners.formatAnsiStatus(Status.RUNNING);
         assertThat(result).contains("RUNNING");
     }
 
     @Test
     @DisplayName("formatAnsiStatus formats PASSED with green")
     void formatAnsiStatusPassed() {
-        String result = Listeners.formatAnsiStatus(Status.PASSED);
+        var result = Listeners.formatAnsiStatus(Status.PASSED);
         assertThat(result).contains("PASSED");
     }
 
     @Test
     @DisplayName("formatAnsiStatus formats FAILED with red")
     void formatAnsiStatusFailed() {
-        String result = Listeners.formatAnsiStatus(Status.FAILED);
+        var result = Listeners.formatAnsiStatus(Status.FAILED);
         assertThat(result).contains("FAILED");
     }
 
     @Test
     @DisplayName("formatAnsiStatus formats SKIPPED with bold yellow")
     void formatAnsiStatusSkipped() {
-        String result = Listeners.formatAnsiStatus(Status.SKIPPED);
+        var result = Listeners.formatAnsiStatus(Status.SKIPPED);
         assertThat(result).contains("SKIPPED");
     }
 
     @Test
     @DisplayName("formatAnsiStatus formats PENDING status as plain text")
     void formatAnsiStatusPending() {
-        String result = Listeners.formatAnsiStatus(Status.PENDING);
+        var result = Listeners.formatAnsiStatus(Status.PENDING);
         assertThat(result).isEqualTo("PENDING");
     }
 
@@ -89,7 +88,7 @@ class ListenersTest {
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("something broke", new RuntimeException("something broke")));
 
-        String result = Listeners.formatException(descriptor);
+        var result = Listeners.formatException(descriptor);
         assertThat(result).startsWith("java.lang.RuntimeException: something broke");
     }
 
@@ -101,7 +100,7 @@ class ListenersTest {
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("failed", new RuntimeException()));
 
-        String result = Listeners.formatException(descriptor);
+        var result = Listeners.formatException(descriptor);
         assertThat(result).isEqualTo("java.lang.RuntimeException");
     }
 
@@ -113,7 +112,7 @@ class ListenersTest {
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("status-only message"));
 
-        String result = Listeners.formatException(descriptor);
+        var result = Listeners.formatException(descriptor);
         assertThat(result).isEqualTo("status-only message");
     }
 
@@ -144,8 +143,8 @@ class ListenersTest {
     void formatNamePathReturnsPathForParentAndChild() {
         var parentAction = Step.of("parent-action", context -> {});
         var childAction = Step.of("child-action", context -> {});
-        MutableDescriptor parent = new ConcreteDescriptor(parentAction);
-        MutableDescriptor child = new ConcreteDescriptor(parent, childAction);
+        var parent = new ConcreteDescriptor(parentAction);
+        var child = new ConcreteDescriptor(parent, childAction);
         parent.addChild(child);
         parent.setStatus(Status.RUNNING);
         parent.setStatus(Status.PASSED);
@@ -161,9 +160,9 @@ class ListenersTest {
         var grandAction = Step.of("grand-action", context -> {});
         var parentAction = Step.of("parent-action", context -> {});
         var childAction = Step.of("child-action", context -> {});
-        MutableDescriptor grand = new ConcreteDescriptor(grandAction);
-        MutableDescriptor parent = new ConcreteDescriptor(grand, parentAction);
-        MutableDescriptor child = new ConcreteDescriptor(parent, childAction);
+        var grand = new ConcreteDescriptor(grandAction);
+        var parent = new ConcreteDescriptor(grand, parentAction);
+        var child = new ConcreteDescriptor(parent, childAction);
         grand.addChild(parent);
         parent.addChild(child);
         grand.setStatus(Status.RUNNING);
@@ -192,8 +191,8 @@ class ListenersTest {
     void formatIdPathReturnsPathForParentAndChild() {
         var parentAction = Step.of("parent-action", context -> {});
         var childAction = Step.of("child-action", context -> {});
-        MutableDescriptor parent = new ConcreteDescriptor(parentAction);
-        MutableDescriptor child = new ConcreteDescriptor(parent, childAction);
+        var parent = new ConcreteDescriptor(parentAction);
+        var child = new ConcreteDescriptor(parent, childAction);
         parent.addChild(child);
         parent.setStatus(Status.RUNNING);
         parent.setStatus(Status.PASSED);

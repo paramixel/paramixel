@@ -20,12 +20,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
-import nonapi.org.paramixel.action.MutableDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Scheduler descriptor validation")
@@ -36,8 +34,8 @@ class SchedulerDescriptorValidationTest {
     void scheduleRejectsNullDescriptor() {
         var scheduler = new Scheduler(1);
         try {
-            Action leaf = Step.of("leaf", context -> {});
-            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+            var leaf = Step.of("leaf", context -> {});
+            var root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
                     Listener.defaultListener(),
@@ -58,8 +56,8 @@ class SchedulerDescriptorValidationTest {
     void scheduleRejectsNullMode() {
         var scheduler = new Scheduler(1);
         try {
-            Action leaf = Step.of("leaf", context -> {});
-            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+            var leaf = Step.of("leaf", context -> {});
+            var root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
                     Listener.defaultListener(),
@@ -80,8 +78,8 @@ class SchedulerDescriptorValidationTest {
     void scheduleRejectsNullParentContext() {
         var scheduler = new Scheduler(1);
         try {
-            Action leaf = Step.of("leaf", context -> {});
-            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+            var leaf = Step.of("leaf", context -> {});
+            var root = new DescriptorBuilder().discover(leaf);
 
             assertThatThrownBy(() -> scheduler.schedule(root, ExecutionMode.RUN, null))
                     .isInstanceOf(NullPointerException.class)
@@ -96,8 +94,8 @@ class SchedulerDescriptorValidationTest {
     void duplicateSchedulingIsRejected() {
         var scheduler = new Scheduler(1);
         try {
-            Action leaf = Step.of("leaf", context -> {});
-            MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+            var leaf = Step.of("leaf", context -> {});
+            var root = new DescriptorBuilder().discover(leaf);
             var context = new ConcreteContext(
                     Configuration.defaultConfiguration(),
                     Listener.defaultListener(),

@@ -31,16 +31,16 @@ class DefaultListenerTest {
     @Test
     @DisplayName("prints action kind before and after execution")
     void printsActionKindBeforeAndAfterExecution() {
-        Listener listener = Listener.defaultListener();
+        var listener = Listener.defaultListener();
         var action = Step.of("direct", context -> {});
 
         var output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var originalOut = System.out;
 
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
 
-            Runner runner = Runner.builder().listener(listener).build();
+            var runner = Runner.builder().listener(listener).build();
             runner.run(action);
         } finally {
             System.setOut(originalOut);

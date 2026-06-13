@@ -236,14 +236,14 @@ class CompositeListenerTest {
     @DisplayName("delegates onRunStarted to all listeners")
     void delegatesOnRunStartedToAllListeners() {
         var calls = new ArrayList<String>();
-        Listener l1 = new Listener() {
+        var l1 = new Listener() {
 
             @Override
             public void onRunStarted() {
                 calls.add("l1-onRunStarted");
             }
         };
-        Listener l2 = new Listener() {
+        var l2 = new Listener() {
 
             @Override
             public void onRunStarted() {
@@ -260,14 +260,14 @@ class CompositeListenerTest {
     @DisplayName("delegates onDiscoveryCompleted to all listeners")
     void delegatesOnDiscoveryCompletedToAllListeners() {
         var calls = new ArrayList<String>();
-        Listener l1 = new Listener() {
+        var l1 = new Listener() {
 
             @Override
             public void onDiscoveryCompleted(Descriptor root) {
                 calls.add("l1-onDiscoveryCompleted");
             }
         };
-        Listener l2 = new Listener() {
+        var l2 = new Listener() {
 
             @Override
             public void onDiscoveryCompleted(Descriptor root) {
@@ -283,8 +283,8 @@ class CompositeListenerTest {
     @Test
     @DisplayName("onDiscoveryCompleted rejects null root")
     void onDiscoveryCompletedRejectsNullRoot() {
-        Listener noop = Listener.defaultListener();
-        CompositeListener cl = new CompositeListener(noop);
+        var noop = Listener.defaultListener();
+        var cl = new CompositeListener(noop);
 
         assertThatThrownBy(() -> cl.onDiscoveryCompleted(null))
                 .isInstanceOf(NullPointerException.class)
@@ -295,14 +295,14 @@ class CompositeListenerTest {
     @DisplayName("delegates initialize to all listeners")
     void delegatesInitializeToAllListeners() {
         var calls = new ArrayList<String>();
-        Listener l1 = new Listener() {
+        var l1 = new Listener() {
 
             @Override
             public void initialize(Configuration configuration) {
                 calls.add("l1-initialize");
             }
         };
-        Listener l2 = new Listener() {
+        var l2 = new Listener() {
 
             @Override
             public void initialize(Configuration configuration) {
@@ -318,8 +318,8 @@ class CompositeListenerTest {
     @Test
     @DisplayName("initialize rejects null configuration")
     void initializeRejectsNullConfiguration() {
-        Listener noop = Listener.defaultListener();
-        CompositeListener cl = new CompositeListener(noop);
+        var noop = Listener.defaultListener();
+        var cl = new CompositeListener(noop);
 
         assertThatThrownBy(() -> cl.initialize(null))
                 .isInstanceOf(NullPointerException.class)
@@ -330,14 +330,14 @@ class CompositeListenerTest {
     @DisplayName("delegates onDiscoveryStarted to all listeners")
     void delegatesOnDiscoveryStartedToAllListeners() {
         var calls = new ArrayList<String>();
-        Listener l1 = new Listener() {
+        var l1 = new Listener() {
 
             @Override
             public void onDiscoveryStarted() {
                 calls.add("l1-onDiscoveryStarted");
             }
         };
-        Listener l2 = new Listener() {
+        var l2 = new Listener() {
 
             @Override
             public void onDiscoveryStarted() {
@@ -354,14 +354,14 @@ class CompositeListenerTest {
     @DisplayName("delegates onBeforeExecution to all listeners")
     void delegatesOnBeforeExecutionToAllListeners() {
         var calls = new ArrayList<String>();
-        Listener l1 = new Listener() {
+        var l1 = new Listener() {
 
             @Override
             public void onBeforeExecution(Descriptor descriptor) {
                 calls.add("l1-onBeforeExecution");
             }
         };
-        Listener l2 = new Listener() {
+        var l2 = new Listener() {
 
             @Override
             public void onBeforeExecution(Descriptor descriptor) {
@@ -377,8 +377,8 @@ class CompositeListenerTest {
     @Test
     @DisplayName("onBeforeExecution rejects null descriptor")
     void onBeforeExecutionRejectsNullDescriptor() {
-        Listener noop = Listener.defaultListener();
-        CompositeListener cl = new CompositeListener(noop);
+        var noop = Listener.defaultListener();
+        var cl = new CompositeListener(noop);
 
         assertThatThrownBy(() -> cl.onBeforeExecution(null))
                 .isInstanceOf(NullPointerException.class)
@@ -389,14 +389,14 @@ class CompositeListenerTest {
     @DisplayName("delegates onAfterExecution to all listeners")
     void delegatesOnAfterExecutionToAllListeners() {
         var calls = new ArrayList<String>();
-        Listener l1 = new Listener() {
+        var l1 = new Listener() {
 
             @Override
             public void onAfterExecution(Descriptor descriptor) {
                 calls.add("l1-onAfterExecution");
             }
         };
-        Listener l2 = new Listener() {
+        var l2 = new Listener() {
 
             @Override
             public void onAfterExecution(Descriptor descriptor) {
@@ -412,8 +412,8 @@ class CompositeListenerTest {
     @Test
     @DisplayName("onAfterExecution rejects null descriptor")
     void onAfterExecutionRejectsNullDescriptor() {
-        Listener noop = Listener.defaultListener();
-        CompositeListener cl = new CompositeListener(noop);
+        var noop = Listener.defaultListener();
+        var cl = new CompositeListener(noop);
 
         assertThatThrownBy(() -> cl.onAfterExecution(null))
                 .isInstanceOf(NullPointerException.class)
@@ -424,14 +424,14 @@ class CompositeListenerTest {
     @DisplayName("delegates onRunCompleted to all listeners")
     void delegatesOnRunCompletedToAllListeners() {
         var calls = new ArrayList<String>();
-        Listener l1 = new Listener() {
+        var l1 = new Listener() {
 
             @Override
             public void onRunCompleted(Result result) {
                 calls.add("l1-onRunCompleted");
             }
         };
-        Listener l2 = new Listener() {
+        var l2 = new Listener() {
 
             @Override
             public void onRunCompleted(Result result) {
@@ -448,7 +448,7 @@ class CompositeListenerTest {
     @DisplayName("recoverable exception from one delegate does not prevent others from being called")
     void recoverableExceptionDoesNotPreventOtherDelegates() {
         var calls = new ArrayList<String>();
-        Listener failing = new Listener() {
+        var failing = new Listener() {
 
             @Override
             public void onRunStarted() {
@@ -456,7 +456,7 @@ class CompositeListenerTest {
                 throw new RuntimeException("delegate failure");
             }
         };
-        Listener succeeding = new Listener() {
+        var succeeding = new Listener() {
 
             @Override
             public void onRunStarted() {
@@ -464,8 +464,8 @@ class CompositeListenerTest {
             }
         };
 
-        PrintStream originalErr = System.err;
-        ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+        var originalErr = System.err;
+        var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
             new CompositeListener(failing, succeeding).onRunStarted();
@@ -480,7 +480,7 @@ class CompositeListenerTest {
     @DisplayName("recoverable exception from initialize does not prevent other delegates")
     void initializeContinuesOnDelegateException() {
         var calls = new ArrayList<String>();
-        Listener failing = new Listener() {
+        var failing = new Listener() {
 
             @Override
             public void initialize(Configuration configuration) {
@@ -488,7 +488,7 @@ class CompositeListenerTest {
                 throw new RuntimeException("delegate failure");
             }
         };
-        Listener succeeding = new Listener() {
+        var succeeding = new Listener() {
 
             @Override
             public void initialize(Configuration configuration) {
@@ -496,8 +496,8 @@ class CompositeListenerTest {
             }
         };
 
-        PrintStream originalErr = System.err;
-        ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+        var originalErr = System.err;
+        var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
             new CompositeListener(failing, succeeding).initialize(STUB_CONFIGURATION);
@@ -512,7 +512,7 @@ class CompositeListenerTest {
     @DisplayName("recoverable exception from onDiscoveryStarted does not prevent other delegates")
     void onDiscoveryStartedContinuesOnDelegateException() {
         var calls = new ArrayList<String>();
-        Listener failing = new Listener() {
+        var failing = new Listener() {
 
             @Override
             public void onDiscoveryStarted() {
@@ -520,7 +520,7 @@ class CompositeListenerTest {
                 throw new RuntimeException("delegate failure");
             }
         };
-        Listener succeeding = new Listener() {
+        var succeeding = new Listener() {
 
             @Override
             public void onDiscoveryStarted() {
@@ -528,8 +528,8 @@ class CompositeListenerTest {
             }
         };
 
-        PrintStream originalErr = System.err;
-        ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+        var originalErr = System.err;
+        var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
             new CompositeListener(failing, succeeding).onDiscoveryStarted();
@@ -543,7 +543,7 @@ class CompositeListenerTest {
     @Test
     @DisplayName("logs recoverable exception to stderr with ANSI prefix when ansi is enabled")
     void logsRecoverableExceptionWithAnsiPrefix() {
-        Listener failing = new Listener() {
+        var failing = new Listener() {
 
             @Override
             public void onRunStarted() {
@@ -551,8 +551,8 @@ class CompositeListenerTest {
             }
         };
 
-        PrintStream originalErr = System.err;
-        ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+        var originalErr = System.err;
+        var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
             new CompositeListener(true, failing).onRunStarted();
@@ -560,7 +560,7 @@ class CompositeListenerTest {
             System.setErr(originalErr);
         }
 
-        String output = errContent.toString(StandardCharsets.UTF_8);
+        var output = errContent.toString(StandardCharsets.UTF_8);
         assertThat(output).contains("CompositeListener delegate Listener.onRunStarted threw exception: delegate oops");
         assertThat(output).contains(Constants.PARAMIXEL_ANSI);
     }
@@ -568,7 +568,7 @@ class CompositeListenerTest {
     @Test
     @DisplayName("logs recoverable exception to stderr with plain prefix when ansi is disabled")
     void logsRecoverableExceptionWithPlainPrefix() {
-        Listener failing = new Listener() {
+        var failing = new Listener() {
 
             @Override
             public void onRunStarted() {
@@ -576,8 +576,8 @@ class CompositeListenerTest {
             }
         };
 
-        PrintStream originalErr = System.err;
-        ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+        var originalErr = System.err;
+        var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
             new CompositeListener(false, failing).onRunStarted();
@@ -585,7 +585,7 @@ class CompositeListenerTest {
             System.setErr(originalErr);
         }
 
-        String output = errContent.toString(StandardCharsets.UTF_8);
+        var output = errContent.toString(StandardCharsets.UTF_8);
         assertThat(output).contains("CompositeListener delegate Listener.onRunStarted threw exception: delegate oops");
         assertThat(output).contains(Constants.PARAMIXEL_PLAIN);
     }
@@ -593,7 +593,7 @@ class CompositeListenerTest {
     @Test
     @DisplayName("rethrows unrecoverable error from delegate")
     void rethrowsUnrecoverableErrorFromDelegate() {
-        Listener failing = new Listener() {
+        var failing = new Listener() {
 
             @Override
             public void onRunStarted() {

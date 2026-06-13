@@ -73,19 +73,26 @@ public class ParallelInstanceTest {
 
         var testName = ParallelInstanceTest.class.getName();
 
-        var parallelMethods = parallel("parallel-methods")
-                .parallelism(PARALLELISM)
-                .child(step("method1()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method1)))
-                .child(step("method2()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method2)))
-                .child(step("method3()", withInstance(ParallelInstanceTest.class, ParallelInstanceTest::method3)));
-
         return scope(testName)
                 .body(instance(testName, ParallelInstanceTest::new)
-                        .body(scope("lifecycle")
+                        .body(scope("scope")
                                 .before(step(
                                         "before()",
                                         withInstance(ParallelInstanceTest.class, ParallelInstanceTest::before)))
-                                .body(parallelMethods)
+                                .body(parallel("parallel-methods")
+                                        .parallelism(PARALLELISM)
+                                        .child(step(
+                                                "method1()",
+                                                withInstance(
+                                                        ParallelInstanceTest.class, ParallelInstanceTest::method1)))
+                                        .child(step(
+                                                "method2()",
+                                                withInstance(
+                                                        ParallelInstanceTest.class, ParallelInstanceTest::method2)))
+                                        .child(step(
+                                                "method3()",
+                                                withInstance(
+                                                        ParallelInstanceTest.class, ParallelInstanceTest::method3))))
                                 .after(step(
                                         "after()",
                                         withInstance(ParallelInstanceTest.class, ParallelInstanceTest::after)))))

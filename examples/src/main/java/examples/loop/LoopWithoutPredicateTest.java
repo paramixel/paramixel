@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package examples.repeat;
+package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Repeat.repeat;
+import static org.paramixel.api.action.Loop.loop;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
@@ -27,11 +27,11 @@ import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Repeat} action with dependent and independent
- * repetitions. Verifies that the child action executes exactly the
+ * Demonstrates the {@link org.paramixel.api.action.Loop} action without a predicate
+ * (run-all mode). Verifies that the child action executes exactly the
  * configured number of times.
  */
-public class RepeatTest {
+public class LoopWithoutPredicateTest {
 
     private static final AtomicInteger dependentCount = new AtomicInteger();
     private static final AtomicInteger independentCount = new AtomicInteger();
@@ -47,20 +47,21 @@ public class RepeatTest {
     }
 
     /**
-     * Builds an action tree that exercises dependent and independent repeat.
+     * Builds an action tree that exercises dependent and independent loop iterations
+     * without a termination predicate.
      *
      * @return the action tree for this test
      */
     @Paramixel.Factory
     public static Action factory() {
         resetCounts();
-        return sequential("repeat-example")
-                .child(repeat("dependent-repeat")
+        return sequential("loop-example")
+                .child(loop("dependent-loop")
                         .body(step("step", context -> dependentCount.incrementAndGet()))
-                        .iterations(3))
-                .child(repeat("independent-repeat")
+                        .maxIterations(3))
+                .child(loop("independent-loop")
                         .body(step("step", context -> independentCount.incrementAndGet()))
-                        .iterations(3))
+                        .maxIterations(3))
                 .child(step("validate", context -> {
                     assertThat(dependentCount.get()).isEqualTo(3);
                     assertThat(independentCount.get()).isEqualTo(3);

@@ -28,7 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.SkipException;
@@ -47,12 +46,12 @@ class StatusListenerOutputTest {
     @Test
     @DisplayName("prints before-action line with action details")
     void printsBeforeActionLineWithActionDetails() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("my-action", context -> {});
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var noop = Step.of("my-action", context -> {});
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -60,7 +59,7 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain("RUN |");
         assertThat(result).contains("my-action");
     }
@@ -68,14 +67,13 @@ class StatusListenerOutputTest {
     @Test
     @DisplayName("suppresses output for root action")
     void suppressesOutputForRoot() {
-        StatusListener listener = new StatusListener();
-        Action child = Step.of("child", context -> {});
-        Parallel parallel =
-                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var child = Step.of("child", context -> {});
+        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(parallel);
@@ -83,22 +81,22 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain(ROOT_NAME);
     }
 
     @Test
     @DisplayName("prints PASSED status with green color")
     void printsSuccessfulStatusWithGreenColor() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("passing-action", context -> {});
-        Runner runner = Runner.builder()
+        var listener = new StatusListener();
+        var noop = Step.of("passing-action", context -> {});
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.ANSI, "true")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -106,24 +104,24 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains(AnsiColor.BOLD_GREEN_TEXT.format("PASSED"));
     }
 
     @Test
     @DisplayName("prints FAILED status with red color")
     void printsFailStatusWithRedColor() {
-        StatusListener listener = new StatusListener();
-        Action action = Step.of("failing-action", context -> {
+        var listener = new StatusListener();
+        var action = Step.of("failing-action", context -> {
             throw new RuntimeException("fail");
         });
-        Runner runner = Runner.builder()
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.ANSI, "true")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -131,24 +129,24 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains(AnsiColor.BOLD_RED_TEXT.format("FAILED"));
     }
 
     @Test
     @DisplayName("prints SKIPPED status with orange color")
     void printsSkipStatusWithOrangeColor() {
-        StatusListener listener = new StatusListener();
-        Action action = Step.of("skipping-action", context -> {
+        var listener = new StatusListener();
+        var action = Step.of("skipping-action", context -> {
             throw new SkipException("skipped");
         });
-        Runner runner = Runner.builder()
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.ANSI, "true")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -156,22 +154,22 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains(AnsiColor.BOLD_YELLOW_TEXT.format("SKIPPED"));
     }
 
     @Test
     @DisplayName("suppresses output for root in afterAction")
     void suppressesOutputForRootInAfterAction() {
-        StatusListener listener = new StatusListener();
-        Parallel parallel = Parallel.builder(ROOT_NAME)
+        var listener = new StatusListener();
+        var parallel = Parallel.builder(ROOT_NAME)
                 .parallelism(1)
                 .child(Step.of("child", context -> {}))
                 .build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(parallel);
@@ -179,21 +177,21 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain(ROOT_NAME);
     }
 
     @Test
     @DisplayName("prints exception details appended to FAILED status line")
     void printsExceptionDetailsAppendedToFailedStatusLine() {
-        StatusListener listener = new StatusListener();
-        Action action = Step.of("error-action", context -> {
+        var listener = new StatusListener();
+        var action = Step.of("error-action", context -> {
             throw new RuntimeException("action error");
         });
-        Runner runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var outputOut = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -201,7 +199,7 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        var outResult = outputOut.toString(StandardCharsets.UTF_8);
         assertThat(outResult).contains("FAILED");
         assertThat(outResult).contains("error-action");
         assertThat(outResult).contains(RuntimeException.class.getName() + ": action error");
@@ -210,14 +208,14 @@ class StatusListenerOutputTest {
     @Test
     @DisplayName("prints EXCEPTION stack trace with prefix on each line")
     void printsExceptionStackTraceWithPrefixOnEachLine() {
-        StatusListener listener = new StatusListener();
-        Action action = Step.of("error-action", context -> {
+        var listener = new StatusListener();
+        var action = Step.of("error-action", context -> {
             throw new RuntimeException("action error");
         });
-        Runner runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var outputOut = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -225,7 +223,7 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        var outResult = outputOut.toString(StandardCharsets.UTF_8);
         String[] lines = outResult.split(System.lineSeparator());
         int failedLineIndex = -1;
         for (int i = 0; i < lines.length; i++) {
@@ -236,14 +234,14 @@ class StatusListenerOutputTest {
         }
         assertThat(failedLineIndex).isNotEqualTo(-1);
         for (int i = failedLineIndex + 1; i < lines.length; i++) {
-            String line = lines[i];
+            var line = lines[i];
             if (line.isBlank()) {
                 continue;
             }
             assertThat(line).as("Stack trace line should start with prefix").startsWith(Constants.PARAMIXEL_PLAIN);
         }
         for (int i = failedLineIndex + 1; i < lines.length; i++) {
-            String line = lines[i];
+            var line = lines[i];
             if (line.isBlank()) {
                 continue;
             }
@@ -259,16 +257,16 @@ class StatusListenerOutputTest {
     @Test
     @DisplayName("suppresses output for root in actionThrowable")
     void suppressesOutputForRootInActionThrowable() {
-        StatusListener listener = new StatusListener();
-        Action failingChild = Step.of("child-fail", context -> {
+        var listener = new StatusListener();
+        var failingChild = Step.of("child-fail", context -> {
             throw new RuntimeException("child error");
         });
-        Parallel parallel =
+        var parallel =
                 Parallel.builder(ROOT_NAME).parallelism(1).child(failingChild).build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var outputOut = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
             runner.run(parallel);
@@ -276,7 +274,7 @@ class StatusListenerOutputTest {
             System.setOut(originalOut);
         }
 
-        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        var outResult = outputOut.toString(StandardCharsets.UTF_8);
         assertThat(outResult).doesNotContain(ROOT_NAME);
     }
 }

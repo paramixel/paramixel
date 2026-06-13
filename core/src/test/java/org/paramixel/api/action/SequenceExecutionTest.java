@@ -29,6 +29,7 @@ import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Sequence execution")
+@SuppressWarnings("removal")
 class SequenceExecutionTest {
 
     @Nested

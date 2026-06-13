@@ -31,7 +31,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.Result;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Step;
 
@@ -43,38 +42,38 @@ class JsonReportListenerTest {
 
     private JsonReportListener createListener(String reportFilePath) {
         var listener = new JsonReportListener();
-        var config = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
-        listener.initialize(config);
+        var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
+        listener.initialize(configuration);
         return listener;
     }
 
     @Test
     @DisplayName("writes null root when result has no descriptor")
     void writesNullRootWhenNoDescriptor() throws Exception {
-        Path reportFile = tempDir.resolve("report.json");
+        var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
         assertThat(reportFile).exists();
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("{\"root\":null}");
     }
 
     @Test
     @DisplayName("writes root descriptor with id, name, status, and children")
     void writesRootDescriptor() throws Exception {
-        Path reportFile = tempDir.resolve("report.json");
+        var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("root-action", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("\"name\":\"root-action\"");
         assertThat(content).contains("\"status\":\"PASSED\"");
         assertThat(content).contains("\"children\":[]");
@@ -83,7 +82,7 @@ class JsonReportListenerTest {
     @Test
     @DisplayName("writes descriptor tree with comma-separated children")
     void writesDescriptorTreeWithChildren() throws Exception {
-        Path reportFile = tempDir.resolve("report.json");
+        var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("parent", v -> {}));
         root.setStatus(Status.RUNNING);
@@ -96,11 +95,11 @@ class JsonReportListenerTest {
         child2.setStatus(Status.SKIPPED);
         root.addChild(child1);
         root.addChild(child2);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("\"name\":\"parent\"");
         assertThat(content).contains("\"name\":\"child-a\"");
         assertThat(content).contains("\"name\":\"child-b\"");
@@ -110,16 +109,16 @@ class JsonReportListenerTest {
     @Test
     @DisplayName("escapes JSON special characters in descriptor names")
     void escapesJsonSpecialCharacters() throws Exception {
-        Path reportFile = tempDir.resolve("report.json");
+        var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("a\\b\"c", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("a\\\\b\\\"c");
         assertThat(content).doesNotContain("\"name\":\"a\\b\"c\"");
     }
@@ -127,16 +126,16 @@ class JsonReportListenerTest {
     @Test
     @DisplayName("encodes unsupported control characters as unicode escapes")
     void encodesUnsupportedControlCharactersAsUnicodeEscapes() throws Exception {
-        Path reportFile = tempDir.resolve("report.json");
+        var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("a\u0001b\u001fc", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("\"name\":\"a\\u0001b\\u001fc\"");
         assertThat(content).doesNotContain("\u0001");
         assertThat(content).doesNotContain("\u001f");
@@ -145,9 +144,9 @@ class JsonReportListenerTest {
     @Test
     @DisplayName("creates parent directories for report file")
     void createsParentDirectories() throws Exception {
-        Path reportFile = tempDir.resolve("deep/nested/dir/report.json");
+        var reportFile = tempDir.resolve("deep/nested/dir/report.json");
         var listener = createListener(reportFile.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
@@ -157,10 +156,10 @@ class JsonReportListenerTest {
     @Test
     @DisplayName("throws UncheckedIOException when report file path is a directory")
     void throwsUncheckedIOExceptionWhenPathIsDirectory() throws Exception {
-        Path dir = tempDir.resolve("blocked.json");
+        var dir = tempDir.resolve("blocked.json");
         Files.createDirectory(dir);
         var listener = createListener(dir.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         assertThatThrownBy(() -> listener.onRunCompleted(result))
                 .isInstanceOf(UncheckedIOException.class)

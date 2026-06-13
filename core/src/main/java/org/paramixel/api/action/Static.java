@@ -62,7 +62,7 @@ public final class Static implements Action {
      * @throws NullPointerException if {@code displayName} is {@code null}
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    @Deprecated(forRemoval = true, since = "6.2.0")
+    @Deprecated(forRemoval = true)
     public static Builder builder(final String displayName) {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
@@ -106,7 +106,7 @@ public final class Static implements Action {
      *
      * @deprecated since 6.2.0, for removal — use {@link Scope.Builder} instead.
      */
-    @Deprecated(forRemoval = true, since = "6.2.0")
+    @Deprecated(forRemoval = true)
     public static final class Builder implements org.paramixel.api.action.Builder {
 
         private final String displayName;

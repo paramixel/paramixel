@@ -43,6 +43,7 @@ import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.FailException;
 
 @DisplayName("Scheduler algorithm")
+@SuppressWarnings("removal")
 class SchedulerAlgorithmTest {
 
     @Test

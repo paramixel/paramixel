@@ -60,7 +60,7 @@ public class TildePathExpander {
      * @throws IllegalArgumentException if {@code input} is blank
      */
     public static Path expand(final String input) {
-        OsDetector osDetector = DEFAULT_OS_DETECTOR;
+        var osDetector = DEFAULT_OS_DETECTOR;
         return expand(
                 input,
                 osDetector,
@@ -91,7 +91,7 @@ public class TildePathExpander {
         // Handle "~" and "~/..."
         if ("~".equals(input) || input.startsWith("~/")) {
 
-            String home = System.getProperty("user.home");
+            var home = System.getProperty("user.home");
 
             if ("~".equals(input)) {
                 return Paths.get(home);
@@ -104,8 +104,8 @@ public class TildePathExpander {
         var m = USER_PATTERN.matcher(input);
 
         if (m.matches()) {
-            String user = m.group(1);
-            String rest = m.group(2);
+            var user = m.group(1);
+            var rest = m.group(2);
 
             String home;
             try {
@@ -151,7 +151,7 @@ public class TildePathExpander {
 
             try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
 
-                String line = reader.readLine();
+                var line = reader.readLine();
 
                 if (line == null || line.isEmpty()) {
                     return null;
@@ -197,7 +197,7 @@ public class TildePathExpander {
 
             try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
 
-                String line = reader.readLine();
+                var line = reader.readLine();
 
                 if (line == null || line.isEmpty()) {
                     return null;

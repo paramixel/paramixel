@@ -24,7 +24,6 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,10 +35,9 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run(Selector) honors class and tag selector")
     void runSelectorHonorsClassAndTagSelector() {
-        Selector selector =
-                Selector.and(Selector.classRegex("ActionResolverSmokeFixture"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classRegex("ActionResolverSmokeFixture"), Selector.tagRegex("^smoke$"));
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().descriptor()).isPresent();
@@ -48,10 +46,9 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run(Selector) honors package selector")
     void runSelectorHonorsPackageSelector() {
-        Selector selector =
-                Selector.and(Selector.packageRegex("^org\\.paramixel\\.api$"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.packageRegex("^org\\.paramixel\\.api$"), Selector.tagRegex("^smoke$"));
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().descriptor()).isPresent();
@@ -60,10 +57,9 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run(Selector) applies selector tag filter")
     void runSelectorAppliesTagFilter() {
-        Selector selector =
-                Selector.and(Selector.classRegex("ActionResolverMultiTagFixture"), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.classRegex("ActionResolverMultiTagFixture"), Selector.tagRegex("smoke"));
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().descriptor()).isPresent();
@@ -72,8 +68,7 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("returns empty when selector tag filter excludes all matches")
     void returnsEmptyWhenSelectorTagFilterExcludesAllMatches() {
-        Selector selector =
-                Selector.and(Selector.classRegex("ActionResolverSmokeFixture"), Selector.tagRegex("nomatch"));
+        var selector = Selector.and(Selector.classRegex("ActionResolverSmokeFixture"), Selector.tagRegex("nomatch"));
 
         assertThat(Runner.builder().build().run(selector)).isEmpty();
     }
@@ -81,10 +76,9 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("supports selector-only classOf with tagRegex")
     void runSelectorSupportsClassOfWithTagRegex() {
-        Selector selector =
-                Selector.and(Selector.classOf(ActionResolverSmokeFixture.class), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classOf(ActionResolverSmokeFixture.class), Selector.tagRegex("^smoke$"));
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().descriptor()).isPresent();
@@ -93,8 +87,8 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("orders resolved actions by discovery metadata")
     void ordersResolvedActionsByDiscoveryMetadata() {
-        Selector selector = Selector.classRegex("ActionResolverOrdering");
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var selector = Selector.classRegex("ActionResolverOrdering");
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().descriptor().orElseThrow().children())
@@ -129,10 +123,10 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("continues after blank tag value during classpath discovery")
     void continuesAfterBlankTagValueDuringClasspathDiscovery() {
-        Selector selector = Selector.classRegex(
+        var selector = Selector.classRegex(
                 "ActionResolverValidTaggedDiscoveryFixture|ActionResolverInvalidBlankTagDiscoveryFixture");
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
@@ -147,11 +141,11 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("aggregates multiple blank tag values")
     void aggregatesMultipleBlankTagValues() {
-        Selector selector = Selector.classRegex("ActionResolverValidTaggedDiscoveryFixture"
+        var selector = Selector.classRegex("ActionResolverValidTaggedDiscoveryFixture"
                 + "|ActionResolverInvalidBlankTagDiscoveryFixture"
                 + "|ActionResolverAnotherInvalidBlankTagDiscoveryFixture");
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
@@ -166,9 +160,9 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run() class regex filters by class name")
     void runClassRegexFiltersByClassName() {
-        var config = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "ActionResolverSmokeFixture"));
+        var configuration = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "ActionResolverSmokeFixture"));
 
-        int exitCode = Runner.builder().configuration(config).build().run();
+        int exitCode = Runner.builder().configuration(configuration).build().run();
 
         assertThat(exitCode).isZero();
     }
@@ -176,11 +170,11 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run() package regex filters by package name")
     void runPackageRegexFiltersByPackage() {
-        var config = Configuration.of(Map.of(
+        var configuration = Configuration.of(Map.of(
                 Configuration.MATCH_PACKAGE_REGEX, "^org\\.paramixel\\.api$",
                 Configuration.MATCH_CLASS_REGEX, "ActionResolverSmokeFixture"));
 
-        int exitCode = Runner.builder().configuration(config).build().run();
+        int exitCode = Runner.builder().configuration(configuration).build().run();
 
         assertThat(exitCode).isZero();
     }
@@ -188,11 +182,11 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run() tag regex filters by tag value")
     void runTagRegexFiltersByTag() {
-        var config = Configuration.of(Map.of(
+        var configuration = Configuration.of(Map.of(
                 Configuration.MATCH_CLASS_REGEX, "ActionResolverSmokeFixture",
                 Configuration.MATCH_TAG_REGEX, "^smoke$"));
 
-        int exitCode = Runner.builder().configuration(config).build().run();
+        int exitCode = Runner.builder().configuration(configuration).build().run();
 
         assertThat(exitCode).isZero();
     }
@@ -200,16 +194,16 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run() combines multiple regex keys with AND (no match)")
     void runCombinesMultipleRegexKeysWithAndNoMatch() {
-        var config = Configuration.of(Map.of(
+        var configuration = Configuration.of(Map.of(
                 Configuration.MATCH_CLASS_REGEX, "ActionResolverSmokeFixture",
                 Configuration.MATCH_TAG_REGEX, "NONEXISTENT",
                 Configuration.FAIL_IF_NO_TESTS, "true"));
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var out = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(out, true, StandardCharsets.UTF_8));
-            int exitCode = Runner.builder().configuration(config).build().run();
+            int exitCode = Runner.builder().configuration(configuration).build().run();
             assertThat(exitCode).isEqualTo(1);
         } finally {
             System.setOut(originalOut);
@@ -220,9 +214,9 @@ class RunnerDiscoveryTest {
     @Test
     @DisplayName("run() with only class regex is backward compatible")
     void runWithOnlyClassRegexIsBackwardCompatible() {
-        var config = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "ActionResolverSmokeFixture"));
+        var configuration = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "ActionResolverSmokeFixture"));
 
-        int exitCode = Runner.builder().configuration(config).build().run();
+        int exitCode = Runner.builder().configuration(configuration).build().run();
 
         assertThat(exitCode).isZero();
     }
@@ -232,11 +226,11 @@ class RunnerDiscoveryTest {
     void runWithNoTestsCallsListenerCallbacks() {
         var calls = new ArrayList<String>();
         var capturedResult = new AtomicReference<Result>();
-        var config = Configuration.of(Map.of(
+        var configuration = Configuration.of(Map.of(
                 Configuration.MATCH_CLASS_REGEX, "nonexistent.ClassName",
                 Configuration.FAIL_IF_NO_TESTS, "true"));
 
-        Listener listener = new Listener() {
+        var listener = new Listener() {
 
             @Override
             public void onRunStarted() {
@@ -251,7 +245,7 @@ class RunnerDiscoveryTest {
         };
 
         int exitCode = Runner.builder()
-                .configuration(config)
+                .configuration(configuration)
                 .listener(listener)
                 .build()
                 .run();

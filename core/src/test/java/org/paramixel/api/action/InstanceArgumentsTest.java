@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Instance arguments")
+@SuppressWarnings("removal")
 class InstanceArgumentsTest {
 
     @Test

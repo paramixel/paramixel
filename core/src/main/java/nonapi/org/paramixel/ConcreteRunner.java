@@ -125,7 +125,7 @@ public final class ConcreteRunner implements Runner {
                 throw error;
             }
             StackTracePruner.prune(t);
-            final String message = t.getMessage() != null ? t.getMessage() : "Runner failed";
+            final var message = t.getMessage() != null ? t.getMessage() : "Runner failed";
             if (root != null) {
                 var status = root.status();
                 if (status.isPending()) {
@@ -246,6 +246,7 @@ public final class ConcreteRunner implements Runner {
             var optionalAction =
                     new ActionResolver(configuration, buildSelector(configuration), shuffled, seed).resolveRootAction();
             if (optionalAction.isEmpty()) {
+                safeListener.initialize(configuration);
                 safeListener.onRunStarted();
                 var result = new ConcreteResult(configuration);
                 safeListener.onRunCompleted(result);
@@ -261,10 +262,10 @@ public final class ConcreteRunner implements Runner {
         return exitCode(runInternal(action));
     }
 
-    private static Selector buildSelector(final Configuration config) {
-        var pkg = config.getString(Configuration.MATCH_PACKAGE_REGEX);
-        var cls = config.getString(Configuration.MATCH_CLASS_REGEX);
-        var tag = config.getString(Configuration.MATCH_TAG_REGEX);
+    private static Selector buildSelector(final Configuration configuration) {
+        var pkg = configuration.getString(Configuration.MATCH_PACKAGE_REGEX);
+        var cls = configuration.getString(Configuration.MATCH_CLASS_REGEX);
+        var tag = configuration.getString(Configuration.MATCH_TAG_REGEX);
 
         if (pkg.isEmpty() && cls.isEmpty() && tag.isEmpty()) {
             return Selector.all();

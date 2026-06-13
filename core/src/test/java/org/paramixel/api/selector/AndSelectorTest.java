@@ -29,7 +29,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("matches when all selectors match")
     void matchesWhenAllSelectorsMatch() {
-        Selector selector = Selector.and(Selector.packageRegex("org\\.paramixel"), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.packageRegex("org\\.paramixel"), Selector.tagRegex("smoke"));
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
         assertThat(selector.matchesTag("smoke")).isTrue();
@@ -38,7 +38,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("does not match when one selector does not match")
     void doesNotMatchWhenOneSelectorDoesNotMatch() {
-        Selector selector = Selector.and(Selector.packageRegex("com\\.example"), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.packageRegex("com\\.example"), Selector.tagRegex("smoke"));
 
         assertThat(selector.matchesPackage("com.example")).isTrue();
         assertThat(selector.matchesTag("integration")).isFalse();
@@ -47,7 +47,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("creates AndSelector from varargs")
     void createsAndSelectorFromVarargs() {
-        Selector selector = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
 
         assertThat(selector).isInstanceOf(AndSelector.class);
         assertThat(((AndSelector) selector).selectors()).hasSize(2);
@@ -56,7 +56,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("creates AndSelector from List")
     void createsAndSelectorFromList() {
-        Selector selector = Selector.and(List.of(Selector.packageRegex("org"), Selector.tagRegex("smoke")));
+        var selector = Selector.and(List.of(Selector.packageRegex("org"), Selector.tagRegex("smoke")));
 
         assertThat(selector).isInstanceOf(AndSelector.class);
         assertThat(((AndSelector) selector).selectors()).hasSize(2);
@@ -101,8 +101,8 @@ class AndSelectorTest {
     @Test
     @DisplayName("flattens nested AND selectors")
     void flattensNestedAndSelectors() {
-        Selector inner = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
-        Selector outer = Selector.and(inner, Selector.classRegex("Test"));
+        var inner = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
+        var outer = Selector.and(inner, Selector.classRegex("Test"));
 
         assertThat(outer).isInstanceOf(AndSelector.class);
         assertThat(((AndSelector) outer).selectors()).hasSize(3);
@@ -111,8 +111,8 @@ class AndSelectorTest {
     @Test
     @DisplayName("does not flatten OR selectors inside AND")
     void doesNotFlattenOrInsideAnd() {
-        Selector orInner = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
-        Selector selector = Selector.and(orInner, Selector.packageRegex("org"));
+        var orInner = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
+        var selector = Selector.and(orInner, Selector.packageRegex("org"));
 
         assertThat(selector).isInstanceOf(AndSelector.class);
         assertThat(((AndSelector) selector).selectors()).hasSize(2);
@@ -121,7 +121,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("allows duplicate selectors")
     void allowsDuplicateSelectors() {
-        Selector selector = Selector.and(Selector.tagRegex("smoke"), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.tagRegex("smoke"), Selector.tagRegex("smoke"));
 
         assertThat(selector).isInstanceOf(AndSelector.class);
         assertThat(((AndSelector) selector).selectors()).hasSize(2);
@@ -130,7 +130,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("getSelectors returns unmodifiable list")
     void getSelectorsReturnsUnmodifiableList() {
-        Selector selector = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
 
         assertThatThrownBy(() -> ((AndSelector) selector).selectors().add(Selector.all()))
                 .isInstanceOf(UnsupportedOperationException.class);
@@ -139,7 +139,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("AND semantics for matchesPackage")
     void andSemanticsForMatchesPackage() {
-        Selector selector = Selector.and(Selector.packageRegex("org"), Selector.packageRegex("paramixel"));
+        var selector = Selector.and(Selector.packageRegex("org"), Selector.packageRegex("paramixel"));
 
         assertThat(selector.matchesPackage("org.paramixel")).isTrue();
         assertThat(selector.matchesPackage("org.example")).isFalse();
@@ -148,7 +148,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("AND semantics for matchesClass")
     void andSemanticsForMatchesClass() {
-        Selector selector = Selector.and(Selector.classRegex("Test"), Selector.classRegex("Selector"));
+        var selector = Selector.and(Selector.classRegex("Test"), Selector.classRegex("Selector"));
 
         assertThat(selector.matchesClass("TestSelector")).isTrue();
         assertThat(selector.matchesClass("TestRunner")).isFalse();
@@ -157,7 +157,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("AND semantics for matchesTag")
     void andSemanticsForMatchesTag() {
-        Selector selector = Selector.and(Selector.tagRegex("smoke"), Selector.tagRegex("fast"));
+        var selector = Selector.and(Selector.tagRegex("smoke"), Selector.tagRegex("fast"));
 
         assertThat(selector.matchesTag("smoke-fast")).isTrue();
         assertThat(selector.matchesTag("smoke")).isFalse();

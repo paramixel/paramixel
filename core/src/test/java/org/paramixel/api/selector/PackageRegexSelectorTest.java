@@ -28,7 +28,7 @@ class PackageRegexSelectorTest {
     @Test
     @DisplayName("getPattern returns the compiled pattern")
     void getPatternReturnsCompiledPattern() {
-        PackageRegexSelector selector = (PackageRegexSelector) Selector.packageRegex("org\\.paramixel");
+        var selector = (PackageRegexSelector) Selector.packageRegex("org\\.paramixel");
 
         assertThat(selector.pattern()).isNotNull();
         assertThat(selector.pattern().pattern()).isEqualTo("org\\.paramixel");
@@ -37,7 +37,7 @@ class PackageRegexSelectorTest {
     @Test
     @DisplayName("matchesPackage uses find() semantics")
     void matchesPackageUsesFindSemantics() {
-        PackageRegexSelector selector = (PackageRegexSelector) Selector.packageRegex("paramixel");
+        var selector = (PackageRegexSelector) Selector.packageRegex("paramixel");
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
     }
@@ -45,7 +45,7 @@ class PackageRegexSelectorTest {
     @Test
     @DisplayName("matchesClass returns true")
     void matchesClassReturnsTrue() {
-        PackageRegexSelector selector = (PackageRegexSelector) Selector.packageRegex("org\\.paramixel");
+        var selector = (PackageRegexSelector) Selector.packageRegex("org\\.paramixel");
 
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isTrue();
     }
@@ -53,7 +53,7 @@ class PackageRegexSelectorTest {
     @Test
     @DisplayName("matchesTag returns true")
     void matchesTagReturnsTrue() {
-        PackageRegexSelector selector = (PackageRegexSelector) Selector.packageRegex("org\\.paramixel");
+        var selector = (PackageRegexSelector) Selector.packageRegex("org\\.paramixel");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
     }
@@ -61,7 +61,7 @@ class PackageRegexSelectorTest {
     @Test
     @DisplayName("matchesPackage rejects null")
     void matchesPackageRejectsNull() {
-        PackageRegexSelector selector = (PackageRegexSelector) Selector.packageRegex("org");
+        var selector = (PackageRegexSelector) Selector.packageRegex("org");
 
         assertThatThrownBy(() -> selector.matchesPackage(null)).isInstanceOf(NullPointerException.class);
     }
@@ -69,7 +69,7 @@ class PackageRegexSelectorTest {
     @Test
     @DisplayName("packageTreeOf produces PackageRegexSelector")
     void packageTreeOfProducesPackageRegexSelector() {
-        Selector selector = Selector.packageTreeOf(PackageRegexSelectorTest.class);
+        var selector = Selector.packageTreeOf(PackageRegexSelectorTest.class);
 
         assertThat(selector).isInstanceOf(PackageRegexSelector.class);
     }
@@ -77,7 +77,7 @@ class PackageRegexSelectorTest {
     @Test
     @DisplayName("packageOf produces PackageRegexSelector")
     void packageOfProducesPackageRegexSelector() {
-        Selector selector = Selector.packageOf(PackageRegexSelectorTest.class);
+        var selector = Selector.packageOf(PackageRegexSelectorTest.class);
 
         assertThat(selector).isInstanceOf(PackageRegexSelector.class);
     }

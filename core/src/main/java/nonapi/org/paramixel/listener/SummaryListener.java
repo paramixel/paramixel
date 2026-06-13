@@ -109,7 +109,7 @@ public final class SummaryListener implements Listener {
         var root = optionalRoot.get();
 
         var version = Version.version();
-        String versionLine = "Paramixel v" + version;
+        var versionLine = "Paramixel v" + version;
 
         if (!excludeTree && !excludeFooter) {
             writer.println(prefix + "-".repeat(versionLine.length()));
@@ -126,15 +126,15 @@ public final class SummaryListener implements Listener {
         }
 
         if (!excludeFooter) {
-            String statusLine = "Status      : " + Listeners.formatStatus(result);
-            String finishedLine =
+            var statusLine = "Status      : " + Listeners.formatStatus(result);
+            var finishedLine =
                     "Finished at : " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String timeLine = "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root));
+            var timeLine = "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root));
 
             int maxLineLength = Math.max(
                     Math.max(versionLine.length(), statusLine.length()),
                     Math.max(finishedLine.length(), timeLine.length()));
-            String dashes = "-".repeat(maxLineLength);
+            var dashes = "-".repeat(maxLineLength);
 
             writer.println(prefix + dashes);
             writer.println(prefix + versionLine);

@@ -70,52 +70,49 @@ public class NestedParallelDeadlockTest {
 
         var testName = NestedParallelDeadlockTest.class.getName();
 
-        var leaf1 = parallel("leaf1")
-                .child(step("l1-1", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }))
-                .child(step("l1-2", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }));
-
-        var leaf2 = parallel("leaf2")
-                .child(step("l2-1", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }))
-                .child(step("l2-2", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }));
-
-        var mid1 = parallel("mid1").parallelism(2).child(leaf1).child(leaf2);
-
-        var leaf3 = parallel("leaf3")
-                .child(step("l3-1", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }))
-                .child(step("l3-2", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }));
-
-        var leaf4 = parallel("leaf4")
-                .child(step("l4-1", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }))
-                .child(step("l4-2", context -> {
-                    executedCount.incrementAndGet();
-                    sleep(10);
-                }));
-
-        var mid2 = parallel("mid2").parallelism(2).child(leaf3).child(leaf4);
-
         return scope(testName)
-                .body(parallel("root").parallelism(2).child(mid1).child(mid2))
+                .body(parallel("root")
+                        .parallelism(2)
+                        .child(parallel("mid1")
+                                .parallelism(2)
+                                .child(parallel("leaf1")
+                                        .child(step("l1-1", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        }))
+                                        .child(step("l1-2", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        })))
+                                .child(parallel("leaf2")
+                                        .child(step("l2-1", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        }))
+                                        .child(step("l2-2", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        }))))
+                        .child(parallel("mid2")
+                                .parallelism(2)
+                                .child(parallel("leaf3")
+                                        .child(step("l3-1", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        }))
+                                        .child(step("l3-2", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        })))
+                                .child(parallel("leaf4")
+                                        .child(step("l4-1", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        }))
+                                        .child(step("l4-2", context -> {
+                                            executedCount.incrementAndGet();
+                                            sleep(10);
+                                        })))))
                 .after(step("validate", ignored -> validate()))
                 .build();
     }
@@ -129,9 +126,9 @@ public class NestedParallelDeadlockTest {
                 .isEqualTo(EXPECTED_EXECUTIONS);
     }
 
-    private static void sleep(final long millis) {
+    private static void sleep(final long millisseconds) {
         try {
-            Thread.sleep(millis);
+            Thread.sleep(millisseconds);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

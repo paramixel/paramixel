@@ -41,9 +41,9 @@ class SummaryListenerExcludesTest {
 
     private static SummaryListener createListener(String excludeValue) {
         var listener = new SummaryListener();
-        var config = new ConcreteConfiguration(
+        var configuration = new ConcreteConfiguration(
                 excludeValue != null ? Map.of(Configuration.LISTENER_EXCLUDE, excludeValue) : Map.of());
-        listener.initialize(config);
+        listener.initialize(configuration);
         return listener;
     }
 
@@ -59,8 +59,8 @@ class SummaryListenerExcludesTest {
     }
 
     private String captureStdout(Runnable runnable) {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runnable.run();
@@ -83,7 +83,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("root-action");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });
@@ -101,7 +101,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("header-test");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });
@@ -118,7 +118,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("tree-test");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });
@@ -136,7 +136,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("footer-test");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });
@@ -154,7 +154,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("quiet-test");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });
@@ -172,7 +172,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("empty-test");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });
@@ -190,7 +190,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("all-test");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });
@@ -207,7 +207,7 @@ class SummaryListenerExcludesTest {
         var listener = createListener("all");
         var result = new ConcreteResult(new ConcreteConfiguration(Map.of()));
 
-        String output = captureStdout(() -> listener.onRunCompleted(result));
+        var output = captureStdout(() -> listener.onRunCompleted(result));
 
         assertThat(output).contains("No Paramixel tests found");
     }
@@ -228,7 +228,7 @@ class SummaryListenerExcludesTest {
         var root = createPassedDescriptor("combo-action");
         var result = createResult(root);
 
-        String output = captureStdout(() -> {
+        var output = captureStdout(() -> {
             listener.onRunStarted();
             listener.onRunCompleted(result);
         });

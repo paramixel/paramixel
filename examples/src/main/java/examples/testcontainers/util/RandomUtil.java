@@ -60,7 +60,7 @@ public class RandomUtil {
         }
 
         var buffer = new char[length];
-        final ThreadLocalRandom random = ThreadLocalRandom.current();
+        final var random = ThreadLocalRandom.current();
 
         for (int i = 0; i < length; i++) {
             buffer[i] = CHARS[random.nextInt(62)];

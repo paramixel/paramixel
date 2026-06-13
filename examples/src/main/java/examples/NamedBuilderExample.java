@@ -22,8 +22,8 @@ import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Conditional.conditional;
 import static org.paramixel.api.action.Delay.delay;
 import static org.paramixel.api.action.Isolated.isolated;
+import static org.paramixel.api.action.Loop.loop;
 import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Repeat.repeat;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
@@ -79,9 +79,9 @@ public class NamedBuilderExample {
                                         .child(step("branch-1", context -> parallelCounter.incrementAndGet()))
                                         .child(step("branch-2", context -> parallelCounter.incrementAndGet()))
                                         .child(step("branch-3", context -> parallelCounter.incrementAndGet())))
-                                .child(repeat("repeat-demo")
+                                .child(loop("repeat-demo")
                                         .body(step("repeated", context -> repeatCounter.incrementAndGet()))
-                                        .iterations(3))
+                                        .maxIterations(3))
                                 .child(delay("delay-demo", 10L))
                                 .child(timeout("timeout-demo")
                                         .timeout(Duration.ofSeconds(1))

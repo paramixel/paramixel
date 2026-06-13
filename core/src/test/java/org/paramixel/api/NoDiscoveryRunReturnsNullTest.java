@@ -30,7 +30,7 @@ class NoDiscoveryRunReturnsNullTest {
     @DisplayName("selector with no matches returns empty and empty result descriptor")
     void selectorWithNoMatchesReturnsEmpty() {
         var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder().listener(listener).build();
         var result = runner.run(Selector.classRegex("nonexistent.ClassName"));
 
         assertThat(result).isEmpty();
@@ -40,7 +40,7 @@ class NoDiscoveryRunReturnsNullTest {
     @DisplayName("direct action run returns result with present descriptor")
     void directActionRunReturnsNonNull() {
         var listener = new NoOpListener();
-        Runner runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder().listener(listener).build();
         var result = runner.run(Step.of("test", context -> {}));
 
         assertThat(result.descriptor()).isPresent();

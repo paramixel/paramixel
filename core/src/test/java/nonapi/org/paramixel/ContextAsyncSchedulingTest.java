@@ -19,7 +19,6 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.concurrent.CompletableFuture;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
@@ -28,14 +27,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Context async scheduling")
+@SuppressWarnings("removal")
 class ContextAsyncSchedulingTest {
 
     private Scheduler scheduler;
@@ -55,15 +53,15 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("scheduleAsync returns future completing with descriptor")
     void scheduleAsyncReturnsFuture() {
-        Action child = Step.of("child", context -> {});
-        Action parent = Sequence.builder("parent").child(child).build();
-        MutableDescriptor root = new DescriptorBuilder().discover(parent);
+        var child = Step.of("child", context -> {});
+        var parent = Sequence.builder("parent").child(child).build();
+        var root = new DescriptorBuilder().discover(parent);
         var childDescriptor = (MutableDescriptor) root.children().get(0);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
         root.markScheduled();
 
-        CompletableFuture<Descriptor> future = context.scheduleAsync(childDescriptor);
+        var future = context.scheduleAsync(childDescriptor);
 
         assertThat(future).isNotNull();
         assertThat(future.join().isPassed()).isTrue();
@@ -72,8 +70,8 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("scheduleAsync rejects null child")
     void scheduleAsyncRejectsNullChild() {
-        Action leaf = Step.of("leaf", context -> {});
-        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+        var leaf = Step.of("leaf", context -> {});
+        var root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
@@ -85,9 +83,9 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("scheduleAsync rejects null mode")
     void scheduleAsyncRejectsNullMode() {
-        Action child = Step.of("child", context -> {});
-        Action parent = Sequence.builder("parent").child(child).build();
-        MutableDescriptor root = new DescriptorBuilder().discover(parent);
+        var child = Step.of("child", context -> {});
+        var parent = Sequence.builder("parent").child(child).build();
+        var root = new DescriptorBuilder().discover(parent);
         var childDescriptor = (MutableDescriptor) root.children().get(0);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
@@ -100,14 +98,14 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("scheduleAsync rejects descriptor from foreign context")
     void scheduleAsyncRejectsForeignDescriptor() {
-        Action leaf = Step.of("leaf", context -> {});
-        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+        var leaf = Step.of("leaf", context -> {});
+        var root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
         root.markScheduled();
 
-        Action foreignLeaf = Step.of("foreign", ignored -> {});
-        MutableDescriptor foreignRoot = new DescriptorBuilder().discover(foreignLeaf);
+        var foreignLeaf = Step.of("foreign", ignored -> {});
+        var foreignRoot = new DescriptorBuilder().discover(foreignLeaf);
         foreignRoot.markScheduled();
 
         var foreignDescriptor = (MutableDescriptor) foreignRoot;
@@ -118,8 +116,8 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("descriptor status can be set directly")
     void descriptorStatusCanBeSetDirectly() {
-        Action leaf = Step.of("leaf", context -> {});
-        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+        var leaf = Step.of("leaf", context -> {});
+        var root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
@@ -131,8 +129,8 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("getInstance returns empty when no instance set")
     void getInstanceReturnsEmptyWhenNoInstance() {
-        Action leaf = Step.of("leaf", context -> {});
-        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+        var leaf = Step.of("leaf", context -> {});
+        var root = new DescriptorBuilder().discover(leaf);
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);
 
@@ -142,8 +140,8 @@ class ContextAsyncSchedulingTest {
     @Test
     @DisplayName("getInstance returns present when instance set")
     void getInstanceReturnsPresentWhenInstanceSet() {
-        Action leaf = Step.of("leaf", context -> {});
-        MutableDescriptor root = new DescriptorBuilder().discover(leaf);
+        var leaf = Step.of("leaf", context -> {});
+        var root = new DescriptorBuilder().discover(leaf);
         instanceHolder.set("hello");
         var context = new ConcreteContext(
                 Configuration.defaultConfiguration(), Listener.defaultListener(), root, scheduler, instanceHolder);

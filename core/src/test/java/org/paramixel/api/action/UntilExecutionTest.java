@@ -27,6 +27,7 @@ import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Until execution")
+@SuppressWarnings("removal")
 class UntilExecutionTest {
 
     @Test

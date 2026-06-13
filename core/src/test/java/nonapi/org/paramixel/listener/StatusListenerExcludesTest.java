@@ -34,7 +34,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
 @DisplayName("StatusListener excludes")
@@ -49,15 +48,15 @@ class StatusListenerExcludesTest {
     @Test
     @DisplayName("prints normal output when excludes is empty")
     void normalOutputWhenNoExcludes() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("normal-action", context -> {});
-        Runner runner = Runner.builder()
+        var listener = new StatusListener();
+        var noop = Step.of("normal-action", context -> {});
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of()))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -65,22 +64,22 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("normal-action");
     }
 
     @Test
     @DisplayName("suppresses onBeforeExecution and onAfterExecution when STATUS excluded")
     void suppressesStatusLinesWhenStatusExcluded() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("silent-action", context -> {});
-        Runner runner = Runner.builder()
+        var listener = new StatusListener();
+        var noop = Step.of("silent-action", context -> {});
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -88,24 +87,24 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain("silent-action");
     }
 
     @Test
     @DisplayName("suppresses status lines but prints exception when STATUS excluded")
     void suppressesStatusLinesButPrintsExceptionWhenStatusExcluded() {
-        StatusListener listener = new StatusListener();
-        Action action = Step.of("test-action", context -> {
+        var listener = new StatusListener();
+        var action = Step.of("test-action", context -> {
             throw new RuntimeException("test error");
         });
-        Runner runner = Runner.builder()
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -113,7 +112,7 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain("PASSED");
         assertThat(result).doesNotContain("FAILED");
         assertThat(result).doesNotContain("test-action");
@@ -123,17 +122,17 @@ class StatusListenerExcludesTest {
     @Test
     @DisplayName("prints stack trace to stdout when STATUS_FOOTER excluded")
     void printsStackTraceToStdoutWhenStatusFooterExcluded() {
-        StatusListener listener = new StatusListener();
-        Action action = Step.of("error-action", context -> {
+        var listener = new StatusListener();
+        var action = Step.of("error-action", context -> {
             throw new RuntimeException("expected error");
         });
-        Runner runner = Runner.builder()
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.footer")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream outputOut = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var outputOut = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(outputOut, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -141,7 +140,7 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String outResult = outputOut.toString(StandardCharsets.UTF_8);
+        var outResult = outputOut.toString(StandardCharsets.UTF_8);
         assertThat(outResult).contains("error-action");
         assertThat(outResult).contains(RuntimeException.class.getName() + ": expected error");
     }
@@ -149,15 +148,15 @@ class StatusListenerExcludesTest {
     @Test
     @DisplayName("quiet shorthand suppresses status lines")
     void quietShorthandSuppressesStatus() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("quiet-action", context -> {});
-        Runner runner = Runner.builder()
+        var listener = new StatusListener();
+        var noop = Step.of("quiet-action", context -> {});
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "quiet")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -165,22 +164,22 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain("quiet-action");
     }
 
     @Test
     @DisplayName("suppresses onBeforeExecution but keeps onAfterExecution when STATUS_HEADER excluded")
     void suppressesBeforeButNotAfterWhenStatusHeaderExcluded() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("header-split", context -> {});
-        Runner runner = Runner.builder()
+        var listener = new StatusListener();
+        var noop = Step.of("header-split", context -> {});
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.header")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -188,7 +187,7 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("PASSED");
         assertThat(result).contains("header-split");
     }
@@ -196,15 +195,15 @@ class StatusListenerExcludesTest {
     @Test
     @DisplayName("suppresses onAfterExecution but keeps onBeforeExecution when STATUS_FOOTER excluded")
     void suppressesAfterButNotBeforeWhenStatusFooterExcluded() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("footer-split", context -> {});
-        Runner runner = Runner.builder()
+        var listener = new StatusListener();
+        var noop = Step.of("footer-split", context -> {});
+        var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.footer")))
                 .listener(listener)
                 .build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -212,7 +211,7 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).doesNotContain("PASSED");
         assertThat(result).contains("footer-split");
     }
@@ -235,8 +234,8 @@ class StatusListenerExcludesTest {
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             listener.onBeforeExecution(descriptor);
@@ -245,7 +244,7 @@ class StatusListenerExcludesTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         boolean expectBefore = !excludeSet.contains(ExcludeTarget.STATUS_HEADER);
         boolean expectAfter = !excludeSet.contains(ExcludeTarget.STATUS_FOOTER);
 

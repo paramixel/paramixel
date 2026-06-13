@@ -76,7 +76,7 @@ public class SequentialEachExample {
                 .body(sequential("arguments", arguments, value -> {
                     int index = Integer.parseInt(value.substring("string-".length()));
                     return instance(value, () -> new SequentialEachExample(index))
-                            .body(scope("lifecycle")
+                            .body(scope("scope")
                                     .before(step(
                                             "before()",
                                             withInstance(SequentialEachExample.class, SequentialEachExample::before)))

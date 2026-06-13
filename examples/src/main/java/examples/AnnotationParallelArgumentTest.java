@@ -69,7 +69,7 @@ public class AnnotationParallelArgumentTest {
 
         var parallel = parallel(testName).parallelism(PARALLELISM);
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
-            String argumentValue = "string-" + i;
+            var argumentValue = "string-" + i;
 
             var lifecycle = scope(argumentValue)
                     .before(annotationResolver.byId("before"))

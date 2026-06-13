@@ -18,7 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +29,7 @@ class ParamixelArgumentsTest {
     @Test
     @DisplayName("constructor is private and cannot be invoked normally")
     void constructorIsPrivate() throws NoSuchMethodException {
-        Constructor<Paramixel> constructor = Paramixel.class.getDeclaredConstructor();
+        var constructor = Paramixel.class.getDeclaredConstructor();
 
         assertThat(Modifier.isPrivate(constructor.getModifiers())).isTrue();
     }
@@ -39,10 +38,10 @@ class ParamixelArgumentsTest {
     @DisplayName("can be invoked reflectively but produces an instance")
     void canBeInvokedReflectively()
             throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException {
-        Constructor<Paramixel> constructor = Paramixel.class.getDeclaredConstructor();
+        var constructor = Paramixel.class.getDeclaredConstructor();
         constructor.setAccessible(true);
 
-        Paramixel instance = constructor.newInstance();
+        var instance = constructor.newInstance();
 
         assertThat(instance).isNotNull();
     }

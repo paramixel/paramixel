@@ -26,6 +26,7 @@ import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Repeat execution")
+@SuppressWarnings("removal")
 class RepeatExecutionTest {
 
     @Test

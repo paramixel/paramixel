@@ -26,12 +26,9 @@ import static org.paramixel.api.action.Delay.delayRandom;
 import static org.paramixel.api.action.Instance.instance;
 import static org.paramixel.api.action.Isolated.isolated;
 import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Repeat.repeat;
 import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequence.sequence;
 import static org.paramixel.api.action.Step.step;
 import static org.paramixel.api.action.Timeout.timeout;
-import static org.paramixel.api.action.Until.until;
 
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +36,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Named builders arguments")
+@SuppressWarnings("removal")
 class NamedBuildersArgumentsTest {
 
     @Nested
@@ -65,13 +63,13 @@ class NamedBuildersArgumentsTest {
         @Test
         @DisplayName("rejects null name")
         void rejectsNullName() {
-            assertThatThrownBy(() -> sequence(null)).isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> Sequence.sequence(null)).isInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("rejects blank name")
         void rejectsBlankName() {
-            assertThatThrownBy(() -> sequence(" ")).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> Sequence.sequence(" ")).isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -99,13 +97,13 @@ class NamedBuildersArgumentsTest {
         @Test
         @DisplayName("rejects null name")
         void rejectsNullName() {
-            assertThatThrownBy(() -> repeat(null)).isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> Repeat.repeat(null)).isInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("rejects blank name")
         void rejectsBlankName() {
-            assertThatThrownBy(() -> repeat(" ")).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> Repeat.repeat(" ")).isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -233,13 +231,13 @@ class NamedBuildersArgumentsTest {
         @Test
         @DisplayName("rejects null name")
         void rejectsNullName() {
-            assertThatThrownBy(() -> until(null)).isInstanceOf(NullPointerException.class);
+            assertThatThrownBy(() -> Until.until(null)).isInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("rejects blank name")
         void rejectsBlankName() {
-            assertThatThrownBy(() -> until(" ")).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> Until.until(" ")).isInstanceOf(IllegalArgumentException.class);
         }
     }
 

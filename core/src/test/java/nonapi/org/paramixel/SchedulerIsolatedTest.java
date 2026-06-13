@@ -40,6 +40,7 @@ import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Isolated action")
+@SuppressWarnings("removal")
 class SchedulerIsolatedTest {
 
     @Test

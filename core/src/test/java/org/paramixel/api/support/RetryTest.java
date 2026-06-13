@@ -22,13 +22,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.exception.PolicyException;
 import org.paramixel.api.support.Retry.Policy;
-import org.paramixel.api.support.Retry.Result;
 
 @DisplayName("Retry")
 class RetryTest {
@@ -36,9 +34,9 @@ class RetryTest {
     @Test
     @DisplayName("run succeeds on first attempt")
     void runSucceedsOnFirstAttempt() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ofMillis(10), Duration.ofSeconds(1)));
+        var retry = Retry.of(Policy.fixed(Duration.ofMillis(10), Duration.ofSeconds(1)));
 
-        Result result = retry.run(() -> {});
+        var result = retry.run(() -> {});
 
         assertThat(result.isSuccessful()).isTrue();
         assertThat(result.attemptCount()).isEqualTo(1);
@@ -49,10 +47,10 @@ class RetryTest {
     @Test
     @DisplayName("run retries and succeeds on second attempt")
     void runRetriesAndSucceedsOnSecondAttempt() {
-        AtomicInteger attempt = new AtomicInteger(0);
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
+        var attempt = new AtomicInteger(0);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             if (attempt.incrementAndGet() == 1) {
                 throw new RuntimeException("transient");
             }
@@ -66,10 +64,10 @@ class RetryTest {
     @Test
     @DisplayName("run returns failure when retry predicate returns false")
     void runReturnsFailureWhenRetryPredicateReturnsFalse() {
-        Retry retry =
+        var retry =
                 Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10))).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -83,9 +81,9 @@ class RetryTest {
     @Test
     @DisplayName("run exhausts duration budget")
     void runExhaustsDurationBudget() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofMillis(1)));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofMillis(1)));
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -97,9 +95,9 @@ class RetryTest {
     @Test
     @DisplayName("run with zero maximum duration fails immediately on exception")
     void runWithZeroMaximumDurationFailsOnException() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -111,10 +109,10 @@ class RetryTest {
     @DisplayName("onRetry callbacks are invoked before each retry")
     void onRetryCallbacksAreInvoked() {
         var callbacks = new ArrayList<String>();
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
                 .onRetry((attempt, cause) -> callbacks.add("attempt-" + attempt + "-" + cause.getMessage()));
 
-        AtomicInteger attempt = new AtomicInteger(0);
+        var attempt = new AtomicInteger(0);
         retry.run(() -> {
             if (attempt.incrementAndGet() <= 2) {
                 throw new RuntimeException("transient-" + attempt.get());
@@ -129,11 +127,11 @@ class RetryTest {
     void multipleOnRetryCallbacksAreInvokedInOrder() {
         var first = new ArrayList<String>();
         var second = new ArrayList<String>();
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
                 .onRetry((attempt, cause) -> first.add("a-" + attempt))
                 .onRetry((attempt, cause) -> second.add("b-" + attempt));
 
-        AtomicInteger attempt = new AtomicInteger(0);
+        var attempt = new AtomicInteger(0);
         retry.run(() -> {
             if (attempt.incrementAndGet() == 1) {
                 throw new RuntimeException("fail");
@@ -147,7 +145,7 @@ class RetryTest {
     @Test
     @DisplayName("hasRun returns false before run")
     void hasRunReturnsFalseBeforeRun() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         assertThat(retry.hasRun()).isFalse();
     }
@@ -155,7 +153,7 @@ class RetryTest {
     @Test
     @DisplayName("hasRun returns true after run")
     void hasRunReturnsTrueAfterRun() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
         retry.run(() -> {});
 
         assertThat(retry.hasRun()).isTrue();
@@ -164,32 +162,32 @@ class RetryTest {
     @Test
     @DisplayName("reset allows retryOn to be called after run")
     void resetAllowsRetryOnToBeCalledAfterRun() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
         retry.run(() -> {});
 
-        Retry same = retry.reset();
+        var same = retry.reset();
 
         assertThat(same).isSameAs(retry);
         assertThat(retry.hasRun()).isFalse();
 
-        Retry reconfigured = retry.retryOn(t -> t instanceof IOException);
+        var reconfigured = retry.retryOn(t -> t instanceof IOException);
         assertThat(reconfigured).isSameAs(retry);
     }
 
     @Test
     @DisplayName("reset allows run to be called after run")
     void resetAllowsRunToBeCalledAfterRun() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
         retry.run(() -> {});
 
         assertThat(retry.hasRun()).isTrue();
 
-        Retry same = retry.reset();
+        var same = retry.reset();
 
         assertThat(same).isSameAs(retry);
         assertThat(retry.hasRun()).isFalse();
 
-        Result result = retry.run(() -> {});
+        var result = retry.run(() -> {});
         assertThat(result.isSuccessful()).isTrue();
     }
 
@@ -197,10 +195,10 @@ class RetryTest {
     @DisplayName("reset preserves onRetry callbacks")
     void resetPreservesOnRetryCallbacks() {
         var callbacks = new ArrayList<String>();
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
                 .onRetry((attempt, cause) -> callbacks.add("callback-" + attempt));
 
-        AtomicInteger attempt = new AtomicInteger(0);
+        var attempt = new AtomicInteger(0);
         retry.run(() -> {
             if (attempt.incrementAndGet() == 1) {
                 throw new RuntimeException("fail");
@@ -223,10 +221,10 @@ class RetryTest {
     @DisplayName("clear removes onRetry callbacks and resets state")
     void clearRemovesOnRetryCallbacksAndResetsState() {
         var callbacks = new ArrayList<String>();
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)))
                 .onRetry((attempt, cause) -> callbacks.add("callback"));
 
-        AtomicInteger attempt = new AtomicInteger(0);
+        var attempt = new AtomicInteger(0);
         retry.run(() -> {
             if (attempt.incrementAndGet() == 1) {
                 throw new RuntimeException("fail");
@@ -235,7 +233,7 @@ class RetryTest {
 
         assertThat(callbacks).hasSize(1);
 
-        Retry same = retry.clear();
+        var same = retry.clear();
 
         assertThat(same).isSameAs(retry);
         assertThat(retry.hasRun()).isFalse();
@@ -253,7 +251,7 @@ class RetryTest {
     @Test
     @DisplayName("runAndThrow returns normally on success")
     void runAndThrowReturnsNormallyOnSuccess() throws Throwable {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         retry.runAndThrow(() -> {});
     }
@@ -261,9 +259,8 @@ class RetryTest {
     @Test
     @DisplayName("runAndThrow throws last exception with earlier suppressed")
     void runAndThrowThrowsLastExceptionWithEarlierSuppressed() {
-        AtomicInteger attempt = new AtomicInteger(0);
-        Retry retry =
-                Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> attempt.get() < 2);
+        var attempt = new AtomicInteger(0);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> attempt.get() < 2);
 
         assertThatThrownBy(() -> retry.runAndThrow(() -> {
                     int n = attempt.incrementAndGet();
@@ -280,7 +277,7 @@ class RetryTest {
     @Test
     @DisplayName("runAndThrow does not throw when result is successful")
     void runAndThrowDoesNotThrowWhenSuccessful() throws Throwable {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         retry.runAndThrow(() -> {});
     }
@@ -288,7 +285,7 @@ class RetryTest {
     @Test
     @DisplayName("runAndThrow does not throw when result has no exceptions")
     void runAndThrowDoesNotThrowWhenNoExceptions() throws Throwable {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         retry.runAndThrow(() -> {});
     }
@@ -296,7 +293,7 @@ class RetryTest {
     @Test
     @DisplayName("run rethrows OutOfMemoryError")
     void runRethrowsOutOfMemoryError() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10)));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10)));
 
         assertThatThrownBy(() -> retry.run(() -> {
                     throw new OutOfMemoryError("simulated oom");
@@ -308,7 +305,7 @@ class RetryTest {
     @Test
     @DisplayName("run rethrows InternalError")
     void runRethrowsInternalError() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10)));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10)));
 
         assertThatThrownBy(() -> retry.run(() -> {
                     throw new InternalError("simulated ie");
@@ -320,9 +317,9 @@ class RetryTest {
     @Test
     @DisplayName("run captures StackOverflowError and may retry")
     void runCapturesStackOverflowError() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new StackOverflowError("soe");
         });
 
@@ -334,10 +331,10 @@ class RetryTest {
     @Test
     @DisplayName("Result getMaximumDuration returns configured budget")
     void resultGetMaximumDurationReturnsConfiguredBudget() {
-        Duration budget = Duration.ofSeconds(5);
-        Retry retry = Retry.of(Policy.fixed(Duration.ofMillis(10), budget));
+        var budget = Duration.ofSeconds(5);
+        var retry = Retry.of(Policy.fixed(Duration.ofMillis(10), budget));
 
-        Result result = retry.run(() -> {});
+        var result = retry.run(() -> {});
 
         assertThat(result.maximumDuration()).isEqualTo(budget);
     }
@@ -345,9 +342,9 @@ class RetryTest {
     @Test
     @DisplayName("Result getElapsedDuration returns positive duration")
     void resultGetElapsedDurationReturnsPositiveDuration() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
 
-        Result result = retry.run(() -> {});
+        var result = retry.run(() -> {});
 
         assertThat(result.elapsedDuration()).isNotNull();
         assertThat(result.elapsedDuration().isNegative()).isFalse();
@@ -356,11 +353,10 @@ class RetryTest {
     @Test
     @DisplayName("Result getException returns exception at index")
     void resultGetExceptionReturnsExceptionAtIndex() {
-        AtomicInteger attempt = new AtomicInteger(0);
-        Retry retry =
-                Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> attempt.get() < 2);
+        var attempt = new AtomicInteger(0);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> attempt.get() < 2);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             int n = attempt.incrementAndGet();
             throw new RuntimeException("fail-" + n);
         });
@@ -373,9 +369,9 @@ class RetryTest {
     @Test
     @DisplayName("Result getException returns empty for negative index")
     void resultGetExceptionReturnsEmptyForNegativeIndex() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -385,9 +381,9 @@ class RetryTest {
     @Test
     @DisplayName("Result getException returns empty for out-of-range index")
     void resultGetExceptionReturnsEmptyForOutOfRangeIndex() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -397,13 +393,13 @@ class RetryTest {
     @Test
     @DisplayName("Result getExceptions returns immutable list")
     void resultGetExceptionsReturnsImmutableList() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO)).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
-        List<Throwable> exceptions = result.exceptions();
+        var exceptions = result.exceptions();
         assertThatThrownBy(() -> exceptions.add(new RuntimeException("extra")))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -411,8 +407,8 @@ class RetryTest {
     @Test
     @DisplayName("Policy.fixed escalates linearly")
     void policyFixedEscalatesLinearly() {
-        Duration initialDelay = Duration.ofMillis(100);
-        Policy policy = Policy.fixed(initialDelay, Duration.ofSeconds(10));
+        var initialDelay = Duration.ofMillis(100);
+        var policy = Policy.fixed(initialDelay, Duration.ofSeconds(10));
 
         assertThat(policy.waitDuration(1, new RuntimeException())).isEqualTo(Duration.ofMillis(100));
         assertThat(policy.waitDuration(2, new RuntimeException())).isEqualTo(Duration.ofMillis(200));
@@ -423,8 +419,8 @@ class RetryTest {
     @Test
     @DisplayName("Policy.exponential escalates exponentially")
     void policyExponentialEscalatesExponentially() {
-        Duration initialDelay = Duration.ofMillis(100);
-        Policy policy = Policy.exponential(initialDelay, Duration.ofSeconds(10));
+        var initialDelay = Duration.ofMillis(100);
+        var policy = Policy.exponential(initialDelay, Duration.ofSeconds(10));
 
         assertThat(policy.waitDuration(1, new RuntimeException())).isEqualTo(Duration.ofMillis(100));
         assertThat(policy.waitDuration(2, new RuntimeException())).isEqualTo(Duration.ofMillis(200));
@@ -436,7 +432,7 @@ class RetryTest {
     @Test
     @DisplayName("Policy.exponential returns zero for negative attempt")
     void policyExponentialReturnsZeroForNegativeAttempt() {
-        Policy policy = Policy.exponential(Duration.ofMillis(100), Duration.ofSeconds(10));
+        var policy = Policy.exponential(Duration.ofMillis(100), Duration.ofSeconds(10));
 
         assertThat(policy.waitDuration(-1, new RuntimeException())).isEqualTo(Duration.ZERO);
     }
@@ -444,7 +440,7 @@ class RetryTest {
     @Test
     @DisplayName("Policy.fixed with zero delays succeeds immediately")
     void policyFixedWithZeroDelays() {
-        Policy policy = Policy.fixed(Duration.ZERO, Duration.ofSeconds(1));
+        var policy = Policy.fixed(Duration.ZERO, Duration.ofSeconds(1));
 
         assertThat(policy.waitDuration(1, new RuntimeException())).isEqualTo(Duration.ZERO);
         assertThat(policy.waitDuration(5, new RuntimeException())).isEqualTo(Duration.ZERO);
@@ -453,11 +449,10 @@ class RetryTest {
     @Test
     @DisplayName("retryOn custom predicate filters retryable exceptions")
     void retryOnCustomPredicateFiltersRetryableExceptions() {
-        AtomicInteger attempt = new AtomicInteger(0);
-        Retry retry =
-                Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> t instanceof IOException);
+        var attempt = new AtomicInteger(0);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> t instanceof IOException);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             int n = attempt.incrementAndGet();
             if (n == 1) {
                 throw new IOException("io fail");
@@ -471,11 +466,10 @@ class RetryTest {
     @Test
     @DisplayName("retryOn custom predicate stops on non-matching exception")
     void retryOnCustomPredicateStopsOnNonMatchingException() {
-        AtomicInteger attempt = new AtomicInteger(0);
-        Retry retry =
-                Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> t instanceof IOException);
+        var attempt = new AtomicInteger(0);
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1))).retryOn(t -> t instanceof IOException);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             attempt.incrementAndGet();
             throw new RuntimeException("not io");
         });
@@ -488,7 +482,7 @@ class RetryTest {
     @Test
     @DisplayName("Policy.fixed with zero maximum duration creates valid policy")
     void policyFixedWithZeroMaximumDuration() {
-        Policy policy = Policy.fixed(Duration.ZERO, Duration.ZERO);
+        var policy = Policy.fixed(Duration.ZERO, Duration.ZERO);
 
         assertThat(policy.maximumDuration()).isEqualTo(Duration.ZERO);
         assertThat(policy.waitDuration(1, new RuntimeException())).isEqualTo(Duration.ZERO);
@@ -497,7 +491,7 @@ class RetryTest {
     @Test
     @DisplayName("Policy.exponential with zero initial delay creates valid policy")
     void policyExponentialWithZeroInitialDelay() {
-        Policy policy = Policy.exponential(Duration.ZERO, Duration.ZERO);
+        var policy = Policy.exponential(Duration.ZERO, Duration.ZERO);
 
         assertThat(policy.maximumDuration()).isEqualTo(Duration.ZERO);
         assertThat(policy.waitDuration(1, new RuntimeException())).isEqualTo(Duration.ZERO);
@@ -506,8 +500,8 @@ class RetryTest {
     @Test
     @DisplayName("run continues when Policy throws PolicyException from waitDuration")
     void runContinuesWhenPolicyThrowsPolicyExceptionFromWaitDuration() {
-        AtomicInteger attempt = new AtomicInteger(0);
-        Policy policy = new Policy() {
+        var attempt = new AtomicInteger(0);
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 if (attempt == 1) {
@@ -521,9 +515,9 @@ class RetryTest {
                 return Duration.ofSeconds(10);
             }
         };
-        Retry retry = Retry.of(policy);
+        var retry = Retry.of(policy);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             if (attempt.incrementAndGet() <= 2) {
                 throw new RuntimeException("transient");
             }
@@ -536,7 +530,7 @@ class RetryTest {
     @Test
     @DisplayName("run continues when Policy throws PolicyException from getMaximumDuration")
     void runContinuesWhenPolicyThrowsPolicyExceptionFromGetMaximumDuration() {
-        Policy policy = new Policy() {
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 return Duration.ZERO;
@@ -547,9 +541,9 @@ class RetryTest {
                 throw new PolicyException("overflow", new ArithmeticException("too big"));
             }
         };
-        Retry retry = Retry.of(policy).retryOn(t -> false);
+        var retry = Retry.of(policy).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -561,7 +555,7 @@ class RetryTest {
     @Test
     @DisplayName("run propagates RuntimeException from Policy waitDuration")
     void runPropagatesRuntimeExceptionFromPolicyWaitDuration() {
-        Policy policy = new Policy() {
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 throw new IllegalStateException("unexpected");
@@ -572,7 +566,7 @@ class RetryTest {
                 return Duration.ofSeconds(10);
             }
         };
-        Retry retry = Retry.of(policy);
+        var retry = Retry.of(policy);
 
         assertThatThrownBy(() -> retry.run(() -> {
                     throw new RuntimeException("fail");
@@ -584,7 +578,7 @@ class RetryTest {
     @Test
     @DisplayName("run propagates RuntimeException from Policy getMaximumDuration")
     void runPropagatesRuntimeExceptionFromPolicyGetMaximumDuration() {
-        Policy policy = new Policy() {
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 return Duration.ZERO;
@@ -595,7 +589,7 @@ class RetryTest {
                 throw new NullPointerException("unexpected");
             }
         };
-        Retry retry = Retry.of(policy);
+        var retry = Retry.of(policy);
 
         assertThatThrownBy(() -> retry.run(() -> {}))
                 .isInstanceOf(NullPointerException.class)
@@ -605,7 +599,7 @@ class RetryTest {
     @Test
     @DisplayName("retryOn throws IllegalStateException when called after run")
     void retryOnThrowsIllegalStateExceptionWhenCalledAfterRun() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
         retry.run(() -> {});
 
         assertThatThrownBy(() -> retry.retryOn(t -> true))
@@ -616,7 +610,7 @@ class RetryTest {
     @Test
     @DisplayName("run stops when Policy returns null from getMaximumDuration")
     void runStopsWhenPolicyReturnsNullFromGetMaximumDuration() {
-        Policy policy = new Policy() {
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 return Duration.ZERO;
@@ -627,9 +621,9 @@ class RetryTest {
                 return null;
             }
         };
-        Retry retry = Retry.of(policy).retryOn(t -> false);
+        var retry = Retry.of(policy).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -640,7 +634,7 @@ class RetryTest {
     @Test
     @DisplayName("run stops when Policy returns negative from getMaximumDuration")
     void runStopsWhenPolicyReturnsNegativeFromGetMaximumDuration() {
-        Policy policy = new Policy() {
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 return Duration.ZERO;
@@ -651,9 +645,9 @@ class RetryTest {
                 return Duration.ofMillis(-1);
             }
         };
-        Retry retry = Retry.of(policy).retryOn(t -> false);
+        var retry = Retry.of(policy).retryOn(t -> false);
 
-        Result result = retry.run(() -> {
+        var result = retry.run(() -> {
             throw new RuntimeException("fail");
         });
 
@@ -664,7 +658,7 @@ class RetryTest {
     @Test
     @DisplayName("run uses zero wait when Policy returns null from waitDuration")
     void runUsesZeroWaitWhenPolicyReturnsNullFromWaitDuration() {
-        Policy policy = new Policy() {
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 return null;
@@ -675,10 +669,10 @@ class RetryTest {
                 return Duration.ofSeconds(1);
             }
         };
-        Retry retry = Retry.of(policy);
+        var retry = Retry.of(policy);
 
-        AtomicInteger attempt = new AtomicInteger(0);
-        Result result = retry.run(() -> {
+        var attempt = new AtomicInteger(0);
+        var result = retry.run(() -> {
             if (attempt.incrementAndGet() == 1) {
                 throw new RuntimeException("fail");
             }
@@ -691,7 +685,7 @@ class RetryTest {
     @Test
     @DisplayName("run uses zero wait when Policy returns negative from waitDuration")
     void runUsesZeroWaitWhenPolicyReturnsNegativeFromWaitDuration() {
-        Policy policy = new Policy() {
+        var policy = new Policy() {
             @Override
             public Duration waitDuration(int attempt, Throwable cause) {
                 return Duration.ofMillis(-1);
@@ -702,10 +696,10 @@ class RetryTest {
                 return Duration.ofSeconds(1);
             }
         };
-        Retry retry = Retry.of(policy);
+        var retry = Retry.of(policy);
 
-        AtomicInteger attempt = new AtomicInteger(0);
-        Result result = retry.run(() -> {
+        var attempt = new AtomicInteger(0);
+        var result = retry.run(() -> {
             if (attempt.incrementAndGet() == 1) {
                 throw new RuntimeException("fail");
             }

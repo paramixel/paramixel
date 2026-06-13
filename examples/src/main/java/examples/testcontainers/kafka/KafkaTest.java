@@ -48,6 +48,7 @@ import org.paramixel.api.action.Action;
  */
 public class KafkaTest {
 
+    private static final int PARALLELISM = 2;
     private static final Logger LOGGER = Logger.createLogger(KafkaTest.class);
     private static final String TOPIC = "test";
     private static final String GROUP_ID = "test-group-id";
@@ -76,10 +77,10 @@ public class KafkaTest {
      */
     @Paramixel.Factory
     public static Action factory() throws Throwable {
-        var parallel = parallel(KafkaTest.class.getName()).parallelism(2);
+        var parallel = parallel(KafkaTest.class.getName()).parallelism(PARALLELISM);
         for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
             parallel.child(instance(environment.name(), () -> new KafkaTest(environment))
-                    .body(scope("lifecycle")
+                    .body(scope("[scenario]")
                             .before(step("setUp()", withInstance(KafkaTest.class, KafkaTest::setUp)))
                             .body(sequential("tests")
                                     .child(step("produce()", withInstance(KafkaTest.class, KafkaTest::produce)))
@@ -110,7 +111,7 @@ public class KafkaTest {
 
         LOGGER.info("[%s] producing message [%s] ...", environment.name(), message);
 
-        try (KafkaProducer<String, String> producer = createKafkaProducer()) {
+        try (var producer = createKafkaProducer()) {
             producer.send(new ProducerRecord<>(TOPIC, message)).get();
             producer.flush();
         }
@@ -124,9 +125,9 @@ public class KafkaTest {
         boolean messageMatched = false;
         int attempts = 0;
         int maxAttempts = 5;
-        Duration pollTimeout = Duration.ofSeconds(2);
+        var pollTimeout = Duration.ofSeconds(2);
 
-        try (KafkaConsumer<String, String> consumer = createKafkaConsumer()) {
+        try (var consumer = createKafkaConsumer()) {
             consumer.subscribe(List.of(TOPIC));
 
             while (!messageMatched && attempts < maxAttempts) {

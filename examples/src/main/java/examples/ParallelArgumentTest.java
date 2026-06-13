@@ -18,6 +18,7 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Each.parallel;
 import static org.paramixel.api.action.Instance.instance;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Scope.scope;
@@ -25,6 +26,7 @@ import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
@@ -64,29 +66,43 @@ public class ParallelArgumentTest {
         resetCounts();
 
         var testName = ParallelArgumentTest.class.getName();
-
-        var parallel = parallel(testName).parallelism(PARALLELISM);
-        for (int i = 0; i < ARGUMENT_COUNT; i++) {
-            String argumentValue = "string-" + i;
-
-            var tests = sequential(argumentValue)
-                    .independent()
-                    .child(step("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)))
-                    .child(step("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)))
-                    .child(step("test()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::test)));
-
-            parallel.child(instance(argumentValue, ParallelArgumentTest::new)
-                    .body(scope("lifecycle")
-                            .before(step(
-                                    "before()", withInstance(ParallelArgumentTest.class, ParallelArgumentTest::before)))
-                            .body(tests)
-                            .after(step(
-                                    "after()",
-                                    withInstance(ParallelArgumentTest.class, ParallelArgumentTest::after)))));
-        }
+        var arguments =
+                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
         return scope(testName)
-                .body(parallel)
+                .body(parallel(
+                                "arguments",
+                                arguments,
+                                value -> instance(value, ParallelArgumentTest::new)
+                                        .body(scope("scope")
+                                                .before(step(
+                                                        "before()",
+                                                        withInstance(
+                                                                ParallelArgumentTest.class,
+                                                                ParallelArgumentTest::before)))
+                                                .body(sequential(value)
+                                                        .independent()
+                                                        .child(step(
+                                                                "test()",
+                                                                withInstance(
+                                                                        ParallelArgumentTest.class,
+                                                                        ParallelArgumentTest::test)))
+                                                        .child(step(
+                                                                "test()",
+                                                                withInstance(
+                                                                        ParallelArgumentTest.class,
+                                                                        ParallelArgumentTest::test)))
+                                                        .child(step(
+                                                                "test()",
+                                                                withInstance(
+                                                                        ParallelArgumentTest.class,
+                                                                        ParallelArgumentTest::test))))
+                                                .after(step(
+                                                        "after()",
+                                                        withInstance(
+                                                                ParallelArgumentTest.class,
+                                                                ParallelArgumentTest::after)))))
+                        .parallelism(PARALLELISM))
                 .after(step("validate", ignored -> validate()))
                 .build();
     }

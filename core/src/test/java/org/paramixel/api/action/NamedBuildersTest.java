@@ -26,12 +26,9 @@ import static org.paramixel.api.action.Delay.delayRandom;
 import static org.paramixel.api.action.Instance.instance;
 import static org.paramixel.api.action.Isolated.isolated;
 import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Repeat.repeat;
 import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequence.sequence;
 import static org.paramixel.api.action.Step.step;
 import static org.paramixel.api.action.Timeout.timeout;
-import static org.paramixel.api.action.Until.until;
 
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +36,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Named builders")
+@SuppressWarnings("removal")
 class NamedBuildersTest {
 
     @Nested
@@ -60,7 +58,8 @@ class NamedBuildersTest {
         @Test
         @DisplayName("returns builder with correct default dependent mode")
         void returnsBuilderWithCorrectDefaults() {
-            var action = sequence("test").child(Step.of("a", ctx -> {})).build();
+            var action =
+                    Sequence.sequence("test").child(Step.of("a", ctx -> {})).build();
             assertThat(action.displayName()).isEqualTo("test");
             assertThat(action.isDependent()).isTrue();
         }
@@ -68,7 +67,7 @@ class NamedBuildersTest {
         @Test
         @DisplayName("accepts children and builds")
         void acceptsChildrenAndBuilds() {
-            var action = sequence("s")
+            var action = Sequence.sequence("s")
                     .child(Step.of("a", ctx -> {}))
                     .child(Step.of("b", ctx -> {}))
                     .build();
@@ -110,7 +109,7 @@ class NamedBuildersTest {
         @DisplayName("returns builder with iterations and body")
         void returnsBuilderWithIterationsAndBody() {
             var body = Step.of("body", ctx -> {});
-            var action = repeat("rep").body(body).iterations(5).build();
+            var action = Repeat.repeat("rep").body(body).iterations(5).build();
             assertThat(action.displayName()).isEqualTo("rep");
             assertThat(action.iterations()).isEqualTo(5);
             assertThat(action.body()).isSameAs(body);
@@ -206,7 +205,7 @@ class NamedBuildersTest {
         @DisplayName("with maxIterations creates action")
         void withMaxIterationsCreatesAction() {
             var body = Step.of("body", ctx -> {});
-            var action = until("u").maxIterations(10).body(body).build();
+            var action = Until.until("u").maxIterations(10).body(body).build();
             assertThat(action.displayName()).isEqualTo("u");
             assertThat(action.maxIterations()).isEqualTo(10);
             assertThat(action.body()).isSameAs(body);
@@ -222,8 +221,11 @@ class NamedBuildersTest {
                 }
             };
             var body = Step.of("body", ctx -> {});
-            var action =
-                    until("u").maxIterations(10).until(predicate).body(body).build();
+            var action = Until.until("u")
+                    .maxIterations(10)
+                    .until(predicate)
+                    .body(body)
+                    .build();
             assertThat(action.until()).containsSame(predicate);
         }
     }

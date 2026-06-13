@@ -18,7 +18,6 @@ package org.paramixel.maven.plugin;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.List;
 import org.apache.maven.model.Build;
@@ -88,7 +87,7 @@ class ParamixelMojoExecutionExceptionTest {
     }
 
     private static void setField(final ParamixelMojo mojo, final String name, final Object value) throws Exception {
-        Field field = ParamixelMojo.class.getDeclaredField(name);
+        var field = ParamixelMojo.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(mojo, value);
     }

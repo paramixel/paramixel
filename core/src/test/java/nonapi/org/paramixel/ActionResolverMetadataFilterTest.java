@@ -19,12 +19,10 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Optional;
 import nonapi.org.paramixel.metadatafilter.InvalidNonPublicFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
@@ -35,10 +33,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("class filter resolves included fixture and excludes non-matching")
     void classFilterResolvesIncludedFixtureAndExcludesNonMatching() {
-        Selector selector = Selector.and(Selector.classRegex("IncludedSmokeFixture$"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classRegex("IncludedSmokeFixture$"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+        var result = new ActionResolver(configuration, selector).resolveRootAction();
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow()).isInstanceOf(Parallel.class);
@@ -47,11 +45,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("package filter excludes metadatafilter package")
     void packageFilterExcludesMetadataFilterPackage() {
-        Selector selector =
-                Selector.and(Selector.packageRegex("^org\\.paramixel\\.api$"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.packageRegex("^org\\.paramixel\\.api$"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+        var result = new ActionResolver(configuration, selector).resolveRootAction();
 
         assertThat(result).isPresent();
     }
@@ -59,10 +56,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("tag filter excludes non-matching fixture")
     void tagFilterExcludesNonMatchingFixture() {
-        Selector selector = Selector.and(Selector.classRegex("ExcludedByTagFilter"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classRegex("ExcludedByTagFilter"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+        var result = new ActionResolver(configuration, selector).resolveRootAction();
 
         assertThat(result).isEmpty();
     }
@@ -70,10 +67,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("tag filter includes matching fixture")
     void tagFilterIncludesMatchingFixture() {
-        Selector selector = Selector.and(Selector.classRegex("IncludedSmokeFixture"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classRegex("IncludedSmokeFixture"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+        var result = new ActionResolver(configuration, selector).resolveRootAction();
 
         assertThat(result).isPresent();
     }
@@ -81,10 +78,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("disabled-only fixture is not resolved")
     void disabledOnlyFixtureIsNotResolved() {
-        Selector selector = Selector.classRegex("DisabledOnlyFixture");
+        var selector = Selector.classRegex("DisabledOnlyFixture");
 
         var configuration = Configuration.defaultConfiguration();
-        Optional<Action> result = new ActionResolver(configuration, selector).resolveRootAction();
+        var result = new ActionResolver(configuration, selector).resolveRootAction();
 
         assertThat(result).isEmpty();
     }
@@ -92,7 +89,7 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("non-public factory that passes metadata filter still throws ResolverException")
     void nonPublicFactoryThatPassesMetadataFilterStillThrows() {
-        Selector selector = Selector.classOf(InvalidNonPublicFixture.class);
+        var selector = Selector.classOf(InvalidNonPublicFixture.class);
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())

@@ -44,7 +44,7 @@ class FailExceptionTest {
     @Test
     @DisplayName("constructor creates FailException with provided message")
     void constructorCreatesFailExceptionWithMessage() {
-        FailException exception = new FailException("validation failed");
+        var exception = new FailException("validation failed");
         assertThat(exception).hasMessage("validation failed");
     }
 }

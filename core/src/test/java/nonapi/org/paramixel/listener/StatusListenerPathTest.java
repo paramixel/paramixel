@@ -24,12 +24,12 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("StatusListener path")
+@SuppressWarnings("removal")
 class StatusListenerPathTest {
 
     private static final String ROOT_NAME = Constants.ROOT_NAME;
@@ -37,12 +37,12 @@ class StatusListenerPathTest {
     @Test
     @DisplayName("shows simple name for core action classes")
     void showsSimpleNameForCoreActionClasses() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("simple", context -> {});
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var noop = Step.of("simple", context -> {});
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -50,19 +50,19 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("simple");
     }
 
     @Test
     @DisplayName("shows FQCN for non-core package action classes")
     void showsFQCNForNonCorePackageActionClasses() {
-        StatusListener listener = new StatusListener();
-        Action custom = Step.of("custom", context -> {});
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var custom = Step.of("custom", context -> {});
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(custom);
@@ -70,21 +70,20 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("custom");
     }
 
     @Test
     @DisplayName("id path excludes root ancestors")
     void idPathExcludesRootAncestors() {
-        StatusListener listener = new StatusListener();
-        Action child = Step.of("visible-child", context -> {});
-        Parallel parallel =
-                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var child = Step.of("visible-child", context -> {});
+        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(parallel);
@@ -92,9 +91,9 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("visible-child");
-        String childLine = result.lines()
+        var childLine = result.lines()
                 .filter(line -> line.contains("visible-child"))
                 .findFirst()
                 .orElse("");
@@ -105,14 +104,13 @@ class StatusListenerPathTest {
     @Test
     @DisplayName("action path excludes root ancestors")
     void actionPathExcludesRootAncestors() {
-        StatusListener listener = new StatusListener();
-        Action child = Step.of("visible-child", context -> {});
-        Parallel parallel =
-                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var child = Step.of("visible-child", context -> {});
+        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(parallel);
@@ -120,7 +118,7 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("visible-child");
         assertThat(result).doesNotContain(ROOT_NAME);
     }
@@ -128,13 +126,13 @@ class StatusListenerPathTest {
     @Test
     @DisplayName("nested action display path includes parent name")
     void nestedActionDisplayPathIncludesParentName() {
-        StatusListener listener = new StatusListener();
-        Action child = Step.of("child", context -> {});
-        Sequence parent = Sequence.builder("parent").child(child).build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var child = Step.of("child", context -> {});
+        var parent = Sequence.builder("parent").child(child).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(parent);
@@ -142,20 +140,20 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("parent / child");
     }
 
     @Test
     @DisplayName("nested action path includes parent name")
     void nestedActionPathIncludesParentName() {
-        StatusListener listener = new StatusListener();
-        Action child = Step.of("child", context -> {});
-        Sequence parent = Sequence.builder("parent").child(child).build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var child = Step.of("child", context -> {});
+        var parent = Sequence.builder("parent").child(child).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(parent);
@@ -163,21 +161,21 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("parent / child");
     }
 
     @Test
     @DisplayName("deep nesting produces full hierarchical display path")
     void deepNestingProducesFullHierarchicalPath() {
-        StatusListener listener = new StatusListener();
-        Action leaf = Step.of("leaf", context -> {});
-        Action mid = Sequence.builder("mid").child(leaf).build();
-        Action top = Sequence.builder("top").child(mid).build();
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var leaf = Step.of("leaf", context -> {});
+        var mid = Sequence.builder("mid").child(leaf).build();
+        var top = Sequence.builder("top").child(mid).build();
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(top);
@@ -185,19 +183,19 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("top / mid / leaf");
     }
 
     @Test
     @DisplayName("timing shows milliseconds")
     void timingShowsMilliseconds() {
-        StatusListener listener = new StatusListener();
-        Step noop = Step.of("timed-action", context -> {});
-        Runner runner = Runner.builder().listener(listener).build();
+        var listener = new StatusListener();
+        var noop = Step.of("timed-action", context -> {});
+        var runner = Runner.builder().listener(listener).build();
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(noop);
@@ -205,7 +203,7 @@ class StatusListenerPathTest {
             System.setOut(originalOut);
         }
 
-        String result = output.toString(StandardCharsets.UTF_8);
+        var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("ms");
     }
 }

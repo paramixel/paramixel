@@ -316,6 +316,9 @@ public final class Status {
         var t = throwable;
         if (t instanceof UserCodeException userCodeException) {
             t = userCodeException.getCause();
+            if (t == null) {
+                t = throwable;
+            }
         }
         UnrecoverableErrors.rethrowIfUnrecoverable(t);
         if (t instanceof InterruptedException) {
@@ -348,11 +351,11 @@ public final class Status {
         }
         return statusName.equals(other.statusName)
                 && Objects.equals(message, other.message)
-                && throwable == other.throwable;
+                && Objects.equals(throwable, other.throwable);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(statusName, message, System.identityHashCode(throwable));
+        return Objects.hash(statusName, message, throwable);
     }
 }

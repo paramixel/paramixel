@@ -99,7 +99,7 @@ public class FastId {
         }
 
         int chunks = (length + 3) / 4;
-        StringBuilder stringBuilder = new StringBuilder(length);
+        var stringBuilder = new StringBuilder(length);
         for (int i = 0; i < chunks; i++) {
             stringBuilder.append(generateLcgChunk());
         }
@@ -114,7 +114,7 @@ public class FastId {
     private static String generateLcgChunk() {
         while (true) {
             long num = counter.getAndUpdate(n -> (n * MULTIPLIER + INCREMENT) % MAX_IDS);
-            String id = encode(num);
+            var id = encode(num);
             if (!isForbidden(id)) {
                 return id;
             }

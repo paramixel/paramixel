@@ -31,7 +31,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.Result;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Step;
 
@@ -43,22 +42,22 @@ class XmlReportListenerTest {
 
     private XmlReportListener createListener(String reportFilePath) {
         var listener = new XmlReportListener();
-        var config = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
-        listener.initialize(config);
+        var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
+        listener.initialize(configuration);
         return listener;
     }
 
     @Test
     @DisplayName("writes self-closing tag when result has no descriptor")
     void writesSelfClosingTagWhenNoDescriptor() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
         assertThat(reportFile).exists();
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         assertThat(content).contains("<paramixel/>");
     }
@@ -66,16 +65,16 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("writes root descriptor with id, name, and status")
     void writesRootDescriptor() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("root-action", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).startsWith("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
         assertThat(content).contains("name=\"root-action\"");
         assertThat(content).contains("status=\"PASSED\"");
@@ -86,7 +85,7 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("writes descriptor tree with children")
     void writesDescriptorTreeWithChildren() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("parent", v -> {}));
         root.setStatus(Status.RUNNING);
@@ -99,11 +98,11 @@ class XmlReportListenerTest {
         child2.setStatus(Status.FAILED);
         root.addChild(child1);
         root.addChild(child2);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("name=\"parent\"");
         assertThat(content).contains("name=\"child-a\"");
         assertThat(content).contains("status=\"PASSED\"");
@@ -114,7 +113,7 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("renders nested descriptors with consistent indentation")
     void rendersNestedDescriptorsWithConsistentIndentation() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("root", v -> {}));
         root.setStatus(Status.RUNNING);
@@ -127,11 +126,11 @@ class XmlReportListenerTest {
         grandchild.setStatus(Status.FAILED);
         child.addChild(grandchild);
         root.addChild(child);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         var lineSeparator = System.lineSeparator();
         assertThat(content).contains(lineSeparator + "<descriptor id=\"");
         assertThat(content).contains(lineSeparator + "  <descriptor id=\"");
@@ -144,16 +143,16 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("escapes XML special characters in descriptor names")
     void escapesXmlSpecialCharacters() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("a&b<c>d\"e", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("a&amp;b&lt;c&gt;d&quot;e");
         assertThat(content).doesNotContain("name=\"a&b<c>d\"e\"");
     }
@@ -161,16 +160,16 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("strips illegal XML control characters from descriptor names")
     void stripsIllegalXmlControlCharacters() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("test\u0001\u0008\u000b\u000c\u001fvalue", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("testvalue");
         assertThat(content).doesNotContain("\u0001");
         assertThat(content).doesNotContain("\u0008");
@@ -182,32 +181,32 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("preserves legal XML control characters tab newline and carriage return")
     void preservesLegalXmlControlCharacters() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("a\tb\nc\rd", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("a\tb\nc\rd");
     }
 
     @Test
     @DisplayName("escapes single quote in descriptor names")
     void escapesSingleQuote() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("it's", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("it&apos;s");
         assertThat(content).doesNotContain("name=\"it's\"");
     }
@@ -215,16 +214,16 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("escapes mixed content with entities legal and illegal control characters")
     void escapesMixedContentWithControlChars() throws Exception {
-        Path reportFile = tempDir.resolve("report.xml");
+        var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
         var root = new ConcreteDescriptor(Step.of("a&b<c\u0001d\te", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).contains("a&amp;b&lt;cd\te");
         assertThat(content).doesNotContain("\u0001");
     }
@@ -232,9 +231,9 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("creates parent directories for report file")
     void createsParentDirectories() throws Exception {
-        Path reportFile = tempDir.resolve("deep/nested/dir/report.xml");
+        var reportFile = tempDir.resolve("deep/nested/dir/report.xml");
         var listener = createListener(reportFile.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
@@ -244,10 +243,10 @@ class XmlReportListenerTest {
     @Test
     @DisplayName("throws UncheckedIOException when report file path is a directory")
     void throwsUncheckedIOExceptionWhenPathIsDirectory() throws Exception {
-        Path dir = tempDir.resolve("blocked.xml");
+        var dir = tempDir.resolve("blocked.xml");
         Files.createDirectory(dir);
         var listener = createListener(dir.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         assertThatThrownBy(() -> listener.onRunCompleted(result))
                 .isInstanceOf(UncheckedIOException.class)

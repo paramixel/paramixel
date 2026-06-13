@@ -28,7 +28,7 @@ class SelectorTest {
     @Test
     @DisplayName("all() matches all packages")
     void allMatchesAllPackages() {
-        Selector selector = Selector.all();
+        var selector = Selector.all();
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName())).isTrue();
     }
@@ -36,7 +36,7 @@ class SelectorTest {
     @Test
     @DisplayName("all() matches all classes")
     void allMatchesAllClasses() {
-        Selector selector = Selector.all();
+        var selector = Selector.all();
 
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isTrue();
     }
@@ -44,7 +44,7 @@ class SelectorTest {
     @Test
     @DisplayName("all() matches all tags")
     void allMatchesAllTags() {
-        Selector selector = Selector.all();
+        var selector = Selector.all();
 
         assertThat(selector.matchesTag("anything")).isTrue();
     }
@@ -58,7 +58,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageRegex matches package")
     void packageRegexMatchesPackage() {
-        Selector selector = Selector.packageRegex("org\\.paramixel\\.api");
+        var selector = Selector.packageRegex("org\\.paramixel\\.api");
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName())).isTrue();
     }
@@ -66,7 +66,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageRegex does not match unrelated package")
     void packageRegexDoesNotMatchUnrelatedPackage() {
-        Selector selector = Selector.packageRegex("com\\.example");
+        var selector = Selector.packageRegex("com\\.example");
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName())).isFalse();
     }
@@ -74,7 +74,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageRegex returns true for matchesClass")
     void packageRegexReturnsTrueForMatchesClass() {
-        Selector selector = Selector.packageRegex("org\\.paramixel");
+        var selector = Selector.packageRegex("org\\.paramixel");
 
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isTrue();
     }
@@ -82,7 +82,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageRegex returns true for matchesTag")
     void packageRegexReturnsTrueForMatchesTag() {
-        Selector selector = Selector.packageRegex("org\\.paramixel");
+        var selector = Selector.packageRegex("org\\.paramixel");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
     }
@@ -90,7 +90,7 @@ class SelectorTest {
     @Test
     @DisplayName("classRegex matches class name")
     void classRegexMatchesClassName() {
-        Selector selector = Selector.classRegex("SelectorTest");
+        var selector = Selector.classRegex("SelectorTest");
 
         assertThat(selector.matchesClass(SelectorTest.class.getName())).isTrue();
     }
@@ -98,7 +98,7 @@ class SelectorTest {
     @Test
     @DisplayName("classRegex does not match unrelated class")
     void classRegexDoesNotMatchUnrelatedClass() {
-        Selector selector = Selector.classRegex("NonExistent");
+        var selector = Selector.classRegex("NonExistent");
 
         assertThat(selector.matchesClass(SelectorTest.class.getName())).isFalse();
     }
@@ -106,7 +106,7 @@ class SelectorTest {
     @Test
     @DisplayName("classRegex returns true for matchesPackage")
     void classRegexReturnsTrueForMatchesPackage() {
-        Selector selector = Selector.classRegex("SelectorTest");
+        var selector = Selector.classRegex("SelectorTest");
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
     }
@@ -114,7 +114,7 @@ class SelectorTest {
     @Test
     @DisplayName("classRegex returns true for matchesTag")
     void classRegexReturnsTrueForMatchesTag() {
-        Selector selector = Selector.classRegex("SelectorTest");
+        var selector = Selector.classRegex("SelectorTest");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
     }
@@ -122,7 +122,7 @@ class SelectorTest {
     @Test
     @DisplayName("tagRegex matches tag value")
     void tagRegexMatchesTagValue() {
-        Selector selector = Selector.tagRegex("smoke");
+        var selector = Selector.tagRegex("smoke");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
         assertThat(selector.matchesTag("smoke-test")).isTrue();
@@ -132,7 +132,7 @@ class SelectorTest {
     @Test
     @DisplayName("tagRegex returns true for matchesPackage")
     void tagRegexReturnsTrueForMatchesPackage() {
-        Selector selector = Selector.tagRegex("smoke");
+        var selector = Selector.tagRegex("smoke");
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
     }
@@ -140,7 +140,7 @@ class SelectorTest {
     @Test
     @DisplayName("tagRegex returns true for matchesClass")
     void tagRegexReturnsTrueForMatchesClass() {
-        Selector selector = Selector.tagRegex("smoke");
+        var selector = Selector.tagRegex("smoke");
 
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isTrue();
     }
@@ -148,7 +148,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageRegex is instance of PackageRegexSelector")
     void packageRegexIsInstanceOfPackageRegexSelector() {
-        Selector selector = Selector.packageRegex("org\\.paramixel");
+        var selector = Selector.packageRegex("org\\.paramixel");
 
         assertThat(selector).isInstanceOf(PackageRegexSelector.class);
         assertThat(((PackageRegexSelector) selector).pattern().pattern()).isEqualTo("org\\.paramixel");
@@ -157,7 +157,7 @@ class SelectorTest {
     @Test
     @DisplayName("classRegex is instance of ClassRegexSelector")
     void classRegexIsInstanceOfClassRegexSelector() {
-        Selector selector = Selector.classRegex("SelectorTest");
+        var selector = Selector.classRegex("SelectorTest");
 
         assertThat(selector).isInstanceOf(ClassRegexSelector.class);
         assertThat(((ClassRegexSelector) selector).pattern().pattern()).isEqualTo("SelectorTest");
@@ -166,7 +166,7 @@ class SelectorTest {
     @Test
     @DisplayName("tagRegex is instance of TagRegexSelector")
     void tagRegexIsInstanceOfTagRegexSelector() {
-        Selector selector = Selector.tagRegex("smoke");
+        var selector = Selector.tagRegex("smoke");
 
         assertThat(selector).isInstanceOf(TagRegexSelector.class);
         assertThat(((TagRegexSelector) selector).pattern().pattern()).isEqualTo("smoke");
@@ -175,7 +175,7 @@ class SelectorTest {
     @Test
     @DisplayName("rejects null packageName in matchesPackage")
     void rejectsNullPackageName() {
-        Selector selector = Selector.all();
+        var selector = Selector.all();
 
         assertThatThrownBy(() -> selector.matchesPackage(null)).isInstanceOf(NullPointerException.class);
     }
@@ -183,7 +183,7 @@ class SelectorTest {
     @Test
     @DisplayName("rejects null className in matchesClass")
     void rejectsNullClassName() {
-        Selector selector = Selector.all();
+        var selector = Selector.all();
 
         assertThatThrownBy(() -> selector.matchesClass(null)).isInstanceOf(NullPointerException.class);
     }
@@ -191,7 +191,7 @@ class SelectorTest {
     @Test
     @DisplayName("rejects null tag in matchesTag")
     void rejectsNullTag() {
-        Selector selector = Selector.tagRegex("smoke");
+        var selector = Selector.tagRegex("smoke");
 
         assertThatThrownBy(() -> selector.matchesTag(null)).isInstanceOf(NullPointerException.class);
     }
@@ -199,7 +199,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageTreeOf matches same package")
     void packageTreeOfMatchesSamePackage() {
-        Selector selector = Selector.packageTreeOf(SelectorTest.class);
+        var selector = Selector.packageTreeOf(SelectorTest.class);
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName())).isTrue();
     }
@@ -207,7 +207,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageTreeOf rejects different package")
     void packageTreeOfRejectsDifferentPackage() {
-        Selector selector = Selector.packageTreeOf(SelectorTest.class);
+        var selector = Selector.packageTreeOf(SelectorTest.class);
 
         assertThat(selector.matchesPackage(String.class.getPackageName())).isFalse();
     }
@@ -215,7 +215,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageTreeOf matches subpackage")
     void packageTreeOfMatchesSubpackage() {
-        Selector selector = Selector.packageTreeOf(SelectorTest.class);
+        var selector = Selector.packageTreeOf(SelectorTest.class);
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName() + ".sub"))
                 .isTrue();
@@ -224,7 +224,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageOf matches same package (exact)")
     void packageOfMatchesSamePackage() {
-        Selector selector = Selector.packageOf(SelectorTest.class);
+        var selector = Selector.packageOf(SelectorTest.class);
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName())).isTrue();
     }
@@ -232,7 +232,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageOf rejects subpackage")
     void packageOfRejectsSubpackage() {
-        Selector selector = Selector.packageOf(SelectorTest.class);
+        var selector = Selector.packageOf(SelectorTest.class);
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName() + ".sub"))
                 .isFalse();
@@ -241,7 +241,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageOf rejects different package")
     void packageOfRejectsDifferentPackage() {
-        Selector selector = Selector.packageOf(SelectorTest.class);
+        var selector = Selector.packageOf(SelectorTest.class);
 
         assertThat(selector.matchesPackage(String.class.getPackageName())).isFalse();
     }
@@ -249,7 +249,7 @@ class SelectorTest {
     @Test
     @DisplayName("classOf matches exact class")
     void classOfMatchesExactClass() {
-        Selector selector = Selector.classOf(SelectorTest.class);
+        var selector = Selector.classOf(SelectorTest.class);
 
         assertThat(selector.matchesClass(SelectorTest.class.getName())).isTrue();
     }
@@ -257,7 +257,7 @@ class SelectorTest {
     @Test
     @DisplayName("classOf rejects different class")
     void classOfRejectsDifferentClass() {
-        Selector selector = Selector.classOf(SelectorTest.class);
+        var selector = Selector.classOf(SelectorTest.class);
 
         assertThat(selector.matchesClass(String.class.getName())).isFalse();
     }
@@ -265,7 +265,7 @@ class SelectorTest {
     @Test
     @DisplayName("matchesTag returns true for all() when no tag pattern set")
     void matchesTagReturnsTrueForAll() {
-        Selector selector = Selector.all();
+        var selector = Selector.all();
 
         assertThat(selector.matchesTag("anything")).isTrue();
     }
@@ -273,7 +273,7 @@ class SelectorTest {
     @Test
     @DisplayName("matchesPackage rejects null")
     void matchesPackageRejectsNull() {
-        Selector selector = Selector.packageRegex("test");
+        var selector = Selector.packageRegex("test");
 
         assertThatThrownBy(() -> selector.matchesPackage(null)).isInstanceOf(NullPointerException.class);
     }
@@ -281,7 +281,7 @@ class SelectorTest {
     @Test
     @DisplayName("matchesClass rejects null")
     void matchesClassRejectsNull() {
-        Selector selector = Selector.classRegex("test");
+        var selector = Selector.classRegex("test");
 
         assertThatThrownBy(() -> selector.matchesClass(null)).isInstanceOf(NullPointerException.class);
     }

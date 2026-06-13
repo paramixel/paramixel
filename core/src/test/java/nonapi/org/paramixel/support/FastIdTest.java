@@ -34,7 +34,7 @@ class FastIdTest {
         int count = 100000;
 
         for (int i = 0; i < count; i++) {
-            String id = FastId.generateId();
+            var id = FastId.generateId();
             assertThat(!ids.add(id)).isFalse();
         }
     }
@@ -48,7 +48,7 @@ class FastIdTest {
         int count = 100000;
 
         for (int i = 0; i < count; i++) {
-            String id = FastId.generateId();
+            var id = FastId.generateId();
             for (String word : forbidden) {
                 assertThat(id).isNotEqualToIgnoringCase(word);
             }
@@ -58,7 +58,7 @@ class FastIdTest {
     @Test
     @DisplayName("IDs do not start from predictable position")
     void idsDoNotStartFromPredictablePosition() {
-        String firstId = FastId.generateId();
+        var firstId = FastId.generateId();
         assertThat(firstId).isNotEqualTo("aaaa");
     }
 

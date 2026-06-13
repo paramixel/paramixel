@@ -128,8 +128,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
         boolean interrupted = false;
 
         try {
-            final DockerImageName image =
-                    DockerImageName.parse(dockerImageName).asCompatibleSubstituteFor("apache/kafka");
+            final var image = DockerImageName.parse(dockerImageName).asCompatibleSubstituteFor("apache/kafka");
 
             kafkaContainer = new KafkaContainer(image)
                     .withNetwork(network)
@@ -215,7 +214,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
             Thread.currentThread().interrupt();
             throw e;
         } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
+            var cause = e.getCause();
             if (cause instanceof TopicExistsException
                     || (cause != null && cause.getCause() instanceof TopicExistsException)) {
                 return;

@@ -122,7 +122,7 @@ class ConcreteContextTest {
         @Test
         @DisplayName("throws IllegalArgumentException for non-ConcreteContext")
         void throwsIllegalArgumentExceptionForNonConcreteContext() {
-            Context customContext = new Context() {
+            var customContext = new Context() {
                 @Override
                 public Configuration configuration() {
                     return Configuration.of(Map.of());
@@ -174,10 +174,10 @@ class ConcreteContextTest {
         @Test
         @DisplayName("configuration() returns stored configuration")
         void configurationReturnsStoredValue() {
-            var config = Configuration.of(Map.of("key", "value"));
-            var context = new ConcreteContext(config, listener, root, scheduler, instanceHolder);
+            var configuration = Configuration.of(Map.of("key", "value"));
+            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
 
-            assertThat(context.configuration()).isSameAs(config);
+            assertThat(context.configuration()).isSameAs(configuration);
         }
 
         @Test

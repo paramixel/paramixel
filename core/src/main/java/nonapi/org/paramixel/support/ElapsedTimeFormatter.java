@@ -41,8 +41,8 @@ public final class ElapsedTimeFormatter {
      */
     public static String formatElapsedTime(final long milliseconds) {
         Arguments.requireFalse(milliseconds < 0, "milliseconds is negative");
-        String formatted = formatDuration(milliseconds);
-        String rawMilliseconds = milliseconds + " ms";
+        var formatted = formatDuration(milliseconds);
+        var rawMilliseconds = milliseconds + " ms";
 
         if (formatted.equals(rawMilliseconds)) {
             return formatted;
@@ -63,7 +63,7 @@ public final class ElapsedTimeFormatter {
     public static String formatDuration(long milliseconds) {
         Arguments.requireFalse(milliseconds < 0, "milliseconds is negative");
 
-        StringBuilder result = new StringBuilder();
+        var result = new StringBuilder();
         boolean hasPrevious = false;
 
         long hours = milliseconds / 3_600_000;

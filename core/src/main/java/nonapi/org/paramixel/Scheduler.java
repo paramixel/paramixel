@@ -16,7 +16,6 @@
 
 package nonapi.org.paramixel;
 
-import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -27,7 +26,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
@@ -36,29 +34,13 @@ import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.action.SchedulerPriorityKey;
-import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.exception.UserCodeException;
 import nonapi.org.paramixel.listener.Listeners;
-import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.StackTracePruner;
 import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Assert;
-import org.paramixel.api.action.Conditional;
-import org.paramixel.api.action.Delay;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Isolated;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Repeat;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Static;
-import org.paramixel.api.action.Step;
-import org.paramixel.api.action.Timeout;
-import org.paramixel.api.action.Until;
 import org.paramixel.api.exception.FailException;
 
 /**
@@ -437,12 +419,22 @@ public final class Scheduler implements AutoCloseable {
      * Shuts down the scheduler and waits for executor termination.
      *
      * <p>Tasks already submitted may continue running until interrupted by shutdown escalation.
+     *
+     * <p>Leaf permit waiters are unblocked by releasing enough permits. After all executor threads
+     * have terminated, excess permits are drained to preserve the invariant
+     * {@code availablePermits <= parallelism}.
+     *
+     * <p>If the calling thread is interrupted during shutdown, the interrupt flag is restored
+     * and the method returns normally rather than throwing. Callers can check
+     * {@link Thread#isInterrupted()} after this method returns to detect interruption.
      */
     @Override
     public void close() {
         closingLock.lock();
         try {
             closing = true;
+            // Release enough permits to unblock any leaf workers waiting on leafPermits.acquire()
+            // so they can finish during the graceful shutdown phase.
             leafPermits.release(parallelism);
             executor.shutdown();
             try {
@@ -453,8 +445,15 @@ public final class Scheduler implements AutoCloseable {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 executor.shutdownNow();
-                throw new IllegalStateException("Interrupted while closing scheduler", e);
+                try {
+                    executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                } catch (InterruptedException e2) {
+                    Thread.currentThread().interrupt();
+                }
             }
+            // All worker threads have terminated. No more leafPermits.release()
+            // calls can occur. Drain any excess permits to restore the invariant.
+            leafPermits.drainPermits();
         } finally {
             closingLock.unlock();
         }
@@ -489,21 +488,16 @@ public final class Scheduler implements AutoCloseable {
             final ExecutionCallback callback) {
         Objects.requireNonNull(mode, "mode is null");
         Throwable executionError = null;
-        Throwable callbackFailure = null;
         var leafAction = descriptor.isLeafAction();
         var acquiredPermit = false;
         var executed = false;
+        var callbackInvoked = false;
 
         try {
             if (leafAction) {
                 leafPermits.acquire();
                 acquiredPermit = true;
                 runningLeafCounter.incrementAndGet();
-            }
-
-            if (callback != null) {
-                callback.onAdmitted();
-                callback.onExecutionStart();
             }
 
             if (descriptor instanceof ConcreteDescriptor concrete) {
@@ -531,6 +525,11 @@ public final class Scheduler implements AutoCloseable {
                     } finally {
                         closingLock.unlock();
                     }
+                }
+                if (!skipExecution && callback != null) {
+                    callback.onAdmitted();
+                    callback.onExecutionStart();
+                    callbackInvoked = true;
                 }
                 if (!skipExecution) {
                     try {
@@ -581,7 +580,8 @@ public final class Scheduler implements AutoCloseable {
             }
         }
 
-        if (callback != null) {
+        Throwable callbackFailure = null;
+        if (callbackInvoked) {
             try {
                 callback.onExecutionComplete(executionError);
             } catch (Throwable t) {
@@ -628,334 +628,12 @@ public final class Scheduler implements AutoCloseable {
     }
 
     private static Status runAction(final MutableDescriptor descriptor, final ConcreteContext context) {
-        var action = descriptor.action();
-        if (action instanceof Step step) {
-            return runStep(step, context);
-        }
-        if (action instanceof Assert assert_) {
-            return runAssert(assert_, context);
-        }
-        if (action instanceof Delay delay) {
-            return runDelay(delay, context);
-        }
-        if (action instanceof Parallel parallel) {
-            return runParallel(parallel, context);
-        }
-        if (action instanceof Timeout timeout) {
-            return runTimeout(timeout, context);
-        }
-        if (action instanceof Sequence sequence) {
-            return runDependentChildren(context, sequence.isDependent());
-        }
-        if (action instanceof Sequential sequential) {
-            return runDependentChildren(context, sequential.isDependent());
-        }
-        if (action instanceof Repeat) {
-            return runRepeat(context);
-        }
-        if (action instanceof Until) {
-            return runUntil(context);
-        }
-        if (action instanceof Scope) {
-            return runLifecycle(context);
-        }
-        if (action instanceof Static) {
-            return runLifecycle(context);
-        }
-        if (action instanceof Instance) {
-            return runInstance(context);
-        }
-        if (action instanceof Isolated) {
-            return runIsolated(context);
-        }
-        if (action instanceof Conditional conditional) {
-            return runConditional(conditional, context);
-        }
-        return runDependentChildren(context, true);
-    }
-
-    private static Status runStep(final Step step, final ConcreteContext context) {
-        try {
-            step.throwableConsumer().accept(context);
-            return Status.PASSED;
-        } catch (Throwable t) {
-            if (t instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (t instanceof Error error) {
-                throw error;
-            }
-            throw new RuntimeException(t);
-        }
-    }
-
-    private static Status runAssert(final Assert assertAction, final ConcreteContext context) {
-        try {
-            assertAction.throwableConsumer().accept(context);
-            return Status.PASSED;
-        } catch (Throwable t) {
-            if (t instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (t instanceof Error error) {
-                throw error;
-            }
-            throw new RuntimeException(t);
-        }
-    }
-
-    private static Status runDelay(final Delay delay, final ConcreteContext context) {
-        try {
-            delay.throwableConsumer().accept(context);
-            return Status.PASSED;
-        } catch (Throwable t) {
-            if (t instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (t instanceof Error error) {
-                throw error;
-            }
-            throw new RuntimeException(t);
-        }
+        return ActionExecutionStrategies.execute(descriptor.action(), context);
     }
 
     private static Status skipAction(final ConcreteContext context) {
         context.runChildren(ExecutionMode.SKIP);
         return Status.SKIPPED;
-    }
-
-    private static Status runDependentChildren(final ConcreteContext context, final boolean dependent) {
-        var aggregated = new StatusAccumulator();
-        var mode = ExecutionMode.RUN;
-
-        for (var descriptor : context.descriptor().children()) {
-            var childResult = context.runChild(descriptor, mode);
-            aggregated.include(childResult);
-
-            if (mode == ExecutionMode.RUN && dependent && !childResult.isPassed() && !childResult.isAborted()) {
-                mode = ExecutionMode.SKIP;
-            }
-        }
-
-        return aggregated.status();
-    }
-
-    private static Status runLifecycle(final ConcreteContext context) {
-        var descriptor = context.descriptor();
-        var aggregated = new StatusAccumulator();
-        var runChildren = true;
-
-        try {
-            if (descriptor.before().isPresent()) {
-                var beforeResult = context.runChild(descriptor.before().get());
-                aggregated.include(beforeResult);
-                if (!beforeResult.isPassed()) {
-                    runChildren = false;
-                }
-            }
-
-            if (runChildren) {
-                descriptor.children().forEach(child -> aggregated.include(context.runChild(child)));
-            } else {
-                descriptor.children().forEach(child -> {
-                    aggregated.include(context.runChild(child, ExecutionMode.SKIP));
-                });
-            }
-
-        } finally {
-            descriptor.after().ifPresent(afterDescriptor -> aggregated.include(context.runChild(afterDescriptor)));
-        }
-
-        return aggregated.status();
-    }
-
-    private static Status runInstance(final ConcreteContext context) {
-        return runLifecycle(context.withInstanceHolder(new InstanceHolder()));
-    }
-
-    private static Status runIsolated(final ConcreteContext context) {
-        var isolated = (Isolated) context.descriptor().action();
-        var lock = context.scheduler().getLock(isolated.lockName());
-        lock.lock();
-        try {
-            var child = Arguments.requireInstanceOf(
-                    context.descriptor().children().get(0),
-                    MutableDescriptor.class,
-                    "child descriptor must be a MutableDescriptor");
-            context.runChild(child, ExecutionMode.RUN);
-            return child.status();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private static Status runConditional(final Conditional conditional, final ConcreteContext context) {
-        boolean conditionResult;
-        try {
-            conditionResult = conditional.condition().test(context);
-        } catch (Throwable t) {
-            context.descriptor().setStatus(Status.failed("condition evaluation failed: " + t.getMessage(), t));
-            context.runChildren(ExecutionMode.SKIP);
-            return Status.FAILED;
-        }
-
-        if (!conditionResult) {
-            context.descriptor().setStatus(Status.skipped(conditional.reason()));
-            context.runChildren(ExecutionMode.SKIP);
-            return Status.SKIPPED;
-        }
-
-        var child = Arguments.requireInstanceOf(
-                context.descriptor().children().get(0),
-                MutableDescriptor.class,
-                "child descriptor must be a MutableDescriptor");
-        context.runChild(child, ExecutionMode.RUN);
-        return child.status();
-    }
-
-    private static Status runRepeat(final ConcreteContext context) {
-        var aggregated = new StatusAccumulator();
-        for (var child : context.descriptor().children()) {
-            aggregated.include(context.runChild(child));
-        }
-        return aggregated.status();
-    }
-
-    private static Status runUntil(final ConcreteContext context) {
-        var descriptor = context.descriptor();
-        var untilAction = (Until) descriptor.action();
-        var children = descriptor.children();
-
-        for (int i = 0; i < children.size(); i++) {
-            var child = children.get(i);
-            var childResult = context.runChild(child, ExecutionMode.RUN);
-
-            if (childResult.isAborted()) {
-                for (int j = i + 1; j < children.size(); j++) {
-                    context.runChild(children.get(j), ExecutionMode.SKIP);
-                }
-                return Status.ABORTED;
-            }
-
-            boolean satisfied;
-            if (untilAction.until().isPresent()) {
-                satisfied = evaluateUntilPredicate(untilAction.until().get(), context);
-            } else {
-                satisfied = childResult.isPassed();
-            }
-
-            if (satisfied) {
-                for (int j = i + 1; j < children.size(); j++) {
-                    context.runChild(children.get(j), ExecutionMode.SKIP);
-                }
-                return Status.PASSED;
-            }
-        }
-
-        return Status.FAILED;
-    }
-
-    private static boolean evaluateUntilPredicate(
-            final java.util.function.Predicate<org.paramixel.api.Context> predicate, final ConcreteContext context) {
-        try {
-            return predicate.test(context);
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    private static Status runParallel(final Parallel parallel, final ConcreteContext context) {
-        var descriptor = context.descriptor();
-        var children = descriptor.children();
-        if (children.isEmpty()) {
-            return Status.PASSED;
-        }
-        var effectiveParallelism =
-                Math.min(parallel.parallelism(), context.scheduler().parallelism());
-        effectiveParallelism = Math.max(1, effectiveParallelism);
-
-        var activeFutures = new ArrayDeque<CompletableFuture<Descriptor>>();
-        var childIterator = children.iterator();
-
-        // Fill initial window
-        for (var i = 0; i < effectiveParallelism && childIterator.hasNext(); i++) {
-            var child = Arguments.requireInstanceOf(
-                    childIterator.next(), MutableDescriptor.class, "child must be a MutableDescriptor");
-            activeFutures.add(context.scheduleAsync(child));
-        }
-
-        // Rolling window: replace completed futures immediately
-        while (!activeFutures.isEmpty()) {
-            try {
-                context.scheduler().managedJoinWaitAny(activeFutures);
-            } catch (CompletionException ignored) {
-                // At least one future completed exceptionally — find it below
-            }
-            // Find any completed future (successfully or exceptionally) and remove it
-            CompletableFuture<Descriptor> completedFuture = null;
-            for (var future : activeFutures) {
-                if (future.isDone()) {
-                    completedFuture = future;
-                    break;
-                }
-            }
-            if (completedFuture == null) {
-                // Should not happen — managedJoinWaitAny returned, so a future must be done
-                break;
-            }
-            activeFutures.remove(completedFuture);
-
-            // Schedule next child if available
-            if (childIterator.hasNext()) {
-                var child = Arguments.requireInstanceOf(
-                        childIterator.next(), MutableDescriptor.class, "child must be a MutableDescriptor");
-                activeFutures.add(context.scheduleAsync(child));
-            }
-        }
-
-        // Aggregate statuses from all children (read descriptor stored status, not future)
-        var aggregated = new StatusAccumulator();
-        for (var child : children) {
-            aggregated.include(child);
-        }
-        return aggregated.status();
-    }
-
-    private static Status runTimeout(final Timeout timeout, final ConcreteContext context) {
-        var childDescriptor = Arguments.requireInstanceOf(
-                context.descriptor().children().get(0),
-                MutableDescriptor.class,
-                "child descriptor must be a MutableDescriptor");
-
-        var childFuture = context.scheduleAsync(childDescriptor);
-        var timedFuture = childFuture.orTimeout(timeout.timeout().toMillis(), TimeUnit.MILLISECONDS);
-
-        try {
-            context.scheduler().managedJoin(timedFuture);
-            return childDescriptor.status();
-        } catch (CompletionException e) {
-            var cause = e.getCause();
-            if (cause instanceof TimeoutException) {
-                return handleTimeout(timeout, childDescriptor);
-            }
-            if (cause instanceof Error err) {
-                throw err;
-            }
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new RuntimeException(cause);
-        }
-    }
-
-    private static Status handleTimeout(final Timeout timeout, final MutableDescriptor childDescriptor) {
-        if (!childDescriptor.isCompleted()) {
-            childDescriptor.interruptExecutingThread();
-            childDescriptor.setStatus(
-                    Status.failed("timed out after " + timeout.timeout().toMillis() + " ms"));
-            childDescriptor.completeFuture();
-        }
-        return Status.FAILED;
     }
 
     private static void ensureTerminalStatus(final ConcreteContext context, final Throwable throwable) {
@@ -969,7 +647,11 @@ public final class Scheduler implements AutoCloseable {
             if (status.isPending() || status.isRunning()) {
                 descriptor.setStatus(failedStatus(throwable));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            throw new AssertionError(
+                    "Failed to set terminal status on descriptor "
+                            + context.descriptor().id(),
+                    e);
         }
     }
 

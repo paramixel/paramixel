@@ -84,12 +84,12 @@ public final class AnnotationResolver<T> {
         Objects.requireNonNull(id, "id is null");
         Arguments.requireNonBlank(id, "id is blank");
 
-        Map<String, Method> methods = CACHE.get(type);
+        var methods = CACHE.get(type);
         if (methods == null) {
             methods = discover(type);
             CACHE.put(type, methods);
         }
-        Method method = methods.get(id);
+        var method = methods.get(id);
         if (method == null) {
             throw new IllegalArgumentException(
                     "no method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
@@ -116,18 +116,18 @@ public final class AnnotationResolver<T> {
         Objects.requireNonNull(id, "id is null");
         Arguments.requireNonBlank(id, "id is blank");
 
-        Map<String, Method> methods = STATIC_CACHE.get(type);
+        var methods = STATIC_CACHE.get(type);
         if (methods == null) {
             methods = discoverStatic(type);
             STATIC_CACHE.put(type, methods);
         }
-        Method method = methods.get(id);
+        var method = methods.get(id);
         if (method == null) {
             throw new IllegalArgumentException(
                     "no static method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
         }
 
-        ThrowingRunnable runnable = reflectingStaticInvocation(method);
+        var runnable = reflectingStaticInvocation(method);
 
         return Step.of(id, context -> runnable.run());
     }
@@ -164,13 +164,13 @@ public final class AnnotationResolver<T> {
                 continue;
             }
 
-            String id = idAnnotation.value();
+            var id = idAnnotation.value();
 
             validateMethodSignature(method, id);
 
             method.trySetAccessible();
 
-            String existing = duplicateTracker.putIfAbsent(id, method.toGenericString());
+            var existing = duplicateTracker.putIfAbsent(id, method.toGenericString());
             if (existing != null) {
                 throw new IllegalArgumentException("multiple methods annotated with @Paramixel.Id(\""
                         + id + "\") were found on " + type.getName()
@@ -197,13 +197,13 @@ public final class AnnotationResolver<T> {
                 continue;
             }
 
-            String id = idAnnotation.value();
+            var id = idAnnotation.value();
 
             validateStaticMethodSignature(method, id);
 
             method.trySetAccessible();
 
-            String existing = duplicateTracker.putIfAbsent(id, method.toGenericString());
+            var existing = duplicateTracker.putIfAbsent(id, method.toGenericString());
             if (existing != null) {
                 throw new IllegalArgumentException("multiple methods annotated with @Paramixel.Id(\""
                         + id + "\") were found on " + type.getName()
@@ -254,7 +254,7 @@ public final class AnnotationResolver<T> {
                 var instance = context.requireInstance(owner);
                 method.invoke(instance);
             } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
+                var cause = e.getCause();
                 if (cause instanceof Error error) {
                     throw error;
                 }
@@ -271,7 +271,7 @@ public final class AnnotationResolver<T> {
             try {
                 method.invoke(null);
             } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
+                var cause = e.getCause();
                 if (cause instanceof Error error) {
                     throw error;
                 }

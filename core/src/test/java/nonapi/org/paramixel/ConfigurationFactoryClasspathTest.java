@@ -32,16 +32,16 @@ class ConfigurationFactoryClasspathTest {
     @Test
     @DisplayName("with custom ClassLoader that has no properties returns empty configuration")
     void withCustomClassLoaderNoPropertiesReturnsEmptyConfiguration() {
-        ClassLoader emptyLoader = new ClassLoader() {
+        var emptyLoader = new ClassLoader() {
             @Override
             public InputStream getResourceAsStream(final String name) {
                 return null;
             }
         };
 
-        Configuration config = ConfigurationFactory.classpathConfiguration(emptyLoader);
+        var configuration = ConfigurationFactory.classpathConfiguration(emptyLoader);
 
-        assertThat(config.keySet()).isEmpty();
+        assertThat(configuration.keySet()).isEmpty();
     }
 
     @Test
@@ -55,22 +55,22 @@ class ConfigurationFactoryClasspathTest {
     @Test
     @DisplayName("with custom ClassLoader returns configuration with defaults")
     void withCustomClassLoaderReturnsConfigurationWithDefaults() {
-        ClassLoader emptyLoader = new ClassLoader() {
+        var emptyLoader = new ClassLoader() {
             @Override
             public InputStream getResourceAsStream(final String name) {
                 return null;
             }
         };
 
-        Configuration config = ConfigurationFactory.defaultConfiguration(emptyLoader);
+        var configuration = ConfigurationFactory.defaultConfiguration(emptyLoader);
 
-        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
     }
 
     @Test
     @DisplayName("throws ConfigurationException when InputStream throws IOException on load")
     void throwsConfigurationExceptionWhenInputStreamThrowsIOException() {
-        ClassLoader brokenLoader = new ClassLoader() {
+        var brokenLoader = new ClassLoader() {
             @Override
             public InputStream getResourceAsStream(final String name) {
                 if (Configuration.CONFIGURATION_FILE_NAME.equals(name)) {
@@ -93,15 +93,15 @@ class ConfigurationFactoryClasspathTest {
     @Test
     @DisplayName("defaultConfiguration(ClassLoader) returns consistent content on repeated calls")
     void defaultConfigurationClassLoaderReturnsConsistentContentOnRepeatedCalls() {
-        ClassLoader emptyLoader = new ClassLoader() {
+        var emptyLoader = new ClassLoader() {
             @Override
             public InputStream getResourceAsStream(final String name) {
                 return null;
             }
         };
 
-        Configuration first = ConfigurationFactory.defaultConfiguration(emptyLoader);
-        Configuration second = ConfigurationFactory.defaultConfiguration(emptyLoader);
+        var first = ConfigurationFactory.defaultConfiguration(emptyLoader);
+        var second = ConfigurationFactory.defaultConfiguration(emptyLoader);
 
         assertThat(first.getString(Configuration.RUNNER_PARALLELISM))
                 .isEqualTo(second.getString(Configuration.RUNNER_PARALLELISM));
@@ -118,21 +118,21 @@ class ConfigurationFactoryClasspathTest {
     @Test
     @DisplayName("different classloaders produce different cached entries")
     void differentClassloadersProduceDifferentCachedEntries() {
-        ClassLoader loader1 = new ClassLoader() {
+        var loader1 = new ClassLoader() {
             @Override
             public InputStream getResourceAsStream(final String name) {
                 return null;
             }
         };
-        ClassLoader loader2 = new ClassLoader() {
+        var loader2 = new ClassLoader() {
             @Override
             public InputStream getResourceAsStream(final String name) {
                 return null;
             }
         };
 
-        Configuration result1 = ConfigurationFactory.defaultConfiguration(loader1);
-        Configuration result2 = ConfigurationFactory.defaultConfiguration(loader2);
+        var result1 = ConfigurationFactory.defaultConfiguration(loader1);
+        var result2 = ConfigurationFactory.defaultConfiguration(loader2);
 
         assertThat(result1).isNotSameAs(result2);
     }

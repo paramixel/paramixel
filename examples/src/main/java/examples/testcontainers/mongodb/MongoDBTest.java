@@ -92,7 +92,7 @@ public class MongoDBTest {
             var collection = database.getCollection("testcol");
             collection.insertOne(new Document("key", "value"));
 
-            Document found = collection.find(new Document("key", "value")).first();
+            var found = collection.find(new Document("key", "value")).first();
 
             assertThat(found).isNotNull();
             assertThat(found.getString("key")).isEqualTo("value");

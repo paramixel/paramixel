@@ -26,10 +26,12 @@ import org.paramixel.api.Context;
  * body action.
  *
  * <p>When the predicate returns {@code true}, the body action executes normally and its
- * status propagates to this node. When the predicate returns {@code false}, this node is
- * set to {@code SKIPPED} with the configured {@link #reason()} message and the body action
- * — together with all descendants — is executed in {@code SKIP} mode, so the entire
- * subtree appears as skipped in reports.
+ * status propagates to this node. When the predicate returns {@code false}, this node
+ * reports {@code PASSED} and the body action — together with all descendants — is
+ * executed in {@code SKIP} mode, so the subtree appears as skipped in reports. Because
+ * this node reports {@code PASSED} when the condition is not met, it does not disrupt
+ * dependent sibling execution in {@link org.paramixel.api.action.Sequential} or
+ * {@link org.paramixel.api.action.Sequence}.
  *
  * <p>If the predicate throws, this node is set to {@code FAILED} with a descriptive
  * message that includes the exception, and the body action is skipped.
@@ -44,21 +46,15 @@ import org.paramixel.api.Context;
  */
 public final class Conditional implements Action {
 
-    private static final String DEFAULT_REASON = "condition not met";
-
     private final String displayName;
     private final Predicate<Context> condition;
-    private final String reason;
     private final Action body;
 
-    private Conditional(
-            final String displayName, final Predicate<Context> condition, final String reason, final Action body) {
+    private Conditional(final String displayName, final Predicate<Context> condition, final Action body) {
         Objects.requireNonNull(displayName, "displayName is null");
         this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
         Objects.requireNonNull(condition, "condition is null");
         this.condition = condition;
-        Objects.requireNonNull(reason, "reason is null");
-        this.reason = Arguments.requireNonBlank(reason, "reason is blank");
         this.body = Objects.requireNonNull(body, "body is null");
     }
 
@@ -109,15 +105,6 @@ public final class Conditional implements Action {
     }
 
     /**
-     * Returns the skip reason message used when the condition evaluates to {@code false}.
-     *
-     * @return the skip reason; never {@code null} or blank
-     */
-    public String reason() {
-        return reason;
-    }
-
-    /**
      * Returns the body action.
      *
      * @return the body action; never {@code null}
@@ -133,27 +120,11 @@ public final class Conditional implements Action {
 
         private final String displayName;
         private final Predicate<Context> condition;
-        private String reason = DEFAULT_REASON;
         private Action body;
 
         private Builder(final String displayName, final Predicate<Context> condition) {
             this.displayName = displayName;
             this.condition = condition;
-        }
-
-        /**
-         * Sets the skip reason message. Calling this method again overwrites the
-         * previous reason.
-         *
-         * @param reason the skip reason message; must not be {@code null} or blank
-         * @return this builder
-         * @throws NullPointerException if {@code reason} is {@code null}
-         * @throws IllegalArgumentException if {@code reason} is blank
-         */
-        public Builder reason(final String reason) {
-            Objects.requireNonNull(reason, "reason is null");
-            this.reason = Arguments.requireNonBlank(reason, "reason is blank");
-            return this;
         }
 
         /**
@@ -194,7 +165,7 @@ public final class Conditional implements Action {
             if (body == null) {
                 throw new IllegalStateException("body action must be configured");
             }
-            return new Conditional(displayName, condition, reason, body);
+            return new Conditional(displayName, condition, body);
         }
     }
 }

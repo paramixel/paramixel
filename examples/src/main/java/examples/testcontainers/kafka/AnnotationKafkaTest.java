@@ -47,6 +47,7 @@ import org.paramixel.api.action.Action;
  */
 public class AnnotationKafkaTest {
 
+    private static final int PARALLELISM = 2;
     private static final Logger LOGGER = Logger.createLogger(AnnotationKafkaTest.class);
     private static final String TOPIC = "test";
     private static final String GROUP_ID = "test-group-id";
@@ -75,18 +76,15 @@ public class AnnotationKafkaTest {
     public static Action factory() throws Throwable {
         var annotationResolver = AnnotationResolver.create(AnnotationKafkaTest.class);
 
-        var parallel = parallel(AnnotationKafkaTest.class.getName());
+        var parallel = parallel(AnnotationKafkaTest.class.getName()).parallelism(PARALLELISM);
         for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
-            var lifecycle = scope(environment.name())
-                    .before(annotationResolver.byId("setUp"))
-                    .body(sequential("tests")
-                            .child(annotationResolver.byId("produce"))
-                            .child(annotationResolver.byId("consume")))
-                    .after(annotationResolver.byId("tearDown"));
-
-            parallel.parallelism(2)
-                    .child(instance(environment.name(), () -> new AnnotationKafkaTest(environment))
-                            .body(lifecycle));
+            parallel.child(instance(environment.name(), () -> new AnnotationKafkaTest(environment))
+                    .body(scope(environment.name())
+                            .before(annotationResolver.byId("setUp"))
+                            .body(sequential("tests")
+                                    .child(annotationResolver.byId("produce"))
+                                    .child(annotationResolver.byId("consume")))
+                            .after(annotationResolver.byId("tearDown"))));
         }
         return parallel.build();
     }
@@ -124,7 +122,7 @@ public class AnnotationKafkaTest {
 
         LOGGER.info("[%s] producing message [%s] ...", environment.name(), message);
 
-        try (KafkaProducer<String, String> producer = createKafkaProducer()) {
+        try (var producer = createKafkaProducer()) {
             producer.send(new ProducerRecord<>(TOPIC, message)).get();
             producer.flush();
         }
@@ -142,9 +140,9 @@ public class AnnotationKafkaTest {
         boolean messageMatched = false;
         int attempts = 0;
         int maxAttempts = 5;
-        Duration pollTimeout = Duration.ofSeconds(2);
+        var pollTimeout = Duration.ofSeconds(2);
 
-        try (KafkaConsumer<String, String> consumer = createKafkaConsumer()) {
+        try (var consumer = createKafkaConsumer()) {
             consumer.subscribe(List.of(TOPIC));
 
             while (!messageMatched && attempts < maxAttempts) {

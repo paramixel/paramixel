@@ -35,7 +35,7 @@ class ParallelDeadlockPreventionTest {
     @DisplayName("Parallel with many children does not deadlock")
     void parallelWithManyChildrenDoesNotDeadlock() {
         int childCount = 2000;
-        AtomicInteger executionCount = new AtomicInteger(0);
+        var executionCount = new AtomicInteger(0);
 
         var parallel = Parallel.builder("many-children").parallelism(50);
 
@@ -61,7 +61,7 @@ class ParallelDeadlockPreventionTest {
     @Test
     @DisplayName("Nested Parallel actions do not deadlock")
     void nestedParallelActionsDoNotDeadlock() {
-        AtomicInteger executionCount = new AtomicInteger(0);
+        var executionCount = new AtomicInteger(0);
         int outerParallelism = 20;
         int innerParallelism = 10;
         int outerChildren = 50;
@@ -99,7 +99,7 @@ class ParallelDeadlockPreventionTest {
     @DisplayName("Parallel with constrained scheduler does not deadlock")
     void parallelWithConstrainedSchedulerDoesNotDeadlock() {
         int childCount = 500;
-        AtomicInteger executionCount = new AtomicInteger(0);
+        var executionCount = new AtomicInteger(0);
 
         var parallel = Parallel.builder("constrained-scheduler").parallelism(20);
 
@@ -129,11 +129,11 @@ class ParallelDeadlockPreventionTest {
     @DisplayName("Parallel fully utilizes global parallelism")
     void parallelFullyUtilizesGlobalParallelism() throws Exception {
         int childCount = 50;
-        AtomicInteger executionCount = new AtomicInteger(0);
-        AtomicInteger active = new AtomicInteger(0);
-        AtomicInteger maxActive = new AtomicInteger(0);
-        CountDownLatch allStarted = new CountDownLatch(8);
-        CountDownLatch mayProceed = new CountDownLatch(1);
+        var executionCount = new AtomicInteger(0);
+        var active = new AtomicInteger(0);
+        var maxActive = new AtomicInteger(0);
+        var allStarted = new CountDownLatch(8);
+        var mayProceed = new CountDownLatch(1);
 
         var parallel = Parallel.builder("parallelism-test").parallelism(50);
 

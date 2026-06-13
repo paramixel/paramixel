@@ -18,7 +18,6 @@ package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Constructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,8 +27,8 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("same name and parameter types are equal")
     void sameNameAndParameterTypesAreEqual() throws Exception {
-        Object key1 = createMethodKey("test", new Class<?>[] {String.class, int.class});
-        Object key2 = createMethodKey("test", new Class<?>[] {String.class, int.class});
+        var key1 = createMethodKey("test", new Class<?>[] {String.class, int.class});
+        var key2 = createMethodKey("test", new Class<?>[] {String.class, int.class});
 
         assertThat(key1.equals(key2)).isTrue();
         assertThat(key1.hashCode()).isEqualTo(key2.hashCode());
@@ -38,8 +37,8 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("different names are not equal")
     void differentNamesAreNotEqual() throws Exception {
-        Object key1 = createMethodKey("foo", new Class<?>[] {String.class});
-        Object key2 = createMethodKey("bar", new Class<?>[] {String.class});
+        var key1 = createMethodKey("foo", new Class<?>[] {String.class});
+        var key2 = createMethodKey("bar", new Class<?>[] {String.class});
 
         assertThat(key1.equals(key2)).isFalse();
     }
@@ -47,8 +46,8 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("different parameter types are not equal")
     void differentParameterTypesAreNotEqual() throws Exception {
-        Object key1 = createMethodKey("test", new Class<?>[] {String.class});
-        Object key2 = createMethodKey("test", new Class<?>[] {int.class});
+        var key1 = createMethodKey("test", new Class<?>[] {String.class});
+        var key2 = createMethodKey("test", new Class<?>[] {int.class});
 
         assertThat(key1.equals(key2)).isFalse();
     }
@@ -56,7 +55,7 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("equals null returns false")
     void equalsNullReturnsFalse() throws Exception {
-        Object key = createMethodKey("test", new Class<?>[] {String.class});
+        var key = createMethodKey("test", new Class<?>[] {String.class});
 
         assertThat(key.equals(null)).isFalse();
     }
@@ -64,7 +63,7 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("equals different type returns false")
     void equalsDifferentTypeReturnsFalse() throws Exception {
-        Object key = createMethodKey("test", new Class<?>[] {String.class});
+        var key = createMethodKey("test", new Class<?>[] {String.class});
 
         assertThat(key.equals("not a MethodKey")).isFalse();
     }
@@ -72,7 +71,7 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("equals self returns true")
     void equalsSelfReturnsTrue() throws Exception {
-        Object key = createMethodKey("test", new Class<?>[] {String.class});
+        var key = createMethodKey("test", new Class<?>[] {String.class});
 
         assertThat(key.equals(key)).isTrue();
     }
@@ -80,7 +79,7 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("hashCode is consistent across calls")
     void hashCodeIsConsistentAcrossCalls() throws Exception {
-        Object key = createMethodKey("test", new Class<?>[] {String.class, int.class});
+        var key = createMethodKey("test", new Class<?>[] {String.class, int.class});
 
         int h1 = key.hashCode();
         int h2 = key.hashCode();
@@ -91,8 +90,8 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("empty parameter types equals another empty parameter types")
     void emptyParameterTypesEqualsAnother() throws Exception {
-        Object key1 = createMethodKey("test", new Class<?>[] {});
-        Object key2 = createMethodKey("test", new Class<?>[] {});
+        var key1 = createMethodKey("test", new Class<?>[] {});
+        var key2 = createMethodKey("test", new Class<?>[] {});
 
         assertThat(key1.equals(key2)).isTrue();
         assertThat(key1.hashCode()).isEqualTo(key2.hashCode());
@@ -101,15 +100,15 @@ class ActionResolverMethodKeyTest {
     @Test
     @DisplayName("empty vs non-empty parameter types are not equal")
     void emptyVsNonEmptyParameterTypesAreNotEqual() throws Exception {
-        Object key1 = createMethodKey("test", new Class<?>[] {});
-        Object key2 = createMethodKey("test", new Class<?>[] {String.class});
+        var key1 = createMethodKey("test", new Class<?>[] {});
+        var key2 = createMethodKey("test", new Class<?>[] {String.class});
 
         assertThat(key1.equals(key2)).isFalse();
     }
 
     private static Object createMethodKey(final String name, final Class<?>[] parameterTypes) throws Exception {
-        Class<?> methodKeyClass = Class.forName("nonapi.org.paramixel.ActionResolver$MethodKey");
-        Constructor<?> constructor = methodKeyClass.getDeclaredConstructor(String.class, Class[].class);
+        var methodKeyClass = Class.forName("nonapi.org.paramixel.ActionResolver$MethodKey");
+        var constructor = methodKeyClass.getDeclaredConstructor(String.class, Class[].class);
         constructor.setAccessible(true);
         return constructor.newInstance(name, parameterTypes);
     }

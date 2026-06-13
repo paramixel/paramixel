@@ -40,7 +40,7 @@ class CustomActionTest {
         var events = new ArrayList<String>();
         var listener = new RecordingListener(events);
 
-        Action action = Step.of("solo", context -> {
+        var action = Step.of("solo", context -> {
             messages.add("solo executed");
         });
         var result = Runner.builder().listener(listener).build().run(action);

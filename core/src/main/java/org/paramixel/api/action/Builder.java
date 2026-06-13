@@ -28,6 +28,7 @@ public sealed interface Builder
         permits Conditional.Builder,
                 Instance.Builder,
                 Isolated.Builder,
+                Loop.Builder,
                 Parallel.Builder,
                 Repeat.Builder,
                 Scope.Builder,

@@ -47,7 +47,7 @@ public class ContainerLogConsumer implements Consumer<OutputFrame> {
      */
     @Override
     public void accept(final OutputFrame outputFrame) {
-        String message = outputFrame.getUtf8String();
+        var message = outputFrame.getUtf8String();
         if (message != null) {
             message = message.trim();
 

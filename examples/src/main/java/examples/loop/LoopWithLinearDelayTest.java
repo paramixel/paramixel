@@ -14,26 +14,28 @@
  * limitations under the License.
  */
 
-package examples.until;
+package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.action.Loop.loop;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Until.until;
 
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Loop;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Until} action with retry and polling patterns.
- * Verifies that the loop stops when satisfied or when maxIterations is exhausted.
+ * Demonstrates the {@link org.paramixel.api.action.Loop} action with a
+ * constant inter-iteration delay ({@link org.paramixel.api.action.Loop.DelayPolicy.Linear}).
+ * Verifies that the loop execution accounts for the configured delay between iterations.
  */
-public class UntilTest {
+public class LoopWithLinearDelayTest {
 
-    private static final AtomicInteger retryCount = new AtomicInteger();
-    private static final AtomicInteger pollCount = new AtomicInteger();
+    private static final AtomicInteger iterationCount = new AtomicInteger();
 
     /**
      * Runs the action factory and exits the JVM.
@@ -46,35 +48,25 @@ public class UntilTest {
     }
 
     /**
-     * Builds an action tree that exercises retry and poll.
+     * Builds an action tree that exercises loop with constant inter-iteration delay.
      *
      * @return the action tree for this test
      */
     @Paramixel.Factory
     public static Action factory() {
         resetCounts();
-        return sequential("until-example")
-                .child(until("retry")
-                        .body(step("attempt", context -> {
-                            int attempt = retryCount.incrementAndGet();
-                            if (attempt < 3) {
-                                throw new RuntimeException("not yet (attempt " + attempt + ")");
-                            }
-                        }))
-                        .maxIterations(5))
-                .child(until("poll")
-                        .body(step("check", context -> pollCount.incrementAndGet()))
-                        .until(context -> pollCount.get() >= 4)
-                        .maxIterations(10))
+        return sequential("loop-linear-delay-example")
+                .child(loop("poll")
+                        .body(step("check", context -> iterationCount.incrementAndGet()))
+                        .maxIterations(3)
+                        .delay(new Loop.DelayPolicy.Linear(Duration.ofMillis(100))))
                 .child(step("validate", context -> {
-                    assertThat(retryCount.get()).isEqualTo(3);
-                    assertThat(pollCount.get()).isEqualTo(4);
+                    assertThat(iterationCount.get()).isEqualTo(3);
                 }))
                 .build();
     }
 
     private static void resetCounts() {
-        retryCount.set(0);
-        pollCount.set(0);
+        iterationCount.set(0);
     }
 }

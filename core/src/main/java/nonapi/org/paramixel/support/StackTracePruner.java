@@ -55,7 +55,7 @@ public final class StackTracePruner {
         if (frames.length == 0) {
             return;
         }
-        List<StackTraceElement> pruned = new ArrayList<>();
+        var pruned = new ArrayList<StackTraceElement>();
         for (StackTraceElement frame : frames) {
             if (!isFramework(frame.getClassName())) {
                 pruned.add(frame);
