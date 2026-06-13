@@ -37,7 +37,7 @@ class RetryArgumentsTest {
     @Test
     @DisplayName("retryOn rejects null predicate")
     void retryOnRejectsNullPredicate() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         assertThatThrownBy(() -> retry.retryOn(null))
                 .isInstanceOf(NullPointerException.class)
@@ -47,7 +47,7 @@ class RetryArgumentsTest {
     @Test
     @DisplayName("onRetry rejects null callback")
     void onRetryRejectsNullCallback() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         assertThatThrownBy(() -> retry.onRetry(null))
                 .isInstanceOf(NullPointerException.class)
@@ -57,7 +57,7 @@ class RetryArgumentsTest {
     @Test
     @DisplayName("onRetry throws IllegalStateException after run")
     void onRetryThrowsIllegalStateExceptionAfterRun() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
         retry.run(() -> {});
 
         assertThatThrownBy(() -> retry.onRetry((attempt, cause) -> {}))
@@ -68,7 +68,7 @@ class RetryArgumentsTest {
     @Test
     @DisplayName("run rejects null executable")
     void runRejectsNullThrowableRunnable() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         assertThatThrownBy(() -> retry.run(null))
                 .isInstanceOf(NullPointerException.class)
@@ -158,7 +158,7 @@ class RetryArgumentsTest {
     @Test
     @DisplayName("run throws on second call")
     void runThrowsOnSecondCall() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10)));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10)));
 
         retry.run(() -> {});
 
@@ -170,7 +170,7 @@ class RetryArgumentsTest {
     @Test
     @DisplayName("runAndThrow rejects null executable")
     void runAndThrowRejectsNullThrowableRunnable() {
-        Retry retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
 
         assertThatThrownBy(() -> retry.runAndThrow(null))
                 .isInstanceOf(NullPointerException.class)

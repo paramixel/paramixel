@@ -18,6 +18,7 @@ package org.paramixel.api.action;
 
 import org.paramixel.api.ContextConsumer;
 
+@SuppressWarnings("removal")
 class SequenceTestSupport {
 
     static <T> Step step(final String name, final ContextConsumer consumer) {

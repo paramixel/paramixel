@@ -77,7 +77,7 @@ class RunnerArgumentsTest {
     @Test
     @DisplayName("runAndReturnExitCode(Action) null action throws NPE")
     void runAndReturnExitCodeNullActionThrowsNPE() {
-        Runner runner = Runner.builder().build();
+        var runner = Runner.builder().build();
         assertThatThrownBy(() -> runner.runAndReturnExitCode((Action) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("action is null");
@@ -86,7 +86,7 @@ class RunnerArgumentsTest {
     @Test
     @DisplayName("runAndReturnExitCode(Selector) null selector throws NPE")
     void nullSelectorThrowsNPE() {
-        Runner runner = Runner.builder().build();
+        var runner = Runner.builder().build();
         assertThatThrownBy(() -> runner.runAndReturnExitCode((Selector) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("selector is null");

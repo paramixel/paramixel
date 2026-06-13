@@ -37,6 +37,7 @@ public sealed interface Action
                 Delay,
                 Instance,
                 Isolated,
+                Loop,
                 Parallel,
                 Repeat,
                 Scope,

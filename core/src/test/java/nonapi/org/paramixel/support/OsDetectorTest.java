@@ -27,7 +27,7 @@ class OsDetectorTest {
     @Test
     @DisplayName("isMac returns false by default")
     void isMacReturnsFalseByDefault() {
-        OsDetector detector = new OsDetector() {
+        var detector = new OsDetector() {
             @Override
             public boolean isWindows() {
                 return false;
@@ -40,7 +40,7 @@ class OsDetectorTest {
     @Test
     @DisplayName("isLinux returns true when not Windows and not Mac")
     void isLinuxReturnsTrueWhenNotWindowsAndNotMac() {
-        OsDetector detector = new OsDetector() {
+        var detector = new OsDetector() {
             @Override
             public boolean isWindows() {
                 return false;
@@ -53,7 +53,7 @@ class OsDetectorTest {
     @Test
     @DisplayName("isLinux returns false when Windows")
     void isLinuxReturnsFalseWhenWindows() {
-        OsDetector detector = new OsDetector() {
+        var detector = new OsDetector() {
             @Override
             public boolean isWindows() {
                 return true;
@@ -66,7 +66,7 @@ class OsDetectorTest {
     @Test
     @DisplayName("isLinux returns false when Mac")
     void isLinuxReturnsFalseWhenMac() {
-        OsDetector detector = new OsDetector() {
+        var detector = new OsDetector() {
             @Override
             public boolean isWindows() {
                 return false;

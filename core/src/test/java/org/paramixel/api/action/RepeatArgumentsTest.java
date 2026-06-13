@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Repeat arguments")
+@SuppressWarnings("removal")
 class RepeatArgumentsTest {
 
     private static final Action STEP = Step.of("step", s -> {});

@@ -46,7 +46,7 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("and() composes package and class regex selectors")
     void andComposesPackageAndClassRegex() {
-        Selector selector = Selector.and(
+        var selector = Selector.and(
                 Selector.packageRegex(RunnerDiscoveryArgumentsTest.class.getPackageName()),
                 Selector.classRegex("RunnerDiscoveryArgumentsTest"));
 
@@ -61,7 +61,7 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("packageTreeOf matches package and subpackages")
     void packageTreeOfMatchesPackageAndSubpackages() {
-        Selector selector = Selector.packageTreeOf(RunnerDiscoveryArgumentsTest.class);
+        var selector = Selector.packageTreeOf(RunnerDiscoveryArgumentsTest.class);
 
         assertThat(selector.matchesPackage(RunnerDiscoveryArgumentsTest.class.getPackageName()))
                 .isTrue();
@@ -71,7 +71,7 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("packageOf (exact) matches exact package only")
     void packageOfExactMatchesExactPackageOnly() {
-        Selector selector = Selector.packageOf(RunnerDiscoveryArgumentsTest.class);
+        var selector = Selector.packageOf(RunnerDiscoveryArgumentsTest.class);
 
         assertThat(selector.matchesPackage(RunnerDiscoveryArgumentsTest.class.getPackageName()))
                 .isTrue();
@@ -81,7 +81,7 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("classOf matches exact class")
     void classOfMatchesExactClass() {
-        Selector selector = Selector.classOf(ActionResolverSmokeFixture.class);
+        var selector = Selector.classOf(ActionResolverSmokeFixture.class);
 
         assertThat(selector.matchesClass(ActionResolverSmokeFixture.class.getName()))
                 .isTrue();
@@ -116,7 +116,7 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("matchesPackage rejects null")
     void matchesPackageRejectsNull() {
-        Selector selector = Selector.packageRegex("test");
+        var selector = Selector.packageRegex("test");
         assertThatThrownBy(() -> selector.matchesPackage(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("packageName is null");
@@ -125,7 +125,7 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("matchesClass rejects null")
     void matchesClassRejectsNull() {
-        Selector selector = Selector.classRegex("test");
+        var selector = Selector.classRegex("test");
         assertThatThrownBy(() -> selector.matchesClass(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("className is null");
@@ -134,7 +134,7 @@ class RunnerDiscoveryArgumentsTest {
     @Test
     @DisplayName("matchesTag rejects null")
     void matchesTagRejectsNull() {
-        Selector selector = Selector.tagRegex("test");
+        var selector = Selector.tagRegex("test");
         assertThatThrownBy(() -> selector.matchesTag(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("tag is null");

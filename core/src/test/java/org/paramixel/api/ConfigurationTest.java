@@ -35,56 +35,56 @@ class ConfigurationTest {
 
     @Test
     void shouldLoadClasspathConfiguration() {
-        Configuration config = Configuration.classpathConfiguration();
-        assertThat(config).isNotNull();
+        var configuration = Configuration.classpathConfiguration();
+        assertThat(configuration).isNotNull();
     }
 
     @Test
     void shouldReturnEmptyWhenPropertiesFileAbsent() {
-        Configuration config = Configuration.classpathConfiguration();
-        assertThat(config).isNotNull();
-        assertThat(config.keySet()).isEmpty();
+        var configuration = Configuration.classpathConfiguration();
+        assertThat(configuration).isNotNull();
+        assertThat(configuration.keySet()).isEmpty();
     }
 
     @Test
     void shouldIncludeParamixelSystemProperties() {
-        Configuration config = Configuration.systemConfiguration();
-        assertThat(config).isNotNull();
-        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+        var configuration = Configuration.systemConfiguration();
+        assertThat(configuration).isNotNull();
+        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
     }
 
     @Test
     void shouldIncludeNonParamixelSystemProperties() {
-        Configuration config = Configuration.systemConfiguration();
-        assertThat(config.getString("java.version")).isPresent();
-        assertThat(config.getString("user.name")).isPresent();
-        assertThat(config.getString("user.dir")).isPresent();
+        var configuration = Configuration.systemConfiguration();
+        assertThat(configuration.getString("java.version")).isPresent();
+        assertThat(configuration.getString("user.name")).isPresent();
+        assertThat(configuration.getString("user.dir")).isPresent();
     }
 
     @Test
     void shouldApplyParallelismDefaultInSystemConfiguration() {
-        Configuration config = Configuration.systemConfiguration();
-        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
-        assertThat(config.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
+        var configuration = Configuration.systemConfiguration();
+        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
                 .isEqualTo(Runtime.getRuntime().availableProcessors());
     }
 
     @Test
     void shouldMergeDefaultsCorrectly() {
-        Configuration config = Configuration.defaultConfiguration();
-        assertThat(config).isNotNull();
-        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
-        assertThat(config.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
+        var configuration = Configuration.defaultConfiguration();
+        assertThat(configuration).isNotNull();
+        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
                 .isEqualTo(Runtime.getRuntime().availableProcessors());
     }
 
     @Test
     void shouldLoadClasspathConfigurationWithNullContextClassLoader() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        var original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(null);
-            Configuration config = Configuration.classpathConfiguration();
-            assertThat(config).isNotNull();
+            var configuration = Configuration.classpathConfiguration();
+            assertThat(configuration).isNotNull();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
         }
@@ -92,20 +92,20 @@ class ConfigurationTest {
 
     @Test
     void shouldLoadClasspathConfigurationFromExplicitClassLoaderWithoutUsingContextClassLoader() throws Exception {
-        Path explicitClasspath = tempDir.resolve("explicit");
+        var explicitClasspath = tempDir.resolve("explicit");
         Files.createDirectories(explicitClasspath);
         Files.writeString(
                 explicitClasspath.resolve(Configuration.CONFIGURATION_FILE_NAME), "paramixel.match.tag.regex=explicit");
 
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-        ClassLoader emptyContextClassLoader = new ClassLoader(null) {};
+        var original = Thread.currentThread().getContextClassLoader();
+        var emptyContextClassLoader = new ClassLoader(null) {};
         try (URLClassLoader explicitClassLoader =
                 new URLClassLoader(new URL[] {explicitClasspath.toUri().toURL()}, null)) {
             Thread.currentThread().setContextClassLoader(emptyContextClassLoader);
 
-            Configuration config = Configuration.classpathConfiguration(explicitClassLoader);
+            var configuration = Configuration.classpathConfiguration(explicitClassLoader);
 
-            assertThat(config.getString("paramixel.match.tag.regex")).contains("explicit");
+            assertThat(configuration.getString("paramixel.match.tag.regex")).contains("explicit");
             assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(emptyContextClassLoader);
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -114,11 +114,12 @@ class ConfigurationTest {
 
     @Test
     void shouldLoadDefaultConfigurationWithNullContextClassLoader() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        var original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(null);
-            Configuration config = Configuration.defaultConfiguration();
-            assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+            var configuration = Configuration.defaultConfiguration();
+            assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM))
+                    .isPresent();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
         }
@@ -126,24 +127,24 @@ class ConfigurationTest {
 
     @Test
     void shouldContainFailureOnSkipKeyInDefaultConfigurationWhenPresentInSystemProperties() {
-        Configuration config = Configuration.defaultConfiguration();
+        var configuration = Configuration.defaultConfiguration();
         if (System.getProperty(Configuration.FAILURE_ON_SKIP) != null) {
-            assertThat(config.getString(Configuration.FAILURE_ON_SKIP)).isPresent();
+            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).isPresent();
         }
     }
 
     @Test
     void shouldContainFailureOnAbortKeyInDefaultConfigurationWhenPresentInSystemProperties() {
-        Configuration config = Configuration.defaultConfiguration();
+        var configuration = Configuration.defaultConfiguration();
         if (System.getProperty(Configuration.FAILURE_ON_ABORT) != null) {
-            assertThat(config.getString(Configuration.FAILURE_ON_ABORT)).isPresent();
+            assertThat(configuration.getString(Configuration.FAILURE_ON_ABORT)).isPresent();
         }
     }
 
     @Test
     void shouldReturnNewCopyOnEachDefaultConfigurationCall() {
-        Configuration first = Configuration.defaultConfiguration();
-        Configuration second = Configuration.defaultConfiguration();
+        var first = Configuration.defaultConfiguration();
+        var second = Configuration.defaultConfiguration();
         assertThat(first.getString(Configuration.RUNNER_PARALLELISM))
                 .isEqualTo(second.getString(Configuration.RUNNER_PARALLELISM));
     }
@@ -199,8 +200,8 @@ class ConfigurationTest {
     @Test
     @DisplayName("Configuration.of(Map) creates configuration from map")
     void ofMapCreatesConfiguration() {
-        Configuration config = Configuration.of(Map.of("key", "value"));
-        assertThat(config.getString("key")).contains("value");
+        var configuration = Configuration.of(Map.of("key", "value"));
+        assertThat(configuration.getString("key")).contains("value");
     }
 
     @Test
@@ -214,16 +215,16 @@ class ConfigurationTest {
     @Test
     @DisplayName("defaultConfiguration(ClassLoader) loads with explicit classloader")
     void defaultConfigurationWithExplicitClassloader() {
-        Configuration config = Configuration.defaultConfiguration(getClass().getClassLoader());
-        assertThat(config).isNotNull();
-        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+        var configuration = Configuration.defaultConfiguration(getClass().getClassLoader());
+        assertThat(configuration).isNotNull();
+        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
     }
 
     @Test
     @DisplayName("ConcreteConfiguration.toMap() returns backing properties")
     void concreteConfigurationToMapReturnsProperties() {
         Map<String, String> props = Map.of("key", "value");
-        var config = new nonapi.org.paramixel.ConcreteConfiguration(props);
-        assertThat(config.toMap()).containsEntry("key", "value");
+        var configuration = new nonapi.org.paramixel.ConcreteConfiguration(props);
+        assertThat(configuration.toMap()).containsEntry("key", "value");
     }
 }

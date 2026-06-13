@@ -59,7 +59,7 @@ public final class LRUCache<K, V> implements AutoCloseable {
             }
         };
         this.reaper = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "paramixel-lrucache");
+            var t = new Thread(r, "paramixel-lrucache");
             t.setDaemon(true);
             return t;
         });
@@ -77,7 +77,7 @@ public final class LRUCache<K, V> implements AutoCloseable {
      */
     public synchronized V get(final K key) {
         Objects.requireNonNull(key, "key cannot be null");
-        CacheEntry<V> entry = backingMap.get(key);
+        var entry = backingMap.get(key);
         if (entry == null) {
             return null;
         }
@@ -114,7 +114,7 @@ public final class LRUCache<K, V> implements AutoCloseable {
      */
     public synchronized V remove(final K key) {
         Objects.requireNonNull(key, "key cannot be null");
-        CacheEntry<V> entry = backingMap.remove(key);
+        var entry = backingMap.remove(key);
         return entry != null ? entry.value : null;
     }
 

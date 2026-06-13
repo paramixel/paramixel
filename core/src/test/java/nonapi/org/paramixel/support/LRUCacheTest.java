@@ -20,9 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -153,7 +151,7 @@ class LRUCacheTest {
         int operationsPerThread = 500;
         var latch = new CountDownLatch(threadCount);
         var errors = new AtomicInteger(0);
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        var executor = Executors.newFixedThreadPool(threadCount);
 
         for (int t = 0; t < threadCount; t++) {
             final int threadId = t;
@@ -197,7 +195,7 @@ class LRUCacheTest {
     @Test
     @DisplayName("try-with-resources: works with AutoCloseable")
     void tryWithResources() {
-        List<String> results = new ArrayList<>();
+        var results = new ArrayList<>();
 
         try (var cache = new LRUCache<String, String>(10, 60_000)) {
             cache.put("a", "1");

@@ -74,7 +74,7 @@ public class ParallelEachExample {
                                 "arguments",
                                 arguments,
                                 value -> instance(value, ParallelEachExample::new)
-                                        .body(scope("lifecycle")
+                                        .body(scope("scope")
                                                 .before(step(
                                                         "before()",
                                                         withInstance(

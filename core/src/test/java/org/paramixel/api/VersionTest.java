@@ -34,7 +34,7 @@ class VersionTest {
     @Test
     @DisplayName("loads version from classpath resource")
     void loadsVersionFromClasspathResource() throws IOException {
-        String version = Version.version();
+        var version = Version.version();
 
         assertThat(version).isNotBlank();
         assertThat(version).isEqualTo(loadVersionFromResource());
@@ -43,10 +43,10 @@ class VersionTest {
     @Test
     @DisplayName("loads version when context class loader is null")
     void loadsVersionWhenContextClassLoaderIsNull() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        var original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(null);
-            String version = Version.version();
+            var version = Version.version();
             assertThat(version).isNotBlank();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -56,8 +56,8 @@ class VersionTest {
     @Test
     @DisplayName("returns consistent version across calls")
     void returnsConsistentVersionAcrossCalls() {
-        String first = Version.version();
-        String second = Version.version();
+        var first = Version.version();
+        var second = Version.version();
         assertThat(first).isSameAs(second);
         assertThat(first).isNotBlank();
     }
@@ -65,7 +65,7 @@ class VersionTest {
     @Test
     @DisplayName("returns non-null non-blank version")
     void returnsNonNullNonBlankVersion() {
-        String version = Version.version();
+        var version = Version.version();
         assertThat(version).isNotNull();
         assertThat(version).isNotBlank();
     }
@@ -77,20 +77,20 @@ class VersionTest {
         @Test
         @DisplayName("returns UNKNOWN when resource provider returns null")
         void returnsUnknownWhenResourceAbsent() {
-            String result = Version.loadVersion(name -> null);
+            var result = Version.loadVersion(name -> null);
             assertThat(result).isEqualTo("UNKNOWN");
         }
 
         @Test
         @DisplayName("returns UNKNOWN when InputStream throws IOException on load")
         void returnsUnknownWhenIOExceptionOnLoad() {
-            InputStream broken = new InputStream() {
+            var broken = new InputStream() {
                 @Override
                 public int read() throws IOException {
                     throw new IOException("simulated read failure");
                 }
             };
-            String result = Version.loadVersion(name -> broken);
+            var result = Version.loadVersion(name -> broken);
             assertThat(result).isEqualTo("UNKNOWN");
         }
 
@@ -98,7 +98,7 @@ class VersionTest {
         @DisplayName("returns UNKNOWN when version property is missing")
         void returnsUnknownWhenVersionPropertyMissing() {
             var content = "other=value".getBytes(StandardCharsets.ISO_8859_1);
-            String result = Version.loadVersion(name -> new ByteArrayInputStream(content));
+            var result = Version.loadVersion(name -> new ByteArrayInputStream(content));
             assertThat(result).isEqualTo("UNKNOWN");
         }
 
@@ -106,7 +106,7 @@ class VersionTest {
         @DisplayName("returns UNKNOWN when version property is blank")
         void returnsUnknownWhenVersionPropertyBlank() {
             var content = "version=   ".getBytes(StandardCharsets.ISO_8859_1);
-            String result = Version.loadVersion(name -> new ByteArrayInputStream(content));
+            var result = Version.loadVersion(name -> new ByteArrayInputStream(content));
             assertThat(result).isEqualTo("UNKNOWN");
         }
 
@@ -114,7 +114,7 @@ class VersionTest {
         @DisplayName("returns version string when present and non-blank")
         void returnsVersionWhenPresent() {
             var content = "version=1.2.3".getBytes(StandardCharsets.ISO_8859_1);
-            String result = Version.loadVersion(name -> new ByteArrayInputStream(content));
+            var result = Version.loadVersion(name -> new ByteArrayInputStream(content));
             assertThat(result).isEqualTo("1.2.3");
         }
 
@@ -126,10 +126,9 @@ class VersionTest {
     }
 
     private static String loadVersionFromResource() throws IOException {
-        InputStream inputStream =
-                Thread.currentThread().getContextClassLoader().getResourceAsStream("version.properties");
+        var inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("version.properties");
         assertThat(inputStream).isNotNull();
-        Properties properties = new Properties();
+        var properties = new Properties();
         try (inputStream) {
             properties.load(inputStream);
         }

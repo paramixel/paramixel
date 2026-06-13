@@ -27,16 +27,16 @@ class ConfigurationExceptionTest {
     @Test
     @DisplayName("constructor(String) creates exception with message")
     void constructorStringCreatesExceptionWithMessage() {
-        ConfigurationException exception = new ConfigurationException("config error");
-        assertThat(exception).hasMessage("config error");
+        var exception = new ConfigurationException("configuration error");
+        assertThat(exception).hasMessage("configuration error");
     }
 
     @Test
     @DisplayName("constructor(String, Throwable) creates exception with message and cause")
     void constructorStringThrowableCreatesExceptionWithMessageAndCause() {
-        Throwable cause = new RuntimeException("root cause");
-        ConfigurationException exception = new ConfigurationException("config error", cause);
-        assertThat(exception).hasMessage("config error");
+        var cause = new RuntimeException("root cause");
+        var exception = new ConfigurationException("configuration error", cause);
+        assertThat(exception).hasMessage("configuration error");
         assertThat(exception).hasCauseInstanceOf(RuntimeException.class);
         assertThat(exception.getCause()).hasMessage("root cause");
     }

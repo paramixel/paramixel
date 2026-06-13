@@ -83,7 +83,7 @@ class UnrecoverableErrorsTest {
     @Test
     @DisplayName("rethrows OutOfMemoryError")
     void rethrowsOutOfMemoryError() {
-        OutOfMemoryError oom = new OutOfMemoryError("simulated");
+        var oom = new OutOfMemoryError("simulated");
 
         assertThatThrownBy(() -> UnrecoverableErrors.rethrowIfUnrecoverable(oom))
                 .isInstanceOf(OutOfMemoryError.class)
@@ -93,7 +93,7 @@ class UnrecoverableErrorsTest {
     @Test
     @DisplayName("rethrows InternalError")
     void rethrowsInternalError() {
-        InternalError ie = new InternalError("simulated");
+        var ie = new InternalError("simulated");
 
         assertThatThrownBy(() -> UnrecoverableErrors.rethrowIfUnrecoverable(ie))
                 .isInstanceOf(InternalError.class)

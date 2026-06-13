@@ -18,6 +18,7 @@ package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Each.sequential;
 import static org.paramixel.api.action.Instance.instance;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
@@ -102,32 +103,45 @@ public class MixedArgumentTest {
     public static Action factory() {
         resetCounts();
 
-        var arguments = sequential("MixedArgumentTest").independent();
-
-        for (TestArgument testArgument :
-                List.of(new StringArgument("paramixel"), new IntegerArgument(42), new PointArgument(new Point(3, 7)))) {
-            arguments.child(instance(testArgument.name(), () -> new MixedArgumentTest(testArgument))
-                    .body(scope("lifecycle")
-                            .before(step("setUp()", withInstance(MixedArgumentTest.class, MixedArgumentTest::setUp)))
-                            .body(scope("testOne")
-                                    .before(step(
-                                            "beforeEach()",
-                                            withInstance(MixedArgumentTest.class, MixedArgumentTest::beforeEach)))
-                                    .body(step(
-                                            "testOne()",
-                                            withInstance(MixedArgumentTest.class, MixedArgumentTest::testOne)))
-                                    .after(step(
-                                            "afterEach()",
-                                            withInstance(MixedArgumentTest.class, MixedArgumentTest::afterEach))))
-                            .after(step(
-                                    "tearDown()",
-                                    withInstance(MixedArgumentTest.class, MixedArgumentTest::tearDown)))));
-        }
-
         return instance("MixedArgumentTest", MixedArgumentTest::new)
                 .body(sequential("body")
-                        .child(arguments)
-                        .child(scope("lifecycle")
+                        .child(sequential(
+                                        "MixedArgumentTest",
+                                        List.of(
+                                                new StringArgument("paramixel"),
+                                                new IntegerArgument(42),
+                                                new PointArgument(new Point(3, 7))),
+                                        testArgument -> instance(
+                                                        testArgument.name(), () -> new MixedArgumentTest(testArgument))
+                                                .body(scope("scope")
+                                                        .before(step(
+                                                                "setUp()",
+                                                                withInstance(
+                                                                        MixedArgumentTest.class,
+                                                                        MixedArgumentTest::setUp)))
+                                                        .body(scope("testOne")
+                                                                .before(step(
+                                                                        "beforeEach()",
+                                                                        withInstance(
+                                                                                MixedArgumentTest.class,
+                                                                                MixedArgumentTest::beforeEach)))
+                                                                .body(step(
+                                                                        "testOne()",
+                                                                        withInstance(
+                                                                                MixedArgumentTest.class,
+                                                                                MixedArgumentTest::testOne)))
+                                                                .after(step(
+                                                                        "afterEach()",
+                                                                        withInstance(
+                                                                                MixedArgumentTest.class,
+                                                                                MixedArgumentTest::afterEach))))
+                                                        .after(step(
+                                                                "tearDown()",
+                                                                withInstance(
+                                                                        MixedArgumentTest.class,
+                                                                        MixedArgumentTest::tearDown)))))
+                                .independent())
+                        .child(scope("scope")
                                 .body(step("[validate-ready]", context -> {}))
                                 .after(step(
                                         "validate()",

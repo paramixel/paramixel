@@ -45,7 +45,7 @@ public class SetUpTearDownLifecycleTest {
         resetCounts();
 
         return instance("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
-                .body(scope("lifecycle")
+                .body(scope("scope")
                         .before(step(
                                 "setUp()",
                                 withInstance(SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::setUp)))

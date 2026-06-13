@@ -19,8 +19,6 @@ package org.paramixel.maven.plugin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -376,10 +374,10 @@ class ParamixelMojoPropertyTest {
         @DisplayName("blank Maven property key through buildConfiguration throws descriptive exception")
         void blankMavenPropertyKeyThroughBuildConfigurationThrowsDescriptiveException() throws Exception {
             var property = new Property();
-            Field keyField = Property.class.getDeclaredField("key");
+            var keyField = Property.class.getDeclaredField("key");
             keyField.setAccessible(true);
             keyField.set(property, "   ");
-            Field valueField = Property.class.getDeclaredField("value");
+            var valueField = Property.class.getDeclaredField("value");
             valueField.setAccessible(true);
             valueField.set(property, "some-value");
             var mojo = new ParamixelMojo();
@@ -427,10 +425,13 @@ class ParamixelMojoPropertyTest {
                 var mojo = new ParamixelMojo();
                 setField(mojo, "reportFile", "   ");
 
-                var configuration =
-                        invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+                try (var classLoader =
+                        new URLClassLoader(new URL[0], Thread.currentThread().getContextClassLoader())) {
+                    var configuration = invokeBuildConfiguration(mojo, classLoader);
 
-                assertThat(configuration.getString(Configuration.REPORT_FILE)).isEmpty();
+                    assertThat(configuration.getString(Configuration.REPORT_FILE))
+                            .isEmpty();
+                }
             } finally {
                 restoreSystemProperty(Configuration.REPORT_FILE, originalReportFile);
             }
@@ -484,13 +485,13 @@ class ParamixelMojoPropertyTest {
 
     private static Configuration invokeBuildConfiguration(final ParamixelMojo mojo, final ClassLoader classLoader)
             throws Exception {
-        Method method = ParamixelMojo.class.getDeclaredMethod("buildConfiguration", ClassLoader.class);
+        var method = ParamixelMojo.class.getDeclaredMethod("buildConfiguration", ClassLoader.class);
         method.setAccessible(true);
         return (Configuration) method.invoke(mojo, classLoader);
     }
 
     private static void setField(final ParamixelMojo mojo, final String name, final Object value) throws Exception {
-        Field field = ParamixelMojo.class.getDeclaredField(name);
+        var field = ParamixelMojo.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(mojo, value);
     }

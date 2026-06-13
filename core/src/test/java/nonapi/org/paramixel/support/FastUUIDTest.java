@@ -34,7 +34,7 @@ class FastUUIDTest {
     @DisplayName("generateUuid produces RFC 9562 canonical format")
     void generateUuidProducesRfc9562Format() {
         for (int i = 0; i < 10_000; i++) {
-            String uuid = FastUUID.generateUuid();
+            var uuid = FastUUID.generateUuid();
             assertThat(uuid).matches(UUID_V4_PATTERN);
         }
     }
@@ -43,7 +43,7 @@ class FastUUIDTest {
     @DisplayName("generateUuid sets version 4 bits")
     void generateUuidSetsVersion4Bits() {
         for (int i = 0; i < 10_000; i++) {
-            String uuid = FastUUID.generateUuid();
+            var uuid = FastUUID.generateUuid();
             assertThat(uuid.charAt(14)).isEqualTo('4');
         }
     }
@@ -52,7 +52,7 @@ class FastUUIDTest {
     @DisplayName("generateUuid sets RFC 4122 variant bits")
     void generateUuidSetsVariantBits() {
         for (int i = 0; i < 10_000; i++) {
-            String uuid = FastUUID.generateUuid();
+            var uuid = FastUUID.generateUuid();
             char variantChar = uuid.charAt(19);
             assertThat(variantChar).isIn('8', '9', 'a', 'b');
         }
@@ -62,7 +62,7 @@ class FastUUIDTest {
     @DisplayName("generateUuid is parseable by UUID.fromString")
     void generateUuidIsParseable() {
         for (int i = 0; i < 10_000; i++) {
-            String uuid = FastUUID.generateUuid();
+            var uuid = FastUUID.generateUuid();
             assertThat(UUID.fromString(uuid)).isNotNull();
         }
     }
@@ -74,7 +74,7 @@ class FastUUIDTest {
         int count = 100_000;
 
         for (int i = 0; i < count; i++) {
-            String uuid = FastUUID.generateUuid();
+            var uuid = FastUUID.generateUuid();
             assertThat(uuids.add(uuid)).isTrue();
         }
     }

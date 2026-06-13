@@ -18,12 +18,14 @@ package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Context.withInstance;
+import static org.paramixel.api.action.Each.sequential;
 import static org.paramixel.api.action.Instance.instance;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
@@ -61,30 +63,42 @@ public class IndependentArgumentTest {
         resetCounts();
 
         var testName = IndependentArgumentTest.class.getName();
-
-        var arguments = sequential(testName).independent();
-
-        for (int i = 0; i < ARGUMENT_COUNT; i++) {
-            String argumentValue = "string-" + i;
-
-            var tests = sequential(argumentValue)
-                    .child(step("test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)))
-                    .child(step("test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)))
-                    .child(step("test()", withInstance(IndependentArgumentTest.class, IndependentArgumentTest::test)));
-
-            arguments.child(instance(argumentValue, IndependentArgumentTest::new)
-                    .body(scope("lifecycle")
-                            .before(step(
-                                    "before()",
-                                    withInstance(IndependentArgumentTest.class, IndependentArgumentTest::before)))
-                            .body(tests)
-                            .after(step(
-                                    "after()",
-                                    withInstance(IndependentArgumentTest.class, IndependentArgumentTest::after)))));
-        }
+        var arguments =
+                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
         return scope(testName)
-                .body(arguments)
+                .body(sequential(
+                                testName,
+                                arguments,
+                                value -> instance(value, IndependentArgumentTest::new)
+                                        .body(scope("scope")
+                                                .before(step(
+                                                        "before()",
+                                                        withInstance(
+                                                                IndependentArgumentTest.class,
+                                                                IndependentArgumentTest::before)))
+                                                .body(sequential(value)
+                                                        .child(step(
+                                                                "test()",
+                                                                withInstance(
+                                                                        IndependentArgumentTest.class,
+                                                                        IndependentArgumentTest::test)))
+                                                        .child(step(
+                                                                "test()",
+                                                                withInstance(
+                                                                        IndependentArgumentTest.class,
+                                                                        IndependentArgumentTest::test)))
+                                                        .child(step(
+                                                                "test()",
+                                                                withInstance(
+                                                                        IndependentArgumentTest.class,
+                                                                        IndependentArgumentTest::test))))
+                                                .after(step(
+                                                        "after()",
+                                                        withInstance(
+                                                                IndependentArgumentTest.class,
+                                                                IndependentArgumentTest::after)))))
+                        .independent())
                 .after(step("validate", ignored -> validate()))
                 .build();
     }

@@ -298,9 +298,8 @@ public final class ConcreteDescriptor implements MutableDescriptor {
             }
             status = newStatus;
             completedAt = Instant.now();
-            return;
         }
-        throw new IllegalStateException("Descriptor already completed with status " + status.name());
+        // Descriptor already in a terminal state — no-op.
     }
 
     @Override

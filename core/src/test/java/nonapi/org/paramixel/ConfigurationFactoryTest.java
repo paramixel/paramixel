@@ -32,44 +32,44 @@ class ConfigurationFactoryTest {
     @Test
     @DisplayName("classpathConfiguration returns non-null configuration")
     void classpathConfigurationReturnsNonNull() {
-        Configuration config = ConfigurationFactory.classpathConfiguration();
+        var configuration = ConfigurationFactory.classpathConfiguration();
 
-        assertThat(config).isNotNull();
+        assertThat(configuration).isNotNull();
     }
 
     @Test
     @DisplayName("systemConfiguration returns non-null configuration")
     void systemConfigurationReturnsNonNull() {
-        Configuration config = ConfigurationFactory.systemConfiguration();
+        var configuration = ConfigurationFactory.systemConfiguration();
 
-        assertThat(config).isNotNull();
+        assertThat(configuration).isNotNull();
     }
 
     @Test
     @DisplayName("systemConfiguration includes non-paramixel keys")
     void systemConfigurationIncludesNonParamixelKeys() {
-        Configuration config = ConfigurationFactory.systemConfiguration();
+        var configuration = ConfigurationFactory.systemConfiguration();
 
-        assertThat(config.getString("java.version")).isPresent();
-        assertThat(config.getString("user.name")).isPresent();
+        assertThat(configuration.getString("java.version")).isPresent();
+        assertThat(configuration.getString("user.name")).isPresent();
     }
 
     @Test
     @DisplayName("defaultConfiguration includes non-paramixel keys")
     void defaultConfigurationIncludesNonParamixelKeys() {
-        Configuration config = ConfigurationFactory.defaultConfiguration();
+        var configuration = ConfigurationFactory.defaultConfiguration();
 
-        assertThat(config.getString("java.version")).isPresent();
-        assertThat(config.getString("user.name")).isPresent();
+        assertThat(configuration.getString("java.version")).isPresent();
+        assertThat(configuration.getString("user.name")).isPresent();
     }
 
     @Test
     @DisplayName("defaultConfiguration contains RUNNER_PARALLELISM")
     void defaultConfigurationContainsRunnerParallelism() {
-        Configuration config = ConfigurationFactory.defaultConfiguration();
+        var configuration = ConfigurationFactory.defaultConfiguration();
 
-        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
-        assertThat(config.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
+        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
                 .isEqualTo(Runtime.getRuntime().availableProcessors());
     }
 
@@ -112,9 +112,11 @@ class ConfigurationFactoryTest {
     @Test
     @DisplayName("defaultConfiguration contains SCHEDULER_QUEUE_CAPACITY")
     void defaultConfigurationContainsSchedulerQueueCapacity() {
-        Configuration config = ConfigurationFactory.defaultConfiguration();
+        var configuration = ConfigurationFactory.defaultConfiguration();
 
-        assertThat(config.getString(Configuration.SCHEDULER_QUEUE_CAPACITY)).isPresent();
-        assertThat(config.getString(Configuration.SCHEDULER_QUEUE_CAPACITY)).contains("1024");
+        assertThat(configuration.getString(Configuration.SCHEDULER_QUEUE_CAPACITY))
+                .isPresent();
+        assertThat(configuration.getString(Configuration.SCHEDULER_QUEUE_CAPACITY))
+                .contains("1024");
     }
 }

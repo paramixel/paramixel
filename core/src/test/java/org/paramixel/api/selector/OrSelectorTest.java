@@ -29,7 +29,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("matches when any selector matches")
     void matchesWhenAnySelectorMatches() {
-        Selector selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
+        var selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
 
         assertThat(selector.matchesTag("smoke")).isTrue();
         assertThat(selector.matchesTag("integration")).isTrue();
@@ -39,7 +39,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("does not match when no selector matches")
     void doesNotMatchWhenNoSelectorMatches() {
-        Selector selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
+        var selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
 
         assertThat(selector.matchesTag("e2e")).isFalse();
     }
@@ -47,7 +47,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("creates OrSelector from varargs")
     void createsOrSelectorFromVarargs() {
-        Selector selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
+        var selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
 
         assertThat(selector).isInstanceOf(OrSelector.class);
         assertThat(((OrSelector) selector).selectors()).hasSize(2);
@@ -56,7 +56,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("creates OrSelector from List")
     void createsOrSelectorFromList() {
-        Selector selector = Selector.or(List.of(Selector.tagRegex("smoke"), Selector.tagRegex("integration")));
+        var selector = Selector.or(List.of(Selector.tagRegex("smoke"), Selector.tagRegex("integration")));
 
         assertThat(selector).isInstanceOf(OrSelector.class);
         assertThat(((OrSelector) selector).selectors()).hasSize(2);
@@ -101,8 +101,8 @@ class OrSelectorTest {
     @Test
     @DisplayName("flattens nested OR selectors")
     void flattensNestedOrSelectors() {
-        Selector inner = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
-        Selector outer = Selector.or(inner, Selector.tagRegex("e2e"));
+        var inner = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
+        var outer = Selector.or(inner, Selector.tagRegex("e2e"));
 
         assertThat(outer).isInstanceOf(OrSelector.class);
         assertThat(((OrSelector) outer).selectors()).hasSize(3);
@@ -111,8 +111,8 @@ class OrSelectorTest {
     @Test
     @DisplayName("does not flatten AND selectors inside OR")
     void doesNotFlattenAndInsideOr() {
-        Selector andInner = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
-        Selector selector = Selector.or(andInner, Selector.tagRegex("integration"));
+        var andInner = Selector.and(Selector.packageRegex("org"), Selector.tagRegex("smoke"));
+        var selector = Selector.or(andInner, Selector.tagRegex("integration"));
 
         assertThat(selector).isInstanceOf(OrSelector.class);
         assertThat(((OrSelector) selector).selectors()).hasSize(2);
@@ -121,7 +121,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("allows duplicate selectors")
     void allowsDuplicateSelectors() {
-        Selector selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("smoke"));
+        var selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("smoke"));
 
         assertThat(selector).isInstanceOf(OrSelector.class);
         assertThat(((OrSelector) selector).selectors()).hasSize(2);
@@ -130,7 +130,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("getSelectors returns unmodifiable list")
     void getSelectorsReturnsUnmodifiableList() {
-        Selector selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
+        var selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
 
         assertThatThrownBy(() -> ((OrSelector) selector).selectors().add(Selector.all()))
                 .isInstanceOf(UnsupportedOperationException.class);
@@ -139,7 +139,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("OR semantics for tag-only selectors: any match returns true")
     void orSemanticsForTagOnlySelectors() {
-        Selector selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
+        var selector = Selector.or(Selector.tagRegex("smoke"), Selector.tagRegex("integration"));
 
         assertThat(selector.matchesTag("smoke")).isTrue();
         assertThat(selector.matchesTag("integration")).isTrue();
@@ -149,8 +149,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("OR semantics for matchesPackage")
     void orSemanticsForMatchesPackage() {
-        Selector selector =
-                Selector.or(Selector.packageRegex("com\\.example"), Selector.packageRegex("org\\.paramixel"));
+        var selector = Selector.or(Selector.packageRegex("com\\.example"), Selector.packageRegex("org\\.paramixel"));
 
         assertThat(selector.matchesPackage("com.example")).isTrue();
         assertThat(selector.matchesPackage("org.paramixel")).isTrue();
@@ -160,7 +159,7 @@ class OrSelectorTest {
     @Test
     @DisplayName("OR semantics for matchesClass")
     void orSemanticsForMatchesClass() {
-        Selector selector = Selector.or(Selector.classRegex("TestA"), Selector.classRegex("TestB"));
+        var selector = Selector.or(Selector.classRegex("TestA"), Selector.classRegex("TestB"));
 
         assertThat(selector.matchesClass("com.example.TestA")).isTrue();
         assertThat(selector.matchesClass("com.example.TestB")).isTrue();

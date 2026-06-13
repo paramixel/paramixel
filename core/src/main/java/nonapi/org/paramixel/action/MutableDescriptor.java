@@ -177,6 +177,7 @@ public interface MutableDescriptor extends Descriptor {
      *
      * @return {@code true} when the wrapped action is coordination-only
      */
+    @SuppressWarnings("removal")
     default boolean isCoordinationAction() {
         return action() instanceof Parallel
                 || action() instanceof Sequence

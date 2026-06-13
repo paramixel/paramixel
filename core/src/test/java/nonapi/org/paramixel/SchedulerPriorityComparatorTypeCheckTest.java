@@ -19,7 +19,6 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Field;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -43,23 +42,23 @@ class SchedulerPriorityComparatorTypeCheckTest {
 
     static {
         SCHEDULER = new Scheduler(1, 32);
-        var config = Configuration.of(Map.of(
+        var configuration = Configuration.of(Map.of(
                 Configuration.RUNNER_PARALLELISM, "1",
                 Configuration.SCHEDULER_QUEUE_CAPACITY, "32",
                 Configuration.ANSI, "false"));
         var descriptor = new ConcreteDescriptor(Step.of("test", ctx -> {}));
-        CONTEXT = new ConcreteContext(config, new Listener() {}, descriptor, SCHEDULER, new InstanceHolder());
+        CONTEXT = new ConcreteContext(configuration, new Listener() {}, descriptor, SCHEDULER, new InstanceHolder());
     }
 
     @Test
     @DisplayName("comparator accepts PrioritizedTask instances")
     void comparatorAcceptsPrioritizedTaskInstances() throws Exception {
-        Comparator<Runnable> comparator = getPriorityComparator();
+        var comparator = getPriorityComparator();
 
-        SchedulerPriorityKey leftKey = SchedulerPriorityKey.root().child(0).child(0);
-        SchedulerPriorityKey rightKey = SchedulerPriorityKey.root().child(0).child(1);
-        Runnable leftTask = createPrioritizedTask(leftKey, 1L);
-        Runnable rightTask = createPrioritizedTask(rightKey, 2L);
+        var leftKey = SchedulerPriorityKey.root().child(0).child(0);
+        var rightKey = SchedulerPriorityKey.root().child(0).child(1);
+        var leftTask = createPrioritizedTask(leftKey, 1L);
+        var rightTask = createPrioritizedTask(rightKey, 2L);
 
         int result = comparator.compare(leftTask, rightTask);
         assertThat(result).isNegative();
@@ -68,11 +67,11 @@ class SchedulerPriorityComparatorTypeCheckTest {
     @Test
     @DisplayName("comparator throws ClassCastException when left is not PrioritizedTask")
     void comparatorThrowsWhenLeftIsNotPrioritizedTask() throws Exception {
-        Comparator<Runnable> comparator = getPriorityComparator();
+        var comparator = getPriorityComparator();
 
         Runnable leftNotPrioritized = () -> {};
-        SchedulerPriorityKey rightKey = SchedulerPriorityKey.root().child(0);
-        Runnable rightTask = createPrioritizedTask(rightKey, 1L);
+        var rightKey = SchedulerPriorityKey.root().child(0);
+        var rightTask = createPrioritizedTask(rightKey, 1L);
 
         assertThatThrownBy(() -> comparator.compare(leftNotPrioritized, rightTask))
                 .isInstanceOf(ClassCastException.class)
@@ -83,10 +82,10 @@ class SchedulerPriorityComparatorTypeCheckTest {
     @Test
     @DisplayName("comparator throws ClassCastException when right is not PrioritizedTask")
     void comparatorThrowsWhenRightIsNotPrioritizedTask() throws Exception {
-        Comparator<Runnable> comparator = getPriorityComparator();
+        var comparator = getPriorityComparator();
 
-        SchedulerPriorityKey leftKey = SchedulerPriorityKey.root().child(0);
-        Runnable leftTask = createPrioritizedTask(leftKey, 1L);
+        var leftKey = SchedulerPriorityKey.root().child(0);
+        var leftTask = createPrioritizedTask(leftKey, 1L);
         Runnable rightNotPrioritized = () -> {};
 
         assertThatThrownBy(() -> comparator.compare(leftTask, rightNotPrioritized))
@@ -98,7 +97,7 @@ class SchedulerPriorityComparatorTypeCheckTest {
     @Test
     @DisplayName("comparator handles both inputs as non-PrioritizedTask")
     void comparatorThrowsWhenBothAreNotPrioritizedTask() throws Exception {
-        Comparator<Runnable> comparator = getPriorityComparator();
+        var comparator = getPriorityComparator();
 
         Runnable leftNotPrioritized = () -> {};
         Runnable rightNotPrioritized = () -> {};
@@ -112,11 +111,11 @@ class SchedulerPriorityComparatorTypeCheckTest {
     @Test
     @DisplayName("priority blocking queue with comparator rejects non-PrioritizedTask")
     void priorityBlockingQueueRejectsNonPrioritizedTask() throws Exception {
-        Comparator<Runnable> comparator = getPriorityComparator();
+        var comparator = getPriorityComparator();
         var queue = new PriorityBlockingQueue<>(11, comparator);
 
-        SchedulerPriorityKey key = SchedulerPriorityKey.root().child(0);
-        Runnable prioritizedTask = createPrioritizedTask(key, 1L);
+        var key = SchedulerPriorityKey.root().child(0);
+        var prioritizedTask = createPrioritizedTask(key, 1L);
         queue.offer(prioritizedTask);
         assertThat(queue).hasSize(1);
 
@@ -126,13 +125,13 @@ class SchedulerPriorityComparatorTypeCheckTest {
 
     @SuppressWarnings("unchecked")
     private static Comparator<Runnable> getPriorityComparator() throws Exception {
-        Field comparatorField = Scheduler.class.getDeclaredField("PRIORITY_COMPARATOR");
+        var comparatorField = Scheduler.class.getDeclaredField("PRIORITY_COMPARATOR");
         comparatorField.setAccessible(true);
         return (Comparator<Runnable>) comparatorField.get(null);
     }
 
     private static Runnable createPrioritizedTask(SchedulerPriorityKey priorityKey, long sequence) throws Exception {
-        Class<?> prioritizedTaskClass =
+        var prioritizedTaskClass =
                 Class.forName("nonapi.org.paramixel.Scheduler$PrioritizedTask", true, Scheduler.class.getClassLoader());
         var constructor = prioritizedTaskClass.getDeclaredConstructor(
                 SchedulerPriorityKey.class,

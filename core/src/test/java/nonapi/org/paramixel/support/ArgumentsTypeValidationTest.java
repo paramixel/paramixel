@@ -29,7 +29,7 @@ class ArgumentsTypeValidationTest {
     @Test
     @DisplayName("requireInstanceOf(Object, Class, String) returns instance when type matches")
     void requireInstanceOfStringReturnsInstanceWhenTypeMatches() {
-        String value = "hello";
+        var value = "hello";
         assertThat(Arguments.requireInstanceOf(value, String.class, "wrong type"))
                 .isSameAs(value);
     }
@@ -37,7 +37,7 @@ class ArgumentsTypeValidationTest {
     @Test
     @DisplayName("requireInstanceOf(Object, Class, String) returns subclass instance")
     void requireInstanceOfStringReturnsSubclassInstance() {
-        Number value = Integer.valueOf(42);
+        var value = Integer.valueOf(42);
         assertThat(Arguments.requireInstanceOf(value, Number.class, "wrong type"))
                 .isSameAs(value);
     }
@@ -67,7 +67,7 @@ class ArgumentsTypeValidationTest {
     @Test
     @DisplayName("requireInstanceOf(Object, Class, Supplier) returns instance when type matches")
     void requireInstanceOfSupplierReturnsInstanceWhenTypeMatches() {
-        String value = "hello";
+        var value = "hello";
         assertThat(Arguments.requireInstanceOf(value, String.class, () -> "wrong type"))
                 .isSameAs(value);
     }

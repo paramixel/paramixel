@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
@@ -55,10 +54,10 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute returns early when skipTests is true")
         void executeReturnsEarlyWhenSkipTestsIsTrue() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, null);
+            var mojo = newMojo(tempDir, null);
             setField(mojo, "skipTests", true);
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatCode(mojo::execute).doesNotThrowAnyException();
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -75,9 +74,9 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute succeeds with passing fixture")
         void executeSucceedsWithPassingFixture() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "PassingMojoFixture");
+            var mojo = newMojo(tempDir, "PassingMojoFixture");
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatCode(mojo::execute).doesNotThrowAnyException();
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -94,9 +93,9 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute throws MojoFailureException for failing fixture")
         void executeThrowsMojoFailureExceptionForFailingFixture() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "FailingMojoFixture");
+            var mojo = newMojo(tempDir, "FailingMojoFixture");
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatThrownBy(mojo::execute).isInstanceOf(MojoFailureException.class);
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -113,10 +112,10 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute succeeds when failureOnSkip is false")
         void executeSucceedsWhenFailureOnSkipIsFalse() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "SkippingMojoFixture");
+            var mojo = newMojo(tempDir, "SkippingMojoFixture");
             setField(mojo, "failureOnSkip", false);
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatCode(mojo::execute).doesNotThrowAnyException();
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -128,10 +127,10 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute throws MojoFailureException when failureOnSkip is true")
         void executeThrowsMojoFailureExceptionWhenFailureOnSkipIsTrue() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "SkippingMojoFixture");
+            var mojo = newMojo(tempDir, "SkippingMojoFixture");
             setField(mojo, "failureOnSkip", true);
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatThrownBy(mojo::execute).isInstanceOf(MojoFailureException.class);
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -148,10 +147,10 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute throws MojoFailureException for failing fixture with failFast")
         void executeThrowsForFailingFixtureWithFailFast() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "FailingMojoFixture");
+            var mojo = newMojo(tempDir, "FailingMojoFixture");
             setField(mojo, "failFast", true);
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatThrownBy(mojo::execute).isInstanceOf(MojoFailureException.class);
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -163,10 +162,10 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute succeeds for passing fixture with failFast")
         void executeSucceedsForPassingFixtureWithFailFast() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "PassingMojoFixture");
+            var mojo = newMojo(tempDir, "PassingMojoFixture");
             setField(mojo, "failFast", true);
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatCode(mojo::execute).doesNotThrowAnyException();
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -196,10 +195,10 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute succeeds when failIfNoTests is false")
         void executeSucceedsWhenFailIfNoTestsIsFalse() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
+            var mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
             setField(mojo, "failIfNoTests", false);
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatCode(mojo::execute).doesNotThrowAnyException();
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -211,10 +210,10 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute throws MojoExecutionException when failIfNoTests is true")
         void executeThrowsMojoExecutionExceptionWhenFailIfNoTestsIsTrue() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
+            var mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
             setField(mojo, "failIfNoTests", true);
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatThrownBy(mojo::execute)
                         .isInstanceOf(MojoExecutionException.class)
@@ -233,9 +232,9 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("execute wraps resolver exceptions as MojoExecutionException")
         void executeWrapsResolverExceptionsAsMojoExecutionException() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "ThrowingFactoryMojoFixture");
+            var mojo = newMojo(tempDir, "ThrowingFactoryMojoFixture");
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatThrownBy(mojo::execute).isInstanceOf(MojoExecutionException.class);
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -259,7 +258,7 @@ class ParamixelMojoExecuteTest {
                 }
             };
 
-            ParamixelMojo mojo = new ParamixelMojo();
+            var mojo = new ParamixelMojo();
             setField(mojo, "project", project);
 
             assertThatThrownBy(mojo::execute)
@@ -275,14 +274,14 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("context classloader is restored before URLClassLoader is closed on error path")
         void contextClassLoaderRestoredBeforeUrlClassLoaderIsClosedOnErrorPath() throws Exception {
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
-            AtomicReference<ClassLoader> classLoaderAtClose = new AtomicReference<>();
-            MavenProject project = newProject(tempDir);
+            var original = Thread.currentThread().getContextClassLoader();
+            var classLoaderAtClose = new AtomicReference<ClassLoader>();
+            var project = newProject(tempDir);
 
             ParamixelMojo mojo = new ParamixelMojo() {
                 @Override
                 URLClassLoader buildTestClassLoader() throws MojoExecutionException {
-                    URLClassLoader delegate = super.buildTestClassLoader();
+                    var delegate = super.buildTestClassLoader();
                     return new URLClassLoader(delegate.getURLs(), delegate.getParent()) {
                         @Override
                         public void close() throws IOException {
@@ -308,14 +307,14 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("context classloader is restored before URLClassLoader is closed on success path")
         void contextClassLoaderRestoredBeforeUrlClassLoaderIsClosedOnSuccessPath() throws Exception {
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
-            AtomicReference<ClassLoader> classLoaderAtClose = new AtomicReference<>();
-            MavenProject project = newProject(tempDir);
+            var original = Thread.currentThread().getContextClassLoader();
+            var classLoaderAtClose = new AtomicReference<ClassLoader>();
+            var project = newProject(tempDir);
 
             ParamixelMojo mojo = new ParamixelMojo() {
                 @Override
                 URLClassLoader buildTestClassLoader() throws MojoExecutionException {
-                    URLClassLoader delegate = super.buildTestClassLoader();
+                    var delegate = super.buildTestClassLoader();
                     return new URLClassLoader(delegate.getURLs(), delegate.getParent()) {
                         @Override
                         public void close() throws IOException {
@@ -346,9 +345,9 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("no warning when no lingering threads after normal execution")
         void noWarningWhenNoLingeringThreadsAfterNormalExecution() throws Exception {
-            ParamixelMojo mojo = newMojo(tempDir, "PassingMojoFixture");
+            var mojo = newMojo(tempDir, "PassingMojoFixture");
 
-            ClassLoader original = Thread.currentThread().getContextClassLoader();
+            var original = Thread.currentThread().getContextClassLoader();
             try {
                 assertThatCode(mojo::execute).doesNotThrowAnyException();
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
@@ -360,12 +359,12 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("snapshotNonDaemonThreads returns non-null set")
         void snapshotNonDaemonThreadsReturnsNonNullSet() throws Exception {
-            ParamixelMojo mojo = new ParamixelMojo();
-            Method method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+            var mojo = new ParamixelMojo();
+            var method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
             method.setAccessible(true);
 
             @SuppressWarnings("unchecked")
-            Set<Thread> threads = (Set<Thread>) method.invoke(mojo);
+            var threads = (Set<Thread>) method.invoke(mojo);
 
             assertThat(threads).isNotNull();
         }
@@ -373,11 +372,11 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("strictThreadLifecycle fails build when lingering non-daemon thread detected")
         void strictThreadLifecycleFailsBuildWhenLingeringNonDaemonThreadDetected() throws Exception {
-            ParamixelMojo mojo = new ParamixelMojo();
+            var mojo = new ParamixelMojo();
             setField(mojo, "strictThreadLifecycle", true);
 
-            URLClassLoader testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
-            Thread dummyThread = new Thread(
+            var testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
+            var dummyThread = new Thread(
                     () -> {
                         try {
                             Thread.sleep(30_000);
@@ -391,14 +390,14 @@ class ParamixelMojoExecuteTest {
             try {
                 dummyThread.start();
 
-                Method snapshotMethod = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+                var snapshotMethod = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
                 snapshotMethod.setAccessible(true);
 
                 @SuppressWarnings("unchecked")
-                Set<Thread> baseline = (Set<Thread>) snapshotMethod.invoke(mojo);
+                var baseline = (Set<Thread>) snapshotMethod.invoke(mojo);
                 baseline.remove(dummyThread);
 
-                Method warnMethod = ParamixelMojo.class.getDeclaredMethod("warnOrErrorLingeringThreads", Set.class);
+                var warnMethod = ParamixelMojo.class.getDeclaredMethod("warnOrErrorLingeringThreads", Set.class);
                 warnMethod.setAccessible(true);
 
                 assertThatThrownBy(() -> warnMethod.invoke(mojo, baseline))
@@ -413,11 +412,11 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("warns when lingering threads detected with strictThreadLifecycle disabled")
         void warnsWhenLingeringThreadsDetectedWithStrictThreadLifecycleDisabled() throws Exception {
-            ParamixelMojo mojo = new ParamixelMojo();
+            var mojo = new ParamixelMojo();
             setField(mojo, "strictThreadLifecycle", false);
 
-            URLClassLoader testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
-            Thread dummyThread = new Thread(
+            var testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
+            var dummyThread = new Thread(
                     () -> {
                         try {
                             Thread.sleep(30_000);
@@ -431,14 +430,14 @@ class ParamixelMojoExecuteTest {
             try {
                 dummyThread.start();
 
-                Method snapshotMethod = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+                var snapshotMethod = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
                 snapshotMethod.setAccessible(true);
 
                 @SuppressWarnings("unchecked")
-                Set<Thread> baseline = (Set<Thread>) snapshotMethod.invoke(mojo);
+                var baseline = (Set<Thread>) snapshotMethod.invoke(mojo);
                 baseline.remove(dummyThread);
 
-                Method warnMethod = ParamixelMojo.class.getDeclaredMethod("warnOrErrorLingeringThreads", Set.class);
+                var warnMethod = ParamixelMojo.class.getDeclaredMethod("warnOrErrorLingeringThreads", Set.class);
                 warnMethod.setAccessible(true);
 
                 assertThatCode(() -> warnMethod.invoke(mojo, baseline)).doesNotThrowAnyException();
@@ -452,12 +451,12 @@ class ParamixelMojoExecuteTest {
         @Test
         @DisplayName("snapshotNonDaemonThreads excludes daemon threads")
         void snapshotNonDaemonThreadsExcludesDaemonThreads() throws Exception {
-            ParamixelMojo mojo = new ParamixelMojo();
-            Method method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+            var mojo = new ParamixelMojo();
+            var method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
             method.setAccessible(true);
 
             @SuppressWarnings("unchecked")
-            Set<Thread> threads = (Set<Thread>) method.invoke(mojo);
+            var threads = (Set<Thread>) method.invoke(mojo);
 
             for (Thread t : threads) {
                 assertThat(t.isDaemon()).isFalse();
@@ -466,8 +465,8 @@ class ParamixelMojoExecuteTest {
     }
 
     private ParamixelMojo newMojo(Path targetDir, String classMatch) throws Exception {
-        MavenProject project = newProject(targetDir);
-        ParamixelMojo mojo = new ParamixelMojo();
+        var project = newProject(targetDir);
+        var mojo = new ParamixelMojo();
         setField(mojo, "project", project);
         setField(mojo, "skipTests", false);
         if (classMatch != null) {
@@ -477,12 +476,12 @@ class ParamixelMojoExecuteTest {
     }
 
     private static MavenProject newProject(Path targetDir) throws Exception {
-        Path fixtureClasses = Paths.get(PassingMojoFixture.class
+        var fixtureClasses = Paths.get(PassingMojoFixture.class
                 .getProtectionDomain()
                 .getCodeSource()
                 .getLocation()
                 .toURI());
-        Path coreClasses = Paths.get(
+        var coreClasses = Paths.get(
                 Action.class.getProtectionDomain().getCodeSource().getLocation().toURI());
 
         var build = new Build();
@@ -506,7 +505,7 @@ class ParamixelMojoExecuteTest {
     }
 
     private static void setField(Object target, String name, Object value) throws Exception {
-        Class<?> clazz = target.getClass();
+        var clazz = target.getClass();
         Field field = null;
         while (clazz != null && field == null) {
             try {

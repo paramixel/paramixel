@@ -47,12 +47,12 @@ class TreeSummaryRendererTest {
 
     private String runAndCaptureOutput(final Action action) {
         var listener = new SummaryListener();
-        var config = new ConcreteConfiguration(Map.of(Configuration.ANSI, "true"));
-        listener.initialize(config);
-        Runner runner = Runner.builder().listener(listener).build();
+        var configuration = new ConcreteConfiguration(Map.of(Configuration.ANSI, "true"));
+        listener.initialize(configuration);
+        var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -65,12 +65,12 @@ class TreeSummaryRendererTest {
 
     private String runAndCapturePlainOutput(final Action action) {
         var listener = new SummaryListener();
-        var config = new ConcreteConfiguration(Map.of(Configuration.ANSI, "false"));
-        listener.initialize(config);
-        Runner runner = Runner.builder().listener(listener).build();
+        var configuration = new ConcreteConfiguration(Map.of(Configuration.ANSI, "false"));
+        listener.initialize(configuration);
+        var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
-        PrintStream originalOut = System.out;
+        var originalOut = System.out;
         try {
             System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
             runner.run(action);
@@ -83,10 +83,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("synthetic root node is hidden")
     void syntheticRootNodeIsHidden() {
-        Action child = Step.of("visible-child", context -> {});
-        Parallel parallel =
-                Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
-        String output = runAndCapturePlainOutput(parallel);
+        var child = Step.of("visible-child", context -> {});
+        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var output = runAndCapturePlainOutput(parallel);
 
         assertThat(output).contains("visible-child");
         assertThat(output).doesNotContain("PASSED " + ROOT_NAME);
@@ -95,7 +94,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("synthetic root renders lifecycle slots as top-level siblings")
     void syntheticRootRendersLifecycleSlotsAsTopLevelSiblings() {
-        Scope root = Scope.builder(ROOT_NAME)
+        var root = Scope.builder(ROOT_NAME)
                 .before(Sequence.builder("BeforeAll hooks")
                         .child(Step.of("beforeOne", context -> {}))
                         .child(Step.of("beforeTwo", context -> {}))
@@ -106,7 +105,7 @@ class TreeSummaryRendererTest {
                         .child(Step.of("afterTwo", context -> {}))
                         .build())
                 .build();
-        String output = runAndCapturePlainOutput(root);
+        var output = runAndCapturePlainOutput(root);
 
         assertThat(output).doesNotContain("PASSED " + ROOT_NAME);
         assertThat(output).contains("PASSED Run");
@@ -122,7 +121,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("synthetic root labels parallel body action type")
     void syntheticRootLabelsParallelBodyActionType() {
-        Scope root = Scope.builder(ROOT_NAME)
+        var root = Scope.builder(ROOT_NAME)
                 .before(Step.of("before", context -> {}))
                 .body(Parallel.builder("actions")
                         .parallelism(1)
@@ -131,7 +130,7 @@ class TreeSummaryRendererTest {
                         .build())
                 .after(Step.of("after", context -> {}))
                 .build();
-        String output = runAndCapturePlainOutput(root);
+        var output = runAndCapturePlainOutput(root);
 
         assertThat(output).contains("PASSED Run");
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED before");
@@ -144,8 +143,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("non-hidden root rendered")
     void nonHiddenRootRendered() {
-        Step noop = Step.of("my-root", context -> {});
-        String output = runAndCaptureOutput(noop);
+        var noop = Step.of("my-root", context -> {});
+        var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("my-root");
     }
@@ -153,8 +152,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("single action renders with PASSED status")
     void singleActionWithNoChildren() {
-        Step noop = Step.of("leaf", context -> {});
-        String output = runAndCaptureOutput(noop);
+        var noop = Step.of("leaf", context -> {});
+        var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("leaf");
         assertThat(output).contains("PASSED");
@@ -163,8 +162,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("PASSED status rendered with green")
     void successfulStatusRenderedWithGreen() {
-        Step noop = Step.of("passing", context -> {});
-        String output = runAndCaptureOutput(noop);
+        var noop = Step.of("passing", context -> {});
+        var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains(AnsiColor.BOLD_GREEN_TEXT.format("PASSED"));
     }
@@ -172,10 +171,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("FAILED status rendered with red")
     void failStatusRenderedWithRed() {
-        Action failing = Step.of("failing", context -> {
+        var failing = Step.of("failing", context -> {
             throw new RuntimeException("error");
         });
-        String output = runAndCaptureOutput(failing);
+        var output = runAndCaptureOutput(failing);
 
         assertThat(output).contains(AnsiColor.BOLD_RED_TEXT.format("FAILED"));
     }
@@ -183,10 +182,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("SKIPPED status rendered with bold yellow")
     void skipStatusRenderedWithBoldYellow() {
-        Action skipping = Step.of("skipper", context -> {
+        var skipping = Step.of("skipper", context -> {
             throw new SkipException("reason");
         });
-        String output = runAndCaptureOutput(skipping);
+        var output = runAndCaptureOutput(skipping);
 
         assertThat(output).contains(AnsiColor.BOLD_YELLOW_TEXT.format("SKIPPED"));
     }
@@ -194,7 +193,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("plain output disables ANSI formatting")
     void plainOutputDisablesAnsiFormatting() {
-        String output = runAndCapturePlainOutput(Step.of("plain", context -> {}));
+        var output = runAndCapturePlainOutput(Step.of("plain", context -> {}));
 
         assertThat(output).contains(Constants.PARAMIXEL_PLAIN);
         assertThat(output).contains("PASSED");
@@ -204,10 +203,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("failure info shows exception class and message on same line")
     void failureInfoWithThrowable() {
-        Action failing = Step.of("fail-action", context -> {
+        var failing = Step.of("fail-action", context -> {
             throw new IllegalStateException("bad state");
         });
-        String output = runAndCaptureOutput(failing);
+        var output = runAndCaptureOutput(failing);
 
         assertThat(output).contains("java.lang.IllegalStateException");
         assertThat(output).contains("bad state");
@@ -216,10 +215,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("failure info with multi-line message renders on single line")
     void failureInfoWithMultiLineMessageRendersOnSingleLine() {
-        Action failing = Step.of("multiline-fail", context -> {
+        var failing = Step.of("multiline-fail", context -> {
             throw new RuntimeException("\nline2\nline3");
         });
-        String output = runAndCaptureOutput(failing);
+        var output = runAndCaptureOutput(failing);
 
         assertThat(output).contains("java.lang.RuntimeException");
         assertThat(output).contains("line2 - line3");
@@ -228,8 +227,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("renders core action name without kind")
     void rendersCoreActionNameWithoutKind() {
-        Step noop = Step.of("noop-action", context -> {});
-        String output = runAndCaptureOutput(noop);
+        var noop = Step.of("noop-action", context -> {});
+        var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("noop-action");
     }
@@ -237,8 +236,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("timing shows milliseconds")
     void timingShowsMilliseconds() {
-        Step noop = Step.of("timed", context -> {});
-        String output = runAndCaptureOutput(noop);
+        var noop = Step.of("timed", context -> {});
+        var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("ms");
     }
@@ -246,9 +245,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("full action names are preserved without truncation")
     void fullActionNamesPreserved() {
-        String thirtyFiveCharName = "a".repeat(35);
-        Step noop = Step.of(thirtyFiveCharName, context -> {});
-        String output = runAndCaptureOutput(noop);
+        var thirtyFiveCharName = "a".repeat(35);
+        var noop = Step.of(thirtyFiveCharName, context -> {});
+        var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains(thirtyFiveCharName);
     }
@@ -256,10 +255,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("two children rendered with tree connectors")
     void twoChildrenRenderedWithTreeConnectors() {
-        Action child1 = Step.of("child-1", context -> {});
-        Action child2 = Step.of("child-2", context -> {});
-        Sequence seq = Sequence.builder("parent").child(child1).child(child2).build();
-        String output = runAndCaptureOutput(seq);
+        var child1 = Step.of("child-1", context -> {});
+        var child2 = Step.of("child-2", context -> {});
+        var seq = Sequence.builder("parent").child(child1).child(child2).build();
+        var output = runAndCaptureOutput(seq);
 
         assertThat(output).contains("child-1");
         assertThat(output).contains("child-2");
@@ -269,15 +268,15 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before and after renders with standard connectors")
     void lifecycleWithBeforeAndAfterRendersStandardConnectors() {
-        Action before = Step.of("before", context -> {});
-        Action body = Step.of("body", context -> {});
-        Action after = Step.of("after", context -> {});
-        Scope scope = Scope.builder("myLifecycle")
+        var before = Step.of("before", context -> {});
+        var body = Step.of("body", context -> {});
+        var after = Step.of("after", context -> {});
+        var scope = Scope.builder("myLifecycle")
                 .before(before)
                 .body(body)
                 .after(after)
                 .build();
-        String output = runAndCapturePlainOutput(scope);
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED before");
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED body");
@@ -287,15 +286,15 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before, body, and after renders as siblings")
     void lifecycleWithBeforeBodyAfterRendersAsSiblings() {
-        Action before = Step.of("setUp()", context -> {});
-        Action body = Step.of("testGet()", context -> {});
-        Action after = Step.of("tearDown()", context -> {});
-        Scope scope = Scope.builder("myLifecycle")
+        var before = Step.of("setUp()", context -> {});
+        var body = Step.of("testGet()", context -> {});
+        var after = Step.of("tearDown()", context -> {});
+        var scope = Scope.builder("myLifecycle")
                 .before(before)
                 .body(body)
                 .after(after)
                 .build();
-        String output = runAndCapturePlainOutput(scope);
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED testGet()");
@@ -305,16 +304,16 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before, multiple body, and after renders as siblings")
     void lifecycleWithBeforeMultipleBodyAfterRendersAsSiblings() {
-        Action before = Step.of("setUp()", context -> {});
-        Action body1 = Step.of("testA()", context -> {});
-        Action body2 = Step.of("testB()", context -> {});
-        Action after = Step.of("tearDown()", context -> {});
-        Scope scope = Scope.builder("myLifecycle")
+        var before = Step.of("setUp()", context -> {});
+        var body1 = Step.of("testA()", context -> {});
+        var body2 = Step.of("testB()", context -> {});
+        var after = Step.of("tearDown()", context -> {});
+        var scope = Scope.builder("myLifecycle")
                 .before(before)
                 .body(Sequence.builder("body").child(body1).child(body2).build())
                 .after(after)
                 .build();
-        String output = runAndCapturePlainOutput(scope);
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
         assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
@@ -326,10 +325,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before and no after renders with standard connectors")
     void lifecycleWithBeforeNoAfterRendersStandardConnectors() {
-        Action before = Step.of("before", context -> {});
-        Action body = Step.of("body", context -> {});
-        Scope scope = Scope.builder("myLifecycle").before(before).body(body).build();
-        String output = runAndCapturePlainOutput(scope);
+        var before = Step.of("before", context -> {});
+        var body = Step.of("body", context -> {});
+        var scope = Scope.builder("myLifecycle").before(before).body(body).build();
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED before");
         assertThat(output).contains("\u2514\u2500 body[step]: PASSED body");
@@ -338,10 +337,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before, body, and no after renders as siblings")
     void lifecycleWithBeforeBodyNoAfterRendersAsSiblings() {
-        Action before = Step.of("setUp()", context -> {});
-        Action body = Step.of("testGet()", context -> {});
-        Scope scope = Scope.builder("myLifecycle").before(before).body(body).build();
-        String output = runAndCapturePlainOutput(scope);
+        var before = Step.of("setUp()", context -> {});
+        var body = Step.of("testGet()", context -> {});
+        var scope = Scope.builder("myLifecycle").before(before).body(body).build();
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
         assertThat(output).contains("\u2514\u2500 body[step]: PASSED testGet()");
@@ -350,10 +349,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with after and no before renders with standard connectors")
     void lifecycleWithAfterNoBeforeRendersStandardConnectors() {
-        Action body = Step.of("body", context -> {});
-        Action after = Step.of("after", context -> {});
-        Scope scope = Scope.builder("myLifecycle").body(body).after(after).build();
-        String output = runAndCapturePlainOutput(scope);
+        var body = Step.of("body", context -> {});
+        var after = Step.of("after", context -> {});
+        var scope = Scope.builder("myLifecycle").body(body).after(after).build();
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED body");
         assertThat(output).contains("\u2514\u2500 after[step]: PASSED after");
@@ -362,10 +361,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with body and after but no before renders body flat with after last")
     void lifecycleWithBodyAfterNoBeforeRendersBodyFlatWithAfterLast() {
-        Action body = Step.of("testGet()", context -> {});
-        Action after = Step.of("tearDown()", context -> {});
-        Scope scope = Scope.builder("myLifecycle").body(body).after(after).build();
-        String output = runAndCapturePlainOutput(scope);
+        var body = Step.of("testGet()", context -> {});
+        var after = Step.of("tearDown()", context -> {});
+        var scope = Scope.builder("myLifecycle").body(body).after(after).build();
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED testGet()");
         assertThat(output).contains("\u2514\u2500 after[step]: PASSED tearDown()");
@@ -374,15 +373,15 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with setUp and tearDown names renders with standard connectors")
     void lifecycleWithSetUpTearDownNamesRendersStandardConnectors() {
-        Action before = Step.of("setUp()", context -> {});
-        Action body = Step.of("body", context -> {});
-        Action after = Step.of("tearDown()", context -> {});
-        Scope scope = Scope.builder("myLifecycle")
+        var before = Step.of("setUp()", context -> {});
+        var body = Step.of("body", context -> {});
+        var after = Step.of("tearDown()", context -> {});
+        var scope = Scope.builder("myLifecycle")
                 .before(before)
                 .body(body)
                 .after(after)
                 .build();
-        String output = runAndCapturePlainOutput(scope);
+        var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED body");
@@ -392,19 +391,18 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("instance with lifecycle body child renders lifecycle slots as siblings")
     void instanceWithLifecycleBodyChildRendersLifecycleSlotsAsSiblings() {
-        Action lifecycleBefore = Step.of("setUp()", context -> {});
-        Action lifecycleBody = Step.of("testGet()", context -> {});
-        Action lifecycleAfter = Step.of("tearDown()", context -> {});
-        Scope scope = Scope.builder("lifecycle")
+        var lifecycleBefore = Step.of("setUp()", context -> {});
+        var lifecycleBody = Step.of("testGet()", context -> {});
+        var lifecycleAfter = Step.of("tearDown()", context -> {});
+        var scope = Scope.builder("lifecycle")
                 .before(lifecycleBefore)
                 .body(lifecycleBody)
                 .after(lifecycleAfter)
                 .build();
-        Instance instance =
+        var instance =
                 Instance.builder("nginx:1.29.5", () -> "instance").body(scope).build();
-        Parallel parallel =
-                Parallel.builder("root").parallelism(1).child(instance).build();
-        String output = runAndCapturePlainOutput(parallel);
+        var parallel = Parallel.builder("root").parallelism(1).child(instance).build();
+        var output = runAndCapturePlainOutput(parallel);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED [instantiate]");
         assertThat(output).contains("\u251C\u2500 body[scope]: PASSED lifecycle");
@@ -417,7 +415,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("static with before and after renders body as sibling")
     void staticWithBeforeAndAfterRendersBodyAsSibling() {
-        Action staticAction = Static.builder("myStatic")
+        var staticAction = Static.builder("myStatic")
                 .before(Step.of("staticSetUp", context -> {}))
                 .body(Sequence.builder("body")
                         .child(Step.of("testOne", context -> {}))
@@ -425,7 +423,7 @@ class TreeSummaryRendererTest {
                         .build())
                 .after(Step.of("staticTearDown", context -> {}))
                 .build();
-        String output = runAndCapturePlainOutput(staticAction);
+        var output = runAndCapturePlainOutput(staticAction);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED staticSetUp");
         assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
@@ -437,7 +435,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("instance renders instantiate, body, and destroy as siblings")
     void instanceRendersInstantiateBodyAndDestroyAsSiblings() {
-        Instance instance = Instance.builder("myInstance", () -> "instance")
+        var instance = Instance.builder("myInstance", () -> "instance")
                 .body(Sequence.builder("body")
                         .child(Step.of("setUp", s -> {}))
                         .child(Step.of("test produce", s -> {}))
@@ -445,9 +443,8 @@ class TreeSummaryRendererTest {
                         .child(Step.of("tearDown", s -> {}))
                         .build())
                 .build();
-        Parallel parallel =
-                Parallel.builder("root").parallelism(1).child(instance).build();
-        String output = runAndCapturePlainOutput(parallel);
+        var parallel = Parallel.builder("root").parallelism(1).child(instance).build();
+        var output = runAndCapturePlainOutput(parallel);
 
         assertThat(output).contains("myInstance");
         assertThat(output).contains("[instantiate]");
@@ -472,7 +469,7 @@ class TreeSummaryRendererTest {
         var root = createDeepLinearDescriptorTree(depth);
         var renderer = new TreeSummaryRenderer(false);
 
-        String output = renderer.render(root);
+        var output = renderer.render(root);
 
         assertThat(output).contains("depth-0");
         assertThat(output).contains("depth-" + (depth - 1));
@@ -482,8 +479,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("onRunStarted prints starting banner")
     void onRunStartedPrintsStartingBanner() {
-        Step noop = Step.of("banner-test", context -> {});
-        String output = runAndCapturePlainOutput(noop);
+        var noop = Step.of("banner-test", context -> {});
+        var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("Paramixel v" + Version.version() + " starting...");
     }
@@ -491,8 +488,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("onRunCompleted prints footer with status, finished-at, and total time")
     void onRunCompletedPrintsFooter() {
-        Step noop = Step.of("footer-test", context -> {});
-        String output = runAndCapturePlainOutput(noop);
+        var noop = Step.of("footer-test", context -> {});
+        var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("Status      : PASSED");
         assertThat(output).contains("Finished at :");
@@ -502,8 +499,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("footer uses ANSI-colored status when ANSI is enabled")
     void footerUsesAnsiStatusWhenEnabled() {
-        Step noop = Step.of("ansi-footer", context -> {});
-        String output = runAndCaptureOutput(noop);
+        var noop = Step.of("ansi-footer", context -> {});
+        var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains(AnsiColor.BOLD_GREEN_TEXT.format("PASSED"));
     }
@@ -511,8 +508,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("footer uses plain status when ANSI is disabled")
     void footerUsesPlainStatusWhenDisabled() {
-        Step noop = Step.of("plain-footer", context -> {});
-        String output = runAndCapturePlainOutput(noop);
+        var noop = Step.of("plain-footer", context -> {});
+        var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("Status      : PASSED");
         assertThat(output).doesNotContain("\u001B[");
@@ -521,8 +518,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("onRunCompleted prints dashed separators around footer")
     void onRunCompletedPrintsDashedSeparators() {
-        Step noop = Step.of("separator-test", context -> {});
-        String output = runAndCapturePlainOutput(noop);
+        var noop = Step.of("separator-test", context -> {});
+        var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("----------");
     }
@@ -530,8 +527,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("each output line is prefixed with [PARAMIXEL]")
     void eachLinePrefixedWithParamixel() {
-        Step noop = Step.of("prefix-test", context -> {});
-        String output = runAndCapturePlainOutput(noop);
+        var noop = Step.of("prefix-test", context -> {});
+        var output = runAndCapturePlainOutput(noop);
 
         for (var line : output.split(System.lineSeparator())) {
             if (!line.isEmpty() && !line.startsWith("ACTIVE THREAD COUNT ")) {
@@ -543,8 +540,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("passed status lines have no trailing whitespace")
     void passedStatusLinesHaveNoTrailingWhitespace() {
-        Step noop = Step.of("trailing-space-test", context -> {});
-        String output = runAndCapturePlainOutput(noop);
+        var noop = Step.of("trailing-space-test", context -> {});
+        var output = runAndCapturePlainOutput(noop);
 
         for (var line : output.split(System.lineSeparator())) {
             if (line.contains("trailing-space-test")) {
@@ -556,7 +553,7 @@ class TreeSummaryRendererTest {
     @Test
     void renderRejectsNullDescriptor() {
         var renderer = new TreeSummaryRenderer();
-        String output = renderer.render(null);
+        var output = renderer.render(null);
 
         assertThat(output).contains("No Paramixel tests found");
     }

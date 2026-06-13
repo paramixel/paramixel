@@ -75,7 +75,7 @@ public class AnnotationDependentArgumentTest {
 
         for (int i = 0; i < ARGUMENT_COUNT; i++) {
             int argumentIndex = i;
-            String argumentValue = "string-" + i;
+            var argumentValue = "string-" + i;
 
             var lifecycle = scope(argumentValue)
                     .before(annotationResolver.byId("before"))

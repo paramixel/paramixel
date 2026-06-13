@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +56,7 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("expands tilde to user home directory")
     void expandsTildeToUserHome() {
-        Path result = TildePathExpander.expand("~");
+        var result = TildePathExpander.expand("~");
         assertThat(result).isAbsolute();
         assertThat(result.toString()).isEqualTo(USER_HOME);
     }
@@ -65,7 +64,7 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("expands tilde slash path to path under user home")
     void expandsTildeSlashPath() {
-        Path result = TildePathExpander.expand("~/sub/dir");
+        var result = TildePathExpander.expand("~/sub/dir");
         assertThat(result).isAbsolute();
         assertThat(result.toString()).isEqualTo(USER_HOME + "/sub/dir");
     }
@@ -73,14 +72,14 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("passes through absolute path unchanged")
     void passesThroughAbsolutePath() {
-        Path result = TildePathExpander.expand("/absolute/path");
+        var result = TildePathExpander.expand("/absolute/path");
         assertThat(result.toString()).isEqualTo("/absolute/path");
     }
 
     @Test
     @DisplayName("passes through relative path unchanged")
     void passesThroughRelativePath() {
-        Path result = TildePathExpander.expand("relative/path");
+        var result = TildePathExpander.expand("relative/path");
         assertThat(result.toString()).isEqualTo("relative/path");
     }
 
@@ -110,9 +109,9 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("assumes Linux when os.name is unrecognizable")
     void assumesLinuxWhenOsNameUnrecognizable() {
-        OsDetector unknownOs = LINUX_OS;
+        var unknownOs = LINUX_OS;
 
-        Path result = TildePathExpander.expand("~testuser", unknownOs, user -> "/home/" + user);
+        var result = TildePathExpander.expand("~testuser", unknownOs, user -> "/home/" + user);
 
         assertThat(result.toString()).isEqualTo("/home/testuser");
     }
@@ -120,7 +119,7 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("returns input as-is on Windows")
     void returnsInputAsIsOnWindows() {
-        Path result = TildePathExpander.expand("~/some/path", WINDOWS_OS, user -> "/home/" + user);
+        var result = TildePathExpander.expand("~/some/path", WINDOWS_OS, user -> "/home/" + user);
 
         assertThat(result.toString()).isEqualTo("~/some/path");
     }
@@ -128,7 +127,7 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("expands ~user/path to home directory with subpath")
     void expandsUserPathToHomeWithSubpath() {
-        Path result = TildePathExpander.expand("~testuser/docs", LINUX_OS, user -> "/home/" + user);
+        var result = TildePathExpander.expand("~testuser/docs", LINUX_OS, user -> "/home/" + user);
 
         assertThat(result.toString()).isEqualTo("/home/testuser/docs");
     }
@@ -136,7 +135,7 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("wraps IOException from resolver in UncheckedIOException")
     void wrapsIOExceptionFromResolver() {
-        IOException cause = new IOException("lookup failed");
+        var cause = new IOException("lookup failed");
 
         assertThatThrownBy(() -> TildePathExpander.expand("~testuser", LINUX_OS, user -> {
                     throw cause;
@@ -156,7 +155,7 @@ class TildePathExpanderTest {
     @Test
     @DisplayName("returns normal path when input does not start with tilde on Linux")
     void returnsNormalPathWithoutTildeOnLinux() {
-        Path result = TildePathExpander.expand("plain/path", LINUX_OS, user -> "/home/" + user);
+        var result = TildePathExpander.expand("plain/path", LINUX_OS, user -> "/home/" + user);
 
         assertThat(result.toString()).isEqualTo("plain/path");
     }

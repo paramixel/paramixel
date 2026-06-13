@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Timeout arguments")
+@SuppressWarnings("removal")
 class TimeoutArgumentsTest {
 
     private static final Action STEP = Step.of("step", s -> {});

@@ -62,13 +62,11 @@ public class AnnotationMongoDBTest {
 
         var parallel = parallel(AnnotationMongoDBTest.class.getName());
         for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            var lifecycle = scope(environment.name())
-                    .before(annotationResolver.byId("setUp"))
-                    .body(annotationResolver.byId("testInsertAndQuery"))
-                    .after(annotationResolver.byId("tearDown"));
-
             parallel.child(instance(environment.name(), () -> new AnnotationMongoDBTest(environment))
-                    .body(lifecycle));
+                    .body(scope(environment.name())
+                            .before(annotationResolver.byId("setUp"))
+                            .body(annotationResolver.byId("testInsertAndQuery"))
+                            .after(annotationResolver.byId("tearDown"))));
         }
         return parallel.build();
     }
@@ -102,7 +100,7 @@ public class AnnotationMongoDBTest {
             var collection = database.getCollection("testcol");
             collection.insertOne(new Document("key", "value"));
 
-            Document found = collection.find(new Document("key", "value")).first();
+            var found = collection.find(new Document("key", "value")).first();
 
             assertThat(found).isNotNull();
             assertThat(found.getString("key")).isEqualTo("value");

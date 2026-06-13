@@ -36,7 +36,7 @@ public final class NetworkFactory {
      * @return a new, eagerly-allocated Testcontainers network
      */
     public static Network createNetwork() {
-        Network network = Network.newNetwork();
+        var network = Network.newNetwork();
         // Eagerly allocate the Docker network by calling getId().
         // This ensures the network is fully materialized before any
         // container references it, preventing race conditions during

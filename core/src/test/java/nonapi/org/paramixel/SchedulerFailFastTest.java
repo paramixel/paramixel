@@ -33,6 +33,7 @@ import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.AbortedException;
 
 @DisplayName("Scheduler fail-fast")
+@SuppressWarnings("removal")
 class SchedulerFailFastTest {
 
     @Test

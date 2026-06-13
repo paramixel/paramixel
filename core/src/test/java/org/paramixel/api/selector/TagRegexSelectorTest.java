@@ -28,7 +28,7 @@ class TagRegexSelectorTest {
     @Test
     @DisplayName("getPattern returns the compiled pattern")
     void getPatternReturnsCompiledPattern() {
-        TagRegexSelector selector = (TagRegexSelector) Selector.tagRegex("smoke");
+        var selector = (TagRegexSelector) Selector.tagRegex("smoke");
 
         assertThat(selector.pattern()).isNotNull();
         assertThat(selector.pattern().pattern()).isEqualTo("smoke");
@@ -37,7 +37,7 @@ class TagRegexSelectorTest {
     @Test
     @DisplayName("matchesTag uses find() semantics")
     void matchesTagUsesFindSemantics() {
-        TagRegexSelector selector = (TagRegexSelector) Selector.tagRegex("smoke");
+        var selector = (TagRegexSelector) Selector.tagRegex("smoke");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
         assertThat(selector.matchesTag("smoke-test")).isTrue();
@@ -47,7 +47,7 @@ class TagRegexSelectorTest {
     @Test
     @DisplayName("matchesPackage returns true")
     void matchesPackageReturnsTrue() {
-        TagRegexSelector selector = (TagRegexSelector) Selector.tagRegex("smoke");
+        var selector = (TagRegexSelector) Selector.tagRegex("smoke");
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
     }
@@ -55,7 +55,7 @@ class TagRegexSelectorTest {
     @Test
     @DisplayName("matchesClass returns true")
     void matchesClassReturnsTrue() {
-        TagRegexSelector selector = (TagRegexSelector) Selector.tagRegex("smoke");
+        var selector = (TagRegexSelector) Selector.tagRegex("smoke");
 
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isTrue();
     }
@@ -63,7 +63,7 @@ class TagRegexSelectorTest {
     @Test
     @DisplayName("matchesTag rejects null")
     void matchesTagRejectsNull() {
-        TagRegexSelector selector = (TagRegexSelector) Selector.tagRegex("smoke");
+        var selector = (TagRegexSelector) Selector.tagRegex("smoke");
 
         assertThatThrownBy(() -> selector.matchesTag(null)).isInstanceOf(NullPointerException.class);
     }

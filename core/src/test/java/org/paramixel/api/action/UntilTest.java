@@ -28,6 +28,7 @@ import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.FailException;
 
 @DisplayName("Until action")
+@SuppressWarnings("removal")
 class UntilTest {
 
     private static final Action STEP = Step.of("step", s -> {});

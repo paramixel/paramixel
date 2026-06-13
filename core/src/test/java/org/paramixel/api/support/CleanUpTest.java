@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ class CleanUpTest {
     @DisplayName("run executes runnable")
     void runExecutesRunnable() {
         var executed = new boolean[1];
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> executed[0] = true);
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> executed[0] = true);
 
         cleanup.run();
 
@@ -43,7 +42,7 @@ class CleanUpTest {
     @Test
     @DisplayName("run with null AutoCloseable is no-op")
     void runWithNullAutoCloseableIsNoOp() {
-        CleanUp cleanup = CleanUp.of((AutoCloseable) null);
+        var cleanup = CleanUp.of((AutoCloseable) null);
 
         cleanup.run();
 
@@ -54,7 +53,7 @@ class CleanUpTest {
     @DisplayName("run captures RuntimeException")
     void runCapturesRuntimeException() {
         var exception = new RuntimeException("error");
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw exception;
         });
 
@@ -70,7 +69,7 @@ class CleanUpTest {
         class CheckedException extends Exception {}
 
         var exception = new CheckedException();
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw exception;
         });
 
@@ -83,7 +82,7 @@ class CleanUpTest {
     @Test
     @DisplayName("run rethrows OutOfMemoryError")
     void runRethrowsOutOfMemoryError() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw new OutOfMemoryError("simulated oom");
         });
 
@@ -95,7 +94,7 @@ class CleanUpTest {
     @Test
     @DisplayName("run rethrows InternalError")
     void runRethrowsInternalError() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw new InternalError("simulated ie");
         });
 
@@ -107,7 +106,7 @@ class CleanUpTest {
     @Test
     @DisplayName("run captures StackOverflowError")
     void runCapturesStackOverflowError() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw new StackOverflowError("simulated soe");
         });
 
@@ -120,7 +119,7 @@ class CleanUpTest {
     @Test
     @DisplayName("run captures AssertionError")
     void runCapturesAssertionError() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw new AssertionError("assertion failed");
         });
 
@@ -133,7 +132,7 @@ class CleanUpTest {
     @Test
     @DisplayName("run throws IllegalStateException on second call")
     void runThrowsIllegalStateExceptionOnSecondCall() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.run();
 
@@ -153,7 +152,7 @@ class CleanUpTest {
             }
         }
 
-        CleanUp cleanup = CleanUp.of(new TestCloseable());
+        var cleanup = CleanUp.of(new TestCloseable());
         cleanup.run();
 
         assertThat(executionOrder).containsExactly("closed");
@@ -170,7 +169,7 @@ class CleanUpTest {
             }
         }
 
-        CleanUp cleanup = CleanUp.of(new ThrowingCloseable());
+        var cleanup = CleanUp.of(new ThrowingCloseable());
         cleanup.run();
 
         assertThat(cleanup.isNotEmpty()).isTrue();
@@ -180,7 +179,7 @@ class CleanUpTest {
     @Test
     @DisplayName("runAndThrow returns normally when no exception")
     void runAndThrowReturnsNormallyWhenNoException() throws Throwable {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.runAndThrow();
     }
@@ -189,7 +188,7 @@ class CleanUpTest {
     @DisplayName("runAndThrow throws captured exception")
     void runAndThrowThrowsCapturedException() {
         var exception = new RuntimeException("error");
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw exception;
         });
 
@@ -199,7 +198,7 @@ class CleanUpTest {
     @Test
     @DisplayName("runAndThrow rethrows OutOfMemoryError immediately")
     void runAndThrowRethrowsOutOfMemoryErrorImmediately() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw new OutOfMemoryError("simulated oom");
         });
 
@@ -211,7 +210,7 @@ class CleanUpTest {
     @Test
     @DisplayName("runAndThrow throws IllegalStateException on second call")
     void runAndThrowThrowsIllegalStateExceptionOnSecondCall() throws Throwable {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.runAndThrow();
 
@@ -223,7 +222,7 @@ class CleanUpTest {
     @Test
     @DisplayName("getThrowable returns null before run")
     void getThrowableReturnsNullBeforeRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         assertThat(cleanup.throwable()).isNull();
     }
@@ -231,7 +230,7 @@ class CleanUpTest {
     @Test
     @DisplayName("getThrowable returns null after successful run")
     void getThrowableReturnsNullAfterSuccessfulRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.run();
 
@@ -242,7 +241,7 @@ class CleanUpTest {
     @DisplayName("getThrowable returns exception after failed run")
     void getThrowableReturnsExceptionAfterFailedRun() {
         var exception = new RuntimeException("error");
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw exception;
         });
 
@@ -254,7 +253,7 @@ class CleanUpTest {
     @Test
     @DisplayName("isEmpty returns true before run")
     void isEmptyReturnsTrueBeforeRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         assertThat(cleanup.isEmpty()).isTrue();
     }
@@ -262,7 +261,7 @@ class CleanUpTest {
     @Test
     @DisplayName("isEmpty returns true after successful run")
     void isEmptyReturnsTrueAfterSuccessfulRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.run();
 
@@ -272,7 +271,7 @@ class CleanUpTest {
     @Test
     @DisplayName("isEmpty returns false after failed run")
     void isEmptyReturnsFalseAfterFailedRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw new RuntimeException("error");
         });
 
@@ -284,7 +283,7 @@ class CleanUpTest {
     @Test
     @DisplayName("isNotEmpty returns false before run")
     void isNotEmptyReturnsFalseBeforeRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         assertThat(cleanup.isNotEmpty()).isFalse();
     }
@@ -292,7 +291,7 @@ class CleanUpTest {
     @Test
     @DisplayName("isNotEmpty returns false after successful run")
     void isNotEmptyReturnsFalseAfterSuccessfulRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.run();
 
@@ -302,7 +301,7 @@ class CleanUpTest {
     @Test
     @DisplayName("isNotEmpty returns true after failed run")
     void isNotEmptyReturnsTrueAfterFailedRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {
             throw new RuntimeException("error");
         });
 
@@ -318,13 +317,13 @@ class CleanUpTest {
         var second = new RuntimeException("second");
         var third = new RuntimeException("third");
 
-        CleanUp cleanup1 = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup1 = CleanUp.of((ThrowingRunnable) () -> {
             throw first;
         });
-        CleanUp cleanup2 = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup2 = CleanUp.of((ThrowingRunnable) () -> {
             throw second;
         });
-        CleanUp cleanup3 = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup3 = CleanUp.of((ThrowingRunnable) () -> {
             throw third;
         });
 
@@ -340,8 +339,8 @@ class CleanUpTest {
     @Test
     @DisplayName("static runAndThrow with vararg returns normally when no exceptions")
     void staticRunAndThrowVarargReturnsNormallyWhenNoExceptions() throws Throwable {
-        CleanUp cleanup1 = CleanUp.of((ThrowingRunnable) () -> {});
-        CleanUp cleanup2 = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup1 = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup2 = CleanUp.of((ThrowingRunnable) () -> {});
 
         CleanUp.runAndThrow(cleanup1, cleanup2);
     }
@@ -350,10 +349,10 @@ class CleanUpTest {
     @DisplayName("static runAndThrow with vararg throws when first fails and second succeeds")
     void staticRunAndThrowVarargThrowsWhenFirstFailsAndSecondSucceeds() {
         var exception = new RuntimeException("error");
-        CleanUp cleanup1 = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup1 = CleanUp.of((ThrowingRunnable) () -> {
             throw exception;
         });
-        CleanUp cleanup2 = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup2 = CleanUp.of((ThrowingRunnable) () -> {});
 
         assertThatThrownBy(() -> CleanUp.runAndThrow(cleanup1, cleanup2)).isSameAs(exception);
     }
@@ -362,8 +361,8 @@ class CleanUpTest {
     @DisplayName("static runAndThrow with vararg throws when first succeeds and second fails")
     void staticRunAndThrowVarargThrowsWhenFirstSucceedsAndSecondFails() {
         var exception = new RuntimeException("error");
-        CleanUp cleanup1 = CleanUp.of((ThrowingRunnable) () -> {});
-        CleanUp cleanup2 = CleanUp.of((ThrowingRunnable) () -> {
+        var cleanup1 = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup2 = CleanUp.of((ThrowingRunnable) () -> {
             throw exception;
         });
 
@@ -382,7 +381,7 @@ class CleanUpTest {
         var first = new RuntimeException("first");
         var second = new RuntimeException("second");
 
-        Collection<CleanUp> cleanUps = List.of(
+        var cleanUps = List.of(
                 CleanUp.of((ThrowingRunnable) () -> {
                     throw first;
                 }),
@@ -399,8 +398,7 @@ class CleanUpTest {
     @Test
     @DisplayName("static runAndThrow with collection returns normally when no exceptions")
     void staticRunAndThrowCollectionReturnsNormallyWhenNoExceptions() throws Throwable {
-        Collection<CleanUp> cleanUps =
-                List.of(CleanUp.of((ThrowingRunnable) () -> {}), CleanUp.of((ThrowingRunnable) () -> {}));
+        var cleanUps = List.of(CleanUp.of((ThrowingRunnable) () -> {}), CleanUp.of((ThrowingRunnable) () -> {}));
 
         CleanUp.runAndThrow(cleanUps);
     }
@@ -414,7 +412,7 @@ class CleanUpTest {
     @Test
     @DisplayName("hasRun returns false before run")
     void hasRunReturnsFalseBeforeRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         assertThat(cleanup.hasRun()).isFalse();
     }
@@ -422,7 +420,7 @@ class CleanUpTest {
     @Test
     @DisplayName("hasRun returns true after run")
     void hasRunReturnsTrueAfterRun() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.run();
 
@@ -432,7 +430,7 @@ class CleanUpTest {
     @Test
     @DisplayName("hasRun returns true after runAndThrow")
     void hasRunReturnsTrueAfterRunAndThrow() throws Throwable {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.runAndThrow();
 
@@ -442,8 +440,8 @@ class CleanUpTest {
     @Test
     @DisplayName("static runAndThrow with vararg skips already-run instances")
     void staticRunAndThrowVarargSkipsAlreadyRunInstances() throws Throwable {
-        CleanUp a = CleanUp.of((ThrowingRunnable) () -> {});
-        CleanUp b = CleanUp.of((ThrowingRunnable) () -> {});
+        var a = CleanUp.of((ThrowingRunnable) () -> {});
+        var b = CleanUp.of((ThrowingRunnable) () -> {});
 
         a.run();
         b.run();
@@ -457,10 +455,10 @@ class CleanUpTest {
         var first = new RuntimeException("first");
         var second = new RuntimeException("second");
 
-        CleanUp a = CleanUp.of((ThrowingRunnable) () -> {
+        var a = CleanUp.of((ThrowingRunnable) () -> {
             throw first;
         });
-        CleanUp b = CleanUp.of((ThrowingRunnable) () -> {
+        var b = CleanUp.of((ThrowingRunnable) () -> {
             throw second;
         });
 
@@ -479,10 +477,10 @@ class CleanUpTest {
         var first = new RuntimeException("first");
         var second = new RuntimeException("second");
 
-        CleanUp a = CleanUp.of((ThrowingRunnable) () -> {
+        var a = CleanUp.of((ThrowingRunnable) () -> {
             throw first;
         });
-        CleanUp b = CleanUp.of((ThrowingRunnable) () -> {
+        var b = CleanUp.of((ThrowingRunnable) () -> {
             throw second;
         });
 
@@ -502,8 +500,8 @@ class CleanUpTest {
     @Test
     @DisplayName("static runAndThrow with collection skips already-run instances")
     void staticRunAndThrowCollectionSkipsAlreadyRunInstances() throws Throwable {
-        CleanUp a = CleanUp.of((ThrowingRunnable) () -> {});
-        CleanUp b = CleanUp.of((ThrowingRunnable) () -> {});
+        var a = CleanUp.of((ThrowingRunnable) () -> {});
+        var b = CleanUp.of((ThrowingRunnable) () -> {});
 
         a.run();
         b.run();

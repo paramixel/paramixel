@@ -20,8 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.File;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
@@ -69,9 +67,9 @@ class ParamixelMojoClasspathTest {
             var mojo = new ParamixelMojo();
             setField(mojo, "project", project);
 
-            List<URL> urls = invokeBuildTestClasspathUrls(mojo);
+            var urls = invokeBuildTestClasspathUrls(mojo);
 
-            List<String> urlPaths = urls.stream().map(URL::getPath).toList();
+            var urlPaths = urls.stream().map(URL::getPath).toList();
             assertThat(urlPaths)
                     .containsExactly(
                             new File(generatedTestOutput).toURI().toURL().getPath(),
@@ -100,7 +98,7 @@ class ParamixelMojoClasspathTest {
             var mojo = new ParamixelMojo();
             setField(mojo, "project", project);
 
-            List<URL> urls = invokeBuildTestClasspathUrls(mojo);
+            var urls = invokeBuildTestClasspathUrls(mojo);
 
             assertThat(urls).hasSize(2);
             assertThat(urls.get(0)).isEqualTo(new File(a).toURI().toURL());
@@ -126,7 +124,7 @@ class ParamixelMojoClasspathTest {
             var mojo = new ParamixelMojo();
             setField(mojo, "project", project);
 
-            List<URL> urls = invokeBuildTestClasspathUrls(mojo);
+            var urls = invokeBuildTestClasspathUrls(mojo);
 
             assertThat(urls).hasSize(1);
             assertThat(urls.get(0)).isEqualTo(new File(nonexistent).toURI().toURL());
@@ -194,7 +192,7 @@ class ParamixelMojoClasspathTest {
             var mojo = new ParamixelMojo();
             setField(mojo, "project", project);
 
-            List<URL> urls = invokeBuildTestClasspathUrls(mojo);
+            var urls = invokeBuildTestClasspathUrls(mojo);
 
             assertThat(urls).hasSize(1);
             assertThat(urls.get(0)).isEqualTo(new File(valid).toURI().toURL());
@@ -215,7 +213,7 @@ class ParamixelMojoClasspathTest {
             var mojo = new ParamixelMojo();
             setField(mojo, "project", project);
 
-            List<URL> urls = invokeBuildTestClasspathUrls(mojo);
+            var urls = invokeBuildTestClasspathUrls(mojo);
 
             assertThat(urls).isEmpty();
         }
@@ -258,19 +256,19 @@ class ParamixelMojoClasspathTest {
 
     @SuppressWarnings("unchecked")
     private static List<URL> invokeBuildTestClasspathUrls(final ParamixelMojo mojo) throws Exception {
-        Method method = ParamixelMojo.class.getDeclaredMethod("buildTestClasspathUrls");
+        var method = ParamixelMojo.class.getDeclaredMethod("buildTestClasspathUrls");
         method.setAccessible(true);
         return (List<URL>) method.invoke(mojo);
     }
 
     private static URLClassLoader invokeBuildTestClassLoader(final ParamixelMojo mojo) throws Exception {
-        Method method = ParamixelMojo.class.getDeclaredMethod("buildTestClassLoader");
+        var method = ParamixelMojo.class.getDeclaredMethod("buildTestClassLoader");
         method.setAccessible(true);
         return (URLClassLoader) method.invoke(mojo);
     }
 
     private static void setField(final ParamixelMojo mojo, final String name, final Object value) throws Exception {
-        Field field = ParamixelMojo.class.getDeclaredField(name);
+        var field = ParamixelMojo.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(mojo, value);
     }

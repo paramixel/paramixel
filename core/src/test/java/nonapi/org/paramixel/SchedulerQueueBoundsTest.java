@@ -17,6 +17,7 @@
 package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
@@ -308,7 +309,7 @@ class SchedulerQueueBoundsTest {
         var scheduler = new Scheduler(1);
         try {
             var expected = new IllegalStateException("boom");
-            Action action = Step.of("failure", context -> {
+            var action = Step.of("failure", context -> {
                 throw expected;
             });
             var root = new DescriptorBuilder().discover(action);
@@ -345,9 +346,7 @@ class SchedulerQueueBoundsTest {
         var completeError = new AtomicReference<Throwable>();
         var scheduler = new Scheduler(1);
         try {
-            Action action = Step.of("status-failure", context -> {
-                FailException.fail("status-based failure");
-            });
+            var action = Step.of("status-failure", context -> FailException.fail("status-based failure"));
             var root = new DescriptorBuilder().discover(action);
             var context = newContext(scheduler, root);
             var callback = new Scheduler.ExecutionCallback() {
@@ -442,7 +441,7 @@ class SchedulerQueueBoundsTest {
     void unwrapPreservesExceptionContextForNonSpecialCauses() {
         var scheduler = new Scheduler(1);
         try {
-            Action action = Step.of("wrapping-action", context -> {
+            var action = Step.of("wrapping-action", context -> {
                 throw new RuntimeException(new IOException("disk full"));
             });
             var root = new DescriptorBuilder().discover(action);
@@ -461,7 +460,7 @@ class SchedulerQueueBoundsTest {
 
     @Test
     @DisplayName("unwrap recursively unwraps nested CompletionException")
-    void unwrapRecursivelyUnwrapsNestedCompletionException() throws Exception {
+    void unwrapRecursivelyUnwrapsNestedCompletionException() {
         var scheduler = new Scheduler(1);
         try {
             var innermost = new IOException("disk full");
@@ -502,6 +501,65 @@ class SchedulerQueueBoundsTest {
 
     @Test
     @Timeout(15)
+    @DisplayName("BUG: parallel should not reject children when queue capacity is smaller than effective parallelism")
+    void parallelMustNotRejectChildrenWhenQueueExhaustedAndThreadsBusy() throws Exception {
+        var scheduler = new Scheduler(2, 1);
+        try {
+            var context = newContext(scheduler);
+            var root = contextRoot(context);
+
+            var blockerStarted = new CountDownLatch(1);
+            var blockerRelease = new CountDownLatch(1);
+            var blocker = newChildDescriptor(root, Step.of("blocker", ctx -> {
+                blockerStarted.countDown();
+                try {
+                    blockerRelease.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            scheduler.schedule(blocker, ExecutionMode.RUN, context);
+            assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+            var executed = new AtomicInteger();
+            var parallelAction = Parallel.builder("parallel-under-pressure")
+                    .child(Step.of("child-1", ctx -> executed.incrementAndGet()))
+                    .child(Step.of("child-2", ctx -> executed.incrementAndGet()))
+                    .child(Step.of("child-3", ctx -> executed.incrementAndGet()))
+                    .build();
+            var parallelRoot = new DescriptorBuilder().discover(parallelAction);
+            var parallelContext = newContext(scheduler, parallelRoot);
+            var parallelFuture = scheduler.schedule(parallelRoot, ExecutionMode.RUN, parallelContext);
+
+            blockerRelease.countDown();
+
+            assertThatCode(parallelFuture::join)
+                    .as("parallel must complete successfully, not with FailException from rejected child")
+                    .doesNotThrowAnyException();
+
+            var children = parallelRoot.children();
+            assertThat(children).hasSize(3);
+
+            assertThat(children.get(0).isPassed()).as("child-1 must be PASSED").isTrue();
+            assertThat(children.get(1).isPassed())
+                    .as("child-2 must be PASSED — not silently rejected by queue capacity")
+                    .isTrue();
+            assertThat(children.get(2).isPassed()).as("child-3 must be PASSED").isTrue();
+
+            assertThat(executed.get())
+                    .as("all 3 children must execute, not just 2")
+                    .isEqualTo(3);
+
+            assertThat(parallelRoot.isPassed())
+                    .as("parallel aggregate must be PASSED when all children pass")
+                    .isTrue();
+        } finally {
+            scheduler.close();
+        }
+    }
+
+    @Test
+    @Timeout(15)
     @DisplayName("schedule while closing returns IllegalStateException not RejectedExecutionException")
     void scheduleWhileClosingReturnsIllegalStateNotRejectedExecution() throws Exception {
         var scheduler = new Scheduler(1, 16);
@@ -514,12 +572,11 @@ class SchedulerQueueBoundsTest {
             var blockingTask = newChildDescriptor(root, Step.of("blocking", innerContext -> {
                 taskStarted.countDown();
                 taskProceed.await(10, TimeUnit.SECONDS);
-                return;
             }));
             scheduler.schedule(blockingTask, ExecutionMode.RUN, context);
             taskStarted.await();
 
-            var closeThread = new Thread(() -> scheduler.close());
+            var closeThread = new Thread(scheduler::close);
             closeThread.start();
 
             Thread.sleep(100);
@@ -527,9 +584,7 @@ class SchedulerQueueBoundsTest {
             var scheduleResult = new AtomicReference<Throwable>();
             var scheduleDone = new CountDownLatch(1);
             var scheduleThread = new Thread(() -> {
-                var task = newChildDescriptor(root, Step.of("task", innerContext -> {
-                    return;
-                }));
+                var task = newChildDescriptor(root, Step.of("task", innerContext -> {}));
                 try {
                     scheduler.schedule(task, ExecutionMode.RUN, context).join();
                 } catch (Throwable t) {
@@ -570,7 +625,7 @@ class SchedulerQueueBoundsTest {
     }
 
     private static MutableDescriptor contextRoot(final ConcreteContext context) {
-        return (MutableDescriptor) ConcreteContext.require(context).descriptor();
+        return ConcreteContext.require(context).descriptor();
     }
 
     private static MutableDescriptor newChildDescriptor(final MutableDescriptor parent, final Action action) {

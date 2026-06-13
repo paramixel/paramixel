@@ -140,7 +140,7 @@ public final class Retry {
         state = STATE_RUNNING;
 
         List<BiConsumer<Integer, Throwable>> callbacks = List.copyOf(onRetryCallbacks);
-        Duration maximumDuration = maximumDurationOrZero();
+        var maximumDuration = maximumDurationOrZero();
         long startNanos = System.nanoTime();
         var exceptions = new ArrayList<Throwable>();
         int attempt = 0;
@@ -162,8 +162,8 @@ public final class Retry {
                             maximumDuration, attempt, elapsedDuration(startNanos), false, List.copyOf(exceptions));
                 }
 
-                Duration elapsed = elapsedDuration(startNanos);
-                Duration remaining = maximumDuration.minus(elapsed);
+                var elapsed = elapsedDuration(startNanos);
+                var remaining = maximumDuration.minus(elapsed);
 
                 if (remaining.isZero() || remaining.isNegative()) {
                     state = STATE_COMPLETED;
@@ -174,7 +174,7 @@ public final class Retry {
                     callback.accept(attempt + 1, e);
                 }
 
-                Duration waitDuration = waitDurationOrZero(attempt, e);
+                var waitDuration = waitDurationOrZero(attempt, e);
                 if (waitDuration.compareTo(remaining) > 0) {
                     waitDuration = remaining;
                 }
@@ -196,7 +196,7 @@ public final class Retry {
 
     private Duration maximumDurationOrZero() {
         try {
-            Duration maximumDuration = backoffPolicy.maximumDuration();
+            var maximumDuration = backoffPolicy.maximumDuration();
             if (maximumDuration == null || maximumDuration.isNegative()) {
                 return Duration.ZERO;
             }
@@ -208,7 +208,7 @@ public final class Retry {
 
     private Duration waitDurationOrZero(int attempt, Throwable cause) {
         try {
-            Duration waitDuration = backoffPolicy.waitDuration(attempt, cause);
+            var waitDuration = backoffPolicy.waitDuration(attempt, cause);
             if (waitDuration == null || waitDuration.isNegative()) {
                 return Duration.ZERO;
             }
@@ -237,7 +237,7 @@ public final class Retry {
 
         if (!result.isSuccessful() && result.hasExceptions()) {
             List<Throwable> exceptions = result.exceptions();
-            Throwable lastException = exceptions.get(exceptions.size() - 1);
+            var lastException = exceptions.get(exceptions.size() - 1);
             for (int i = 0; i < exceptions.size() - 1; i++) {
                 lastException.addSuppressed(exceptions.get(i));
             }
@@ -397,7 +397,7 @@ public final class Retry {
                 return Duration.ZERO;
             }
             try {
-                Duration result = duration.multipliedBy(multiplier);
+                var result = duration.multipliedBy(multiplier);
                 if (result.isNegative()) {
                     return Duration.ZERO;
                 }

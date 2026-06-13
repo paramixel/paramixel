@@ -29,7 +29,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("all() matches everything")
     void allMatchesEverything() {
-        Selector selector = Selector.all();
+        var selector = Selector.all();
 
         assertThat(selector).isNotNull();
         assertThat(selector.matchesPackage(SelectorArgumentsTest.class.getPackageName()))
@@ -42,7 +42,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("packageRegex creates package regex selector")
     void packageRegexCreatesSelector() {
-        Selector selector = Selector.packageRegex("org\\.paramixel");
+        var selector = Selector.packageRegex("org\\.paramixel");
 
         assertThat(selector).isNotNull();
         assertThat(selector).isInstanceOf(PackageRegexSelector.class);
@@ -51,7 +51,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("classRegex creates class regex selector")
     void classRegexCreatesSelector() {
-        Selector selector = Selector.classRegex("SelectorArgumentsTest");
+        var selector = Selector.classRegex("SelectorArgumentsTest");
 
         assertThat(selector).isNotNull();
         assertThat(selector).isInstanceOf(ClassRegexSelector.class);
@@ -60,7 +60,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("tagRegex creates tag regex selector")
     void tagRegexCreatesSelector() {
-        Selector selector = Selector.tagRegex("smoke");
+        var selector = Selector.tagRegex("smoke");
 
         assertThat(selector).isNotNull();
         assertThat(selector).isInstanceOf(TagRegexSelector.class);
@@ -70,7 +70,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("and() creates AND selector")
     void andCreatesSelector() {
-        Selector selector = Selector.and(Selector.packageRegex("org\\.paramixel"), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.packageRegex("org\\.paramixel"), Selector.tagRegex("smoke"));
 
         assertThat(selector).isNotNull();
         assertThat(selector).isInstanceOf(AndSelector.class);
@@ -151,7 +151,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("packageTreeOf creates anchored package pattern matching same package")
     void packageTreeOfCreatesAnchoredPackagePattern() {
-        Selector selector = Selector.packageTreeOf(SelectorArgumentsTest.class);
+        var selector = Selector.packageTreeOf(SelectorArgumentsTest.class);
 
         assertThat(selector.matchesPackage(SelectorArgumentsTest.class.getPackageName()))
                 .isTrue();
@@ -167,7 +167,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("classOf creates anchored class pattern matching exact class")
     void classOfCreatesAnchoredClassPattern() {
-        Selector selector = Selector.classOf(SelectorArgumentsTest.class);
+        var selector = Selector.classOf(SelectorArgumentsTest.class);
 
         assertThat(selector.matchesClass(SelectorArgumentsTest.class.getName())).isTrue();
         assertThat(selector.matchesClass(String.class.getName())).isFalse();
@@ -182,7 +182,7 @@ class SelectorArgumentsTest {
     @Test
     @DisplayName("packageOf creates exact package pattern")
     void packageOfCreatesExactPackagePattern() {
-        Selector selector = Selector.packageOf(SelectorArgumentsTest.class);
+        var selector = Selector.packageOf(SelectorArgumentsTest.class);
 
         assertThat(selector.matchesPackage(SelectorArgumentsTest.class.getPackageName()))
                 .isTrue();

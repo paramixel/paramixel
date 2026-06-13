@@ -19,7 +19,6 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
@@ -33,8 +32,8 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("finds single factory via run with classOf selector")
     void findsSingleFactory() {
-        Selector selector = Selector.classOf(ActionResolverSmokeFixture.class);
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var selector = Selector.classOf(ActionResolverSmokeFixture.class);
+        var result = Runner.builder().build().run(selector);
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
         assertThat(children).hasSize(1);
@@ -44,10 +43,9 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("applies selector tag filter via matchesTag")
     void appliesTagFiltersWithAndSemantics() {
-        Selector selector =
-                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke"));
+        var selector = Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke"));
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
@@ -58,7 +56,7 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("returns empty when tag filter does not match")
     void returnsEmptyWhenTagFiltersDoNotBothMatch() {
-        Selector selector =
+        var selector =
                 Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("missing"));
 
         assertThat(Runner.builder().build().run(selector)).isEmpty();
@@ -67,9 +65,9 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("blank tag values produce discovery validation failure action")
     void rejectsBlankTagValues() {
-        Selector selector = Selector.classOf(BlankTagFactory.class);
+        var selector = Selector.classOf(BlankTagFactory.class);
 
-        Optional<Result> result = Runner.builder().build().run(selector);
+        var result = Runner.builder().build().run(selector);
 
         assertThat(result).isPresent();
         var children = result.orElseThrow().descriptor().orElseThrow().children();
@@ -80,7 +78,7 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("child override without factory shadows parent factory")
     void childOverrideWithoutFactoryShadowsParentFactory() {
-        Selector selector = Selector.classOf(ChildOverridesWithoutFactory.class);
+        var selector = Selector.classOf(ChildOverridesWithoutFactory.class);
 
         assertThat(Runner.builder().build().run(selector)).isEmpty();
     }
@@ -88,7 +86,7 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("throws when more than one factory exists in a hierarchy")
     void throwsWhenMoreThanOneFactoryExistsInHierarchy() {
-        Selector selector = Selector.classOf(ChildDeclaresOwnFactory.class);
+        var selector = Selector.classOf(ChildDeclaresOwnFactory.class);
 
         assertThatThrownBy(() -> Runner.builder().build().run(selector))
                 .isInstanceOf(ResolverException.class)
@@ -98,7 +96,7 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("error from factory method is re-thrown directly, not wrapped")
     void errorFromFactoryMethodIsReThrownDirectlyNotWrapped() {
-        Selector selector = Selector.classOf(ErrorThrowingFactory.class);
+        var selector = Selector.classOf(ErrorThrowingFactory.class);
 
         assertThatThrownBy(() -> Runner.builder().build().run(selector))
                 .isInstanceOf(TestError.class)

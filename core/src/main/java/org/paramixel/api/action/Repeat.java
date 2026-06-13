@@ -30,7 +30,10 @@ import nonapi.org.paramixel.support.Arguments;
  *
  * <p>All repetitions run regardless of individual outcomes. A failure in a single
  * repetition does not prevent subsequent repetitions from running.
+ *
+ * @deprecated Use {@link Loop} instead.
  */
+@Deprecated(forRemoval = true, since = "6.2.0")
 public final class Repeat implements Action {
 
     private final String displayName;

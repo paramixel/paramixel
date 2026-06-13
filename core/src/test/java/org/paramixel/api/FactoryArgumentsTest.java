@@ -19,7 +19,6 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import nonapi.org.paramixel.listener.CompositeListener;
@@ -42,16 +41,16 @@ class FactoryArgumentsTest {
     @Test
     @DisplayName("defaultListener(configuration) omits report listener when report file is blank")
     void defaultListenerWithBlankReportFileOmitsReportListener() throws Exception {
-        Listener listener = Listener.defaultListener(Configuration.of(Map.of(Configuration.REPORT_FILE, " ")));
+        var listener = Listener.defaultListener(Configuration.of(Map.of(Configuration.REPORT_FILE, " ")));
 
         assertThat(listener).isInstanceOf(SafeListener.class);
-        Field delegateField = SafeListener.class.getDeclaredField("delegate");
+        var delegateField = SafeListener.class.getDeclaredField("delegate");
         delegateField.setAccessible(true);
-        Object delegate = delegateField.get(listener);
-        Field listenersField = CompositeListener.class.getDeclaredField("listeners");
+        var delegate = delegateField.get(listener);
+        var listenersField = CompositeListener.class.getDeclaredField("listeners");
         listenersField.setAccessible(true);
         @SuppressWarnings("unchecked")
-        List<Listener> listeners = (List<Listener>) listenersField.get(delegate);
+        var listeners = (List<Listener>) listenersField.get(delegate);
         assertThat(listeners).hasSize(2);
         assertThat(listeners).noneMatch(ReportListener.class::isInstance);
     }
@@ -59,7 +58,7 @@ class FactoryArgumentsTest {
     @Test
     @DisplayName("defaultRunner returns non-null runner")
     void defaultRunnerReturnsNonNull() {
-        Runner runner = Runner.defaultRunner();
+        var runner = Runner.defaultRunner();
         assertThat(runner).isNotNull();
     }
 }

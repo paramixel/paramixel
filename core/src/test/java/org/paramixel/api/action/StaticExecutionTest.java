@@ -143,6 +143,61 @@ class StaticExecutionTest {
     }
 
     @Test
+    @DisplayName("before throws RuntimeException skips body and runs after")
+    void beforeThrowsSkipsBodyAndRunsAfter() {
+        var bodyCalls = new AtomicInteger();
+        var afterCalls = new AtomicInteger();
+
+        var action = Static.builder("static")
+                .before(Step.of("before", context -> {
+                    throw new RuntimeException("before threw");
+                }))
+                .body(Sequence.builder("body")
+                        .child(Step.of("child-1", context -> bodyCalls.incrementAndGet()))
+                        .child(Step.of("child-2", context -> bodyCalls.incrementAndGet()))
+                        .build())
+                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .build();
+
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().message()).contains("before threw");
+        assertThat(root.children()).hasSize(1);
+        var body = root.children().get(0);
+        assertThat(body.children()).hasSize(2);
+        assertThat(body.children().get(0).isSkipped()).isTrue();
+        assertThat(body.children().get(1).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(bodyCalls.get()).isZero();
+        assertThat(afterCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("before throws RuntimeException and after fails")
+    void beforeThrowsAndAfterThrows() {
+        var bodyCalls = new AtomicInteger();
+
+        var action = Static.builder("static")
+                .before(Step.of("before", context -> {
+                    throw new RuntimeException("before threw");
+                }))
+                .body(Step.of("child", context -> bodyCalls.incrementAndGet()))
+                .after(Step.of("after", context -> FailException.fail("after failed")))
+                .build();
+
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(root.children()).hasSize(1);
+        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().isFailed()).isTrue();
+        assertThat(bodyCalls.get()).isZero();
+    }
+
+    @Test
     @DisplayName("dependent body: first child fails skips remaining and runs after")
     void dependentBodyFirstBodyFailsSkipsRemainingAndRunsAfter() {
         var child2Calls = new AtomicInteger();

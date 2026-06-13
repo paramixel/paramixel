@@ -18,7 +18,6 @@ package nonapi.org.paramixel.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.InputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,17 +28,17 @@ class ResourceLoaderTest {
     @Test
     @DisplayName("finds existing resource")
     void findsExistingResource() {
-        InputStream stream = ResourceLoader.getResourceAsStream("version.properties");
+        var stream = ResourceLoader.getResourceAsStream("version.properties");
         assertThat(stream).isNotNull();
     }
 
     @Test
     @DisplayName("finds resource when context class loader is null")
     void findsResourceWithNullContextClassLoader() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        var original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(null);
-            InputStream stream = ResourceLoader.getResourceAsStream("version.properties");
+            var stream = ResourceLoader.getResourceAsStream("version.properties");
             assertThat(stream).isNotNull();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -49,10 +48,10 @@ class ResourceLoaderTest {
     @Test
     @DisplayName("falls back to defining class loader when context class loader cannot find resource")
     void fallsBackToDefiningClassLoader() {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        var original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(new ClassLoader(null) {});
-            InputStream stream = ResourceLoader.getResourceAsStream("version.properties");
+            var stream = ResourceLoader.getResourceAsStream("version.properties");
             assertThat(stream).isNotNull();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -62,7 +61,7 @@ class ResourceLoaderTest {
     @Test
     @DisplayName("returns null stream for nonexistent resource")
     void returnsNullStreamForNonexistentResource() {
-        InputStream stream = ResourceLoader.getResourceAsStream("nonexistent.resource.that.does.not.exist");
+        var stream = ResourceLoader.getResourceAsStream("nonexistent.resource.that.does.not.exist");
         assertThat(stream).isNull();
     }
 
@@ -73,32 +72,31 @@ class ResourceLoaderTest {
         @Test
         @DisplayName("finds resource through provided class loader")
         void findsResourceThroughProvidedClassLoader() {
-            ClassLoader classLoader = getClass().getClassLoader();
-            InputStream stream = ResourceLoader.getResourceAsStream("version.properties", classLoader);
+            var classLoader = getClass().getClassLoader();
+            var stream = ResourceLoader.getResourceAsStream("version.properties", classLoader);
             assertThat(stream).isNotNull();
         }
 
         @Test
         @DisplayName("falls back to defining class loader when provided class loader cannot find resource")
         void fallsBackWhenProvidedClassLoaderCannotFindResource() {
-            ClassLoader emptyLoader = new ClassLoader(null) {};
-            InputStream stream = ResourceLoader.getResourceAsStream("version.properties", emptyLoader);
+            var emptyLoader = new ClassLoader(null) {};
+            var stream = ResourceLoader.getResourceAsStream("version.properties", emptyLoader);
             assertThat(stream).isNotNull();
         }
 
         @Test
         @DisplayName("returns null when no class loader finds the resource")
         void returnsNullWhenNoClassLoaderFindsResource() {
-            ClassLoader emptyLoader = new ClassLoader(null) {};
-            InputStream stream =
-                    ResourceLoader.getResourceAsStream("nonexistent.resource.that.does.not.exist", emptyLoader);
+            var emptyLoader = new ClassLoader(null) {};
+            var stream = ResourceLoader.getResourceAsStream("nonexistent.resource.that.does.not.exist", emptyLoader);
             assertThat(stream).isNull();
         }
 
         @Test
         @DisplayName("works with null class loader via defining/system fallback")
         void worksWithNullClassLoader() {
-            InputStream stream = ResourceLoader.getResourceAsStream("version.properties", (ClassLoader) null);
+            var stream = ResourceLoader.getResourceAsStream("version.properties", (ClassLoader) null);
             assertThat(stream).isNotNull();
         }
     }

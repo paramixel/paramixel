@@ -312,7 +312,7 @@ public final class ActionResolver {
         var current = Objects.requireNonNull(clazz, "clazz is null");
         while (current != null && current != Object.class) {
             for (Method method : current.getDeclaredMethods()) {
-                MethodKey key = new MethodKey(method.getName(), method.getParameterTypes());
+                var key = new MethodKey(method.getName(), method.getParameterTypes());
                 if (!seenSignatures.add(key)) {
                     continue;
                 }
@@ -344,7 +344,7 @@ public final class ActionResolver {
             current = current.getSuperclass();
         }
         if (candidates.size() > 1) {
-            String methodList =
+            var methodList =
                     candidates.stream().map(ValidatedFactoryMethod::location).collect(Collectors.joining(", "));
             throw new ResolverException("Class " + clazz.getName()
                     + " has more than one @Paramixel.Factory method in its hierarchy: " + methodList);
@@ -492,6 +492,7 @@ public final class ActionResolver {
         }
     }
 
+    @SuppressWarnings("removal")
     private static Optional<Action> buildHookSequence(final List<Action> actions, final String displayName) {
         if (actions.isEmpty()) {
             return Optional.empty();

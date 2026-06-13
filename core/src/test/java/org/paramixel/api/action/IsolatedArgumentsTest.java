@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Isolated arguments")
+@SuppressWarnings("removal")
 class IsolatedArgumentsTest {
 
     @Test

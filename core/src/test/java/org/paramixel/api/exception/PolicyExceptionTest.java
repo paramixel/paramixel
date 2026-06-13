@@ -28,7 +28,7 @@ class PolicyExceptionTest {
     @Test
     @DisplayName("constructor with message creates exception")
     void constructorWithMessageCreatesException() {
-        PolicyException exception = new PolicyException("overflow");
+        var exception = new PolicyException("overflow");
 
         assertThat(exception).hasMessage("overflow");
         assertThat(exception.getCause()).isNull();
@@ -37,8 +37,8 @@ class PolicyExceptionTest {
     @Test
     @DisplayName("constructor with message and cause creates exception")
     void constructorWithMessageAndCauseCreatesException() {
-        ArithmeticException cause = new ArithmeticException("too big");
-        PolicyException exception = new PolicyException("overflow", cause);
+        var cause = new ArithmeticException("too big");
+        var exception = new PolicyException("overflow", cause);
 
         assertThat(exception).hasMessage("overflow");
         assertThat(exception.getCause()).isSameAs(cause);

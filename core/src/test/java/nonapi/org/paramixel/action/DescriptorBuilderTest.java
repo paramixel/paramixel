@@ -23,7 +23,6 @@ import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
@@ -42,8 +41,8 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("discovers single leaf action")
     void discoversSingleLeafAction() {
-        Action action = Step.of("leaf", context -> {});
-        MutableDescriptor root = builder.discover(action);
+        var action = Step.of("leaf", context -> {});
+        var root = builder.discover(action);
 
         assertThat(root).isNotNull();
         assertThat(root.action()).isSameAs(action);
@@ -53,10 +52,10 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("discovers composite action with children")
     void discoversCompositeWithChildren() {
-        Action child1 = Step.of("child1", context -> {});
-        Action child2 = Step.of("child2", context -> {});
-        Action parent = Sequence.builder("parent").child(child1).child(child2).build();
-        MutableDescriptor root = builder.discover(parent);
+        var child1 = Step.of("child1", context -> {});
+        var child2 = Step.of("child2", context -> {});
+        var parent = Sequence.builder("parent").child(child1).child(child2).build();
+        var root = builder.discover(parent);
 
         assertThat(root.children()).hasSize(2);
         assertThat(((MutableDescriptor) root.children().get(0)).action()).isSameAs(child1);
@@ -66,9 +65,9 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("child descriptors have parent reference")
     void childDescriptorsHaveParent() {
-        Action child = Step.of("child", context -> {});
-        Action parent = Sequence.builder("parent").child(child).build();
-        MutableDescriptor root = builder.discover(parent);
+        var child = Step.of("child", context -> {});
+        var parent = Sequence.builder("parent").child(child).build();
+        var root = builder.discover(parent);
 
         assertThat(root.children()).hasSize(1);
         assertThat(root.children().get(0).parent()).containsSame(root);
@@ -85,9 +84,9 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("same action instance reused in multiple positions produces independent descriptors")
     void sameActionInstanceReusedProducesIndependentDescriptors() {
-        Action shared = Step.of("shared", context -> {});
-        Action parent = Sequence.builder("parent").child(shared).child(shared).build();
-        MutableDescriptor root = builder.discover(parent);
+        var shared = Step.of("shared", context -> {});
+        var parent = Sequence.builder("parent").child(shared).child(shared).build();
+        var root = builder.discover(parent);
 
         assertThat(root.children()).hasSize(2);
         assertThat(root.children().get(0)).isNotSameAs(root.children().get(1));
@@ -98,8 +97,8 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("root descriptor starts with PENDING status")
     void rootDescriptorStartsPending() {
-        Action action = Step.of("leaf", context -> {});
-        MutableDescriptor root = builder.discover(action);
+        var action = Step.of("leaf", context -> {});
+        var root = builder.discover(action);
 
         assertThat(root.status().isPending()).isTrue();
     }
@@ -107,11 +106,11 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("discover leaves descriptor tree mutable until frozen")
     void discoverLeavesDescriptorTreeMutableUntilFrozen() {
-        Action parent = Sequence.builder("parent")
+        var parent = Sequence.builder("parent")
                 .child(Step.of("child", context -> {}))
                 .build();
-        MutableDescriptor root = builder.discover(parent);
-        MutableDescriptor child = (MutableDescriptor) root.children().get(0);
+        var root = builder.discover(parent);
+        var child = (MutableDescriptor) root.children().get(0);
 
         assertThat(root.isFrozen()).isFalse();
         assertThat(child.isFrozen()).isFalse();
@@ -120,11 +119,11 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("freeze caches immutable children view")
     void freezeCachesImmutableChildrenView() {
-        Action parent = Sequence.builder("parent")
+        var parent = Sequence.builder("parent")
                 .child(Step.of("child", context -> {}))
                 .build();
-        MutableDescriptor root = builder.discover(parent);
-        MutableDescriptor child = (MutableDescriptor) root.children().get(0);
+        var root = builder.discover(parent);
+        var child = (MutableDescriptor) root.children().get(0);
         root.freeze();
 
         assertThat(root.children()).isSameAs(root.children());
@@ -134,7 +133,7 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("freeze rejects post-freeze structural mutations")
     void freezeRejectsPostFreezeStructuralMutations() {
-        MutableDescriptor root = builder.discover(Step.of("leaf", context -> {}));
+        var root = builder.discover(Step.of("leaf", context -> {}));
         root.freeze();
 
         assertThatThrownBy(() -> root.addChild(new ConcreteDescriptor(Step.of("late-child", context -> {}))))

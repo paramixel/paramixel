@@ -27,6 +27,7 @@ import org.paramixel.api.Runner;
 import org.paramixel.api.exception.FailException;
 
 @DisplayName("Repeat action")
+@SuppressWarnings("removal")
 class RepeatTest {
 
     @Test

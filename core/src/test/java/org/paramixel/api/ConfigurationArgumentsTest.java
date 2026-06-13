@@ -115,23 +115,23 @@ class ConfigurationArgumentsTest {
     @Test
     @DisplayName("classpathConfiguration() returns non-null configuration")
     void classpathConfigurationReturnsNonNull() {
-        Configuration config = Configuration.classpathConfiguration();
-        assertThat(config).isNotNull();
+        var configuration = Configuration.classpathConfiguration();
+        assertThat(configuration).isNotNull();
     }
 
     @Test
     @DisplayName("defaultConfiguration() returns non-null configuration with RUNNER_PARALLELISM key")
     void defaultConfigurationReturnsNonNull() {
-        Configuration config = Configuration.defaultConfiguration();
-        assertThat(config).isNotNull();
-        assertThat(config.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+        var configuration = Configuration.defaultConfiguration();
+        assertThat(configuration).isNotNull();
+        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
     }
 
     @Test
     @DisplayName("Configuration.of(Map) returns non-null configuration")
     void ofMapReturnsNonNull() {
-        Configuration config = Configuration.of(Map.of());
-        assertThat(config).isNotNull();
+        var configuration = Configuration.of(Map.of());
+        assertThat(configuration).isNotNull();
     }
 
     @Test
@@ -155,50 +155,50 @@ class ConfigurationArgumentsTest {
     @Test
     @DisplayName("getString returns empty optional for absent key")
     void getStringReturnsEmptyForAbsentKey() {
-        Configuration config = Configuration.of(Map.of());
-        assertThat(config.getString("nonexistent")).isEmpty();
+        var configuration = Configuration.of(Map.of());
+        assertThat(configuration.getString("nonexistent")).isEmpty();
     }
 
     @Test
     @DisplayName("getString returns present optional for present key")
     void getStringReturnsPresentForPresentKey() {
-        Configuration config = Configuration.of(Map.of("key", "value"));
-        assertThat(config.getString("key")).contains("value");
+        var configuration = Configuration.of(Map.of("key", "value"));
+        assertThat(configuration.getString("key")).contains("value");
     }
 
     @Test
     @DisplayName("getBoolean returns true for 'true' value")
     void getBooleanReturnsTrueForTrueValue() {
-        Configuration config = Configuration.of(Map.of("key", "true"));
-        assertThat(config.getBoolean("key")).contains(true);
+        var configuration = Configuration.of(Map.of("key", "true"));
+        assertThat(configuration.getBoolean("key")).contains(true);
     }
 
     @Test
     @DisplayName("getBoolean returns false for 'false' value")
     void getBooleanReturnsFalseForFalseValue() {
-        Configuration config = Configuration.of(Map.of("key", "false"));
-        assertThat(config.getBoolean("key")).contains(false);
+        var configuration = Configuration.of(Map.of("key", "false"));
+        assertThat(configuration.getBoolean("key")).contains(false);
     }
 
     @Test
     @DisplayName("getBoolean returns empty optional for absent key")
     void getBooleanReturnsEmptyForAbsentKey() {
-        Configuration config = Configuration.of(Map.of());
-        assertThat(config.getBoolean("key")).isEmpty();
+        var configuration = Configuration.of(Map.of());
+        assertThat(configuration.getBoolean("key")).isEmpty();
     }
 
     @Test
     @DisplayName("getInteger returns present optional for valid integer")
     void getIntegerReturnsPresentForValidInteger() {
-        Configuration config = Configuration.of(Map.of("key", "42"));
-        assertThat(config.getInteger("key")).contains(42);
+        var configuration = Configuration.of(Map.of("key", "42"));
+        assertThat(configuration.getInteger("key")).contains(42);
     }
 
     @Test
     @DisplayName("keySet returns all keys")
     void keySetReturnsAllKeys() {
-        Configuration config = Configuration.of(Map.of("a", "1", "b", "2"));
-        assertThat(config.keySet()).containsExactlyInAnyOrder("a", "b");
+        var configuration = Configuration.of(Map.of("a", "1", "b", "2"));
+        assertThat(configuration.keySet()).containsExactlyInAnyOrder("a", "b");
     }
 
     @Nested
@@ -208,29 +208,29 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("returns present optional for valid long")
         void returnsPresentForValidLong() {
-            Configuration config = Configuration.of(Map.of("key", "123456789012"));
-            assertThat(config.getLong("key")).contains(123456789012L);
+            var configuration = Configuration.of(Map.of("key", "123456789012"));
+            assertThat(configuration.getLong("key")).contains(123456789012L);
         }
 
         @Test
         @DisplayName("returns present optional for whitespace-padded valid long")
         void returnsPresentForWhitespacePaddedLong() {
-            Configuration config = Configuration.of(Map.of("key", "  42  "));
-            assertThat(config.getLong("key")).contains(42L);
+            var configuration = Configuration.of(Map.of("key", "  42  "));
+            assertThat(configuration.getLong("key")).contains(42L);
         }
 
         @Test
         @DisplayName("returns empty optional for absent key")
         void returnsEmptyForAbsentKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThat(config.getLong("key")).isEmpty();
+            var configuration = Configuration.of(Map.of());
+            assertThat(configuration.getLong("key")).isEmpty();
         }
 
         @Test
         @DisplayName("throws ConfigurationException for invalid long")
         void throwsForInvalidLong() {
-            Configuration config = Configuration.of(Map.of("key", "not-a-long"));
-            assertThatThrownBy(() -> config.getLong("key"))
+            var configuration = Configuration.of(Map.of("key", "not-a-long"));
+            assertThatThrownBy(() -> configuration.getLong("key"))
                     .isInstanceOf(ConfigurationException.class)
                     .hasMessage("Invalid configuration for 'key': expected long but was 'not-a-long'")
                     .hasCauseInstanceOf(NumberFormatException.class);
@@ -239,8 +239,8 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("throws NullPointerException for null key")
         void throwsForNullKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThatThrownBy(() -> config.getLong(null)).isInstanceOf(NullPointerException.class);
+            var configuration = Configuration.of(Map.of());
+            assertThatThrownBy(() -> configuration.getLong(null)).isInstanceOf(NullPointerException.class);
         }
     }
 
@@ -251,29 +251,29 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("returns present optional for valid float")
         void returnsPresentForValidFloat() {
-            Configuration config = Configuration.of(Map.of("key", "3.14"));
-            assertThat(config.getFloat("key")).contains(3.14f);
+            var configuration = Configuration.of(Map.of("key", "3.14"));
+            assertThat(configuration.getFloat("key")).contains(3.14f);
         }
 
         @Test
         @DisplayName("returns present optional for whitespace-padded valid float")
         void returnsPresentForWhitespacePaddedFloat() {
-            Configuration config = Configuration.of(Map.of("key", "  2.5  "));
-            assertThat(config.getFloat("key")).contains(2.5f);
+            var configuration = Configuration.of(Map.of("key", "  2.5  "));
+            assertThat(configuration.getFloat("key")).contains(2.5f);
         }
 
         @Test
         @DisplayName("returns empty optional for absent key")
         void returnsEmptyForAbsentKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThat(config.getFloat("key")).isEmpty();
+            var configuration = Configuration.of(Map.of());
+            assertThat(configuration.getFloat("key")).isEmpty();
         }
 
         @Test
         @DisplayName("throws ConfigurationException for invalid float")
         void throwsForInvalidFloat() {
-            Configuration config = Configuration.of(Map.of("key", "not-a-float"));
-            assertThatThrownBy(() -> config.getFloat("key"))
+            var configuration = Configuration.of(Map.of("key", "not-a-float"));
+            assertThatThrownBy(() -> configuration.getFloat("key"))
                     .isInstanceOf(ConfigurationException.class)
                     .hasMessage("Invalid configuration for 'key': expected float but was 'not-a-float'")
                     .hasCauseInstanceOf(NumberFormatException.class);
@@ -282,8 +282,8 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("throws NullPointerException for null key")
         void throwsForNullKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThatThrownBy(() -> config.getFloat(null)).isInstanceOf(NullPointerException.class);
+            var configuration = Configuration.of(Map.of());
+            assertThatThrownBy(() -> configuration.getFloat(null)).isInstanceOf(NullPointerException.class);
         }
     }
 
@@ -294,29 +294,29 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("returns present optional for valid double")
         void returnsPresentForValidDouble() {
-            Configuration config = Configuration.of(Map.of("key", "2.718281828"));
-            assertThat(config.getDouble("key")).contains(2.718281828);
+            var configuration = Configuration.of(Map.of("key", "2.718281828"));
+            assertThat(configuration.getDouble("key")).contains(2.718281828);
         }
 
         @Test
         @DisplayName("returns present optional for whitespace-padded valid double")
         void returnsPresentForWhitespacePaddedDouble() {
-            Configuration config = Configuration.of(Map.of("key", "  1.5  "));
-            assertThat(config.getDouble("key")).contains(1.5);
+            var configuration = Configuration.of(Map.of("key", "  1.5  "));
+            assertThat(configuration.getDouble("key")).contains(1.5);
         }
 
         @Test
         @DisplayName("returns empty optional for absent key")
         void returnsEmptyForAbsentKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThat(config.getDouble("key")).isEmpty();
+            var configuration = Configuration.of(Map.of());
+            assertThat(configuration.getDouble("key")).isEmpty();
         }
 
         @Test
         @DisplayName("throws ConfigurationException for invalid double")
         void throwsForInvalidDouble() {
-            Configuration config = Configuration.of(Map.of("key", "not-a-double"));
-            assertThatThrownBy(() -> config.getDouble("key"))
+            var configuration = Configuration.of(Map.of("key", "not-a-double"));
+            assertThatThrownBy(() -> configuration.getDouble("key"))
                     .isInstanceOf(ConfigurationException.class)
                     .hasMessage("Invalid configuration for 'key': expected double but was 'not-a-double'")
                     .hasCauseInstanceOf(NumberFormatException.class);
@@ -325,8 +325,8 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("throws NullPointerException for null key")
         void throwsForNullKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThatThrownBy(() -> config.getDouble(null)).isInstanceOf(NullPointerException.class);
+            var configuration = Configuration.of(Map.of());
+            assertThatThrownBy(() -> configuration.getDouble(null)).isInstanceOf(NullPointerException.class);
         }
     }
 
@@ -337,24 +337,24 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("returns transformed value for present key")
         void returnsTransformedValue() {
-            Configuration config = Configuration.of(Map.of("key", "42"));
+            var configuration = Configuration.of(Map.of("key", "42"));
             Function<String, Integer> transformer = Integer::parseInt;
-            assertThat(config.get("key", transformer)).contains(42);
+            assertThat(configuration.get("key", transformer)).contains(42);
         }
 
         @Test
         @DisplayName("returns empty optional for absent key")
         void returnsEmptyForAbsentKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThat(config.get("key", String::length)).isEmpty();
+            var configuration = Configuration.of(Map.of());
+            assertThat(configuration.get("key", String::length)).isEmpty();
         }
 
         @Test
         @DisplayName("throws ConfigurationException when transformer throws")
         void throwsConfigurationExceptionWhenTransformerThrows() {
-            Configuration config = Configuration.of(Map.of("key", "bad"));
+            var configuration = Configuration.of(Map.of("key", "bad"));
             Function<String, Integer> transformer = Integer::parseInt;
-            assertThatThrownBy(() -> config.get("key", transformer))
+            assertThatThrownBy(() -> configuration.get("key", transformer))
                     .isInstanceOf(ConfigurationException.class)
                     .hasMessageContaining("Invalid configuration for 'key':");
         }
@@ -362,12 +362,12 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("ConfigurationException preserves original cause")
         void configurationExceptionPreservesCause() {
-            Configuration config = Configuration.of(Map.of("key", "bad"));
+            var configuration = Configuration.of(Map.of("key", "bad"));
             var cause = new RuntimeException("boom");
-            Function<String, String> transformer = s -> {
+            Function<String, Integer> transformer = s -> {
                 throw cause;
             };
-            assertThatThrownBy(() -> config.get("key", transformer))
+            assertThatThrownBy(() -> configuration.get("key", transformer))
                     .isInstanceOf(ConfigurationException.class)
                     .hasCause(cause);
         }
@@ -375,15 +375,15 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("throws NullPointerException for null key")
         void throwsForNullKey() {
-            Configuration config = Configuration.of(Map.of());
-            assertThatThrownBy(() -> config.get(null, String::trim)).isInstanceOf(NullPointerException.class);
+            var configuration = Configuration.of(Map.of());
+            assertThatThrownBy(() -> configuration.get(null, String::trim)).isInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("throws NullPointerException for null transformer")
         void throwsForNullTransformer() {
-            Configuration config = Configuration.of(Map.of());
-            assertThatThrownBy(() -> config.get("key", null)).isInstanceOf(NullPointerException.class);
+            var configuration = Configuration.of(Map.of());
+            assertThatThrownBy(() -> configuration.get("key", null)).isInstanceOf(NullPointerException.class);
         }
     }
 
@@ -394,8 +394,8 @@ class ConfigurationArgumentsTest {
         @Test
         @DisplayName("throws ConfigurationException for invalid integer")
         void throwsForInvalidInteger() {
-            Configuration config = Configuration.of(Map.of("key", "not-an-int"));
-            assertThatThrownBy(() -> config.getInteger("key"))
+            var configuration = Configuration.of(Map.of("key", "not-an-int"));
+            assertThatThrownBy(() -> configuration.getInteger("key"))
                     .isInstanceOf(ConfigurationException.class)
                     .hasMessage("Invalid configuration for 'key': expected integer but was 'not-an-int'")
                     .hasCauseInstanceOf(NumberFormatException.class);

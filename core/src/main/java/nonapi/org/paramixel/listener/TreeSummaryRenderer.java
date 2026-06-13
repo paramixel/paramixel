@@ -25,6 +25,7 @@ import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Conditional;
 import org.paramixel.api.action.Instance;
 import org.paramixel.api.action.Isolated;
+import org.paramixel.api.action.Loop;
 import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Static;
@@ -66,7 +67,7 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
             return Constants.PARAMIXEL_PLAIN + "No Paramixel tests found" + System.lineSeparator();
         }
         var stringBuilder = new StringBuilder();
-        Deque<RenderFrame> stack = new ArrayDeque<>();
+        var stack = new ArrayDeque<RenderFrame>();
         if (isSyntheticRoot(root)) {
             renderRunLine(root, stringBuilder);
             pushInReverse(stack, buildChildFrames(root, ""));
@@ -91,7 +92,7 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
     private List<RenderFrame> buildChildFrames(final Descriptor descriptor, final String childPrefix) {
         var children = new ArrayList<ChildFrame>();
         descriptor.before().ifPresent(child -> children.add(new ChildFrame(child, "before")));
-        String bodySlot = supportsBody(descriptor.action()) ? "body" : null;
+        var bodySlot = supportsBody(descriptor.action()) ? "body" : null;
         descriptor.children().forEach(child -> children.add(new ChildFrame(child, bodySlot)));
         descriptor.after().ifPresent(child -> children.add(new ChildFrame(child, "after")));
         return buildFlatChildFrames(children, childPrefix);
@@ -111,6 +112,7 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
                 || action instanceof Instance
                 || action instanceof Isolated
                 || action instanceof Repeat
+                || action instanceof Loop
                 || action instanceof Scope
                 || action instanceof Static
                 || action instanceof Timeout
@@ -124,28 +126,28 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
     }
 
     private void renderRunLine(final Descriptor descriptor, final StringBuilder stringBuilder) {
-        String status = formatStatus(descriptor);
-        String timing = formatTiming(Listeners.elapsedMillis(descriptor));
-        String failureInfo = formatFailureInfo(descriptor);
-        String line = status + " Run " + timing + failureInfo;
+        var status = formatStatus(descriptor);
+        var timing = formatTiming(Listeners.elapsedMillis(descriptor));
+        var failureInfo = formatFailureInfo(descriptor);
+        var line = status + " Run " + timing + failureInfo;
         stringBuilder.append(line.stripTrailing()).append(System.lineSeparator());
     }
 
     private void renderNodeLine(final RenderFrame frame, final StringBuilder stringBuilder) {
         var descriptor = frame.descriptor();
-        String status = formatStatus(descriptor);
-        String actionName = descriptor.action().displayName();
-        String timing = formatTiming(Listeners.elapsedMillis(descriptor));
-        String failureInfo = formatFailureInfo(descriptor);
+        var status = formatStatus(descriptor);
+        var actionName = descriptor.action().displayName();
+        var timing = formatTiming(Listeners.elapsedMillis(descriptor));
+        var failureInfo = formatFailureInfo(descriptor);
 
-        String connector = ConnectorStyle.STANDARD.connector(frame.isLast());
-        String line = frame.prefix() + connector + formatLabel(frame.slot(), descriptor.action()) + status + " "
+        var connector = ConnectorStyle.STANDARD.connector(frame.isLast());
+        var line = frame.prefix() + connector + formatLabel(frame.slot(), descriptor.action()) + status + " "
                 + actionName + " " + timing + failureInfo;
         stringBuilder.append(line.stripTrailing()).append(System.lineSeparator());
     }
 
     private static String formatLabel(final String slot, final Action action) {
-        String actionType = actionType(action);
+        var actionType = actionType(action);
         if (slot == null) {
             return actionType + ": ";
         }
@@ -153,7 +155,7 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
     }
 
     private static String actionType(final Action action) {
-        String simpleName = action.getClass().getSimpleName();
+        var simpleName = action.getClass().getSimpleName();
         if (simpleName.isBlank()) {
             return "action";
         }

@@ -19,6 +19,9 @@ package nonapi.org.paramixel.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -122,6 +125,45 @@ class SchedulerPriorityKeyTest {
             var a = SchedulerPriorityKey.root().child(0);
             var b = SchedulerPriorityKey.root().child(1);
             assertThat(a.hashCode()).isNotEqualTo(b.hashCode());
+        }
+    }
+
+    @Test
+    @DisplayName("child cache returns same cached instance under concurrent access")
+    void childCacheReturnsSameInstanceUnderConcurrentAccess() throws Exception {
+        var parent = SchedulerPriorityKey.root();
+        var threadCount = 8;
+        var latch = new CountDownLatch(1);
+        var resultsByIndex = new ConcurrentHashMap<Integer, ConcurrentLinkedQueue<SchedulerPriorityKey>>();
+        for (var i = 0; i < 4; i++) {
+            resultsByIndex.put(i, new ConcurrentLinkedQueue<>());
+        }
+        var threads = new Thread[threadCount];
+
+        for (var i = 0; i < threadCount; i++) {
+            var index = i % 4; // use only indices 0–3 to force contention
+            threads[i] = new Thread(() -> {
+                try {
+                    latch.await();
+                    resultsByIndex.get(index).add(parent.child(index));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            threads[i].start();
+        }
+
+        latch.countDown();
+        for (var thread : threads) {
+            thread.join();
+        }
+
+        // After the fix: every call to child(index) returns the same reference
+        for (var i = 0; i < 4; i++) {
+            var expected = parent.child(i);
+            assertThat(resultsByIndex.get(i))
+                    .as("all concurrent child(" + i + ") calls return same reference")
+                    .allMatch(key -> key == expected);
         }
     }
 }

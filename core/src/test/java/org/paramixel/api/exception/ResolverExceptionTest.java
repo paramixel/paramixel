@@ -38,7 +38,7 @@ class ResolverExceptionTest {
     @DisplayName("constructor with message and cause sets both")
     void constructorWithMessageAndCause() {
         var message = "test message";
-        Throwable cause = new IOException("test cause");
+        var cause = new IOException("test cause");
         var exception = new ResolverException(message, cause);
         assertThat(exception.getMessage()).isEqualTo(message);
         assertThat(exception.getCause()).isSameAs(cause);

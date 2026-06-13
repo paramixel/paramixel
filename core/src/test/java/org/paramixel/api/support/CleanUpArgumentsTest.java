@@ -38,7 +38,7 @@ class CleanUpArgumentsTest {
     @Test
     @DisplayName("of AutoCloseable accepts null")
     void ofAutoCloseableAcceptsNull() {
-        CleanUp cleanup = CleanUp.of((AutoCloseable) null);
+        var cleanup = CleanUp.of((AutoCloseable) null);
 
         cleanup.run();
     }
@@ -46,7 +46,7 @@ class CleanUpArgumentsTest {
     @Test
     @DisplayName("run throws IllegalStateException on second call")
     void runThrowsIllegalStateExceptionOnSecondCall() {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.run();
 
@@ -58,7 +58,7 @@ class CleanUpArgumentsTest {
     @Test
     @DisplayName("runAndThrow throws IllegalStateException on second call")
     void runAndThrowThrowsIllegalStateExceptionOnSecondCall() throws Throwable {
-        CleanUp cleanup = CleanUp.of((ThrowingRunnable) () -> {});
+        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
         cleanup.runAndThrow();
 

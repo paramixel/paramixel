@@ -32,7 +32,7 @@ class ParamixelTest {
     @Test
     @DisplayName("@Paranixel.Factory has RUNTIME retention")
     void factoryHasRuntimeRetention() {
-        Retention retention = Paramixel.Factory.class.getAnnotation(Retention.class);
+        var retention = Paramixel.Factory.class.getAnnotation(Retention.class);
 
         assertThat(retention.value()).isEqualTo(RetentionPolicy.RUNTIME);
     }
@@ -40,7 +40,7 @@ class ParamixelTest {
     @Test
     @DisplayName("@Paramixel.Factory targets METHOD")
     void factoryTargetsMethod() {
-        Target target = Paramixel.Factory.class.getAnnotation(Target.class);
+        var target = Paramixel.Factory.class.getAnnotation(Target.class);
 
         assertThat(target.value()).containsExactly(ElementType.METHOD);
     }
@@ -64,7 +64,7 @@ class ParamixelTest {
     @Test
     @DisplayName("@Paramixel.Tag is Repeatable with Tags container")
     void tagIsRepeatableWithTagsContainer() {
-        Repeatable repeatable = Paramixel.Tag.class.getAnnotation(Repeatable.class);
+        var repeatable = Paramixel.Tag.class.getAnnotation(Repeatable.class);
 
         assertThat(repeatable).isNotNull();
         assertThat(repeatable.value()).isEqualTo(Paramixel.Tags.class);
@@ -81,7 +81,7 @@ class ParamixelTest {
     @Test
     @DisplayName("@Paramixel.Id targets METHOD")
     void idTargetsMethod() {
-        Target target = Paramixel.Id.class.getAnnotation(Target.class);
+        var target = Paramixel.Id.class.getAnnotation(Target.class);
 
         assertThat(target.value()).containsExactly(ElementType.METHOD);
     }
@@ -89,7 +89,7 @@ class ParamixelTest {
     @Test
     @DisplayName("@Paramixel.Id has RUNTIME retention")
     void idHasRuntimeRetention() {
-        Retention retention = Paramixel.Id.class.getAnnotation(Retention.class);
+        var retention = Paramixel.Id.class.getAnnotation(Retention.class);
 
         assertThat(retention.value()).isEqualTo(RetentionPolicy.RUNTIME);
     }

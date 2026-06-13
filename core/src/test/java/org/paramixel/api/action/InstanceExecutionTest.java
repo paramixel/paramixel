@@ -31,6 +31,7 @@ import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Instance execution")
+@SuppressWarnings("removal")
 class InstanceExecutionTest {
 
     record CloseableFixture(AtomicInteger closed) implements AutoCloseable {

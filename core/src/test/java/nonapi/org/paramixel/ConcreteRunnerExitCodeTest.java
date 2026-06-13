@@ -32,11 +32,11 @@ import org.paramixel.api.action.Step;
 @DisplayName("ConcreteRunner exitCode")
 class ConcreteRunnerExitCodeTest {
 
-    private static Configuration config() {
+    private static Configuration configuration() {
         return Configuration.of(Map.of());
     }
 
-    private static Configuration config(String key, String value) {
+    private static Configuration configuration(String key, String value) {
         return Configuration.of(Map.of(key, value));
     }
 
@@ -101,13 +101,13 @@ class ConcreteRunnerExitCodeTest {
         @Test
         @DisplayName("with default configuration")
         void passedDefault() {
-            assertThat(exitCode(config(), passedDescriptor())).isZero();
+            assertThat(exitCode(configuration(), passedDescriptor())).isZero();
         }
 
         @Test
         @DisplayName("with FAILURE_ON_SKIP true")
         void passedWithFailureOnSkip() {
-            assertThat(exitCode(config(Configuration.FAILURE_ON_SKIP, "true"), passedDescriptor()))
+            assertThat(exitCode(configuration(Configuration.FAILURE_ON_SKIP, "true"), passedDescriptor()))
                     .isZero();
         }
     }
@@ -119,13 +119,13 @@ class ConcreteRunnerExitCodeTest {
         @Test
         @DisplayName("with default configuration")
         void failedDefault() {
-            assertThat(exitCode(config(), failedDescriptor())).isOne();
+            assertThat(exitCode(configuration(), failedDescriptor())).isOne();
         }
 
         @Test
         @DisplayName("with FAILURE_ON_SKIP true")
         void failedWithFailureOnSkip() {
-            assertThat(exitCode(config(Configuration.FAILURE_ON_SKIP, "true"), failedDescriptor()))
+            assertThat(exitCode(configuration(Configuration.FAILURE_ON_SKIP, "true"), failedDescriptor()))
                     .isOne();
         }
     }
@@ -137,27 +137,27 @@ class ConcreteRunnerExitCodeTest {
         @Test
         @DisplayName("returns 0 when FAILURE_ON_SKIP is absent (default)")
         void skippedDefault() {
-            assertThat(exitCode(config(), skippedDescriptor())).isZero();
+            assertThat(exitCode(configuration(), skippedDescriptor())).isZero();
         }
 
         @Test
         @DisplayName("returns 0 when FAILURE_ON_SKIP is false")
         void skippedWhenFailureOnSkipFalse() {
-            assertThat(exitCode(config(Configuration.FAILURE_ON_SKIP, "false"), skippedDescriptor()))
+            assertThat(exitCode(configuration(Configuration.FAILURE_ON_SKIP, "false"), skippedDescriptor()))
                     .isZero();
         }
 
         @Test
         @DisplayName("returns 1 when FAILURE_ON_SKIP is true")
         void skippedWhenFailureOnSkipTrue() {
-            assertThat(exitCode(config(Configuration.FAILURE_ON_SKIP, "true"), skippedDescriptor()))
+            assertThat(exitCode(configuration(Configuration.FAILURE_ON_SKIP, "true"), skippedDescriptor()))
                     .isOne();
         }
 
         @Test
         @DisplayName("returns 0 for no-tests SKIPPED with FAIL_IF_NO_TESTS false")
         void noTestsSkippedWithFailIfNoTestsFalse() {
-            assertThat(exitCode(config(Configuration.FAIL_IF_NO_TESTS, "false"), Status.SKIPPED))
+            assertThat(exitCode(configuration(Configuration.FAIL_IF_NO_TESTS, "false"), Status.SKIPPED))
                     .isZero();
         }
     }
@@ -169,20 +169,20 @@ class ConcreteRunnerExitCodeTest {
         @Test
         @DisplayName("returns 1 when FAILURE_ON_ABORT is absent (default)")
         void abortedDefault() {
-            assertThat(exitCode(config(), abortedDescriptor())).isOne();
+            assertThat(exitCode(configuration(), abortedDescriptor())).isOne();
         }
 
         @Test
         @DisplayName("returns 1 when FAILURE_ON_ABORT is true")
         void abortedWhenFailureOnAbortTrue() {
-            assertThat(exitCode(config(Configuration.FAILURE_ON_ABORT, "true"), abortedDescriptor()))
+            assertThat(exitCode(configuration(Configuration.FAILURE_ON_ABORT, "true"), abortedDescriptor()))
                     .isOne();
         }
 
         @Test
         @DisplayName("returns 0 when FAILURE_ON_ABORT is false")
         void abortedWhenFailureOnAbortFalse() {
-            assertThat(exitCode(config(Configuration.FAILURE_ON_ABORT, "false"), abortedDescriptor()))
+            assertThat(exitCode(configuration(Configuration.FAILURE_ON_ABORT, "false"), abortedDescriptor()))
                     .isZero();
         }
     }

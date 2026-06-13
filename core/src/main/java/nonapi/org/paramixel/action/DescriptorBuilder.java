@@ -22,17 +22,6 @@ import java.util.IdentityHashMap;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Conditional;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Isolated;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Repeat;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Static;
-import org.paramixel.api.action.Timeout;
-import org.paramixel.api.action.Until;
 import org.paramixel.api.exception.CycleDetectedException;
 
 /**
@@ -71,47 +60,14 @@ public final class DescriptorBuilder {
             final IdentityHashMap<Action, Boolean> visited) {
         path.addLast(action);
         visited.put(action, Boolean.TRUE);
-        if (action instanceof Scope scope) {
-            scope.before().ifPresent(b -> descriptor.setBefore(build(descriptor, b, path, visited)));
-            if (scope.body() != null) {
-                descriptor.addChild(build(descriptor, scope.body(), path, visited));
-            }
-            scope.after().ifPresent(a -> descriptor.setAfter(build(descriptor, a, path, visited)));
-        } else if (action instanceof Static staticAction) {
-            staticAction.before().ifPresent(b -> descriptor.setBefore(build(descriptor, b, path, visited)));
-            if (staticAction.body() != null) {
-                descriptor.addChild(build(descriptor, staticAction.body(), path, visited));
-            }
-            staticAction.after().ifPresent(a -> descriptor.setAfter(build(descriptor, a, path, visited)));
-        } else if (action instanceof Instance instance) {
-            descriptor.setBefore(build(descriptor, instance.instantiate(), path, visited));
-            if (instance.body() != null) {
-                descriptor.addChild(build(descriptor, instance.body(), path, visited));
-            }
-            descriptor.setAfter(build(descriptor, instance.destroy(), path, visited));
-        } else if (action instanceof Parallel parallel) {
-            parallel.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
-        } else if (action instanceof Sequence sequence) {
-            sequence.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
-        } else if (action instanceof Sequential sequential) {
-            sequential.children().forEach(c -> descriptor.addChild(build(descriptor, c, path, visited)));
-        } else if (action instanceof Repeat repeat) {
-            for (int i = 0; i < repeat.iterations(); i++) {
-                descriptor.addChild(build(descriptor, repeat.body(), path, visited));
-            }
-        } else if (action instanceof Until until) {
-            for (int i = 0; i < until.maxIterations(); i++) {
-                descriptor.addChild(build(descriptor, until.body(), path, visited));
-            }
-        } else if (action instanceof Timeout timeout) {
-            descriptor.addChild(build(descriptor, timeout.body(), path, visited));
-        } else if (action instanceof Isolated isolated) {
-            descriptor.addChild(build(descriptor, isolated.body(), path, visited));
-        } else if (action instanceof Conditional conditional) {
-            descriptor.addChild(build(descriptor, conditional.body(), path, visited));
+        try {
+            DescriptorExpansions.expand(
+                    action,
+                    new DescriptorExpansionContext(descriptor, child -> build(descriptor, child, path, visited)));
+        } finally {
+            path.removeLast();
+            visited.remove(action);
         }
-        path.removeLast();
-        visited.remove(action);
     }
 
     private MutableDescriptor build(

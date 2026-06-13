@@ -23,7 +23,6 @@ import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Descriptor status lifecycle")
@@ -137,15 +136,20 @@ class DescriptorStatusLifecycleTest {
     }
 
     @Test
-    @DisplayName("terminal to any status is invalid")
-    void terminalToAnyStatusIsInvalid() {
+    @DisplayName("terminal to any status is a no-op")
+    void terminalToAnyStatusIsNoOp() {
         var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 
-        assertThatThrownBy(() -> descriptor.setStatus(Status.RUNNING))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("already completed");
+        // Calling setStatus on an already-terminal descriptor should silently no-op
+        descriptor.setStatus(Status.RUNNING);
+        descriptor.setStatus(Status.FAILED);
+        descriptor.setStatus(Status.SKIPPED);
+
+        // Descriptor retains original terminal state
+        assertThat(descriptor.isPassed()).isTrue();
+        assertThat(descriptor.isCompleted()).isTrue();
     }
 
     @Test
@@ -197,7 +201,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("descriptor exposes action")
     void descriptorExposesAction() {
-        Action action = Step.of("test", context -> {});
+        var action = Step.of("test", context -> {});
         var descriptor = new ConcreteDescriptor(action);
 
         assertThat(descriptor.action()).isSameAs(action);
@@ -231,5 +235,75 @@ class DescriptorStatusLifecycleTest {
         descriptor.markScheduled();
 
         assertThat(descriptor.isScheduled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("defensive setStatus on completed descriptor is a no-op")
+    void defensiveSetStatusOnCompletedDescriptorIsNoOp() {
+        // Simulates ConcreteRunner.runInternal() catch block:
+        //   - Descriptor completed normally (PASSED)
+        //   - A listener throws after completion
+        //   - Catch block defensively calls setStatus(FAILED)
+        var root = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        root.setStatus(Status.RUNNING);
+        root.setStatus(Status.PASSED);
+
+        // This must not throw
+        root.setStatus(Status.failed("listener error", new RuntimeException("original listener exception")));
+
+        // Descriptor retains its original terminal state (PASSED — not changed to FAILED)
+        assertThat(root.isPassed()).isTrue();
+        assertThat(root.isCompleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("no-op on terminal descriptor does not change timestamps")
+    void noOpOnTerminalDescriptorDoesNotChangeTimestamps() throws InterruptedException {
+        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        descriptor.setStatus(Status.RUNNING);
+        Thread.sleep(10);
+        descriptor.setStatus(Status.PASSED);
+
+        var startedAtBefore = descriptor.startedAt().orElseThrow();
+        var completedAtBefore = descriptor.completedAt().orElseThrow();
+
+        // No-op call
+        descriptor.setStatus(Status.FAILED);
+
+        // Timestamps must be unchanged
+        assertThat(descriptor.startedAt()).containsSame(startedAtBefore);
+        assertThat(descriptor.completedAt()).containsSame(completedAtBefore);
+    }
+
+    @Test
+    @DisplayName("no-op on all terminal states (PASSED, FAILED, SKIPPED, ABORTED)")
+    void noOpOnAllTerminalStates() {
+        // PASSED → no-op on setStatus(FAILED)
+        var passed = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        passed.setStatus(Status.RUNNING);
+        passed.setStatus(Status.PASSED);
+        passed.setStatus(Status.FAILED);
+        assertThat(passed.isPassed()).isTrue();
+
+        // FAILED → no-op on setStatus(PASSED)
+        var failed = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        failed.setStatus(Status.RUNNING);
+        failed.setStatus(Status.FAILED);
+        failed.setStatus(Status.PASSED);
+        assertThat(failed.isFailed()).isTrue();
+
+        // SKIPPED → no-op on setStatus(ABORTED)
+        var skipped = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        skipped.setStatus(Status.RUNNING);
+        skipped.setStatus(Status.SKIPPED);
+        skipped.setStatus(Status.ABORTED);
+        assertThat(skipped.isSkipped()).isTrue();
+
+        // ABORTED → no-op on setStatus(SKIPPED)
+        var aborted = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        aborted.setStatus(Status.RUNNING);
+        aborted.setStatus(Status.ABORTED);
+        aborted.setStatus(Status.SKIPPED);
+        assertThat(aborted.isAborted()).isTrue();
     }
 }

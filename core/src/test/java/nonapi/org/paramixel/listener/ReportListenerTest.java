@@ -31,7 +31,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.Result;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Step;
 
@@ -43,29 +42,29 @@ class ReportListenerTest {
 
     private ReportListener createListener(String reportFilePath) {
         var listener = new ReportListener();
-        var config = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
-        listener.initialize(config);
+        var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
+        listener.initialize(configuration);
         return listener;
     }
 
     @Test
     @DisplayName("writes no-tests message when result has no descriptor")
     void writesNoTestsMessageWhenNoDescriptor() throws Exception {
-        Path reportFile = tempDir.resolve("report.txt");
+        var reportFile = tempDir.resolve("report.txt");
         var listener = createListener(reportFile.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
         assertThat(reportFile).exists();
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         assertThat(content).isEqualTo("No Paramixel tests found" + System.lineSeparator());
     }
 
     @Test
     @DisplayName("writes descriptor tree with indentation and sanitized message")
     void writesDescriptorTreeWithIndentationAndSanitizedMessage() throws Exception {
-        Path reportFile = tempDir.resolve("report.txt");
+        var reportFile = tempDir.resolve("report.txt");
         var listener = createListener(reportFile.toString());
 
         var root = new ConcreteDescriptor(Step.of("root", v -> {}));
@@ -78,11 +77,11 @@ class ReportListenerTest {
 
         root.addChild(child);
 
-        Result result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
 
-        String content = Files.readString(reportFile, StandardCharsets.UTF_8);
+        var content = Files.readString(reportFile, StandardCharsets.UTF_8);
         var lineSeparator = System.lineSeparator();
         assertThat(content)
                 .contains("PASSED | root" + lineSeparator + "  FAILED | child | first - second third" + lineSeparator);
@@ -91,10 +90,10 @@ class ReportListenerTest {
     @Test
     @DisplayName("throws UncheckedIOException with text format label when report path is a directory")
     void throwsUncheckedIOExceptionWhenReportPathIsDirectory() throws Exception {
-        Path dir = tempDir.resolve("blocked.txt");
+        var dir = tempDir.resolve("blocked.txt");
         Files.createDirectory(dir);
         var listener = createListener(dir.toString());
-        Result result = new ConcreteResult(Configuration.defaultConfiguration());
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
 
         assertThatThrownBy(() -> listener.onRunCompleted(result))
                 .isInstanceOf(UncheckedIOException.class)

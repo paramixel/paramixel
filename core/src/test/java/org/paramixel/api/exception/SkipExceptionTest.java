@@ -44,7 +44,7 @@ class SkipExceptionTest {
     @Test
     @DisplayName("constructor creates SkipException with provided message")
     void constructorCreatesSkipExceptionWithMessage() {
-        SkipException exception = new SkipException("database unavailable");
+        var exception = new SkipException("database unavailable");
         assertThat(exception).hasMessage("database unavailable");
     }
 }

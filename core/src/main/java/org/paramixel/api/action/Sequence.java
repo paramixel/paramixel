@@ -31,6 +31,7 @@ import nonapi.org.paramixel.support.Arguments;
  * remaining children to be skipped or aborted. When configured as <em>independent</em>,
  * all children run regardless of individual outcomes.
  */
+@Deprecated(forRemoval = true, since = "6.2.0")
 public final class Sequence implements Action {
 
     private final String displayName;

@@ -53,7 +53,7 @@ public class FastUUID {
      * @return a canonical UUID version 4 string; never {@code null}
      */
     public static String generateUuid() {
-        ThreadLocalRandom rng = ThreadLocalRandom.current();
+        var rng = ThreadLocalRandom.current();
         long msb = rng.nextLong();
         long lsb = rng.nextLong();
         msb = (msb & ~0x0000_0000_0000_F000L) | 0x0000_0000_0000_4000L;

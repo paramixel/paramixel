@@ -26,7 +26,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import nonapi.org.paramixel.support.AnsiColor;
 import nonapi.org.paramixel.support.Arguments;
@@ -211,18 +210,18 @@ public class ParamixelMojo extends AbstractMojo {
         final var originalClassLoader = Thread.currentThread().getContextClassLoader();
         final var preExecutionThreads = snapshotNonDaemonThreads();
 
-        try (URLClassLoader testClassLoader = buildTestClassLoader()) {
+        try (var testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
             try {
                 final var configuration = buildConfiguration(testClassLoader);
                 final var selector = buildSelector();
 
-                Runner runner = Runner.builder()
+                var runner = Runner.builder()
                         .configuration(configuration)
                         .listener(Listener.defaultListener(configuration))
                         .build();
 
-                Optional<Result> optionalResult = runner.run(selector);
+                var optionalResult = runner.run(selector);
                 if (optionalResult.isEmpty()) {
                     if (failIfNoTests) {
                         throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
@@ -232,7 +231,7 @@ public class ParamixelMojo extends AbstractMojo {
                     return;
                 }
 
-                Result result = optionalResult.orElseThrow();
+                var result = optionalResult.orElseThrow();
                 if (result.isFailed()) {
                     throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                 }
@@ -289,7 +288,7 @@ public class ParamixelMojo extends AbstractMojo {
      * @return a mutable set of live non-daemon threads excluding known JVM system threads
      */
     private Set<Thread> snapshotNonDaemonThreads() {
-        Thread[] buffer = new Thread[Thread.activeCount() + 10];
+        var buffer = new Thread[Thread.activeCount() + 10];
         int count = Thread.enumerate(buffer);
         var result = new HashSet<Thread>(count);
         for (Thread t : buffer) {
@@ -316,15 +315,15 @@ public class ParamixelMojo extends AbstractMojo {
      *     and lingering threads are detected
      */
     private void warnOrErrorLingeringThreads(final Set<Thread> baseline) throws MojoExecutionException {
-        Set<Thread> current = snapshotNonDaemonThreads();
+        var current = snapshotNonDaemonThreads();
         current.removeAll(baseline);
 
-        List<Thread> lingering = current.stream()
+        var lingering = current.stream()
                 .filter(t -> t.getContextClassLoader() instanceof URLClassLoader)
                 .toList();
 
         if (!lingering.isEmpty()) {
-            String message = "Non-daemon threads are still running after Paramixel execution; "
+            var message = "Non-daemon threads are still running after Paramixel execution; "
                     + "these threads may fail when the test classloader is closed:";
             if (strictThreadLifecycle) {
                 throw new MojoExecutionException(message);
@@ -354,8 +353,8 @@ public class ParamixelMojo extends AbstractMojo {
         if (properties != null) {
             var seenKeys = new HashSet<String>();
             for (Property property : properties) {
-                String key = property.getKey();
-                String value = property.getValue();
+                var key = property.getKey();
+                var value = property.getValue();
 
                 if (key == null) {
                     throw new MojoExecutionException("Paramixel property key is null");
@@ -405,7 +404,7 @@ public class ParamixelMojo extends AbstractMojo {
             snapshot = systemProps.entrySet().stream().toList();
         }
         for (var entry : snapshot) {
-            String k = String.valueOf(entry.getKey());
+            var k = String.valueOf(entry.getKey());
             configMap.put(k, String.valueOf(entry.getValue()));
         }
 
@@ -429,7 +428,7 @@ public class ParamixelMojo extends AbstractMojo {
      *     test dependency resolution fails, or a classpath element cannot be converted to a URL
      */
     URLClassLoader buildTestClassLoader() throws MojoExecutionException {
-        final List<URL> classpathUrls = buildTestClasspathUrls();
+        final var classpathUrls = buildTestClasspathUrls();
         return new URLClassLoader(classpathUrls.toArray(new URL[0]), getClass().getClassLoader());
     }
 

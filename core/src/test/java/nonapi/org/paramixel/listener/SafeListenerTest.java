@@ -43,7 +43,7 @@ class SafeListenerTest {
     @DisplayName("catches recoverable exception from onRunStarted and reports to stderr")
     void catchesRecoverableExceptionFromOnRunStarted() {
         var delegate = new ThrowingListener("onRunStarted", new RuntimeException("boom"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onRunStarted());
 
@@ -54,7 +54,7 @@ class SafeListenerTest {
     @DisplayName("catches recoverable exception from onDiscoveryCompleted and reports to stderr")
     void catchesRecoverableExceptionFromOnDiscoveryCompleted() {
         var delegate = new ThrowingListener("onDiscoveryCompleted", new RuntimeException("discovery-err"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onDiscoveryCompleted(stubDescriptor()));
 
@@ -65,7 +65,7 @@ class SafeListenerTest {
     @DisplayName("catches recoverable exception from onBeforeExecution and reports to stderr")
     void catchesRecoverableExceptionFromOnBeforeExecution() {
         var delegate = new ThrowingListener("onBeforeExecution", new RuntimeException("before-err"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onBeforeExecution(stubDescriptor()));
 
@@ -76,7 +76,7 @@ class SafeListenerTest {
     @DisplayName("catches recoverable exception from onAfterExecution and reports to stderr")
     void catchesRecoverableExceptionFromOnAfterExecution() {
         var delegate = new ThrowingListener("onAfterExecution", new RuntimeException("after-err"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onAfterExecution(stubDescriptor()));
 
@@ -87,7 +87,7 @@ class SafeListenerTest {
     @DisplayName("catches recoverable exception from onRunCompleted and reports to stderr")
     void catchesRecoverableExceptionFromOnRunCompleted() {
         var delegate = new ThrowingListener("onRunCompleted", new RuntimeException("complete-err"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onRunCompleted(stubResult()));
 
@@ -98,7 +98,7 @@ class SafeListenerTest {
     @DisplayName("uses ANSI prefix when ansiEnabled is true")
     void usesAnsiPrefixWhenEnabled() {
         var delegate = new ThrowingListener("onRunStarted", new RuntimeException("ansi-test"));
-        Listener safe = new SafeListener(delegate, true);
+        var safe = new SafeListener(delegate, true);
 
         var captured = captureStdErr(() -> safe.onRunStarted());
 
@@ -110,7 +110,7 @@ class SafeListenerTest {
     @DisplayName("uses plain prefix when ansiEnabled is false")
     void usesPlainPrefixWhenDisabled() {
         var delegate = new ThrowingListener("onRunStarted", new RuntimeException("plain-test"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onRunStarted());
 
@@ -121,7 +121,7 @@ class SafeListenerTest {
     @DisplayName("rethrows VirtualMachineError as unrecoverable")
     void rethrowsVirtualMachineErrorAsUnrecoverable() {
         var delegate = new ThrowingListener("onRunStarted", new InternalError("vm-failure"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         assertThatThrownBy(safe::onRunStarted).isInstanceOf(InternalError.class);
     }
@@ -130,7 +130,7 @@ class SafeListenerTest {
     @DisplayName("does not rethrow StackOverflowError")
     void doesNotRethrowStackOverflowError() {
         var delegate = new ThrowingListener("onRunStarted", new StackOverflowError("stack"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onRunStarted());
 
@@ -141,7 +141,7 @@ class SafeListenerTest {
     @DisplayName("catches recoverable exception from initialize and reports to stderr")
     void catchesRecoverableExceptionFromInitialize() {
         var delegate = new ThrowingListener("initialize", new RuntimeException("init-err"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.initialize(stubConfiguration()));
 
@@ -152,7 +152,7 @@ class SafeListenerTest {
     @DisplayName("catches recoverable exception from onDiscoveryStarted and reports to stderr")
     void catchesRecoverableExceptionFromOnDiscoveryStarted() {
         var delegate = new ThrowingListener("onDiscoveryStarted", new RuntimeException("discovery-start-err"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onDiscoveryStarted());
 
@@ -163,7 +163,7 @@ class SafeListenerTest {
     @DisplayName("rethrows VirtualMachineError from initialize as unrecoverable")
     void rethrowsVirtualMachineErrorFromInitialize() {
         var delegate = new ThrowingListener("initialize", new InternalError("vm-failure"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         assertThatThrownBy(() -> safe.initialize(stubConfiguration())).isInstanceOf(InternalError.class);
     }
@@ -172,7 +172,7 @@ class SafeListenerTest {
     @DisplayName("rethrows VirtualMachineError from onDiscoveryStarted as unrecoverable")
     void rethrowsVirtualMachineErrorFromOnDiscoveryStarted() {
         var delegate = new ThrowingListener("onDiscoveryStarted", new InternalError("vm-failure"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         assertThatThrownBy(safe::onDiscoveryStarted).isInstanceOf(InternalError.class);
     }
@@ -181,7 +181,7 @@ class SafeListenerTest {
     @DisplayName("does not rethrow StackOverflowError from initialize")
     void doesNotRethrowStackOverflowErrorFromInitialize() {
         var delegate = new ThrowingListener("initialize", new StackOverflowError("stack"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.initialize(stubConfiguration()));
 
@@ -192,7 +192,7 @@ class SafeListenerTest {
     @DisplayName("does not rethrow StackOverflowError from onDiscoveryStarted")
     void doesNotRethrowStackOverflowErrorFromOnDiscoveryStarted() {
         var delegate = new ThrowingListener("onDiscoveryStarted", new StackOverflowError("stack"));
-        Listener safe = new SafeListener(delegate, false);
+        var safe = new SafeListener(delegate, false);
 
         var captured = captureStdErr(() -> safe.onDiscoveryStarted());
 

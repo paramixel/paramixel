@@ -26,19 +26,19 @@ import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Scheduler priority key ordering")
+@SuppressWarnings("removal")
 class SchedulerPriorityKeyOrderingTest {
 
     @Test
     @DisplayName("precomputed keys preserve legacy scheduler ordering")
     void precomputedKeysPreserveLegacySchedulerOrdering() {
-        Action branch = Sequence.builder("branch")
+        var branch = Sequence.builder("branch")
                 .child(Step.of("branch-step-0", context -> {}))
                 .child(Parallel.builder("branch-parallel")
                         .parallelism(2)
@@ -48,13 +48,13 @@ class SchedulerPriorityKeyOrderingTest {
                 .child(Step.of("branch-step-2", context -> {}))
                 .build();
 
-        Action rootAction = Scope.builder("root")
+        var rootAction = Scope.builder("root")
                 .before(Step.of("before", context -> {}))
                 .body(branch)
                 .after(Step.of("after", context -> {}))
                 .build();
 
-        MutableDescriptor descriptorTree = new DescriptorBuilder().discover(rootAction);
+        var descriptorTree = new DescriptorBuilder().discover(rootAction);
 
         var descriptors = collectDescriptors(descriptorTree);
         var expected = descriptors.stream()
@@ -83,7 +83,7 @@ class SchedulerPriorityKeyOrderingTest {
 
     private static List<Integer> priorityOfLegacy(final MutableDescriptor descriptor) {
         var path = new ArrayList<Integer>();
-        MutableDescriptor current = descriptor;
+        var current = descriptor;
         while (current.parent().isPresent()) {
             if (current.parent().orElseThrow() instanceof MutableDescriptor parent) {
                 path.add(indexInParent(parent, current));

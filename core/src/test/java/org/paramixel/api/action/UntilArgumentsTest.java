@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Until arguments")
+@SuppressWarnings("removal")
 class UntilArgumentsTest {
 
     private static final Action STEP = Step.of("step", s -> {});

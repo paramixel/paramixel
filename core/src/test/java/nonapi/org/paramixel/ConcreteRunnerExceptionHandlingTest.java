@@ -18,7 +18,6 @@ package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Field;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
@@ -45,7 +44,7 @@ class ConcreteRunnerExceptionHandlingTest {
     }
 
     private static void setIntField(final Object target, final String fieldName, final int value) throws Exception {
-        Field field = target.getClass().getDeclaredField(fieldName);
+        var field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setInt(target, value);
     }

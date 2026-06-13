@@ -64,13 +64,11 @@ public class AnnotationNginxTest {
 
         var parallel = parallel(AnnotationNginxTest.class.getName());
         for (NginxTestEnvironment environment : NginxTestEnvironment.createTestEnvironments()) {
-            var lifecycle = scope(environment.name())
-                    .before(annotationResolver.byId("setUp"))
-                    .body(annotationResolver.byId("testGet"))
-                    .after(annotationResolver.byId("tearDown"));
-
             parallel.child(instance(environment.name(), () -> new AnnotationNginxTest(environment))
-                    .body(lifecycle));
+                    .body(scope(environment.name())
+                            .before(annotationResolver.byId("setUp"))
+                            .body(annotationResolver.byId("testGet"))
+                            .after(annotationResolver.byId("tearDown"))));
         }
         return parallel.build();
     }
@@ -100,7 +98,7 @@ public class AnnotationNginxTest {
         LOGGER.info("[%s] testing GET ...", environment.name());
 
         int port = environment.getNginxContainer().getMappedPort(80);
-        String content = doGet("http://localhost:" + port);
+        var content = doGet("http://localhost:" + port);
         assertThat(content).contains("Welcome to nginx!");
     }
 
@@ -116,8 +114,7 @@ public class AnnotationNginxTest {
 
     private static String doGet(final String url) throws Exception {
         var result = new StringBuilder();
-        HttpURLConnection connection =
-                (HttpURLConnection) URI.create(url).toURL().openConnection();
+        var connection = (HttpURLConnection) URI.create(url).toURL().openConnection();
         connection.setConnectTimeout(5_000);
         connection.setReadTimeout(10_000);
 

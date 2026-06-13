@@ -28,7 +28,7 @@ class ClassRegexSelectorTest {
     @Test
     @DisplayName("getPattern returns the compiled pattern")
     void getPatternReturnsCompiledPattern() {
-        ClassRegexSelector selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
+        var selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
 
         assertThat(selector.pattern()).isNotNull();
         assertThat(selector.pattern().pattern()).isEqualTo("SelectorTest");
@@ -37,7 +37,7 @@ class ClassRegexSelectorTest {
     @Test
     @DisplayName("matchesClass uses find() semantics")
     void matchesClassUsesFindSemantics() {
-        ClassRegexSelector selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
+        var selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
 
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isTrue();
     }
@@ -45,7 +45,7 @@ class ClassRegexSelectorTest {
     @Test
     @DisplayName("matchesPackage returns true")
     void matchesPackageReturnsTrue() {
-        ClassRegexSelector selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
+        var selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
     }
@@ -53,7 +53,7 @@ class ClassRegexSelectorTest {
     @Test
     @DisplayName("matchesTag returns true")
     void matchesTagReturnsTrue() {
-        ClassRegexSelector selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
+        var selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
     }
@@ -61,7 +61,7 @@ class ClassRegexSelectorTest {
     @Test
     @DisplayName("matchesClass rejects null")
     void matchesClassRejectsNull() {
-        ClassRegexSelector selector = (ClassRegexSelector) Selector.classRegex("Test");
+        var selector = (ClassRegexSelector) Selector.classRegex("Test");
 
         assertThatThrownBy(() -> selector.matchesClass(null)).isInstanceOf(NullPointerException.class);
     }
@@ -69,7 +69,7 @@ class ClassRegexSelectorTest {
     @Test
     @DisplayName("classOf produces ClassRegexSelector")
     void classOfProducesClassRegexSelector() {
-        Selector selector = Selector.classOf(ClassRegexSelectorTest.class);
+        var selector = Selector.classOf(ClassRegexSelectorTest.class);
 
         assertThat(selector).isInstanceOf(ClassRegexSelector.class);
     }

@@ -26,7 +26,7 @@ function UnreleasedVersionLabel({siteTitle, versionMetadata}) {
 }
 
 function UnmaintainedVersionLabel({siteTitle, versionMetadata}) {
-  if (versionMetadata.className === 'notice-legacy') {
+  if (versionMetadata.className === 'notice-unmaintained') {
     return (
       <Translate
         id="theme.docs.versions.legacyVersionLabel"
