@@ -40,7 +40,7 @@ import org.paramixel.api.exception.ConfigurationException;
  */
 public final class ConfigurationFactory {
 
-    private static final int DEFAULT_SCHEDULER_QUEUE_CAPACITY = 1024;
+    private static final int DEFAULT_SCHEDULER_QUEUE_CAPACITY = 1_024;
 
     private static final Map<ClassLoader, Configuration> CLASSLOADER_CACHE =
             Collections.synchronizedMap(new WeakHashMap<>());

@@ -19,6 +19,7 @@ package org.paramixel.api.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -52,7 +53,7 @@ class TimeoutTest {
     void bodyExceedsTimeout() {
         var action = Timeout.builder("slow-child")
                 .body(Step.of("blocking-step", context -> {
-                    Thread.sleep(5000);
+                    Thread.sleep(5_000);
                 }))
                 .timeout(Duration.ofMillis(50))
                 .build();
@@ -73,7 +74,7 @@ class TimeoutTest {
         var action = Timeout.builder("interrupt-child")
                 .body(Step.of("sleep-step", context -> {
                     try {
-                        Thread.sleep(5000);
+                        Thread.sleep(5_000);
                     } catch (InterruptedException e) {
                         interrupted.set(true);
                         Thread.currentThread().interrupt();
@@ -124,6 +125,29 @@ class TimeoutTest {
         assertThat(root.isFailed()).isTrue();
         var child = root.children().get(0);
         assertThat(child.isFailed()).isTrue();
+        assertThat(child.throwable()).isPresent();
+        assertThat(child.throwable().get()).isSameAs(exception);
+    }
+
+    @Test
+    @DisplayName("child checked exception within timeout preserves original cause")
+    void bodyCheckedExceptionWithinTimeoutPreservesOriginalCause() {
+        var exception = new IOException("checked failure");
+        var action = Timeout.builder("failing-child")
+                .body(Step.of("fail-step", context -> {
+                    throw exception;
+                }))
+                .timeout(Duration.ofSeconds(5))
+                .build();
+
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
+        var child = root.children().get(0);
+
+        assertThat(root.isFailed()).isTrue();
+        assertThat(root.message()).contains("checked failure");
+        assertThat(child.isFailed()).isTrue();
+        assertThat(child.message()).contains("checked failure");
         assertThat(child.throwable()).isPresent();
         assertThat(child.throwable().get()).isSameAs(exception);
     }

@@ -19,12 +19,14 @@ package nonapi.org.paramixel;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.locks.ReentrantLock;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.listener.SafeListener;
 import nonapi.org.paramixel.support.StackTracePruner;
+import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
@@ -108,15 +110,41 @@ public final class ConcreteRunner implements Runner {
         safeListener.onDiscoveryStarted();
         MutableDescriptor root = null;
         Scheduler scheduler = null;
+        boolean discoveryCompleted = false;
         try {
             root = new DescriptorBuilder().discover(action);
             safeListener.onDiscoveryCompleted(root);
+            discoveryCompleted = true;
             scheduler = new Scheduler(parallelism, schedulerQueueCapacity);
             scheduler.setFailFast(
                     configuration.getBoolean(Configuration.FAIL_FAST).orElse(false));
             var context = new ConcreteContext(configuration, safeListener, root, scheduler, new InstanceHolder());
             root.markScheduled();
+            var rootFuture = root.scheduledFuture();
             scheduler.executeDescriptor(root, context, ExecutionMode.RUN);
+            // executeDescriptor waits for deferred coordination roots via the scheduler's
+            // managedJoin(nodeCompletion) path. The root future should therefore already be done;
+            // join() remains as an idempotent safety guard for unusual external-completion paths.
+            //
+            // join() blocks indefinitely — timeouts are the responsibility of the
+            // Timeout action, not the runner. join() is interruptible: if the calling
+            // thread is interrupted (e.g. by JUnit @Timeout), the interrupt propagates
+            // and close() in the finally block handles executor shutdown.
+            if (rootFuture != null) {
+                try {
+                    rootFuture.join();
+                } catch (CompletionException e) {
+                    var cause = Throwables.unwrap(e);
+                    if (UnrecoverableErrors.isUnrecoverable(cause) && cause instanceof Error error) {
+                        throw error;
+                    }
+                    // Root failed; status is already set on the descriptor.
+                }
+            }
+            var unrecoverableFailure = scheduler.unrecoverableFailure();
+            if (unrecoverableFailure instanceof Error error) {
+                throw error;
+            }
             var result = new ConcreteResult(root, configuration);
             safeListener.onRunCompleted(result);
             return result;
@@ -136,6 +164,9 @@ public final class ConcreteRunner implements Runner {
             final var result = root != null
                     ? new ConcreteResult(root, configuration)
                     : new ConcreteResult(configuration, Status.failed(message, t));
+            if (!discoveryCompleted) {
+                safeListener.onDiscoveryCompleted(root);
+            }
             safeListener.onRunCompleted(result);
             return result;
         } finally {
@@ -159,7 +190,7 @@ public final class ConcreteRunner implements Runner {
     private static int resolveSchedulerQueueCapacity(final Configuration configuration) {
         final var optionalCapacity = configuration.getInteger(Configuration.SCHEDULER_QUEUE_CAPACITY);
         if (optionalCapacity.isEmpty()) {
-            return 1024;
+            return 1_024;
         }
         final int value = optionalCapacity.get();
         if (value <= 0) {
@@ -181,7 +212,11 @@ public final class ConcreteRunner implements Runner {
         try {
             Objects.requireNonNull(selector, "selector is null");
             var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
-            return optionalAction.map(this::runInternal);
+            if (optionalAction.isEmpty()) {
+                fireNoTestsLifecycle();
+                return Optional.empty();
+            }
+            return Optional.of(runInternal(optionalAction.get()));
         } finally {
             lock.unlock();
         }
@@ -205,7 +240,11 @@ public final class ConcreteRunner implements Runner {
         try {
             Objects.requireNonNull(selector, "selector is null");
             var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
-            return optionalAction.map(this::runAndReturnExitCodeInternal).orElseGet(this::noTestsExitCode);
+            if (optionalAction.isEmpty()) {
+                fireNoTestsLifecycle();
+                return noTestsExitCode();
+            }
+            return exitCode(runInternal(optionalAction.get()));
         } finally {
             lock.unlock();
         }
@@ -232,7 +271,12 @@ public final class ConcreteRunner implements Runner {
         try {
             Objects.requireNonNull(selector, "selector is null");
             var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
-            exitCode = optionalAction.map(this::runAndReturnExitCodeInternal).orElseGet(this::noTestsExitCode);
+            if (optionalAction.isEmpty()) {
+                fireNoTestsLifecycle();
+                exitCode = noTestsExitCode();
+            } else {
+                exitCode = exitCode(runInternal(optionalAction.get()));
+            }
         } finally {
             lock.unlock();
         }
@@ -246,11 +290,8 @@ public final class ConcreteRunner implements Runner {
             var optionalAction =
                     new ActionResolver(configuration, buildSelector(configuration), shuffled, seed).resolveRootAction();
             if (optionalAction.isEmpty()) {
-                safeListener.initialize(configuration);
-                safeListener.onRunStarted();
-                var result = new ConcreteResult(configuration);
-                safeListener.onRunCompleted(result);
-                return exitCode(result);
+                fireNoTestsLifecycle();
+                return noTestsExitCode();
             }
             return exitCode(runInternal(optionalAction.get()));
         } finally {
@@ -258,8 +299,13 @@ public final class ConcreteRunner implements Runner {
         }
     }
 
-    private int runAndReturnExitCodeInternal(final Action action) {
-        return exitCode(runInternal(action));
+    private void fireNoTestsLifecycle() {
+        safeListener.initialize(configuration);
+        safeListener.onRunStarted();
+        safeListener.onDiscoveryStarted();
+        safeListener.onDiscoveryCompleted(null);
+        var result = new ConcreteResult(configuration);
+        safeListener.onRunCompleted(result);
     }
 
     private static Selector buildSelector(final Configuration configuration) {

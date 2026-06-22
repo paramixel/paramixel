@@ -48,7 +48,7 @@ class RunnerDiscoveryArgumentsTest {
     void andComposesPackageAndClassRegex() {
         var selector = Selector.and(
                 Selector.packageRegex(RunnerDiscoveryArgumentsTest.class.getPackageName()),
-                Selector.classRegex("RunnerDiscoveryArgumentsTest"));
+                Selector.classRegex(".*RunnerDiscoveryArgumentsTest.*"));
 
         assertThat(selector.matchesPackage(RunnerDiscoveryArgumentsTest.class.getPackageName()))
                 .isTrue();

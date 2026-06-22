@@ -48,6 +48,28 @@ class ArgumentsNumericValidationTest {
     }
 
     @Test
+    @DisplayName("requirePositive(long, String) returns positive value")
+    void requirePositiveLongReturnsPositiveValue() {
+        assertThat(Arguments.requirePositive(5L, "must be positive")).isEqualTo(5L);
+    }
+
+    @Test
+    @DisplayName("requirePositive(long, String) rejects zero")
+    void requirePositiveLongRejectsZero() {
+        assertThatThrownBy(() -> Arguments.requirePositive(0L, "must be positive"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("must be positive");
+    }
+
+    @Test
+    @DisplayName("requirePositive(long, String) rejects negative value")
+    void requirePositiveLongRejectsNegative() {
+        assertThatThrownBy(() -> Arguments.requirePositive(-1L, "must be positive"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("must be positive");
+    }
+
+    @Test
     @DisplayName("requireNonNegative(long, String) returns zero value")
     void requireNonNegativeReturnsZero() {
         assertThat(Arguments.requireNonNegative(0L, "must be non-negative")).isEqualTo(0L);

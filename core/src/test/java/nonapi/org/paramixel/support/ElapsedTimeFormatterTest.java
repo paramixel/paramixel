@@ -40,49 +40,49 @@ class ElapsedTimeFormatterTest {
     @Test
     @DisplayName("formats exactly one second")
     void formatsExactlyOneSecond() {
-        assertThat(ElapsedTimeFormatter.formatDuration(1000)).isEqualTo("1 s 0 ms");
+        assertThat(ElapsedTimeFormatter.formatDuration(1_000)).isEqualTo("1 s 0 ms");
     }
 
     @Test
     @DisplayName("formats seconds and milliseconds")
     void formatsSecondsAndMilliseconds() {
-        assertThat(ElapsedTimeFormatter.formatDuration(1500)).isEqualTo("1 s 500 ms");
+        assertThat(ElapsedTimeFormatter.formatDuration(1_500)).isEqualTo("1 s 500 ms");
     }
 
     @Test
     @DisplayName("formats exactly one minute")
     void formatsExactlyOneMinute() {
-        assertThat(ElapsedTimeFormatter.formatDuration(60000)).isEqualTo("1 m 0 s 0 ms");
+        assertThat(ElapsedTimeFormatter.formatDuration(60_000)).isEqualTo("1 m 0 s 0 ms");
     }
 
     @Test
     @DisplayName("formats minutes, seconds, and milliseconds")
     void formatsMinutesSecondsAndMilliseconds() {
-        assertThat(ElapsedTimeFormatter.formatDuration(90000)).isEqualTo("1 m 30 s 0 ms");
+        assertThat(ElapsedTimeFormatter.formatDuration(90_000)).isEqualTo("1 m 30 s 0 ms");
     }
 
     @Test
     @DisplayName("formats exactly one hour")
     void formatsExactlyOneHour() {
-        assertThat(ElapsedTimeFormatter.formatDuration(3600000)).isEqualTo("1 h 0 m 0 s 0 ms");
+        assertThat(ElapsedTimeFormatter.formatDuration(3_600_000)).isEqualTo("1 h 0 m 0 s 0 ms");
     }
 
     @Test
     @DisplayName("formats hours, minutes, seconds, and milliseconds")
     void formatsHoursMinutesSecondsAndMilliseconds() {
-        assertThat(ElapsedTimeFormatter.formatDuration(3723400)).isEqualTo("1 h 2 m 3 s 400 ms");
+        assertThat(ElapsedTimeFormatter.formatDuration(3_723_400)).isEqualTo("1 h 2 m 3 s 400 ms");
     }
 
     @Test
     @DisplayName("formats all non-zero units")
     void formatsAllNonZeroUnits() {
-        assertThat(ElapsedTimeFormatter.formatDuration(3661500)).isEqualTo("1 h 1 m 1 s 500 ms");
+        assertThat(ElapsedTimeFormatter.formatDuration(3_661_500)).isEqualTo("1 h 1 m 1 s 500 ms");
     }
 
     @Test
     @DisplayName("rejects negative duration")
     void rejectsNegativeDuration() {
-        assertThatThrownBy(() -> ElapsedTimeFormatter.formatDuration(-90000))
+        assertThatThrownBy(() -> ElapsedTimeFormatter.formatDuration(-90_000))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("milliseconds is negative");
     }
@@ -102,25 +102,25 @@ class ElapsedTimeFormatterTest {
     @Test
     @DisplayName("appends raw milliseconds in parentheses for second duration")
     void appendsRawMillisecondsForSecondDuration() {
-        assertThat(ElapsedTimeFormatter.formatElapsedTime(1000)).isEqualTo("1 s 0 ms (1000 ms)");
+        assertThat(ElapsedTimeFormatter.formatElapsedTime(1_000)).isEqualTo("1 s 0 ms (1000 ms)");
     }
 
     @Test
     @DisplayName("appends raw milliseconds in parentheses for minute duration")
     void appendsRawMillisecondsForMinuteDuration() {
-        assertThat(ElapsedTimeFormatter.formatElapsedTime(90000)).isEqualTo("1 m 30 s 0 ms (90000 ms)");
+        assertThat(ElapsedTimeFormatter.formatElapsedTime(90_000)).isEqualTo("1 m 30 s 0 ms (90000 ms)");
     }
 
     @Test
     @DisplayName("appends raw milliseconds in parentheses for hour duration")
     void appendsRawMillisecondsForHourDuration() {
-        assertThat(ElapsedTimeFormatter.formatElapsedTime(3600000)).isEqualTo("1 h 0 m 0 s 0 ms (3600000 ms)");
+        assertThat(ElapsedTimeFormatter.formatElapsedTime(3_600_000)).isEqualTo("1 h 0 m 0 s 0 ms (3600000 ms)");
     }
 
     @Test
     @DisplayName("rejects negative elapsed time")
     void rejectsNegativeElapsedTime() {
-        assertThatThrownBy(() -> ElapsedTimeFormatter.formatElapsedTime(-90000))
+        assertThatThrownBy(() -> ElapsedTimeFormatter.formatElapsedTime(-90_000))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("milliseconds is negative");
     }

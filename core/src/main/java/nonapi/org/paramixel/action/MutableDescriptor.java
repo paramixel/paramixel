@@ -152,6 +152,41 @@ public interface MutableDescriptor extends Descriptor {
     void interruptExecutingThread();
 
     /**
+     * Cancels this descriptor's subtree best-effort.
+     *
+     * <p>Marks this descriptor terminal with {@code rootStatus} (if not already terminal),
+     * completes its scheduled future exceptionally with {@code cause}, interrupts this
+     * descriptor's executing thread when it is a leaf action, and recurses into
+     * {@link #before()}, {@link #children()}, and {@link #after()}: each descendant is marked
+     * {@link Status#ABORTED}, has its scheduled future completed exceptionally, and, when it is
+     * a leaf action, has its executing thread interrupted.
+     *
+     * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel})
+     * whose coordinator is parked in the scheduler's managed join: completing the futures makes
+     * the join observe {@code isDone()} and exit, and interrupting leaf threads unblocks
+     * cooperative (interruptible) user code so its leaf permits are released.
+     *
+     * <p>For deeply nested synchronous coordination (e.g. Sequential → Parallel → Sequential
+     * → Parallel → Step), the abort propagation is bounded: the interrupt targets the leaf's
+     * executing thread, the leaf's exception unwinds through the call stack, each coordination
+     * node's {@code managedJoin} returns (either from the interrupt or the future completion),
+     * and the parent's {@code runChild} returns, allowing the next level to observe its child's
+     * terminal state. The propagation time is bounded by the nesting depth and the scheduler's
+     * backoff ceiling (1 second per {@code managedJoin} park).
+     *
+     * <p>Idempotent: a descriptor already in a terminal state is skipped, so concurrent
+     * completion and cancellation both converge safely. Safe to call from any thread,
+     * including a scheduler worker thread; this method never blocks on a future, it only
+     * completes them. A leaf whose body ignores interruption (e.g. a CPU-bound loop) cannot be
+     * forcibly stopped and may leak its leaf permit and worker thread until the scheduler is
+     * closed.
+     *
+     * @param rootStatus the terminal status for this descriptor; must not be {@code null}
+     * @param cause the cause used to complete futures exceptionally; must not be {@code null}
+     */
+    void abort(Status rootStatus, Throwable cause);
+
+    /**
      * Returns the descriptor depth from the root.
      *
      * <p>Root descriptors have depth {@code 0}. Direct children of root have depth {@code 1}, and
@@ -196,4 +231,31 @@ public interface MutableDescriptor extends Descriptor {
     default boolean isLeafAction() {
         return action() instanceof Step || action() instanceof Assert || action() instanceof Delay;
     }
+
+    /**
+     * Returns the execution node attached to this descriptor, if any.
+     *
+     * <p>Coordination strategies attach execution nodes to track pending children
+     * and schedule continuations. Leaf descriptors never have execution nodes.
+     *
+     * @return the execution node, or {@code null} if not set
+     */
+    ExecutionNode executionNode();
+
+    /**
+     * Attaches an execution node to this descriptor.
+     *
+     * @param node the execution node, or {@code null} to clear it
+     */
+    void setExecutionNode(ExecutionNode node);
+
+    /**
+     * Returns the scheduling future for this descriptor.
+     *
+     * <p>The future is created by {@link #markScheduled()} and completed when
+     * the descriptor reaches a terminal status (or fails to start).
+     *
+     * @return the scheduling future, or {@code null} if not yet scheduled
+     */
+    CompletableFuture<Descriptor> scheduledFuture();
 }

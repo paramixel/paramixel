@@ -126,9 +126,9 @@ public final class SummaryListener implements Listener {
         }
 
         if (!excludeFooter) {
+            var finishedAtFormatted = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             var statusLine = "Status      : " + Listeners.formatStatus(result);
-            var finishedLine =
-                    "Finished at : " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            var finishedLine = "Finished at : " + finishedAtFormatted;
             var timeLine = "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root));
 
             int maxLineLength = Math.max(
@@ -140,8 +140,7 @@ public final class SummaryListener implements Listener {
             writer.println(prefix + versionLine);
             writer.println(prefix + dashes);
             writer.println(prefix + "Status      : " + formatStatus(result));
-            writer.println(prefix + "Finished at : "
-                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            writer.println(prefix + "Finished at : " + finishedAtFormatted);
             writer.println(
                     prefix + "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root)));
             writer.println(prefix + dashes);
@@ -152,13 +151,19 @@ public final class SummaryListener implements Listener {
         return ansiEnabled ? Constants.PARAMIXEL_ANSI : Constants.PARAMIXEL_PLAIN;
     }
 
+    /**
+     * Returns the shared PrintWriter, lazily initializing it from System.out.
+     *
+     * <p>The CAS-losing writer is intentionally discarded without closing, because closing it
+     * would close System.out (the underlying OutputStream).
+     *
+     * @return the shared PrintWriter; never {@code null}
+     */
     private PrintWriter getWriter() {
-        var w = out.get();
-        if (w == null) {
+        var writer = out.get();
+        if (writer == null) {
             var newWriter = new PrintWriter(System.out, true);
-            if (!out.compareAndSet(null, newWriter)) {
-                newWriter.close();
-            }
+            out.compareAndSet(null, newWriter);
         }
         return out.get();
     }

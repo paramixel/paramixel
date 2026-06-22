@@ -23,7 +23,7 @@ Check filters:
 -Dparamixel.match.tag.regex=...
 ```
 
-Regex filters use `find()` semantics, not full-string-only matching.
+Regex filters use `matches()` semantics. The regex must match the entire string. To match substrings, use wildcards such as `.*pattern.*`.
 
 ## Factory is skipped
 

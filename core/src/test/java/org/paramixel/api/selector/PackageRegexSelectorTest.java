@@ -35,9 +35,9 @@ class PackageRegexSelectorTest {
     }
 
     @Test
-    @DisplayName("matchesPackage uses find() semantics")
-    void matchesPackageUsesFindSemantics() {
-        var selector = (PackageRegexSelector) Selector.packageRegex("paramixel");
+    @DisplayName("matchesPackage uses matches() semantics")
+    void matchesPackageUsesMatchesSemantics() {
+        var selector = (PackageRegexSelector) Selector.packageRegex("org\\.paramixel\\.api");
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
     }

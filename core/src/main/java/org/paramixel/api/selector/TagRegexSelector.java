@@ -19,7 +19,7 @@ package org.paramixel.api.selector;
 /**
  * A {@link RegexSelector} that filters discovery candidates by tag value.
  *
- * <p>{@link #matchesTag(String)} applies the regex pattern using {@code find()} semantics.
+ * <p>{@link #matchesTag(String)} applies the regex pattern using {@code matches()} semantics.
  * {@link #matchesPackage(String)} and {@link #matchesClass(String)} return {@code true} because
  * a tag-only selector does not constrain package names or class names.
  *

@@ -78,9 +78,9 @@ Multiple `@BeforeAll` methods are ordered by `@Paramixel.Priority` on their decl
 Use configuration keys or selectors:
 
 ```properties
-paramixel.match.package.regex=com\.example\.smoke
-paramixel.match.class.regex=Checkout
+paramixel.match.package.regex=com\.example\.smoke.*
+paramixel.match.class.regex=.*Checkout.*
 paramixel.match.tag.regex=smoke|critical
 ```
 
-The regex filters use Java `Pattern.find()` semantics.
+The regex filters use Java `Pattern.matches()` semantics. The regex must match the entire string. To match substrings, use wildcards such as `.*pattern.*`.

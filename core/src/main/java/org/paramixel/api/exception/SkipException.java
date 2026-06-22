@@ -20,13 +20,20 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Signals that an action should be marked as skipped rather than executed or failed.
+ * Signals that an action should be marked as {@link org.paramixel.api.Status#SKIPPED skipped}
+ * rather than executed or failed.
  *
- * <p>This is a deliberate, author-initiated skip — the Paramixel runtime catches
- * {@code SkipException} and records the action as skipped with the provided message,
- * continuing execution of remaining actions. This exception can be instantiated directly
- * through {@link #SkipException(String)} or thrown immediately with {@link #skip()} and
- * {@link #skip(String)}.
+ * <p>This is a deliberate, author-initiated skip. The runtime catches {@code SkipException}
+ * and records the descriptor as {@link org.paramixel.api.Status#SKIPPED}. Effect on
+ * surrounding actions depends on the container: in a dependent
+ * {@link org.paramixel.api.action.Sequence}/{@link org.paramixel.api.action.Sequential} a
+ * skipped child short-circuits the sequence (remaining children are skipped); in an
+ * independent {@link org.paramixel.api.action.Sequence}/{@link org.paramixel.api.action.Sequential},
+ * a {@link org.paramixel.api.action.Parallel}, or a {@link org.paramixel.api.action.Repeat},
+ * remaining children still run; and in a {@link org.paramixel.api.action.Loop} or
+ * {@link org.paramixel.api.action.Until} a skipped iteration does not stop the loop. This
+ * exception can be instantiated directly through {@link #SkipException(String)} or thrown
+ * immediately with {@link #skip()} and {@link #skip(String)}.
  */
 public final class SkipException extends RuntimeException {
 

@@ -37,7 +37,7 @@ class NotSelectorTest {
     @Test
     @DisplayName("negates matchesClass")
     void negatesMatchesClass() {
-        var selector = Selector.not(Selector.classRegex("Test"));
+        var selector = Selector.not(Selector.classRegex("com\\.example\\.Test"));
 
         assertThat(selector.matchesClass("com.example.Runner")).isTrue();
         assertThat(selector.matchesClass("com.example.Test")).isFalse();

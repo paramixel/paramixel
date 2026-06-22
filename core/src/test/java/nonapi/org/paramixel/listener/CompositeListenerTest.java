@@ -281,14 +281,27 @@ class CompositeListenerTest {
     }
 
     @Test
-    @DisplayName("onDiscoveryCompleted rejects null root")
-    void onDiscoveryCompletedRejectsNullRoot() {
-        var noop = Listener.defaultListener();
-        var cl = new CompositeListener(noop);
+    @DisplayName("onDiscoveryCompleted accepts null root and forwards to delegates")
+    void onDiscoveryCompletedAcceptsNullRoot() {
+        var calls = new java.util.ArrayList<String>();
+        var l1 = new Listener() {
 
-        assertThatThrownBy(() -> cl.onDiscoveryCompleted(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("root is null");
+            @Override
+            public void onDiscoveryCompleted(Descriptor root) {
+                calls.add("l1:" + (root == null ? "null" : "non-null"));
+            }
+        };
+        var l2 = new Listener() {
+
+            @Override
+            public void onDiscoveryCompleted(Descriptor root) {
+                calls.add("l2:" + (root == null ? "null" : "non-null"));
+            }
+        };
+
+        new CompositeListener(l1, l2).onDiscoveryCompleted(null);
+
+        assertThat(calls).containsExactly("l1:null", "l2:null");
     }
 
     @Test

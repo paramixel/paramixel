@@ -159,7 +159,8 @@ class OrSelectorTest {
     @Test
     @DisplayName("OR semantics for matchesClass")
     void orSemanticsForMatchesClass() {
-        var selector = Selector.or(Selector.classRegex("TestA"), Selector.classRegex("TestB"));
+        var selector =
+                Selector.or(Selector.classRegex("com\\.example\\.TestA"), Selector.classRegex("com\\.example\\.TestB"));
 
         assertThat(selector.matchesClass("com.example.TestA")).isTrue();
         assertThat(selector.matchesClass("com.example.TestB")).isTrue();

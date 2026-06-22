@@ -35,12 +35,12 @@ class TagRegexSelectorTest {
     }
 
     @Test
-    @DisplayName("matchesTag uses find() semantics")
-    void matchesTagUsesFindSemantics() {
+    @DisplayName("matchesTag uses matches() semantics")
+    void matchesTagUsesMatchesSemantics() {
         var selector = (TagRegexSelector) Selector.tagRegex("smoke");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
-        assertThat(selector.matchesTag("smoke-test")).isTrue();
+        assertThat(selector.matchesTag("smoke-test")).isFalse();
         assertThat(selector.matchesTag("integration")).isFalse();
     }
 

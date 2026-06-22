@@ -28,6 +28,7 @@ import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.Configuration;
@@ -164,5 +165,76 @@ class JsonReportListenerTest {
         assertThatThrownBy(() -> listener.onRunCompleted(result))
                 .isInstanceOf(UncheckedIOException.class)
                 .hasMessageContaining("json report file");
+    }
+
+    private String reportContent(ConcreteDescriptor root) throws Exception {
+        var reportFile = tempDir.resolve("report.json");
+        var listener = createListener(reportFile.toString());
+        root.setStatus(Status.RUNNING);
+        root.setStatus(Status.PASSED);
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        listener.onRunCompleted(result);
+        return Files.readString(reportFile, StandardCharsets.UTF_8);
+    }
+
+    // Returns whether the descriptor containing nameField is preceded by a comma.
+    private static boolean precededByComma(String content, String nameField) {
+        int nameIndex = content.indexOf(nameField);
+        int objectStart = content.lastIndexOf("{\"id\"", nameIndex);
+        return objectStart > 0 && content.charAt(objectStart - 1) == ',';
+    }
+
+    @Nested
+    @DisplayName("JSON escaping")
+    class JsonEscaping {
+
+        @Test
+        @DisplayName("escapes named whitespace escapes as short forms")
+        void escapesNamedWhitespaceAsShortForms() throws Exception {
+            var content = reportContent(new ConcreteDescriptor(Step.of("a\nb\rc\td\be\ff", v -> {})));
+
+            assertThat(content).contains("\"name\":\"a\\nb\\rc\\td\\be\\ff\"");
+        }
+
+        @Test
+        @DisplayName("detects quote as first escaped character")
+        void detectsQuoteAsFirstEscapedCharacter() throws Exception {
+            var content = reportContent(new ConcreteDescriptor(Step.of("a\"b", v -> {})));
+
+            assertThat(content).contains("\"name\":\"a\\\"b\"");
+        }
+    }
+
+    @Nested
+    @DisplayName("descriptor tree slots")
+    class DescriptorTreeSlots {
+
+        @Test
+        @DisplayName("writes before, child, and after slots with separating commas")
+        void writesBeforeChildAndAfterWithSeparatingCommas() throws Exception {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            root.setBefore(new ConcreteDescriptor(Step.of("before", v -> {})));
+            root.addChild(new ConcreteDescriptor(Step.of("child", v -> {})));
+            root.setAfter(new ConcreteDescriptor(Step.of("after", v -> {})));
+
+            var content = reportContent(root);
+
+            assertThat(content).containsSubsequence("\"name\":\"before\"", "\"name\":\"child\"", "\"name\":\"after\"");
+            assertThat(precededByComma(content, "\"name\":\"before\"")).isFalse();
+            assertThat(precededByComma(content, "\"name\":\"child\"")).isTrue();
+            assertThat(precededByComma(content, "\"name\":\"after\"")).isTrue();
+        }
+
+        @Test
+        @DisplayName("writes lone after slot without leading comma")
+        void writesLoneAfterWithoutLeadingComma() throws Exception {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            root.setAfter(new ConcreteDescriptor(Step.of("after", v -> {})));
+
+            var content = reportContent(root);
+
+            assertThat(content).contains("\"name\":\"after\"");
+            assertThat(precededByComma(content, "\"name\":\"after\"")).isFalse();
+        }
     }
 }

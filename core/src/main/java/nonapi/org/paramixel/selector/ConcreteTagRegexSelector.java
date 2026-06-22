@@ -23,7 +23,7 @@ import org.paramixel.api.selector.TagRegexSelector;
 /**
  * Concrete implementation of {@link TagRegexSelector}.
  *
- * <p>Matches tag values using {@link Pattern#matcher(CharSequence)} {@code .find()} semantics.
+ * <p>Matches tag values using {@link Pattern#matcher(CharSequence)} {@code .matches()} semantics.
  * Package name and class name matching always return {@code true}.
  */
 public final class ConcreteTagRegexSelector implements TagRegexSelector {
@@ -47,7 +47,7 @@ public final class ConcreteTagRegexSelector implements TagRegexSelector {
     @Override
     public boolean matchesTag(final String tag) {
         Objects.requireNonNull(tag, "tag is null");
-        return pattern.matcher(tag).find();
+        return pattern.matcher(tag).matches();
     }
 
     @Override

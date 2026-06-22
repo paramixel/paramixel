@@ -34,7 +34,7 @@ class ParallelDeadlockPreventionTest {
     @Test
     @DisplayName("Parallel with many children does not deadlock")
     void parallelWithManyChildrenDoesNotDeadlock() {
-        int childCount = 2000;
+        int childCount = 2_000;
         var executionCount = new AtomicInteger(0);
 
         var parallel = Parallel.builder("many-children").parallelism(50);

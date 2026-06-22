@@ -98,7 +98,6 @@ public class CompositeListener implements Listener {
 
     @Override
     public void onDiscoveryCompleted(final Descriptor root) {
-        Objects.requireNonNull(root, "root is null");
         invokeEach("onDiscoveryCompleted", listener -> listener.onDiscoveryCompleted(root));
     }
 

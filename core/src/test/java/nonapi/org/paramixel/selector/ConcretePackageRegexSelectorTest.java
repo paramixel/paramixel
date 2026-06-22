@@ -46,7 +46,7 @@ class ConcretePackageRegexSelectorTest {
     @Test
     @DisplayName("matchesPackage returns true for matching package")
     void matchesPackageReturnsTrueForMatch() {
-        var selector = new ConcretePackageRegexSelector(Pattern.compile("paramixel"));
+        var selector = new ConcretePackageRegexSelector(Pattern.compile("org\\.paramixel\\.api"));
 
         assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
     }

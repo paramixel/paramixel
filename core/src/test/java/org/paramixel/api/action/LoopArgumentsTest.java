@@ -112,6 +112,16 @@ class LoopArgumentsTest {
     }
 
     @Test
+    @DisplayName("delay millis wraps in Linear policy")
+    void delayMillisWrapsInLinear() {
+        var action =
+                Loop.builder("loop").body(STEP).maxIterations(1).delay(500L).build();
+        assertThat(action.delay()).isPresent();
+        assertThat(action.delay().get()).isInstanceOf(Loop.DelayPolicy.Linear.class);
+        assertThat(((Loop.DelayPolicy.Linear) action.delay().get()).delay()).isEqualTo(Duration.ofMillis(500));
+    }
+
+    @Test
     @DisplayName("delay convenience wraps in Linear")
     void delayConvenienceWrapsInLinear() {
         var action = Loop.builder("loop")

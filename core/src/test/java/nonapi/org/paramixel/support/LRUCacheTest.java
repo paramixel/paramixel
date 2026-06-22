@@ -292,6 +292,24 @@ class LRUCacheTest {
     }
 
     @Test
+    @DisplayName(
+            "ttlMillisOfOneConstructsAndSupportsPutGet: smallest documented-valid TTL works (reaper cadence floored at 1ms)")
+    void ttlMillisOfOneConstructsAndSupportsPutGet() throws InterruptedException {
+        var cache = new LRUCache<String, String>(10, 1);
+
+        cache.put("key", "value");
+        assertThat(cache.get("key")).isEqualTo("value");
+
+        // Let the eviction reaper (clamped to a 1ms cadence) fire at least once without throwing.
+        Thread.sleep(20);
+
+        // A 1ms TTL has elapsed since last access, so the entry is now expired.
+        assertThat(cache.get("key")).isNull();
+
+        cache.close();
+    }
+
+    @Test
     @DisplayName("putNullKeyThrowsNPE: null key throws NullPointerException")
     void putNullKeyThrowsNPE() {
         var cache = new LRUCache<String, String>(10, 60_000);

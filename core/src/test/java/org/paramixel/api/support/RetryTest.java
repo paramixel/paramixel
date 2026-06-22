@@ -708,4 +708,113 @@ class RetryTest {
         assertThat(result.isSuccessful()).isTrue();
         assertThat(result.attemptCount()).isEqualTo(2);
     }
+
+    @Test
+    @DisplayName("run uses default predicate to stop retrying on StackOverflowError")
+    void runUsesDefaultPredicateToStopRetryingOnStackOverflowError() {
+        // No retryOn(...) override: exercises DEFAULT_RETRY_ON (t -> !(t instanceof Error))
+        // against a StackOverflowError, which evaluates to false and stops the sequence.
+        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(1)));
+
+        var result = retry.run(() -> {
+            throw new StackOverflowError("soe");
+        });
+
+        assertThat(result.isSuccessful()).isFalse();
+        assertThat(result.attemptCount()).isEqualTo(1);
+        assertThat(result.hasExceptions()).isTrue();
+        assertThat(result.exceptions().get(0)).isInstanceOf(StackOverflowError.class);
+    }
+
+    @Test
+    @DisplayName("run fails when elapsed wall-clock time exceeds the duration budget")
+    void runFailsWhenElapsedExceedsDurationBudget() {
+        // A 1-nanosecond budget is always exceeded by real elapsed time after a failed
+        // attempt, so the remaining budget is strictly negative.
+        var policy = new Policy() {
+            @Override
+            public Duration waitDuration(int attempt, Throwable cause) {
+                return Duration.ZERO;
+            }
+
+            @Override
+            public Duration maximumDuration() {
+                return Duration.ofNanos(1);
+            }
+        };
+        var retry = Retry.of(policy);
+
+        var result = retry.run(() -> {
+            throw new RuntimeException("fail");
+        });
+
+        assertThat(result.isSuccessful()).isFalse();
+        assertThat(result.attemptCount()).isEqualTo(1);
+        assertThat(result.hasExceptions()).isTrue();
+    }
+
+    @Test
+    @DisplayName("run caps wait duration to remaining budget and sleeps before retry")
+    void runCapsWaitDurationToRemainingBudgetAndSleeps() {
+        // The policy wait far exceeds the budget; the retry loop caps it at the remaining
+        // budget and performs a real (non-zero) sleep before the successful retry.
+        var policy = new Policy() {
+            @Override
+            public Duration waitDuration(int attempt, Throwable cause) {
+                return Duration.ofSeconds(30);
+            }
+
+            @Override
+            public Duration maximumDuration() {
+                return Duration.ofMillis(100);
+            }
+        };
+        var retry = Retry.of(policy);
+
+        var attempt = new AtomicInteger(0);
+        var result = retry.run(() -> {
+            if (attempt.incrementAndGet() == 1) {
+                throw new RuntimeException("transient");
+            }
+        });
+
+        assertThat(result.isSuccessful()).isTrue();
+        assertThat(result.attemptCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("run returns failure when retry sleep is interrupted")
+    void runReturnsFailureWhenRetrySleepInterrupted() {
+        // The on-retry callback interrupts the running thread before the wait sleep;
+        // Thread.sleep observes the interrupt and the retry loop captures it.
+        var policy = new Policy() {
+            @Override
+            public Duration waitDuration(int attempt, Throwable cause) {
+                return Duration.ofSeconds(30);
+            }
+
+            @Override
+            public Duration maximumDuration() {
+                return Duration.ofSeconds(1);
+            }
+        };
+        var current = Thread.currentThread();
+        var retry = Retry.of(policy).onRetry((nextAttempt, cause) -> current.interrupt());
+
+        try {
+            var result = retry.run(() -> {
+                throw new RuntimeException("fail");
+            });
+
+            assertThat(result.isSuccessful()).isFalse();
+            assertThat(result.hasExceptions()).isTrue();
+            // The original failure plus the InterruptedException captured by the retry loop.
+            assertThat(result.exceptions()).hasSize(2);
+            assertThat(result.exceptions().get(0)).hasMessage("fail");
+            assertThat(result.exceptions().get(1)).isInstanceOf(InterruptedException.class);
+        } finally {
+            // Clear any lingering interrupt status left by the retry loop's re-interrupt.
+            Thread.interrupted();
+        }
+    }
 }

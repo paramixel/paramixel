@@ -28,6 +28,7 @@ import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.Configuration;
@@ -98,5 +99,41 @@ class ReportListenerTest {
         assertThatThrownBy(() -> listener.onRunCompleted(result))
                 .isInstanceOf(UncheckedIOException.class)
                 .hasMessageContaining("text report file");
+    }
+
+    @Nested
+    @DisplayName("descriptor tree slots")
+    class DescriptorTreeSlots {
+
+        @Test
+        @DisplayName("writes before and after slots as nested rows")
+        void writesBeforeAndAfterSlots() throws Exception {
+            var reportFile = tempDir.resolve("report.txt");
+            var listener = createListener(reportFile.toString());
+
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            root.setStatus(Status.RUNNING);
+            root.setStatus(Status.PASSED);
+            var before = new ConcreteDescriptor(Step.of("before", v -> {}));
+            before.setStatus(Status.RUNNING);
+            before.setStatus(Status.PASSED);
+            root.setBefore(before);
+            var child = new ConcreteDescriptor(Step.of("child", v -> {}));
+            child.setStatus(Status.RUNNING);
+            child.setStatus(Status.PASSED);
+            root.addChild(child);
+            var after = new ConcreteDescriptor(Step.of("after", v -> {}));
+            after.setStatus(Status.RUNNING);
+            after.setStatus(Status.PASSED);
+            root.setAfter(after);
+
+            var result = new ConcreteResult(root, Configuration.defaultConfiguration());
+            listener.onRunCompleted(result);
+
+            var content = Files.readString(reportFile, StandardCharsets.UTF_8);
+            // The before and after slots render at the same indentation depth as
+            // regular children, before and after the children list respectively.
+            assertThat(content).containsSubsequence("  PASSED | before", "  PASSED | child", "  PASSED | after");
+        }
     }
 }

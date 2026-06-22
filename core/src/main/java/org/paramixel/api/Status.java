@@ -325,13 +325,13 @@ public final class Status {
             Thread.currentThread().interrupt();
         }
         if (t instanceof AbortedException e) {
-            return aborted(e.getMessage());
+            return aborted(e.getMessage(), e);
         }
         if (t instanceof SkipException e) {
-            return skipped(e.getMessage());
+            return skipped(e.getMessage(), e);
         }
         if (t instanceof FailException e) {
-            return failed(e.getMessage());
+            return failed(e.getMessage(), e);
         }
         return failed(t.getMessage() != null ? t.getMessage() : "failed", t);
     }

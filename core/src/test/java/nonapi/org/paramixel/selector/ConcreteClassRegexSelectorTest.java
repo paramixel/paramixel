@@ -46,7 +46,7 @@ class ConcreteClassRegexSelectorTest {
     @Test
     @DisplayName("matchesClass returns true for matching class name")
     void matchesClassReturnsTrueForMatch() {
-        var selector = new ConcreteClassRegexSelector(Pattern.compile("Test"));
+        var selector = new ConcreteClassRegexSelector(Pattern.compile("com\\.example\\.MyTest"));
 
         assertThat(selector.matchesClass("com.example.MyTest")).isTrue();
     }

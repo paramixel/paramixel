@@ -192,8 +192,8 @@ class NamedBuildersTest {
         @DisplayName("accepts milliseconds")
         void acceptsMillis() {
             var body = Step.of("body", ctx -> {});
-            var action = timeout("tm").timeoutMillis(3000).body(body).build();
-            assertThat(action.timeout()).isEqualTo(Duration.ofMillis(3000));
+            var action = timeout("tm").timeoutMillis(3_000).body(body).build();
+            assertThat(action.timeout()).isEqualTo(Duration.ofMillis(3_000));
         }
     }
 

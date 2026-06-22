@@ -35,6 +35,7 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Step;
+import org.paramixel.api.exception.FailException;
 
 @DisplayName("StatusListener excludes")
 class StatusListenerExcludesTest {
@@ -143,6 +144,33 @@ class StatusListenerExcludesTest {
         var outResult = outputOut.toString(StandardCharsets.UTF_8);
         assertThat(outResult).contains("error-action");
         assertThat(outResult).contains(RuntimeException.class.getName() + ": expected error");
+    }
+
+    @Test
+    @DisplayName("prints FailException message when STATUS_FOOTER excluded")
+    void printsFailExceptionMessageWhenStatusFooterExcluded() {
+        var listener = new StatusListener();
+        var action = Step.of("fail-action", context -> {
+            FailException.fail("custom failure");
+        });
+        var runner = Runner.builder()
+                .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.footer")))
+                .listener(listener)
+                .build();
+
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            runner.run(action);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        var result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result).doesNotContain("FAILED");
+        assertThat(result).contains("fail-action");
+        assertThat(result).contains("custom failure");
     }
 
     @Test

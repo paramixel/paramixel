@@ -465,7 +465,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("renderer handles deep user-generated descriptor chains without recursion overflow")
     void rendererHandlesDeepUserGeneratedDescriptorChains() {
-        final int depth = 2500;
+        final int depth = 2_500;
         var root = createDeepLinearDescriptorTree(depth);
         var renderer = new TreeSummaryRenderer(false);
 
@@ -556,6 +556,47 @@ class TreeSummaryRendererTest {
         var output = renderer.render(null);
 
         assertThat(output).contains("No Paramixel tests found");
+    }
+
+    @Test
+    @DisplayName("action display names with ANSI sequences are sanitized in tree")
+    void actionDisplayNamesWithAnsiSequencesAreSanitizedInTree() {
+        var action = Step.of("\u001B[31mred-name\u001B[0m", context -> {});
+        var output = runAndCapturePlainOutput(action);
+
+        assertThat(output).contains("red-name");
+        assertThat(output).doesNotContain("\u001B");
+    }
+
+    @Test
+    @DisplayName("failure info with control characters in throwable message is sanitized")
+    void failureInfoWithControlCharsInThrowableMessageIsSanitized() {
+        var failing = Step.of("ctrl-fail", context -> {
+            throw new RuntimeException("msg\u0000with\u0007controls");
+        });
+        var output = runAndCapturePlainOutput(failing);
+
+        assertThat(output).contains("java.lang.RuntimeException: msgwithcontrols");
+        assertThat(output).doesNotContain("\u0000");
+        assertThat(output).doesNotContain("\u0007");
+    }
+
+    @Test
+    @DisplayName("tree output is free of control characters with mixed input")
+    void treeOutputIsFreeOfControlCharactersWithMixedInput() {
+        var child = Step.of("\u0000inner\u001B[1m", context -> {
+            throw new RuntimeException("\u0007bad\u0080state");
+        });
+        var parent = Sequence.builder("outer\u001B[0m").child(child).build();
+        var output = runAndCapturePlainOutput(parent);
+
+        assertThat(output).contains("outer");
+        assertThat(output).contains("inner");
+        assertThat(output).contains("badstate");
+        assertThat(output).doesNotContain("\u0000");
+        assertThat(output).doesNotContain("\u0007");
+        assertThat(output).doesNotContain("\u0080");
+        assertThat(output).doesNotContain("\u001B");
     }
 
     private static ConcreteDescriptor createDeepLinearDescriptorTree(final int depth) {

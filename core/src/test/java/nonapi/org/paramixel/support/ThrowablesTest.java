@@ -78,11 +78,11 @@ class ThrowablesTest {
         }
 
         @Test
-        @DisplayName("unwraps RuntimeException when cause is Error")
-        void unwrapsRuntimeExceptionWhenCauseIsError() {
-            var error = new LinkageError("linkage error");
+        @DisplayName("does not unwrap RuntimeException when cause is recoverable Error")
+        void doesNotUnwrapRuntimeExceptionWhenCauseIsRecoverableError() {
+            var error = new StackOverflowError("simulated stack overflow");
             var runtime = new RuntimeException(error);
-            assertThat(Throwables.unwrap(runtime)).isSameAs(error);
+            assertThat(Throwables.unwrap(runtime)).isSameAs(runtime);
         }
 
         @Test

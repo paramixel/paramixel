@@ -28,11 +28,14 @@ import org.paramixel.api.Status;
  * propagates. If the child does not complete within the duration, the action
  * fails with {@link Status#FAILED} and a message indicating the timeout.
  *
- * <p>On timeout, the child's executing thread is interrupted after a brief
- * grace period. If the child does not terminate after interruption, the action
- * records failure and continues — the child thread becomes orphaned. Because
- * the framework's scheduler uses daemon threads, orphaned threads cannot
- * prevent JVM shutdown.
+ * <p>On timeout, the child's subtree is cancelled best-effort: each still-running descendant
+ * is marked terminal and has its scheduled future completed exceptionally (unblocking any
+ * coordinator parked in the scheduler's managed join), and each leaf descendant has its
+ * executing thread interrupted. Cooperative (interruptible) bodies — {@code Thread.sleep},
+ * blocking {@code java.util.concurrent} operations, NIO, etc. — terminate and release their leaf
+ * permits promptly. A leaf whose body ignores interruption (e.g. a CPU-bound loop) cannot be
+ * forcibly stopped and may leak its leaf permit and worker thread until the scheduler is closed;
+ * because scheduler worker threads are daemon threads, such leaks cannot prevent JVM shutdown.
  *
  * <p>Skipped executions short-circuit without executing the child.
  */

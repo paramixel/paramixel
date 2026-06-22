@@ -47,7 +47,7 @@ reflect mid-JVM property changes.
 | `paramixel.failIfNoTests` | `false` | Fail when classpath discovery finds no factories. |
 | `paramixel.failFast` | `false` | Stop scheduling remaining root children after the first failed or aborted action. |
 | `paramixel.report.file` | unset | Write a run report. `.json`, `.xml`, `.html`, `.log`, and `.txt` are recognized; unknown extensions use text. |
-| `paramixel.match.package.regex` | unset | Java regex, using `find()`, matched against package names. |
-| `paramixel.match.class.regex` | unset | Java regex, using `find()`, matched against fully qualified class names. |
-| `paramixel.match.tag.regex` | unset | Java regex, using `find()`, matched against each `@Paramixel.Tag` value. |
+| `paramixel.match.package.regex` | unset | Java regex, using `matches()`, matched against package names. |
+| `paramixel.match.class.regex` | unset | Java regex, using `matches()`, matched against fully qualified class names. |
+| `paramixel.match.tag.regex` | unset | Java regex, using `matches()`, matched against each `@Paramixel.Tag` value. |
 | `paramixel.listener.exclude` | unset | Comma-separated listener sections: `status.header`, `status.footer`, `summary.header`, `summary.tree`, `summary.footer`, plus shorthands `status`, `quiet`, and `all`. |
