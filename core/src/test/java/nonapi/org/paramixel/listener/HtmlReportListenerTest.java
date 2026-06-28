@@ -28,6 +28,7 @@ import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.Configuration;
@@ -183,5 +184,94 @@ class HtmlReportListenerTest {
         assertThatThrownBy(() -> listener.onRunCompleted(result))
                 .isInstanceOf(UncheckedIOException.class)
                 .hasMessageContaining("html report file");
+    }
+
+    private String render(ConcreteDescriptor root) throws Exception {
+        var reportFile = tempDir.resolve("report.html");
+        var listener = createListener(reportFile.toString());
+        root.setStatus(Status.RUNNING);
+        root.setStatus(Status.PASSED);
+        var result = new ConcreteResult(root, Configuration.defaultConfiguration());
+        listener.onRunCompleted(result);
+        return Files.readString(reportFile, StandardCharsets.UTF_8);
+    }
+
+    @Nested
+    @DisplayName("status classes")
+    class StatusClasses {
+
+        @Test
+        @DisplayName("renders skipped, running, and pending row classes")
+        void rendersSkippedRunningAndPendingRowClasses() throws Exception {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            var skipped = new ConcreteDescriptor(Step.of("skipped", v -> {}));
+            skipped.setStatus(Status.RUNNING);
+            skipped.setStatus(Status.SKIPPED);
+            var running = new ConcreteDescriptor(Step.of("running", v -> {}));
+            running.setStatus(Status.RUNNING);
+            var pending = new ConcreteDescriptor(Step.of("pending", v -> {}));
+            root.addChild(skipped);
+            root.addChild(running);
+            root.addChild(pending);
+
+            var content = render(root);
+
+            assertThat(content).contains("<tr class=\"skipped\">");
+            assertThat(content).contains("<tr class=\"running\">");
+            assertThat(content).contains("<tr class=\"pending\">");
+            assertThat(content).contains("<td>SKIPPED</td>");
+            // A never-started (PENDING) descriptor renders the "pending" row class but,
+            // per Listeners.formatStatus, any non-completed descriptor shows "RUNNING" text.
+            assertThat(content).contains("<td>RUNNING</td>");
+        }
+    }
+
+    @Nested
+    @DisplayName("descriptor tree slots")
+    class DescriptorTreeSlots {
+
+        @Test
+        @DisplayName("writes before and after slots as nested rows")
+        void writesBeforeAndAfterSlots() throws Exception {
+            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            root.setBefore(new ConcreteDescriptor(Step.of("before", v -> {})));
+            root.addChild(new ConcreteDescriptor(Step.of("child", v -> {})));
+            root.setAfter(new ConcreteDescriptor(Step.of("after", v -> {})));
+
+            var content = render(root);
+
+            assertThat(content)
+                    .containsSubsequence(
+                            "<td style=\"padding-left:2em\">before</td>",
+                            "<td style=\"padding-left:2em\">child</td>",
+                            "<td style=\"padding-left:2em\">after</td>");
+        }
+    }
+
+    @Nested
+    @DisplayName("HTML escaping")
+    class HtmlEscaping {
+
+        @Test
+        @DisplayName("detects less-than as first escaped character")
+        void detectsLessThanAsFirstEscapedCharacter() throws Exception {
+            var root = new ConcreteDescriptor(Step.of("<less", v -> {}));
+
+            var content = render(root);
+
+            assertThat(content).contains("&lt;less");
+            assertThat(content).doesNotContain(">less");
+        }
+
+        @Test
+        @DisplayName("detects greater-than as first escaped character")
+        void detectsGreaterThanAsFirstEscapedCharacter() throws Exception {
+            var root = new ConcreteDescriptor(Step.of(">greater", v -> {}));
+
+            var content = render(root);
+
+            assertThat(content).contains("&gt;greater");
+            assertThat(content).doesNotContain(">greater");
+        }
     }
 }

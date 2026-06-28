@@ -38,7 +38,7 @@ class ActionResolverDiscoveryOrderTest {
     @Test
     @DisplayName("action name is not used as a discovery sort key")
     void actionNameIsNotUsedAsDiscoverySortKey() {
-        var selector = Selector.classRegex("ActionResolverMetadata");
+        var selector = Selector.classRegex(".*ActionResolverMetadata.*");
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
 
@@ -51,7 +51,7 @@ class ActionResolverDiscoveryOrderTest {
     @Test
     @DisplayName("factories are invoked after metadata sorting")
     void factoriesAreInvokedAfterMetadataSorting() {
-        var selector = Selector.classRegex("ActionResolverFactoryTiming");
+        var selector = Selector.classRegex(".*ActionResolverFactoryTiming.*");
         var configuration = Configuration.defaultConfiguration();
         new ActionResolver(configuration, selector).resolveRootAction();
 
@@ -61,7 +61,7 @@ class ActionResolverDiscoveryOrderTest {
     @Test
     @DisplayName("step run contains actual work and is not executed during discovery")
     void stepRunContainsActualWorkAndIsNotExecutedDuringDiscovery() {
-        var selector = Selector.classRegex("ActionResolverFactoryTiming");
+        var selector = Selector.classRegex(".*ActionResolverFactoryTiming.*");
         var configuration = Configuration.defaultConfiguration();
         var root = new ActionResolver(configuration, selector).resolveRootAction();
 

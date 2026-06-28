@@ -27,9 +27,14 @@ import nonapi.org.paramixel.support.Arguments;
 /**
  * An action that executes its children sequentially in the order they were added.
  *
- * <p>When configured as <em>dependent</em> (the default), a failure in any child causes
- * remaining children to be skipped or aborted. When configured as <em>independent</em>,
- * all children run regardless of individual outcomes.
+ * <p>When configured as <em>dependent</em> (the default), an
+ * {@link org.paramixel.api.Status#FAILED FAILED} or {@link org.paramixel.api.Status#SKIPPED SKIPPED}
+ * child causes all remaining children to be skipped. An {@link org.paramixel.api.Status#ABORTED ABORTED}
+ * child is a local precondition/assumption failure and does <em>not</em> short-circuit the
+ * sequence: remaining children still run, and the sequence aggregates to
+ * {@link org.paramixel.api.Status#ABORTED}. (To stop a dependent sequence after a child, have
+ * that child throw {@link org.paramixel.api.exception.FailException}.) When configured as
+ * <em>independent</em>, all children run regardless of individual outcomes.
  */
 @Deprecated(forRemoval = true, since = "6.2.0")
 public final class Sequence implements Action {
@@ -83,8 +88,9 @@ public final class Sequence implements Action {
     }
 
     /**
-     * Returns whether children are dependent — i.e., a failure in one child causes
-     * remaining children to be skipped or aborted.
+     * Returns whether children are dependent — i.e., an {@link org.paramixel.api.Status#FAILED FAILED}
+     * or {@link org.paramixel.api.Status#SKIPPED SKIPPED} child causes remaining children to be
+     * skipped (an {@link org.paramixel.api.Status#ABORTED ABORTED} child does not short-circuit).
      *
      * @return {@code true} if children are dependent
      */
@@ -166,8 +172,10 @@ public final class Sequence implements Action {
         }
 
         /**
-         * Configures the sequence action as dependent, so that a failure in any child
-         * causes remaining children to be skipped or aborted. This is the default.
+         * Configures the sequence action as dependent, so that an {@link org.paramixel.api.Status#FAILED FAILED}
+         * or {@link org.paramixel.api.Status#SKIPPED SKIPPED} child causes remaining children to be
+         * skipped. An {@link org.paramixel.api.Status#ABORTED ABORTED} child does not short-circuit.
+         * This is the default.
          *
          * @return this builder
          */

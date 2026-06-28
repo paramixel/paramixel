@@ -53,7 +53,8 @@ class ActionResolverTest {
     @Test
     @DisplayName("applies selector tag filter with AND semantics")
     void appliesTagFiltersWithAndSemantics() {
-        var selector = Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke"));
+        var selector =
+                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke-fast"));
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -154,7 +155,8 @@ class ActionResolverTest {
     @Test
     @DisplayName("resolves actions using selector")
     void resolvesActionsUsingSelector() {
-        var selector = Selector.and(Selector.classRegex("ActionResolverSmokeFixture"), Selector.tagRegex("^smoke$"));
+        var selector =
+                Selector.and(Selector.classRegex(".*ActionResolverSmokeFixture.*"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -166,7 +168,8 @@ class ActionResolverTest {
     @Test
     @DisplayName("returns empty when selector tag filter excludes all matches")
     void returnsEmptyWhenSelectorTagFilterExcludesAllMatches() {
-        var selector = Selector.and(Selector.classRegex("ActionResolverSmokeFixture"), Selector.tagRegex("nomatch"));
+        var selector =
+                Selector.and(Selector.classRegex(".*ActionResolverSmokeFixture.*"), Selector.tagRegex("nomatch"));
 
         var configuration = Configuration.defaultConfiguration();
         assertThat(new ActionResolver(configuration, selector).resolveRootAction())
@@ -177,7 +180,7 @@ class ActionResolverTest {
     @DisplayName("continues after blank tag value during classpath discovery")
     void continuesAfterBlankTagValueDuringClasspathDiscovery() {
         var selector = Selector.classRegex(
-                "ActionResolverValidTaggedDiscoveryFixture|ActionResolverInvalidBlankTagDiscoveryFixture");
+                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*");
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -195,7 +198,7 @@ class ActionResolverTest {
     @DisplayName("discovery validation failure action fails when run")
     void discoveryValidationFailureActionFailsWhenRun() {
         var selector = Selector.classRegex(
-                "ActionResolverValidTaggedDiscoveryFixture|ActionResolverInvalidBlankTagDiscoveryFixture");
+                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*");
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -224,8 +227,8 @@ class ActionResolverTest {
     @DisplayName("aggregates multiple blank tag values")
     void aggregatesMultipleBlankTagValues() {
         var selector = Selector.classRegex(
-                "ActionResolverValidTaggedDiscoveryFixture|ActionResolverInvalidBlankTagDiscoveryFixture"
-                        + "|ActionResolverAnotherInvalidBlankTagDiscoveryFixture");
+                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*"
+                        + "|.*ActionResolverAnotherInvalidBlankTagDiscoveryFixture.*");
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();

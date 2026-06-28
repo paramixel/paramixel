@@ -49,8 +49,9 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     private volatile boolean frozen;
     private volatile SchedulerPriorityKey schedulerPriorityKey = SchedulerPriorityKey.root();
     private volatile Thread executingThread;
-    private CompletableFuture<Descriptor> scheduledFuture;
+    private volatile CompletableFuture<Descriptor> scheduledFuture;
     volatile MutableDescriptor parent;
+    volatile ExecutionNode executionNode;
 
     /**
      * Creates a root descriptor.
@@ -331,5 +332,88 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         if (thread != null) {
             thread.interrupt();
         }
+    }
+
+    @Override
+    public ExecutionNode executionNode() {
+        return executionNode;
+    }
+
+    @Override
+    public void setExecutionNode(final ExecutionNode node) {
+        this.executionNode = node;
+    }
+
+    @Override
+    public CompletableFuture<Descriptor> scheduledFuture() {
+        return scheduledFuture;
+    }
+
+    @Override
+    public void abort(final Status rootStatus, final Throwable cause) {
+        Objects.requireNonNull(rootStatus, "rootStatus is null");
+        Objects.requireNonNull(cause, "cause is null");
+        if (!beginAbort(rootStatus, cause)) {
+            return; // already terminal — idempotent
+        }
+        // Recurse without holding this node's monitor: children()/before()/after() are immutable
+        // post-freeze, and releasing avoids holding a lock across the recursive walk.
+        var abortedDescendant = Status.aborted("cancelled by ancestor: " + cause.getMessage());
+        if (before != null) {
+            before.abort(abortedDescendant, cause);
+        }
+        for (var child : children()) {
+            Arguments.requireInstanceOf(child, MutableDescriptor.class, "child must be a MutableDescriptor")
+                    .abort(abortedDescendant, cause);
+        }
+        if (after != null) {
+            after.abort(abortedDescendant, cause);
+        }
+    }
+
+    /**
+     * Performs this node's own terminal transition and leaf interrupt.
+     *
+     * <p>Returns {@code false} when this descriptor is already terminal, making {@link #abort}
+     * idempotent. Uses {@link #setStatus} to preserve the documented status state machine and
+     * {@code startedAt}/{@code completedAt} bookkeeping.
+     *
+     * <p>Only leaf descriptors run user code on their executing thread; coordination nodes are
+     * unblocked solely by future completion, so interrupting only leaves avoids stranding an
+     * interrupt flag on a coordinator parked in the scheduler's managed join. For deeply nested
+     * synchronous coordination (e.g. Sequential → Parallel → Sequential → Parallel → Step),
+     * the interrupt propagates through the chain: each coordination node's {@code managedJoin}
+     * observes the future completion (or the interrupt waking it from park), unwinds through
+     * the call stack, and the parent's {@code runChild} returns, allowing the next level to
+     * observe its child's terminal state. This propagation is bounded by the depth of the
+     * nesting and the scheduler's backoff ceiling (1 second per {@code managedJoin} park).
+     *
+     * @param rootStatus the terminal status for this descriptor; must not be {@code null}
+     * @param cause the cause used to complete the scheduling future exceptionally; must not be
+     *     {@code null}
+     * @return {@code true} if this node transitioned (or was running and now completes)
+     */
+    private synchronized boolean beginAbort(final Status rootStatus, final Throwable cause) {
+        if (isCompleted()) {
+            return false;
+        }
+        if (status.isPending()) {
+            // State machine requires PENDING -> RUNNING -> terminal.
+            setStatus(Status.RUNNING);
+        }
+        setStatus(rootStatus);
+        completeFutureExceptionally(cause);
+        var node = executionNode;
+        if (node != null) {
+            executionNode = null;
+            node.completeExternally();
+        }
+        // Only leaf descriptors run user code on their executing thread; coordination nodes are
+        // unblocked solely by future completion, so interrupting only leaves avoids stranding an
+        // interrupt flag on a coordinator parked in the scheduler's managed join.
+        if (isLeafAction()) {
+            interruptExecutingThread();
+        }
+        return true;
     }
 }

@@ -64,8 +64,8 @@ class ConcreteRunnerBuildSelectorTest {
     @DisplayName("valid regex patterns do not throw")
     void validRegexPatternsDoNotThrow() throws Exception {
         var configuration = Configuration.of(Map.of(
-                Configuration.MATCH_PACKAGE_REGEX, "org\\.paramixel",
-                Configuration.MATCH_CLASS_REGEX, "Test",
+                Configuration.MATCH_PACKAGE_REGEX, "org\\.paramixel\\.api",
+                Configuration.MATCH_CLASS_REGEX, ".*Test.*",
                 Configuration.MATCH_TAG_REGEX, "smoke"));
         var exception = callBuildSelector(configuration);
         assertThat(exception).isNull();

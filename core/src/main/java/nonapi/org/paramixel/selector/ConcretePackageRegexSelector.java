@@ -23,7 +23,7 @@ import org.paramixel.api.selector.PackageRegexSelector;
 /**
  * Concrete implementation of {@link PackageRegexSelector}.
  *
- * <p>Matches package names using {@link Pattern#matcher(CharSequence)} {@code .find()} semantics.
+ * <p>Matches package names using {@link Pattern#matcher(CharSequence)} {@code .matches()} semantics.
  * Class name and tag matching always return {@code true}.
  */
 public final class ConcretePackageRegexSelector implements PackageRegexSelector {
@@ -47,7 +47,7 @@ public final class ConcretePackageRegexSelector implements PackageRegexSelector 
     @Override
     public boolean matchesPackage(final String packageName) {
         Objects.requireNonNull(packageName, "packageName is null");
-        return pattern.matcher(packageName).find();
+        return pattern.matcher(packageName).matches();
     }
 
     @Override

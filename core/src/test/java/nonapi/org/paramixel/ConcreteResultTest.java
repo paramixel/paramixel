@@ -442,6 +442,93 @@ class ConcreteResultTest {
             assertThat(result.isFailed()).isTrue();
         }
 
+        @Test
+        @DisplayName("preserves message for failed non-mutable descriptor")
+        void preservesMessageForFailedNonMutable() {
+            var descriptor = descriptorWithStatusAndDetail(Status.FAILED, "timeout", null);
+            var result = new ConcreteResult(descriptor, configuration());
+            assertThat(result.isFailed()).isTrue();
+            assertThat(result.status().message()).hasValue("timeout");
+            assertThat(result.status().throwable()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("preserves message and throwable for failed non-mutable descriptor")
+        void preservesMessageAndThrowableForFailedNonMutable() {
+            var cause = new RuntimeException("boom");
+            var descriptor = descriptorWithStatusAndDetail(Status.FAILED, "timeout", cause);
+            var result = new ConcreteResult(descriptor, configuration());
+            assertThat(result.isFailed()).isTrue();
+            assertThat(result.status().message()).hasValue("timeout");
+            assertThat(result.status().throwable()).containsSame(cause);
+        }
+
+        @Test
+        @DisplayName("preserves throwable with default message when descriptor has no message")
+        void preservesThrowableWithDefaultMessageForFailedNonMutable() {
+            var cause = new RuntimeException("boom");
+            var descriptor = descriptorWithStatusAndDetail(Status.FAILED, null, cause);
+            var result = new ConcreteResult(descriptor, configuration());
+            assertThat(result.isFailed()).isTrue();
+            assertThat(result.status().message()).hasValue("action failed");
+            assertThat(result.status().throwable()).containsSame(cause);
+        }
+
+        @Test
+        @DisplayName("preserves message for aborted non-mutable descriptor")
+        void preservesMessageForAbortedNonMutable() {
+            var descriptor = descriptorWithStatusAndDetail(Status.ABORTED, "precondition failed", null);
+            var result = new ConcreteResult(descriptor, configuration(Configuration.FAILURE_ON_ABORT, "false"));
+            assertThat(result.isAborted()).isTrue();
+            assertThat(result.status().message()).hasValue("precondition failed");
+            assertThat(result.status().throwable()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("preserves message and throwable for aborted non-mutable descriptor")
+        void preservesMessageAndThrowableForAbortedNonMutable() {
+            var cause = new RuntimeException("precondition");
+            var descriptor = descriptorWithStatusAndDetail(Status.ABORTED, "precondition failed", cause);
+            var result = new ConcreteResult(descriptor, configuration(Configuration.FAILURE_ON_ABORT, "false"));
+            assertThat(result.isAborted()).isTrue();
+            assertThat(result.status().message()).hasValue("precondition failed");
+            assertThat(result.status().throwable()).containsSame(cause);
+        }
+
+        @Test
+        @DisplayName("preserves message for skipped non-mutable descriptor")
+        void preservesMessageForSkippedNonMutable() {
+            var descriptor = descriptorWithStatusAndDetail(Status.SKIPPED, "disabled", null);
+            var result = new ConcreteResult(descriptor, configuration());
+            assertThat(result.isSkipped()).isTrue();
+            assertThat(result.status().message()).hasValue("disabled");
+            assertThat(result.status().throwable()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("returns canonical constant when no message or throwable present")
+        void canonicalConstantWhenNoDetailForFailedNonMutable() {
+            var descriptor = descriptorWithStatusAndDetail(Status.FAILED, null, null);
+            var result = new ConcreteResult(descriptor, configuration());
+            assertThat(result.isFailed()).isTrue();
+            assertThat(result.status().message()).isEmpty();
+            assertThat(result.status().throwable()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("existing no-detail stubs still resolve correctly after fix")
+        void existingNoDetailStubsStillResolveCorrectly() {
+            assertThat(new ConcreteResult(descriptorWithStatus(Status.FAILED), configuration()).isFailed())
+                    .isTrue();
+            assertThat(new ConcreteResult(
+                                    descriptorWithStatus(Status.ABORTED),
+                                    configuration(Configuration.FAILURE_ON_ABORT, "false"))
+                            .isAborted())
+                    .isTrue();
+            assertThat(new ConcreteResult(descriptorWithStatus(Status.SKIPPED), configuration()).isSkipped())
+                    .isTrue();
+        }
+
         private Descriptor descriptorWithStatus(final Status status) {
             boolean isPassed = status.isPassed();
             boolean isFailed = status.isFailed();
@@ -507,6 +594,81 @@ class ConcreteResultTest {
                 @Override
                 public Optional<Throwable> throwable() {
                     return Optional.empty();
+                }
+
+                @Override
+                public boolean isCompleted() {
+                    return completed;
+                }
+
+                @Override
+                public List<Descriptor> children() {
+                    return List.of();
+                }
+            };
+        }
+
+        private Descriptor descriptorWithStatusAndDetail(
+                final Status status, final String message, final Throwable throwable) {
+            boolean isPassed = status.isPassed();
+            boolean isFailed = status.isFailed();
+            boolean isAborted = status.isAborted();
+            boolean isSkipped = status.isSkipped();
+            boolean completed = isPassed || isFailed || isAborted || isSkipped;
+            return new Descriptor() {
+                @Override
+                public Optional<Descriptor> parent() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public String id() {
+                    return "stub";
+                }
+
+                @Override
+                public Action action() {
+                    return Step.of("stub", v -> {});
+                }
+
+                @Override
+                public boolean isPassed() {
+                    return isPassed;
+                }
+
+                @Override
+                public boolean isFailed() {
+                    return isFailed;
+                }
+
+                @Override
+                public boolean isSkipped() {
+                    return isSkipped;
+                }
+
+                @Override
+                public boolean isAborted() {
+                    return isAborted;
+                }
+
+                @Override
+                public Optional<Instant> startedAt() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<Instant> completedAt() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public Optional<String> message() {
+                    return Optional.ofNullable(message);
+                }
+
+                @Override
+                public Optional<Throwable> throwable() {
+                    return Optional.ofNullable(throwable);
                 }
 
                 @Override

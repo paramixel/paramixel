@@ -263,7 +263,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
 
         var deadlineNanos = System.nanoTime() + BROKER_READINESS_TIMEOUT.toNanos();
         var attempt = 0;
-        var maxBackoffMs = 2000L;
+        var maxBackoffMs = 2_000L;
         Exception lastException = null;
 
         while (System.nanoTime() < deadlineNanos) {

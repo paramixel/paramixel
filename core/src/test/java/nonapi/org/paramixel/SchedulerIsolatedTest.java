@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -173,6 +174,29 @@ class SchedulerIsolatedTest {
     }
 
     @Test
+    @DisplayName("re-entrant nested same lock inside Parallel body")
+    void reEntrantNestedSameLockInsideParallelBody() {
+        var executed = new AtomicInteger();
+        var action = Isolated.builder("outer", "L")
+                .body(Parallel.builder("body")
+                        .parallelism(2)
+                        .child(Isolated.builder("inner-1", "L")
+                                .body(Step.of("work-1", ctx -> executed.incrementAndGet()))
+                                .build())
+                        .child(Isolated.builder("inner-2", "L")
+                                .body(Step.of("work-2", ctx -> executed.incrementAndGet()))
+                                .build())
+                        .build())
+                .build();
+
+        var result = assertTimeoutPreemptively(
+                Duration.ofSeconds(10), () -> runner(2).run(action));
+
+        assertThat(result.isPassed()).isTrue();
+        assertThat(executed.get()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("lock released on body failure")
     void lockReleasedOnBodyFailure() {
         var secondExecuted = new AtomicInteger();
@@ -234,6 +258,47 @@ class SchedulerIsolatedTest {
 
         assertThat(result.isPassed()).isTrue();
         assertThat(maxActive.get()).isLessThanOrEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("same-lock waiters work-steal while blocked")
+    void sameLockWaitersWorkStealWhileBlocked() throws Exception {
+        var innerStarted = new java.util.concurrent.CountDownLatch(4);
+        var releaseInner = new java.util.concurrent.CountDownLatch(1);
+        var innerParallel = Parallel.builder("inner").parallelism(4);
+        for (var i = 0; i < 4; i++) {
+            innerParallel.child(Step.of("inner-" + i, ctx -> {
+                innerStarted.countDown();
+                releaseInner.await();
+            }));
+        }
+        var root = Parallel.builder("root")
+                .parallelism(4)
+                .child(Isolated.builder("holder", "L")
+                        .body(innerParallel.build())
+                        .build())
+                .child(Isolated.builder("waiter-1", "L")
+                        .body(Step.of("waiter-1", ctx -> {}))
+                        .build())
+                .child(Isolated.builder("waiter-2", "L")
+                        .body(Step.of("waiter-2", ctx -> {}))
+                        .build())
+                .child(Isolated.builder("waiter-3", "L")
+                        .body(Step.of("waiter-3", ctx -> {}))
+                        .build())
+                .build();
+
+        var resultFuture = CompletableFuture.supplyAsync(() -> runner(4).run(root));
+        try {
+            assertThat(innerStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("lock waiters should not occupy all scheduler workers while the lock holder waits")
+                    .isTrue();
+        } finally {
+            releaseInner.countDown();
+        }
+
+        assertThat(resultFuture.get(5, java.util.concurrent.TimeUnit.SECONDS).isPassed())
+                .isTrue();
     }
 
     @Test

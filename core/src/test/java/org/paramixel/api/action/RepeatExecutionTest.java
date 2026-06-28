@@ -18,9 +18,13 @@ package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Configuration;
 import org.paramixel.api.Runner;
 import org.paramixel.api.exception.AbortedException;
 import org.paramixel.api.exception.SkipException;
@@ -28,6 +32,38 @@ import org.paramixel.api.exception.SkipException;
 @DisplayName("Repeat execution")
 @SuppressWarnings("removal")
 class RepeatExecutionTest {
+
+    @Test
+    @DisplayName("repetitions run sequentially without overlap")
+    void repetitionsRunSequentiallyWithoutOverlap() {
+        var inFlight = new AtomicInteger();
+        var maxConcurrent = new AtomicInteger();
+        var iteration = new AtomicInteger();
+        var observedOrder = Collections.synchronizedList(new ArrayList<Integer>());
+
+        var action = Repeat.builder("repeat")
+                .body(Step.of("step", context -> {
+                    var current = inFlight.incrementAndGet();
+                    maxConcurrent.accumulateAndGet(current, Math::max);
+                    observedOrder.add(iteration.incrementAndGet());
+                    try {
+                        Thread.sleep(25);
+                    } finally {
+                        inFlight.decrementAndGet();
+                    }
+                }))
+                .iterations(4)
+                .build();
+
+        var runner = Runner.builder()
+                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "4")))
+                .build();
+        var root = runner.run(action).descriptor().orElseThrow();
+
+        assertThat(root.isPassed()).isTrue();
+        assertThat(observedOrder).containsExactly(1, 2, 3, 4);
+        assertThat(maxConcurrent.get()).isEqualTo(1);
+    }
 
     @Test
     @DisplayName("second rep aborts, all still run")

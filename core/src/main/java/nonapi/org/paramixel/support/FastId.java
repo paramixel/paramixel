@@ -41,9 +41,9 @@ public class FastId {
 
     private static final int CHARSET_SIZE = 52;
 
-    private static final long MAX_IDS = 7311616L; // 52^4
+    private static final long MAX_IDS = 7_311_616L; // 52^4
 
-    private static final long MULTIPLIER = 4518593L;
+    private static final long MULTIPLIER = 4_518_593L;
 
     private static final long INCREMENT = 1L;
 

@@ -70,6 +70,7 @@ public class StatusListener implements Listener {
                 .append(displayName(descriptor))
                 .append(LINE_SEPARATOR);
         System.out.print(stringBuilder);
+        System.out.flush();
     }
 
     @Override
@@ -94,36 +95,60 @@ public class StatusListener implements Listener {
                         .append(" | ")
                         .append(throwable.getClass().getName())
                         .append(": ")
-                        .append(throwable.getMessage());
-                var sw = new StringWriter();
-                throwable.printStackTrace(new PrintWriter(sw));
-                try (var br = new BufferedReader(new StringReader(sw.toString()))) {
+                        .append(Listeners.sanitizeMessage(throwable.getMessage()))
+                        .append(LINE_SEPARATOR);
+                var stringWriter = new StringWriter();
+                throwable.printStackTrace(new PrintWriter(stringWriter));
+                try (var br = new BufferedReader(new StringReader(stringWriter.toString()))) {
                     String line;
                     while ((line = br.readLine()) != null) {
-                        stringBuilder.append(prefix()).append(line).append(LINE_SEPARATOR);
+                        stringBuilder
+                                .append(prefix())
+                                .append(Listeners.stripUnsafe(line))
+                                .append(LINE_SEPARATOR);
                     }
                 } catch (IOException e) {
                     throw new AssertionError(e);
                 }
             } else {
+                descriptor
+                        .message()
+                        .ifPresent(message -> stringBuilder.append(" | ").append(Listeners.sanitizeMessage(message)));
                 stringBuilder.append(LINE_SEPARATOR);
             }
             System.out.print(stringBuilder);
+            System.out.flush();
         } else {
-            descriptor.throwable().ifPresent(throwable -> {
-                var stringBuilder = new StringBuilder();
-                var sw = new StringWriter();
-                throwable.printStackTrace(new PrintWriter(sw));
-                try (var br = new BufferedReader(new StringReader(sw.toString()))) {
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        stringBuilder.append(prefix()).append(line).append(LINE_SEPARATOR);
-                    }
-                } catch (IOException e) {
-                    throw new AssertionError(e);
-                }
-                System.out.print(stringBuilder);
-            });
+            descriptor
+                    .throwable()
+                    .ifPresentOrElse(
+                            throwable -> {
+                                var stringBuilder = new StringBuilder();
+                                var sw = new StringWriter();
+                                throwable.printStackTrace(new PrintWriter(sw));
+                                try (var br = new BufferedReader(new StringReader(sw.toString()))) {
+                                    String line;
+                                    while ((line = br.readLine()) != null) {
+                                        stringBuilder
+                                                .append(prefix())
+                                                .append(Listeners.stripUnsafe(line))
+                                                .append(LINE_SEPARATOR);
+                                    }
+                                } catch (IOException e) {
+                                    throw new AssertionError(e);
+                                }
+                                System.out.print(stringBuilder);
+                                System.out.flush();
+                            },
+                            () -> descriptor.message().ifPresent(message -> {
+                                var stringBuilder = new StringBuilder();
+                                stringBuilder
+                                        .append(prefix())
+                                        .append(Listeners.sanitizeMessage(message))
+                                        .append(LINE_SEPARATOR);
+                                System.out.print(stringBuilder);
+                                System.out.flush();
+                            }));
         }
     }
 

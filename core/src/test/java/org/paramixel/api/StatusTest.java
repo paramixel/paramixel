@@ -273,30 +273,36 @@ class StatusTest {
     class FromThrowable {
 
         @Test
-        @DisplayName("FailException wrapped in UserCodeException returns failed with message")
+        @DisplayName("FailException wrapped in UserCodeException returns failed with message and throwable")
         void failExceptionWrappedInUserCodeException() {
-            var status = Status.fromThrowable(new UserCodeException(new FailException("assertion")));
+            var failException = new FailException("assertion");
+            var status = Status.fromThrowable(new UserCodeException(failException));
 
             assertThat(status.isFailed()).isTrue();
             assertThat(status.message()).contains("assertion");
+            assertThat(status.throwable()).containsSame(failException);
         }
 
         @Test
-        @DisplayName("SkipException wrapped in UserCodeException returns skipped with message")
+        @DisplayName("SkipException wrapped in UserCodeException returns skipped with message and throwable")
         void skipExceptionWrappedInUserCodeException() {
-            var status = Status.fromThrowable(new UserCodeException(new SkipException("not ready")));
+            var skipException = new SkipException("not ready");
+            var status = Status.fromThrowable(new UserCodeException(skipException));
 
             assertThat(status.isSkipped()).isTrue();
             assertThat(status.message()).contains("not ready");
+            assertThat(status.throwable()).containsSame(skipException);
         }
 
         @Test
-        @DisplayName("AbortedException wrapped in UserCodeException returns aborted with message")
+        @DisplayName("AbortedException wrapped in UserCodeException returns aborted with message and throwable")
         void abortedExceptionWrappedInUserCodeException() {
-            var status = Status.fromThrowable(new UserCodeException(new AbortedException("precondition")));
+            var abortedException = new AbortedException("precondition");
+            var status = Status.fromThrowable(new UserCodeException(abortedException));
 
             assertThat(status.isAborted()).isTrue();
             assertThat(status.message()).contains("precondition");
+            assertThat(status.throwable()).containsSame(abortedException);
         }
 
         @Test

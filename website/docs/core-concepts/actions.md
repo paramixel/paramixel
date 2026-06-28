@@ -18,7 +18,7 @@ public sealed interface Action
 ## Built-in actions
 
 - `Step` wraps a `ContextConsumer` for user logic.
-- `Sequential` runs children one after another in dependent or independent mode, optionally shuffled.
+- `Sequential` runs children one after another in dependent or independent mode, optionally shuffled. In dependent mode (the default), a `FAILED` or `SKIPPED` child short-circuits the sequence (remaining children are skipped); an `ABORTED` child does **not** short-circuit, so siblings still run and the sequence aggregates to `ABORTED`. In independent mode, all children run regardless of outcome. See [Exception Reference](../api/exception-reference) for how each outcome exception affects siblings.
 - `Parallel` runs children concurrently with configurable parallelism, optionally shuffled.
 - `Scope` provides before-body-after execution with lifecycle guarantee; the after action always runs.
 - `Static` provides before-body-after without a fixture instance. _(Deprecated since 6.2 — use `Scope` instead.)_

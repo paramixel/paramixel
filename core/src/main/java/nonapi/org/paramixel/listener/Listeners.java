@@ -36,6 +36,10 @@ public final class Listeners {
 
     private static final Pattern MULTIPLE_SPACES = Pattern.compile(" {2,}");
 
+    private static final Pattern ANSI_ESCAPE = Pattern.compile("\\x1B\\[[\\d;]*[A-Za-z]");
+
+    private static final Pattern CONTROL_CHARS = Pattern.compile("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\x80-\\x9F]");
+
     private Listeners() {
         // Intentionally empty
     }
@@ -105,6 +109,8 @@ public final class Listeners {
     /**
      * Formats the descriptor path from root to descriptor by walking the tree.
      *
+     * <p>Each display name component is sanitized to strip control characters.
+     *
      * @param descriptor the descriptor; must not be {@code null}
      * @return the display path
      */
@@ -112,7 +118,7 @@ public final class Listeners {
         Objects.requireNonNull(descriptor, "descriptor is null");
         var names = new ArrayDeque<String>();
         for (var d = descriptor; d != null; d = d.parent().orElse(null)) {
-            var name = d.action().displayName();
+            var name = sanitizeMessage(d.action().displayName());
             if (!Constants.ROOT_NAME.equals(name)) {
                 names.addFirst(name);
             }
@@ -217,7 +223,32 @@ public final class Listeners {
     }
 
     /**
+     * Strips characters that cause command-line tools such as {@code grep} to treat output as binary,
+     * without otherwise altering the text.
+     *
+     * <p>Removes ANSI CSI escape sequences and C0/C1 control characters (including NUL, BEL, backspace,
+     * ESC, and DEL). Tab ({@code U+0009}), line feed ({@code U+000A}), and carriage return
+     * ({@code U+000D}) are preserved so that multi-line structures such as stack traces keep their
+     * formatting. Use this for text that must remain structurally intact (for example, individual
+     * stack-trace lines). For single-line display, use {@link #sanitizeMessage(String)} which also
+     * flattens whitespace.
+     *
+     * @param text the text, or {@code null}
+     * @return the text with unsafe bytes removed, or {@code null} if the input was {@code null}
+     */
+    public static String stripUnsafe(final String text) {
+        if (text == null) {
+            return null;
+        }
+        return CONTROL_CHARS.matcher(ANSI_ESCAPE.matcher(text).replaceAll("")).replaceAll("");
+    }
+
+    /**
      * Sanitizes a message for single-line display.
+     *
+     * <p>Strips ANSI escape sequences and C0/C1 control characters (except tab, line feed,
+     * and carriage return which are handled separately), then replaces newlines with
+     * {@code " - "}, collapses multiple spaces, and trims the result.
      *
      * @param message the message, or {@code null}
      * @return the sanitized message, or {@code null}
@@ -226,8 +257,9 @@ public final class Listeners {
         if (message == null) {
             return null;
         }
+        var stripped = stripUnsafe(message.replace('\t', ' '));
         return MULTIPLE_SPACES
-                .matcher(NEWLINES.matcher(message.replace('\t', ' ')).replaceAll(" - "))
+                .matcher(NEWLINES.matcher(stripped).replaceAll(" - "))
                 .replaceAll(" ")
                 .strip();
     }

@@ -109,9 +109,9 @@ public interface Listener {
     }
 
     /**
-     * Invoked after discovery creates the descriptor tree.
+     * Invoked after discovery creates the descriptor tree, or when discovery fails.
      *
-     * @param root the discovered root descriptor; never {@code null}
+     * @param root the discovered root descriptor, or {@code null} when discovery failed
      */
     default void onDiscoveryCompleted(final Descriptor root) {
         // Intentionally empty

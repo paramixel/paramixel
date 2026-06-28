@@ -19,13 +19,13 @@ var checkout = Selector.classRegex("Checkout");
 var selected = Selector.and(smoke, checkout);
 ```
 
-Regex selectors use Java regex `find()` semantics.
+Regex selectors use Java regex `matches()` semantics. The regex must match the entire candidate string. To match substrings, use wildcards such as `.*Checkout.*`.
 
 ## Configuration equivalents
 
 ```properties
-paramixel.match.package.regex=com\.example
-paramixel.match.class.regex=Checkout
+paramixel.match.package.regex=com\.example.*
+paramixel.match.class.regex=.*Checkout.*
 paramixel.match.tag.regex=smoke
 ```
 

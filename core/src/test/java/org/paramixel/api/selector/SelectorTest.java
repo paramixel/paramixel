@@ -58,7 +58,7 @@ class SelectorTest {
     @Test
     @DisplayName("packageRegex matches package")
     void packageRegexMatchesPackage() {
-        var selector = Selector.packageRegex("org\\.paramixel\\.api");
+        var selector = Selector.packageRegex("org\\.paramixel\\.api\\.selector");
 
         assertThat(selector.matchesPackage(SelectorTest.class.getPackageName())).isTrue();
     }
@@ -90,7 +90,7 @@ class SelectorTest {
     @Test
     @DisplayName("classRegex matches class name")
     void classRegexMatchesClassName() {
-        var selector = Selector.classRegex("SelectorTest");
+        var selector = Selector.classRegex("org\\.paramixel\\.api\\.selector\\.SelectorTest");
 
         assertThat(selector.matchesClass(SelectorTest.class.getName())).isTrue();
     }
@@ -125,7 +125,7 @@ class SelectorTest {
         var selector = Selector.tagRegex("smoke");
 
         assertThat(selector.matchesTag("smoke")).isTrue();
-        assertThat(selector.matchesTag("smoke-test")).isTrue();
+        assertThat(selector.matchesTag("smoke-test")).isFalse();
         assertThat(selector.matchesTag("integration")).isFalse();
     }
 

@@ -149,18 +149,50 @@ public final class ConcreteResult implements Result {
             return mutableDescriptor.status();
         }
         if (descriptor.isFailed()) {
-            return Status.FAILED;
+            return statusFor(descriptor, () -> Status.FAILED, Status::failed, Status::failed, "action failed");
         }
         if (descriptor.isAborted()) {
-            return Status.ABORTED;
+            return statusFor(descriptor, () -> Status.ABORTED, Status::aborted, Status::aborted, "action aborted");
         }
         if (!descriptor.isCompleted()) {
             return Status.RUNNING;
         }
         if (descriptor.isSkipped()) {
-            return Status.SKIPPED;
+            return statusFor(descriptor, () -> Status.SKIPPED, Status::skipped, Status::skipped, "action skipped");
         }
         return Status.PASSED;
+    }
+
+    /**
+     * Reconstructs a detail-preserving {@link Status} from a {@link Descriptor} that does
+     * not implement {@link MutableDescriptor}.
+     *
+     * <p>Uses {@link Descriptor#message()} and {@link Descriptor#throwable()} to preserve
+     * outcome detail. Falls back to the canonical constant when neither is present.
+     *
+     * @param descriptor   the descriptor providing status detail; must not be {@code null}
+     * @param canonical    supplies the canonical constant (no message, no throwable)
+     * @param withMessage  creates a status carrying a message only
+     * @param withThrowable creates a status carrying a message and throwable
+     * @param defaultMessage fallback message when a throwable is present but no message
+     *                       is available
+     * @return a status instance carrying any available message and throwable
+     */
+    private static Status statusFor(
+            final Descriptor descriptor,
+            final java.util.function.Supplier<Status> canonical,
+            final java.util.function.Function<String, Status> withMessage,
+            final java.util.function.BiFunction<String, Throwable, Status> withThrowable,
+            final String defaultMessage) {
+        var messageOpt = descriptor.message();
+        var throwableOpt = descriptor.throwable();
+        if (throwableOpt.isPresent()) {
+            return withThrowable.apply(messageOpt.orElse(defaultMessage), throwableOpt.orElseThrow());
+        }
+        if (messageOpt.isPresent()) {
+            return withMessage.apply(messageOpt.orElseThrow());
+        }
+        return canonical.get();
     }
 
     private static Optional<Instant> earliestStartedAt(final Descriptor descriptor) {

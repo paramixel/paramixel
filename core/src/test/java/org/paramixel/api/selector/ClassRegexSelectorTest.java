@@ -35,9 +35,9 @@ class ClassRegexSelectorTest {
     }
 
     @Test
-    @DisplayName("matchesClass uses find() semantics")
-    void matchesClassUsesFindSemantics() {
-        var selector = (ClassRegexSelector) Selector.classRegex("SelectorTest");
+    @DisplayName("matchesClass uses matches() semantics")
+    void matchesClassUsesMatchesSemantics() {
+        var selector = (ClassRegexSelector) Selector.classRegex("org\\.paramixel\\.api\\.SelectorTest");
 
         assertThat(selector.matchesClass("org.paramixel.api.SelectorTest")).isTrue();
     }

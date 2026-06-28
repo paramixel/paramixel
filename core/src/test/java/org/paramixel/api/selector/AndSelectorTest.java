@@ -29,9 +29,10 @@ class AndSelectorTest {
     @Test
     @DisplayName("matches when all selectors match")
     void matchesWhenAllSelectorsMatch() {
-        var selector = Selector.and(Selector.packageRegex("org\\.paramixel"), Selector.tagRegex("smoke"));
+        var selector =
+                Selector.and(Selector.packageRegex("org\\.paramixel\\.api\\.selector"), Selector.tagRegex("smoke"));
 
-        assertThat(selector.matchesPackage("org.paramixel.api")).isTrue();
+        assertThat(selector.matchesPackage("org.paramixel.api.selector")).isTrue();
         assertThat(selector.matchesTag("smoke")).isTrue();
     }
 
@@ -139,7 +140,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("AND semantics for matchesPackage")
     void andSemanticsForMatchesPackage() {
-        var selector = Selector.and(Selector.packageRegex("org"), Selector.packageRegex("paramixel"));
+        var selector = Selector.and(Selector.packageRegex("org\\.paramixel"), Selector.packageRegex(".*paramixel.*"));
 
         assertThat(selector.matchesPackage("org.paramixel")).isTrue();
         assertThat(selector.matchesPackage("org.example")).isFalse();
@@ -148,7 +149,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("AND semantics for matchesClass")
     void andSemanticsForMatchesClass() {
-        var selector = Selector.and(Selector.classRegex("Test"), Selector.classRegex("Selector"));
+        var selector = Selector.and(Selector.classRegex(".*Test.*"), Selector.classRegex(".*Selector.*"));
 
         assertThat(selector.matchesClass("TestSelector")).isTrue();
         assertThat(selector.matchesClass("TestRunner")).isFalse();
@@ -157,7 +158,7 @@ class AndSelectorTest {
     @Test
     @DisplayName("AND semantics for matchesTag")
     void andSemanticsForMatchesTag() {
-        var selector = Selector.and(Selector.tagRegex("smoke"), Selector.tagRegex("fast"));
+        var selector = Selector.and(Selector.tagRegex(".*smoke.*"), Selector.tagRegex(".*fast.*"));
 
         assertThat(selector.matchesTag("smoke-fast")).isTrue();
         assertThat(selector.matchesTag("smoke")).isFalse();

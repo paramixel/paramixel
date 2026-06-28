@@ -209,7 +209,7 @@ class ConfigurationArgumentsTest {
         @DisplayName("returns present optional for valid long")
         void returnsPresentForValidLong() {
             var configuration = Configuration.of(Map.of("key", "123456789012"));
-            assertThat(configuration.getLong("key")).contains(123456789012L);
+            assertThat(configuration.getLong("key")).contains(123_456_789_012L);
         }
 
         @Test
@@ -252,14 +252,14 @@ class ConfigurationArgumentsTest {
         @DisplayName("returns present optional for valid float")
         void returnsPresentForValidFloat() {
             var configuration = Configuration.of(Map.of("key", "3.14"));
-            assertThat(configuration.getFloat("key")).contains(3.14f);
+            assertThat(configuration.getFloat("key")).contains(3.14F);
         }
 
         @Test
         @DisplayName("returns present optional for whitespace-padded valid float")
         void returnsPresentForWhitespacePaddedFloat() {
             var configuration = Configuration.of(Map.of("key", "  2.5  "));
-            assertThat(configuration.getFloat("key")).contains(2.5f);
+            assertThat(configuration.getFloat("key")).contains(2.5F);
         }
 
         @Test
@@ -295,7 +295,7 @@ class ConfigurationArgumentsTest {
         @DisplayName("returns present optional for valid double")
         void returnsPresentForValidDouble() {
             var configuration = Configuration.of(Map.of("key", "2.718281828"));
-            assertThat(configuration.getDouble("key")).contains(2.718281828);
+            assertThat(configuration.getDouble("key")).contains(2.718_281_828);
         }
 
         @Test

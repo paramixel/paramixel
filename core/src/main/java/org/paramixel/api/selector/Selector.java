@@ -35,9 +35,10 @@ import nonapi.org.paramixel.support.Arguments;
  *
  * <p>Selectors may constrain discovery by package name, fully qualified class name, tag value, or a
  * composition of these using {@link #and(Selector...)}, {@link #or(Selector...)}, or {@link #not(Selector)}.
- * All selector regular expressions use {@link Pattern#matcher(CharSequence)} {@code .find()} semantics.
+ * All selector regular expressions use {@link Pattern#matcher(CharSequence)} {@code .matches()} semantics.
  *
- * <p>If an exact match is required, callers should provide an anchored regular expression such as {@code ^smoke$}.
+ * <p>To match substrings, use wildcards such as {@code .*smoke.*}. By default, the regex must match the entire
+ * candidate string.
  *
  * <p>Use the static factory methods to create selectors:
  * <ul>
@@ -104,7 +105,7 @@ public interface Selector {
     /**
      * Creates a selector that matches package names using the supplied regular expression.
      *
-     * <p>The expression is matched with {@code find()} semantics against candidate package names.
+     * <p>The expression is matched with {@code matches()} semantics against candidate package names.
      *
      * @param regex the package-match regular expression; must not be {@code null} or blank
      * @return a new package regex selector
@@ -118,7 +119,7 @@ public interface Selector {
     /**
      * Creates a selector that matches fully qualified class names using the supplied regular expression.
      *
-     * <p>The expression is matched with {@code find()} semantics against candidate class names.
+     * <p>The expression is matched with {@code matches()} semantics against candidate class names.
      *
      * @param regex the class-match regular expression; must not be {@code null} or blank
      * @return a new class regex selector
@@ -132,7 +133,7 @@ public interface Selector {
     /**
      * Creates a selector that matches tag values using the supplied regular expression.
      *
-     * <p>The expression is matched with {@code find()} semantics against each declared
+     * <p>The expression is matched with {@code matches()} semantics against each declared
      * {@link org.paramixel.api.Paramixel.Tag} value.
      *
      * @param regex the tag-match regular expression; must not be {@code null} or blank

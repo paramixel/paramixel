@@ -18,9 +18,13 @@ package nonapi.org.paramixel.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
+import nonapi.org.paramixel.ConcreteConfiguration;
+import nonapi.org.paramixel.ConcreteResult;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Configuration;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Step;
 
@@ -221,5 +225,37 @@ class ListenersTest {
         descriptor.setStatus(Status.PASSED);
 
         assertThat(Listeners.elapsedMillis(descriptor)).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("formatStatus formats status name without ANSI color")
+    void formatStatusReturnsStatusName() {
+        assertThat(Listeners.formatStatus(Status.PASSED)).isEqualTo("PASSED");
+        assertThat(Listeners.formatStatus(Status.FAILED)).isEqualTo("FAILED");
+    }
+
+    @Test
+    @DisplayName("formatException returns throwable class name when message is blank")
+    void formatExceptionReturnsClassNameWhenMessageBlank() {
+        var action = Step.of("test", context -> {});
+        var descriptor = new ConcreteDescriptor(action);
+        descriptor.setStatus(Status.RUNNING);
+        descriptor.setStatus(Status.failed("failed", new RuntimeException("   ")));
+
+        var result = Listeners.formatException(descriptor);
+        assertThat(result).isEqualTo("java.lang.RuntimeException");
+    }
+
+    @Test
+    @DisplayName("formatStatus formats aborted result as ABORTED")
+    void formatStatusFormatsAbortedResult() {
+        // Disable failure-on-abort promotion so the result retains its ABORTED outcome.
+        var config = new ConcreteConfiguration(Map.of(Configuration.FAILURE_ON_ABORT, "false"));
+        var root = new ConcreteDescriptor(Step.of("root", context -> {}));
+        root.setStatus(Status.RUNNING);
+        root.setStatus(Status.ABORTED);
+        var result = new ConcreteResult(root, config);
+
+        assertThat(Listeners.formatStatus(result)).isEqualTo("ABORTED");
     }
 }

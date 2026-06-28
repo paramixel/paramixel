@@ -20,14 +20,30 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Signals that an action should be marked as aborted rather than executed or failed.
+ * Signals that an action should be marked as {@link org.paramixel.api.Status#ABORTED aborted}
+ * rather than executed or failed.
  *
- * <p>This indicates a precondition or assumption failure — the action could not run due to an
- * unmet condition, which is distinct from a deliberate skip or an unexpected failure.
- * The Paramixel runtime catches {@code AbortedException} and records the action as aborted
- * with the provided message, continuing execution of remaining actions. This exception can
- * be instantiated directly through {@link #AbortedException(String)} or thrown immediately
- * with {@link #abort()} and {@link #abort(String)}.
+ * <p>This indicates a <em>precondition or assumption failure</em> — the action could not run
+ * due to an unmet condition. This is distinct from a deliberate
+ * {@link org.paramixel.api.exception.SkipException skip} (the action chose not to run) and an
+ * unexpected {@link org.paramixel.api.exception.FailException failure} (the action ran but an
+ * assertion did not hold).
+ *
+ * <p>The runtime catches {@code AbortedException} and records the descriptor as
+ * {@link org.paramixel.api.Status#ABORTED}. An abort does not, by itself, cancel sibling or
+ * subsequent work: in a {@link org.paramixel.api.action.Sequence},
+ * {@link org.paramixel.api.action.Sequential}, {@link org.paramixel.api.action.Parallel}, or
+ * {@link org.paramixel.api.action.Repeat} an aborted child does not short-circuit the
+ * surrounding action — remaining children still run, and the aggregate surfaces
+ * {@link org.paramixel.api.Status#ABORTED}. (To stop the remaining children of a dependent
+ * {@link org.paramixel.api.action.Sequence}/{@link org.paramixel.api.action.Sequential},
+ * throw {@link org.paramixel.api.exception.FailException} instead.) The one exception is a
+ * {@link org.paramixel.api.action.Loop} or {@link org.paramixel.api.action.Until}: there an
+ * aborted iteration is treated as a request to stop iterating, so remaining iterations are
+ * skipped and the action reports {@link org.paramixel.api.Status#ABORTED}.
+ *
+ * <p>This exception can be instantiated directly through {@link #AbortedException(String)}
+ * or thrown immediately with {@link #abort()} and {@link #abort(String)}.
  */
 public final class AbortedException extends RuntimeException {
 

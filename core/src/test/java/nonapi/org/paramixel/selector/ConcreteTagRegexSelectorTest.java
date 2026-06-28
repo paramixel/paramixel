@@ -48,7 +48,7 @@ class ConcreteTagRegexSelectorTest {
     void matchesTagReturnsTrueForMatch() {
         var selector = new ConcreteTagRegexSelector(Pattern.compile("smoke"));
 
-        assertThat(selector.matchesTag("smoke-test")).isTrue();
+        assertThat(selector.matchesTag("smoke")).isTrue();
     }
 
     @Test

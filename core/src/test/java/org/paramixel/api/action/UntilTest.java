@@ -160,6 +160,40 @@ class UntilTest {
     }
 
     @Test
+    @DisplayName("predicate InternalError propagates")
+    void predicateInternalErrorPropagates() {
+        var error = new InternalError("fatal predicate");
+        var action = Until.builder("pred-internal-error")
+                .body(Step.of("step", context -> {}))
+                .until(context -> {
+                    throw error;
+                })
+                .maxIterations(1)
+                .build();
+
+        assertThatThrownBy(() -> Runner.builder().build().run(action)).isSameAs(error);
+    }
+
+    @Test
+    @DisplayName("predicate recoverable exception returns false")
+    void predicateRecoverableExceptionReturnsFalse() {
+        var counter = new AtomicInteger();
+        var action = Until.builder("pred-recoverable")
+                .body(Step.of("step", context -> counter.incrementAndGet()))
+                .until(context -> {
+                    throw new RuntimeException("recoverable predicate");
+                })
+                .maxIterations(2)
+                .build();
+
+        var result = Runner.builder().build().run(action);
+        var root = result.descriptor().orElseThrow();
+
+        assertThat(root.isFailed()).isTrue();
+        assertThat(counter.get()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("abort stops loop")
     void abortStopsLoop() {
         var counter = new AtomicInteger();

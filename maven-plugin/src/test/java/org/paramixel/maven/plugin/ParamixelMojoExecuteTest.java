@@ -404,7 +404,7 @@ class ParamixelMojoExecuteTest {
                         .hasCauseInstanceOf(MojoExecutionException.class);
             } finally {
                 dummyThread.interrupt();
-                dummyThread.join(5000);
+                dummyThread.join(5_000);
                 testCl.close();
             }
         }
@@ -443,7 +443,7 @@ class ParamixelMojoExecuteTest {
                 assertThatCode(() -> warnMethod.invoke(mojo, baseline)).doesNotThrowAnyException();
             } finally {
                 dummyThread.interrupt();
-                dummyThread.join(5000);
+                dummyThread.join(5_000);
                 testCl.close();
             }
         }

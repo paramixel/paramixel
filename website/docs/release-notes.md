@@ -11,6 +11,15 @@ description: Current documentation-facing release notes.
   the skip-status message now includes the conditional's display name. Use a
   descriptive display name instead of a separate reason message.
 
+## 6.2.1
+
+- **Bug fix: regex selector matching** — `Selector.packageRegex()`, `Selector.classRegex()`, `Selector.tagRegex()`,
+  and the `paramixel.match.*.regex` configuration keys incorrectly used `Pattern.find()` (substring match) instead of
+  `Pattern.matches()` (full-string match). The `match` in the configuration key names specifies the intended contract;
+  the implementation did not honor it. This is now fixed. Patterns that previously relied on the incorrect substring
+  behavior must be updated with wildcards (e.g., `.*smoke.*`). See
+  [Migration 6.2.x to 6.2.1](./guides/migration-6.2-to-6.2.1) for details.
+
 ## 6.0.0 documentation baseline
 
 These docs reflect the current source tree:

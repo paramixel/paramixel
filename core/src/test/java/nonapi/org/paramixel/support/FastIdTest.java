@@ -31,7 +31,7 @@ class FastIdTest {
     @DisplayName("generated IDs are unique")
     void generatedIdsAreUnique() {
         Set<String> ids = new HashSet<>();
-        int count = 100000;
+        int count = 100_000;
 
         for (int i = 0; i < count; i++) {
             var id = FastId.generateId();
@@ -45,7 +45,7 @@ class FastIdTest {
         String[] forbidden = {
             "stag", "succ", "fail", "skip", "STAG", "SUCC", "FAIL", "SKIP", "Stag", "Succ", "Fail", "Skip"
         };
-        int count = 100000;
+        int count = 100_000;
 
         for (int i = 0; i < count; i++) {
             var id = FastId.generateId();
@@ -65,7 +65,7 @@ class FastIdTest {
     @Test
     @DisplayName("consecutive IDs are not sequential")
     void consecutiveIdsAreNotSequence() {
-        int count = 1000;
+        int count = 1_000;
         String[] ids = new String[count];
         for (int i = 0; i < count; i++) {
             ids[i] = FastId.generateId();
@@ -101,7 +101,7 @@ class FastIdTest {
         long prevVal = decode(prev);
         long nextVal = decode(next);
         long diff = nextVal - prevVal;
-        return diff == 1 || diff == -7311615L;
+        return diff == 1 || diff == -7_311_615L;
     }
 
     private static long decode(final String id) {

@@ -23,7 +23,7 @@ import org.paramixel.api.selector.ClassRegexSelector;
 /**
  * Concrete implementation of {@link ClassRegexSelector}.
  *
- * <p>Matches fully qualified class names using {@link Pattern#matcher(CharSequence)} {@code .find()} semantics.
+ * <p>Matches fully qualified class names using {@link Pattern#matcher(CharSequence)} {@code .matches()} semantics.
  * Package name and tag matching always return {@code true}.
  */
 public final class ConcreteClassRegexSelector implements ClassRegexSelector {
@@ -47,7 +47,7 @@ public final class ConcreteClassRegexSelector implements ClassRegexSelector {
     @Override
     public boolean matchesClass(final String className) {
         Objects.requireNonNull(className, "className is null");
-        return pattern.matcher(className).find();
+        return pattern.matcher(className).matches();
     }
 
     @Override

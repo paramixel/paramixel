@@ -138,7 +138,7 @@ public interface Configuration {
     /**
      * Configuration key for the package-name regular expression used to filter discovered action factories.
      *
-     * <p>The value is interpreted as a Java regular expression and matched with {@code find()} semantics
+     * <p>The value is interpreted as a Java regular expression and matched with {@code matches()} semantics
      * against candidate package names.
      */
     String MATCH_PACKAGE_REGEX = "paramixel.match.package.regex";
@@ -146,7 +146,7 @@ public interface Configuration {
     /**
      * Configuration key for the fully qualified class-name regular expression used to filter discovered action factories.
      *
-     * <p>The value is interpreted as a Java regular expression and matched with {@code find()} semantics
+     * <p>The value is interpreted as a Java regular expression and matched with {@code matches()} semantics
      * against candidate fully qualified class names.
      */
     String MATCH_CLASS_REGEX = "paramixel.match.class.regex";
@@ -154,7 +154,7 @@ public interface Configuration {
     /**
      * Configuration key for the tag regular expression used to filter discovered action factories.
      *
-     * <p>The value is interpreted as a Java regular expression and matched with {@code find()} semantics
+     * <p>The value is interpreted as a Java regular expression and matched with {@code matches()} semantics
      * against each declared {@link Paramixel.Tag} value.
      */
     String MATCH_TAG_REGEX = "paramixel.match.tag.regex";

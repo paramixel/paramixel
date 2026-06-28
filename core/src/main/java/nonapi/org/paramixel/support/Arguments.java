@@ -103,6 +103,21 @@ public class Arguments {
     }
 
     /**
+     * Returns the supplied long when it is positive.
+     *
+     * @param value the value to validate
+     * @param message the exception message to use when validation fails
+     * @return {@code value}
+     * @throws IllegalArgumentException if {@code value} is not positive
+     */
+    public static long requirePositive(final long value, final String message) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(message);
+        }
+        return value;
+    }
+
+    /**
      * Returns the supplied long when it is non-negative.
      *
      * @param value the value to validate

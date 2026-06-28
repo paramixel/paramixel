@@ -33,7 +33,7 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("class filter resolves included fixture and excludes non-matching")
     void classFilterResolvesIncludedFixtureAndExcludesNonMatching() {
-        var selector = Selector.and(Selector.classRegex("IncludedSmokeFixture$"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classRegex(".*IncludedSmokeFixture$"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -56,7 +56,7 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("tag filter excludes non-matching fixture")
     void tagFilterExcludesNonMatchingFixture() {
-        var selector = Selector.and(Selector.classRegex("ExcludedByTagFilter"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classRegex(".*ExcludedByTagFilter.*"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -67,7 +67,7 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("tag filter includes matching fixture")
     void tagFilterIncludesMatchingFixture() {
-        var selector = Selector.and(Selector.classRegex("IncludedSmokeFixture"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.and(Selector.classRegex(".*IncludedSmokeFixture.*"), Selector.tagRegex("^smoke$"));
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -78,7 +78,7 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("disabled-only fixture is not resolved")
     void disabledOnlyFixtureIsNotResolved() {
-        var selector = Selector.classRegex("DisabledOnlyFixture");
+        var selector = Selector.classRegex(".*DisabledOnlyFixture.*");
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();

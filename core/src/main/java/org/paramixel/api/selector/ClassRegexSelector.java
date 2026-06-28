@@ -19,7 +19,7 @@ package org.paramixel.api.selector;
 /**
  * A {@link RegexSelector} that filters discovery candidates by fully qualified class name.
  *
- * <p>{@link #matchesClass(String)} applies the regex pattern using {@code find()} semantics.
+ * <p>{@link #matchesClass(String)} applies the regex pattern using {@code matches()} semantics.
  * {@link #matchesPackage(String)} and {@link #matchesTag(String)} return {@code true} because
  * a class-only selector does not constrain package names or tags.
  *

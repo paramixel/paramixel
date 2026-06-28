@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Timeout;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Scheduler close behavior")
@@ -282,7 +283,7 @@ class SchedulerCloseBehaviorTest {
             for (var i = 0; i < parallelism; i++) {
                 var leaf = newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {
                     leafRunning.countDown();
-                    sleep(2000);
+                    sleep(2_000);
                 }));
                 scheduler.schedule(leaf, ExecutionMode.RUN, context);
             }
@@ -320,6 +321,281 @@ class SchedulerCloseBehaviorTest {
                     .isLessThanOrEqualTo(parallelism);
         } finally {
             scheduler.close();
+        }
+    }
+
+    // ================================================================
+    // Issue #6: Work-stealing during close permit window
+    // ================================================================
+
+    @Nested
+    @DisplayName("close() during managedJoin work-stealing")
+    class CloseDuringWorkStealing {
+
+        @Test
+        @Timeout(60)
+        @DisplayName("external-thread managedJoin: leaf permit invariant holds after close "
+                + "with queued children stolen during shutdown")
+        void externalThreadManagedJoinPermitInvariantAfterClose() throws Exception {
+            var parallelism = 2;
+            // close() blocks on awaitTermination(5s) while slow leaves hold
+            // executor threads, so each trial takes ~5s. Keep trial count low.
+            for (var trial = 0; trial < 5; trial++) {
+                var scheduler = new Scheduler(parallelism);
+                try {
+                    var leafStarted = new CountDownLatch(parallelism);
+                    var leafBlocked = new CountDownLatch(1);
+
+                    // Create a Parallel whose children saturate the executor. Two children
+                    // are slow (hold permits), additional children queue behind them so
+                    // the coordinator in managedJoin has tasks to work-steal.
+                    var totalChildren = 6;
+                    var builder = Parallel.builder("parent").parallelism(parallelism);
+                    for (var i = 0; i < totalChildren; i++) {
+                        final int idx = i;
+                        builder = builder.child(Step.of("leaf-" + i, ctx -> {
+                            if (idx < parallelism) {
+                                leafStarted.countDown();
+                                await(leafBlocked);
+                            }
+                            // Remaining children are no-ops; they queue behind the
+                            // slow children and become work-steal candidates.
+                        }));
+                    }
+                    var parallelAction = builder.build();
+
+                    var root = new DescriptorBuilder().discover(parallelAction);
+                    var context = new ConcreteContext(
+                            Configuration.defaultConfiguration(),
+                            Listener.defaultListener(),
+                            root,
+                            scheduler,
+                            new InstanceHolder());
+
+                    // Execute on an external thread so managedJoin work-stealing
+                    // happens outside the executor pool. awaitTermination in close()
+                    // does not wait for this thread, creating the exact window of
+                    // concern.
+                    var execThread = new Thread(() -> {
+                        scheduler.executeDescriptor((MutableDescriptor) root, context, ExecutionMode.RUN);
+                    });
+                    execThread.start();
+
+                    // Wait for the slow leaves to start (they hold permits).
+                    leafStarted.await(5, TimeUnit.SECONDS);
+
+                    // close() on the test thread:
+                    //   - acquires closingLock (blocks schedule())
+                    //   - releases parallelism permits
+                    //   - shuts down executor
+                    //   - awaits executor thread termination
+                    //   - drains permits
+                    // The external thread's managedJoin continues work-stealing
+                    // throughout, including during the release->drain window.
+                    scheduler.close();
+
+                    // Release slow leaves so the external thread's managedJoin
+                    // observes their completion and returns.
+                    leafBlocked.countDown();
+                    execThread.join(10_000);
+
+                    var leafPermits = getLeafPermits(scheduler);
+                    assertThat(leafPermits.availablePermits())
+                            .as("trial " + trial + ": available permits must not exceed parallelism")
+                            .isLessThanOrEqualTo(parallelism);
+                } finally {
+                    scheduler.close();
+                }
+            }
+        }
+
+        @Test
+        @Timeout(20)
+        @DisplayName("external-thread managedJoin: close returns promptly even " + "when work-stealing is active")
+        void externalThreadManagedJoinCloseReturnsPromptly() throws Exception {
+            var parallelism = 2;
+            var scheduler = new Scheduler(parallelism);
+            try {
+                var leafStarted = new CountDownLatch(parallelism);
+                var leafBlocked = new CountDownLatch(1);
+
+                var builder = Parallel.builder("parent").parallelism(parallelism);
+                for (var i = 0; i < 4; i++) {
+                    final int idx = i;
+                    builder = builder.child(Step.of("leaf-" + i, ctx -> {
+                        if (idx < parallelism) {
+                            leafStarted.countDown();
+                            await(leafBlocked);
+                        }
+                    }));
+                }
+                var parallelAction = builder.build();
+                var root = new DescriptorBuilder().discover(parallelAction);
+                var context = new ConcreteContext(
+                        Configuration.defaultConfiguration(),
+                        Listener.defaultListener(),
+                        root,
+                        scheduler,
+                        new InstanceHolder());
+
+                var execThread = new Thread(() -> {
+                    scheduler.executeDescriptor((MutableDescriptor) root, context, ExecutionMode.RUN);
+                });
+                execThread.start();
+                leafStarted.await(5, TimeUnit.SECONDS);
+
+                var closeStart = System.nanoTime();
+                scheduler.close();
+                var closeElapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - closeStart);
+
+                leafBlocked.countDown();
+                execThread.join(10_000);
+
+                // close() blocks only on executor thread termination (awaitTermination),
+                // not on the external managedJoin thread. The slow leaves hold executor
+                // threads until leafBlocked is released, so close() takes one graceful
+                // timeout period (~5s) plus shutdownNow escalation.
+                assertThat(closeElapsed)
+                        .as("close() should return within two graceful periods even with external "
+                                + "work-stealing active")
+                        .isLessThan(10_000L);
+            } finally {
+                scheduler.close();
+            }
+        }
+
+        @Test
+        @Timeout(60)
+        @DisplayName("executor-thread managedJoin: stress test permit invariant after " + "overlapped schedule + close")
+        void executorThreadManagedJoinStressTest() throws Exception {
+            for (var parallelism : new int[] {1, 2, 4}) {
+                for (var trial = 0; trial < 50; trial++) {
+                    var scheduler = new Scheduler(parallelism);
+                    try {
+                        var leafStarted = new CountDownLatch(parallelism);
+                        var leafRelease = new CountDownLatch(1);
+
+                        // Build a Parallel with 3x parallelism children: the first
+                        // <parallelism> are slow (hold all permits), the rest queue
+                        // and become work-steal candidates while the coordinator
+                        // is in managedJoin.
+                        var totalChildren = parallelism * 3;
+                        var builder = Parallel.builder("parent").parallelism(parallelism);
+                        for (var i = 0; i < totalChildren; i++) {
+                            final int idx = i;
+                            builder = builder.child(Step.of("leaf-" + i, ctx -> {
+                                if (idx < parallelism) {
+                                    leafStarted.countDown();
+                                    await(leafRelease);
+                                }
+                            }));
+                        }
+                        var parallelAction = builder.build();
+                        var root = new DescriptorBuilder().discover(parallelAction);
+                        var context = new ConcreteContext(
+                                Configuration.defaultConfiguration(),
+                                Listener.defaultListener(),
+                                root,
+                                scheduler,
+                                new InstanceHolder());
+
+                        // Submit to the executor so managedJoin runs on an
+                        // executor thread.
+                        var future = scheduler.schedule((MutableDescriptor) root, ExecutionMode.RUN, context);
+                        leafStarted.await(5, TimeUnit.SECONDS);
+
+                        // Close on a separate thread while the coordinator is
+                        // in managedJoin work-stealing.
+                        var closeThread = new Thread(() -> scheduler.close());
+                        closeThread.start();
+
+                        // Give close() time to acquire closingLock and enter
+                        // shutdown before releasing leaves.
+                        Thread.sleep(50);
+                        leafRelease.countDown();
+
+                        closeThread.join(15_000);
+                        // The parallel may return FAILED when children are rejected
+                        // because closing=true. The leaf permit invariant is the
+                        // relevant assertion.
+                        try {
+                            future.join();
+                        } catch (Exception ignored) {
+                            // Expected: children rejected because closing=true
+                        }
+
+                        var leafPermits = getLeafPermits(scheduler);
+                        assertThat(leafPermits.availablePermits())
+                                .as("p=" + parallelism + " trial=" + trial + ": permits must not exceed parallelism")
+                                .isLessThanOrEqualTo(parallelism);
+                    } finally {
+                        scheduler.close();
+                    }
+                }
+            }
+        }
+
+        @Test
+        @Timeout(30)
+        @DisplayName("shutdownNow escalation: permit invariant holds when "
+                + "awaitTermination times out during work-stealing")
+        void shutdownNowDuringWorkStealingPermitInvariantHolds() throws Exception {
+            var parallelism = 2;
+            var scheduler = new Scheduler(parallelism);
+            try {
+                // A leaf that ignores interrupts, holding a permit beyond the
+                // graceful timeout so shutdownNow escalates.
+                var stuckLeaf = Step.of("stuck-leaf", ctx -> {
+                    while (true) {
+                        try {
+                            Thread.sleep(1_000);
+                        } catch (InterruptedException e) {
+                            // Intentionally suppress: simulate a leaf that
+                            // ignores the interrupt, forcing shutdownNow
+                            // escalation to time out.
+                        }
+                    }
+                });
+
+                // Additional leaves that queue behind the stuck leaf.
+                var builder = Parallel.builder("parent")
+                        .parallelism(parallelism)
+                        .child(stuckLeaf)
+                        .child(Step.of("leaf-1", ctx -> {}))
+                        .child(Step.of("leaf-2", ctx -> {}));
+                var parallelAction = builder.build();
+                var root = new DescriptorBuilder().discover(parallelAction);
+                var context = new ConcreteContext(
+                        Configuration.defaultConfiguration(),
+                        Listener.defaultListener(),
+                        root,
+                        scheduler,
+                        new InstanceHolder());
+
+                // Submit to executor - coordinator enters managedJoin.
+                scheduler.schedule((MutableDescriptor) root, ExecutionMode.RUN, context);
+
+                // Give the stuck leaf time to acquire its permit.
+                Thread.sleep(200);
+
+                var closeStart = System.nanoTime();
+                scheduler.close();
+                var closeElapsed = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - closeStart);
+
+                // With a 5s graceful timeout and a stuck leaf, close()
+                // escalates to shutdownNow which also times out (5s).
+                // Total ~10s + overhead.
+                assertThat(closeElapsed)
+                        .as("close() should return after shutdownNow escalation")
+                        .isLessThanOrEqualTo(20L);
+
+                var leafPermits = getLeafPermits(scheduler);
+                assertThat(leafPermits.availablePermits())
+                        .as("permits must not exceed parallelism after " + "shutdownNow escalation")
+                        .isLessThanOrEqualTo(parallelism);
+            } finally {
+                scheduler.close();
+            }
         }
     }
 
@@ -492,6 +768,14 @@ class SchedulerCloseBehaviorTest {
     private static void closeQuietly(final Scheduler scheduler) {
         if (scheduler != null) {
             scheduler.close();
+        }
+    }
+
+    private static void await(final CountDownLatch latch) {
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

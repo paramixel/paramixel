@@ -206,4 +206,70 @@ class StatusListenerPathTest {
         var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("ms");
     }
+
+    @Test
+    @DisplayName("display name with ANSI sequences is sanitized in status output")
+    void displayNameWithAnsiSequencesIsSanitized() {
+        var listener = new StatusListener();
+        var action = Step.of("\u001B[31mred-name\u001B[0m", context -> {});
+        var runner = Runner.builder().listener(listener).build();
+
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            runner.run(action);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        var result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result).contains("red-name");
+        assertThat(result).doesNotContain("\u001B");
+    }
+
+    @Test
+    @DisplayName("display name with null bytes is sanitized in status output")
+    void displayNameWithNullBytesIsSanitized() {
+        var listener = new StatusListener();
+        var action = Step.of("test\u0000name", context -> {});
+        var runner = Runner.builder().listener(listener).build();
+
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            runner.run(action);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        var result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result).contains("testname");
+        assertThat(result).doesNotContain("\u0000");
+    }
+
+    @Test
+    @DisplayName("nested display names with control characters are sanitized in path")
+    void nestedDisplayNamesWithControlCharsAreSanitizedInPath() {
+        var listener = new StatusListener();
+        var child = Step.of("\u0007leaf\u001B[0m", context -> {});
+        var parent = Sequence.builder("\u001B[1mtop\u0000").child(child).build();
+        var runner = Runner.builder().listener(listener).build();
+
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            runner.run(parent);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        var result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result).contains("top / leaf");
+        assertThat(result).doesNotContain("\u001B");
+        assertThat(result).doesNotContain("\u0000");
+        assertThat(result).doesNotContain("\u0007");
+    }
 }

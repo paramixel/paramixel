@@ -21,8 +21,8 @@ import java.util.regex.Pattern;
 /**
  * A {@link Selector} that matches discovery candidates using a compiled regular-expression {@link Pattern}.
  *
- * <p>Regex selectors use {@link Pattern#matcher(CharSequence)} {@code .find()} semantics. For exact matches,
- * callers should provide anchored regular expressions such as {@code ^smoke$}.
+ * <p>Regex selectors use {@link Pattern#matcher(CharSequence)} {@code .matches()} semantics. The regex must
+ * match the entire candidate string. To match substrings, use wildcards such as {@code .*smoke.*}.
  *
  * @see PackageRegexSelector
  * @see ClassRegexSelector

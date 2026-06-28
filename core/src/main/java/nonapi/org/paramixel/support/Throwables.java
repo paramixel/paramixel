@@ -29,10 +29,12 @@ import java.util.concurrent.CompletionException;
  * <ul>
  * <li>{@link CompletionException} is recursively unwrapped when it carries a
  *     non-null cause.
- * <li>{@link RuntimeException} is unwrapped when its cause is an unrecoverable {@link Error},
- *     an {@link Error} subclass (other than {@link StackOverflowError}, which is recoverable),
- *     or an {@link InterruptedException}. This preserves the interrupt semantics of cancellation
- *     paths while avoiding false peels of ordinary user-thrown runtime exceptions.
+ * <li>{@link RuntimeException} is unwrapped when its cause is an unrecoverable {@link Error}
+ *     (a non-{@link StackOverflowError} {@link VirtualMachineError}) or an
+ *     {@link InterruptedException}. Recoverable errors — including {@link StackOverflowError},
+ *     {@link AssertionError}, {@link LinkageError}, and custom {@link Error} subclasses —
+ *     are not peeled. This preserves the interrupt semantics of cancellation paths while
+ *     avoiding false peels of recoverable errors and ordinary user-thrown runtime exceptions.
  * </ul>
  */
 public final class Throwables {
@@ -54,9 +56,7 @@ public final class Throwables {
         }
         if (throwable instanceof RuntimeException rt && rt.getCause() != null) {
             var cause = rt.getCause();
-            if (UnrecoverableErrors.isUnrecoverable(cause)
-                    || cause instanceof Error
-                    || cause instanceof InterruptedException) {
+            if (UnrecoverableErrors.isUnrecoverable(cause) || cause instanceof InterruptedException) {
                 return cause;
             }
         }

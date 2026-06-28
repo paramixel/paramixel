@@ -18,8 +18,12 @@ package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Descriptor;
+import org.paramixel.api.Listener;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Step;
 
@@ -41,6 +45,30 @@ class ConcreteRunnerExceptionHandlingTest {
             assertThat(throwable).isInstanceOf(IllegalArgumentException.class);
             assertThat(throwable.getMessage()).contains("queueCapacity must be positive");
         });
+    }
+
+    @Test
+    @DisplayName("onDiscoveryCompleted called exactly once when Scheduler constructor throws")
+    void onDiscoveryCompletedCalledOnceWhenSchedulerThrows() throws Exception {
+        var discoveryCount = new AtomicInteger();
+        var lastRootWasNull = new AtomicBoolean();
+
+        var listener = new Listener() {
+            @Override
+            public void onDiscoveryCompleted(Descriptor root) {
+                discoveryCount.incrementAndGet();
+                lastRootWasNull.set(root == null);
+            }
+        };
+
+        var runner = (ConcreteRunner) Runner.builder().listener(listener).build();
+        setIntField(runner, "schedulerQueueCapacity", 0);
+
+        var result = runner.run(Step.of("test", ctx -> {}));
+
+        assertThat(discoveryCount.get()).isEqualTo(1);
+        assertThat(lastRootWasNull.get()).isFalse();
+        assertThat(result.isFailed()).isTrue();
     }
 
     private static void setIntField(final Object target, final String fieldName, final int value) throws Exception {

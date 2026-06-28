@@ -26,8 +26,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Assert;
 import org.paramixel.api.action.Delay;
+import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 @DisplayName("MutableDescriptor")
@@ -227,6 +229,27 @@ class MutableDescriptorTest {
         @DisplayName("returns true when wrapping a Sequence action")
         void returnsTrueWhenWrappingSequence() {
             var descriptor = new ConcreteDescriptor(Sequence.builder("sequence").build());
+
+            assertThat(descriptor.isCoordinationAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true when wrapping a Sequential action")
+        @SuppressWarnings("removal")
+        void returnsTrueWhenWrappingSequential() {
+            var descriptor =
+                    new ConcreteDescriptor(Sequential.builder("sequential").build());
+
+            assertThat(descriptor.isCoordinationAction()).isTrue();
+        }
+
+        @Test
+        @DisplayName("returns true when wrapping an Isolated action")
+        @SuppressWarnings("removal")
+        void returnsTrueWhenWrappingIsolated() {
+            var descriptor = new ConcreteDescriptor(Isolated.builder("isolated", "lock")
+                    .body(Step.of("body", v -> {}))
+                    .build());
 
             assertThat(descriptor.isCoordinationAction()).isTrue();
         }

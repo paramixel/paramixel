@@ -43,7 +43,8 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("applies selector tag filter via matchesTag")
     void appliesTagFiltersWithAndSemantics() {
-        var selector = Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke"));
+        var selector =
+                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke-fast"));
 
         var result = Runner.builder().build().run(selector);
 

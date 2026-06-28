@@ -24,14 +24,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
+import org.paramixel.api.selector.Selector;
 
 @DisplayName("ConcreteRunner no-tests listener lifecycle")
 class ConcreteRunnerNoTestsListenerTest {
 
     @Test
-    @DisplayName("initialize is called exactly once before onRunStarted and onRunCompleted in no-tests path")
+    @DisplayName("run() no-tests path fires full listener lifecycle")
     void initializeCalledInNoTestsPath() {
         var initializeCalls = new AtomicInteger(0);
         var callOrder = new ArrayList<String>();
@@ -49,6 +51,16 @@ class ConcreteRunnerNoTestsListenerTest {
             }
 
             @Override
+            public void onDiscoveryStarted() {
+                callOrder.add("onDiscoveryStarted");
+            }
+
+            @Override
+            public void onDiscoveryCompleted(final Descriptor root) {
+                callOrder.add("onDiscoveryCompleted");
+            }
+
+            @Override
             public void onRunCompleted(final Result result) {
                 callOrder.add("onRunCompleted");
             }
@@ -60,6 +72,100 @@ class ConcreteRunnerNoTestsListenerTest {
         runner.run();
 
         assertThat(initializeCalls.get()).isEqualTo(1);
-        assertThat(callOrder).containsExactly("initialize", "onRunStarted", "onRunCompleted");
+        assertThat(callOrder)
+                .containsExactly(
+                        "initialize", "onRunStarted", "onDiscoveryStarted", "onDiscoveryCompleted", "onRunCompleted");
+    }
+
+    @Test
+    @DisplayName("run(Selector) no-tests path fires full listener lifecycle")
+    void runSelectorNoTestsCallsAllCallbacks() {
+        var initializeCalls = new AtomicInteger(0);
+        var callOrder = new ArrayList<String>();
+
+        var listener = new Listener() {
+            @Override
+            public void initialize(final Configuration configuration) {
+                initializeCalls.incrementAndGet();
+                callOrder.add("initialize");
+            }
+
+            @Override
+            public void onRunStarted() {
+                callOrder.add("onRunStarted");
+            }
+
+            @Override
+            public void onDiscoveryStarted() {
+                callOrder.add("onDiscoveryStarted");
+            }
+
+            @Override
+            public void onDiscoveryCompleted(final Descriptor root) {
+                callOrder.add("onDiscoveryCompleted");
+            }
+
+            @Override
+            public void onRunCompleted(final Result result) {
+                callOrder.add("onRunCompleted");
+            }
+        };
+
+        var selector = Selector.classRegex("NonExistentClassXyz123");
+        var runner = new ConcreteRunner(Configuration.defaultConfiguration(), listener);
+
+        var result = runner.run(selector);
+
+        assertThat(initializeCalls.get()).isEqualTo(1);
+        assertThat(callOrder)
+                .containsExactly(
+                        "initialize", "onRunStarted", "onDiscoveryStarted", "onDiscoveryCompleted", "onRunCompleted");
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("runAndReturnExitCode(Selector) no-tests path fires full listener lifecycle")
+    void runAndReturnExitCodeSelectorNoTestsCallsAllCallbacks() {
+        var initializeCalls = new AtomicInteger(0);
+        var callOrder = new ArrayList<String>();
+
+        var listener = new Listener() {
+            @Override
+            public void initialize(final Configuration configuration) {
+                initializeCalls.incrementAndGet();
+                callOrder.add("initialize");
+            }
+
+            @Override
+            public void onRunStarted() {
+                callOrder.add("onRunStarted");
+            }
+
+            @Override
+            public void onDiscoveryStarted() {
+                callOrder.add("onDiscoveryStarted");
+            }
+
+            @Override
+            public void onDiscoveryCompleted(final Descriptor root) {
+                callOrder.add("onDiscoveryCompleted");
+            }
+
+            @Override
+            public void onRunCompleted(final Result result) {
+                callOrder.add("onRunCompleted");
+            }
+        };
+
+        var selector = Selector.classRegex("NonExistentClassXyz123");
+        var runner = new ConcreteRunner(Configuration.defaultConfiguration(), listener);
+
+        int exitCode = runner.runAndReturnExitCode(selector);
+
+        assertThat(initializeCalls.get()).isEqualTo(1);
+        assertThat(callOrder)
+                .containsExactly(
+                        "initialize", "onRunStarted", "onDiscoveryStarted", "onDiscoveryCompleted", "onRunCompleted");
+        assertThat(exitCode).isZero();
     }
 }

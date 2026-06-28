@@ -136,7 +136,7 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
     private void renderNodeLine(final RenderFrame frame, final StringBuilder stringBuilder) {
         var descriptor = frame.descriptor();
         var status = formatStatus(descriptor);
-        var actionName = descriptor.action().displayName();
+        var actionName = Listeners.sanitizeMessage(descriptor.action().displayName());
         var timing = formatTiming(Listeners.elapsedMillis(descriptor));
         var failureInfo = formatFailureInfo(descriptor);
 
