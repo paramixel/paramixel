@@ -67,6 +67,7 @@ const sidebars = {
         'guides/quick-reference',
         'guides/troubleshooting',
         'guides/examples',
+        'guides/migration-6.2-to-6.2.1',
         'guides/migration-5.1-to-6',
         'guides/migration-5-to-6',
         'guides/migration-4-to-6',
