@@ -58,13 +58,13 @@
         <!-- Dependency versions -->
         <assertj-core.version>3.27.7</assertj-core.version>
         <commons-compress.version>1.28.0</commons-compress.version>
-        <junit.version>6.1.0</junit.version>
-        <kafka-clients.version>4.3.0</kafka-clients.version>
+        <junit.version>6.1.1</junit.version>
+        <kafka-clients.version>4.3.1</kafka-clients.version>
         <maven.version>3.9.16</maven.version>
         <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
         <mongodb-driver-sync.version>5.8.0</mongodb-driver-sync.version>
         <palantir-java-format.version>2.91.0</palantir-java-format.version>
-        <pmd.version>7.25.0</pmd.version>
+        <pmd.version>7.26.0</pmd.version>
         <jmh.version>1.37</jmh.version>
         <slf4j.version>2.0.18</slf4j.version>
         <testcontainers.version>2.0.5</testcontainers.version>
@@ -72,7 +72,7 @@
         <testcontainers-mongodb.version>1.21.4</testcontainers-mongodb.version>
         <testcontainers-nginx.version>1.21.4</testcontainers-nginx.version>
         <!-- Plugin versions -->
-        <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
+        <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
         <flatten-maven-plugin.version>1.7.3</flatten-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
@@ -87,7 +87,7 @@
         <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
-        <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
+        <spotless-maven-plugin.version>3.8.0</spotless-maven-plugin.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     </properties>
 
