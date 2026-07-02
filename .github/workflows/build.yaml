@@ -30,7 +30,7 @@ jobs:
           distribution: corretto
 
       - name: Cache Maven local repository
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository
           key: maven-local-repo-${{ runner.os }}-java17-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-17.txt') }}
@@ -85,7 +85,7 @@ jobs:
           distribution: corretto
 
       - name: Cache Maven local repository
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository
           key: maven-local-repo-${{ runner.os }}-java21-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-21.txt') }}
@@ -140,7 +140,7 @@ jobs:
           distribution: corretto
 
       - name: Cache Maven local repository
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository
           key: maven-local-repo-${{ runner.os }}-java25-${{ hashFiles('**/pom.xml', '.github/cache/maven-java-25.txt') }}
