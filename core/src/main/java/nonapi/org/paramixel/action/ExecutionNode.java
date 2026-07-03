@@ -62,9 +62,13 @@ public final class ExecutionNode {
      */
     public static final int PHASE_COMPLETE = 3;
 
-    /** The descriptor being executed. */
+    /**
+     * The descriptor being executed.
+     */
     public final MutableDescriptor descriptor;
-    /** The scheduler executing this node. */
+    /**
+     * The scheduler executing this node.
+     */
     public final Scheduler scheduler;
 
     /**

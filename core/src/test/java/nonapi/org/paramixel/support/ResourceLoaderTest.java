@@ -28,7 +28,7 @@ class ResourceLoaderTest {
     @Test
     @DisplayName("finds existing resource")
     void findsExistingResource() {
-        var stream = ResourceLoader.getResourceAsStream("version.properties");
+        var stream = ResourceLoader.getResourceAsStream("core-version.properties");
         assertThat(stream).isNotNull();
     }
 
@@ -38,7 +38,7 @@ class ResourceLoaderTest {
         var original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(null);
-            var stream = ResourceLoader.getResourceAsStream("version.properties");
+            var stream = ResourceLoader.getResourceAsStream("core-version.properties");
             assertThat(stream).isNotNull();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -51,7 +51,7 @@ class ResourceLoaderTest {
         var original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(new ClassLoader(null) {});
-            var stream = ResourceLoader.getResourceAsStream("version.properties");
+            var stream = ResourceLoader.getResourceAsStream("core-version.properties");
             assertThat(stream).isNotNull();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
@@ -73,7 +73,7 @@ class ResourceLoaderTest {
         @DisplayName("finds resource through provided class loader")
         void findsResourceThroughProvidedClassLoader() {
             var classLoader = getClass().getClassLoader();
-            var stream = ResourceLoader.getResourceAsStream("version.properties", classLoader);
+            var stream = ResourceLoader.getResourceAsStream("core-version.properties", classLoader);
             assertThat(stream).isNotNull();
         }
 
@@ -81,7 +81,7 @@ class ResourceLoaderTest {
         @DisplayName("falls back to defining class loader when provided class loader cannot find resource")
         void fallsBackWhenProvidedClassLoaderCannotFindResource() {
             var emptyLoader = new ClassLoader(null) {};
-            var stream = ResourceLoader.getResourceAsStream("version.properties", emptyLoader);
+            var stream = ResourceLoader.getResourceAsStream("core-version.properties", emptyLoader);
             assertThat(stream).isNotNull();
         }
 
@@ -96,7 +96,7 @@ class ResourceLoaderTest {
         @Test
         @DisplayName("works with null class loader via defining/system fallback")
         void worksWithNullClassLoader() {
-            var stream = ResourceLoader.getResourceAsStream("version.properties", (ClassLoader) null);
+            var stream = ResourceLoader.getResourceAsStream("core-version.properties", (ClassLoader) null);
             assertThat(stream).isNotNull();
         }
     }

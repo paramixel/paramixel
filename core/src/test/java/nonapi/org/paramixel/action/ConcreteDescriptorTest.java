@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
+import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Step;
 
 @DisplayName("ConcreteDescriptor")
@@ -58,6 +59,27 @@ class ConcreteDescriptorTest {
             assertThatThrownBy(() -> descriptor.setStatus(Status.RUNNING))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("Descriptor must transition from RUNNING to terminal status");
+        }
+    }
+
+    @Nested
+    @DisplayName("abort")
+    class Abort {
+
+        @Test
+        @DisplayName("handles cause with null message")
+        void handlesNullCauseMessage() {
+            var root = new ConcreteDescriptor(Parallel.builder("root").build());
+            var child = new ConcreteDescriptor(Step.of("child", context -> {}));
+            root.addChild(child);
+            root.freeze();
+
+            root.abort(Status.ABORTED, new AssertionError());
+
+            var childStatus = child.status();
+            assertThat(childStatus.isAborted()).isTrue();
+            assertThat(childStatus.message()).isPresent();
+            assertThat(childStatus.message().orElseThrow()).doesNotContain("null");
         }
     }
 

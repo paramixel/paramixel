@@ -1,3 +1,11 @@
+Paramixel Core
+Copyright (c) 2026-present Douglas Hoard
+
+Licensed under the Apache License, Version 2.0 (the "License");
+see META-INF/LICENSE for the full license text.
+
+This JAR embeds relocated source code from the following third-party project.
+
 This product includes source code from ClassGraph
 (https://github.com/classgraph/classgraph), version 4.8.184.
 

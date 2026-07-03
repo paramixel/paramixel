@@ -44,9 +44,11 @@ import org.paramixel.api.action.Step;
  */
 public final class AnnotationResolver<T> {
 
-    private static final LRUCache<Class<?>, Map<String, Method>> CACHE = new LRUCache<>(100, 60_000);
+    private static final Object CACHE_LOCK = new Object();
 
-    private static final LRUCache<Class<?>, Map<String, Method>> STATIC_CACHE = new LRUCache<>(100, 60_000);
+    private static volatile LRUCache<Class<?>, Map<String, Method>> CACHE;
+
+    private static volatile LRUCache<Class<?>, Map<String, Method>> STATIC_CACHE;
 
     private final Class<T> type;
 
@@ -84,10 +86,11 @@ public final class AnnotationResolver<T> {
         Objects.requireNonNull(id, "id is null");
         Arguments.requireNonBlank(id, "id is blank");
 
-        var methods = CACHE.get(type);
+        var cache = instanceCache();
+        var methods = cache.get(type);
         if (methods == null) {
             methods = discover(type);
-            CACHE.put(type, methods);
+            cache.put(type, methods);
         }
         var method = methods.get(id);
         if (method == null) {
@@ -116,10 +119,11 @@ public final class AnnotationResolver<T> {
         Objects.requireNonNull(id, "id is null");
         Arguments.requireNonBlank(id, "id is blank");
 
-        var methods = STATIC_CACHE.get(type);
+        var cache = staticCache();
+        var methods = cache.get(type);
         if (methods == null) {
             methods = discoverStatic(type);
-            STATIC_CACHE.put(type, methods);
+            cache.put(type, methods);
         }
         var method = methods.get(id);
         if (method == null) {
@@ -138,16 +142,60 @@ public final class AnnotationResolver<T> {
      * @param type the type whose cache entry should be cleared; must not be {@code null}
      */
     public static void clearCache(final Class<?> type) {
-        CACHE.remove(type);
-        STATIC_CACHE.remove(type);
+        var instanceCache = CACHE;
+        if (instanceCache != null) {
+            instanceCache.remove(type);
+        }
+        var staticCache = STATIC_CACHE;
+        if (staticCache != null) {
+            staticCache.remove(type);
+        }
     }
 
     /**
-     * Invalidates all resolver cache entries.
+     * Invalidates all resolver cache entries and releases cache resources.
+     *
+     * <p>The backing {@code LRUCache} instances are closed (reaper threads terminated)
+     * and discarded. Subsequent calls to {@link #byId(String)} or {@link #staticById(String)}
+     * create fresh cache instances lazily.
      */
     public static void clearAllCache() {
-        CACHE.clear();
-        STATIC_CACHE.clear();
+        synchronized (CACHE_LOCK) {
+            if (CACHE != null) {
+                CACHE.close();
+                CACHE = null;
+            }
+            if (STATIC_CACHE != null) {
+                STATIC_CACHE.close();
+                STATIC_CACHE = null;
+            }
+        }
+    }
+
+    private static LRUCache<Class<?>, Map<String, Method>> instanceCache() {
+        var cache = CACHE;
+        if (cache == null) {
+            synchronized (CACHE_LOCK) {
+                cache = CACHE;
+                if (cache == null) {
+                    CACHE = cache = new LRUCache<>(100, 60_000);
+                }
+            }
+        }
+        return cache;
+    }
+
+    private static LRUCache<Class<?>, Map<String, Method>> staticCache() {
+        var cache = STATIC_CACHE;
+        if (cache == null) {
+            synchronized (CACHE_LOCK) {
+                cache = STATIC_CACHE;
+                if (cache == null) {
+                    STATIC_CACHE = cache = new LRUCache<>(100, 60_000);
+                }
+            }
+        }
+        return cache;
     }
 
     private static Map<String, Method> discover(final Class<?> type) {

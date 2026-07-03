@@ -26,6 +26,7 @@ import nonapi.org.paramixel.support.TildePathExpander;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
+import org.paramixel.api.exception.ConfigurationException;
 
 /**
  * Base class for listeners that write an end-of-run report to a file.
@@ -43,7 +44,7 @@ abstract class AbstractReportFileListener implements Listener {
     public void initialize(final Configuration configuration) {
         var file = configuration
                 .getString(Configuration.REPORT_FILE)
-                .orElseThrow(() -> new IllegalStateException("No report file configured"));
+                .orElseThrow(() -> new ConfigurationException("No report file configured"));
         this.reportFile = TildePathExpander.expand(file);
     }
 

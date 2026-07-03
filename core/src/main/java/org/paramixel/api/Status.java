@@ -313,6 +313,7 @@ public final class Status {
      * @throws Error if the throwable is an unrecoverable error
      */
     public static Status fromThrowable(final Throwable throwable) {
+        Objects.requireNonNull(throwable, "throwable is null");
         var t = throwable;
         if (t instanceof UserCodeException userCodeException) {
             t = userCodeException.getCause();

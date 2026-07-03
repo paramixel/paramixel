@@ -23,9 +23,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.MutableDescriptor;
@@ -33,6 +36,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
@@ -140,6 +144,7 @@ class SchedulerLifecycleDefectTest {
         try {
             var root = new ConcreteDescriptor(Step.of("success", context -> {}));
             var context = newContext(scheduler, root);
+            var completeError = new AtomicReference<Throwable>();
             var callback = new Scheduler.ExecutionCallback() {
                 @Override
                 public void onExecutionStart() {
@@ -147,7 +152,9 @@ class SchedulerLifecycleDefectTest {
                 }
 
                 @Override
-                public void onExecutionComplete(final Throwable error) {}
+                public void onExecutionComplete(final Throwable error) {
+                    completeError.set(error);
+                }
             };
 
             assertThatThrownBy(() -> scheduler
@@ -159,8 +166,108 @@ class SchedulerLifecycleDefectTest {
             assertThat(root.isCompleted()).isTrue();
             assertThat(root.isFailed()).isTrue();
             assertThat(root.message()).contains("start failed");
+            assertThat(completeError.get())
+                    .as("onExecutionComplete must be called with the start failure error")
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("start failed");
         } finally {
             scheduler.close();
+        }
+    }
+
+    @Test
+    @Timeout(5)
+    @DisplayName("onAdmitted failure delivers onExecutionComplete with the admission error")
+    void admissionCallbackFailureDeliversOnExecutionComplete() {
+        var scheduler = new Scheduler(1);
+        try {
+            var root = new ConcreteDescriptor(Step.of("success", context -> {}));
+            var context = newContext(scheduler, root);
+            var started = new AtomicBoolean();
+            var completeError = new AtomicReference<Throwable>();
+            var callback = new Scheduler.ExecutionCallback() {
+                @Override
+                public void onAdmitted() {
+                    throw new IllegalStateException("admission failed");
+                }
+
+                @Override
+                public void onExecutionStart() {
+                    started.set(true);
+                }
+
+                @Override
+                public void onExecutionComplete(final Throwable error) {
+                    completeError.set(error);
+                }
+            };
+
+            assertThatThrownBy(() -> scheduler
+                            .schedule(root, ExecutionMode.RUN, context, callback)
+                            .join())
+                    .isInstanceOf(CompletionException.class)
+                    .hasCauseInstanceOf(IllegalStateException.class);
+
+            assertThat(root.isCompleted()).isTrue();
+            assertThat(root.isFailed()).isTrue();
+            assertThat(root.message()).contains("admission failed");
+            assertThat(started.get())
+                    .as("onExecutionStart must not be called after onAdmitted throws")
+                    .isFalse();
+            assertThat(completeError.get())
+                    .as("onExecutionComplete must be called with the admission error")
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("admission failed");
+        } finally {
+            scheduler.close();
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    @DisplayName("managedJoin exits after scheduler is closed (executor terminated, drain empty)")
+    void managedJoinExitsAfterExecutorTermination() throws Exception {
+        var scheduler = new Scheduler(1);
+        var root = new ConcreteDescriptor(Step.of("root", context -> {}));
+        var context = newContext(scheduler, root);
+
+        // Create a future that will never complete — simulating a deferred descriptor
+        // whose completion path is severed by executor termination.
+        var hangingFuture = new CompletableFuture<Descriptor>();
+
+        var joinError = new AtomicReference<Throwable>();
+        var joinDone = new CountDownLatch(1);
+        var joinThread = new Thread(
+                () -> {
+                    try {
+                        scheduler.managedJoin(hangingFuture);
+                    } catch (Throwable t) {
+                        joinError.set(t);
+                    } finally {
+                        joinDone.countDown();
+                    }
+                },
+                "managedJoin-test");
+        joinThread.setDaemon(true);
+        joinThread.start();
+
+        // Give managedJoin time to enter the backoff-park loop.
+        Thread.sleep(200);
+
+        // Close the scheduler — this shuts down the executor, waits for termination,
+        // and clears the shutdown drain. After close() returns, managedJoin should
+        // detect isTerminated() && shutdownDrain.isEmpty() and exit the loop.
+        scheduler.close();
+
+        // managedJoin must return within the timeout (the test's @Timeout(10) guards this).
+        assertThat(joinDone.await(5, TimeUnit.SECONDS))
+                .as("managedJoin must exit after executor termination")
+                .isTrue();
+        // After termination, the uncompletable future is cancelled and join() throws.
+        // This is acceptable — the critical property is that managedJoin returns,
+        // not that it returns successfully.
+        if (joinError.get() != null) {
+            assertThat(joinError.get()).isInstanceOf(java.util.concurrent.CancellationException.class);
         }
     }
 

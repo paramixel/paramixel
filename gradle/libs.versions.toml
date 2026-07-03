@@ -4,8 +4,11 @@ commons-compress = "1.28.0"
 jmh = "1.37"
 junit = "6.1.1"
 kafka-clients = "4.3.1"
+maven = "3.9.16"
+maven-plugin-annotations = "3.15.2"
 mongodb-driver-sync = "5.8.0"
 pmd = "7.26.0"
+shadow = "8.1.1"
 slf4j = "2.0.18"
 testcontainers = "2.0.5"
 testcontainers-kafka = "1.21.4"
@@ -20,6 +23,11 @@ jmh-generator-annprocess = { group = "org.openjdk.jmh", name = "jmh-generator-an
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit" }
 kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.ref = "kafka-clients" }
+maven-artifact = { group = "org.apache.maven", name = "maven-artifact", version.ref = "maven" }
+maven-core = { group = "org.apache.maven", name = "maven-core", version.ref = "maven" }
+maven-model = { group = "org.apache.maven", name = "maven-model", version.ref = "maven" }
+maven-plugin-annotations = { group = "org.apache.maven.plugin-tools", name = "maven-plugin-annotations", version.ref = "maven-plugin-annotations" }
+maven-plugin-api = { group = "org.apache.maven", name = "maven-plugin-api", version.ref = "maven" }
 mongodb-driver-sync = { group = "org.mongodb", name = "mongodb-driver-sync", version.ref = "mongodb-driver-sync" }
 slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
 testcontainers = { group = "org.testcontainers", name = "testcontainers", version.ref = "testcontainers" }
@@ -28,4 +36,6 @@ testcontainers-mongodb = { group = "org.testcontainers", name = "mongodb", versi
 testcontainers-nginx = { group = "org.testcontainers", name = "nginx", version.ref = "testcontainers-nginx" }
 
 [plugins]
+shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
+
 [bundles]

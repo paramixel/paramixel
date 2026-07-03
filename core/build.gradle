@@ -1,0 +1,21 @@
+dependencies {
+    testImplementation libs.assertj.core
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+def projectVersion = project.version
+
+tasks.named('processResources') {
+    filesMatching('core-version.properties') {
+        expand(project: [version: projectVersion])
+    }
+    from(rootDir) {
+        include 'LICENSE'
+        into 'META-INF'
+    }
+}

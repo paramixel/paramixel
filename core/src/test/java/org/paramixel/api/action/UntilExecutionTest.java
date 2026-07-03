@@ -79,8 +79,8 @@ class UntilExecutionTest {
     }
 
     @Test
-    @DisplayName("predicate throws continues loop")
-    void predicateThrowsContinuesLoop() {
+    @DisplayName("predicate throws fails until immediately")
+    void predicateThrowsFailsUntilImmediately() {
         var counter = new AtomicInteger();
 
         var action = Until.builder("until")
@@ -94,7 +94,9 @@ class UntilExecutionTest {
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
         assertThat(root.isFailed()).isTrue();
-        assertThat(counter.get()).isEqualTo(3);
+        assertThat(root.message()).isPresent();
+        assertThat(root.message().get()).contains("until predicate failed");
+        assertThat(counter.get()).isEqualTo(1);
     }
 
     @Test

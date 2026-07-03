@@ -278,27 +278,30 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Snapshots all live non-daemon, non-system threads at the current moment.
      *
-     * <p>Uses {@link Thread#enumerate(Thread[])} instead of {@link Thread#getAllStackTraces()}
-     * because stack traces are not required — only thread identity is needed for the
-     * lingering-thread leak detector.
+     * <p>Uses {@link Thread#getAllStackTraces()} to guarantee a complete snapshot of every
+     * live thread. Unlike {@link Thread#enumerate(Thread[])}, which silently drops threads
+     * when the supplied buffer is too small, {@code getAllStackTraces()} returns all live
+     * threads regardless of count.
      *
-     * <p>The returned set is a mutable best-effort snapshot; threads created during enumeration
-     * may be missed. This is acceptable for a diagnostic warning.
+     * <p>Collecting stack traces is more expensive than enumeration, but the method is
+     * called at most three times per build (pre-execution baseline, warning check,
+     * and error check), so the cost is negligible compared to build and test
+     * execution time.
+     *
+     * <p>If a {@link SecurityManager} is installed that denies
+     * {@code RuntimePermission("getStackTrace")}, this method throws a
+     * {@link SecurityException}. No security manager is installed by default in
+     * modern JVM builds.
      *
      * @return a mutable set of live non-daemon threads excluding known JVM system threads
      */
     private Set<Thread> snapshotNonDaemonThreads() {
-        var buffer = new Thread[Thread.activeCount() + 10];
-        int count = Thread.enumerate(buffer);
-        var result = new HashSet<Thread>(count);
-        for (Thread t : buffer) {
-            if (t == null) {
-                continue;
-            }
+        var result = new HashSet<Thread>();
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
             if (t.isDaemon()
                     || t.getThreadGroup() == null
                     || "system".equals(t.getThreadGroup().getName())
-                    || SYSTEM_THREAD_PREFIXES.contains(t.getName())) {
+                    || SYSTEM_THREAD_PREFIXES.stream().anyMatch(t.getName()::startsWith)) {
                 continue;
             }
             result.add(t);
@@ -368,6 +371,10 @@ public class ParamixelMojo extends AbstractMojo {
                     throw new MojoExecutionException("Paramixel property '" + key + "' value is null");
                 }
 
+                if (value.isBlank()) {
+                    throw new MojoExecutionException("Paramixel property '" + key + "' value is blank");
+                }
+
                 if (!seenKeys.add(key)) {
                     getLog().warn("Duplicate Paramixel property key '" + key + "' — later value overrides earlier");
                 }
@@ -397,7 +404,10 @@ public class ParamixelMojo extends AbstractMojo {
             configMap.put(Configuration.FAIL_FAST, "true");
         }
 
-        // System properties always win (matches JUnit Platform precedence)
+        // System properties always win (matches JUnit Platform precedence).
+        // Note: defaultConfiguration(classLoader) above already includes system
+        // properties; this loop provides the authoritative point-in-time snapshot
+        // that overrides any earlier values.
         var systemProps = System.getProperties();
         List<Map.Entry<Object, Object>> snapshot;
         synchronized (systemProps) {

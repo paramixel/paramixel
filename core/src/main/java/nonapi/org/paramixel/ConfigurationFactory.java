@@ -17,12 +17,10 @@
 package nonapi.org.paramixel;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.TreeMap;
-import java.util.WeakHashMap;
 import nonapi.org.paramixel.support.ResourceLoader;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.exception.ConfigurationException;
@@ -41,9 +39,6 @@ import org.paramixel.api.exception.ConfigurationException;
 public final class ConfigurationFactory {
 
     private static final int DEFAULT_SCHEDULER_QUEUE_CAPACITY = 1_024;
-
-    private static final Map<ClassLoader, Configuration> CLASSLOADER_CACHE =
-            Collections.synchronizedMap(new WeakHashMap<>());
 
     private ConfigurationFactory() {
         // Intentionally empty
@@ -109,17 +104,11 @@ public final class ConfigurationFactory {
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Configuration defaultConfiguration() {
-        var cached = CLASSLOADER_CACHE.get(ResourceLoader.class.getClassLoader());
-        if (cached != null) {
-            return cached;
-        }
         var map = new TreeMap<String, String>();
         loadClasspathProperties(map, ResourceLoader.class.getClassLoader());
         map.putAll(systemPropertiesRaw());
         configureDefaults(map);
-        var configuration = new ConcreteConfiguration(Map.copyOf(map));
-        CLASSLOADER_CACHE.putIfAbsent(ResourceLoader.class.getClassLoader(), configuration);
-        return CLASSLOADER_CACHE.get(ResourceLoader.class.getClassLoader());
+        return new ConcreteConfiguration(Map.copyOf(map));
     }
 
     /**
@@ -132,17 +121,11 @@ public final class ConfigurationFactory {
      */
     public static Configuration defaultConfiguration(final ClassLoader classLoader) {
         Objects.requireNonNull(classLoader, "classLoader is null");
-        var cached = CLASSLOADER_CACHE.get(classLoader);
-        if (cached != null) {
-            return cached;
-        }
         var map = new TreeMap<String, String>();
         loadClasspathProperties(map, classLoader);
         map.putAll(systemPropertiesRaw());
         configureDefaults(map);
-        var configuration = new ConcreteConfiguration(Map.copyOf(map));
-        CLASSLOADER_CACHE.putIfAbsent(classLoader, configuration);
-        return CLASSLOADER_CACHE.get(classLoader);
+        return new ConcreteConfiguration(Map.copyOf(map));
     }
 
     private static void configureDefaults(final TreeMap<String, String> map) {

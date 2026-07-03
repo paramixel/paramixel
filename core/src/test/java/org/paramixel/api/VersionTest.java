@@ -105,7 +105,7 @@ class VersionTest {
         @Test
         @DisplayName("returns UNKNOWN when version property is blank")
         void returnsUnknownWhenVersionPropertyBlank() {
-            var content = "version=   ".getBytes(StandardCharsets.ISO_8859_1);
+            var content = "paramixel.core.version=   ".getBytes(StandardCharsets.ISO_8859_1);
             var result = Version.loadVersion(name -> new ByteArrayInputStream(content));
             assertThat(result).isEqualTo("UNKNOWN");
         }
@@ -113,7 +113,7 @@ class VersionTest {
         @Test
         @DisplayName("returns version string when present and non-blank")
         void returnsVersionWhenPresent() {
-            var content = "version=1.2.3".getBytes(StandardCharsets.ISO_8859_1);
+            var content = "paramixel.core.version=1.2.3".getBytes(StandardCharsets.ISO_8859_1);
             var result = Version.loadVersion(name -> new ByteArrayInputStream(content));
             assertThat(result).isEqualTo("1.2.3");
         }
@@ -126,12 +126,12 @@ class VersionTest {
     }
 
     private static String loadVersionFromResource() throws IOException {
-        var inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("version.properties");
+        var inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream("core-version.properties");
         assertThat(inputStream).isNotNull();
         var properties = new Properties();
         try (inputStream) {
             properties.load(inputStream);
         }
-        return properties.getProperty("version");
+        return properties.getProperty("paramixel.core.version");
     }
 }

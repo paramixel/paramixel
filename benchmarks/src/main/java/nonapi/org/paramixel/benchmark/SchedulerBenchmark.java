@@ -90,7 +90,9 @@ public class SchedulerBenchmark {
         blackhole.consume(result);
     }
 
-    /** State for heterogeneous duration benchmark. */
+    /**
+     * State for heterogeneous duration benchmark.
+     */
     @State(Scope.Benchmark)
     public static class ParallelHeterogeneousState {
 
@@ -132,7 +134,9 @@ public class SchedulerBenchmark {
         }
     }
 
-    /** State for many small tasks benchmark. */
+    /**
+     * State for many small tasks benchmark.
+     */
     @State(Scope.Benchmark)
     public static class ManySmallTasksState {
 
@@ -164,7 +168,9 @@ public class SchedulerBenchmark {
         }
     }
 
-    /** State for uniform duration benchmark. */
+    /**
+     * State for uniform duration benchmark.
+     */
     @State(Scope.Benchmark)
     public static class ParallelUniformState {
 

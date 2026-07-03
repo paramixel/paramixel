@@ -390,6 +390,25 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
+        @DisplayName("blank Maven property value through buildConfiguration throws descriptive exception")
+        void blankMavenPropertyValueThroughBuildConfigurationThrowsDescriptiveException() throws Exception {
+            var property = new Property();
+            var keyField = Property.class.getDeclaredField("key");
+            keyField.setAccessible(true);
+            keyField.set(property, "paramixel.custom");
+            var valueField = Property.class.getDeclaredField("value");
+            valueField.setAccessible(true);
+            valueField.set(property, "   ");
+            var mojo = new ParamixelMojo();
+            setField(mojo, "properties", List.of(property));
+
+            assertThatThrownBy(() -> invokeBuildConfiguration(mojo, getClass().getClassLoader()))
+                    .cause()
+                    .isInstanceOf(MojoExecutionException.class)
+                    .hasMessage("Paramixel property 'paramixel.custom' value is blank");
+        }
+
+        @Test
         @DisplayName("duplicate property key logs warning and later value overrides")
         void duplicatePropertyKeyLogsWarningAndLaterValueOverrides() throws Exception {
             var originalReportFile = System.getProperty(Configuration.REPORT_FILE);

@@ -22,14 +22,12 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Predicate;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.ExecutionNode;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
-import org.paramixel.api.Context;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
@@ -333,10 +331,11 @@ final class ActionExecutionStrategies {
             var completedChild = node.children.get(completedIndex);
             node.aggregator.include(completedChild);
 
-            if (dependent && node.childMode == ExecutionMode.RUN) {
-                if (!completedChild.isPassed() && !completedChild.isAborted()) {
-                    node.childMode = ExecutionMode.SKIP;
-                }
+            if (dependent
+                    && node.childMode == ExecutionMode.RUN
+                    && !completedChild.isPassed()
+                    && !completedChild.isAborted()) {
+                node.childMode = ExecutionMode.SKIP;
             }
         }
 
@@ -354,7 +353,7 @@ final class ActionExecutionStrategies {
         return startLifecycleInternal(context);
     }
 
-    private static Status startInstance(final Instance instance, final ConcreteContext context) {
+    private static Status startInstance(final Instance ignored, final ConcreteContext context) {
         return startLifecycleInternal(context.withInstanceHolder(new InstanceHolder()));
     }
 
@@ -440,12 +439,9 @@ final class ActionExecutionStrategies {
         advanceLifecyclePhase(node, context);
     }
 
+    // before is already included in advanceLifecyclePhase(PHASE_BODY) — do not double-tally.
     private static void completeLifecycle(final ExecutionNode node) {
         var descriptor = node.descriptor;
-        var before = descriptor.before().orElse(null);
-        if (before != null) {
-            node.aggregator.include(before);
-        }
         for (var child : descriptor.children()) {
             node.aggregator.include(child);
         }
@@ -527,9 +523,9 @@ final class ActionExecutionStrategies {
 
     private static void completeTimeout(
             final ExecutionNode node,
-            final Timeout timeout,
+            final Timeout ignoredTimeout,
             final MutableDescriptor childDescriptor,
-            final AtomicBoolean timedOut) {
+            final AtomicBoolean ignoredTimedOut) {
         // Timeout has exactly one child, so its aggregate status is the child's status. The node
         // aggregator is intentionally not consulted here (it would only hold the single child).
         node.descriptor.setStatus(childDescriptor.status());
@@ -586,7 +582,16 @@ final class ActionExecutionStrategies {
             }
 
             if (loopAction.until().isPresent()) {
-                boolean satisfied = evaluateUntilPredicate(loopAction.until().get(), context);
+                boolean satisfied;
+                try {
+                    satisfied = loopAction.until().get().test(context);
+                } catch (Throwable t) {
+                    UnrecoverableErrors.rethrowIfUnrecoverable(t);
+                    skipRemainingLoopChildren(node, context);
+                    node.descriptor.setStatus(Status.failed("until predicate failed: " + t.getMessage(), t));
+                    node.descriptor.setExecutionNode(null);
+                    return;
+                }
                 if (satisfied) {
                     skipRemainingLoopChildren(node, context);
                     node.descriptor.setStatus(Status.PASSED);
@@ -638,15 +643,6 @@ final class ActionExecutionStrategies {
             node.descriptor.setStatus(node.aggregator.status());
         }
         node.descriptor.setExecutionNode(null);
-    }
-
-    private static boolean evaluateUntilPredicate(final Predicate<Context> predicate, final ConcreteContext context) {
-        try {
-            return predicate.test(context);
-        } catch (Throwable t) {
-            UnrecoverableErrors.rethrowIfUnrecoverable(t);
-            return false;
-        }
     }
 
     // ── Async Repeat ───────────────────────────────────────────────────
@@ -751,7 +747,15 @@ final class ActionExecutionStrategies {
 
             boolean satisfied;
             if (untilAction.until().isPresent()) {
-                satisfied = evaluateUntilPredicate(untilAction.until().get(), context);
+                try {
+                    satisfied = untilAction.until().get().test(context);
+                } catch (Throwable t) {
+                    UnrecoverableErrors.rethrowIfUnrecoverable(t);
+                    skipRemainingUntilChildren(node, context);
+                    node.descriptor.setStatus(Status.failed("until predicate failed: " + t.getMessage(), t));
+                    node.descriptor.setExecutionNode(null);
+                    return;
+                }
             } else {
                 satisfied = completedChild.isPassed();
             }

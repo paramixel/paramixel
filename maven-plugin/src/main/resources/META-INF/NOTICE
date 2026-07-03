@@ -1,0 +1,9 @@
+Paramixel Maven Plugin
+Copyright (c) 2026-present Douglas Hoard
+
+Licensed under the Apache License, Version 2.0 (the "License");
+see META-INF/LICENSE for the full license text.
+
+This artifact does not bundle or relocate any third-party software.
+Its runtime dependency org.paramixel:core is resolved from the consuming
+environment's classpath.

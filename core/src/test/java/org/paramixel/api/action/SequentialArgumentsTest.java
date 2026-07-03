@@ -243,4 +243,24 @@ class SequentialArgumentsTest {
         assertThatThrownBy(() -> builder.child((org.paramixel.api.action.Builder) null))
                 .isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    @DisplayName("sequential() is alias for builder()")
+    void sequentialIsAliasForBuilder() {
+        var seq = Sequential.sequential("seq").child(Step.of("step", s -> {})).build();
+        assertThat(seq.displayName()).isEqualTo("seq");
+        assertThat(seq.children()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("sequential() rejects null")
+    void sequentialRejectsNull() {
+        assertThatThrownBy(() -> Sequential.sequential(null)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("sequential() rejects blank")
+    void sequentialRejectsBlank() {
+        assertThatThrownBy(() -> Sequential.sequential(" ")).isInstanceOf(IllegalArgumentException.class);
+    }
 }

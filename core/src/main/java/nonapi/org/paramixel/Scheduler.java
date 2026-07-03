@@ -193,10 +193,14 @@ public final class Scheduler implements AutoCloseable {
      * Creates a scheduler with the given parallelism and queue capacity.
      *
      * <p>{@code queueCapacity} sets the initial array size for the global executor's internal
-     * priority queue and determines the number of global admission permits. The actual bound on
-     * queued tasks is enforced by a semaphore — {@link java.util.concurrent.PriorityBlockingQueue}
-     * is unbounded and never rejects elements. If the semaphore is exhausted, subsequent submissions
-     * are rejected immediately.
+     * priority queue and determines the number of global admission permits for initial descriptor
+     * scheduling. The actual bound on queued tasks is enforced by a semaphore —
+     * {@link java.util.concurrent.PriorityBlockingQueue} is unbounded and never rejects elements.
+     * If the semaphore is exhausted, subsequent submissions are rejected immediately.
+     *
+     * <p>Continuation tasks (submitted by coordination strategies via
+     * {@link #executeContinuation(ExecutionNode)}) are not gated by this semaphore; they are
+     * necessary for forward progress and the executor's backing queue is unbounded.
      *
      * @param parallelism the maximum concurrent leaf execution count (must be positive)
      * @param queueCapacity global admission permit count and initial queue allocation (must be
@@ -719,6 +723,16 @@ public final class Scheduler implements AutoCloseable {
                     continue;
                 }
             }
+            // Once the executor is fully terminated and no continuations remain
+            // in the drain queue, no further progress is possible. The future
+            // should already be done (all scheduler workers have terminated).
+            // If it is not, cancel it to avoid blocking forever in join().
+            if (executor.isTerminated() && shutdownDrain.isEmpty()) {
+                if (!future.isDone()) {
+                    future.cancel(true);
+                }
+                break;
+            }
             // ParkNanos returns immediately without blocking when the interrupt flag
             // is set, turning the backoff-gated park into a busy-spin. Consume any
             // stray flag and reset the backoff so the next park actually blocks.
@@ -791,6 +805,11 @@ public final class Scheduler implements AutoCloseable {
      * <p>Schedules the node's continuation runnable as a work item on the executor
      * queue. The continuation runs on a scheduler worker thread with proper thread
      * naming and lifecycle management.
+     *
+     * <p>This method does not acquire an admission permit from the global semaphore.
+     * Continuations are necessary for forward progress and rejection is not an option;
+     * the executor's backing {@link java.util.concurrent.PriorityBlockingQueue} is
+     * unbounded.
      *
      * @param node the execution node whose continuation should run; must not be
      *     {@code null}
@@ -969,7 +988,7 @@ public final class Scheduler implements AutoCloseable {
         var leafAction = descriptor.isLeafAction();
         var acquiredPermit = false;
         var executed = false;
-        var callbackInvoked = false;
+        var callbackLifecycleStarted = false;
         var deferred = false;
 
         try {
@@ -1006,9 +1025,9 @@ public final class Scheduler implements AutoCloseable {
                     }
                 }
                 if (!skipExecution && callback != null) {
+                    callbackLifecycleStarted = true;
                     callback.onAdmitted();
                     callback.onExecutionStart();
-                    callbackInvoked = true;
                 }
                 if (!skipExecution) {
                     try {
@@ -1068,7 +1087,7 @@ public final class Scheduler implements AutoCloseable {
         // Consume any lingering interrupt.
         Thread.interrupted();
 
-        publishDescriptorCompletion(descriptor, context, future, callback, callbackInvoked, executionError);
+        publishDescriptorCompletion(descriptor, context, future, callback, callbackLifecycleStarted, executionError);
     }
 
     private void publishDescriptorCompletion(
@@ -1076,7 +1095,7 @@ public final class Scheduler implements AutoCloseable {
             final ConcreteContext context,
             final CompletableFuture<Descriptor> future,
             final ExecutionCallback callback,
-            final boolean callbackInvoked,
+            final boolean callbackLifecycleStarted,
             final Throwable initialExecutionError) {
         var executionError = initialExecutionError;
         if (executionError == null) {
@@ -1086,7 +1105,7 @@ public final class Scheduler implements AutoCloseable {
         recordExecutionFailureForFailFast(executionError);
 
         Throwable callbackFailure = null;
-        if (callbackInvoked && callback != null) {
+        if (callbackLifecycleStarted && callback != null) {
             try {
                 callback.onExecutionComplete(executionError);
             } catch (Throwable t) {
@@ -1418,14 +1437,6 @@ public final class Scheduler implements AutoCloseable {
         public void run() {
             scheduler.runContinuationOnce(node);
         }
-    }
-
-    private static Throwable extractPostExecutionErrorFromDescriptor(final MutableDescriptor descriptor) {
-        var status = descriptor.status();
-        if (status.isFailed() || status.isAborted()) {
-            return status.throwable().orElse(new FailException(status.message().orElse("action failed")));
-        }
-        return null;
     }
 
     private record IsolationFrame(String lockName, MutableDescriptor descriptor, ReentrantLock lock) {}

@@ -37,7 +37,7 @@ public final class ConcreteConfiguration implements Configuration {
     /**
      * Creates a configuration backed by the supplied map.
      *
-     * <p>The map is stored by reference; callers must not mutate it after construction.
+     * <p>The supplied map is defensively copied; subsequent changes to the original map are not reflected in this configuration.
      *
      * @param properties the backing property map; must not be {@code null}
      */

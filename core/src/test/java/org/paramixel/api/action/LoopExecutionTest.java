@@ -72,8 +72,8 @@ class LoopExecutionTest {
     }
 
     @Test
-    @DisplayName("predicate throws continues loop")
-    void predicateThrowsContinuesLoop() {
+    @DisplayName("predicate throws fails loop immediately")
+    void predicateThrowsFailsLoopImmediately() {
         var counter = new AtomicInteger();
 
         var action = Loop.builder("loop")
@@ -87,7 +87,9 @@ class LoopExecutionTest {
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
         assertThat(root.isFailed()).isTrue();
-        assertThat(counter.get()).isEqualTo(3);
+        assertThat(root.message()).isPresent();
+        assertThat(root.message().get()).contains("until predicate failed");
+        assertThat(counter.get()).isEqualTo(1);
     }
 
     @Test

@@ -26,6 +26,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,7 +38,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
 import org.paramixel.maven.plugin.fixtures.PassingMojoFixture;
 
@@ -172,19 +172,6 @@ class ParamixelMojoExecuteTest {
             } finally {
                 Thread.currentThread().setContextClassLoader(original);
             }
-        }
-    }
-
-    @Nested
-    @DisplayName("staged status check")
-    class StagedStatusCheck {
-
-        @Test
-        @DisplayName("isPending is included in Mojo failure condition")
-        void isPendingIncludedInMojoFailureCondition() {
-            var status = Status.PENDING;
-            assertThat(status.isFailed() || status.isPending()).isTrue();
-            assertThat(status.isPassed()).isFalse();
         }
     }
 
@@ -460,6 +447,106 @@ class ParamixelMojoExecuteTest {
 
             for (Thread t : threads) {
                 assertThat(t.isDaemon()).isFalse();
+            }
+        }
+
+        @Test
+        @DisplayName("snapshotNonDaemonThreads excludes threads with system prefixes")
+        void snapshotNonDaemonThreadsExcludesThreadsWithSystemPrefixes() throws Exception {
+            var testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
+            var forkJoinThread = new Thread(
+                    () -> {
+                        try {
+                            Thread.sleep(30_000);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    },
+                    "ForkJoinPool-1");
+            forkJoinThread.setDaemon(false);
+            forkJoinThread.setContextClassLoader(testCl);
+
+            var timerThread = new Thread(
+                    () -> {
+                        try {
+                            Thread.sleep(30_000);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    },
+                    "Timer-0");
+            timerThread.setDaemon(false);
+            timerThread.setContextClassLoader(testCl);
+
+            try {
+                forkJoinThread.start();
+                timerThread.start();
+
+                // Wait for threads to start
+                Thread.sleep(100);
+
+                var mojo = new ParamixelMojo();
+                var method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+                method.setAccessible(true);
+
+                @SuppressWarnings("unchecked")
+                var threads = (Set<Thread>) method.invoke(mojo);
+
+                var threadNames = threads.stream().map(Thread::getName).toList();
+                assertThat(threadNames).doesNotContain("ForkJoinPool-1", "Timer-0");
+            } finally {
+                forkJoinThread.interrupt();
+                timerThread.interrupt();
+                forkJoinThread.join(5_000);
+                timerThread.join(5_000);
+                testCl.close();
+            }
+        }
+
+        @Test
+        @DisplayName("snapshotNonDaemonThreads captures threads beyond activeCount + 10")
+        void snapshotNonDaemonThreadsCapturesThreadsBeyondBufferLimit() throws Exception {
+            var testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
+            int threadCount = Thread.activeCount() + 15;
+            var threads = new ArrayList<Thread>();
+            try {
+                for (int i = 0; i < threadCount; i++) {
+                    var t = new Thread(
+                            () -> {
+                                try {
+                                    Thread.sleep(30_000);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            },
+                            "overflow-test-thread-" + i);
+                    t.setDaemon(false);
+                    t.setContextClassLoader(testCl);
+                    threads.add(t);
+                    t.start();
+                }
+
+                // Wait for threads to start
+                Thread.sleep(200);
+
+                var mojo = new ParamixelMojo();
+                var method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+                method.setAccessible(true);
+
+                @SuppressWarnings("unchecked")
+                var snapshot = (Set<Thread>) method.invoke(mojo);
+
+                for (Thread t : threads) {
+                    assertThat(snapshot).contains(t);
+                }
+            } finally {
+                for (Thread t : threads) {
+                    t.interrupt();
+                }
+                for (Thread t : threads) {
+                    t.join(5_000);
+                }
+                testCl.close();
             }
         }
     }

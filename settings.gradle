@@ -7,8 +7,14 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         mavenCentral()
     }
 }
 
 rootProject.name = 'paramixel'
+
+include 'core'
+include 'maven-plugin'
+include 'examples'
+include 'benchmarks'

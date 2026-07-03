@@ -136,5 +136,8 @@
     
     <!-- Exclude package-info files -->
     <exclude-pattern>.*/package-info\.java</exclude-pattern>
+
+    <!-- Exclude classpath files -->
+    <exclude-pattern>.*/classpath/.*</exclude-pattern>
     
 </ruleset>

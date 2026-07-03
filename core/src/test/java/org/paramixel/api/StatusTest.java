@@ -17,6 +17,7 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -376,6 +377,14 @@ class StatusTest {
             assertThat(status.isFailed()).isTrue();
             assertThat(status.throwable()).containsSame(wrapper);
             assertThat(status.message()).contains("original");
+        }
+
+        @Test
+        @DisplayName("fromThrowable rejects null with descriptive NullPointerException")
+        void fromThrowableRejectsNull() {
+            assertThatThrownBy(() -> Status.fromThrowable(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("throwable is null");
         }
     }
 

@@ -1,0 +1,22 @@
+dependencies {
+    compileOnly libs.maven.plugin.annotations
+    compileOnly libs.maven.plugin.api
+    compileOnly libs.maven.core
+    compileOnly libs.maven.artifact
+    compileOnly libs.maven.model
+
+    implementation project(':core')
+
+    testImplementation libs.maven.plugin.annotations
+    testImplementation libs.maven.plugin.api
+    testImplementation libs.maven.core
+    testImplementation libs.maven.artifact
+    testImplementation libs.maven.model
+    testImplementation libs.assertj.core
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly libs.junit.platform.launcher
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

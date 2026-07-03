@@ -109,9 +109,10 @@ public final class BackoffDelay {
      */
     private long grow(final long from) {
         double next = from * growthFactor;
-        if (Double.isNaN(next) || Double.isInfinite(next) || next > ceilingNanos) {
+        if (Double.isNaN(next) || Double.isInfinite(next)) {
             return ceilingNanos;
         }
-        return (long) next;
+        long result = (long) next;
+        return result > ceilingNanos ? ceilingNanos : result;
     }
 }

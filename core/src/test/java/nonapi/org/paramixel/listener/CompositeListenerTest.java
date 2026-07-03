@@ -233,6 +233,57 @@ class CompositeListenerTest {
     }
 
     @Test
+    @DisplayName("varargs constructor with ansiEnabled constructs successfully")
+    void varargsConstructorWithAnsiEnabledConstructsSuccessfully() {
+        var calls = new ArrayList<String>();
+        var listener = new Listener() {
+
+            @Override
+            public void onRunStarted() {
+                calls.add("onRunStarted");
+            }
+        };
+
+        new CompositeListener(true, listener).onRunStarted();
+
+        assertThat(calls).containsExactly("onRunStarted");
+    }
+
+    @Test
+    @DisplayName("varargs constructor with ansiEnabled=false constructs successfully")
+    void varargsConstructorWithAnsiDisabledConstructsSuccessfully() {
+        var calls = new ArrayList<String>();
+        var listener = new Listener() {
+
+            @Override
+            public void onRunStarted() {
+                calls.add("onRunStarted");
+            }
+        };
+
+        new CompositeListener(false, listener).onRunStarted();
+
+        assertThat(calls).containsExactly("onRunStarted");
+    }
+
+    @Test
+    @DisplayName("list constructor constructs successfully")
+    void listConstructorConstructsSuccessfully() {
+        var calls = new ArrayList<String>();
+        var listener = new Listener() {
+
+            @Override
+            public void onRunStarted() {
+                calls.add("onRunStarted");
+            }
+        };
+
+        new CompositeListener(List.of(listener)).onRunStarted();
+
+        assertThat(calls).containsExactly("onRunStarted");
+    }
+
+    @Test
     @DisplayName("delegates onRunStarted to all listeners")
     void delegatesOnRunStartedToAllListeners() {
         var calls = new ArrayList<String>();
