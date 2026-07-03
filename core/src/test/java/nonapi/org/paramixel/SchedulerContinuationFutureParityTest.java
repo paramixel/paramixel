@@ -92,6 +92,46 @@ class SchedulerContinuationFutureParityTest {
     }
 
     @Test
+    @DisplayName("completeExternally returns true on first call")
+    void completeExternallyReturnsTrueOnFirstCall() {
+        var fixture = fixture(Step.of("step", context -> {}));
+        var node = new ExecutionNode(fixture.child, scheduler);
+
+        assertThat(node.completeExternally()).isTrue();
+        assertThat(node.nodeCompletion).isDone();
+    }
+
+    @Test
+    @DisplayName("completeExternally returns false on second call")
+    void completeExternallyReturnsFalseOnSecondCall() {
+        var fixture = fixture(Step.of("step", context -> {}));
+        var node = new ExecutionNode(fixture.child, scheduler);
+
+        node.completeExternally();
+        assertThat(node.completeExternally()).isFalse();
+    }
+
+    @Test
+    @DisplayName("drainPendingChildren returns false when no children pending")
+    void drainPendingChildrenReturnsFalseWhenNoChildrenPending() {
+        var fixture = fixture(Step.of("step", context -> {}));
+        var node = new ExecutionNode(fixture.child, scheduler);
+
+        assertThat(node.drainPendingChildren()).isFalse();
+    }
+
+    @Test
+    @DisplayName("drainPendingChildren returns true when children pending")
+    void drainPendingChildrenReturnsTrueWhenChildrenPending() {
+        var fixture = fixture(Step.of("step", context -> {}));
+        var node = new ExecutionNode(fixture.child, scheduler);
+        node.incrementPendingChildren();
+
+        assertThat(node.drainPendingChildren()).isTrue();
+        assertThat(node.pendingChildCount()).isZero();
+    }
+
+    @Test
     @DisplayName("queued descriptor that becomes terminal before execution notifies parent")
     void queuedDescriptorThatBecomesTerminalBeforeExecutionNotifiesParent() throws Exception {
         scheduler.close();

@@ -1,0 +1,23 @@
+dependencies {
+    implementation project(':core')
+    implementation project(':maven-plugin')
+
+    implementation libs.junit.jupiter
+    implementation libs.assertj.core
+    implementation libs.slf4j.nop
+    implementation libs.commons.compress
+    implementation libs.testcontainers
+    implementation libs.testcontainers.kafka
+    implementation libs.kafka.clients
+    implementation libs.testcontainers.mongodb
+    implementation libs.mongodb.driver.sync
+    implementation libs.testcontainers.nginx
+}
+
+tasks.register('paramixelTest', JavaExec) {
+    dependsOn classes
+    group = 'verification'
+    description = 'Discovers and executes Paramixel action trees'
+    mainClass = 'org.paramixel.api.Runner'
+    classpath = sourceSets.main.runtimeClasspath
+}

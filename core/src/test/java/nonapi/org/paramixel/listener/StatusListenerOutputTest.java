@@ -536,4 +536,29 @@ class StatusListenerOutputTest {
         assertThat(result).doesNotContain("\u001B");
         assertThat(result).contains(RuntimeException.class.getName() + ": badmsg");
     }
+
+    @Test
+    @DisplayName("null throwable message does not render null text")
+    void nullThrowableMessageDoesNotRenderNullText() {
+        var action = Step.of("throws", context -> {
+            throw new RuntimeException();
+        });
+        var listener = new StatusListener();
+        var configuration = new ConcreteConfiguration(Map.of(Configuration.ANSI, "false"));
+        listener.initialize(configuration);
+        var runner = Runner.builder().listener(listener).build();
+
+        var output = new ByteArrayOutputStream();
+        var originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(output, true, StandardCharsets.UTF_8));
+            runner.run(action);
+        } finally {
+            System.setOut(originalOut);
+        }
+
+        var result = output.toString(StandardCharsets.UTF_8);
+        assertThat(result).doesNotContain("RuntimeException: null");
+        assertThat(result).contains("RuntimeException");
+    }
 }

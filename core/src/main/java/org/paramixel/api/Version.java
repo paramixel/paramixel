@@ -20,13 +20,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.function.Function;
-import nonapi.org.paramixel.support.ResourceLoader;
 
 /**
  * Provides the current Paramixel version string loaded from the classpath.
  *
  * <p>Version information is loaded once during class initialization from the classpath resource
- * {@code version.properties}. If the resource is missing or unreadable, the version falls back to
+ * {@code core-version.properties}. If the resource is missing or unreadable, the version falls back to
  * {@link #UNKNOWN}. This class cannot be instantiated.
  */
 public final class Version {
@@ -37,11 +36,11 @@ public final class Version {
      */
     public static final String UNKNOWN = "UNKNOWN";
 
-    private static final String RESOURCE_NAME = "version.properties";
+    private static final String RESOURCE_NAME = "core-version.properties";
 
-    private static final String VERSION_PROPERTY = "version";
+    private static final String VERSION_PROPERTY = "paramixel.core.version";
 
-    private static final String VERSION = loadVersion(ResourceLoader::getResourceAsStream);
+    private static final String VERSION = loadVersion(Version::getResourceAsString);
 
     private Version() {
         // Intentionally empty
@@ -59,9 +58,9 @@ public final class Version {
     /**
      * Loads the version string from the supplied resource provider.
      *
-     * <p>This method reads the {@code version} property from the {@code version.properties} resource
+     * <p>This method reads the {@code paramixel.core.version} property from the {@code core-version.properties} resource
      * obtained via the supplied provider. Returns {@link #UNKNOWN} when the resource is absent,
-     * unreadable, or missing the {@code version} property.
+     * unreadable, or missing the {@code paramixel.core.version} property.
      *
      * @param resourceProvider the function that supplies an {@link java.io.InputStream} for a resource name
      * @return the version string, or {@link #UNKNOWN} on any loading failure
@@ -83,5 +82,23 @@ public final class Version {
             return UNKNOWN;
         }
         return version;
+    }
+
+    private static InputStream getResourceAsString(String name) {
+        ClassLoader ctx = Thread.currentThread().getContextClassLoader();
+        if (ctx != null) {
+            InputStream is = ctx.getResourceAsStream(name);
+            if (is != null) {
+                return is;
+            }
+        }
+        ClassLoader def = Version.class.getClassLoader();
+        if (def != null) {
+            InputStream is = def.getResourceAsStream(name);
+            if (is != null) {
+                return is;
+            }
+        }
+        return ClassLoader.getSystemResourceAsStream(name);
     }
 }

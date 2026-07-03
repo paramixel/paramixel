@@ -170,7 +170,13 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
         if (descriptor.isFailed()) {
             return descriptor
                     .throwable()
-                    .map(f -> " \u2192 " + f.getClass().getName() + ": " + Listeners.sanitizeMessage(f.getMessage()))
+                    .map(f -> {
+                        var msg = Listeners.sanitizeMessage(f.getMessage());
+                        if (msg == null || msg.isBlank()) {
+                            return " \u2192 " + f.getClass().getName();
+                        }
+                        return " \u2192 " + f.getClass().getName() + ": " + msg;
+                    })
                     .or(() -> descriptor.message().map(m -> " \u2192 " + Listeners.sanitizeMessage(m)))
                     .orElse("");
         } else if (descriptor.isAborted()) {

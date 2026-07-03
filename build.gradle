@@ -1,130 +1,20 @@
-plugins {
-    id 'java'
-    id 'pmd'
-}
-
 def projectVersion = (file('pom.xml').text =~ /<revision>([^<]+)<\/revision>/)[0][1]
 
-def classgraphExclude = '**/nonapi/org/paramixel/classgraph/**'
+allprojects {
+    version = projectVersion
+    group = 'org.paramixel'
+}
 
-version = projectVersion
+subprojects {
+    apply plugin: 'java-library'
 
-sourceSets {
-    main {
-        java {
-            srcDir 'core/src/main/java'
-        }
-        resources {
-            srcDir 'core/src/main/resources'
-        }
+    java {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
-    test {
-        java {
-            srcDir 'core/src/test/java'
-        }
-    }
-    paramixel {
-        java {
-            srcDir 'core/src/main/java'
-            srcDir 'examples/src/main/java'
-        }
-        resources {
-            srcDir 'core/src/main/resources'
-            srcDir 'examples/src/main/resources'
-        }
-    }
-    benchmarks {
-        java {
-            srcDir 'benchmarks/src/main/java'
-        }
-    }
-}
 
-dependencies {
-    testImplementation libs.assertj.core
-    testImplementation libs.junit.jupiter
-    testRuntimeOnly libs.junit.platform.launcher
-
-    paramixelImplementation libs.commons.compress
-    paramixelImplementation libs.kafka.clients
-    paramixelImplementation libs.assertj.core
-    paramixelImplementation libs.junit.jupiter
-    paramixelImplementation libs.mongodb.driver.sync
-    paramixelImplementation libs.slf4j.nop
-    paramixelImplementation libs.testcontainers.kafka
-    paramixelImplementation libs.testcontainers.mongodb
-    paramixelImplementation libs.testcontainers.nginx
-    paramixelImplementation libs.testcontainers
-}
-
-dependencies {
-    benchmarksImplementation sourceSets.main.output
-    benchmarksImplementation libs.jmh.core
-    benchmarksAnnotationProcessor libs.jmh.generator.annprocess
-}
-
-pmd {
-    toolVersion = libs.versions.pmd.get()
-    ruleSetFiles = files("${rootDir}/assets/pmd-ruleset.xml")
-    ruleSets = []
-    consoleOutput = true
-    ignoreFailures = true
-}
-
-tasks.named('javadoc') {
-    exclude classgraphExclude
-    options.addStringOption('Xdoclint:all', '-quiet')
-    options.addBooleanOption('Werror', true)
-}
-
-tasks.named('pmdMain') {
-    exclude classgraphExclude
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-
-tasks.named('pmdTest') {
-    enabled = false
-}
-
-tasks.named('pmdParamixel') {
-    enabled = false
-}
-
-tasks.named('processResources') {
-    filesMatching('version.properties') {
-        expand(project: [version: projectVersion])
-    }
-}
-
-tasks.named('processParamixelResources') {
-    filesMatching('version.properties') {
-        expand(project: [version: projectVersion])
-    }
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
-}
-
-tasks.register('paramixelTest', JavaExec) {
-    dependsOn 'test'
-    dependsOn 'paramixelClasses'
-    group = 'verification'
-    description = 'Discovers and executes Paramixel action trees'
-    mainClass = 'org.paramixel.api.Runner'
-    classpath = sourceSets.paramixel.runtimeClasspath
-}
-
-tasks.named('build').configure {
-    dependsOn 'paramixelClasses'
-}
-
-tasks.named('check').configure {
-    dependsOn 'javadoc'
-    if (!project.hasProperty('paramixelSkipTests')) {
-        dependsOn 'paramixelTest'
+    repositories {
+        mavenLocal()
+        mavenCentral()
     }
 }

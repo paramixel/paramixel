@@ -18,6 +18,7 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -150,6 +151,59 @@ class AnnotationResolverTest {
         AnnotationResolver.create(CacheClearFixture.class).byId("cached");
         AnnotationResolver.clearAllCache();
         AnnotationResolver.create(CacheClearFixture.class).byId("cached");
+    }
+
+    @Test
+    @DisplayName("clearAllCache closes cache instances and lazy re-initialization works")
+    void clearAllCacheClosesCacheInstancesAndLazyReinitializationWorks() throws Exception {
+        // Populate both caches to ensure the LRUCache instances exist.
+        AnnotationResolver.create(CacheClearFixture.class).byId("cached");
+        AnnotationResolver.create(StaticCacheFixture.class).staticById("staticCache");
+
+        // Capture the old cache instances before clearing.
+        var oldInstanceCache = getCacheField("CACHE");
+        var oldStaticCache = getCacheField("STATIC_CACHE");
+
+        assertThat(oldInstanceCache).as("instance cache exists before clear").isNotNull();
+        assertThat(oldStaticCache).as("static cache exists before clear").isNotNull();
+
+        AnnotationResolver.clearAllCache();
+
+        // After clearAllCache, the old cache instances should be closed (reaper threads terminated).
+        assertThat(isReaperShutdown(oldInstanceCache))
+                .as("instance cache reaper thread should be terminated after clearAllCache")
+                .isTrue();
+        assertThat(isReaperShutdown(oldStaticCache))
+                .as("static cache reaper thread should be terminated after clearAllCache")
+                .isTrue();
+
+        // After clearAllCache, lazy re-initialization should create fresh instances.
+        var action = AnnotationResolver.create(CacheClearFixture.class).byId("cached");
+        assertThat(action).isNotNull();
+
+        var newInstanceCache = getCacheField("CACHE");
+        assertThat(newInstanceCache)
+                .as("new cache instance created after clear")
+                .isNotNull();
+        assertThat(newInstanceCache)
+                .as("new cache must be a different instance from the closed one")
+                .isNotSameAs(oldInstanceCache);
+    }
+
+    private static Object getCacheField(final String name) throws Exception {
+        var field = AnnotationResolver.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(null);
+    }
+
+    private static boolean isReaperShutdown(final Object cache) throws Exception {
+        if (cache == null) {
+            return false;
+        }
+        var reaperField = cache.getClass().getDeclaredField("reaper");
+        reaperField.setAccessible(true);
+        var reaper = (ScheduledExecutorService) reaperField.get(cache);
+        return reaper.isShutdown();
     }
 
     private static class ErrorThrowingFixture {

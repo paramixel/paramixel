@@ -146,4 +146,24 @@ class LoopArgumentsTest {
         assertThat(second.body().displayName()).isEqualTo("step");
         assertThat(second.maxIterations()).isEqualTo(3);
     }
+
+    @Test
+    @DisplayName("loop() is alias for builder()")
+    void loopIsAliasForBuilder() {
+        var action = Loop.loop("loop").body(STEP).maxIterations(1).build();
+        assertThat(action.displayName()).isEqualTo("loop");
+        assertThat(action.body()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("loop() rejects null")
+    void loopRejectsNull() {
+        assertThatThrownBy(() -> Loop.loop(null).maxIterations(1)).isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("loop() rejects blank")
+    void loopRejectsBlank() {
+        assertThatThrownBy(() -> Loop.loop(" ").maxIterations(1)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -91,12 +91,12 @@ public class StatusListener implements Listener {
                     .append(formatTiming(Listeners.elapsedMillis(descriptor)));
             var throwable = descriptor.throwable().orElse(null);
             if (throwable != null) {
-                stringBuilder
-                        .append(" | ")
-                        .append(throwable.getClass().getName())
-                        .append(": ")
-                        .append(Listeners.sanitizeMessage(throwable.getMessage()))
-                        .append(LINE_SEPARATOR);
+                var msg = Listeners.sanitizeMessage(throwable.getMessage());
+                stringBuilder.append(" | ").append(throwable.getClass().getName());
+                if (msg != null && !msg.isBlank()) {
+                    stringBuilder.append(": ").append(msg);
+                }
+                stringBuilder.append(LINE_SEPARATOR);
                 var stringWriter = new StringWriter();
                 throwable.printStackTrace(new PrintWriter(stringWriter));
                 try (var br = new BufferedReader(new StringReader(stringWriter.toString()))) {

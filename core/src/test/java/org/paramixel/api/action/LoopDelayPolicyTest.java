@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Loop.DelayPolicy;
+import org.paramixel.api.exception.PolicyException;
 
 @DisplayName("Loop.DelayPolicy")
 class LoopDelayPolicyTest {
@@ -126,6 +127,26 @@ class LoopDelayPolicyTest {
             var policy = new DelayPolicy.Exponential(Duration.ZERO);
             assertThat(policy.delayForIteration(1)).isEqualTo(Duration.ZERO);
             assertThat(policy.delayForIteration(2)).isEqualTo(Duration.ZERO);
+        }
+
+        @Test
+        @DisplayName("throws PolicyException on duration overflow")
+        void throwsPolicyExceptionOnDurationOverflow() {
+            // Use a base delay that passes constructor validation but overflows when multiplied
+            // Long.MAX_VALUE / 1000 seconds is the largest that doesn't overflow toMillis()
+            // Iteration 21 has multiplier 1L << 20 = 1048576, which causes overflow
+            var policy = new DelayPolicy.Exponential(Duration.ofSeconds(Long.MAX_VALUE / 1000));
+            assertThatThrownBy(() -> policy.delayForIteration(21))
+                    .isInstanceOf(PolicyException.class)
+                    .hasMessageContaining("duration overflow")
+                    .hasCauseInstanceOf(ArithmeticException.class);
+        }
+
+        @Test
+        @DisplayName("returns zero for very large iteration with zero base delay")
+        void returnsZeroForVeryLargeIterationWithZeroBaseDelay() {
+            var policy = new DelayPolicy.Exponential(Duration.ZERO);
+            assertThat(policy.delayForIteration(100)).isEqualTo(Duration.ZERO);
         }
     }
 }

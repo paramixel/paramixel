@@ -599,6 +599,24 @@ class TreeSummaryRendererTest {
         assertThat(output).doesNotContain("\u001B");
     }
 
+    @Test
+    @DisplayName("null throwable message does not render null text")
+    void nullThrowableMessageDoesNotRenderNullText() {
+        var root = new ConcreteDescriptor(Step.of("root", context -> {
+            throw new RuntimeException();
+        }));
+        root.freeze();
+        root.markScheduled();
+        root.setStatus(org.paramixel.api.Status.RUNNING);
+        root.setStatus(org.paramixel.api.Status.failed("fail", new RuntimeException()));
+
+        var renderer = new TreeSummaryRenderer(false);
+        var output = renderer.render(root);
+
+        assertThat(output).doesNotContain("RuntimeException: null");
+        assertThat(output).contains("RuntimeException");
+    }
+
     private static ConcreteDescriptor createDeepLinearDescriptorTree(final int depth) {
         var root = new ConcreteDescriptor(Step.of("depth-0", context -> {}));
         var current = root;

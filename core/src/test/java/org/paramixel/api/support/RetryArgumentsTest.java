@@ -16,11 +16,13 @@
 
 package org.paramixel.api.support;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.exception.PolicyException;
 import org.paramixel.api.support.Retry.Policy;
 
 @DisplayName("Retry arguments")
@@ -175,5 +177,41 @@ class RetryArgumentsTest {
         assertThatThrownBy(() -> retry.runAndThrow(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("throwableRunnable is null");
+    }
+
+    @Test
+    @DisplayName("Policy.exponential throws PolicyException on duration overflow")
+    void policyExponentialThrowsPolicyExceptionOnDurationOverflow() {
+        // Use a large initial delay that will overflow when multiplied exponentially
+        // Long.MAX_VALUE / 1000 seconds is the largest that doesn't overflow toMillis()
+        // Attempt 21 has multiplier 1L << 20 = 1048576, which causes overflow
+        var policy = Policy.exponential(Duration.ofSeconds(Long.MAX_VALUE / 1000), Duration.ofSeconds(Long.MAX_VALUE));
+
+        assertThatThrownBy(() -> policy.waitDuration(21, new RuntimeException()))
+                .isInstanceOf(PolicyException.class)
+                .hasMessageContaining("duration overflow")
+                .hasCauseInstanceOf(ArithmeticException.class);
+    }
+
+    @Test
+    @DisplayName("Policy.fixed throws PolicyException on duration overflow")
+    void policyFixedThrowsPolicyExceptionOnDurationOverflow() {
+        // Use a large initial delay that will overflow when multiplied by attempt number
+        // Long.MAX_VALUE / 1000 seconds is the largest that doesn't overflow toMillis()
+        // Attempt 1001 will overflow since 1001 * (Long.MAX_VALUE / 1000) > Long.MAX_VALUE
+        var policy = Policy.fixed(Duration.ofSeconds(Long.MAX_VALUE / 1000), Duration.ofSeconds(Long.MAX_VALUE));
+
+        assertThatThrownBy(() -> policy.waitDuration(1001, new RuntimeException()))
+                .isInstanceOf(PolicyException.class)
+                .hasMessageContaining("duration overflow")
+                .hasCauseInstanceOf(ArithmeticException.class);
+    }
+
+    @Test
+    @DisplayName("Policy.exponential returns zero for negative attempt")
+    void policyExponentialReturnsZeroForNegativeAttempt() {
+        var policy = Policy.exponential(Duration.ofMillis(100), Duration.ofSeconds(10));
+
+        assertThat(policy.waitDuration(-1, new RuntimeException())).isEqualTo(Duration.ZERO);
     }
 }

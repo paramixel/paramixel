@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -118,5 +119,56 @@ class ConfigurationFactoryTest {
                 .isPresent();
         assertThat(configuration.getString(Configuration.SCHEDULER_QUEUE_CAPACITY))
                 .contains("1024");
+    }
+
+    // --- H1 cache-staleness reproduction tests ---
+
+    private String savedParallelism;
+
+    @AfterEach
+    void restoreSystemProperty() {
+        if (savedParallelism != null) {
+            System.setProperty(Configuration.RUNNER_PARALLELISM, savedParallelism);
+        } else {
+            System.clearProperty(Configuration.RUNNER_PARALLELISM);
+        }
+    }
+
+    @Test
+    @DisplayName("defaultConfiguration reflects system property changes (no stale cache)")
+    void defaultConfigurationReflectsSystemPropertyChanges() {
+        savedParallelism = System.getProperty(Configuration.RUNNER_PARALLELISM);
+
+        // Prime the cache with the current value.
+        ConfigurationFactory.defaultConfiguration();
+
+        // Change the system property.
+        System.setProperty(Configuration.RUNNER_PARALLELISM, "3");
+
+        // Second call must reflect the new value, not the cached snapshot.
+        var configuration = ConfigurationFactory.defaultConfiguration();
+        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM))
+                .as("second defaultConfiguration() must reflect the changed system property")
+                .hasValue(3);
+    }
+
+    @Test
+    @DisplayName("defaultConfiguration(ClassLoader) reflects system property changes (no stale cache)")
+    void defaultConfigurationWithClassLoaderReflectsSystemPropertyChanges() {
+        savedParallelism = System.getProperty(Configuration.RUNNER_PARALLELISM);
+
+        var classLoader = getClass().getClassLoader();
+
+        // Prime the cache with the current value.
+        ConfigurationFactory.defaultConfiguration(classLoader);
+
+        // Change the system property.
+        System.setProperty(Configuration.RUNNER_PARALLELISM, "3");
+
+        // Second call must reflect the new value, not the cached snapshot.
+        var configuration = ConfigurationFactory.defaultConfiguration(classLoader);
+        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM))
+                .as("second defaultConfiguration(ClassLoader) must reflect the changed system property")
+                .hasValue(3);
     }
 }

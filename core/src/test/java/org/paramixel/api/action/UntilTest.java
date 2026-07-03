@@ -175,8 +175,8 @@ class UntilTest {
     }
 
     @Test
-    @DisplayName("predicate recoverable exception returns false")
-    void predicateRecoverableExceptionReturnsFalse() {
+    @DisplayName("predicate recoverable exception fails until")
+    void predicateRecoverableExceptionFailsUntil() {
         var counter = new AtomicInteger();
         var action = Until.builder("pred-recoverable")
                 .body(Step.of("step", context -> counter.incrementAndGet()))
@@ -190,7 +190,9 @@ class UntilTest {
         var root = result.descriptor().orElseThrow();
 
         assertThat(root.isFailed()).isTrue();
-        assertThat(counter.get()).isEqualTo(2);
+        assertThat(root.message()).isPresent();
+        assertThat(root.message().get()).contains("until predicate failed");
+        assertThat(counter.get()).isEqualTo(1);
     }
 
     @Test

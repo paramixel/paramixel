@@ -22,6 +22,7 @@ import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.support.AnsiColor;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Result;
@@ -127,13 +128,20 @@ public final class Listeners {
     }
 
     /**
-     * Formats the descriptor id path from root to descriptor by walking the tree.
+     * Formats the descriptor id path from root to descriptor.
+     *
+     * <p>For {@link ConcreteDescriptor} instances, the computed path is cached for
+     * subsequent calls since the parent chain is immutable post-freeze.
      *
      * @param descriptor the descriptor; must not be {@code null}
      * @return the id path
      */
     public static String formatIdPath(final Descriptor descriptor) {
         Objects.requireNonNull(descriptor, "descriptor is null");
+        if (descriptor instanceof ConcreteDescriptor concrete) {
+            return concrete.idPath();
+        }
+        // Fallback for non-ConcreteDescriptor implementations
         var ids = new ArrayDeque<String>();
         for (var d = descriptor; d != null; d = d.parent().orElse(null)) {
             ids.addFirst(d.id());

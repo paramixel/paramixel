@@ -40,14 +40,14 @@
                 <directory>src/main/resources</directory>
                 <filtering>false</filtering>
                 <excludes>
-                    <exclude>version.properties</exclude>
+                    <exclude>core-version.properties</exclude>
                 </excludes>
             </resource>
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
                 <includes>
-                    <include>version.properties</include>
+                    <include>core-version.properties</include>
                 </includes>
             </resource>
         </resources>

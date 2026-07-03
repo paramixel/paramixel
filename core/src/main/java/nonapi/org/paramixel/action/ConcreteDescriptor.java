@@ -17,6 +17,7 @@
 package nonapi.org.paramixel.action;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -50,6 +51,7 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     private volatile SchedulerPriorityKey schedulerPriorityKey = SchedulerPriorityKey.root();
     private volatile Thread executingThread;
     private volatile CompletableFuture<Descriptor> scheduledFuture;
+    private volatile String cachedIdPath;
     volatile MutableDescriptor parent;
     volatile ExecutionNode executionNode;
 
@@ -334,6 +336,28 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         }
     }
 
+    /**
+     * Returns the id path from root to this descriptor, cached after first computation.
+     *
+     * <p>The parent chain is immutable post-freeze, so the id path is a stable value.
+     * Uses a volatile field with benign races: two threads may compute the same string,
+     * but {@link String} is immutable and the computation is pure.
+     *
+     * @return the id path; never {@code null}
+     */
+    public String idPath() {
+        var path = cachedIdPath;
+        if (path != null) {
+            return path;
+        }
+        var ids = new ArrayDeque<String>();
+        for (var d = this; d != null; d = d.parent instanceof ConcreteDescriptor cd ? cd : null) {
+            ids.addFirst(d.id());
+        }
+        cachedIdPath = String.join("-", ids);
+        return cachedIdPath;
+    }
+
     @Override
     public ExecutionNode executionNode() {
         return executionNode;
@@ -358,7 +382,8 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         }
         // Recurse without holding this node's monitor: children()/before()/after() are immutable
         // post-freeze, and releasing avoids holding a lock across the recursive walk.
-        var abortedDescendant = Status.aborted("cancelled by ancestor: " + cause.getMessage());
+        var message = cause.getMessage() != null ? cause.getMessage() : "cancelled";
+        var abortedDescendant = Status.aborted("cancelled by ancestor: " + message);
         if (before != null) {
             before.abort(abortedDescendant, cause);
         }

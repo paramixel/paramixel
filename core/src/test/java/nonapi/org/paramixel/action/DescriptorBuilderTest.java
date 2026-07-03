@@ -19,10 +19,14 @@ package nonapi.org.paramixel.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.Field;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
@@ -423,5 +427,58 @@ class DescriptorBuilderTest {
             assertThat(timeoutDesc.action()).isSameAs(timeout);
             assertThat(timeoutDesc.children()).hasSize(1);
         }
+    }
+
+    @Test
+    @DisplayName("throws CycleDetectedException for self-referencing action")
+    void throwsCycleDetectedExceptionForSelfReferencingAction() throws Exception {
+        // Create a Sequence that contains itself as a child, forming a cycle
+        var step = Step.of("step", context -> {});
+        var selfRef = Sequence.builder("selfRef").child(step).build();
+
+        // Use reflection to add selfRef as a child of itself
+        Field childrenField = Sequence.class.getDeclaredField("children");
+        childrenField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        var originalChildren = (List<Action>) childrenField.get(selfRef);
+        var mutableChildren = new ArrayList<>(originalChildren);
+        mutableChildren.add(selfRef);
+        childrenField.set(selfRef, List.copyOf(mutableChildren));
+
+        assertThatThrownBy(() -> builder.discover(selfRef))
+                .isInstanceOf(org.paramixel.api.exception.CycleDetectedException.class)
+                .hasMessageContaining("Cycle detected in action tree:")
+                .hasMessageContaining("selfRef")
+                .hasMessageContaining("Sequence");
+    }
+
+    @Test
+    @DisplayName("throws CycleDetectedException for indirect cycle")
+    void throwsCycleDetectedExceptionForIndirectCycle() throws Exception {
+        // Create a cycle: A -> B -> A
+        var stepA = Step.of("stepA", context -> {});
+        var stepB = Step.of("stepB", context -> {});
+        var seqA = Sequence.builder("seqA").child(stepA).build();
+        var seqB = Sequence.builder("seqB").child(stepB).build();
+
+        // Add seqB as child of seqA, and seqA as child of seqB
+        Field childrenField = Sequence.class.getDeclaredField("children");
+        childrenField.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        var childrenA = (List<Action>) childrenField.get(seqA);
+        var mutableA = new ArrayList<>(childrenA);
+        mutableA.add(seqB);
+        childrenField.set(seqA, List.copyOf(mutableA));
+
+        @SuppressWarnings("unchecked")
+        var childrenB = (List<Action>) childrenField.get(seqB);
+        var mutableB = new ArrayList<>(childrenB);
+        mutableB.add(seqA);
+        childrenField.set(seqB, List.copyOf(mutableB));
+
+        assertThatThrownBy(() -> builder.discover(seqA))
+                .isInstanceOf(org.paramixel.api.exception.CycleDetectedException.class)
+                .hasMessageContaining("Cycle detected in action tree:");
     }
 }

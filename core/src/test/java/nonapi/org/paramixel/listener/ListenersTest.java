@@ -247,6 +247,48 @@ class ListenersTest {
     }
 
     @Test
+    @DisplayName("formatIdPath returns cached value on subsequent calls")
+    void formatIdPathReturnsCachedValue() {
+        var action = Step.of("test", context -> {});
+        var parent = new ConcreteDescriptor(action);
+        var child = new ConcreteDescriptor(parent, Step.of("child", context -> {}));
+        parent.addChild(child);
+        parent.freeze();
+
+        var first = Listeners.formatIdPath(child);
+        var second = Listeners.formatIdPath(child);
+
+        assertThat(first).isSameAs(second);
+    }
+
+    @Test
+    @DisplayName("formatIdPath returns correct path for deep tree")
+    void formatIdPathDeepTree() {
+        var root = new ConcreteDescriptor(Step.of("root", context -> {}));
+        var current = root;
+        for (int i = 1; i <= 10; i++) {
+            var child = new ConcreteDescriptor(current, Step.of("level-" + i, context -> {}));
+            current.addChild(child);
+            current = child;
+        }
+        root.freeze();
+
+        var path = Listeners.formatIdPath(current);
+        var ids = path.split("-");
+        assertThat(ids).hasSize(11); // root + 10 levels
+    }
+
+    @Test
+    @DisplayName("formatIdPath returns own id for root descriptor")
+    void formatIdPathReturnsOwnIdForRoot() {
+        var action = Step.of("root", context -> {});
+        var descriptor = new ConcreteDescriptor(action);
+        descriptor.freeze();
+
+        assertThat(Listeners.formatIdPath(descriptor)).isEqualTo(descriptor.id());
+    }
+
+    @Test
     @DisplayName("formatStatus formats aborted result as ABORTED")
     void formatStatusFormatsAbortedResult() {
         // Disable failure-on-abort promotion so the result retains its ABORTED outcome.

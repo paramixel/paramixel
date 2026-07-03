@@ -67,10 +67,12 @@
         <pmd.version>7.26.0</pmd.version>
         <jmh.version>1.37</jmh.version>
         <slf4j.version>2.0.18</slf4j.version>
+        <logback.version>1.5.34</logback.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
         <testcontainers-mongodb.version>1.21.4</testcontainers-mongodb.version>
         <testcontainers-nginx.version>1.21.4</testcontainers-nginx.version>
+
         <!-- Plugin versions -->
         <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
@@ -198,6 +200,12 @@
                 <artifactId>slf4j-nop</artifactId>
                 <version>${slf4j.version}</version>
             </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -377,6 +385,31 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-license</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <inherited>true</inherited>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/META-INF</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${maven.multiModuleProjectDirectory}</directory>
+                                    <includes>
+                                        <include>LICENSE</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
