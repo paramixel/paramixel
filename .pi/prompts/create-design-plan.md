@@ -1,9 +1,7 @@
 # Design Plan
 
-Produce a design plan document for the given problem. Produce only the
-design plan.
-
-$ARGUMENTS
+Produce a design plan document for the given problem. Produce only the design
+plan artifact and the final response described below.
 
 ## Execution Boundary
 
@@ -12,194 +10,155 @@ This prompt is for design-plan creation only.
 - Do not write code.
 - Do not implement anything.
 - Do not create or modify tests.
-- Do not modify source files, build files, configs, scripts, generated
-  files, or unrelated documentation.
-- Do not run build, test, formatting, validation, packaging, or release
-  commands.
-- You may inspect the repository by reading files and running read-only
-  search/listing commands.
+- Do not modify source files, build files, configs, scripts, generated files, or
+  unrelated documentation.
+- Do not run build, test, formatting, validation, packaging, release, commit,
+  push, network, browser, or editor actions.
+- You may inspect the repository by reading files and using read-only search or
+  listing commands.
 - The only permitted write is the requested design plan document.
 - After writing the design plan document, stop.
 
 ## Objective
 
-Document the approach, tradeoffs, API impact, concurrency model, test
-strategy, and acceptance criteria for a proposed change. The plan must be
-concrete enough that a reviewer can approve or reject the approach and an
-implementer can convert it into an implementation specification.
+Document the approach, tradeoffs, API impact, compatibility impact,
+exception handling, concurrency/lifecycle model, test strategy, and
+acceptance criteria for a proposed change. The plan must be concrete enough for
+review and for conversion into an implementation specification.
 
 ## Input
 
-A concrete problem statement, issue reference, or description of the
-feature or bug. The input may also be a resolved design from
-`design-interview.md`.
+$ARGUMENTS
 
-Optionally, the input may include paths to relevant design documents,
-specifications, related issues, source files, or test files.
+A concrete problem statement, issue reference, resolved design interview, or
+feature/bug description. The input may include paths to relevant design
+documents, specifications, source files, tests, or related issues.
 
-If the problem statement is too vague to produce a design (for example,
-"make it faster"), ask for a concrete, verifiable problem description
-before continuing.
+If the problem is too vague to produce a concrete, reviewable design, ask for a
+specific verifiable problem before continuing.
 
-If the problem is concrete but major design decisions remain unresolved,
-do not invent answers. In an interactive runtime, ask for the missing
-decision. Otherwise, stop and recommend resolving the open decisions with
-`design-interview.md` before creating the design plan.
+## Output Path Rules
 
-## Output
+Write exactly one plan.
 
-Write the plan to the file path specified by the user. If no path is
-specified, write exactly one plan to:
+Use a user-specified path when supplied. Otherwise write to:
 
 `.pi/plans/<action>[-<number>]-<description>.md`
 
 where:
 
-- `<action>` is one of `fix`, `feature`, `refactor`, `chore`, or `polish`.
+- `<action>` is `fix`, `feature`, `refactor`, `chore`, or `polish`.
 - `<number>` is an issue or ticket number, if available.
-- `<description>` is a brief lowercase summary with words separated by
-  dashes.
+- `<description>` is a brief lowercase dash-separated summary.
 
-Use the user-specified path when supplied. If deriving the path and the
-derived file already exists, choose a more specific non-conflicting
-description or report a blocker. Do not overwrite an existing file unless
-the user explicitly requested that path or replacement.
+If deriving the path and the file already exists, choose a more specific
+non-conflicting description or report a blocker. Do not overwrite an existing
+file unless the user explicitly requested replacement.
 
-Do not write or update any other file.
+The `.pi/plans/` directory is a local planning-artifact location. Create it if
+needed. Do not write or update any other file.
 
-## Prerequisites
+## Required Repository Inspection
 
-Before proposing a design, use read-only repository inspection to:
+Before proposing a design:
 
-- Read the relevant source files, interfaces, and tests in the affected area.
-- Identify the existing patterns, naming conventions, and architectural
-  decisions in play.
-- Identify the relevant build or configuration files, if they constrain
-  the design.
-- Note any constraints that must be preserved: language or runtime
-  version compatibility, public API semantics, exception contracts, and
-  null-safety contracts.
-- Identify existing API, error-handling, concurrency, and lifecycle
-  patterns that the design must follow.
-- Identify the likely test strategy and validation commands future
-  implementers should use, without running those commands while creating
-  the design plan.
-- Only proceed to the design once the current code is understood.
+- Read relevant source files, interfaces, tests, repository guidance, and build
+  or configuration files.
+- Identify existing patterns, naming conventions, architecture, APIs,
+  exception handling, and validation practices.
+- Identify constraints to preserve, including language/runtime version,
+  compatibility, public API semantics, exception contracts, and null-safety
+  or nullability contracts.
+- Identify likely validation commands from repository guidance without running
+  them.
+- Proceed only after current behavior and constraints are understood.
 
 ## Stop Conditions
 
 Abort and report the blocker if:
 
-- The problem statement is too vague to produce a concrete, reviewable
-  design.
+- The problem statement is too vague.
 - Repository inspection reveals the problem is already solved.
-- The affected code or current behavior cannot be located or understood
-  sufficiently.
-- Required design decisions remain unresolved and cannot be inferred from
-  the repository.
-- The proposed design would conflict with documented repository
-  constraints.
-- The requested output path is ambiguous, outside the allowed write
-  boundary, or cannot be written.
-- Writing the plan would require modifying anything other than the design
-  plan file.
-
-Do not invent design elements without evidence from the codebase.
+- Affected code or current behavior cannot be located or understood.
+- Required design decisions remain unresolved.
+- The design would conflict with documented repository constraints.
+- The output path is ambiguous, outside the allowed write boundary, or cannot be
+  written.
 
 ## Deliverables
 
-The design plan must include the following sections.
+The design plan must include these sections in order:
 
 ### Problem Statement
 
-- The problem being solved, in concrete terms.
-- How the problem manifests today: observable behavior, missing capability,
-  or performance gap.
+Concrete problem and evidence from repository inspection.
 
 ### Goals and Non-Goals
 
-- What the design is intended to accomplish.
-- What is explicitly out of scope.
+Explicit in-scope and out-of-scope behavior.
 
 ### Assumptions
 
-- Assumptions inferred from the problem statement, repository, or existing
-  design documents.
-- Any assumption that requires reviewer confirmation.
+Assumptions required for the plan, or `None`.
 
 ### Relevant Existing Code
 
-- Classes, interfaces, and test files in the affected area.
-- Key patterns and contracts the design must follow.
-- Existing public API surface that must remain backward-compatible.
+Exact files and methods, classes, and interfaces inspected. Include repository patterns that must
+be preserved.
 
 ### Proposed Design
 
-- The approach: what changes, what stays the same, what is new.
-- Files and classes to modify or create.
-- Key method signatures and data flow.
-- Component responsibilities and how they compose.
+Concrete design, data flow, behavior rules, and affected components.
 
 ### Alternatives Considered
 
-- At least one alternative approach, with reasoning for why it was not chosen.
-- Tradeoffs between the proposed design and each alternative.
+At least one alternative or `None` if no meaningful alternative exists.
 
 ### API Impact and Backward Compatibility
 
-- Whether public API, method signatures, or exception contracts change.
-- Migration path for existing callers, if any.
-- New dependencies, if any, with justification.
+Public API, behavior, compatibility, migration, and deprecation impact, or `Not
+applicable`.
+
+### Error Handling
+
+Expected failures and exception handling behavior, or `Not applicable`.
 
 ### Risks and Tradeoffs
 
-- Complexity introduced, performance implications, maintenance burden.
-- What could go wrong with this approach and how it is mitigated.
-- Areas where the design is deliberately extensible or not.
+Correctness, maintainability, compatibility, performance, and operational risks.
 
 ### Concurrency and Lifecycle
 
-Include if relevant. If not relevant, state that explicitly and omit the
-section.
-
-- Thread-safety guarantees, locking strategy, resource cleanup.
-- Object lifecycle: creation, initialization, shutdown.
+Thread, executor, synchronization, resource, and lifecycle implications, or `Not applicable`.
 
 ### Test Strategy
 
-- Types of tests required: unit, integration, end-to-end.
-- Test scenarios: happy path, edge cases, error conditions.
-- Whether existing tests need to be updated.
-- Validation commands future implementers should run, without running them
-  during design-plan creation.
+Tests to add/update and validation commands future implementers should run.
+Do not run them while creating the design plan.
 
 ### Open Questions
 
-Include only non-blocking questions, if any. Questions that affect the
-implementation approach are blockers and must trigger a stop condition
-instead.
+Questions that do not block the plan, or `None`. Blocking questions belong in a
+blocker response instead of the plan.
 
 ### Implementation Handoff
 
-- State whether a separate implementation specification should be created
-  before coding begins.
-- State that implementation must wait for reviewer sign-off on the design
-  approach.
+Files likely to modify, sequencing, and constraints for the implementation spec.
 
 ### Acceptance Criteria
 
-- Concrete conditions under which the design plan is complete.
-- Must include reviewer sign-off on the approach before implementation
-  begins.
+Concrete conditions required for completion, including validation expectations.
 
 ## Completion Boundary
 
-Once the design plan file has been written, stop.
+Once the design plan file has been written, stop. Do not continue into
+implementation specification, tests, source changes, formatting, validation, or
+cleanup.
 
-Do not continue into implementation specification, test creation, source
-changes, formatting, validation, cleanup, or implementation tasks.
+## Final Response
 
-In the final response, report only:
+Report only:
 
-- The design plan path written.
-- Any blockers or assumptions.
+- the design plan path written;
+- blockers, if any;
+- assumptions, if any.

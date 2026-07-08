@@ -1,6 +1,6 @@
-# Fix Code Loop
+# Fix Code Loop × 100 — All Modules
 
-Run one complete bounded loop of analysis → design → specification → implementation.
+Run up to 100 complete bounded loops of analysis → design → specification → implementation.
 Each phase must complete before the next phase begins.
 
 ## Execution Boundary
@@ -18,7 +18,7 @@ code/tests only during the implementation phase of a confirmed, bounded issue.
 
 ## Objective
 
-Find and fix correctness issues in the target repository using one loop of
+Find and fix correctness issues in the target repository using up to 100 loops of
 this deterministic phase sequence:
 
 1. `analyze-code.md` — evidence-backed correctness analysis.
@@ -140,7 +140,7 @@ Stop and report the reason if:
 - A design decision remains unresolved.
 - Implementation would require unrelated changes.
 - Validation reveals unrelated failures that cannot be safely handled in scope.
-- Stop after one complete successful loop, or earlier if no confirmed bounded issue exists.
+- Stop after 100 successful loops, or earlier if no confirmed bounded issues remain.
 
 ## Final Report
 

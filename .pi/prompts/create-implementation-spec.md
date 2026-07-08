@@ -1,159 +1,152 @@
 # Implementation Specification
 
-Convert a design plan into a detailed implementation specification.
-Produce only the specification document.
+Convert a completed design plan into an implementation specification. Produce
+only the specification artifact and the final response described below.
 
 ## Execution Boundary
 
-This prompt is for specification creation only.
+This prompt is for implementation-specification creation only.
 
-- Do not write code.
-- Do not implement anything.
+- Do not write production code.
 - Do not create or modify tests.
-- Do not modify source files, build files, docs, configs, scripts, or
-  generated files.
-- Do not run build, test, formatting, validation, or packaging commands.
-- You may inspect the repository by reading files and running read-only
-  search/listing commands.
-- The only permitted write is the requested implementation specification
-  document.
-- After writing the specification document, stop.
+- Do not modify source files, build files, configs, scripts, generated files, or
+  unrelated documentation.
+- Do not run build, test, formatting, validation, packaging, release, commit,
+  push, network, browser, or editor actions.
+- You may inspect the repository and design plan by reading files and using
+  read-only search or listing commands.
+- The only permitted write is the requested implementation specification.
+- After writing the specification, stop.
 
 ## Objective
 
-Produce step-by-step implementation instructions — tests, file changes,
-method signatures, behavior rules, error handling — concrete enough that
-an implementer can execute them without making design decisions.
-
-For bugs and issues, the specification must require the implementer to
-recreate the problem with a failing test first, confirm the expected
-failure, and only then implement the fix.
+Create a deterministic, test-first implementation specification that tells a
+future implementer exactly what to change, how to validate it, and when to stop.
 
 ## Input
 
-Path or reference to the design plan to convert into a specification.
-Optionally, an issue reference providing additional context.
+$ARGUMENTS
 
-If the design plan cannot be found or is incomplete, report the blocker
-before continuing.
+A path or reference to a design plan. The input may include an issue reference,
+requested output path, or additional repository context.
 
-## Output
+If the design plan cannot be found or is incomplete, report a blocker before
+continuing.
 
-Write the specification to the file path specified by the user. If no path
-is specified, write to `.pi/plans/<action>-<description>.md` using the
-same naming convention as the design plan.
+## Output Path Rules
 
-Do not write or update any other file.
+Use a user-specified path when supplied. Otherwise write to the same directory
+as the design plan using the same base name with `-spec` appended before the
+extension.
+
+Do not overwrite an existing specification unless the user explicitly requested
+replacement. Do not write or update any other file.
 
 ## Specification Planning Prerequisites
 
-Before writing the specification, inspect enough context to describe the
-reproduction-first implementation workflow. Do not execute that workflow.
+Before writing the specification:
 
-For bugs and issues, identify in the specification:
-
-- The minimal test file and test method the implementer should add or
-  update to reproduce the bug.
-- The exact scenario the test should cover.
-- The command the implementer should run to observe the expected failure.
-- The expected pre-fix failure mode: assertion failure, exception, error
-  message, incorrect result, or missing behavior.
-- The source area the implementer should fix after confirming the failing
-  test.
-
-For features without a bug, describe the test that should demonstrate the
-missing behavior before implementation begins.
+- Read the design plan in full.
+- Inspect enough source, tests, repository guidance, and build/configuration
+  context to describe the implementation workflow accurately.
+- Identify the narrowest reproduction or missing-behavior test to write first.
+- Identify expected pre-fix behavior: assertion failure, panic, exception,
+  incorrect result, missing behavior, or compile failure.
+- Identify validation commands from repository guidance without running them.
 
 ## Stop Conditions
 
 Abort and report the blocker if:
 
-- The design plan cannot be located or is too incomplete to convert.
-- The issue description is too vague to define a concrete reproduction
-  test or missing-behavior test.
-- The expected failing behavior cannot be identified from the design plan,
-  issue, source, or existing tests.
-- The requested output path is ambiguous or cannot be written.
+- The design plan cannot be located.
+- The design plan is too incomplete to convert.
+- The expected failing or missing behavior cannot be identified.
+- Required files, signatures, behavior, or compatibility constraints are
+  ambiguous.
+- The requested output path is ambiguous, outside the allowed write boundary, or
+  cannot be written.
 
 ## Deliverables
 
-The specification must include the following sections.
+The specification must include these sections in order:
+
+### Source Design Plan
+
+Path to the design plan.
+
+### Objective
+
+Implementation objective and scope.
 
 ### Tests to Add or Update
 
-List every test file and test method that will validate the work. Describe
-the test scenarios: happy path, edge cases, error conditions.
+Every test file and test case/function/class to add or update.
 
-For bugs and issues, the first test listed must be the minimal
-reproduction test. Include the file path, test class, test method name,
-setup, action, assertion, and expected pre-fix failure. State that the
-implementer must not start implementation until this test fails for the
-expected reason.
+For bugs, list the minimal reproduction test first and include:
 
-For features, identify the test that demonstrates the missing behavior
-before implementation. Where applicable, include both unit tests and
-integration tests.
+- file path;
+- test name;
+- setup;
+- action;
+- assertion;
+- expected pre-fix failure;
+- instruction not to start implementation until the test fails for the expected
+  reason.
+
+For features, identify the missing-behavior test that must fail or be absent
+before implementation.
 
 ### Ordered Implementation Steps
 
-Break the work into small, independently verifiable steps. Each step must
-have a clear completion criterion.
-
-For bugs and issues, the ordered steps must begin with:
+Small, independently verifiable steps. For bugs and issues, the first steps
+must be:
 
 1. Add or update the minimal reproduction test.
-2. Run the narrowest relevant test command and confirm it fails for the
-   expected reason.
+2. Run the narrowest relevant test command and confirm the expected failure.
 3. Implement the smallest source change that fixes the failure.
 4. Re-run the reproduction test and relevant regression tests.
-5. Apply formatting and broader validation required by project guidance.
-
-These are instructions for the future implementer. Do not execute them
-while creating the specification.
+5. Apply formatting and broader validation required by repository guidance.
 
 ### Exact Files and Classes to Modify
 
-Full paths to every source file that will be changed.
+Exact paths to files that will be changed.
 
 ### New Classes and Interfaces to Create
 
-Fully qualified names with a brief description of each.
+New methods, classes, and interfaces to create, or `Not applicable`.
 
 ### Method Signatures
 
-Exact signatures for every method: visibility, return type, name,
-parameters.
+Exact signatures for every changed or new method or constructor, including parameters, return values, and checked exceptions. Use `Not applicable` if no signatures change.
 
 ### Behavior Rules
 
-Detailed behavior for each changed or new method. Contractual obligations:
-preconditions, postconditions, invariants.
+Preconditions, postconditions, invariants, compatibility behavior, and edge
+cases.
 
 ### Error Handling
 
-How invalid inputs, system errors, and edge cases are handled. Exception
-types and messages.
+Invalid inputs, system failures, exceptions, messages, wrapping, propagation,
+and recovery behavior, or `Not applicable`.
 
 ### Concurrency and Lifecycle
 
-Include if relevant. If not relevant, state that explicitly and omit the
-section.
-
-- Thread-safety guarantees, locking strategy, resource cleanup.
+Thread, executor, synchronization, resource, and lifecycle guarantees, cleanup, cancellation, and ownership
+rules, or `Not applicable`.
 
 ### Acceptance Criteria
 
-Concrete conditions under which the implementation is complete. Must
-include a passing test suite as the primary acceptance gate.
+Concrete completion gates, including passing validation as the primary gate.
 
 ## Completion Boundary
 
-Once the specification file has been written, stop.
+After writing the specification file, stop. Do not continue into tests, source
+changes, implementation, formatting, validation, or cleanup.
 
-Do not continue into test creation, source changes, implementation,
-formatting, validation, or cleanup tasks.
+## Final Response
 
-In the final response, report only:
+Report only:
 
-- The specification path written.
-- Any blockers or assumptions.
+- the specification path written;
+- blockers, if any;
+- assumptions, if any.

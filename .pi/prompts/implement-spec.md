@@ -1,107 +1,116 @@
 # Implement Specification
 
-Implement the implementation specification exactly. Do not deviate.
-Do not add unrelated changes.
+Implement the referenced implementation specification exactly. Do not deviate
+from its scope.
 
 ## Objective
 
-Execute every step in the specification: write reproduction tests,
-implement the fix or feature, run validation, and verify acceptance
-criteria. Produce only the changes the specification describes.
+Execute every required step in the specification: write reproduction or
+missing-behavior tests, implement the scoped fix or feature, run validation, and
+verify acceptance criteria.
 
 ## Input
+
+$ARGUMENTS
 
 Path or reference to the implementation specification to implement.
 
 If the specification cannot be found, report the blocker before continuing.
 
-## Prerequisites
+## Execution Boundary
 
-Before writing any code:
+This is an implementation-capable prompt.
+
+- Modify only files required by the specification.
+- Do not introduce unrelated refactors, style changes, dependency changes,
+  generated-file changes, release actions, commits, or pushes unless explicitly
+  required by the specification or user.
+- Use repository-discovered build, test, format, and validation commands.
+- Do not use network access, dependency downloads, browser actions, or editor
+  actions unless the user or repository guidance explicitly requires them.
+
+## Required Preflight
+
+Before writing code:
 
 - Read the implementation specification in full.
-- Confirm you understand every section: tests to write, files to touch,
-  method signatures, behavior rules, acceptance criteria.
-- Identify the project's build, test, and formatting commands from the
-  project's agent instructions or repository guidance.
-- Do not begin implementation until the specification is fully understood
-  and every ambiguity is resolved.
+- Confirm tests to write, files to touch, method signatures, behavior rules,
+  exception handling, concurrency/lifecycle requirements, and acceptance
+  criteria.
+- Read relevant source files, tests, repository guidance, and build/configuration
+  files.
+- Identify validation commands from repository guidance.
+- Resolve every ambiguity before editing.
 
 ## Stop Conditions
 
 Abort and report the blocker if:
 
 - The specification cannot be found or is incomplete.
-- Any part of the specification is ambiguous. Ask for clarification before
-  implementing.
-- The specification describes a change that contradicts the project's
-  conventions or architecture.
+- Any required file, behavior rule, signature, or validation command is
+  ambiguous.
+- The specification conflicts with repository architecture or conventions.
+- The reproduction or missing-behavior test cannot be written as specified.
+- A validation failure appears unrelated to the scoped change and cannot be
+  safely fixed within the specification.
 
 ## Workflow
 
-1. **Write reproduction tests first.** Write the tests described in the
-   specification that reproduce the bug or demonstrate the missing feature.
-   If the project follows test-first methodology, these tests must fail
-   against the current code. If the project does not follow test-first
-   methodology, adapt accordingly but tests must still be specified before
-   implementation steps.
-
-2. **Run the reproduction tests.** Execute them using the project's test
-   commands. If the tests pass unexpectedly, stop and investigate before
-   continuing.
-
-3. **Implement the fix or feature.** Make the smallest focused change that
-   satisfies the specification. Follow the ordered implementation steps and
-   method signatures exactly as written.
-
-4. **Run the reproduction tests again.** Confirm they pass after the
-   implementation.
-
-5. **Run the full relevant test suite.** Execute the project's standard
-   validation — formatting, static analysis, all relevant tests — to ensure
-   no regressions.
-
-6. **Verify acceptance criteria.** Confirm every acceptance criterion in
-   the specification is met before declaring the work complete.
+1. **Write the specified test first.** Add or update the reproduction or
+   missing-behavior test exactly as described.
+2. **Confirm expected pre-fix behavior.** Run the narrowest repository-discovered
+   validation command for the new test. If it does not fail for the expected
+   reason, stop and investigate.
+3. **Implement the smallest scoped change.** Follow the ordered implementation
+   steps and signatures exactly.
+4. **Re-run narrow validation.** Confirm the new or updated test passes.
+5. **Run relevant regression validation.** Use repository-discovered commands.
+6. **Apply required formatting.** Use the repository's formatting guidance.
+7. **Verify acceptance criteria.** Confirm every criterion in the specification.
 
 ## Rules
 
 ### Change Discipline
 
-- Do not introduce unrelated refactors, style changes, or "while I'm here"
-  cleanups.
-- Do not change public API, exception contracts, or method signatures
-  beyond what the specification states.
 - Keep changes minimal and focused on the specification.
-- Remove only the imports, variables, or code that your change makes unused.
+- Preserve public API, compatibility, exception contracts, and existing behavior
+  unless the specification explicitly changes them.
+- Remove only imports, variables, or code made unused by your scoped change.
+- Do not clean up unrelated pre-existing issues.
 
 ### Testing Discipline
 
-- If the project follows test-first methodology, write tests before
-  implementation code.
-- Tests must cover happy path, edge cases, and error conditions as
-  described in the specification.
-- Do not weaken test assertions or skip tests to make validation pass.
+- Test behavior, not implementation details.
+- For bugs, keep the reproduction test as the first validation gate.
+- If a required test cannot be written, stop and report why.
 
 ### Validation Discipline
 
-- Run the project's format command before any build or validation.
-- Run the relevant test commands from the project's guidance before and
-  after implementation.
-- If pre-existing test failures exist, report them before starting. Do not
-  silently fix them.
+- Run the narrowest relevant validation first, then broader validation required
+  by repository guidance.
+- Report every command run and pass/fail result.
+- Do not claim validation passed unless it was run and passed.
 
 ### Error Recovery
 
-- If reproduction tests pass before the implementation, stop: the issue may
-  not be reproducible, or the test may be incorrect.
-- If a change causes unexpected test failures, revert to the last passing
-  state and reassess before continuing.
-- If stuck, report what was tried and what was observed rather than
-  guessing.
+- If your change causes a regression, either fix it within the specification or
+  revert the scoped change and report the blocker.
+- If existing unrelated tests fail, report them separately with evidence.
 
 ## Acceptance Criteria
 
-- All tests described in the specification pass.
-- The full project test suite passes with no regressions.
-- Every acceptance criterion in the specification is satisfied.
+Implementation is complete when:
+
+- All specified tests are added or updated.
+- The scoped implementation satisfies the behavior rules.
+- Required validation passes or unrelated failures are documented.
+- No unrelated files or behaviors are changed.
+
+## Final Response
+
+Report only:
+
+- files changed;
+- validation commands run with results;
+- blockers, if any;
+- assumptions, if any.

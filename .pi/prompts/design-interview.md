@@ -1,116 +1,126 @@
 # Design Interview
 
-Conduct a structured design interview to arrive at a shared,
-decision-complete understanding of the design. Walk every design
-branch in dependency order. Replace open-ended brainstorming with
-a systematic resolution of every open question.
+Conduct a structured design interview to resolve design decisions before a
+plan is written.
 
 ## Objective
 
-Resolve all design decisions before writing a design plan. By the end of
-the interview, every branch of the design tree must have an explicit,
-confirmed answer. No open questions that affect implementation may remain.
+Arrive at a decision-complete, self-consistent design state for the problem in
+`$ARGUMENTS`. Resolve dependent decisions in order and avoid open-ended
+brainstorming.
 
 ## Input
 
-A problem statement, issue reference, or feature request. Optionally,
-paths to existing design documents, specifications, or related issues.
+$ARGUMENTS
 
-If the input is too vague to proceed (for example, "design a better
-system"), ask for a concrete problem statement before continuing.
+A concrete problem statement, issue reference, feature request, or bug report.
+Optionally include paths to existing designs, specifications, source files,
+tests, or related issues.
 
-## Prerequisites
+If the input is too vague to scope the interview, ask for a concrete problem
+statement before continuing.
 
-Before beginning the interview:
+## Execution Boundary
 
-- Read any existing design documents, specifications, or related issues in
-  the repository.
-- Inspect the relevant source code and tests to understand the current
-  state of the affected components.
-- Identify architectural patterns and conventions already in use within the
-  project.
+This is a read-only interview prompt.
+
+- Do not write code.
+- Do not create or modify tests.
+- Do not modify source files, build files, configs, generated files, or
+  documentation.
+- Do not run build, test, formatting, packaging, release, commit, push, network,
+  browser, or editor actions.
+- You may inspect the repository by reading files and using read-only search or
+  listing commands.
+
+## Required Repository Inspection
+
+Before asking design questions:
+
+- Read referenced design documents, specifications, source files, and tests.
+- Identify current architecture, naming, API, exception handling, and
+  validation patterns.
+- Answer any question that can be resolved from repository evidence instead of
+  asking the user.
+- State assumptions only when they are low-risk and clearly marked.
 
 ## Interview Rules
 
-- Walk each branch of the design tree and resolve dependent decisions one
-  by one.
-- Include a recommended answer with every question.
-- If a question can be answered by inspecting the repository, inspect the
-  repository instead of asking.
-- Follow the project's coding conventions and guardrails as documented in
-  the project's agent instructions.
+- Ask only decision-relevant questions.
+- Walk decisions in dependency order.
+- Include a recommended answer with each question and explain why it is
+  recommended.
+- Keep a running design state from prior answers.
+- Do not invent answers for unresolved decisions that affect implementation.
 
 ### Interaction Mode
 
-**If the LLM runtime supports multi-turn conversation:**
-Ask exactly one question, then stop and wait for the user's answer before
-continuing. Do not include the next question, a checklist of future
-questions, or a full interview outline in the same response. After the user
-answers, incorporate that answer into the design state and ask exactly one
-next dependent question.
+If the runtime supports multi-turn interaction, ask exactly one question and
+then stop. Do not include future questions or a full interview outline.
 
-**If the LLM runtime does not support multi-turn conversation:**
-Produce all questions as a structured list, organized by dependency order,
-with a recommended answer for each. Ask the user to respond in bulk. Flag
-questions whose answers depend on earlier questions so the user can
-resolve them in order.
+If the runtime does not support multi-turn interaction, produce all questions as
+a structured list in dependency order. Mark questions that depend on earlier
+answers and include a recommended answer for each.
 
 ## Topics to Cover
 
-Address these topics in dependency order. Skip any topic that is not
-relevant to the current design.
+Skip topics that are not relevant. For skipped mandatory topics, state `Not
+applicable`.
 
 ### Scope and Boundaries
 
-- What problem is being solved? What is explicitly out of scope?
-- Which components, modules, or services are affected?
+- Problem being solved.
+- Explicit non-goals.
+- Affected packages or classes and files.
 
-### Data Model
+### Data and State
 
-- What data flows through the system? Inputs, outputs, intermediate
-  representations.
-- What invariants must be preserved?
+- Inputs, outputs, intermediate state, and invariants.
+- Compatibility and migration constraints.
 
 ### API and Contracts
 
-- What interfaces, method signatures, or API endpoints are involved?
-- What are the backward-compatibility constraints?
+- Public APIs, interfaces, signatures, and behavior contracts.
+- Backward compatibility requirements.
 
 ### Error Handling
 
-- What can go wrong? How should each failure mode be handled?
-- What exception types and error messages are appropriate?
+- Expected failure modes.
+- Exception types, messages, wrapping, propagation, or recovery behavior.
 
 ### Concurrency and Lifecycle
 
-- Are there thread-safety requirements? What is the locking strategy?
-- What resource lifecycle must be managed: startup, shutdown, cleanup?
+- Thread, executor, synchronization, resource, and lifecycle requirements.
+- Startup, shutdown, cleanup, ownership, and cancellation rules.
 
-### Testing Strategy
+### Testing and Validation
 
-- What test scenarios are required: happy path, edge cases, error conditions?
-- Should there be both unit and integration tests?
+- Unit, integration, regression, and edge-case scenarios.
+- Repository-discovered validation commands.
 
 ## Stop Conditions
 
 Abort and report the blocker if:
 
-- The input problem statement is too vague to scope the interview.
-- Repository inspection reveals the problem is already solved or is
-  infeasible given the current architecture.
-- A design branch cannot be resolved without information that is
-  unavailable and cannot be inferred from the repository.
-
-Do not invent answers to unresolved design branches. Flag them as
-unresolved and explain what information is needed.
+- The problem statement is too vague to scope.
+- Repository inspection shows the requested problem is already solved.
+- Required context cannot be found.
+- A design branch cannot be resolved from repository evidence or user input.
+- The requested design conflicts with documented repository constraints.
 
 ## Completion Criteria
 
 The interview is complete when:
 
-- Every branch of the design tree has been resolved with explicit user
-  confirmation.
-- All interdependent decisions have been addressed in dependency order.
-- The resulting design is self-consistent and does not contradict existing
-  project conventions.
-- No open questions remain that affect implementation.
+- Every implementation-affecting design branch has an explicit answer.
+- Assumptions, non-goals, compatibility constraints, and validation strategy are
+  recorded.
+- No open questions remain that would block a design plan.
+
+## Final Response
+
+Return either:
+
+- the next single interview question with a recommended answer; or
+- a compact resolved-design summary suitable for `create-design-plan.md`; or
+- a blocker with the exact missing information.

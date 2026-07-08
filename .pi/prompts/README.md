@@ -1,85 +1,105 @@
-# Prompt Templates
+# Java Prompt Templates
 
-LLM-agnostic and project-agnostic prompt templates for structured software engineering
-workflows. Every prompt is self-contained — drop it into any LLM runtime or coding agent
-and it works without additional context.
+Pi-compatible and project-agnostic prompt templates for structured Java software
+engineering workflows. Executable prompts are self-contained and use pi's
+`$ARGUMENTS` variable for parameterization.
 
-Language-specific prompts (Java) are marked below.
+## Prompt Contract
+
+All executable prompts in this directory follow the repository-level
+[`PROMPT_CONTRACT.md`](../PROMPT_CONTRACT.md). Review changes with
+[`PROMPT_REVIEW_CHECKLIST.md`](../PROMPT_REVIEW_CHECKLIST.md).
+
+Reference documents such as `coding-principles.md` and `planning-workflow.md`
+are not standalone executable workflows and may omit `$ARGUMENTS`.
 
 ## Prompt Index
 
 | File | Purpose | Use When |
 |---|---|---|
-| `planning-workflow.md` | Plan file naming convention | You need a durable plan file and want consistent naming |
-| `design-interview.md` | Structured design interview | You have a problem statement and need to resolve all design decisions before writing a plan |
-| `create-design-plan.md` | Design plan document | You have a resolved design and need to document the approach, tradeoffs, and test strategy |
+| `design-interview.md` | Structured design interview | You have a problem statement and need to resolve design decisions before writing a plan |
+| `create-design-plan.md` | Design plan document | You have a resolved design and need to document approach, tradeoffs, and test strategy |
 | `create-implementation-spec.md` | Implementation specification | You have a design plan and need step-by-step implementation instructions |
 | `implement-spec.md` | Execute an implementation spec | You have a complete implementation specification and are ready to write code |
-| `analyze-code.md` | Correctness and bug analysis | You need a focused bug-hunt on a module without writing any code |
-| `fix-code-loop.md` | Full analysis-to-implementation loop | You want to find and fix correctness issues in one end-to-end pass |
-| `java-code-review.md` | Java code review (`{java}` specific) | You need a comprehensive engineering review of Java code |
-| `java-code-coverage.md` | Java coverage improvement (`{java}` specific) | You want one safe, deterministic iteration to improve test coverage |
-| `java-performance-review.md` | Java performance review (`{java}` specific) | You have profile or benchmark data and need performance recommendations |
-| `website-docs-reconciliation.md` | Docs reconciliation with source | You need to update documentation to match current implementation |
+| `analyze-code.md` | Correctness and bug analysis | You need a focused bug hunt on a module without writing code |
+| `java-code-review.md` | Java code review | You need an evidence-backed engineering review of Java code |
+| `java-code-coverage.md` | Java coverage improvement | You want one safe, deterministic iteration to improve test coverage |
+| `java-performance-review.md` | Java performance review | You have profile, benchmark, or repository evidence and need performance recommendations |
+| `fix-code-loop.md` | Single fix loop | You want one bounded analysis-to-implementation loop |
+| `fix-code-loop-10.md` | 10-loop fix sequence | You want up to ten bounded fix loops across a project |
+| `fix-code-loop-100.md` | 100-loop fix sequence | You want up to one hundred bounded fix loops across a project |
+| `coding-principles.md` | Reference: engineering discipline | You need reusable coding-agent behavior guidance |
+| `planning-workflow.md` | Reference: plan naming | You need durable plan-file naming guidance |
 
 ## Workflow Sequence
 
 The primary design-to-implementation workflow:
 
-```
+```text
 Problem Statement
       │
       ▼
-design-interview.md ──► Resolve all design decisions
+design-interview.md ──► Resolve design decisions
       │
       ▼
-create-design-plan.md ──► Document approach, tradeoffs, test strategy
+create-design-plan.md ──► Document approach, tradeoffs, and test strategy
       │
       ▼
-create-implementation-spec.md ──► Step-by-step implementation instructions
+create-implementation-spec.md ──► Define reproduction-first implementation steps
       │
       ▼
-implement-spec.md ──► Write the code
+implement-spec.md ──► Make the scoped code/test/documentation changes
       │
       ▼
-analyze-code.md ──► Verify correctness (optional review pass)
+analyze-code.md ──► Optional evidence-backed correctness review
 ```
 
-Standalone prompts (use independently):
+Standalone prompts and references:
 
-```
-java-code-review.md ──► Comprehensive Java code review (any time)
-java-code-coverage.md ──► One focused coverage improvement iteration
-java-performance-review.md ──► Performance analysis from profile data
-website-docs-reconciliation.md ─► Docs audit against source code
-planning-workflow.md ──► Reference for plan file naming (not an executable prompt)
+```text
+java-code-review.md ──► Java code review
+java-code-coverage.md ──► Java coverage improvement
+java-performance-review.md ──► Java performance review
+fix-code-loop.md ──► Single bounded analysis-to-implementation loop
+fix-code-loop-10.md ──► Up to ten bounded fix loops
+fix-code-loop-100.md ──► Up to one hundred bounded fix loops
+planning-workflow.md ──► Reference for plan file naming
+coding-principles.md ──► Engineering discipline reference
 ```
 
 ## Template Structure
 
-Prompts follow a consistent pattern tailored to their purpose:
+Prompts use stable sections appropriate to their type:
 
-- **Design workflow prompts** (`design-interview.md`, `create-design-plan.md`,
-  `create-implementation-spec.md`, `implement-spec.md`, `analyze-code.md`)
-  follow: Objective → Input → Prerequisites → Stop Conditions →
-  Deliverables → Completion Criteria.
-
-- **Review and analysis prompts** (`java-code-review.md`,
-  `java-code-coverage.md`, `java-performance-review.md`) use
-  purpose-specific structures with priorities, checklists, and output formats.
-
-- **Task-specific prompts** (`website-docs-reconciliation.md`) follow the
-  task's natural workflow.
+- **Read-only analysis**: Objective → Input → Execution Boundary → Required
+  Inspection → Evidence Rules → Stop Conditions → Output Format → Completion
+  Criteria.
+- **Artifact-writing planning**: Execution Boundary → Objective → Input →
+  Output Path Rules → Required Inspection → Stop Conditions → Deliverables →
+  Completion Boundary → Final Response.
+- **Implementation**: Objective → Input → Preflight → Stop Conditions →
+  Workflow → Change Discipline → Validation Discipline → Error Recovery →
+  Acceptance Criteria → Final Response.
+- **Orchestration**: Execution Boundary → Objective → Input → Loop State →
+  Issue Selection → Phase Contracts → Handoffs → Stop Conditions → Final Report.
 
 ## Design Principles
 
-- **LLM-agnostic**: No model names, provider names, or LLM-specific capabilities.
-  The `design-interview.md` prompt handles both multi-turn and single-turn runtimes
-  via branching instructions.
-- **Project-agnostic**: No project names, module paths, or tool-specific commands.
-  References to build commands, test commands, or conventions use generic placeholders
-  (e.g., "the project's agent instructions").
-- **Tooling-agnostic**: No editor commands, file-system verbs like "open an editor,"
-  or IDE features.
-- **Self-contained**: Every prompt contains all the context it needs to be used.
-  Drop it into any LLM runtime and it works.
+- **pi-native**: Executable prompts use `$ARGUMENTS` as the only required
+  substitution variable.
+- **LLM/provider agnostic**: Prompts do not require a specific model family,
+  hosted service, editor, browser, shell, or IDE.
+- **Project-agnostic**: Commands and conventions are discovered from the target
+  repository when possible. Generic command examples are illustrative defaults.
+- **Deterministic**: Prompts define stable sections, stop conditions, evidence
+  requirements, and final responses.
+- **Bounded**: Prompts state whether they are read-only, artifact-writing, or
+  implementation-capable.
+
+## License
+
+[MIT](../LICENSE)
+
+---
+
+Copyright (c) 2026-present Douglas Hoard

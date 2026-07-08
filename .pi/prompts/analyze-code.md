@@ -1,102 +1,98 @@
 # Code Analysis
 
-Analyze the target module for correctness issues and potential bugs.
-Produce findings only. Do not write or modify any code.
-
-$ARGUMENTS
+Analyze the target package or class for correctness issues and potential bugs.
+Produce findings only. Do not write or modify code.
 
 ## Objective
 
 Identify runtime bugs, logic errors, race conditions, resource leaks,
-exception-handling problems, and API contract violations in the target
-module. Report every finding with its location, impact, and a suggested fix.
+exception handling problems, API contract violations, and deterministic
+behavior risks in the target package or class. Report only evidence-backed findings
+with location, impact, and suggested validation.
 
 ## Input
 
-Paths to the source files, interfaces, tests, and build configuration of
-the target module. An issue reference or bug report may provide additional
-context.
+$ARGUMENTS
 
-If the target module cannot be located or its files cannot be read, abort
-and report the blocker.
+Paths to source files, interfaces, tests, build configuration, repository
+guidance, or an issue reference for the target package or class.
 
-## Prerequisites
+If no target can be identified from the input or repository, ask for the target
+or report a blocker before continuing.
 
-Before performing the analysis:
+## Execution Boundary
 
-- Read every source file, interface, test file, and build configuration
-  file in the target module.
-- Identify the module's documented contracts, public API semantics, and
-  exception guarantees.
-- Understand the concurrency model, lifecycle management, and error-
-  propagation patterns in use.
-- Only proceed to the analysis once the codebase is understood.
+This is a read-only analysis prompt.
+
+- Do not write code.
+- Do not modify tests, source files, build files, configs, generated files, or
+  documentation.
+- Do not run build, test, formatting, packaging, release, commit, push, network,
+  browser, or editor actions unless the user explicitly requests read-only
+  validation commands.
+- You may inspect the repository by reading files and using read-only search or
+  listing commands.
+
+## Required Repository Inspection
+
+Before performing analysis:
+
+- Read every relevant source file, interface, test file, and build or
+  configuration file for the target package or class.
+- Read repository guidance that defines coding, testing, validation, or agent
+  behavior.
+- Identify documented contracts, public API semantics, exception contracts, and
+  compatibility constraints.
+- Understand the thread, executor, synchronization, resource, and lifecycle model where relevant.
+- Identify existing test patterns and validation commands, but do not run them
+  unless explicitly permitted by the input.
+
+Proceed only after the affected code and contracts are understood.
+
+## Evidence Rules
+
+Every confirmed finding must include:
+
+- Severity: Critical, High, Medium, or Low, unless project guidance defines a
+  different severity scale.
+- Exact file path and method, class, or interface.
+- Repository evidence supporting the finding.
+- Why it is a correctness issue rather than a style preference.
+- Minimal trigger scenario.
+- Observable impact.
+- Suggested fix.
+- Suggested test or validation.
+
+Use `Needs confirmation` for suspicious observations that lack enough evidence.
+Do not present speculation as a confirmed bug.
 
 ## Stop Conditions
 
 Abort and report the blocker if:
 
-- The target module cannot be located or its files cannot be read.
+- The target package or class cannot be located.
+- Required files cannot be read.
 - The codebase cannot be understood sufficiently to identify contracts and
   semantics.
+- The issue depends on product decisions not present in the repository.
+- Repository evidence shows the reported problem is already solved.
 
-Do not fabricate findings when evidence is missing.
+## Output Format
 
-## Deliverables
-
-### Scope
-
-Include only issues with plausible correctness impact:
-
-- Runtime bugs, logic errors, edge cases, and incorrect assumptions.
-- Race conditions, resource leaks, and exception-handling problems.
-- Invalid state transitions, concurrency issues, and API contract violations.
-- Nullability issues, boundary conditions, and test coverage gaps that could
-  hide real bugs.
-- Issues that could cause incorrect behavior, hangs, crashes, data loss,
-  skipped execution, duplicate execution, inconsistent results, or misleading
-  success or failure reporting.
-- Any place where behavior may differ from the documented contract.
-
-### Exclusions
-
-Do not include:
-
-- Design preferences, architecture rewrites, or naming suggestions.
-- Formatting, style, or documentation polish.
-- Report, presentation, or UI improvements unless tied to a concrete
-  correctness bug.
-- "Nice to have" improvements.
-- Performance suggestions unless they expose a correctness, deadlock,
-  starvation, or resource-exhaustion bug.
-- Broad redesigns or recommendations that cannot be tied to an observable
-  incorrect behavior.
-
-### Severity Levels
-
-Check the project's agent instructions for defined severity levels. If
-none are defined, use: Critical, High, Medium, Low.
-
-### Output Format
-
-1. **Summary** of the most serious potential bugs.
-2. **Detailed findings**, grouped by severity: Critical, High, Medium, Low.
-   For each finding include:
-   - File and method or class.
-   - What the potential bug is.
-   - Why it is a bug, not a design preference.
-   - A minimal scenario that could trigger it.
-   - Suggested fix.
-   - Suggested test case.
-3. **Needs confirmation**: findings that look suspicious but lack sufficient
-   evidence to classify as a bug. Explain what evidence is missing.
+1. **Summary**
+   - Most serious confirmed issues, or `None`.
+2. **Detailed Findings**
+   - Group by severity: Critical, High, Medium, Low.
+   - For each finding include the required evidence fields.
+3. **Needs Confirmation**
+   - Suspicious observations that require more evidence, or `None`.
+4. **Scope Inspected**
+   - Files and repository guidance inspected.
+5. **Validation Not Run**
+   - Commands identified but not run, or `Not applicable`.
 
 ## Completion Criteria
 
-The analysis is complete when:
-
-- Every source file, interface, and test in the target module has been
-  inspected.
-- Every finding is tied to a specific file and method or class.
-- Every finding describes an observable incorrect behavior.
-- No design preferences, style suggestions, or broad redesigns are included.
+The analysis is complete when every relevant source file, interface, and test in
+the target scope has been inspected and every confirmed finding is tied to
+specific repository evidence and observable incorrect behavior.
