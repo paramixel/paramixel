@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
+import org.paramixel.api.action.Loop;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
@@ -339,6 +340,32 @@ class DescriptorBuilderTest {
 
             assertThat(root.children()).hasSize(1);
         }
+    }
+
+    @Test
+    @DisplayName("discovers exactly one hundred thousand descriptors")
+    void discoversExactlyOneHundredThousandDescriptors() {
+        var loop = Loop.builder("loop")
+                .body(Step.of("step", context -> {}))
+                .maxIterations(99_999)
+                .build();
+
+        var root = builder.discover(loop);
+
+        assertThat(root.children()).hasSize(99_999);
+    }
+
+    @Test
+    @DisplayName("rejects descriptor tree exceeding one hundred thousand descriptors")
+    void rejectsDescriptorTreeExceedingOneHundredThousandDescriptors() {
+        var loop = Loop.builder("loop")
+                .body(Step.of("step", context -> {}))
+                .maxIterations(100_000)
+                .build();
+
+        assertThatThrownBy(() -> builder.discover(loop))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Descriptor expansion limit exceeded: maximum 100000 descriptors");
     }
 
     @Nested

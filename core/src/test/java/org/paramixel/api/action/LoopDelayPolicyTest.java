@@ -66,6 +66,22 @@ class LoopDelayPolicyTest {
         }
 
         @Test
+        @DisplayName("rejects negative sub-millisecond delay")
+        void linearRejectsNegativeSubMillisecondDelay() {
+            assertThatThrownBy(() -> new DelayPolicy.Linear(Duration.ofNanos(-1)))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("accepts positive sub-millisecond delay")
+        void linearAcceptsPositiveSubMillisecondDelay() {
+            var delay = Duration.ofNanos(1);
+            var policy = new DelayPolicy.Linear(delay);
+
+            assertThat(policy.delayForIteration(1)).isEqualTo(delay);
+        }
+
+        @Test
         @DisplayName("accepts zero delay")
         void acceptsZeroDelay() {
             var policy = new DelayPolicy.Linear(Duration.ZERO);
@@ -118,6 +134,13 @@ class LoopDelayPolicyTest {
         @DisplayName("rejects negative baseDelay")
         void rejectsNegativeBaseDelay() {
             assertThatThrownBy(() -> new DelayPolicy.Exponential(Duration.ofMillis(-1)))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("rejects negative sub-millisecond baseDelay")
+        void exponentialRejectsNegativeSubMillisecondBaseDelay() {
+            assertThatThrownBy(() -> new DelayPolicy.Exponential(Duration.ofNanos(-1)))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
