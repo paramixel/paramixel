@@ -33,6 +33,7 @@ release.properties
 **/.flattened-pom.xml
 .opencode/
 .pi/plans/
+.pi/specs/
 .pi/implemented/
 stress-test.log
 .DS_Store
