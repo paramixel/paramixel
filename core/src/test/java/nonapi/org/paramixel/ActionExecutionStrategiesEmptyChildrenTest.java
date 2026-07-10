@@ -26,6 +26,7 @@ import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Sequential;
 
 @DisplayName("Empty composite action execution")
+@SuppressWarnings("removal")
 class ActionExecutionStrategiesEmptyChildrenTest {
 
     @Test

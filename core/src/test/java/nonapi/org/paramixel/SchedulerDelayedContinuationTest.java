@@ -35,6 +35,7 @@ import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Step;
 
 @DisplayName("Scheduler delayed continuations")
+@SuppressWarnings("removal")
 class SchedulerDelayedContinuationTest {
 
     private static final Duration DELAY = Duration.ofMillis(500);
