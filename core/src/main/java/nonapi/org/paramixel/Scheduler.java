@@ -24,8 +24,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -151,6 +154,8 @@ public final class Scheduler implements AutoCloseable {
     private final int parallelism;
     private final boolean allowCoreThreadTimeout;
     private final ThreadPoolExecutor executor;
+    private final ScheduledExecutorService delayExecutor;
+    private final ConcurrentHashMap<ExecutionNode, ScheduledFuture<?>> delayedContinuations = new ConcurrentHashMap<>();
     private final AtomicInteger workerThreadCounter = new AtomicInteger();
     private final AtomicInteger runningLeafCounter = new AtomicInteger();
     private final AtomicLong taskSequence = new AtomicLong(0);
@@ -241,6 +246,11 @@ public final class Scheduler implements AutoCloseable {
         this.queuePermits = new Semaphore(queueCapacity);
         this.leafPermits = new Semaphore(parallelism);
         this.executor = createExecutor();
+        this.delayExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            var thread = new Thread(runnable, THREAD_NAME + "-delay");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     /**
@@ -773,7 +783,14 @@ public final class Scheduler implements AutoCloseable {
             // Release enough permits to unblock any leaf workers waiting on leafPermits.acquire()
             // so they can finish during the graceful shutdown phase.
             leafPermits.release(parallelism);
+            delayExecutor.shutdownNow();
             executor.shutdown();
+            for (var entry : delayedContinuations.entrySet()) {
+                if (delayedContinuations.remove(entry.getKey(), entry.getValue())) {
+                    entry.getValue().cancel(false);
+                    executeContinuation(entry.getKey());
+                }
+            }
         } finally {
             closingLock.unlock();
         }
@@ -832,6 +849,36 @@ public final class Scheduler implements AutoCloseable {
         } catch (RejectedExecutionException e) {
             // Race: shut down between the isShutdown() check and execute().
             shutdownDrain.add(node);
+        }
+    }
+
+    void executeContinuationAfter(final ExecutionNode node, final long delay, final TimeUnit unit) {
+        Objects.requireNonNull(node, "node is null");
+        Objects.requireNonNull(unit, "unit is null");
+        if (delay < 0) {
+            throw new IllegalArgumentException("delay must not be negative, was: " + delay);
+        }
+        if (closing || delayExecutor.isShutdown()) {
+            executeContinuation(node);
+            return;
+        }
+        try {
+            var future = delayExecutor.schedule(
+                    () -> {
+                        delayedContinuations.remove(node);
+                        executeContinuation(node);
+                    },
+                    delay,
+                    unit);
+            var existing = delayedContinuations.putIfAbsent(node, future);
+            if (existing != null) {
+                future.cancel(false);
+            } else if (closing && delayedContinuations.remove(node, future)) {
+                future.cancel(false);
+                executeContinuation(node);
+            }
+        } catch (RejectedExecutionException e) {
+            executeContinuation(node);
         }
     }
 

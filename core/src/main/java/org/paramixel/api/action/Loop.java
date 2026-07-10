@@ -198,7 +198,7 @@ public final class Loop implements Action {
              */
             public Linear {
                 Objects.requireNonNull(delay, "delay is null");
-                Arguments.requireNonNegative(delay.toMillis(), "delay is negative");
+                Arguments.requireFalse(delay.isNegative(), "delay is negative");
             }
 
             @Override
@@ -225,7 +225,7 @@ public final class Loop implements Action {
              */
             public Exponential {
                 Objects.requireNonNull(baseDelay, "baseDelay is null");
-                Arguments.requireNonNegative(baseDelay.toMillis(), "baseDelay is negative");
+                Arguments.requireFalse(baseDelay.isNegative(), "baseDelay is negative");
             }
 
             @Override
@@ -350,7 +350,7 @@ public final class Loop implements Action {
          */
         public Builder delay(final Duration fixedDelay) {
             Objects.requireNonNull(fixedDelay, "fixedDelay is null");
-            Arguments.requireNonNegative(fixedDelay.toMillis(), "fixedDelay is negative");
+            Arguments.requireFalse(fixedDelay.isNegative(), "fixedDelay is negative");
             this.delayPolicy = new DelayPolicy.Linear(fixedDelay);
             return this;
         }

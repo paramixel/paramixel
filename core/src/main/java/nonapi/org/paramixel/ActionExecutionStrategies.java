@@ -16,6 +16,7 @@
 
 package nonapi.org.paramixel;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
@@ -480,7 +481,7 @@ final class ActionExecutionStrategies {
             signalChildSchedulingFailure(node);
             return Status.RUNNING;
         }
-        childFuture.orTimeout(timeout.timeout().toMillis(), TimeUnit.MILLISECONDS);
+        childFuture.orTimeout(timeoutNanos(timeout.timeout()), TimeUnit.NANOSECONDS);
 
         childFuture.whenComplete((result, ex) -> {
             if (ex instanceof TimeoutException && timedOut.compareAndSet(false, true)) {
@@ -497,6 +498,15 @@ final class ActionExecutionStrategies {
         });
 
         return Status.RUNNING;
+    }
+
+    static long timeoutNanos(final Duration duration) {
+        Objects.requireNonNull(duration, "duration is null");
+        try {
+            return duration.toNanos();
+        } catch (ArithmeticException e) {
+            return Long.MAX_VALUE;
+        }
     }
 
     /**
@@ -569,6 +579,11 @@ final class ActionExecutionStrategies {
         if (node.descriptor.executionNode() != node) {
             return;
         }
+        if (node.delayScheduled) {
+            node.delayScheduled = false;
+            scheduleNextLoopChild(node, context, loopAction);
+            return;
+        }
         var completedIndex = node.childIndex - 1;
         if (completedIndex >= 0 && completedIndex < node.children.size()) {
             var completedChild = node.children.get(completedIndex);
@@ -607,20 +622,9 @@ final class ActionExecutionStrategies {
                         .delayForIteration(completedIndex + 1)
                         .toMillis();
                 if (delayMs > 0) {
-                    // NOTE: this sleep runs on the scheduler worker executing the continuation.
-                    // For typical short inter-iteration delays this is acceptable; under low
-                    // parallelism a long delay ties up a worker that could run other ready tasks.
-                    // A future enhancement could schedule post-delay admission on a
-                    // ScheduledExecutorService to free the worker.
-                    try {
-                        Thread.sleep(delayMs);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        skipRemainingLoopChildren(node, context);
-                        node.descriptor.setStatus(Status.ABORTED);
-                        node.descriptor.setExecutionNode(null);
-                        return;
-                    }
+                    node.delayScheduled = true;
+                    context.scheduler().executeContinuationAfter(node, delayMs, TimeUnit.MILLISECONDS);
+                    return;
                 }
             }
         }

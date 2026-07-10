@@ -103,6 +103,15 @@ class LoopArgumentsTest {
     }
 
     @Test
+    @DisplayName("delay duration rejects negative sub-millisecond duration")
+    void delayDurationRejectsNegativeSubMillisecondDuration() {
+        var builder = Loop.builder("loop").body(STEP);
+        assertThatThrownBy(() -> builder.delay(Duration.ofNanos(-1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fixedDelay is negative");
+    }
+
+    @Test
     @DisplayName("delay millis rejects negative")
     void delayMillisRejectsNegative() {
         var builder = Loop.builder("loop").body(STEP);

@@ -34,6 +34,19 @@ import org.paramixel.api.action.Timeout;
 class ActionExecutionStrategiesDefectTest {
 
     @Test
+    @DisplayName("timeout nanos preserves positive sub-millisecond duration")
+    void timeoutNanosPreservesPositiveSubMillisecondDuration() {
+        assertThat(ActionExecutionStrategies.timeoutNanos(Duration.ofNanos(1))).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("timeout nanos saturates overflow")
+    void timeoutNanosSaturatesOverflow() {
+        assertThat(ActionExecutionStrategies.timeoutNanos(Duration.ofSeconds(Long.MAX_VALUE)))
+                .isEqualTo(Long.MAX_VALUE);
+    }
+
+    @Test
     @DisplayName("handleTimeout returns existing terminal status when child already completed")
     void handleTimeoutReturnsExistingTerminalStatusWhenChildAlreadyCompleted() throws Exception {
         var timeout = Timeout.builder("timeout")

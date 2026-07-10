@@ -141,6 +141,11 @@ public final class ExecutionNode {
     public int attemptedChildren;
 
     /**
+     * Whether a Loop continuation is waiting for its configured inter-iteration delay.
+     */
+    public boolean delayScheduled;
+
+    /**
      * Whether this node's strategy has already published terminal state to
      * {@link #nodeCompletion}. Set atomically by the first continuation or
      * external abort path that completes the node to prevent duplicate completion.
