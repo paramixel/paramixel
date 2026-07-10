@@ -104,8 +104,7 @@ Use `create-implementation-spec.md` for the design plan.
 
 ### Deliverables
 
-- Spec path derived from the design plan path unless the user supplied another
-  path.
+- Spec path under `.pi/specs/` unless the user supplied another path.
 - Reproduction-first or missing-behavior-first test instructions.
 - Ordered implementation steps.
 - Exact files, signatures, behavior rules, exception handling, validation, and

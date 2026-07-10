@@ -35,9 +35,12 @@ continuing.
 
 ## Output Path Rules
 
-Use a user-specified path when supplied. Otherwise write to the same directory
-as the design plan using the same base name with `-spec` appended before the
-extension.
+Use a user-specified path when supplied. Otherwise write to `.pi/specs/` using
+the design plan's base name with `-spec` appended before the extension. For
+example, a design plan at `.pi/plans/fix-0123-null-pointer.md` produces a spec
+at `.pi/specs/fix-0123-null-pointer-spec.md`.
+
+Create `.pi/specs/` if it does not exist.
 
 Do not overwrite an existing specification unless the user explicitly requested
 replacement. Do not write or update any other file.
