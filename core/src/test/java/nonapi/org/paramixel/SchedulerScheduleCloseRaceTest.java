@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import nonapi.org.paramixel.action.ConcreteContext;
@@ -141,9 +142,150 @@ class SchedulerScheduleCloseRaceTest {
                 assertThat(queuePermits.availablePermits())
                         .as("trial " + trial + ": available permits must not exceed queue capacity")
                         .isLessThanOrEqualTo(scheduler.queueCapacity());
+
+                // leafPermits invariant: available permits never exceed parallelism.
+                var leafPermitsField = Scheduler.class.getDeclaredField("leafPermits");
+                leafPermitsField.setAccessible(true);
+                var leafPermits = (Semaphore) leafPermitsField.get(scheduler);
+                assertThat(leafPermits.availablePermits())
+                        .as("trial " + trial + ": available leaf permits must not exceed parallelism")
+                        .isLessThanOrEqualTo(scheduler.parallelism());
             } finally {
                 scheduler.close();
             }
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    @DisplayName("deterministic admission/close race: every returned future is terminal")
+    void deterministicAdmissionCloseRaceEveryReturnedFutureTerminal() throws Exception {
+        var workerCreated = new CountDownLatch(1);
+        var workerProceed = new CountDownLatch(1);
+        var threadCounter = new AtomicInteger();
+
+        ThreadFactory blockingFactory = runnable -> {
+            Runnable pausedRunnable = () -> {
+                workerCreated.countDown();
+                try {
+                    workerProceed.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                runnable.run();
+            };
+            var thread = new Thread(pausedRunnable, "paramixel-scheduler-" + threadCounter.getAndIncrement());
+            thread.setDaemon(true);
+            return thread;
+        };
+
+        var scheduler = new Scheduler(1, 16, true, blockingFactory);
+        try {
+            var descriptors = new ConcurrentLinkedQueue<MutableDescriptor>();
+            var futures = new ConcurrentLinkedQueue<CompletableFuture<Descriptor>>();
+            var publishedCounts = new ConcurrentLinkedQueue<AtomicInteger>();
+            var submitterDone = new CountDownLatch(3);
+
+            // Submit first task to trigger worker creation.
+            var firstRoot = new DescriptorBuilder().discover(Step.of("first-leaf", context -> {}));
+            var firstContext = newContext(scheduler, firstRoot);
+            var firstFuture = scheduler.schedule(firstRoot, ExecutionMode.RUN, firstContext);
+            descriptors.add(firstRoot);
+            futures.add(firstFuture);
+
+            // Wait for worker creation to be triggered.
+            assertThat(workerCreated.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // Now submit more tasks concurrently while the worker is paused.
+            for (var i = 0; i < 3; i++) {
+                new Thread(() -> {
+                            for (var j = 0; j < 5; j++) {
+                                var leaf = Step.of("leaf", context -> {});
+                                var root = new DescriptorBuilder().discover(leaf);
+                                root.freeze();
+                                var publishedRef = new AtomicInteger();
+                                var callback = new Scheduler.ExecutionCallback() {
+                                    @Override
+                                    public void onExecutionStart() {}
+
+                                    @Override
+                                    public void onExecutionComplete(final Throwable error) {
+                                        publishedRef.incrementAndGet();
+                                    }
+                                };
+                                var context = newContext(scheduler, root);
+                                try {
+                                    var future = scheduler.schedule(root, ExecutionMode.RUN, context, callback);
+                                    descriptors.add(root);
+                                    futures.add(future);
+                                    publishedCounts.add(publishedRef);
+                                } catch (Exception ignored) {
+                                }
+                            }
+                            submitterDone.countDown();
+                        })
+                        .start();
+            }
+
+            // Start close on a separate thread while the worker is paused.
+            var closeComplete = new CountDownLatch(1);
+            new Thread(() -> {
+                        scheduler.close();
+                        closeComplete.countDown();
+                    })
+                    .start();
+
+            // Give the close thread time to start blocking.
+            Thread.sleep(100);
+
+            // Release the worker so admission and close race.
+            workerProceed.countDown();
+
+            // Wait for everything to complete.
+            assertThat(submitterDone.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(closeComplete.await(10, TimeUnit.SECONDS)).isTrue();
+
+            scheduler.close(); // idempotent
+
+            // Assertions: every returned future is done.
+            for (var future : futures) {
+                assertThat(future.isDone())
+                        .as("every returned future must be done")
+                        .isTrue();
+            }
+
+            // Every submitted descriptor is terminal.
+            for (var descriptor : descriptors) {
+                assertThat(descriptor.isCompleted())
+                        .as("every submitted descriptor must be terminal")
+                        .isTrue();
+            }
+
+            // No descriptor is published more than once.
+            for (var count : publishedCounts) {
+                assertThat(count.get())
+                        .as("no descriptor should be published more than once")
+                        .isLessThanOrEqualTo(1);
+            }
+
+            // queuePermits invariant.
+            var queuePermitsField = Scheduler.class.getDeclaredField("queuePermits");
+            queuePermitsField.setAccessible(true);
+            var queuePermits = (Semaphore) queuePermitsField.get(scheduler);
+            assertThat(queuePermits.availablePermits())
+                    .as("available permits must not exceed queue capacity")
+                    .isLessThanOrEqualTo(scheduler.queueCapacity());
+
+            // leafPermits invariant.
+            var leafPermitsField = Scheduler.class.getDeclaredField("leafPermits");
+            leafPermitsField.setAccessible(true);
+            var leafPermits = (Semaphore) leafPermitsField.get(scheduler);
+            assertThat(leafPermits.availablePermits())
+                    .as("available permits must not exceed parallelism")
+                    .isLessThanOrEqualTo(scheduler.parallelism());
+        } finally {
+            scheduler.close();
         }
     }
 
