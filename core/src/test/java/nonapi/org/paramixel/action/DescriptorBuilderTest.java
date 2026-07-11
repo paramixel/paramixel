@@ -343,29 +343,16 @@ class DescriptorBuilderTest {
     }
 
     @Test
-    @DisplayName("discovers exactly one hundred thousand descriptors")
-    void discoversExactlyOneHundredThousandDescriptors() {
-        var loop = Loop.builder("loop")
-                .body(Step.of("step", context -> {}))
-                .maxIterations(99_999)
-                .build();
+    @DisplayName("discovers more than one hundred thousand descriptors")
+    void discoversMoreThanOneHundredThousandDescriptors() {
+        var step = Step.of("step", context -> {});
+        var loop = Loop.builder("loop").body(step).maxIterations(100_000).build();
 
         var root = builder.discover(loop);
 
-        assertThat(root.children()).hasSize(99_999);
-    }
-
-    @Test
-    @DisplayName("rejects descriptor tree exceeding one hundred thousand descriptors")
-    void rejectsDescriptorTreeExceedingOneHundredThousandDescriptors() {
-        var loop = Loop.builder("loop")
-                .body(Step.of("step", context -> {}))
-                .maxIterations(100_000)
-                .build();
-
-        assertThatThrownBy(() -> builder.discover(loop))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Descriptor expansion limit exceeded: maximum 100000 descriptors");
+        assertThat(root).isNotNull();
+        assertThat(root.action()).isSameAs(loop);
+        assertThat(root.children()).hasSize(100_000);
     }
 
     @Nested
