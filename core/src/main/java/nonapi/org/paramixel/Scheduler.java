@@ -19,6 +19,7 @@ package nonapi.org.paramixel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -30,6 +31,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -245,7 +247,49 @@ public final class Scheduler implements AutoCloseable {
         this.allowCoreThreadTimeout = allowCoreThreadTimeout;
         this.queuePermits = new Semaphore(queueCapacity);
         this.leafPermits = new Semaphore(parallelism);
-        this.executor = createExecutor();
+        this.executor = createExecutor(defaultThreadFactory());
+        this.delayExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            var thread = new Thread(runnable, THREAD_NAME + "-delay");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    /**
+     * Creates a scheduler with the given parallelism, queue capacity, core thread timeout
+     * policy, and worker thread factory.
+     *
+     * <p>The thread factory is used to create executor worker threads. The scheduler wraps
+     * each created thread with its own lifecycle tracking. The factory must produce daemon
+     * threads with appropriate naming for correct scheduler operation.
+     *
+     * @param parallelism the maximum concurrent leaf execution count (must be positive)
+     * @param queueCapacity global admission permit count and initial queue allocation (must be
+     *     positive)
+     * @param allowCoreThreadTimeout whether idle scheduler threads may be terminated
+     * @param threadFactory the factory for executor worker threads; must not be {@code null}
+     * @throws IllegalArgumentException if {@code parallelism} or {@code queueCapacity} is not
+     *     positive
+     * @throws NullPointerException if {@code threadFactory} is {@code null}
+     */
+    Scheduler(
+            final int parallelism,
+            final int queueCapacity,
+            final boolean allowCoreThreadTimeout,
+            final ThreadFactory threadFactory) {
+        if (parallelism <= 0) {
+            throw new IllegalArgumentException("parallelism must be positive, was: " + parallelism);
+        }
+        if (queueCapacity <= 0) {
+            throw new IllegalArgumentException("queueCapacity must be positive, was: " + queueCapacity);
+        }
+        Objects.requireNonNull(threadFactory, "threadFactory is null");
+        this.parallelism = parallelism;
+        this.queueCapacity = queueCapacity;
+        this.allowCoreThreadTimeout = allowCoreThreadTimeout;
+        this.queuePermits = new Semaphore(queueCapacity);
+        this.leafPermits = new Semaphore(parallelism);
+        this.executor = createExecutor(threadFactory);
         this.delayExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
             var thread = new Thread(runnable, THREAD_NAME + "-delay");
             thread.setDaemon(true);
@@ -366,7 +410,6 @@ public final class Scheduler implements AutoCloseable {
                 this,
                 parentContext.instanceHolder());
 
-        final CompletableFuture<Descriptor> future;
         closingLock.lock();
         try {
             if (closing) {
@@ -375,16 +418,17 @@ public final class Scheduler implements AutoCloseable {
                 childCompleted(descriptor);
                 return CompletableFuture.failedFuture(closingException);
             }
-
-            try {
-                future = descriptor.markScheduled();
-            } catch (Throwable t) {
-                ensureTerminalStatus(context, t);
-                childCompleted(descriptor);
-                return CompletableFuture.failedFuture(t);
-            }
         } finally {
             closingLock.unlock();
+        }
+
+        final CompletableFuture<Descriptor> future;
+        try {
+            future = descriptor.markScheduled();
+        } catch (Throwable t) {
+            ensureTerminalStatus(context, t);
+            childCompleted(descriptor);
+            return CompletableFuture.failedFuture(t);
         }
 
         if (!queuePermits.tryAcquire()) {
@@ -396,40 +440,28 @@ public final class Scheduler implements AutoCloseable {
             return future;
         }
 
+        var priorityKey = descriptor.schedulerPriorityKey();
+        var sequence = taskSequence.getAndIncrement();
+        var task = new PrioritizedTask(
+                priorityKey, sequence, descriptor, context, mode, future, callback, queuePermits, this);
+
         closingLock.lock();
         try {
             if (closing) {
-                queuePermits.release();
-                var closingException = new IllegalStateException("Scheduler is closing");
-                ensureTerminalStatus(context, closingException);
-                completeExceptionally(descriptor, future, closingException);
-                publishRejectedCompletion(descriptor, callback, closingException);
+                rejectNeverStartedTask(task, new IllegalStateException("Scheduler is closing"));
                 return future;
+            }
+            try {
+                executor.execute(task);
+            } catch (RejectedExecutionException rejected) {
+                rejectNeverStartedTask(task, rejected);
+            } catch (Throwable t) {
+                rejectNeverStartedTask(task, t);
+                recordUnrecoverableFailure(t);
+                UnrecoverableErrors.rethrowIfUnrecoverable(t);
             }
         } finally {
             closingLock.unlock();
-        }
-
-        var priorityKey = descriptor.schedulerPriorityKey();
-        var sequence = taskSequence.getAndIncrement();
-        try {
-            executor.execute(new PrioritizedTask(
-                    priorityKey, sequence, descriptor, context, mode, future, callback, queuePermits, this));
-        } catch (RejectedExecutionException rejected) {
-            queuePermits.release();
-            ensureTerminalStatus(context, rejected);
-            completeExceptionally(descriptor, future, rejected);
-            publishRejectedCompletion(descriptor, callback, rejected);
-        } catch (Throwable t) {
-            queuePermits.release();
-            recordUnrecoverableFailure(t);
-            ensureTerminalStatus(context, t);
-            completeExceptionally(descriptor, future, t);
-            try {
-                publishRejectedCompletion(descriptor, callback, t);
-            } finally {
-                UnrecoverableErrors.rethrowIfUnrecoverable(t);
-            }
         }
 
         return future;
@@ -639,6 +671,31 @@ public final class Scheduler implements AutoCloseable {
         publishRejectedCompletion(task.descriptor, task.callback, error);
     }
 
+    private void rejectNeverStartedTask(final PrioritizedTask task, final Throwable cause) {
+        task.queuePermits.release();
+        ensureTerminalStatus(task.context, cause);
+        completeExceptionally(task.descriptor, task.future, cause);
+        publishRejectedCompletion(task.descriptor, task.callback, cause);
+    }
+
+    private void processRemovedTasks(final List<Runnable> removed) {
+        if (removed == null || removed.isEmpty()) {
+            return;
+        }
+        for (var task : removed) {
+            try {
+                if (task instanceof PrioritizedTask pt) {
+                    rejectNeverStartedTask(pt, schedulerClosingException());
+                } else if (task instanceof ContinuationTask ct) {
+                    runContinuationOnce(ct.node);
+                }
+                // Unexpected runnable type: skip (defensive)
+            } catch (Throwable t) {
+                // Don't let one failing task strand the rest
+            }
+        }
+    }
+
     private void deferIsolationTask(final IsolationState state, final PrioritizedTask task) {
         if (state.dispatchedTask == task) {
             state.dispatchedTask = null;
@@ -799,12 +856,14 @@ public final class Scheduler implements AutoCloseable {
         // callers (e.g. Parallel coordinators) that need the lock to check closing.
         try {
             if (!executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                executor.shutdownNow();
+                var removed = executor.shutdownNow();
+                processRemovedTasks(removed);
                 executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            executor.shutdownNow();
+            var removed = executor.shutdownNow();
+            processRemovedTasks(removed);
             try {
                 executor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             } catch (InterruptedException e2) {
@@ -1307,27 +1366,31 @@ public final class Scheduler implements AutoCloseable {
         callbackFailure.printStackTrace(System.err);
     }
 
-    private ThreadPoolExecutor createExecutor() {
+    private ThreadFactory defaultThreadFactory() {
+        return runnable -> {
+            Runnable lifecycleTrackedRunnable = () -> {
+                schedulerWorker.set(true);
+                try {
+                    runnable.run();
+                } finally {
+                    schedulerWorker.remove();
+                }
+            };
+            var thread =
+                    new Thread(lifecycleTrackedRunnable, THREAD_NAME + "-" + workerThreadCounter.getAndIncrement());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    private ThreadPoolExecutor createExecutor(final ThreadFactory threadFactory) {
         var executor = new ThreadPoolExecutor(
                 parallelism,
                 parallelism,
                 THREAD_KEEP_ALIVE_SECONDS,
                 TimeUnit.SECONDS,
                 new PriorityBlockingQueue<>(queueCapacity, PRIORITY_COMPARATOR),
-                runnable -> {
-                    Runnable lifecycleTrackedRunnable = () -> {
-                        schedulerWorker.set(true);
-                        try {
-                            runnable.run();
-                        } finally {
-                            schedulerWorker.remove();
-                        }
-                    };
-                    var thread = new Thread(
-                            lifecycleTrackedRunnable, THREAD_NAME + "-" + workerThreadCounter.getAndIncrement());
-                    thread.setDaemon(true);
-                    return thread;
-                });
+                threadFactory);
         executor.allowCoreThreadTimeOut(allowCoreThreadTimeout);
         return executor;
     }

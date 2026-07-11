@@ -17,13 +17,18 @@
 package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.DescriptorBuilder;
@@ -725,6 +730,179 @@ class SchedulerCloseBehaviorTest {
                 Thread.interrupted();
                 scheduler.close();
             }
+        }
+    }
+
+    // ================================================================
+    // Forced-shutdown removed-task cleanup
+    // ================================================================
+
+    @Test
+    @Timeout(15)
+    @DisplayName("shutdownNow terminalizes queued task and publishes exactly once")
+    void shutdownNowTerminalizesQueuedTaskAndPublishesExactlyOnce() throws Exception {
+        var scheduler = new Scheduler(1, 2);
+        try {
+            var context = newContext(scheduler);
+            var root = contextRoot(context);
+
+            // First task: blocks, occupying the sole worker.
+            var blockerStarted = new CountDownLatch(1);
+            var blockerRelease = new CountDownLatch(1);
+            var blocker = newChildDescriptor(root, Step.of("blocker", innerContext -> {
+                blockerStarted.countDown();
+                try {
+                    blockerRelease.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            scheduler.schedule(blocker, ExecutionMode.RUN, context);
+            assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // Second task: queues behind the blocker.
+            var queuedExecuted = new AtomicBoolean();
+            var callbackCount = new AtomicInteger();
+            var queuedLeaf = newChildDescriptor(root, Step.of("queued", innerContext -> {
+                queuedExecuted.set(true);
+            }));
+            var callback = new Scheduler.ExecutionCallback() {
+                @Override
+                public void onExecutionStart() {}
+
+                @Override
+                public void onExecutionComplete(final Throwable error) {
+                    callbackCount.incrementAndGet();
+                }
+            };
+            var queuedFuture = scheduler.schedule(queuedLeaf, ExecutionMode.RUN, context, callback);
+
+            // Close on a separate thread — will timeout and escalate to shutdownNow.
+            var closeComplete = new CountDownLatch(1);
+            new Thread(() -> {
+                        scheduler.close();
+                        closeComplete.countDown();
+                    })
+                    .start();
+
+            assertThat(closeComplete.await(15, TimeUnit.SECONDS)).isTrue();
+
+            // Release the blocker.
+            blockerRelease.countDown();
+
+            // Assertions on the removed queued task.
+            assertThat(queuedExecuted.get())
+                    .as("removed queued task must not execute")
+                    .isFalse();
+            assertThat(queuedLeaf.isCompleted())
+                    .as("removed queued descriptor must be terminal")
+                    .isTrue();
+            assertThat(queuedLeaf.isFailed())
+                    .as("removed queued descriptor must be failed")
+                    .isTrue();
+            assertThat(queuedFuture.isDone())
+                    .as("removed queued future must be done")
+                    .isTrue();
+            assertThat(queuedFuture.isCompletedExceptionally())
+                    .as("removed queued future must be completed exceptionally")
+                    .isTrue();
+            assertThatThrownBy(queuedFuture::join)
+                    .isInstanceOf(CompletionException.class)
+                    .hasCauseInstanceOf(RejectedExecutionException.class)
+                    .hasMessageContaining("Scheduler is closing");
+
+            assertThat(callbackCount.get())
+                    .as("callback must be invoked exactly once")
+                    .isEqualTo(1);
+
+            // Queue permits invariant.
+            var queuePermitsField = Scheduler.class.getDeclaredField("queuePermits");
+            queuePermitsField.setAccessible(true);
+            var queuePermits = (Semaphore) queuePermitsField.get(scheduler);
+            assertThat(queuePermits.availablePermits())
+                    .as("available permits must not exceed queue capacity")
+                    .isLessThanOrEqualTo(scheduler.queueCapacity());
+
+            // Leaf permits invariant.
+            var leafPermits = getLeafPermits(scheduler);
+            assertThat(leafPermits.availablePermits())
+                    .as("available permits must not exceed parallelism")
+                    .isLessThanOrEqualTo(scheduler.parallelism());
+        } finally {
+            scheduler.close();
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    @DisplayName("interrupted close terminalizes removed queued task")
+    void interruptedCloseTerminalizesRemovedQueuedTask() throws Exception {
+        var scheduler = new Scheduler(1, 2);
+        try {
+            var context = newContext(scheduler);
+            var root = contextRoot(context);
+
+            // First task: blocks, occupying the sole worker.
+            var blockerStarted = new CountDownLatch(1);
+            var blockerRelease = new CountDownLatch(1);
+            var blocker = newChildDescriptor(root, Step.of("blocker", innerContext -> {
+                blockerStarted.countDown();
+                try {
+                    blockerRelease.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            scheduler.schedule(blocker, ExecutionMode.RUN, context);
+            assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // Second task: queues behind the blocker.
+            var queuedExecuted = new AtomicBoolean();
+            var callbackCount = new AtomicInteger();
+            var queuedLeaf = newChildDescriptor(root, Step.of("queued", innerContext -> {
+                queuedExecuted.set(true);
+            }));
+            var callback = new Scheduler.ExecutionCallback() {
+                @Override
+                public void onExecutionStart() {}
+
+                @Override
+                public void onExecutionComplete(final Throwable error) {
+                    callbackCount.incrementAndGet();
+                }
+            };
+            var queuedFuture = scheduler.schedule(queuedLeaf, ExecutionMode.RUN, context, callback);
+
+            // Interrupt the calling thread before close().
+            Thread.currentThread().interrupt();
+
+            scheduler.close();
+
+            // Verify interrupt flag is preserved.
+            assertThat(Thread.currentThread().isInterrupted())
+                    .as("interrupt flag should be preserved after close()")
+                    .isTrue();
+
+            // Release the blocker.
+            Thread.interrupted(); // Clear flag to avoid contaminating blocker
+            blockerRelease.countDown();
+
+            // Assertions on the removed queued task.
+            assertThat(queuedExecuted.get())
+                    .as("removed queued task must not execute")
+                    .isFalse();
+            assertThat(queuedLeaf.isCompleted())
+                    .as("removed queued descriptor must be terminal")
+                    .isTrue();
+            assertThat(queuedFuture.isDone())
+                    .as("removed queued future must be done")
+                    .isTrue();
+            assertThat(callbackCount.get())
+                    .as("callback must be invoked exactly once")
+                    .isEqualTo(1);
+        } finally {
+            Thread.interrupted();
+            scheduler.close();
         }
     }
 
