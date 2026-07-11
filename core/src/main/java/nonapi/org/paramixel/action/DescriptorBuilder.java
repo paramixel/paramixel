@@ -35,8 +35,6 @@ import org.paramixel.api.exception.CycleDetectedException;
 @SuppressWarnings("removal")
 public final class DescriptorBuilder {
 
-    private static final int MAX_DESCRIPTOR_COUNT = 100_000;
-
     /**
      * Creates a descriptor builder.
      */
@@ -50,10 +48,8 @@ public final class DescriptorBuilder {
      */
     public MutableDescriptor discover(final Action root) {
         Objects.requireNonNull(root, "root is null");
-        var budget = new DescriptorBudget();
-        budget.reserve();
         var rootDescriptor = new ConcreteDescriptor(null, root);
-        buildDescendants(rootDescriptor, root, new ArrayDeque<>(), new IdentityHashMap<>(), budget);
+        buildDescendants(rootDescriptor, root, new ArrayDeque<>(), new IdentityHashMap<>());
         return rootDescriptor;
     }
 
@@ -61,15 +57,13 @@ public final class DescriptorBuilder {
             final MutableDescriptor descriptor,
             final Action action,
             final Deque<Action> path,
-            final IdentityHashMap<Action, Boolean> visited,
-            final DescriptorBudget budget) {
+            final IdentityHashMap<Action, Boolean> visited) {
         path.addLast(action);
         visited.put(action, Boolean.TRUE);
         try {
             DescriptorExpansions.expand(
                     action,
-                    new DescriptorExpansionContext(
-                            descriptor, child -> build(descriptor, child, path, visited, budget)));
+                    new DescriptorExpansionContext(descriptor, child -> build(descriptor, child, path, visited)));
         } finally {
             path.removeLast();
             visited.remove(action);
@@ -80,28 +74,14 @@ public final class DescriptorBuilder {
             final MutableDescriptor parent,
             final Action action,
             final Deque<Action> path,
-            final IdentityHashMap<Action, Boolean> visited,
-            final DescriptorBudget budget) {
+            final IdentityHashMap<Action, Boolean> visited) {
         if (visited.containsKey(action)) {
             throw new CycleDetectedException(buildCycleMessage(path, action));
         }
 
-        budget.reserve();
         var descriptor = new ConcreteDescriptor(parent, action);
-        buildDescendants(descriptor, action, path, visited, budget);
+        buildDescendants(descriptor, action, path, visited);
         return descriptor;
-    }
-
-    private static final class DescriptorBudget {
-        private int count;
-
-        void reserve() {
-            if (count >= MAX_DESCRIPTOR_COUNT) {
-                throw new IllegalArgumentException(
-                        "Descriptor expansion limit exceeded: maximum " + MAX_DESCRIPTOR_COUNT + " descriptors");
-            }
-            count++;
-        }
     }
 
     private static String buildCycleMessage(final Deque<Action> path, final Action repeatedAction) {
