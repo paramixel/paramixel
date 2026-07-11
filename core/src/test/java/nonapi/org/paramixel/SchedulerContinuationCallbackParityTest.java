@@ -20,15 +20,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.action.Sequential;
@@ -103,6 +108,96 @@ class SchedulerContinuationCallbackParityTest {
         assertThat(result.isPassed()).isTrue();
         assertThat(fixture.child.scheduledFuture()).isDone();
         assertThat(callback.completed.get()).isEqualTo(1);
+    }
+
+    @Test
+    @Timeout(10)
+    @DisplayName("rejection callback failure does not replace queue capacity rejection or parent completion")
+    void rejectionCallbackFailureDoesNotReplaceQueueCapacityRejectionOrParentCompletion() throws Exception {
+        // Use a scheduler with queue capacity 1 so the third schedule is rejected.
+        scheduler.close();
+        scheduler = new Scheduler(1, 1);
+        var blockerStarted = new CountDownLatch(1);
+        var releaseBlocker = new CountDownLatch(1);
+
+        // Create a root descriptor for context.
+        var root = new DescriptorBuilder().discover(Step.of("root", context -> {}));
+        root.markScheduled();
+        var context = new ConcreteContext(
+                Configuration.defaultConfiguration(),
+                Listener.defaultListener(),
+                root,
+                scheduler,
+                new InstanceHolder());
+
+        // Schedule a blocking descriptor first (worker picks it up, releases permit, and blocks).
+        var blocker = new ConcreteDescriptor(root, Step.of("blocker", ctx -> {
+            blockerStarted.countDown();
+            try {
+                releaseBlocker.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+        root.addChild(blocker);
+        scheduler.schedule(blocker, ExecutionMode.RUN, context);
+        assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Schedule a second descriptor — permit available, fills the queue.
+        var second = new ConcreteDescriptor(root, Step.of("second", ctx -> {}));
+        root.addChild(second);
+        scheduler.schedule(second, ExecutionMode.RUN, context);
+
+        // Now schedule a third with a throwing completion callback — should be rejected.
+        var callback = new ThrowingCompletionCallback();
+        var third = new ConcreteDescriptor(root, Step.of("third", ctx -> {}));
+        root.addChild(third);
+        var future = scheduler.schedule(third, ExecutionMode.RUN, context, callback);
+
+        assertThatThrownBy(future::join)
+                .isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(RejectedExecutionException.class);
+
+        assertThat(third.isCompleted())
+                .as("rejected descriptor must be terminal")
+                .isTrue();
+        assertThat(callback.completed.get())
+                .as("callback completion must be invoked exactly once on rejection")
+                .isEqualTo(1);
+
+        releaseBlocker.countDown();
+    }
+
+    @Test
+    @Timeout(5)
+    @DisplayName("closing rejection publishes one completion callback with closing error")
+    void closingRejectionPublishesOneCompletionCallbackWithClosingError() {
+        var callback = new CountingCallback();
+        var childAction = Step.of("child", ctx -> {});
+        var root = new DescriptorBuilder().discover(childAction);
+
+        scheduler.close();
+
+        var context = new ConcreteContext(
+                Configuration.defaultConfiguration(),
+                Listener.defaultListener(),
+                root,
+                scheduler,
+                new InstanceHolder());
+
+        var future = scheduler.schedule(root, ExecutionMode.RUN, context, callback);
+
+        assertThatThrownBy(future::join)
+                .isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Scheduler is closing");
+
+        assertThat(root.isCompleted())
+                .as("rejected descriptor must be terminal")
+                .isTrue();
+        assertThat(callback.completed.get())
+                .as("callback completion must not be invoked for descriptor rejected before lifecycle start")
+                .isZero();
     }
 
     private Fixture fixture(final org.paramixel.api.action.Action childAction) {

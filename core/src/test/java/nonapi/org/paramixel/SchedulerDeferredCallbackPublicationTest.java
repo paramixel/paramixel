@@ -27,6 +27,7 @@ import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Status;
@@ -127,6 +128,114 @@ class SchedulerDeferredCallbackPublicationTest {
         assertThat(callback.completed.get())
                 .as("onExecutionComplete must be delivered exactly once even when finalized during close")
                 .isEqualTo(1);
+    }
+
+    @Test
+    @Timeout(10)
+    @DisplayName("deferred child aborted by timeout or close completes started callback once")
+    void deferredChildAbortedByTimeoutOrCloseCompletesStartedCallbackOnce() throws Exception {
+        var blockingLeafStarted = new CountDownLatch(1);
+        var scheduler = new Scheduler(2);
+        try {
+            var action = Sequential.builder("root")
+                    .child(Step.of("blocker", ctx -> {
+                        blockingLeafStarted.countDown();
+                        try {
+                            Thread.sleep(10_000);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }))
+                    .child(Step.of("never-runs", ctx -> {}))
+                    .build();
+            var root = new DescriptorBuilder().discover(action);
+            var callback = new CountingCallback();
+            var context = new ConcreteContext(
+                    Configuration.defaultConfiguration(),
+                    Listener.defaultListener(),
+                    root,
+                    scheduler,
+                    new InstanceHolder());
+            scheduler.schedule(root, ExecutionMode.RUN, context, callback);
+            assertThat(blockingLeafStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // Close the scheduler to abort the deferred child.
+            scheduler.close();
+
+            assertThat(callback.started.get())
+                    .as("onExecutionStart must be invoked exactly once")
+                    .isEqualTo(1);
+            assertThat(callback.completed.get())
+                    .as("onExecutionComplete must be invoked exactly once")
+                    .isEqualTo(1);
+            assertThat(callback.error.get())
+                    .as("completion error must be non-null after close abort")
+                    .isNotNull();
+            assertThat(root.isCompleted())
+                    .as("root must be terminal after close")
+                    .isTrue();
+        } finally {
+            scheduler.close();
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    @DisplayName("fail fast skipped descriptor publishes no callback events")
+    void failFastSkippedDescriptorPublishesNoCallbackEvents() {
+        var callback = new CountingCallback();
+        var scheduler = new Scheduler(1);
+        try {
+            scheduler.setFailFast(true);
+
+            // Cause a failure in a root child so subsequent siblings are skipped.
+            var failing = Step.of("failing", ctx -> {
+                throw new RuntimeException("boom");
+            });
+            var skipped = Step.of("skipped", ctx -> {});
+            var rootAction = Sequential.builder("root")
+                    .child(failing)
+                    .child(skipped)
+                    .independent()
+                    .build();
+            var root = new DescriptorBuilder().discover(rootAction);
+            root.markScheduled();
+            var context = new ConcreteContext(
+                    Configuration.defaultConfiguration(),
+                    Listener.defaultListener(),
+                    root,
+                    scheduler,
+                    new InstanceHolder());
+
+            // Schedule the failing child.
+            var failingChild = (MutableDescriptor) root.children().get(0);
+            try {
+                scheduler.schedule(failingChild, ExecutionMode.RUN, context).join();
+            } catch (Exception expected) {
+                // Expected: the failing child throws.
+            }
+
+            // Schedule the skipped child with a callback.
+            var skippedChild = (MutableDescriptor) root.children().get(1);
+            scheduler
+                    .schedule(skippedChild, ExecutionMode.RUN, context, callback)
+                    .join();
+
+            assertThat(skippedChild.isSkipped())
+                    .as("skipped descriptor must be in SKIPPED status")
+                    .isTrue();
+            assertThat(callback.admitted.get())
+                    .as("onAdmitted must not fire for a skipped descriptor")
+                    .isZero();
+            assertThat(callback.started.get())
+                    .as("onExecutionStart must not fire for a skipped descriptor")
+                    .isZero();
+            assertThat(callback.completed.get())
+                    .as("onExecutionComplete must not fire for a skipped descriptor")
+                    .isZero();
+        } finally {
+            scheduler.close();
+        }
     }
 
     /**

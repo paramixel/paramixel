@@ -18,20 +18,25 @@ package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Loop;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Sequence;
@@ -73,6 +78,156 @@ class SchedulerShutdownContinuationDrainTest {
     void loopLargeTreeCompletesAfterClose(final int childCount) throws Exception {
         assertCompletesAfterClose(blocker ->
                 Loop.builder("root").body(blocker).maxIterations(childCount).build());
+    }
+
+    @Test
+    @Timeout(15)
+    @DisplayName("delayed loop tree completes after close during inter-iteration delay")
+    void delayedLoopTreeCompletesAfterCloseDuringInterIterationDelay() throws Exception {
+        var firstIterationStarted = new CountDownLatch(1);
+        var iterations = new AtomicInteger();
+
+        var loop = Loop.builder("loop")
+                .body(Step.of("body", ctx -> {
+                    iterations.incrementAndGet();
+                    firstIterationStarted.countDown();
+                }))
+                .maxIterations(20)
+                .delay(Duration.ofMillis(500))
+                .build();
+
+        var root = new DescriptorBuilder().discover(loop);
+        root.markScheduled();
+        var rootFuture = root.scheduledFuture();
+        var scheduler = new Scheduler(2);
+        var context = new ConcreteContext(
+                Configuration.defaultConfiguration(),
+                Listener.defaultListener(),
+                root,
+                scheduler,
+                new InstanceHolder());
+
+        var execThread = new Thread(() -> scheduler.executeDescriptor(root, context, ExecutionMode.RUN), "exec");
+        execThread.start();
+
+        // Wait for the first iteration to start, then close while the delay is being waited.
+        assertThat(firstIterationStarted.await(5, TimeUnit.SECONDS)).isTrue();
+        Thread.sleep(100); // Let the delay register.
+
+        scheduler.close();
+        execThread.join(10_000);
+
+        assertThat(rootFuture.isDone()).as("root scheduled future must be done").isTrue();
+        assertThat(hasPendingDescriptor(root))
+                .as("no pending descriptors should remain after close")
+                .isFalse();
+    }
+
+    @Test
+    @Timeout(15)
+    @DisplayName("isolated deferred tree completes after close")
+    void isolatedDeferredTreeCompletesAfterClose() throws Exception {
+        var holderStarted = new CountDownLatch(1);
+        var releaseHolder = new CountDownLatch(1);
+
+        var action = Isolated.builder("iso", "L")
+                .body(Parallel.builder("body")
+                        .parallelism(1)
+                        .child(Step.of("holder", ctx -> {
+                            holderStarted.countDown();
+                            try {
+                                releaseHolder.await(10, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }))
+                        .child(Step.of("waiter", ctx -> {}))
+                        .build())
+                .build();
+
+        var root = new DescriptorBuilder().discover(action);
+        root.markScheduled();
+        var rootFuture = root.scheduledFuture();
+        var scheduler = new Scheduler(2);
+        var context = new ConcreteContext(
+                Configuration.defaultConfiguration(),
+                Listener.defaultListener(),
+                root,
+                scheduler,
+                new InstanceHolder());
+
+        var execThread = new Thread(() -> scheduler.executeDescriptor(root, context, ExecutionMode.RUN), "exec");
+        execThread.start();
+
+        assertThat(holderStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Close while work is in flight.
+        var closer = new Thread(scheduler::close, "closer");
+        closer.start();
+        Thread.sleep(500);
+        releaseHolder.countDown();
+
+        closer.join(10_000);
+        execThread.join(10_000);
+
+        assertThat(rootFuture.isDone()).as("root future must complete").isTrue();
+        assertThat(hasPendingDescriptor(root))
+                .as("all subtree descriptors must be terminal")
+                .isFalse();
+    }
+
+    @Test
+    @Timeout(15)
+    @DisplayName("timeout around deferred child completes after close")
+    void timeoutAroundDeferredChildCompletesAfterClose() throws Exception {
+        var blockerStarted = new CountDownLatch(1);
+        var releaseBlocker = new CountDownLatch(1);
+
+        var action = org.paramixel.api.action.Timeout.builder("timeout")
+                .timeout(Duration.ofSeconds(30))
+                .body(Sequential.builder("body")
+                        .child(Step.of("blocker", ctx -> {
+                            blockerStarted.countDown();
+                            try {
+                                releaseBlocker.await(10, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }))
+                        .child(Step.of("after-blocker", ctx -> {}))
+                        .build())
+                .build();
+
+        var root = new DescriptorBuilder().discover(action);
+        root.markScheduled();
+        var rootFuture = root.scheduledFuture();
+        var scheduler = new Scheduler(2);
+        var context = new ConcreteContext(
+                Configuration.defaultConfiguration(),
+                Listener.defaultListener(),
+                root,
+                scheduler,
+                new InstanceHolder());
+
+        var execThread = new Thread(() -> scheduler.executeDescriptor(root, context, ExecutionMode.RUN), "exec");
+        execThread.start();
+
+        assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Close the scheduler while the deferred child is blocked.
+        var closer = new Thread(scheduler::close, "closer");
+        closer.start();
+        Thread.sleep(500);
+        releaseBlocker.countDown();
+
+        closer.join(10_000);
+        execThread.join(10_000);
+
+        assertThat(rootFuture.isDone()).as("root future must be done").isTrue();
+        assertThat(root.isCompleted()).as("root descriptor must be terminal").isTrue();
+        assertThat(hasPendingDescriptor(root))
+                .as("no listener bracket or descriptor should remain pending")
+                .isFalse();
     }
 
     private static Action buildSequential(final int childCount, final Step blocker) {
