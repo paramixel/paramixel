@@ -2,7 +2,7 @@
 assertj-core = "3.27.7"
 commons-compress = "1.28.0"
 jmh = "1.37"
-junit = "6.1.1"
+junit = "6.1.2"
 kafka-clients = "4.3.1"
 maven = "3.9.16"
 maven-plugin-annotations = "3.15.2"
