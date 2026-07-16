@@ -501,7 +501,7 @@ class SchedulerQueueBoundsTest {
 
     @Test
     @Timeout(15)
-    @DisplayName("BUG: parallel should not reject children when queue capacity is smaller than effective parallelism")
+    @DisplayName("parallel should not reject children when queue capacity is smaller than effective parallelism")
     void parallelMustNotRejectChildrenWhenQueueExhaustedAndThreadsBusy() throws Exception {
         var scheduler = new Scheduler(2, 1);
         try {
