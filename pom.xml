@@ -62,12 +62,12 @@
         <kafka-clients.version>4.3.1</kafka-clients.version>
         <maven.version>3.9.16</maven.version>
         <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
-        <mongodb-driver-sync.version>5.9.0</mongodb-driver-sync.version>
+        <mongodb-driver-sync.version>5.9.1</mongodb-driver-sync.version>
         <palantir-java-format.version>2.91.0</palantir-java-format.version>
         <pmd.version>7.26.0</pmd.version>
         <jmh.version>1.37</jmh.version>
         <slf4j.version>2.0.18</slf4j.version>
-        <logback.version>1.5.38</logback.version>
+        <logback.version>1.6.0</logback.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
         <testcontainers-mongodb.version>1.21.4</testcontainers-mongodb.version>
@@ -82,7 +82,7 @@
         <maven-dependency-plugin.version>3.11.0</maven-dependency-plugin.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
-        <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
+        <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-plugin-plugin.version>3.15.2</maven-plugin-plugin.version>
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
