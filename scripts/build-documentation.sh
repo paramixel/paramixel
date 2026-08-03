@@ -231,10 +231,13 @@ validate_internal_links() {
 install_dependencies() {
     log "Installing dependencies in ${WEBSITE_DIR}/..."
 
+    # Run npm from the website directory instead of using --prefix: on npm 11,
+    # `npm ci --prefix` with a prefix path that traverses a symlink (for example
+    # /home/... -> /mnt/...) fails the package.json/package-lock.json sync check.
     if [[ -f "${WEBSITE_DIR}/package-lock.json" ]]; then
-        npm ci --prefix "${WEBSITE_DIR}"
+        (cd "${WEBSITE_DIR}" && npm ci)
     else
-        npm install --prefix "${WEBSITE_DIR}"
+        (cd "${WEBSITE_DIR}" && npm install)
     fi
 }
 
