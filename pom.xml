@@ -62,12 +62,12 @@
         <kafka-clients.version>4.3.1</kafka-clients.version>
         <maven.version>3.9.16</maven.version>
         <maven-plugin-annotations.version>3.15.2</maven-plugin-annotations.version>
-        <mongodb-driver-sync.version>5.9.1</mongodb-driver-sync.version>
+        <mongodb-driver-sync.version>5.9.2</mongodb-driver-sync.version>
         <palantir-java-format.version>2.91.0</palantir-java-format.version>
         <pmd.version>7.26.0</pmd.version>
         <jmh.version>1.37</jmh.version>
         <slf4j.version>2.0.18</slf4j.version>
-        <logback.version>1.6.1</logback.version>
+        <logback.version>1.6.2</logback.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
         <testcontainers-mongodb.version>1.21.4</testcontainers-mongodb.version>
