@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: 17
           distribution: corretto
@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: 21
           distribution: corretto
@@ -134,7 +134,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: 25
           distribution: corretto
@@ -189,7 +189,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: 17
           distribution: corretto
