@@ -141,6 +141,33 @@ public final class ExecutionNode {
     public int attemptedChildren;
 
     /**
+     * Strategy hook invoked when ready-queue capacity becomes available after an internal child
+     * admission was deferred. The installed runnable resumes the strategy's cursor-based
+     * admission from the deferred child. Installed by the owning strategy and invoked at most
+     * once per deferred admission by the scheduler.
+     */
+    public volatile Runnable admissionRetry;
+
+    /**
+     * Coalescing flag for scheduler admission wakeups: {@code true} while a wakeup for this node
+     * is queued or in flight. Set by the scheduler before enqueueing the wakeup and cleared when
+     * the wakeup runs.
+     */
+    public final AtomicBoolean admissionWakeupPending = new AtomicBoolean(false);
+    /**
+     * Child index into {@link #descriptor children} for lifecycle body admission. Advanced as
+     * body children are dispatched so a deferred body admission can resume where it stopped.
+     */
+    public int bodyChildIndex;
+
+    /**
+     * Whether all body children of a lifecycle node have been dispatched (or there were none).
+     * The lifecycle node only leaves the body phase once this is {@code true} and every
+     * dispatched body child has completed.
+     */
+    public boolean bodyAdmissionComplete;
+
+    /**
      * Whether a Loop continuation is waiting for its configured inter-iteration delay.
      */
     public boolean delayScheduled;

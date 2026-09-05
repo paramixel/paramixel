@@ -19,8 +19,10 @@ package nonapi.org.paramixel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -112,6 +114,7 @@ public final class Scheduler implements AutoCloseable {
     private static final long MANAGED_JOIN_BACKOFF_FLOOR_NANOS = 1_000L; // 1 microsecond
     private static final long MANAGED_JOIN_BACKOFF_CEILING_NANOS = 1_000_000_000L; // 1 second
     private static final double MANAGED_JOIN_BACKOFF_GROWTH_FACTOR = 4.0;
+    private static final long ISOLATION_JOIN_PARK_CEILING_NANOS = 10_000_000L; // 10 ms
     private static final Comparator<Runnable> PRIORITY_COMPARATOR = (left, right) -> {
         var leftKey = priorityKeyOf(left);
         var rightKey = priorityKeyOf(right);
@@ -137,6 +140,9 @@ public final class Scheduler implements AutoCloseable {
         if (task instanceof ContinuationTask ct) {
             return ct.priorityKey;
         }
+        if (task instanceof AdmissionWakeupTask at) {
+            return at.priorityKey;
+        }
         return null;
     }
 
@@ -146,6 +152,9 @@ public final class Scheduler implements AutoCloseable {
         }
         if (task instanceof ContinuationTask ct) {
             return ct.sequence;
+        }
+        if (task instanceof AdmissionWakeupTask at) {
+            return at.sequence;
         }
         return 0L;
     }
@@ -165,6 +174,40 @@ public final class Scheduler implements AutoCloseable {
     private final ThreadLocal<ArrayList<IsolationFrame>> isolationFrames = ThreadLocal.withInitial(ArrayList::new);
 
     /**
+     * Serializes capacity bookkeeping: the admission waiter registry and the parked ready tasks
+     * FIFO. Critical sections are short; dispatch and retry work happens outside the monitor.
+     */
+    private final Object capacityMonitor = new Object();
+
+    /**
+     * Execution nodes whose internal child admission was deferred because ready capacity was
+     * exhausted. Each registered node is woken at most once per deferred admission; the node
+     * re-registers when its retry defers again.
+     */
+    private final Set<ExecutionNode> admissionWaiters = new LinkedHashSet<>();
+
+    /**
+     * Relinquished queued initial tasks waiting to be redispatched when capacity becomes
+     * available. A relinquished task has released its queue permit without executing or
+     * terminalizing; it is redispatched by re-acquiring a permit.
+     */
+    private final ArrayDeque<PrioritizedTask> parkedReadyTasks = new ArrayDeque<>();
+
+    /**
+     * Result of an internal child admission attempt.
+     */
+    enum ChildAdmissionResult {
+        /** The child was dispatched to the executor; a completion event will follow. */
+        DISPATCHED,
+        /** Ready capacity was exhausted; the child was left unscheduled and the parent node is
+         * registered for a capacity wakeup. */
+        DEFERRED,
+        /** The scheduler is closing or the child was already terminal; the child was
+         * terminalized and {@code childCompleted} was published. */
+        REJECTED
+    }
+
+    /**
      * Shared work queue for continuations during executor shutdown.
      *
      * <p>During shutdown, continuations cannot be submitted to the executor (it rejects new
@@ -175,6 +218,16 @@ public final class Scheduler implements AutoCloseable {
      * {@code managedJoin}.
      */
     private final ConcurrentLinkedQueue<ExecutionNode> shutdownDrain = new ConcurrentLinkedQueue<>();
+
+    /**
+     * Shared work queue for admission retries during executor shutdown.
+     *
+     * <p>Admission retries (capacity wakeups) cannot be submitted to the executor during
+     * shutdown, so they are added to this queue. {@link #managedJoin} polls this queue while
+     * waiting for a future, ensuring that coordination nodes with a deferred child admission
+     * are woken and their children terminalized during close.
+     */
+    private final ConcurrentLinkedQueue<ExecutionNode> admissionDrain = new ConcurrentLinkedQueue<>();
 
     private volatile boolean closing;
     private volatile boolean failFast;
@@ -384,6 +437,71 @@ public final class Scheduler implements AutoCloseable {
         Objects.requireNonNull(mode, "mode is null");
         Objects.requireNonNull(parentContext, "parentContext is null");
 
+        var outcome = prepareScheduledTask(descriptor, parentContext);
+        if (outcome.future != null) {
+            return outcome.future;
+        }
+        var verdict = admitPreparedTask(descriptor, outcome.context, mode, callback, null, false);
+        if (verdict == ChildAdmissionResult.REJECTED) {
+            // External direct submissions keep their documented capacity-rejection semantics.
+            var rejected = new RejectedExecutionException(
+                    "Scheduler queue capacity exceeded (capacity=" + queueCapacity + ")");
+            ensureTerminalStatus(outcome.context, rejected);
+            publishRejectedCompletion(descriptor, callback, rejected);
+            return CompletableFuture.failedFuture(rejected);
+        }
+        return descriptor.scheduledFuture();
+    }
+
+    /**
+     * Attempts to dispatch one internally scheduled child descriptor for a coordination strategy.
+     *
+     * <p>This is the framework child-admission path used by execution strategies. Unlike
+     * {@link #schedule(MutableDescriptor, ExecutionMode, ConcreteContext, ExecutionCallback)},
+     * transient ready-capacity exhaustion does <em>not</em> fail the child: the child stays
+     * unscheduled (its status remains pending and its scheduling future incomplete) and the
+     * parent node is registered so its {@code admissionRetry} runs when capacity becomes
+     * available.
+     *
+     * @param descriptor the child descriptor to schedule (must not be {@code null})
+     * @param mode the execution mode (must not be {@code null})
+     * @param parentContext the parent execution context (must not be {@code null})
+     * @param parentNode the coordination node whose strategy owns the admission cursor
+     * @return {@link ChildAdmissionResult#DISPATCHED} when the child was queued,
+     *     {@link ChildAdmissionResult#DEFERRED} when ready capacity was exhausted, or
+     *     {@link ChildAdmissionResult#REJECTED} when the scheduler is closing or the child was
+     *     already terminal (in which case {@code childCompleted} has already been published)
+     * @throws NullPointerException if any required argument is {@code null}
+     */
+    ChildAdmissionResult dispatchChild(
+            final MutableDescriptor descriptor,
+            final ExecutionMode mode,
+            final ConcreteContext parentContext,
+            final ExecutionNode parentNode) {
+        Objects.requireNonNull(descriptor, "descriptor is null");
+        Objects.requireNonNull(mode, "mode is null");
+        Objects.requireNonNull(parentContext, "parentContext is null");
+        Objects.requireNonNull(parentNode, "parentNode is null");
+
+        var outcome = prepareScheduledTask(descriptor, parentContext);
+        if (outcome.future != null) {
+            return ChildAdmissionResult.REJECTED;
+        }
+        return admitPreparedTask(descriptor, outcome.context, mode, null, parentNode, true);
+    }
+
+    /**
+     * Result of preparing a descriptor for scheduling.
+     *
+     * @param future a non-null value when the descriptor was already terminal or the scheduler
+     *     is closing (the caller must return it verbatim); {@code null} when the descriptor is
+     *     ready to be admitted
+     * @param context the execution context when {@code future} is {@code null}
+     */
+    private record PreparationOutcome(CompletableFuture<Descriptor> future, ConcreteContext context) {}
+
+    private PreparationOutcome prepareScheduledTask(
+            final MutableDescriptor descriptor, final ConcreteContext parentContext) {
         // Freeze is idempotent and does not interact with the scheduler's closing state,
         // so it can be done outside the lock to reduce contention.
         if (!descriptor.isFrozen()) {
@@ -395,12 +513,14 @@ public final class Scheduler implements AutoCloseable {
             // Avoid pushing it through the executor only to be skipped; return a failed future so
             // the caller's rolling window drains promptly.
             childCompleted(descriptor);
-            return CompletableFuture.failedFuture(new RejectedExecutionException(
-                    "descriptor already terminal: " + descriptor.status().name()));
+            return new PreparationOutcome(
+                    CompletableFuture.failedFuture(new RejectedExecutionException("descriptor already terminal: "
+                            + descriptor.status().name())),
+                    null);
         }
 
         // Create context early so ensureTerminalStatus can be called in the closing
-        // and markScheduled failure paths. Without this, a descriptor rejected at the
+        // and admission failure paths. Without this, a descriptor rejected at the
         // first closing check stays PENDING, causing composite actions (e.g. Parallel)
         // to aggregate a non-terminal RUNNING status.
         var context = new ConcreteContext(
@@ -416,40 +536,83 @@ public final class Scheduler implements AutoCloseable {
                 var closingException = new IllegalStateException("Scheduler is closing");
                 ensureTerminalStatus(context, closingException);
                 childCompleted(descriptor);
-                return CompletableFuture.failedFuture(closingException);
+                return new PreparationOutcome(CompletableFuture.failedFuture(closingException), null);
             }
         } finally {
             closingLock.unlock();
         }
+        return new PreparationOutcome(null, context);
+    }
 
+    /**
+     * Acquires a ready-capacity reservation and, on success, marks the descriptor scheduled and
+     * enqueues its execution task.
+     *
+     * @param descriptor the descriptor to admit; must not be {@code null}
+     * @param context the execution context; must not be {@code null}
+     * @param mode the execution mode; must not be {@code null}
+     * @param callback optional lifecycle callback, may be {@code null}
+     * @param parentNode the coordination node for internal admission, or {@code null} for direct
+     *     submission
+     * @param internalAdmission whether this is a framework child admission
+     * @return {@link ChildAdmissionResult#DISPATCHED}, {@link ChildAdmissionResult#DEFERRED}, or
+     *     {@link ChildAdmissionResult#REJECTED}
+     */
+    private ChildAdmissionResult admitPreparedTask(
+            final MutableDescriptor descriptor,
+            final ConcreteContext context,
+            final ExecutionMode mode,
+            final ExecutionCallback callback,
+            final ExecutionNode parentNode,
+            final boolean internalAdmission) {
+        if (!queuePermits.tryAcquire()) {
+            if (internalAdmission && parentNode != null) {
+                registerCapacityWaiter(parentNode);
+                if (relinquishIneligibleQueuedTaskIfNeeded() && queuePermits.tryAcquire()) {
+                    return markScheduledAndEnqueue(descriptor, context, mode, callback);
+                }
+                return ChildAdmissionResult.DEFERRED;
+            }
+            return ChildAdmissionResult.REJECTED;
+        }
+        return markScheduledAndEnqueue(descriptor, context, mode, callback);
+    }
+
+    private ChildAdmissionResult markScheduledAndEnqueue(
+            final MutableDescriptor descriptor,
+            final ConcreteContext context,
+            final ExecutionMode mode,
+            final ExecutionCallback callback) {
         final CompletableFuture<Descriptor> future;
         try {
             future = descriptor.markScheduled();
         } catch (Throwable t) {
+            // Defensive: a child is only ever dispatched once, but release the reservation and
+            // terminalize rather than leaking either.
+            queuePermits.release();
             ensureTerminalStatus(context, t);
             childCompleted(descriptor);
-            return CompletableFuture.failedFuture(t);
+            return ChildAdmissionResult.REJECTED;
         }
+        enqueueTask(descriptor, context, future, mode, callback);
+        return ChildAdmissionResult.DISPATCHED;
+    }
 
-        if (!queuePermits.tryAcquire()) {
-            var rejected = new RejectedExecutionException(
-                    "Scheduler queue capacity exceeded (capacity=" + queueCapacity + ")");
-            ensureTerminalStatus(context, rejected);
-            completeExceptionally(descriptor, future, rejected);
-            publishRejectedCompletion(descriptor, callback, rejected);
-            return future;
-        }
-
+    private void enqueueTask(
+            final MutableDescriptor descriptor,
+            final ConcreteContext context,
+            final CompletableFuture<Descriptor> future,
+            final ExecutionMode mode,
+            final ExecutionCallback callback) {
         var priorityKey = descriptor.schedulerPriorityKey();
         var sequence = taskSequence.getAndIncrement();
         var task = new PrioritizedTask(
                 priorityKey, sequence, descriptor, context, mode, future, callback, queuePermits, this);
-
         closingLock.lock();
         try {
             if (closing) {
                 rejectNeverStartedTask(task, new IllegalStateException("Scheduler is closing"));
-                return future;
+                return;
             }
             try {
                 executor.execute(task);
@@ -463,8 +626,6 @@ public final class Scheduler implements AutoCloseable {
         } finally {
             closingLock.unlock();
         }
-
-        return future;
     }
 
     /**
@@ -662,20 +823,35 @@ public final class Scheduler implements AutoCloseable {
                 rejectDeferredIsolationTask(nextTask, e);
             }
         }
+        // Lock release may free capacity for relinquished tasks that were parked while this
+        // owner held its lock.
+        signalCapacityAvailable();
     }
 
     private void rejectDeferredIsolationTask(final PrioritizedTask task, final Throwable error) {
-        task.queuePermits.release();
+        releaseReservationIfHeld(task);
         ensureTerminalStatus(task.context, error);
         completeExceptionally(task.descriptor, task.future, error);
         publishRejectedCompletion(task.descriptor, task.callback, error);
     }
 
     private void rejectNeverStartedTask(final PrioritizedTask task, final Throwable cause) {
-        task.queuePermits.release();
+        releaseReservationIfHeld(task);
         ensureTerminalStatus(task.context, cause);
         completeExceptionally(task.descriptor, task.future, cause);
         publishRejectedCompletion(task.descriptor, task.callback, cause);
+    }
+
+    /**
+     * Releases a parked task's queue reservation if it still holds one.
+     *
+     * @param task the task whose reservation to release
+     */
+    private static void releaseReservationIfHeld(final PrioritizedTask task) {
+        if (task.reservationHeld) {
+            task.reservationHeld = false;
+            task.queuePermits.release();
+        }
     }
 
     private void processRemovedTasks(final List<Runnable> removed) {
@@ -688,11 +864,172 @@ public final class Scheduler implements AutoCloseable {
                     rejectNeverStartedTask(pt, schedulerClosingException());
                 } else if (task instanceof ContinuationTask ct) {
                     runContinuationOnce(ct.node);
+                } else if (task instanceof AdmissionWakeupTask at) {
+                    admissionDrain.add(at.node);
                 }
                 // Unexpected runnable type: skip (defensive)
             } catch (Throwable t) {
                 // Don't let one failing task strand the rest
             }
+        }
+    }
+
+    /**
+     * Registers a coordination node whose internal child admission was deferred so its
+     * {@code admissionRetry} runs when ready capacity becomes available.
+     *
+     * @param node the node waiting for capacity; must not be {@code null}
+     */
+    private void registerCapacityWaiter(final ExecutionNode node) {
+        synchronized (capacityMonitor) {
+            admissionWaiters.add(node);
+        }
+        // Recheck after registration to prevent a lost wakeup between the failed acquire and the
+        // next permit release.
+        if (queuePermits.availablePermits() > 0) {
+            dispatchAdmissionWakeup(node);
+        }
+    }
+
+    /**
+     * Called whenever a queue permit is released. Retries deferred child admissions and
+     * redispatches relinquished tasks that can now obtain capacity.
+     */
+    private void signalCapacityAvailable() {
+        boolean anythingPending;
+        synchronized (capacityMonitor) {
+            anythingPending = !admissionWaiters.isEmpty() || !parkedReadyTasks.isEmpty();
+        }
+        if (!anythingPending || queuePermits.availablePermits() == 0) {
+            return;
+        }
+        List<ExecutionNode> waiters = List.of();
+        synchronized (capacityMonitor) {
+            if (!admissionWaiters.isEmpty()) {
+                waiters = new ArrayList<>(admissionWaiters);
+            }
+        }
+        for (var node : waiters) {
+            dispatchAdmissionWakeup(node);
+        }
+        redispatchParkedTask();
+    }
+
+    /**
+     * Queues one admission wakeup for a node, coalesced to at most one outstanding wakeup per
+     * node. The node re-registers when its retry defers again.
+     *
+     * @param node the node to wake; must not be {@code null}
+     */
+    private void dispatchAdmissionWakeup(final ExecutionNode node) {
+        synchronized (capacityMonitor) {
+            admissionWaiters.remove(node);
+        }
+        if (!node.admissionWakeupPending.compareAndSet(false, true)) {
+            return;
+        }
+        if (executor.isShutdown()) {
+            admissionDrain.add(node);
+            return;
+        }
+        var descriptor = node.descriptor;
+        var priorityKey = descriptor.schedulerPriorityKey();
+        var sequence = taskSequence.getAndIncrement();
+        try {
+            executor.execute(new AdmissionWakeupTask(priorityKey, sequence, node, this));
+        } catch (RejectedExecutionException e) {
+            node.admissionWakeupPending.set(false);
+            admissionDrain.add(node);
+        }
+    }
+
+    /**
+     * Runs one admission retry once: clears the coalescing flag and invokes the node's
+     * strategy-provided retry.
+     *
+     * @param node the node whose admission should be retried; must not be {@code null}
+     */
+    private void runAdmissionRetryOnce(final ExecutionNode node) {
+        node.admissionWakeupPending.set(false);
+        try {
+            var retry = node.admissionRetry;
+            if (retry != null) {
+                retry.run();
+            }
+        } catch (Throwable t) {
+            recordUnrecoverableFailure(Throwables.unwrap(t));
+        }
+    }
+
+    /**
+     * When the current thread holds isolation frames and ready capacity is exhausted, relinquishes
+     * one queued initial task that does not belong to the held isolation subtree, freeing its
+     * reservation so the lock owner can admit its own descendants.
+     *
+     * <p>The relinquished task is not executed or terminalized; it is parked and redispatched by
+     * {@link #redispatchParkedTask()} once capacity is available again.
+     *
+     * @return {@code true} when one queued task was relinquished
+     */
+    private boolean relinquishIneligibleQueuedTaskIfNeeded() {
+        var frames = isolationFrames.get();
+        if (frames.isEmpty()) {
+            return false;
+        }
+        var innermostDescriptor = frames.get(frames.size() - 1).descriptor();
+        var queue = executor.getQueue();
+        PrioritizedTask victim = null;
+        for (var candidate : queue.toArray()) {
+            if (candidate instanceof PrioritizedTask pt && !isSameOrDescendant(pt.descriptor, innermostDescriptor)) {
+                victim = pt;
+                break;
+            }
+        }
+        if (victim == null || !queue.remove(victim)) {
+            return false;
+        }
+        synchronized (capacityMonitor) {
+            parkedReadyTasks.addLast(victim);
+        }
+        releaseReservationIfHeld(victim);
+        return true;
+    }
+
+    /**
+     * Redispatches one relinquished queued task when a queue permit is available, re-acquiring
+     * the reservation before re-enqueueing.
+     */
+    private void redispatchParkedTask() {
+        PrioritizedTask task;
+        synchronized (capacityMonitor) {
+            if (parkedReadyTasks.isEmpty() || queuePermits.availablePermits() == 0) {
+                return;
+            }
+            task = parkedReadyTasks.pollFirst();
+        }
+        if (task == null) {
+            return;
+        }
+        if (!queuePermits.tryAcquire()) {
+            synchronized (capacityMonitor) {
+                parkedReadyTasks.addFirst(task);
+            }
+            return;
+        }
+        task.reservationHeld = true;
+        closingLock.lock();
+        try {
+            if (closing) {
+                rejectNeverStartedTask(task, schedulerClosingException());
+                return;
+            }
+            try {
+                executor.execute(task);
+            } catch (RejectedExecutionException e) {
+                rejectNeverStartedTask(task, e);
+            }
+        } finally {
+            closingLock.unlock();
         }
     }
 
@@ -763,6 +1100,7 @@ public final class Scheduler implements AutoCloseable {
      */
     public <T> T managedJoin(final CompletableFuture<T> future) {
         Objects.requireNonNull(future, "future is null");
+        var framesHeld = !isolationFrames.get().isEmpty();
         var backoff = new BackoffDelay(
                 MANAGED_JOIN_BACKOFF_FLOOR_NANOS,
                 MANAGED_JOIN_BACKOFF_CEILING_NANOS,
@@ -774,7 +1112,7 @@ public final class Scheduler implements AutoCloseable {
                 runQueuedTask(ownedIsolationTask);
                 continue;
             }
-            var task = executor.getQueue().poll();
+            var task = stealEligibleReadyTask();
             if (task != null) {
                 backoff.reset();
                 runQueuedTask(task);
@@ -789,12 +1127,18 @@ public final class Scheduler implements AutoCloseable {
                     runContinuationOnce(node);
                     continue;
                 }
+                var admissionNode = admissionDrain.poll();
+                if (admissionNode != null) {
+                    backoff.reset();
+                    runAdmissionRetryOnce(admissionNode);
+                    continue;
+                }
             }
-            // Once the executor is fully terminated and no continuations remain
-            // in the drain queue, no further progress is possible. The future
+            // Once the executor is fully terminated and no work remains
+            // in the drain queues, no further progress is possible. The future
             // should already be done (all scheduler workers have terminated).
             // If it is not, cancel it to avoid blocking forever in join().
-            if (executor.isTerminated() && shutdownDrain.isEmpty()) {
+            if (executor.isTerminated() && shutdownDrain.isEmpty() && admissionDrain.isEmpty()) {
                 if (!future.isDone()) {
                     future.cancel(true);
                 }
@@ -806,9 +1150,87 @@ public final class Scheduler implements AutoCloseable {
             if (Thread.interrupted()) {
                 backoff.reset();
             }
-            LockSupport.parkNanos(backoff.nextDelayNanos());
+            // A lock owner parks only when no eligible work is available; new eligible work can
+            // arrive at any time (e.g. an inter-iteration delay continuation), so cap the park so
+            // eligibility changes are noticed promptly instead of after a full backoff ceiling.
+            var parkNanos = backoff.nextDelayNanos();
+            if (framesHeld && parkNanos > ISOLATION_JOIN_PARK_CEILING_NANOS) {
+                parkNanos = ISOLATION_JOIN_PARK_CEILING_NANOS;
+            }
+            LockSupport.parkNanos(parkNanos);
         }
         return future.join();
+    }
+
+    /**
+     * Polls one eligible task from the ready queue for this thread to run inline.
+     *
+     * <p>When the calling thread holds isolation frames it must only execute work that belongs to
+     * its own isolation subtree. An unrelated coordinator may schedule a same-lock descendant
+     * that is deferred behind the held lock; the stolen coordinator would then block forever on
+     * the lock release that its own stack is preventing. When no isolation frames are held any
+     * task may be stolen (unrestricted work stealing).
+     *
+     * @return a task to run inline, or {@code null} when the queue holds no eligible work
+     */
+    private Runnable stealEligibleReadyTask() {
+        var frames = isolationFrames.get();
+        if (frames.isEmpty()) {
+            return executor.getQueue().poll();
+        }
+        // Work selection must respect every active isolation frame. Frames are strictly nested
+        // in the descriptor tree, so the innermost frame's subtree is the eligibility bound.
+        var innermostDescriptor = frames.get(frames.size() - 1).descriptor();
+        var queue = executor.getQueue();
+        // Fast path: the head is eligible.
+        var head = queue.peek();
+        if (head != null && taskEligible(head, innermostDescriptor)) {
+            var polled = queue.poll();
+            if (polled != null && taskEligible(polled, innermostDescriptor)) {
+                return polled;
+            }
+            if (polled != null) {
+                // Another worker removed the eligible head and we polled an ineligible task
+                // instead: put it back and fall through to the full scan. The backing queue is
+                // an unbounded PriorityBlockingQueue, so the offer cannot be rejected.
+                queue.offer(polled);
+            }
+        }
+        // PriorityBlockingQueue iteration is not sorted and arbitrary removal is O(n); the queue
+        // is only scanned this way when the owner holds isolation frames and the head is not
+        // eligible, which is rare. Find the highest-priority eligible task anywhere in the queue
+        // so an ineligible head cannot starve eligible work behind it.
+        Runnable best = null;
+        for (var candidate : queue.toArray()) {
+            if (!(candidate instanceof Runnable runnable) || !taskEligible(runnable, innermostDescriptor)) {
+                continue;
+            }
+            if (best == null || PRIORITY_COMPARATOR.compare(runnable, best) < 0) {
+                best = runnable;
+            }
+        }
+        if (best != null && queue.remove(best)) {
+            return best;
+        }
+        return null;
+    }
+
+    private static boolean taskEligible(final Runnable task, final MutableDescriptor innermostFrameDescriptor) {
+        var descriptor = taskDescriptorOf(task);
+        return descriptor != null && isSameOrDescendant(descriptor, innermostFrameDescriptor);
+    }
+
+    private static MutableDescriptor taskDescriptorOf(final Runnable task) {
+        if (task instanceof PrioritizedTask pt) {
+            return pt.descriptor;
+        }
+        if (task instanceof ContinuationTask ct) {
+            return ct.node.descriptor;
+        }
+        if (task instanceof AdmissionWakeupTask at) {
+            return at.node.descriptor;
+        }
+        return null;
     }
 
     /**
@@ -847,6 +1269,23 @@ public final class Scheduler implements AutoCloseable {
                     entry.getValue().cancel(false);
                     executeContinuation(entry.getKey());
                 }
+            }
+            // Wake coordination nodes whose internal child admissions were deferred so their
+            // children are terminalized during shutdown, and terminalize relinquished queued
+            // tasks so no retained scheduler state outlives close.
+            List<ExecutionNode> waiters;
+            List<PrioritizedTask> parked;
+            synchronized (capacityMonitor) {
+                waiters = new ArrayList<>(admissionWaiters);
+                admissionWaiters.clear();
+                parked = new ArrayList<>(parkedReadyTasks);
+                parkedReadyTasks.clear();
+            }
+            for (var node : waiters) {
+                dispatchAdmissionWakeup(node);
+            }
+            for (var task : parked) {
+                rejectNeverStartedTask(task, schedulerClosingException());
             }
         } finally {
             closingLock.unlock();
@@ -938,6 +1377,34 @@ public final class Scheduler implements AutoCloseable {
             }
         } catch (RejectedExecutionException e) {
             executeContinuation(node);
+        }
+    }
+
+    /**
+     * Runs an arbitrary task once after the given delay on the scheduler's delay executor.
+     *
+     * <p>The task is cancelled if the scheduler is closed before it fires. Used for strategy
+     * deadlines (such as {@code Timeout}) that must apply while a child admission is deferred.
+     *
+     * @param task the task to run; must not be {@code null}
+     * @param delay the delay; must not be negative
+     * @param unit the delay unit; must not be {@code null}
+     * @throws NullPointerException if {@code task} or {@code unit} is {@code null}
+     * @throws IllegalArgumentException if {@code delay} is negative
+     */
+    void executeAfterDelay(final Runnable task, final long delay, final TimeUnit unit) {
+        Objects.requireNonNull(task, "task is null");
+        Objects.requireNonNull(unit, "unit is null");
+        if (delay < 0) {
+            throw new IllegalArgumentException("delay must not be negative, was: " + delay);
+        }
+        if (closing || delayExecutor.isShutdown()) {
+            return;
+        }
+        try {
+            delayExecutor.schedule(task, delay, unit);
+        } catch (RejectedExecutionException e) {
+            // Closing raced the schedule; the task is dropped, matching close-time cancellation.
         }
     }
 
@@ -1474,6 +1941,13 @@ public final class Scheduler implements AutoCloseable {
         private final Semaphore queuePermits;
         private final Scheduler scheduler;
 
+        /**
+         * Whether this task currently holds a queue reservation. A reservation is acquired at
+         * scheduling time, released when the task starts running, released when the task is
+         * relinquished (parked), and re-acquired when a relinquished task is redispatched.
+         */
+        private volatile boolean reservationHeld;
+
         PrioritizedTask(
                 final SchedulerPriorityKey priorityKey,
                 final long sequence,
@@ -1493,15 +1967,20 @@ public final class Scheduler implements AutoCloseable {
             this.callback = callback;
             this.queuePermits = Objects.requireNonNull(queuePermits, "queuePermits is null");
             this.scheduler = Objects.requireNonNull(scheduler, "scheduler is null");
+            this.reservationHeld = true;
         }
 
         @Override
         public void run() {
             if (!scheduler.tryEnterScheduledIsolation(this)) {
+                // Deferred behind an isolation lock: the reservation stays held until the task is
+                // redispatched and actually starts.
                 return;
             }
             try {
+                reservationHeld = false;
                 queuePermits.release();
+                scheduler.signalCapacityAvailable();
                 scheduler.executeScheduledDescriptor(descriptor, context, mode, future, callback);
             } finally {
                 scheduler.exitScheduledIsolationIfHeld(this);
@@ -1546,6 +2025,33 @@ public final class Scheduler implements AutoCloseable {
         @Override
         public void run() {
             scheduler.runContinuationOnce(node);
+        }
+    }
+
+    /**
+     * A work item that wakes a coordination node whose internal child admission was deferred,
+     * allowing its strategy to retry the admission now that capacity is available.
+     */
+    private static final class AdmissionWakeupTask implements Runnable {
+        private final SchedulerPriorityKey priorityKey;
+        private final long sequence;
+        private final ExecutionNode node;
+        private final Scheduler scheduler;
+
+        AdmissionWakeupTask(
+                final SchedulerPriorityKey priorityKey,
+                final long sequence,
+                final ExecutionNode node,
+                final Scheduler scheduler) {
+            this.priorityKey = Objects.requireNonNull(priorityKey, "priorityKey is null");
+            this.sequence = sequence;
+            this.node = Objects.requireNonNull(node, "node is null");
+            this.scheduler = Objects.requireNonNull(scheduler, "scheduler is null");
+        }
+
+        @Override
+        public void run() {
+            scheduler.runAdmissionRetryOnce(node);
         }
     }
 
