@@ -231,19 +231,33 @@ final class ActionExecutionStrategies {
         node.continueOnEveryChildCompletion = true;
         node.aggregator = new StatusAccumulator();
         node.continuation = () -> continueParallel(node, context);
+        node.admissionRetry = () -> retryParallelAdmission(node, context);
         descriptor.setExecutionNode(node);
 
         synchronized (node) {
             admitParallelChildren(node, context);
         }
 
-        if (node.attemptedChildren == 0) {
+        if (node.attemptedChildren == 0 && node.childIndex >= node.children.size()) {
             completeParallel(node);
             return node.aggregator.status();
         }
         return Status.RUNNING;
     }
 
+    private static void retryParallelAdmission(final ExecutionNode node, final ConcreteContext context) {
+        synchronized (node) {
+            if (node.descriptor.executionNode() != node) {
+                return;
+            }
+            admitParallelChildren(node, context);
+        }
+    }
+
+    /**
+     * Admits parallel children while the local window has room, stopping without advancing the
+     * cursor when an admission is deferred for ready capacity.
+     */
     private static void admitParallelChildren(final ExecutionNode node, final ConcreteContext context) {
         var children = node.children;
         while (node.runningChildren < node.cap && node.childIndex < children.size()) {
@@ -251,8 +265,12 @@ final class ActionExecutionStrategies {
                     children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
             node.childIndex++;
             node.runningChildren++;
-            if (!scheduleChild(child, ExecutionMode.RUN, node, context)) {
+            if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+                // The child at the cursor was not dispatched; roll the cursor back and stop
+                // admitting. A capacity wakeup resumes from this cursor via node.admissionRetry.
+                node.childIndex--;
                 node.runningChildren--;
+                return;
             }
         }
     }
@@ -268,7 +286,7 @@ final class ActionExecutionStrategies {
 
             admitParallelChildren(node, context);
 
-            if (node.pendingChildCount() == 0) {
+            if (node.pendingChildCount() == 0 && node.childIndex >= node.children.size()) {
                 completeParallel(node);
             }
         }
@@ -303,6 +321,7 @@ final class ActionExecutionStrategies {
         node.childMode = ExecutionMode.RUN;
         node.cap = dependent ? 1 : 0; // reuse cap field as dependent flag
         node.continuation = () -> continueSequential(node, context, dependent);
+        node.admissionRetry = () -> scheduleNextSequentialChild(node, context);
         descriptor.setExecutionNode(node);
 
         scheduleNextSequentialChild(node, context);
@@ -318,7 +337,12 @@ final class ActionExecutionStrategies {
         var child = Arguments.requireInstanceOf(
                 node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
         node.childIndex++;
-        scheduleChild(child, node.childMode, node, context);
+        if (scheduleChild(child, node.childMode, node, context) == Admission.DEFERRED) {
+            // The child at the cursor was not dispatched; roll back so the capacity retry
+            // re-dispatches it.
+            node.childIndex--;
+            return;
+        }
     }
 
     private static void continueSequential(
@@ -363,73 +387,81 @@ final class ActionExecutionStrategies {
         var node = createNode(descriptor, context);
         node.aggregator = new StatusAccumulator();
         node.phase = ExecutionNode.PHASE_BEFORE;
+        node.childMode = ExecutionMode.RUN;
         node.continuation = () -> continueLifecycle(node, context);
+        node.admissionRetry = () -> retryLifecycleAdmission(node, context);
         descriptor.setExecutionNode(node);
 
-        advanceLifecyclePhase(node, context);
+        dispatchLifecyclePhase(node, context);
         return runningIfChildrenAttempted(node);
     }
 
-    private static void advanceLifecyclePhase(final ExecutionNode node, final ConcreteContext context) {
-        var descriptor = node.descriptor;
+    /**
+     * Lifecycle node state machine. The node phase denotes the lifecycle phase currently being
+     * dispatched or executed:
+     *
+     * <ul>
+     *   <li>{@link ExecutionNode#PHASE_BEFORE}: the optional before child is (or is about to be)
+     *       dispatched; its completion advances the node to the body phase.</li>
+     *   <li>{@link ExecutionNode#PHASE_BODY}: body children are being admitted and executed;
+     *       {@link ExecutionNode#bodyAdmissionComplete} records whether every body child has been
+     *       dispatched, and the body phase is only left once every body child has both been
+     *       dispatched and completed.</li>
+     *   <li>{@link ExecutionNode#PHASE_AFTER}: the optional after child is (or is about to be)
+     *       dispatched; its completion finishes the lifecycle.</li>
+     *   <li>{@link ExecutionNode#PHASE_COMPLETE}: aggregation has been published.</li>
+     * </ul>
+     *
+     * <p>All lifecycle transitions are serialized on the node monitor. Dispatch may be interrupted
+     * when ready capacity is exhausted: {@link Scheduler#dispatchChild} leaves the child at the
+     * cursor unscheduled and registers the node, and {@link #retryLifecycleAdmission} resumes the
+     * interrupted dispatch from the cursors stored on the node.
+     */
+    private static void dispatchLifecyclePhase(final ExecutionNode node, final ConcreteContext context) {
+        synchronized (node) {
+            if (node.descriptor.executionNode() != node) {
+                return;
+            }
+            switch (node.phase) {
+                case ExecutionNode.PHASE_BEFORE:
+                    scheduleLifecycleBeforeChild(node, context);
+                    break;
+                case ExecutionNode.PHASE_BODY:
+                    dispatchLifecycleBodyChildren(node, context);
+                    break;
+                case ExecutionNode.PHASE_AFTER:
+                    enterLifecycleAfterPhase(node, context);
+                    break;
+                case ExecutionNode.PHASE_COMPLETE:
+                default:
+                    break;
+            }
+        }
+    }
 
-        switch (node.phase) {
-            case ExecutionNode.PHASE_BEFORE:
-                node.phase = ExecutionNode.PHASE_BODY;
-                var beforeDesc = descriptor.before().orElse(null);
-                if (beforeDesc != null) {
-                    scheduleChild(beforeDesc, ExecutionMode.RUN, node, context);
-                } else {
-                    advanceLifecyclePhase(node, context);
-                }
-                break;
-
-            case ExecutionNode.PHASE_BODY:
-                node.phase = ExecutionNode.PHASE_AFTER;
-                var before = descriptor.before().orElse(null);
-                var runBody = true;
-                if (before != null) {
-                    node.aggregator.include(before);
-                    if (!before.isPassed()) {
-                        runBody = false;
+    private static void retryLifecycleAdmission(final ExecutionNode node, final ConcreteContext context) {
+        synchronized (node) {
+            if (node.descriptor.executionNode() != node) {
+                return;
+            }
+            // Body admission may also resume from a completion continuation once capacity returns;
+            // guard so a wakeup that raced a completed phase transition is a no-op.
+            switch (node.phase) {
+                case ExecutionNode.PHASE_BEFORE:
+                    scheduleLifecycleBeforeChild(node, context);
+                    break;
+                case ExecutionNode.PHASE_BODY:
+                    if (!node.bodyAdmissionComplete) {
+                        dispatchLifecycleBodyChildren(node, context);
                     }
-                }
-
-                var bodyChildren = descriptor.children();
-                if (runBody && !bodyChildren.isEmpty()) {
-                    for (var child : bodyChildren) {
-                        scheduleChild(child, ExecutionMode.RUN, node, context);
-                    }
-                } else if (!runBody) {
-                    if (bodyChildren.isEmpty()) {
-                        advanceLifecyclePhase(node, context);
-                    } else {
-                        for (var child : bodyChildren) {
-                            scheduleChild(child, ExecutionMode.SKIP, node, context);
-                        }
-                    }
-                } else {
-                    // No body children.
-                    advanceLifecyclePhase(node, context);
-                }
-                break;
-
-            case ExecutionNode.PHASE_AFTER:
-                node.phase = ExecutionNode.PHASE_COMPLETE;
-                var afterDesc = descriptor.after().orElse(null);
-                if (afterDesc != null) {
-                    scheduleChild(afterDesc, ExecutionMode.RUN, node, context);
-                } else {
-                    advanceLifecyclePhase(node, context);
-                }
-                break;
-
-            case ExecutionNode.PHASE_COMPLETE:
-                completeLifecycle(node);
-                break;
-
-            default:
-                break;
+                    break;
+                case ExecutionNode.PHASE_AFTER:
+                    enterLifecycleAfterPhase(node, context);
+                    break;
+                case ExecutionNode.PHASE_COMPLETE:
+                default:
+                    break;
+            }
         }
     }
 
@@ -437,10 +469,132 @@ final class ActionExecutionStrategies {
         if (node.descriptor.executionNode() != node) {
             return;
         }
-        advanceLifecyclePhase(node, context);
+        lifecycleChildrenCompleted(node, context);
     }
 
-    // before is already included in advanceLifecyclePhase(PHASE_BODY) — do not double-tally.
+    /**
+     * Handles a child-completion event (pending count reached zero) for the current lifecycle
+     * phase and advances the phase when its children are fully dispatched and completed.
+     */
+    private static void lifecycleChildrenCompleted(final ExecutionNode node, final ConcreteContext context) {
+        synchronized (node) {
+            if (node.descriptor.executionNode() != node) {
+                return;
+            }
+            switch (node.phase) {
+                case ExecutionNode.PHASE_BEFORE:
+                    enterLifecycleBodyPhase(node, context);
+                    break;
+                case ExecutionNode.PHASE_BODY:
+                    if (node.bodyAdmissionComplete) {
+                        enterLifecycleAfterPhase(node, context);
+                    }
+                    // Body children still awaiting admission: the capacity retry resumes the
+                    // burst and the burst's own completions advance the phase.
+                    break;
+                case ExecutionNode.PHASE_AFTER:
+                    if (node.pendingChildCount() == 0) {
+                        finishLifecycle(node);
+                    }
+                    // Stray continuation from a previous phase while the after child is still in
+                    // flight: nothing to do.
+                    break;
+                case ExecutionNode.PHASE_COMPLETE:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private static void scheduleLifecycleBeforeChild(final ExecutionNode node, final ConcreteContext context) {
+        var before = node.descriptor.before().orElse(null);
+        if (before == null) {
+            enterLifecycleBodyPhase(node, context);
+            return;
+        }
+        var child = Arguments.requireInstanceOf(before, MutableDescriptor.class, "before descriptor is mutable");
+        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+            // Before child not dispatched; the capacity retry re-enters this method.
+            return;
+        }
+        // Before child is in flight; its completion continuation advances the phase.
+    }
+
+    /**
+     * Transitions the lifecycle from the before phase to the body phase, aggregates the before
+     * child, decides the body execution mode, and dispatches the body children.
+     */
+    private static void enterLifecycleBodyPhase(final ExecutionNode node, final ConcreteContext context) {
+        var descriptor = node.descriptor;
+        node.phase = ExecutionNode.PHASE_BODY;
+        node.bodyChildIndex = 0;
+        node.bodyAdmissionComplete = false;
+
+        var before = descriptor.before().orElse(null);
+        var runBody = true;
+        if (before != null) {
+            node.aggregator.include(before);
+            if (!before.isPassed()) {
+                runBody = false;
+            }
+        }
+
+        if (descriptor.children().isEmpty()) {
+            node.bodyAdmissionComplete = true;
+            enterLifecycleAfterPhase(node, context);
+            return;
+        }
+        node.childMode = runBody ? ExecutionMode.RUN : ExecutionMode.SKIP;
+        dispatchLifecycleBodyChildren(node, context);
+    }
+
+    /**
+     * Dispatches body children from {@link ExecutionNode#bodyChildIndex} onward, stopping without
+     * advancing the cursor when an admission is deferred for ready capacity.
+     */
+    private static void dispatchLifecycleBodyChildren(final ExecutionNode node, final ConcreteContext context) {
+        var bodyChildren = node.descriptor.children();
+        while (node.bodyChildIndex < bodyChildren.size()) {
+            var child = Arguments.requireInstanceOf(
+                    bodyChildren.get(node.bodyChildIndex),
+                    MutableDescriptor.class,
+                    "body child must be a MutableDescriptor");
+            node.bodyChildIndex++;
+            if (scheduleChild(child, node.childMode, node, context) == Admission.DEFERRED) {
+                // The child at the cursor was not dispatched; roll back so the capacity retry
+                // resumes the burst here.
+                node.bodyChildIndex--;
+                return;
+            }
+        }
+        node.bodyAdmissionComplete = true;
+    }
+
+    /**
+     * Enters the after phase and dispatches the optional after child; the lifecycle finishes when
+     * the after child (if any) completes.
+     */
+    private static void enterLifecycleAfterPhase(final ExecutionNode node, final ConcreteContext context) {
+        node.phase = ExecutionNode.PHASE_AFTER;
+        var after = node.descriptor.after().orElse(null);
+        if (after == null) {
+            finishLifecycle(node);
+            return;
+        }
+        var child = Arguments.requireInstanceOf(after, MutableDescriptor.class, "after descriptor is mutable");
+        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+            // After child not dispatched; the capacity retry re-enters this method.
+            return;
+        }
+        // After child is in flight; its completion continuation finishes the lifecycle.
+    }
+
+    private static void finishLifecycle(final ExecutionNode node) {
+        node.phase = ExecutionNode.PHASE_COMPLETE;
+        completeLifecycle(node);
+    }
+
+    // before is already included when the body phase began — do not double-tally.
     private static void completeLifecycle(final ExecutionNode node) {
         var descriptor = node.descriptor;
         for (var child : descriptor.children()) {
@@ -470,34 +624,49 @@ final class ActionExecutionStrategies {
         node.aggregator = new StatusAccumulator();
         var timedOut = new AtomicBoolean(false);
         node.continuation = () -> completeTimeout(node, timeout, childDescriptor, timedOut);
+        node.admissionRetry = () -> dispatchTimeoutChild(node, childDescriptor, context);
         descriptor.setExecutionNode(node);
 
-        node.incrementPendingChildren();
-        node.attemptedChildren++;
-        final java.util.concurrent.CompletableFuture<Descriptor> childFuture;
+        // The deadline starts counting when the timeout begins orchestrating, so it also covers
+        // a child whose admission is deferred for ready capacity.
+        context.scheduler()
+                .executeAfterDelay(
+                        () -> fireTimeout(node, timeout, childDescriptor, timedOut),
+                        timeoutNanos(timeout.timeout()),
+                        TimeUnit.NANOSECONDS);
+        dispatchTimeoutChild(node, childDescriptor, context);
+        return Status.RUNNING;
+    }
+
+    /**
+     * Dispatches the timeout's single child; a deferred admission parks the child (registered
+     * for a capacity wakeup) while the deadline timer keeps running.
+     */
+    private static void dispatchTimeoutChild(
+            final ExecutionNode node, final MutableDescriptor childDescriptor, final ConcreteContext context) {
         try {
-            childFuture = context.scheduleAsync(childDescriptor);
+            if (scheduleChild(childDescriptor, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+                // Child parked for capacity; the deadline timer and the capacity retry (which
+                // re-enters this method) take over.
+            }
         } catch (Throwable t) {
             signalChildSchedulingFailure(node);
-            return Status.RUNNING;
         }
-        childFuture.orTimeout(timeoutNanos(timeout.timeout()), TimeUnit.NANOSECONDS);
+    }
 
-        childFuture.whenComplete((result, ex) -> {
-            if (ex instanceof TimeoutException && timedOut.compareAndSet(false, true)) {
-                // orTimeout's internal TimeoutException has a null message, which produces
-                // "cancelled by ancestor: null" in abort's descendant status. Create a
-                // properly-messaged exception to pass through the cascade.
-                var cause = new TimeoutException(
-                        "timeout exceeded: " + timeout.timeout().toMillis() + " ms");
-                handleTimeout(timeout, childDescriptor, cause);
-                if (node.drainPendingChildren()) {
-                    node.scheduleContinuation();
-                }
-            }
-        });
-
-        return Status.RUNNING;
+    private static void fireTimeout(
+            final ExecutionNode node,
+            final Timeout timeout,
+            final MutableDescriptor childDescriptor,
+            final AtomicBoolean timedOut) {
+        if (!timedOut.compareAndSet(false, true)) {
+            return;
+        }
+        var cause =
+                new TimeoutException("timeout exceeded: " + timeout.timeout().toMillis() + " ms");
+        handleTimeout(timeout, childDescriptor, cause);
+        node.drainPendingChildren();
+        node.scheduleContinuation();
     }
 
     static long timeoutNanos(final Duration duration) {
@@ -556,6 +725,7 @@ final class ActionExecutionStrategies {
         node.childIndex = 0;
         node.aggregator = new StatusAccumulator();
         node.continuation = () -> continueLoop(node, context, loopAction);
+        node.admissionRetry = () -> scheduleNextLoopChild(node, context, loopAction);
         descriptor.setExecutionNode(node);
 
         scheduleNextLoopChild(node, context, loopAction);
@@ -572,7 +742,12 @@ final class ActionExecutionStrategies {
         var child = Arguments.requireInstanceOf(
                 node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
         node.childIndex++;
-        scheduleChild(child, ExecutionMode.RUN, node, context);
+        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+            // The iteration child at the cursor was not dispatched; roll back so the capacity
+            // retry re-dispatches it.
+            node.childIndex--;
+            return;
+        }
     }
 
     private static void continueLoop(final ExecutionNode node, final ConcreteContext context, final Loop loopAction) {
@@ -663,6 +838,7 @@ final class ActionExecutionStrategies {
         node.childIndex = 0;
         node.aggregator = new StatusAccumulator();
         node.continuation = () -> continueRepeat(node, context);
+        node.admissionRetry = () -> scheduleNextRepeatChild(node, context);
         descriptor.setExecutionNode(node);
 
         scheduleNextRepeatChild(node, context);
@@ -679,7 +855,12 @@ final class ActionExecutionStrategies {
         var child = Arguments.requireInstanceOf(
                 node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
         node.childIndex++;
-        scheduleChild(child, ExecutionMode.RUN, node, context);
+        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+            // The child at the cursor was not dispatched; roll back so the capacity retry
+            // re-dispatches it.
+            node.childIndex--;
+            return;
+        }
     }
 
     private static void continueRepeat(final ExecutionNode node, final ConcreteContext context) {
@@ -713,6 +894,7 @@ final class ActionExecutionStrategies {
         node.childIndex = 0;
         node.aggregator = new StatusAccumulator();
         node.continuation = () -> continueUntil(node, context, untilAction);
+        node.admissionRetry = () -> scheduleNextUntilChild(node, context);
         descriptor.setExecutionNode(node);
 
         scheduleNextUntilChild(node, context);
@@ -729,7 +911,12 @@ final class ActionExecutionStrategies {
         var child = Arguments.requireInstanceOf(
                 node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
         node.childIndex++;
-        scheduleChild(child, ExecutionMode.RUN, node, context);
+        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+            // The child at the cursor was not dispatched; roll back so the capacity retry
+            // re-dispatches it.
+            node.childIndex--;
+            return;
+        }
     }
 
     private static void continueUntil(
@@ -785,12 +972,24 @@ final class ActionExecutionStrategies {
 
     // ── Helpers ────────────────────────────────────────────────────────
 
+    /**
+     * Result of a child scheduling attempt for a coordination strategy.
+     */
+    private enum Admission {
+        /** The child was dispatched (or terminalized by the scheduler) and a completion event
+         * will follow; the strategy advances its cursor. */
+        ADMITTED,
+        /** Ready capacity was exhausted; the child at the cursor was not dispatched and the node
+         * is registered for a capacity wakeup. The strategy keeps its cursor in place. */
+        DEFERRED
+    }
+
     private static ExecutionNode createNode(final MutableDescriptor descriptor, final ConcreteContext context) {
         return new ExecutionNode(descriptor, context.scheduler());
     }
 
     /**
-     * Schedules a child descriptor for execution.
+     * Schedules a child descriptor for execution, keeping this node's completion accounting.
      *
      * <p>The pending count is incremented before scheduling so even immediate
      * child completion or scheduler rejection can safely notify this node. The
@@ -799,23 +998,41 @@ final class ActionExecutionStrategies {
      * complete exceptionally because the child genuinely ran and failed before
      * this method returns.
      *
-     * @return {@code true} if the schedule call was accepted by the scheduler,
-     *     or {@code false} if scheduling threw before the scheduler could take
-     *     ownership
+     * <p>When ready capacity is exhausted the child is left unscheduled (never dispatched, never
+     * terminalized), the pending and attempted counters are rolled back, and the parent node is
+     * registered so its {@code admissionRetry} resumes the strategy's cursor-based admission when
+     * capacity becomes available.
+     *
+     * @param child the child descriptor to schedule; must not be {@code null}
+     * @param mode the execution mode; must not be {@code null}
+     * @param parentNode the coordination node whose strategy owns the cursor; must not be
+     *     {@code null}
+     * @param context the parent execution context; must not be {@code null}
+     * @return {@link Admission#ADMITTED} when the child was dispatched or terminalized, or
+     *     {@link Admission#DEFERRED} when ready capacity was exhausted
      */
-    private static boolean scheduleChild(
+    private static Admission scheduleChild(
             final Descriptor child,
             final ExecutionMode mode,
             final ExecutionNode parentNode,
             final ConcreteContext context) {
         parentNode.incrementPendingChildren();
         parentNode.attemptedChildren++;
+        var mutableChild = Arguments.requireInstanceOf(
+                child, MutableDescriptor.class, "child descriptor must be a MutableDescriptor");
         try {
-            context.scheduleAsync(child, mode);
-            return true;
+            if (context.scheduler().dispatchChild(mutableChild, mode, context, parentNode)
+                    == Scheduler.ChildAdmissionResult.DEFERRED) {
+                parentNode.decrementPendingChildren();
+                parentNode.attemptedChildren--;
+                return Admission.DEFERRED;
+            }
+            return Admission.ADMITTED;
         } catch (Throwable t) {
+            parentNode.decrementPendingChildren();
+            parentNode.attemptedChildren--;
             signalChildSchedulingFailure(parentNode);
-            return false;
+            return Admission.ADMITTED;
         }
     }
 
@@ -830,7 +1047,7 @@ final class ActionExecutionStrategies {
     }
 
     private static Status runningIfChildrenAttempted(final ExecutionNode node) {
-        if (node.attemptedChildren > 0) {
+        if (node.descriptor.executionNode() != null) {
             return Status.RUNNING;
         }
         return node.descriptor.status();
