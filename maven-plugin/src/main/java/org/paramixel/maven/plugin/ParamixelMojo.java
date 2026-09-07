@@ -195,7 +195,10 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @throws MojoExecutionException when configuration is invalid, action resolution fails,
      *     lingering threads are detected with {@code strictThreadLifecycle} enabled,
-     *     or an unexpected error occurs during execution
+     *     or an unexpected error occurs during execution. When a primary exception is already
+     *     in flight (for example a {@code MojoFailureException} from failed tests), a
+     *     strict-thread-lifecycle error is attached to it as a suppressed exception instead of
+     *     replacing it.
      * @throws MojoFailureException when {@link Result#isFailed()} is {@code true}
      */
     @Override
@@ -212,6 +215,7 @@ public class ParamixelMojo extends AbstractMojo {
 
         try (var testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
+            Throwable primary = null;
             try {
                 final var configuration = buildConfiguration(testClassLoader);
                 final var selector = buildSelector();
@@ -235,9 +239,22 @@ public class ParamixelMojo extends AbstractMojo {
                 if (result.isFailed()) {
                     throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                 }
+            } catch (Throwable t) {
+                primary = t;
+                throw t;
             } finally {
                 Thread.currentThread().setContextClassLoader(originalClassLoader);
-                warnOrErrorLingeringThreads(preExecutionThreads);
+                try {
+                    warnOrErrorLingeringThreads(preExecutionThreads);
+                } catch (MojoExecutionException leakError) {
+                    // A strict-thread-lifecycle error must not replace an in-flight primary
+                    // exception (e.g. a test failure); attach it as suppressed instead.
+                    if (primary != null) {
+                        primary.addSuppressed(leakError);
+                    } else {
+                        throw leakError;
+                    }
+                }
             }
         } catch (ConfigurationException e) {
             throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);

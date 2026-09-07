@@ -61,6 +61,32 @@ class SchedulerFailFastTest {
     }
 
     @Test
+    @DisplayName("fail fast skip cascades SKIPPED to descendants of the skipped action")
+    void failFastSkipCascadesToDescendants() {
+        var root = Parallel.builder("root")
+                .parallelism(1)
+                .child(Step.of("fail", ctx -> {
+                    throw new RuntimeException("boom");
+                }))
+                .child(Sequence.builder("skipped-seq")
+                        .child(Step.of("inner-1", ctx -> {}))
+                        .child(Step.of("inner-2", ctx -> {}))
+                        .build())
+                .build();
+
+        var result = runner(true, 1).run(root);
+
+        assertThat(result.isFailed()).isTrue();
+        var children = result.descriptor().orElseThrow().children();
+        assertThat(children.get(0).isFailed()).isTrue();
+        assertThat(children.get(1).isSkipped()).isTrue();
+        var grandchildren = children.get(1).children();
+        assertThat(grandchildren).hasSize(2);
+        assertThat(grandchildren.get(0).isSkipped()).isTrue();
+        assertThat(grandchildren.get(1).isSkipped()).isTrue();
+    }
+
+    @Test
     @DisplayName("fail fast does not affect nested children of already-running subtrees")
     void failFastDoesNotAffectNestedChildren() {
         var nestedExecuted = new AtomicInteger();

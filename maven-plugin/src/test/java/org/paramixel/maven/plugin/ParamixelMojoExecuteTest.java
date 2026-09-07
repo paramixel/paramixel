@@ -19,6 +19,7 @@ package org.paramixel.maven.plugin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.action.Action;
+import org.paramixel.maven.plugin.fixtures.LingeringFailingMojoFixture;
 import org.paramixel.maven.plugin.fixtures.PassingMojoFixture;
 
 @DisplayName("ParamixelMojo execute()")
@@ -101,6 +103,39 @@ class ParamixelMojoExecuteTest {
                 assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(original);
             } finally {
                 Thread.currentThread().setContextClassLoader(original);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("strict thread lifecycle with failing fixture")
+    class StrictThreadLifecycleWithFailure {
+
+        @Test
+        @DisplayName("test failure is not masked by the strict thread lifecycle error")
+        void testFailureIsNotMaskedByStrictThreadLifecycleError() throws Exception {
+            var mojo = newMojo(tempDir, "LingeringFailingMojoFixture");
+            setField(mojo, "strictThreadLifecycle", true);
+
+            var original = Thread.currentThread().getContextClassLoader();
+            try {
+                var thrown = catchThrowable(mojo::execute);
+                assertThat(thrown)
+                        .as("the test failure must remain the primary exception")
+                        .isInstanceOf(MojoFailureException.class);
+                assertThat(thrown.getSuppressed())
+                        .as("the thread leak error must be attached as suppressed")
+                        .anySatisfy(suppressed -> {
+                            assertThat(suppressed).isInstanceOf(MojoExecutionException.class);
+                            assertThat(suppressed.getMessage()).contains("Non-daemon threads");
+                        });
+            } finally {
+                Thread.currentThread().setContextClassLoader(original);
+                LingeringFailingMojoFixture.THREAD_RELEASE.countDown();
+                var lingering = LingeringFailingMojoFixture.lingeringThread();
+                if (lingering != null) {
+                    lingering.join(5_000);
+                }
             }
         }
     }
