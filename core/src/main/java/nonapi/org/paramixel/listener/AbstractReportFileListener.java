@@ -50,6 +50,11 @@ abstract class AbstractReportFileListener implements Listener {
 
     @Override
     public final void onRunCompleted(final Result result) {
+        if (reportFile == null) {
+            // initialize() failed (e.g. no report file configured); fail with a clear
+            // configuration error instead of an NPE.
+            throw new ConfigurationException("No report file configured");
+        }
         try {
             final var parent = reportFile.getParent();
             if (parent != null) {

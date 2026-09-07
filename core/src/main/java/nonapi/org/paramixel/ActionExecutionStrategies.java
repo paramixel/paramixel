@@ -791,14 +791,10 @@ final class ActionExecutionStrategies {
             }
 
             if (loopAction.delay().isPresent() && node.childIndex < node.children.size()) {
-                long delayMs = loopAction
-                        .delay()
-                        .get()
-                        .delayForIteration(completedIndex + 1)
-                        .toMillis();
-                if (delayMs > 0) {
+                var delayNanos = delayNanosOrZero(loopAction.delay().get().delayForIteration(completedIndex + 1));
+                if (delayNanos > 0) {
                     node.delayScheduled = true;
-                    context.scheduler().executeContinuationAfter(node, delayMs, TimeUnit.MILLISECONDS);
+                    context.scheduler().executeContinuationAfter(node, delayNanos, TimeUnit.NANOSECONDS);
                     return;
                 }
             }
@@ -822,6 +818,20 @@ final class ActionExecutionStrategies {
             node.descriptor.setStatus(node.aggregator.status());
         }
         node.descriptor.setExecutionNode(null);
+    }
+
+    /**
+     * Converts a loop inter-iteration delay to nanoseconds without truncating
+     * sub-millisecond values. Non-positive durations yield zero (no delay).
+     *
+     * @param delay the policy-computed delay; must not be {@code null}
+     * @return the delay in nanoseconds, or zero when no delay applies
+     * @throws ArithmeticException if the duration overflows nanosecond precision,
+     *     matching the previous millisecond-conversion behavior
+     */
+    static long delayNanosOrZero(final Duration delay) {
+        var nanos = delay.toNanos();
+        return Math.max(nanos, 0L);
     }
 
     // ── Async Repeat ───────────────────────────────────────────────────

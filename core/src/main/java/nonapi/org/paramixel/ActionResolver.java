@@ -48,10 +48,14 @@ import org.paramixel.api.selector.Selector;
  * methods, validates them, invokes them to produce {@link Action} instances, and
  * collapses the results into a root {@link Parallel} action.
  *
- * <p>Discovery applies package, class, and tag filters from the {@link Selector}. Invalid methods
- * throw {@link org.paramixel.api.exception.ResolverException} at resolution time; blank tag values are
+ * <p>Factory discovery applies package, class, and tag filters from the {@link Selector}. Invalid
+ * methods throw {@link org.paramixel.api.exception.ResolverException} at resolution time; blank tag values are
  * collected as validation-failure actions rather than failing the entire scan. Methods that return
  * {@code null} are skipped without producing an action.
+ *
+ * <p>{@code @BeforeAll} and {@code @AfterAll} hooks are runner-level lifecycle actions: they are
+ * always discovered regardless of the selector, because they wrap the entire run rather than
+ * individual discovered factories.
  */
 public final class ActionResolver {
 

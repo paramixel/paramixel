@@ -34,6 +34,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Step;
+import org.paramixel.api.exception.ConfigurationException;
 
 @DisplayName("HtmlReportListener")
 class HtmlReportListenerTest {
@@ -46,6 +47,20 @@ class HtmlReportListenerTest {
         var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
         listener.initialize(configuration);
         return listener;
+    }
+
+    @Test
+    @DisplayName("onRunCompleted throws ConfigurationException instead of NPE when initialize failed")
+    void onRunCompletedThrowsConfigurationExceptionWhenNotInitialized() {
+        var listener = new HtmlReportListener();
+        // No report file configured: initialize fails and the listener stays uninitialized.
+        assertThatThrownBy(() -> listener.initialize(new ConcreteConfiguration(Map.of())))
+                .isInstanceOf(ConfigurationException.class);
+
+        var result = new ConcreteResult(Configuration.defaultConfiguration());
+        assertThatThrownBy(() -> listener.onRunCompleted(result))
+                .isInstanceOf(ConfigurationException.class)
+                .isNotInstanceOf(NullPointerException.class);
     }
 
     @Test

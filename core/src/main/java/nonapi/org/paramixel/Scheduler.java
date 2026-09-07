@@ -567,10 +567,16 @@ public final class Scheduler implements AutoCloseable {
             final boolean internalAdmission) {
         if (!queuePermits.tryAcquire()) {
             if (internalAdmission && parentNode != null) {
-                registerCapacityWaiter(parentNode);
                 if (relinquishIneligibleQueuedTaskIfNeeded() && queuePermits.tryAcquire()) {
                     return markScheduledAndEnqueue(descriptor, context, mode, callback);
                 }
+                // Register only when the admission actually remains deferred. Registering
+                // before the relinquish attempt could leave a stale waiter behind when the
+                // attempt succeeds, turning the next capacity signal into a spurious
+                // admission retry (double admission for cursor-based strategies).
+                // Lost wakeups stay impossible: registration happens under the capacity
+                // monitor and the post-registration recheck observes any concurrent release.
+                registerCapacityWaiter(parentNode);
                 return ChildAdmissionResult.DEFERRED;
             }
             return ChildAdmissionResult.REJECTED;
@@ -1589,13 +1595,18 @@ public final class Scheduler implements AutoCloseable {
                                 .isPresent()) {
                     closingLock.lock();
                     try {
-                        if (failureOccurred) {
-                            descriptor.setStatus(Status.skipped("fail fast"));
-                            skipExecution = true;
-                        }
+                        skipExecution = failureOccurred;
                     } finally {
                         closingLock.unlock();
                     }
+                }
+                if (skipExecution) {
+                    // Cascade SKIP to the subtree so no descendant is left PENDING,
+                    // matching normal SKIP-mode propagation (skipAction -> runChildren).
+                    // Deliberately outside closingLock: the cascade executes children
+                    // synchronously and may block on leaf permits.
+                    context.runChildren(ExecutionMode.SKIP);
+                    descriptor.setStatus(Status.skipped("fail fast"));
                 }
                 if (!skipExecution && callback != null) {
                     callbackLifecycleStarted = true;

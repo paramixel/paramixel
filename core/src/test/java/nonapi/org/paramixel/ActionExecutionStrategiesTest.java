@@ -18,7 +18,9 @@ package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
 
@@ -33,6 +35,38 @@ class ActionExecutionStrategiesTest {
             assertThat(ActionExecutionStrategies.supports(type.asSubclass(Action.class)))
                     .as(type.getName())
                     .isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("loop delay conversion")
+    class LoopDelayConversion {
+
+        @Test
+        @DisplayName("sub-millisecond delays are not truncated to zero")
+        void subMillisecondDelaysAreNotTruncated() {
+            assertThat(ActionExecutionStrategies.delayNanosOrZero(Duration.ofNanos(900_000)))
+                    .isEqualTo(900_000L);
+            assertThat(ActionExecutionStrategies.delayNanosOrZero(Duration.ofNanos(1)))
+                    .isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("millisecond and larger delays convert exactly")
+        void millisecondDelaysConvertExactly() {
+            assertThat(ActionExecutionStrategies.delayNanosOrZero(Duration.ofMillis(5)))
+                    .isEqualTo(5_000_000L);
+            assertThat(ActionExecutionStrategies.delayNanosOrZero(Duration.ofSeconds(2)))
+                    .isEqualTo(2_000_000_000L);
+        }
+
+        @Test
+        @DisplayName("zero and negative delays yield no delay")
+        void zeroAndNegativeDelaysYieldNoDelay() {
+            assertThat(ActionExecutionStrategies.delayNanosOrZero(Duration.ZERO))
+                    .isZero();
+            assertThat(ActionExecutionStrategies.delayNanosOrZero(Duration.ofNanos(-5)))
+                    .isZero();
         }
     }
 }
