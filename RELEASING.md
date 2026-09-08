@@ -50,7 +50,14 @@ The `WWW_PARAMIXEL_ORG` environment variable must be set to your SSH host alias 
 
 The `./scripts/release.sh` script automates the entire release process except for publishing from the Maven Central Portal, which requires manual verification.
 
-The script is **idempotent** — each step detects if it has already been completed and skips accordingly. It is safe to re-run if a step fails partway through.
+The script records the next step and release commit in the Git common directory at
+`release-state/<version>`. Rerun the same command to resume a partial release;
+completed releases are no-ops. These checkpoints are local and do not travel with
+a clone. Existing releases without checkpoints require manual recovery.
+
+Dry runs are offline: they read local checkpoint metadata and print the workflow
+without running Maven, fetching Git refs, checking credentials, or writing state.
+Execution refreshes origin and validates the prerequisites for the remaining steps.
 
 ### Usage
 
@@ -74,7 +81,8 @@ The script is **idempotent** — each step detects if it has already been comple
 | ------ | ----------- |
 | `--execute` | Execute the release (default is dry-run) |
 | `--skip-gradle` | Skip Gradle build validation |
-| `--skip-docs-build` | Skip documentation build (pass `--skip-build` to publish script) |
+| `--skip-docs-build` | Reuse a nonempty `website/build` for this release; skip all documentation builds |
+| `--retry-deploy` | Retry step 3 from a step-4 checkpoint after confirming the version is unpublished and all pending deployments have been dropped |
 | `-h`, `--help` | Show help text |
 
 ### What the script does
@@ -90,7 +98,9 @@ The script is **idempotent** — each step detects if it has already been comple
 | 6 | Publish documentation | Yes |
 | 7 | Bump main to development version (`<VERSION>-POST`) | Yes |
 
-The script prompts before every push and tag operation. Answering **N** at Step 4 triggers a full rollback (deletes the release branch locally and remotely, reminds user to drop the Sonatype deployment).
+The script prompts before each required push and verifies existing tags against the
+release commit. Answering **N** at Step 4 stops and preserves the branches and
+checkpoint. It does not delete branches, tags, or Central deployments.
 
 ### Steps the script performs
 
@@ -103,10 +113,11 @@ git checkout -b release/<VERSION>
 ./mvnw versions:set-property -Dproperty=revision -DnewVersion=<VERSION> -DgenerateBackupPoms=false
 ./mvnw spotless:apply
 ./mvnw clean install
+./mvnw spotless:apply
 ./gradlew clean check --no-daemon
 ./scripts/build-documentation.sh
 git add -A
-git commit -s -m "release: Release <VERSION>"
+git commit -s -m "chore: Release <VERSION>"
 git push -u origin release/<VERSION>
 ```
 
@@ -117,6 +128,7 @@ CI runs automatically on the release branch. The script pauses and asks for conf
 #### Step 3 — Deploy to Maven Central
 
 ```bash
+./mvnw spotless:apply
 ./mvnw -Prelease clean deploy
 ```
 
@@ -134,7 +146,7 @@ Before proceeding, verify the pending deployment at [Sonatype Central](https://c
 
 Once verified, publish the deployment from the Maven Central Publishing Portal.
 
-The script pauses for user confirmation. If you answer **N**, the script rolls back (deletes the release branch and reminds you to drop the Sonatype deployment).
+The script pauses for publication confirmation. Answering **N** preserves the pending release; rerun when ready. No rollback or deployment deletion occurs.
 
 #### Step 5 — Tag the release
 
@@ -145,8 +157,12 @@ git push origin v<VERSION>
 
 #### Step 6 — Publish documentation
 
+A continuous run reuses the documentation built during preparation. A resumed
+publication step rebuilds for the checked-out release commit, unless
+`--skip-docs-build` explicitly requests existing output.
+
 ```bash
-./scripts/publish-documentation.sh
+./scripts/publish-documentation.sh --skip-build
 ```
 
 #### Step 7 — Bump main to the next development version
@@ -157,6 +173,7 @@ git pull --ff-only
 ./mvnw versions:set-property -Dproperty=revision -DnewVersion=<VERSION>-POST -DgenerateBackupPoms=false
 ./mvnw spotless:apply
 ./mvnw clean install
+./mvnw spotless:apply
 ./gradlew clean check --no-daemon
 git add -A
 git commit -s -m "chore: Prepare for development"
@@ -188,11 +205,12 @@ git checkout -b release/<VERSION>
 
 ./mvnw spotless:apply
 ./mvnw clean install
+./mvnw spotless:apply
 ./gradlew clean check --no-daemon
 ./scripts/build-documentation.sh
 
 git add -A
-git commit -s -m "release: Release <VERSION>"
+git commit -s -m "chore: Release <VERSION>"
 git push -u origin release/<VERSION>
 ```
 
@@ -226,6 +244,7 @@ Once CI is green, deploy the release artifacts to Sonatype Central. The deployme
 # Ensure you are on the release branch
 git checkout release/<VERSION>
 
+./mvnw spotless:apply
 ./mvnw -Prelease clean deploy
 ```
 
@@ -284,6 +303,7 @@ git pull
 
 ./mvnw spotless:apply
 ./mvnw clean install
+./mvnw spotless:apply
 ./gradlew clean check --no-daemon
 
 git add -A
@@ -309,13 +329,14 @@ git push
    - Pull or push to sync: `git pull` or `git push`
    - Check for diverged branches
 
-4. **"Local tag already exists: vX.Y.Z"**
-   - Check existing tags: `git tag -l`
-   - Delete if stale: `git tag -d vX.Y.Z`
+4. **Existing or conflicting local release tag**
+   - Compare the tag commit with the release checkpoint and published artifacts.
+   - A matching tag is reused when resuming the tagging step.
+   - Without a checkpoint, recover manually; do not delete a published release tag.
 
-5. **"Remote tag already exists: vX.Y.Z"**
-   - Delete remote tag: `git push origin :refs/tags/vX.Y.Z`
-   - Only do this if the previous release was incomplete or failed
+5. **Existing or conflicting remote release tag**
+   - A matching remote tag is reused after publication has been confirmed.
+   - A conflicting tag stops the script. Investigate the release history instead of force-pushing or deleting it.
 
 6. **Central deployment fails**
    - Verify your Sonatype credentials at https://central.sonatype.com
@@ -325,14 +346,26 @@ git push
 
 ### Error Recovery
 
-- **CI fails on the release branch:** Fix on the branch or delete it and start over. No tag or deploy has happened yet.
-- **Maven Central deploy fails:** Do not push the tag. Fix the issue and rerun `./mvnw -Prelease clean deploy`.
-- **Deploy succeeded but publish not yet done:** Review the pending deployment in the Maven Central Publishing Portal. If valid, publish it from the portal. If it should not be published, drop the deployment from the portal, fix the issue locally, and rerun `./mvnw -Prelease clean deploy`.
-- **Publish failed after validation:** Check the deployment status and validation details in the Maven Central Publishing Portal. If it can be retried from the portal, retry there. Otherwise drop the deployment from the portal, fix the issue locally, and rerun `./mvnw -Prelease clean deploy`.
-- **Tag pushed but deploy failed:** Delete the remote tag (`git push origin :refs/tags/vX.Y.Z`), fix the issue, redeploy, then re-tag.
-- **Post-release bump failed on main:** Manually set the version, commit, and push.
-- **Script answered N at Step 4:** The script rolls back automatically. Drop the pending deployment in the Maven Central Publishing Portal if you do not intend to publish.
-- **Script interrupted partway through:** Re-run the script. It is idempotent — each step detects if it has already been completed and skips accordingly.
+- **Build fails with working-tree changes:** Review and commit or stash the changes, then rerun. The script does not discard work. Resume on `main` or `release/<VERSION>`.
+- **CI fails:** Fix and push the release branch, then rerun and confirm CI for the new commit. After CI confirmation, changing the release commit requires manual recovery.
+- **Deploy fails or is interrupted:** The script records step 4 *before* uploading, because a failing client may already have created a deployment. Inspect the portal. If the deployment exists, verify and publish it, then rerun to confirm publication. If the version is unpublished and all pending deployments have been dropped (or none exists), run `./scripts/release.sh <VERSION> --execute --retry-deploy` and confirm the retry. The script cannot query Central publication status automatically.
+- **Publication is pending or declined:** Branches and checkpoint are retained. Rerun once ready. Nothing is automatically deleted.
+- **Tag push fails or is declined:** Rerun; a matching existing local or remote tag is reused. Conflicting tags stop the script.
+- **Documentation upload fails after publication:** Rerun; deployment and tagging are skipped. Set the documented project SSH host variable. Documentation is rebuilt for the release commit unless `--skip-docs-build` is supplied.
+- **Development bump or main push fails:** Review any uncommitted changes, then rerun on `main`. The published release is not redeployed.
+- **Release was started with an older script or another clone:** Local checkpoints are unavailable. Follow the remaining manual steps after verifying the release commit and portal state. Do not delete published tags to restart automation.
+- **Release lock remains after a forced termination:** Confirm no release process is running, then remove the empty `release-script.lock` directory under `git rev-parse --git-common-dir`. Do not remove an active lock or delete checkpoint files to force a deployment retry.
+
+To validate the orchestration without publishing anything:
+
+```bash
+bash -n scripts/release.sh
+shellcheck scripts/release.sh
+python3 scripts/test-release.py
+```
+
+The tests use temporary local Git repositories and mocked build, signing, and
+transport commands. They do not build Java artifacts or contact Central/the website.
 
 ---
 

@@ -20,550 +20,381 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly PROJECT_DIR
-readonly MVNW="${PROJECT_DIR}/mvnw"
-readonly GRADLEW="${PROJECT_DIR}/gradlew"
-
+readonly PROJECT_NAME='Paramixel'
+readonly DOCS_HOST_VARIABLE='WWW_PARAMIXEL_ORG'
+readonly HAS_GRADLE='true'
 readonly VERSION_REGEX='^[0-9]+\.[0-9]+\.[0-9]+$'
 
-EXECUTE="false"
-SKIP_GRADLE="false"
-SKIP_DOCS_BUILD="false"
-VERSION=""
+EXECUTE=false
+SKIP_DOCS_BUILD=false
+SKIP_GRADLE=false
+RETRY_DEPLOY=false
+VERSION=''
+NEXT_STEP=1
+RELEASE_COMMIT=''
+STATE_FILE=''
+LOCK_DIR=''
+REMOTE_TAG_COMMIT=''
 
 usage() {
-    cat <<'EOF'
+    cat <<EOF_HELP
 Usage: ./scripts/release.sh <version> [OPTIONS]
 
-Automated release script for Paramixel. Performs all release steps except
-publishing to the Maven Central Portal (which requires manual verification).
-
-By default runs in dry-run mode (prints commands without executing).
-Use --execute to perform the actual release.
-
-The script is idempotent — safe to re-run. Each step detects if it has
-already been completed and skips accordingly.
-
-Arguments:
-  <version>              Release version in x.y.z format (e.g. 1.2.3)
+Release ${PROJECT_NAME}; Central publication requires manual portal verification.
+Default: offline dry run. Use --execute to run or resume a release.
 
 Options:
-  --execute              Execute the release (default is dry-run)
-  --skip-gradle          Skip Gradle build validation
-  --skip-docs-build      Skip documentation build (use if docs already built)
-  -h, --help             Show this help text
+  --execute          Execute, resuming the local checkpoint when present
+  --skip-docs-build  Reuse website/build without building documentation
+  --skip-gradle      Skip Gradle build validation
+  --retry-deploy     Retry an uncertain deployment after checking/dropping it in Central
+  -h, --help         Show help (no version required)
 
-Examples:
-  ./scripts/release.sh 1.2.3                    # Dry run
-  ./scripts/release.sh 1.2.3 --execute          # Execute release
-  ./scripts/release.sh 1.2.3 --execute --skip-gradle
-EOF
+Checkpoints live in the Git common directory under release-state/<version>.
+Do not delete checkpoints or release tags to retry a published release.
+EOF_HELP
 }
 
-log() {
-    echo "[INFO] $*"
-}
-
-warn() {
-    echo "[WARN] $*" >&2
-}
-
-fail() {
-    echo "[ERROR] $*" >&2
-    exit 1
-}
-
+log() { echo "[INFO] $*"; }
+fail() { echo "[ERROR] $*" >&2; exit 1; }
 prompt_yes() {
-    local question="$1"
     local answer
-    echo ""
-    echo "${question}"
-    read -r -p "[y/N] " answer
-    echo ""
-    [[ "${answer}" == "y" || "${answer}" == "Y" ]]
-}
-
-run_cmd() {
-    local description="$1"
-    shift
-    if [[ "${EXECUTE}" == "true" ]]; then
-        log "${description}"
-        "$@"
-    else
-        log "[DRY-RUN] $*"
-    fi
+    read -r -p "$1 [y/N] " answer || return 1
+    [[ "$answer" == y || "$answer" == Y ]]
 }
 
 parse_args() {
-    if [[ $# -lt 1 ]]; then
-        usage
-        exit 1
-    fi
-
-    VERSION="$1"
-    shift
-
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --execute)
-                EXECUTE="true"
-                ;;
+            --execute) EXECUTE=true ;;
+            --skip-docs-build) SKIP_DOCS_BUILD=true ;;
             --skip-gradle)
-                SKIP_GRADLE="true"
+                [[ "$HAS_GRADLE" == true ]] || fail "Unknown argument: $1"
+                SKIP_GRADLE=true
                 ;;
-            --skip-docs-build)
-                SKIP_DOCS_BUILD="true"
-                ;;
-            -h|--help)
-                usage
-                exit 0
-                ;;
+            --retry-deploy) RETRY_DEPLOY=true ;;
+            -h|--help) usage; exit 0 ;;
+            -*) fail "Unknown argument: $1" ;;
             *)
-                usage >&2
-                fail "Unknown argument: $1"
+                [[ -z "$VERSION" ]] || fail "Unexpected argument: $1"
+                VERSION="$1"
                 ;;
         esac
         shift
     done
+    [[ "$VERSION" =~ $VERSION_REGEX ]] || fail "Version must be x.y.z (for example 1.2.3)."
+}
+
+# Use exact namespaces: a branch must never be mistaken for a tag (or vice versa).
+ref_exists() { git show-ref --verify --quiet "$1"; }
+commit_at() { git rev-parse --verify "$1^{commit}"; }
+require_clean_tree() {
+    local status
+    status=$(git status --porcelain) || fail "Cannot inspect working tree."
+    [[ -z "$status" ]] || fail "Working tree is not clean. Review and commit or stash changes, then rerun."
+}
+
+read_remote_tag() {
+    local refs direct peeled
+    refs=$(git ls-remote --tags origin "refs/tags/v${VERSION}" "refs/tags/v${VERSION}^{}") \
+        || fail "Cannot query remote tags; check origin connectivity and credentials."
+    direct=$(awk -v ref="refs/tags/v${VERSION}" '$2 == ref { print $1 }' <<< "$refs")
+    peeled=$(awk -v ref="refs/tags/v${VERSION}^{}" '$2 == ref { print $1 }' <<< "$refs")
+    REMOTE_TAG_COMMIT="${peeled:-$direct}"
+}
+
+load_state() {
+    local extra=''
+    if [[ -f "$STATE_FILE" ]]; then
+        {
+            read -r NEXT_STEP && read -r RELEASE_COMMIT && ! read -r extra && [[ -z "$extra" ]]
+        } < "$STATE_FILE" || fail "Invalid checkpoint: $STATE_FILE"
+        [[ "$NEXT_STEP" =~ ^[1-8]$ ]] || fail "Invalid checkpoint step: $STATE_FILE"
+        [[ -z "$RELEASE_COMMIT" || "$RELEASE_COMMIT" =~ ^[0-9a-f]{40,64}$ ]] \
+            || fail "Invalid checkpoint commit: $STATE_FILE"
+        [[ "$NEXT_STEP" == 1 || -n "$RELEASE_COMMIT" ]] || fail "Missing checkpoint commit."
+    fi
+}
+
+save_state() {
+    NEXT_STEP="$1"
+    printf '%s\n%s\n' "$NEXT_STEP" "$RELEASE_COMMIT" > "${STATE_FILE}.tmp"
+    mv "${STATE_FILE}.tmp" "$STATE_FILE"
 }
 
 get_current_revision() {
-    (cd "${PROJECT_DIR}" && ./mvnw help:evaluate -Dexpression=revision -q -DforceStdout 2>/dev/null) || echo ""
+    local revision
+    revision=$(./mvnw help:evaluate -Dexpression=revision -q -DforceStdout -Dstyle.color=never) \
+        || fail "Cannot read Maven revision."
+    # Some Maven versions emit ANSI reset sequences even with color disabled.
+    revision=$(printf '%s' "$revision" | sed $'s/\033\\[[0-9;]*m//g')
+    [[ "$revision" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-POST)?$ ]] || fail "Unexpected Maven revision: $revision"
+    printf '%s\n' "$revision"
 }
 
-get_current_branch() {
-    git -C "${PROJECT_DIR}" rev-parse --abbrev-ref HEAD
+validate_build() {
+    ./mvnw spotless:apply
+    ./mvnw clean install
+    if [[ "$HAS_GRADLE" == true && "$SKIP_GRADLE" == false ]]; then
+        ./mvnw spotless:apply
+        ./gradlew clean check --no-daemon
+    fi
 }
 
-is_working_tree_clean() {
-    git -C "${PROJECT_DIR}" status --porcelain | grep -q . && return 1 || return 0
-}
-
-is_main_synced() {
-    local local_hash remote_hash
-    local_hash=$(git -C "${PROJECT_DIR}" rev-parse main)
-    remote_hash=$(git -C "${PROJECT_DIR}" rev-parse origin/main 2>/dev/null) || return 1
-    [[ "${local_hash}" == "${remote_hash}" ]]
-}
-
-local_branch_exists() {
-    git -C "${PROJECT_DIR}" rev-parse --verify "$1" &>/dev/null
-}
-
-remote_branch_exists() {
-    git -C "${PROJECT_DIR}" rev-parse --verify "origin/$1" &>/dev/null
-}
-
-local_tag_exists() {
-    git -C "${PROJECT_DIR}" rev-parse --verify "$1" &>/dev/null
-}
-
-remote_tag_exists() {
-    git -C "${PROJECT_DIR}" ls-remote --tags origin "$1" 2>/dev/null | grep -q .
-}
-
-tag_points_at() {
-    local tag="$1"
-    local commit="$2"
-    local tag_commit
-    tag_commit=$(git -C "${PROJECT_DIR}" rev-list -n 1 "${tag}" 2>/dev/null) || return 1
-    [[ "${tag_commit}" == "${commit}" ]]
-}
-
-remote_branch_tip_matches() {
-    local branch="$1"
-    local commit="$2"
-    local remote_commit
-    remote_commit=$(git -C "${PROJECT_DIR}" rev-parse "origin/${branch}" 2>/dev/null) || return 1
-    [[ "${remote_commit}" == "${commit}" ]]
+validate_docs_build() {
+    [[ -d website/build && -n "$(find website/build -type f -print -quit)" ]] \
+        || fail "website/build is missing or empty; build the release documentation first."
 }
 
 preflight_checks() {
-    log "Running pre-flight checks..."
+    require_clean_tree
+    git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*' \
+        || fail "Cannot refresh origin branches."
+    read_remote_tag
 
-    [[ "${VERSION}" =~ ${VERSION_REGEX} ]] || fail "Invalid version '${VERSION}'. Must be x.y.z format (e.g. 1.2.3)."
-
-    [[ "${VERSION}" != *"-POST" ]] || fail "Version must not end with -POST."
-
-    [[ -x "${MVNW}" ]] || fail "mvnw not found or not executable: ${MVNW}"
-
-    if [[ "${SKIP_GRADLE}" == "false" ]]; then
-        [[ -x "${GRADLEW}" ]] || fail "gradlew not found or not executable: ${GRADLEW} (use --skip-gradle to skip)"
-    fi
-
-    local current_branch
-    current_branch=$(get_current_branch)
-    [[ "${current_branch}" == "main" ]] || fail "Must be on main branch. Currently on: ${current_branch}"
-
-    is_working_tree_clean || fail "Working tree is not clean. Commit or stash changes before releasing."
-
-    is_main_synced || fail "main is not synced with origin/main. Pull or push first."
-
-    local_branch_exists "release/${VERSION}" && log "Local branch release/${VERSION} already exists (will reuse)"
-    remote_branch_exists "release/${VERSION}" && log "Remote branch release/${VERSION} already exists (will reuse)"
-
-    if local_tag_exists "v${VERSION}"; then
-        local current_head
-        current_head=$(git -C "${PROJECT_DIR}" rev-parse HEAD)
-        if tag_points_at "v${VERSION}" "${current_head}"; then
-            log "Local tag v${VERSION} already exists at current HEAD (will reuse)"
-        else
-            local tag_commit
-            tag_commit=$(git -C "${PROJECT_DIR}" rev-list -n 1 "v${VERSION}")
-            fail "Local tag v${VERSION} exists but points at ${tag_commit}, not current HEAD. Delete it if stale: git tag -d v${VERSION}"
+    local branch main_commit remote_main_commit
+    branch=$(git symbolic-ref --quiet --short HEAD) || fail "Detached HEAD is not supported."
+    if [[ "$NEXT_STEP" == 1 ]]; then
+        [[ "$branch" == main || "$branch" == "release/${VERSION}" ]] || fail "Start on main or release/${VERSION}."
+        main_commit=$(commit_at refs/heads/main) || fail "Local main branch is missing."
+        remote_main_commit=$(commit_at refs/remotes/origin/main) || fail "Origin main branch is missing."
+        [[ "$main_commit" == "$remote_main_commit" ]] || fail "main is not synced with origin/main. Pull or push first."
+        if ref_exists "refs/tags/v${VERSION}" || [[ -n "$REMOTE_TAG_COMMIT" ]]; then
+            fail "Tag v${VERSION} exists without a prepared checkpoint. Recover manually; do not delete a published tag."
         fi
-    fi
-
-    if remote_tag_exists "v${VERSION}"; then
-        fail "Remote tag v${VERSION} already exists. Delete if stale: git push origin :refs/tags/v${VERSION}"
-    fi
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        if ! echo "test" | gpg --batch --clearsign &>/dev/null; then
-            fail "GPG signing is not working. Verify your GPG key and passphrase."
-        fi
-
-        if [[ ! -f "${HOME}/.m2/settings.xml" ]]; then
-            fail "Maven settings not found: ~/.m2/settings.xml. Create it with your Sonatype Central credentials."
-        fi
-    fi
-
-    if [[ -z "${WWW_PARAMIXEL_ORG:-}" ]]; then
-        fail "WWW_PARAMIXEL_ORG environment variable is not set. Set it to your SSH host alias."
-    fi
-
-    log "Pre-flight checks passed."
-}
-
-step1_prepare_release_branch() {
-    log "========================================"
-    log "Step 1 — Prepare release branch"
-    log "========================================"
-
-    local current_revision
-    current_revision=$(get_current_revision)
-
-    if local_branch_exists "release/${VERSION}"; then
-        run_cmd "Checking out existing branch release/${VERSION}" git -C "${PROJECT_DIR}" checkout "release/${VERSION}"
-    elif remote_branch_exists "release/${VERSION}"; then
-        run_cmd "Tracking existing remote branch release/${VERSION}" git -C "${PROJECT_DIR}" checkout --track "origin/release/${VERSION}"
+    elif [[ "$NEXT_STEP" -lt 7 ]]; then
+        [[ "$branch" == main || "$branch" == "release/${VERSION}" ]] || fail "Resume on main or release/${VERSION}."
     else
-        run_cmd "Creating branch release/${VERSION} from main" git -C "${PROJECT_DIR}" checkout -b "release/${VERSION}"
+        [[ "$branch" == main || "$branch" == "release/${VERSION}" ]] || fail "Resume the development bump on main or release/${VERSION}."
     fi
 
-    if [[ "${current_revision}" == "${VERSION}" ]]; then
-        log "Version already set to ${VERSION}, skipping versions:set-property"
-    else
-        run_cmd "Setting version to ${VERSION}" "${MVNW}" versions:set-property -Dproperty=revision -DnewVersion="${VERSION}" -DgenerateBackupPoms=false
+    if [[ "$NEXT_STEP" -gt 1 ]]; then
+        if ref_exists "refs/tags/v${VERSION}"; then
+            [[ "$(commit_at "refs/tags/v${VERSION}")" == "$RELEASE_COMMIT" ]] || fail "Local release tag conflicts with checkpoint."
+        fi
+        [[ -z "$REMOTE_TAG_COMMIT" || "$REMOTE_TAG_COMMIT" == "$RELEASE_COMMIT" ]] || fail "Remote release tag conflicts with checkpoint."
+        [[ "$NEXT_STEP" -gt 4 || -z "$REMOTE_TAG_COMMIT" ]] || fail "Remote tag exists before publication confirmation; recover manually."
+        [[ "$NEXT_STEP" -lt 6 || "$REMOTE_TAG_COMMIT" == "$RELEASE_COMMIT" ]] || fail "Published release tag is missing on origin."
     fi
 
-    if [[ "${EXECUTE}" == "true" ]]; then
-        run_cmd "Applying code formatting" "${MVNW}" spotless:apply
-        run_cmd "Building with Maven" "${MVNW}" clean install
-
-        if [[ "${SKIP_GRADLE}" == "false" ]]; then
-            run_cmd "Building with Gradle" "${GRADLEW}" clean check --no-daemon
-        else
-            log "Skipping Gradle build (--skip-gradle)"
-        fi
-
-        run_cmd "Building documentation" "${SCRIPT_DIR}/build-documentation.sh"
-    else
-        log "[DRY-RUN] ${MVNW} spotless:apply"
-        log "[DRY-RUN] ${MVNW} clean install"
-        if [[ "${SKIP_GRADLE}" == "false" ]]; then
-            log "[DRY-RUN] ${GRADLEW} clean check --no-daemon"
-        fi
-        log "[DRY-RUN] ${SCRIPT_DIR}/build-documentation.sh"
+    if [[ "$NEXT_STEP" -le 6 ]]; then
+        [[ -n "${!DOCS_HOST_VARIABLE:-}" ]] || fail "Set ${DOCS_HOST_VARIABLE} to the documentation SSH host alias."
+        local dependency
+        for dependency in rsync ssh; do
+            command -v "$dependency" >/dev/null || fail "Required command missing: $dependency"
+        done
     fi
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        if git -C "${PROJECT_DIR}" diff --cached --quiet 2>/dev/null && git -C "${PROJECT_DIR}" diff --quiet 2>/dev/null; then
-            log "No changes to commit"
-        else
-            run_cmd "Committing release" git -C "${PROJECT_DIR}" add -A
-            run_cmd "Committing release" git -C "${PROJECT_DIR}" commit -s -m "release: Release ${VERSION}"
-        fi
-    else
-        log "[DRY-RUN] git add -A"
-        log "[DRY-RUN] git commit -s -m \"release: Release ${VERSION}\""
+    if [[ "$NEXT_STEP" -le 3 || "$RETRY_DEPLOY" == true ]]; then
+        [[ -f "${HOME}/.m2/settings.xml" ]] || fail "Maven settings not found: ~/.m2/settings.xml"
+        echo test | gpg --batch --clearsign >/dev/null 2>&1 || fail "GPG signing is not working."
     fi
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        local local_commit
-        local_commit=$(git -C "${PROJECT_DIR}" rev-parse HEAD)
-        if remote_branch_exists "release/${VERSION}" && remote_branch_tip_matches "release/${VERSION}" "${local_commit}"; then
-            log "Remote branch release/${VERSION} already up to date, skipping push"
-        else
-            if prompt_yes "Push release/${VERSION} to origin?"; then
-                git -C "${PROJECT_DIR}" push -u origin "release/${VERSION}"
-            else
-                fail "Push cancelled. Release branch is local only."
-            fi
-        fi
-    else
-        log "[DRY-RUN] git push -u origin release/${VERSION}"
+    [[ -x ./mvnw ]] || fail "mvnw is not executable."
+    if [[ "$HAS_GRADLE" == true && "$SKIP_GRADLE" == false && ( "$NEXT_STEP" == 1 || "$NEXT_STEP" == 7 ) ]]; then
+        [[ -x ./gradlew ]] || fail "gradlew is not executable (or use --skip-gradle)."
     fi
 }
 
-step2_wait_for_ci() {
-    log "========================================"
-    log "Step 2 — Wait for CI"
-    log "========================================"
-
-    echo ""
-    log "CI is running on release/${VERSION}."
-    log "Check: https://github.com/paramixel/paramixel/actions"
-    echo ""
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        if prompt_yes "Has CI passed on release/${VERSION}?"; then
-            log "CI confirmed passed."
-        else
-            log "CI not passed. To fix on the release branch and retry, push fixes and re-run this script."
-            log "To start over:"
-            log "  git push origin --delete release/${VERSION}"
-            log "  git checkout main"
-            log "  git branch -D release/${VERSION}"
-            fail "Release aborted — CI not passed."
-        fi
+prepare_release() {
+    log 'Step 1 — Prepare release branch'
+    if ref_exists "refs/heads/release/${VERSION}"; then
+        git checkout "release/${VERSION}"
+    elif ref_exists "refs/remotes/origin/release/${VERSION}"; then
+        git checkout --track "origin/release/${VERSION}"
     else
-        log "[DRY-RUN] Would prompt: Has CI passed on release/${VERSION}?"
+        git checkout -b "release/${VERSION}" main
+    fi
+    local revision
+    revision=$(get_current_revision)
+    if [[ "$revision" != "$VERSION" ]]; then
+        ./mvnw versions:set-property -Dproperty=revision -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+    fi
+    validate_build
+    if [[ "$SKIP_DOCS_BUILD" == false ]]; then
+        "${SCRIPT_DIR}/build-documentation.sh"
+    fi
+    validate_docs_build
+    commit_changes "chore: Release ${VERSION}"
+    RELEASE_COMMIT=$(commit_at HEAD)
+    push_release_branch
+}
+
+commit_changes() {
+    if [[ -n "$(git status --porcelain)" ]]; then
+        git add -A
+        git commit -s -m "$1"
     fi
 }
 
-step3_deploy_to_maven_central() {
-    log "========================================"
-    log "Step 3 — Deploy to Maven Central"
-    log "========================================"
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        log "Deploying release artifacts to Sonatype Central..."
-        (cd "${PROJECT_DIR}" && ./mvnw -Prelease clean deploy)
-        log "Deployment complete. Artifacts are pending at Sonatype Central."
-    else
-        log "[DRY-RUN] ${MVNW} -Prelease clean deploy"
+push_release_branch() {
+    if ! ref_exists "refs/remotes/origin/release/${VERSION}" \
+        || [[ "$(commit_at "refs/remotes/origin/release/${VERSION}")" != "$(commit_at HEAD)" ]]; then
+        prompt_yes "Push release/${VERSION} to origin?" || fail 'Push cancelled; rerun to resume.'
+        git push -u origin "refs/heads/release/${VERSION}:refs/heads/release/${VERSION}"
     fi
 }
 
-step4_verify_and_publish() {
-    log "========================================"
-    log "Step 4 — Verify and publish to Maven Central"
-    log "========================================"
+checkout_release() {
+    git checkout "release/${VERSION}"
+    require_clean_tree
+    local revision
+    revision=$(get_current_revision)
+    [[ "$revision" == "$VERSION" ]] || fail "Release branch revision does not match ${VERSION}."
+    [[ "$(commit_at HEAD)" == "$RELEASE_COMMIT" ]] || fail "Release commit changed after CI confirmation; recover manually."
+    local remote_refs remote_commit
+    remote_refs=$(git ls-remote --heads origin "refs/heads/release/${VERSION}") || fail "Cannot query origin release branch."
+    remote_commit=$(awk '{ print $1 }' <<< "$remote_refs")
+    [[ "$remote_commit" == "$RELEASE_COMMIT" ]] || fail "Origin release branch does not match the release commit."
+}
 
-    echo ""
-    log "Verify the pending deployment at https://central.sonatype.com"
-    log ""
-    log "  1. Confirm the version number is correct: ${VERSION}"
-    log "  2. Confirm expected publishable artifacts are present"
-    log "  3. Confirm each artifact has JAR, sources, javadoc, and POM files"
-    log "  4. Confirm GPG signatures are present"
-    log "  5. Confirm Central validation completed successfully"
-    log ""
-    log "Then publish the deployment from the Maven Central Publishing Portal."
-    echo ""
+wait_for_ci() {
+    log 'Step 2 — Confirm CI'
+    git checkout "release/${VERSION}"
+    local revision
+    revision=$(get_current_revision)
+    [[ "$revision" == "$VERSION" ]] || fail 'Release revision changed; correct it before continuing.'
+    push_release_branch
+    RELEASE_COMMIT=$(commit_at HEAD)
+    log "Check https://github.com/paramixel/paramixel/actions for commit ${RELEASE_COMMIT}."
+    prompt_yes 'Has CI passed for this exact commit?' || fail 'CI not confirmed. Push fixes on the release branch and rerun.'
+}
 
-    if [[ "${EXECUTE}" == "true" ]]; then
-        if prompt_yes "Have you published the deployment in Maven Central?"; then
-            log "Maven Central publish confirmed."
-        else
-            log "Rolling back..."
-            rollback_release
-            fail "Release aborted — Maven Central not published. All release artifacts have been cleaned up."
-        fi
+deploy_to_central() {
+    log 'Step 3 — Deploy to Maven Central'
+    checkout_release
+    ./mvnw spotless:apply
+    require_clean_tree
+    read_remote_tag
+    [[ -z "$REMOTE_TAG_COMMIT" ]] || fail "Remote release tag appeared before deployment; recover manually."
+    # A failing client may already have uploaded. Never silently deploy again.
+    save_state 4
+    ./mvnw -Prelease clean deploy || fail 'Deployment outcome is uncertain. Inspect Central, then rerun to confirm publication or use --retry-deploy after dropping any pending deployment.'
+    require_clean_tree
+}
+
+verify_publication() {
+    log 'Step 4 — Verify and publish in https://central.sonatype.com'
+    checkout_release
+    log "Verify version ${VERSION}, expected artifacts, JARs, sources, Javadoc, POMs, signatures, and successful validation."
+    log 'Publish from the portal. If the previous deploy failed, inspect the portal before retrying.'
+    prompt_yes 'Have you verified and published this deployment in Maven Central?' \
+        || fail 'Publication not confirmed. Branches and checkpoint retained; rerun when ready. No deployment was deleted.'
+}
+
+tag_release() {
+    log 'Step 5 — Tag release'
+    checkout_release
+    read_remote_tag
+    [[ -z "$REMOTE_TAG_COMMIT" || "$REMOTE_TAG_COMMIT" == "$RELEASE_COMMIT" ]] || fail 'Remote release tag conflicts with release commit.'
+    if ref_exists "refs/tags/v${VERSION}"; then
+        [[ "$(commit_at "refs/tags/v${VERSION}")" == "$RELEASE_COMMIT" ]] || fail 'Local release tag conflicts with release commit.'
     else
-        log "[DRY-RUN] Would prompt: Have you published the deployment in Maven Central?"
-        log "[DRY-RUN] Would rollback if answered N"
+        git tag -a "v${VERSION}" "$RELEASE_COMMIT" -m "Release ${VERSION}"
+    fi
+    if [[ -z "$REMOTE_TAG_COMMIT" ]]; then
+        prompt_yes "Push tag v${VERSION} to origin?" || fail 'Tag push cancelled; rerun to resume.'
+        git push origin "refs/tags/v${VERSION}:refs/tags/v${VERSION}"
     fi
 }
 
-rollback_release() {
-    log "Rolling back release..."
-
-    if remote_branch_exists "release/${VERSION}"; then
-        run_cmd "Deleting remote branch release/${VERSION}" git -C "${PROJECT_DIR}" push origin --delete "release/${VERSION}"
-    else
-        log "Remote branch release/${VERSION} does not exist, skipping remote delete"
+publish_docs() {
+    log 'Step 6 — Publish documentation'
+    checkout_release
+    # An interrupted run may have lost ignored build output. Rebuild for this commit.
+    if [[ "$SKIP_DOCS_BUILD" == false && "$PREPARED_THIS_RUN" == false ]]; then
+        "${SCRIPT_DIR}/build-documentation.sh"
     fi
-
-    local current_branch
-    current_branch=$(get_current_branch)
-    if [[ "${current_branch}" != "main" ]]; then
-        run_cmd "Switching to main" git -C "${PROJECT_DIR}" checkout main
-    fi
-
-    if local_branch_exists "release/${VERSION}"; then
-        run_cmd "Deleting local branch release/${VERSION}" git -C "${PROJECT_DIR}" branch -D "release/${VERSION}"
-    else
-        log "Local branch release/${VERSION} does not exist, skipping local delete"
-    fi
-
-    echo ""
-    warn "Deployment is still pending at https://central.sonatype.com"
-    warn "Drop the deployment from the portal if you do not intend to publish."
+    validate_docs_build
+    require_clean_tree
+    "${SCRIPT_DIR}/publish-documentation.sh" --skip-build
 }
 
-step5_tag_release() {
-    log "========================================"
-    log "Step 5 — Tag the release"
-    log "========================================"
-
-    local tag="v${VERSION}"
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        local current_head
-        current_head=$(git -C "${PROJECT_DIR}" rev-parse HEAD)
-
-        if local_tag_exists "${tag}"; then
-            if tag_points_at "${tag}" "${current_head}"; then
-                log "Tag ${tag} already exists at current HEAD, skipping tag creation"
-            else
-                local tag_commit
-                tag_commit=$(git -C "${PROJECT_DIR}" rev-list -n 1 "${tag}")
-                fail "Tag ${tag} exists but points at ${tag_commit}, not HEAD. Delete it if stale: git tag -d ${tag}"
-            fi
-        else
-            run_cmd "Creating tag ${tag}" git -C "${PROJECT_DIR}" tag -a "${tag}" -m "Release ${VERSION}"
-        fi
-
-        if remote_tag_exists "${tag}"; then
-            log "Remote tag ${tag} already exists, skipping push"
-        else
-            if prompt_yes "Push tag ${tag} to origin?"; then
-                git -C "${PROJECT_DIR}" push origin "${tag}"
-            else
-                fail "Tag push cancelled. Tag ${tag} exists locally but not on remote."
-            fi
-        fi
-    else
-        log "[DRY-RUN] git tag -a ${tag} -m \"Release ${VERSION}\""
-        log "[DRY-RUN] git push origin ${tag}"
+bump_dev_version() {
+    log 'Step 7 — Bump development version'
+    git checkout main
+    git pull --ff-only origin main
+    local revision
+    revision=$(get_current_revision)
+    if [[ "$revision" != "${VERSION}-POST" ]]; then
+        ./mvnw versions:set-property -Dproperty=revision -DnewVersion="${VERSION}-POST" -DgenerateBackupPoms=false
+    fi
+    validate_build
+    commit_changes 'chore: Prepare for development'
+    if [[ "$(commit_at HEAD)" != "$(commit_at refs/remotes/origin/main)" ]]; then
+        prompt_yes 'Push main to origin?' || fail 'Push cancelled; rerun to resume the development bump.'
+        git push origin refs/heads/main:refs/heads/main
     fi
 }
 
-step6_publish_documentation() {
-    log "========================================"
-    log "Step 6 — Publish documentation"
-    log "========================================"
-
-    local docs_args=()
-    if [[ "${SKIP_DOCS_BUILD}" == "true" ]]; then
-        docs_args+=(--skip-build)
+print_dry_run() {
+    log "${PROJECT_NAME} ${VERSION}: offline dry run, next step ${NEXT_STEP}."
+    log 'Execution refreshes origin and validates prerequisites and the checkpoint.'
+    log '1. Checkout release branch; set revision; spotless:apply; clean install.'
+    if [[ "$HAS_GRADLE" == true && "$SKIP_GRADLE" == false ]]; then
+        log '   spotless:apply; gradlew clean check --no-daemon (also at step 7).'
     fi
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        run_cmd "Publishing documentation" "${SCRIPT_DIR}/publish-documentation.sh" "${docs_args[@]+"${docs_args[@]}"}"
+    if [[ "$SKIP_DOCS_BUILD" == true ]]; then
+        log '   Reuse website/build (--skip-docs-build).'
     else
-        local cmd="${SCRIPT_DIR}/publish-documentation.sh"
-        if [[ "${SKIP_DOCS_BUILD}" == "true" ]]; then
-            cmd="${cmd} --skip-build"
-        fi
-        log "[DRY-RUN] ${cmd}"
+        log '   Build documentation.'
     fi
-}
-
-step7_bump_dev_version() {
-    log "========================================"
-    log "Step 7 — Bump main to development version"
-    log "========================================"
-
-    local dev_version="${VERSION}-POST"
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        local current_branch
-        current_branch=$(get_current_branch)
-        if [[ "${current_branch}" != "main" ]]; then
-            run_cmd "Switching to main" git -C "${PROJECT_DIR}" checkout main
-        fi
-
-        run_cmd "Pulling main" git -C "${PROJECT_DIR}" pull --ff-only
-
-        local current_revision
-        current_revision=$(get_current_revision)
-
-        if [[ "${current_revision}" == "${dev_version}" ]]; then
-            log "Version already set to ${dev_version}, skipping versions:set-property"
-        else
-            run_cmd "Setting version to ${dev_version}" "${MVNW}" versions:set-property -Dproperty=revision -DnewVersion="${dev_version}" -DgenerateBackupPoms=false
-        fi
-
-        run_cmd "Applying code formatting" "${MVNW}" spotless:apply
-        run_cmd "Building with Maven" "${MVNW}" clean install
-
-        if [[ "${SKIP_GRADLE}" == "false" ]]; then
-            run_cmd "Building with Gradle" "${GRADLEW}" clean check --no-daemon
-        else
-            log "Skipping Gradle build (--skip-gradle)"
-        fi
-
-        if git -C "${PROJECT_DIR}" diff --cached --quiet 2>/dev/null && git -C "${PROJECT_DIR}" diff --quiet 2>/dev/null; then
-            log "No changes to commit"
-        else
-            run_cmd "Committing dev version bump" git -C "${PROJECT_DIR}" add -A
-            run_cmd "Committing dev version bump" git -C "${PROJECT_DIR}" commit -s -m "chore: Prepare for development"
-        fi
-
-        local local_commit
-        local_commit=$(git -C "${PROJECT_DIR}" rev-parse HEAD)
-        local remote_commit
-        remote_commit=$(git -C "${PROJECT_DIR}" rev-parse origin/main 2>/dev/null) || remote_commit=""
-        if [[ "${local_commit}" == "${remote_commit}" ]]; then
-            log "Remote main already up to date, skipping push"
-        else
-            if prompt_yes "Push main to origin?"; then
-                git -C "${PROJECT_DIR}" push
-            else
-                fail "Push cancelled. Main has dev version bump but is not pushed."
-            fi
-        fi
-    else
-        log "[DRY-RUN] git checkout main"
-        log "[DRY-RUN] git pull --ff-only"
-        log "[DRY-RUN] ${MVNW} versions:set-property -Dproperty=revision -DnewVersion=${dev_version} -DgenerateBackupPoms=false"
-        log "[DRY-RUN] ${MVNW} spotless:apply"
-        log "[DRY-RUN] ${MVNW} clean install"
-        if [[ "${SKIP_GRADLE}" == "false" ]]; then
-            log "[DRY-RUN] ${GRADLEW} clean check --no-daemon"
-        fi
-        log "[DRY-RUN] git add -A"
-        log "[DRY-RUN] git commit -s -m \"chore: Prepare for development\""
-        log "[DRY-RUN] git push"
-    fi
+    log '   Commit; confirm release-branch push.'
+    log '2. Confirm CI for the exact release commit.'
+    log '3. spotless:apply; verify clean tree; checkpoint; mvnw -Prelease clean deploy.'
+    log '4. Verify and manually publish in Central; confirm publication.'
+    log '5. Create/reuse matching tag; confirm tag push.'
+    log '6. Publish documentation using the project documentation host variable.'
+    log "7. Set main revision to ${VERSION}-POST; spotless:apply; clean install; commit; confirm push."
+    log 'Completed steps are skipped during execution. No commands above were executed.'
 }
 
 main() {
     parse_args "$@"
-
-    if [[ "${EXECUTE}" == "true" ]]; then
-        log "========================================="
-        log " Paramixel Release ${VERSION} (EXECUTE)"
-        log "========================================="
-    else
-        log "========================================="
-        log " Paramixel Release ${VERSION} (DRY-RUN)"
-        log "========================================="
-        log ""
-        log "This is a dry run. No changes will be made."
-        log "Use --execute to perform the actual release."
-        log ""
+    cd "$PROJECT_DIR"
+    local git_common
+    git_common=$(git rev-parse --git-common-dir) || fail 'Not a Git repository.'
+    git_common=$(cd "$git_common" && pwd)
+    STATE_FILE="${git_common}/release-state/${VERSION}"
+    if [[ "$EXECUTE" == false ]]; then
+        load_state
+        print_dry_run
+        return
     fi
 
+    LOCK_DIR="${git_common}/release-script.lock"
+    mkdir "$LOCK_DIR" 2>/dev/null || fail "Release lock exists: ${LOCK_DIR}. Remove it only after confirming no release process is running."
+    trap 'rmdir "$LOCK_DIR"' EXIT
+    mkdir -p "${git_common}/release-state"
+    load_state
+    if [[ "$NEXT_STEP" == 8 ]]; then
+        log "Release ${VERSION} already completed."
+        return
+    fi
+    if [[ "$RETRY_DEPLOY" == true && "$NEXT_STEP" != 4 ]]; then
+        fail '--retry-deploy is only valid for an uncertain/pending deployment at step 4.'
+    fi
     preflight_checks
-
-    step1_prepare_release_branch
-    step2_wait_for_ci
-    step3_deploy_to_maven_central
-    step4_verify_and_publish
-    step5_tag_release
-    step6_publish_documentation
-    step7_bump_dev_version
-
-    log "========================================="
-    if [[ "${EXECUTE}" == "true" ]]; then
-        log " Release ${VERSION} completed!"
-    else
-        log " Dry run completed!"
+    if [[ "$RETRY_DEPLOY" == true ]]; then
+        checkout_release
+        prompt_yes 'Have you confirmed this version is NOT published and dropped ALL pending deployments for it in Central?' \
+            || fail 'Deployment retry cancelled.'
+        save_state 3
     fi
-    log "========================================="
+
+    PREPARED_THIS_RUN=false
+    while [[ "$NEXT_STEP" -le 7 ]]; do
+        local step="$NEXT_STEP"
+        case "$step" in
+            1) save_state 1; prepare_release; PREPARED_THIS_RUN=true ;;
+            2) wait_for_ci ;;
+            3) deploy_to_central ;;
+            4) verify_publication ;;
+            5) tag_release ;;
+            6) publish_docs ;;
+            7) bump_dev_version ;;
+        esac
+        save_state "$((step + 1))"
+    done
+    log "Release ${VERSION} completed."
 }
 
 main "$@"
