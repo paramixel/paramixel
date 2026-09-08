@@ -1,0 +1,79 @@
+---
+title: Paramixel
+description: Paramixel turns complex Java tests into readable, composable execution trees.
+slug: /
+---
+
+# Paramixel
+
+Paramixel is a Java 17+ test orchestration framework built around executable action trees.
+
+Instead of forcing complex workflows into flat method-shaped tests, Paramixel lets Java code define the test plan directly. The tree describes what runs, what runs in order, what may run in parallel, and where setup and teardown belong.
+
+```text
+Java code builds the tree
+        │
+        ▼
+Paramixel executes the tree
+        │
+        ▼
+Paramixel returns a result tree
+        │
+        ▼
+Reports and callers inspect the same structure
+```
+
+The result tree mirrors the action tree, so reports and callers can inspect the same structure that was executed.
+
+## A small execution tree
+
+```java
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.action.Action;
+import static org.paramixel.api.action.Assert.assertTrue;
+import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
+
+public final class LoginSmokeTest {
+    @Paramixel.Factory
+    public static Action test() {
+        return sequential("login smoke")
+                .child(step("open login page", ctx -> openLoginPage()))
+                .child(step("submit credentials", ctx -> submitCredentials()))
+                .child(assertTrue("user is signed in", true))
+                .build();
+    }
+}
+```
+
+```text
+LoginSmokeTest
+└── login smoke
+    ├── open login page
+    ├── submit credentials
+    └── user is signed in
+```
+
+Run discovered factories with the Maven plugin goal `paramixel:test`, or run programmatically with `Runner.defaultRunner()`.
+
+## Where Paramixel fits
+
+Use JUnit for ordinary unit tests and method-level parameterized tests. Use Paramixel when the structure of the test matters: integration workflows, compatibility scenarios, generated test plans, lifecycle-heavy tests, mixed sequential and parallel branches, and result trees that mirror execution.
+
+## Core API, after the model
+
+- `org.paramixel.api.Runner` executes actions or discovered factories.
+- `org.paramixel.api.action.Builder` produces immutable action trees.
+- `org.paramixel.api.action.Action` is the sealed reusable execution unit.
+- `org.paramixel.api.Paramixel` contains discovery annotations.
+- `org.paramixel.api.Configuration`, `Listener`, `Result`, `Context`, `Status`, and `Descriptor` expose runtime configuration, callbacks, and execution state.
+
+## Learn next
+
+- [When to Use Paramixel](getting-started/when-to-use)
+- [Quick Start: Your First Execution Tree](getting-started/first-test)
+- [Core Concepts](core-concepts)
+- [Test Shapes](test-shapes)
+- [Built-in Actions](core-concepts/actions)
+- [Maven Plugin](integrations/maven-plugin)
+- [API Overview](api/intro)
