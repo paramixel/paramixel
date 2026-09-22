@@ -66,7 +66,7 @@
         <palantir-java-format.version>2.91.0</palantir-java-format.version>
         <pmd.version>7.27.0</pmd.version>
         <jmh.version>1.37</jmh.version>
-        <slf4j.version>2.0.19</slf4j.version>
+        <slf4j.version>2.0.20</slf4j.version>
         <logback.version>1.6.3</logback.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
