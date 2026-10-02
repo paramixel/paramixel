@@ -5,7 +5,7 @@
   "packageRules": [
     {
       "matchManagers": ["maven-wrapper"],
-      "allowedVersions": "^3.9.0",
+      "allowedVersions": "[3.9.0,3.10.0)",
       "groupName": "Maven wrapper pinned to 3.9.x"
     },
     {
