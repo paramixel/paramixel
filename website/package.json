@@ -52,7 +52,7 @@
     "path-to-regexp": "1.9.0",
     "joi": "18.2.9",
     "@babel/core": "7.29.7",
-    "launch-editor": "2.14.1",
+    "launch-editor": "2.14.2",
     "postcss": "8.5.29",
     "fast-uri": "4.2.1",
     "svgo": "4.1.0",
