@@ -54,7 +54,7 @@
     "@babel/core": "7.29.7",
     "launch-editor": "2.14.2",
     "postcss": "8.5.29",
-    "fast-uri": "4.2.1",
+    "fast-uri": "4.2.2",
     "svgo": "4.1.0",
     "nanoid": "6.0.2",
     "js-yaml": "5.4.3"
