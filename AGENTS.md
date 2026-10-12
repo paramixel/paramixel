@@ -4,42 +4,6 @@ Provider-neutral instructions for coding agents working in the Paramixel reposit
 
 ---
 
-## General Coding Principles
-
-Reusable engineering discipline for coding agents. See
-`.pi/prompts/coding-principles.md`.
-
----
-
-## Structured Workflows
-
-For complex tasks, use the structured prompt-driven workflows in `.pi/prompts/`.
-Each prompt is self-contained, LLM-agnostic, and project-agnostic.
-
-### Design-to-Implementation Workflow
-
-| Step | Prompt | Purpose |
-|------|--------|---------|
-| 1. Resolve design decisions | `design-interview.md` | Structured interview resolving every open question |
-| 2. Document approach | `create-design-plan.md` | Design plan with tradeoffs, API impact, and test strategy |
-| 3. Create spec | `create-implementation-spec.md` | Step-by-step implementation instructions |
-| 4. Implement | `implement-spec.md` | Execute the spec, tests-first |
-| 5. Verify (optional) | `analyze-code.md` | Correctness and bug analysis pass |
-
-### Standalone Workflows
-
-| Prompt | Use When |
-|--------|----------|
-| `java-code-review.md` | Comprehensive engineering review of Java code |
-| `java-code-coverage.md` | One focused, safe iteration to improve test coverage |
-| `java-performance-review.md` | Performance recommendations from profile or benchmark data |
-| `website-docs-reconciliation.md` | Update documentation to match current implementation |
-| `planning-workflow.md` | Plan file naming convention (reference only) |
-
-See `.pi/prompts/README.md` for the full prompt index and workflow diagrams.
-
----
-
 ## Paramixel-Specific Rules
 
 The following rules are specific to the Paramixel repository and its build system.
@@ -100,13 +64,13 @@ See `examples/README.md` for the package hierarchy, `__ParamixelRunner__` conven
 - License header from `assets/license-header.txt` is required on all Java files.
 - Run `./mvnw spotless:apply` before validation and before committing.
 - Check formatting with `./mvnw spotless:check` when a read-only formatting check is needed.
-- When modifying Java code, follow `.pi/prompts/java-code-review.md` and these guardrails:
+- When modifying Java code, follow these guardrails:
   - Prefer clear, immutable post-build state over ad-hoc mutation.
   - Keep synchronization minimal and explicit.
   - Avoid novelty refactors; optimize only measurable hot paths.
   - Preserve null-safety contracts and existing exception semantics.
 
-Repository guidance files reference these guardrails as the canonical source. See `.pi/prompts/java-code-review.md` for the full review checklist and modernization audit workflow. See `.pi/prompts/java-code-coverage.md` and `.pi/prompts/java-performance-review.md` for coverage and performance workflows.
+Repository guidance files reference these guardrails as the canonical source.
 
 ## Javadoc
 
@@ -119,7 +83,8 @@ Repository guidance files reference these guardrails as the canonical source. Se
 
 ## Planning
 
-Plans go in `.pi/plans/`. See `.pi/prompts/planning-workflow.md` for naming conventions.
+Plans go in `plans/`. Copy `PLAN_TEMPLATE.md` and name the file with a descriptive
+kebab-case name.
 
 ## Static Analysis
 
