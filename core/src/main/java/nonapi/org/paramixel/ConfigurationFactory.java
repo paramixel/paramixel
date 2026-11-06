@@ -62,9 +62,7 @@ public final class ConfigurationFactory {
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Configuration classpathConfiguration() {
-        var map = new TreeMap<String, String>();
-        loadClasspathProperties(map, ResourceLoader.class.getClassLoader());
-        return new ConcreteConfiguration(map);
+        return classpathConfiguration(ResourceLoader.class.getClassLoader());
     }
 
     /**
@@ -104,11 +102,7 @@ public final class ConfigurationFactory {
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     public static Configuration defaultConfiguration() {
-        var map = new TreeMap<String, String>();
-        loadClasspathProperties(map, ResourceLoader.class.getClassLoader());
-        map.putAll(systemPropertiesRaw());
-        configureDefaults(map);
-        return new ConcreteConfiguration(Map.copyOf(map));
+        return defaultConfiguration(ResourceLoader.class.getClassLoader());
     }
 
     /**

@@ -18,6 +18,11 @@ package nonapi.org.paramixel.benchmark;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import nonapi.org.paramixel.ExecutionMode;
+import nonapi.org.paramixel.InstanceHolder;
+import nonapi.org.paramixel.Scheduler;
+import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.DescriptorBuilder;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -29,12 +34,17 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Listener;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Status;
+import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 /**
@@ -88,6 +98,29 @@ public class SchedulerBenchmark {
     public void runParallelUniformDurations(ParallelUniformState state, Blackhole blackhole) {
         var result = state.runner().run(state.root());
         blackhole.consume(result);
+    }
+
+    /**
+     * Benchmark a single sequential chain of trivial steps.
+     *
+     * <p>Only one descriptor is ready at a time, so this shape measures the per-child hand-off:
+     * continuation submission, thread hand-off, and the park/wakeup path. It is the shape where
+     * inline continuation and waiter unparking are expected to show up.
+     */
+    @Benchmark
+    public void runSequentialChain(SequentialChainState state, Blackhole blackhole) {
+        blackhole.consume(state.run());
+    }
+
+    /**
+     * Benchmark a nested parallel/sequential tree of trivial steps.
+     *
+     * <p>Exercises admission across depths: parallel windows refilling, sequential child
+     * advancement, continuation routing, and aggregating status at every level.
+     */
+    @Benchmark
+    public void runNestedTree(NestedTreeState state, Blackhole blackhole) {
+        blackhole.consume(state.run());
     }
 
     /**
@@ -207,6 +240,133 @@ public class SchedulerBenchmark {
         Parallel root() {
             return root;
         }
+    }
+
+    /**
+     * State for the sequential-chain benchmark: one chain, one ready descriptor at a time.
+     *
+     * <p>Drives the scheduler directly. {@code Runner.run(action)} performs a classpath scan to
+     * discover hooks before every run, which costs milliseconds and would swamp the scheduling
+     * cost these shapes are meant to measure.
+     */
+    @State(Scope.Benchmark)
+    public static class SequentialChainState {
+
+        @Param({"4"})
+        private int parallelism;
+
+        @Param({"64", "256", "1024"})
+        private int stepCount;
+
+        private Configuration configuration;
+        private Scheduler scheduler;
+        private Sequential action;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            configuration = Configuration.defaultConfiguration();
+            scheduler = new Scheduler(parallelism);
+            var sequential = Sequential.builder("chain");
+            for (var i = 0; i < stepCount; i++) {
+                sequential.child(Step.of("step-" + i, context -> Blackhole.consumeCPU(1)));
+            }
+            action = sequential.build();
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            scheduler.close();
+        }
+
+        Status run() {
+            return runDirect(action, scheduler, configuration);
+        }
+    }
+
+    /**
+     * State for the nested-tree benchmark: parallel fan-out, sequential chains inside, and a
+     * parallel level below that, so admission and continuation routing cross several depths.
+     */
+    @State(Scope.Benchmark)
+    public static class NestedTreeState {
+
+        @Param({"4", "8"})
+        private int parallelism;
+
+        @Param({"2", "4"})
+        private int branchCount;
+
+        @Param({"1", "3"})
+        private int depth;
+
+        private Configuration configuration;
+        private Scheduler scheduler;
+        private Parallel action;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            configuration = Configuration.defaultConfiguration();
+            scheduler = new Scheduler(parallelism);
+            var parallel = Parallel.builder("root").parallelism(parallelism);
+            for (var i = 0; i < branchCount; i++) {
+                parallel.child(branch("branch-" + i, depth));
+            }
+            action = parallel.build();
+        }
+
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            scheduler.close();
+        }
+
+        private static Action branch(final String name, final int remainingDepth) {
+            var sequential = Sequential.builder(name);
+            if (remainingDepth <= 1) {
+                sequential.child(Step.of(name + "-leaf-a", context -> Blackhole.consumeCPU(1)));
+                sequential.child(Step.of(name + "-leaf-b", context -> Blackhole.consumeCPU(1)));
+                return sequential.build();
+            }
+            var nested = Parallel.builder(name + "-parallel").parallelism(Integer.MAX_VALUE);
+            for (var i = 0; i < 2; i++) {
+                nested.child(branch(name + "-" + i, remainingDepth - 1));
+            }
+            sequential.child(nested.build());
+            sequential.child(Step.of(name + "-tail", context -> Blackhole.consumeCPU(1)));
+            return sequential.build();
+        }
+
+        Status run() {
+            return runDirect(action, scheduler, configuration);
+        }
+    }
+
+    /**
+     * Executes one action tree on a warm scheduler, bypassing runner discovery.
+     *
+     * @param action the reusable action definition
+     * @param scheduler the scheduler to execute on
+     * @param configuration the configuration to expose to actions
+     * @return the root status after execution
+     */
+    private static Status runDirect(final Action action, final Scheduler scheduler, final Configuration configuration) {
+        var descriptor = new DescriptorBuilder().discover(action);
+        var context =
+                new ConcreteContext(configuration, new Listener() {}, descriptor, scheduler, new InstanceHolder());
+        scheduler.executeDescriptor(descriptor, context, ExecutionMode.RUN);
+        return descriptor.status();
+    }
+
+    private static Runner createQuietRunner(final int parallelism) {
+        return Runner.builder()
+                .configuration(Configuration.of(Map.of(
+                        Configuration.RUNNER_PARALLELISM,
+                        String.valueOf(parallelism),
+                        Configuration.SCHEDULER_QUEUE_CAPACITY,
+                        "4096",
+                        Configuration.ANSI,
+                        "false")))
+                .listener(new org.paramixel.api.Listener() {})
+                .build();
     }
 
     private static Runner createRunner(final int parallelism) {

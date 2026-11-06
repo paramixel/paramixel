@@ -18,7 +18,6 @@ package org.paramixel.api.action;
 
 import java.util.Objects;
 import java.util.Optional;
-import nonapi.org.paramixel.support.Arguments;
 
 /**
  * An action that executes a before action, a single body action, and an after action
@@ -38,8 +37,7 @@ public final class Scope implements Action {
     private final Action after;
 
     private Scope(final String displayName, final Action before, final Action body, final Action after) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.before = before;
         this.body = Objects.requireNonNull(body, "body is null");
         this.after = after;
@@ -111,8 +109,7 @@ public final class Scope implements Action {
         private Action after;
 
         private Builder(final String displayName) {
-            Objects.requireNonNull(displayName, "displayName is null");
-            Arguments.requireNonBlank(displayName, "displayName is blank");
+            ActionNames.requireDisplayName(displayName);
             this.displayName = displayName;
         }
 

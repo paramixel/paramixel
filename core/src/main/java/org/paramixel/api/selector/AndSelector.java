@@ -22,7 +22,7 @@ import java.util.List;
  * A {@link Selector} that combines multiple selectors with logical AND semantics.
  *
  * <p>A candidate matches an {@code AndSelector} when it matches <em>all</em> of the
- * composed selectors. The returned {{@link #selectors()}} list is unmodifiable.
+ * composed selectors. The returned {@link #selectors()} list is unmodifiable.
  *
  * @see Selector#and(Selector...)
  * @see Selector#and(List)

@@ -42,8 +42,6 @@ import org.paramixel.api.selector.Selector;
  */
 public final class ConcreteRunner implements Runner {
 
-    private static final String NO_TESTS_FOUND = "No Paramixel tests found";
-
     private final ReentrantLock lock = new ReentrantLock();
     private final SafeListener safeListener;
     private final Configuration configuration;

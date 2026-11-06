@@ -29,6 +29,7 @@ import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
+import org.paramixel.api.ContextConsumer;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
@@ -114,38 +115,31 @@ final class ActionExecutionStrategies {
     // ── Leaf strategies (synchronous) ──────────────────────────────────
 
     private static Status runStep(final Step step, final ConcreteContext context) {
-        try {
-            step.throwableConsumer().accept(context);
-            return Status.PASSED;
-        } catch (Throwable t) {
-            if (t instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (t instanceof Error error) {
-                throw error;
-            }
-            throw new RuntimeException(t);
-        }
+        return runLeaf(step.throwableConsumer(), context);
     }
 
     private static Status runAssert(final Assert assertAction, final ConcreteContext context) {
-        try {
-            assertAction.throwableConsumer().accept(context);
-            return Status.PASSED;
-        } catch (Throwable t) {
-            if (t instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (t instanceof Error error) {
-                throw error;
-            }
-            throw new RuntimeException(t);
-        }
+        return runLeaf(assertAction.throwableConsumer(), context);
     }
 
     private static Status runDelay(final Delay delay, final ConcreteContext context) {
+        return runLeaf(delay.throwableConsumer(), context);
+    }
+
+    /**
+     * Runs a leaf action's user-supplied body and normalizes checked throwables.
+     *
+     * <p>{@link RuntimeException} and {@link Error} propagate unchanged so that failure kinds the
+     * caller can already interpret are not rewrapped; any other {@link Throwable} is wrapped in a
+     * {@link RuntimeException}.
+     *
+     * @param consumer the action body; must not be {@code null}
+     * @param context the execution context; must not be {@code null}
+     * @return {@link Status#PASSED} when the body returns normally
+     */
+    private static Status runLeaf(final ContextConsumer consumer, final ConcreteContext context) {
         try {
-            delay.throwableConsumer().accept(context);
+            consumer.accept(context);
             return Status.PASSED;
         } catch (Throwable t) {
             if (t instanceof RuntimeException runtimeException) {
@@ -217,11 +211,10 @@ final class ActionExecutionStrategies {
             return Status.PASSED;
         }
 
+        // R2: a node's declared parallelism is a share of the global ceiling. Queue capacity is a
+        // backpressure bound on admission, not a concurrency bound, so it is deliberately absent.
         var effectiveParallelism =
-                Math.min(parallel.parallelism(), context.scheduler().parallelism());
-        effectiveParallelism =
-                Math.min(effectiveParallelism, context.scheduler().queueCapacity());
-        effectiveParallelism = Math.max(1, effectiveParallelism);
+                Math.max(1, Math.min(parallel.parallelism(), context.scheduler().parallelism()));
 
         var node = createNode(descriptor, context);
         node.children = new ArrayList<>(children);
@@ -265,7 +258,7 @@ final class ActionExecutionStrategies {
                     children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
             node.childIndex++;
             node.runningChildren++;
-            if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
+            if (scheduleChild(child, ExecutionMode.RUN, node, context, false) == Admission.DEFERRED) {
                 // The child at the cursor was not dispatched; roll the cursor back and stop
                 // admitting. A capacity wakeup resumes from this cursor via node.admissionRetry.
                 node.childIndex--;
@@ -337,11 +330,10 @@ final class ActionExecutionStrategies {
         var child = Arguments.requireInstanceOf(
                 node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
         node.childIndex++;
-        if (scheduleChild(child, node.childMode, node, context) == Admission.DEFERRED) {
+        if (scheduleChild(child, node.childMode, node, context, true) == Admission.DEFERRED) {
             // The child at the cursor was not dispatched; roll back so the capacity retry
             // re-dispatches it.
             node.childIndex--;
-            return;
         }
     }
 
@@ -513,10 +505,8 @@ final class ActionExecutionStrategies {
             return;
         }
         var child = Arguments.requireInstanceOf(before, MutableDescriptor.class, "before descriptor is mutable");
-        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
-            // Before child not dispatched; the capacity retry re-enters this method.
-            return;
-        }
+        // A deferred admission leaves the child parked; the capacity retry re-enters this method.
+        scheduleChild(child, ExecutionMode.RUN, node, context, true);
         // Before child is in flight; its completion continuation advances the phase.
     }
 
@@ -560,7 +550,7 @@ final class ActionExecutionStrategies {
                     MutableDescriptor.class,
                     "body child must be a MutableDescriptor");
             node.bodyChildIndex++;
-            if (scheduleChild(child, node.childMode, node, context) == Admission.DEFERRED) {
+            if (scheduleChild(child, node.childMode, node, context, false) == Admission.DEFERRED) {
                 // The child at the cursor was not dispatched; roll back so the capacity retry
                 // resumes the burst here.
                 node.bodyChildIndex--;
@@ -582,10 +572,8 @@ final class ActionExecutionStrategies {
             return;
         }
         var child = Arguments.requireInstanceOf(after, MutableDescriptor.class, "after descriptor is mutable");
-        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
-            // After child not dispatched; the capacity retry re-enters this method.
-            return;
-        }
+        // A deferred admission leaves the child parked; the capacity retry re-enters this method.
+        scheduleChild(child, ExecutionMode.RUN, node, context, true);
         // After child is in flight; its completion continuation finishes the lifecycle.
     }
 
@@ -645,10 +633,10 @@ final class ActionExecutionStrategies {
     private static void dispatchTimeoutChild(
             final ExecutionNode node, final MutableDescriptor childDescriptor, final ConcreteContext context) {
         try {
-            if (scheduleChild(childDescriptor, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
-                // Child parked for capacity; the deadline timer and the capacity retry (which
-                // re-enters this method) take over.
-            }
+            // A deferred admission parks the child; the deadline timer and the capacity retry
+            // (which re-enters this method) take over. Not inlined: the deadline must be armed
+            // before the body runs.
+            scheduleChild(childDescriptor, ExecutionMode.RUN, node, context, false);
         } catch (Throwable t) {
             signalChildSchedulingFailure(node);
         }
@@ -711,9 +699,121 @@ final class ActionExecutionStrategies {
         node.descriptor.setExecutionNode(null);
     }
 
-    // ── Async Loop ─────────────────────────────────────────────────────
+    // ── Async iteration (Loop / Repeat / Until) ────────────────────────
+
+    /**
+     * Evaluates whether a completed iteration satisfies the action's termination condition.
+     *
+     * <p>Implementations may throw: an exception is reported as a failed {@code until} predicate,
+     * matching the behavior of the predicate itself.
+     */
+    @FunctionalInterface
+    private interface TerminationCheck {
+
+        boolean isSatisfied(Descriptor completedChild, ConcreteContext context) throws Throwable;
+    }
+
+    /**
+     * Computes the terminal status once every iteration child has been admitted without the
+     * termination condition being satisfied.
+     */
+    @FunctionalInterface
+    private interface ExhaustedStatus {
+
+        Status status(StatusAccumulator aggregator);
+    }
+
+    /**
+     * Computes the delay before the next iteration.
+     */
+    @FunctionalInterface
+    private interface IterationDelay {
+
+        long nanosBeforeNext(int completedIndex);
+    }
+
+    /**
+     * The four behaviors that distinguish {@link Loop}, {@link Repeat}, and {@link Until}.
+     *
+     * <p>Everything else about iterating an action's children — node setup, cursor advance,
+     * capacity deferral, abort handling, remaining-child skipping, and terminal publication — is
+     * shared and lives in {@link #startIteration}.
+     *
+     * @param stopsOnAbort whether an {@link Status#ABORTED ABORTED} child stops the iteration
+     * @param termination the satisfaction test applied after each completed iteration
+     * @param exhausted the terminal status when the cursor reaches the end
+     * @param delay the inter-iteration delay, or a policy returning zero for none
+     */
+    private record IterationPolicy(
+            boolean stopsOnAbort, TerminationCheck termination, ExhaustedStatus exhausted, IterationDelay delay) {
+
+        /**
+         * Returns the policy for {@link Loop}: aborts stop iteration, an optional predicate can
+         * satisfy it, an exhausted tagged loop fails, and an optional delay policy applies
+         * between iterations.
+         *
+         * @param loopAction the loop action; must not be {@code null}
+         * @return the loop policy
+         */
+        static IterationPolicy forLoop(final Loop loopAction) {
+            return new IterationPolicy(
+                    true,
+                    (completedChild, context) -> loopAction
+                            .until()
+                            .map(predicate -> predicate.test(context))
+                            .orElse(false),
+                    aggregator -> loopAction.until().isPresent() ? Status.FAILED : aggregator.status(),
+                    completedIndex -> loopAction
+                            .delay()
+                            .map(policy -> delayNanosOrZero(policy.delayForIteration(completedIndex + 1)))
+                            .orElse(0L));
+        }
+
+        /**
+         * Returns the policy for {@link Repeat}: every child runs, nothing satisfies the
+         * iteration, and the aggregate status is the result.
+         *
+         * @return the repeat policy
+         */
+        static IterationPolicy forRepeat() {
+            return new IterationPolicy(
+                    false, (completedChild, context) -> false, StatusAccumulator::status, completedIndex -> 0L);
+        }
+
+        /**
+         * Returns the policy for {@link Until}: aborts stop iteration, the optional predicate (or
+         * else the child's own outcome) satisfies it, and an exhausted until fails.
+         *
+         * @param untilAction the until action; must not be {@code null}
+         * @return the until policy
+         */
+        static IterationPolicy forUntil(final Until untilAction) {
+            return new IterationPolicy(
+                    true,
+                    (completedChild, context) -> untilAction
+                            .until()
+                            .map(predicate -> predicate.test(context))
+                            .orElseGet(completedChild::isPassed),
+                    aggregator -> Status.FAILED,
+                    completedIndex -> 0L);
+        }
+    }
+
+    private static final IterationPolicy REPEAT_POLICY = IterationPolicy.forRepeat();
 
     private static Status startLoop(final Loop loopAction, final ConcreteContext context) {
+        return startIteration(IterationPolicy.forLoop(loopAction), context);
+    }
+
+    private static Status startRepeat(final Repeat ignored, final ConcreteContext context) {
+        return startIteration(REPEAT_POLICY, context);
+    }
+
+    private static Status startUntil(final Until untilAction, final ConcreteContext context) {
+        return startIteration(IterationPolicy.forUntil(untilAction), context);
+    }
+
+    private static Status startIteration(final IterationPolicy policy, final ConcreteContext context) {
         var descriptor = context.descriptor();
         var children = descriptor.children();
         if (children.isEmpty()) {
@@ -724,39 +824,40 @@ final class ActionExecutionStrategies {
         node.children = new ArrayList<>(children);
         node.childIndex = 0;
         node.aggregator = new StatusAccumulator();
-        node.continuation = () -> continueLoop(node, context, loopAction);
-        node.admissionRetry = () -> scheduleNextLoopChild(node, context, loopAction);
+        node.continuation = () -> continueIteration(node, context, policy);
+        node.admissionRetry = () -> scheduleNextIterationChild(node, context, policy);
         descriptor.setExecutionNode(node);
 
-        scheduleNextLoopChild(node, context, loopAction);
+        scheduleNextIterationChild(node, context, policy);
         return runningIfChildrenAttempted(node);
     }
 
-    private static void scheduleNextLoopChild(
-            final ExecutionNode node, final ConcreteContext context, final Loop loopAction) {
+    private static void scheduleNextIterationChild(
+            final ExecutionNode node, final ConcreteContext context, final IterationPolicy policy) {
         if (node.childIndex >= node.children.size()) {
-            completeLoop(node, loopAction);
+            node.descriptor.setStatus(policy.exhausted().status(node.aggregator));
+            node.descriptor.setExecutionNode(null);
             return;
         }
 
         var child = Arguments.requireInstanceOf(
                 node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
         node.childIndex++;
-        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
-            // The iteration child at the cursor was not dispatched; roll back so the capacity
-            // retry re-dispatches it.
+        if (scheduleChild(child, ExecutionMode.RUN, node, context, true) == Admission.DEFERRED) {
+            // The child at the cursor was not dispatched; roll back so the capacity retry
+            // re-dispatches it.
             node.childIndex--;
-            return;
         }
     }
 
-    private static void continueLoop(final ExecutionNode node, final ConcreteContext context, final Loop loopAction) {
+    private static void continueIteration(
+            final ExecutionNode node, final ConcreteContext context, final IterationPolicy policy) {
         if (node.descriptor.executionNode() != node) {
             return;
         }
         if (node.delayScheduled) {
             node.delayScheduled = false;
-            scheduleNextLoopChild(node, context, loopAction);
+            scheduleNextIterationChild(node, context, policy);
             return;
         }
         var completedIndex = node.childIndex - 1;
@@ -764,60 +865,47 @@ final class ActionExecutionStrategies {
             var completedChild = node.children.get(completedIndex);
             node.aggregator.include(completedChild);
 
-            if (completedChild.isAborted()) {
-                skipRemainingLoopChildren(node, context);
+            if (policy.stopsOnAbort() && completedChild.isAborted()) {
+                skipRemainingIterationChildren(node, context);
                 node.descriptor.setStatus(Status.ABORTED);
                 node.descriptor.setExecutionNode(null);
                 return;
             }
 
-            if (loopAction.until().isPresent()) {
-                boolean satisfied;
-                try {
-                    satisfied = loopAction.until().get().test(context);
-                } catch (Throwable t) {
-                    UnrecoverableErrors.rethrowIfUnrecoverable(t);
-                    skipRemainingLoopChildren(node, context);
-                    node.descriptor.setStatus(Status.failed("until predicate failed: " + t.getMessage(), t));
-                    node.descriptor.setExecutionNode(null);
-                    return;
-                }
-                if (satisfied) {
-                    skipRemainingLoopChildren(node, context);
-                    node.descriptor.setStatus(Status.PASSED);
-                    node.descriptor.setExecutionNode(null);
-                    return;
-                }
+            boolean satisfied;
+            try {
+                satisfied = policy.termination().isSatisfied(completedChild, context);
+            } catch (Throwable t) {
+                UnrecoverableErrors.rethrowIfUnrecoverable(t);
+                skipRemainingIterationChildren(node, context);
+                node.descriptor.setStatus(Status.failed("until predicate failed: " + t.getMessage(), t));
+                node.descriptor.setExecutionNode(null);
+                return;
+            }
+            if (satisfied) {
+                skipRemainingIterationChildren(node, context);
+                node.descriptor.setStatus(Status.PASSED);
+                node.descriptor.setExecutionNode(null);
+                return;
             }
 
-            if (loopAction.delay().isPresent() && node.childIndex < node.children.size()) {
-                var delayNanos = delayNanosOrZero(loopAction.delay().get().delayForIteration(completedIndex + 1));
-                if (delayNanos > 0) {
-                    node.delayScheduled = true;
-                    context.scheduler().executeContinuationAfter(node, delayNanos, TimeUnit.NANOSECONDS);
-                    return;
-                }
+            var delayNanos = policy.delay().nanosBeforeNext(completedIndex);
+            if (delayNanos > 0 && node.childIndex < node.children.size()) {
+                node.delayScheduled = true;
+                context.scheduler().executeContinuationAfter(node, delayNanos, TimeUnit.NANOSECONDS);
+                return;
             }
         }
 
-        scheduleNextLoopChild(node, context, loopAction);
+        scheduleNextIterationChild(node, context, policy);
     }
 
-    private static void skipRemainingLoopChildren(final ExecutionNode node, final ConcreteContext context) {
+    private static void skipRemainingIterationChildren(final ExecutionNode node, final ConcreteContext context) {
         for (var i = node.childIndex; i < node.children.size(); i++) {
             var child = node.children.get(i);
             node.aggregator.include(context.runChild(child, ExecutionMode.SKIP));
         }
         node.childIndex = node.children.size();
-    }
-
-    private static void completeLoop(final ExecutionNode node, final Loop loopAction) {
-        if (loopAction.until().isPresent()) {
-            node.descriptor.setStatus(Status.FAILED);
-        } else {
-            node.descriptor.setStatus(node.aggregator.status());
-        }
-        node.descriptor.setExecutionNode(null);
     }
 
     /**
@@ -832,152 +920,6 @@ final class ActionExecutionStrategies {
     static long delayNanosOrZero(final Duration delay) {
         var nanos = delay.toNanos();
         return Math.max(nanos, 0L);
-    }
-
-    // ── Async Repeat ───────────────────────────────────────────────────
-
-    private static Status startRepeat(final Repeat ignored, final ConcreteContext context) {
-        var descriptor = context.descriptor();
-        var children = descriptor.children();
-        if (children.isEmpty()) {
-            return Status.PASSED;
-        }
-
-        var node = createNode(descriptor, context);
-        node.children = new ArrayList<>(children);
-        node.childIndex = 0;
-        node.aggregator = new StatusAccumulator();
-        node.continuation = () -> continueRepeat(node, context);
-        node.admissionRetry = () -> scheduleNextRepeatChild(node, context);
-        descriptor.setExecutionNode(node);
-
-        scheduleNextRepeatChild(node, context);
-
-        return runningIfChildrenAttempted(node);
-    }
-
-    private static void scheduleNextRepeatChild(final ExecutionNode node, final ConcreteContext context) {
-        if (node.childIndex >= node.children.size()) {
-            completeRepeat(node);
-            return;
-        }
-
-        var child = Arguments.requireInstanceOf(
-                node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
-        node.childIndex++;
-        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
-            // The child at the cursor was not dispatched; roll back so the capacity retry
-            // re-dispatches it.
-            node.childIndex--;
-            return;
-        }
-    }
-
-    private static void continueRepeat(final ExecutionNode node, final ConcreteContext context) {
-        if (node.descriptor.executionNode() != node) {
-            return;
-        }
-        var completedIndex = node.childIndex - 1;
-        if (completedIndex >= 0 && completedIndex < node.children.size()) {
-            node.aggregator.include(node.children.get(completedIndex));
-        }
-
-        scheduleNextRepeatChild(node, context);
-    }
-
-    private static void completeRepeat(final ExecutionNode node) {
-        node.descriptor.setStatus(node.aggregator.status());
-        node.descriptor.setExecutionNode(null);
-    }
-
-    // ── Async Until ────────────────────────────────────────────────────
-
-    private static Status startUntil(final Until untilAction, final ConcreteContext context) {
-        var descriptor = context.descriptor();
-        var children = descriptor.children();
-        if (children.isEmpty()) {
-            return Status.PASSED;
-        }
-
-        var node = createNode(descriptor, context);
-        node.children = new ArrayList<>(children);
-        node.childIndex = 0;
-        node.aggregator = new StatusAccumulator();
-        node.continuation = () -> continueUntil(node, context, untilAction);
-        node.admissionRetry = () -> scheduleNextUntilChild(node, context);
-        descriptor.setExecutionNode(node);
-
-        scheduleNextUntilChild(node, context);
-        return runningIfChildrenAttempted(node);
-    }
-
-    private static void scheduleNextUntilChild(final ExecutionNode node, final ConcreteContext context) {
-        if (node.childIndex >= node.children.size()) {
-            node.descriptor.setStatus(Status.FAILED);
-            node.descriptor.setExecutionNode(null);
-            return;
-        }
-
-        var child = Arguments.requireInstanceOf(
-                node.children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
-        node.childIndex++;
-        if (scheduleChild(child, ExecutionMode.RUN, node, context) == Admission.DEFERRED) {
-            // The child at the cursor was not dispatched; roll back so the capacity retry
-            // re-dispatches it.
-            node.childIndex--;
-            return;
-        }
-    }
-
-    private static void continueUntil(
-            final ExecutionNode node, final ConcreteContext context, final Until untilAction) {
-        if (node.descriptor.executionNode() != node) {
-            return;
-        }
-        var completedIndex = node.childIndex - 1;
-        if (completedIndex >= 0 && completedIndex < node.children.size()) {
-            var completedChild = node.children.get(completedIndex);
-            node.aggregator.include(completedChild);
-
-            if (completedChild.isAborted()) {
-                skipRemainingUntilChildren(node, context);
-                node.descriptor.setStatus(Status.ABORTED);
-                node.descriptor.setExecutionNode(null);
-                return;
-            }
-
-            boolean satisfied;
-            if (untilAction.until().isPresent()) {
-                try {
-                    satisfied = untilAction.until().get().test(context);
-                } catch (Throwable t) {
-                    UnrecoverableErrors.rethrowIfUnrecoverable(t);
-                    skipRemainingUntilChildren(node, context);
-                    node.descriptor.setStatus(Status.failed("until predicate failed: " + t.getMessage(), t));
-                    node.descriptor.setExecutionNode(null);
-                    return;
-                }
-            } else {
-                satisfied = completedChild.isPassed();
-            }
-
-            if (satisfied) {
-                skipRemainingUntilChildren(node, context);
-                node.descriptor.setStatus(Status.PASSED);
-                node.descriptor.setExecutionNode(null);
-                return;
-            }
-        }
-
-        scheduleNextUntilChild(node, context);
-    }
-
-    private static void skipRemainingUntilChildren(final ExecutionNode node, final ConcreteContext context) {
-        for (var i = node.childIndex; i < node.children.size(); i++) {
-            var child = node.children.get(i);
-            node.aggregator.include(context.runChild(child, ExecutionMode.SKIP));
-        }
-        node.childIndex = node.children.size();
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
@@ -1025,12 +967,22 @@ final class ActionExecutionStrategies {
             final Descriptor child,
             final ExecutionMode mode,
             final ExecutionNode parentNode,
-            final ConcreteContext context) {
+            final ConcreteContext context,
+            final boolean allowInline) {
         parentNode.incrementPendingChildren();
         parentNode.attemptedChildren++;
         var mutableChild = Arguments.requireInstanceOf(
                 child, MutableDescriptor.class, "child descriptor must be a MutableDescriptor");
         try {
+            if (allowInline
+                    && mode == ExecutionMode.RUN
+                    && mutableChild.isLeafAction()
+                    && context.scheduler().canExecuteChildInline(mutableChild)) {
+                // No hand-off: the parent is advancing a one-at-a-time child, and nothing queued
+                // outranks it.
+                context.scheduler().executeChildInline(mutableChild, mode, context);
+                return Admission.ADMITTED;
+            }
             if (context.scheduler().dispatchChild(mutableChild, mode, context, parentNode)
                     == Scheduler.ChildAdmissionResult.DEFERRED) {
                 parentNode.decrementPendingChildren();

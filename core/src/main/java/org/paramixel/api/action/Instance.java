@@ -20,7 +20,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Objects;
 import java.util.function.Supplier;
 import nonapi.org.paramixel.action.ConcreteContext;
-import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Context;
 
 /**
@@ -42,8 +41,7 @@ public final class Instance implements Action {
     private final Action destroy;
 
     private Instance(final String displayName, final Action instantiate, final Action body, final Action destroy) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.instantiate = Objects.requireNonNull(instantiate);
         this.body = Objects.requireNonNull(body, "body is null");
         this.destroy = Objects.requireNonNull(destroy);
@@ -61,8 +59,7 @@ public final class Instance implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Builder builder(final String displayName, final Supplier<?> factory) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(factory, "factory is null");
         return new Builder(displayName, factory);
     }
@@ -121,8 +118,7 @@ public final class Instance implements Action {
      *     public no-argument constructor
      */
     public static Builder builder(final String displayName, final Class<?> type) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(type, "type is null");
         return new Builder(displayName, defaultConstructorSupplier(type));
     }

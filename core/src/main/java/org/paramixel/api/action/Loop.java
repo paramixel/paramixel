@@ -21,9 +21,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 import nonapi.org.paramixel.support.Arguments;
+import nonapi.org.paramixel.support.Durations;
 import org.paramixel.api.Context;
 import org.paramixel.api.exception.AbortedException;
-import org.paramixel.api.exception.PolicyException;
 
 /**
  * An action that executes a body action repeatedly for up to {@link #maxIterations()}
@@ -70,8 +70,7 @@ public final class Loop implements Action {
             final int maxIterations,
             final Predicate<Context> until,
             final DelayPolicy delayPolicy) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.body = Objects.requireNonNull(body, "body is null");
         Arguments.requireTrue(maxIterations > 0, "maxIterations must be positive, was: " + maxIterations);
         this.maxIterations = maxIterations;
@@ -88,8 +87,7 @@ public final class Loop implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Builder builder(final String displayName) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         return new Builder(displayName);
     }
 
@@ -235,30 +233,7 @@ public final class Loop implements Action {
                 }
                 int exponent = completedIteration - 1;
                 long multiplier = 1L << Math.min(exponent, 62);
-                return multiplyOrZero(baseDelay, multiplier);
-            }
-        }
-
-        /**
-         * Multiplies a duration by a multiplier, returning {@link Duration#ZERO} on overflow.
-         *
-         * @param duration the duration to multiply
-         * @param multiplier the multiplier
-         * @return the multiplied duration
-         * @throws PolicyException if the multiplication overflows
-         */
-        private static Duration multiplyOrZero(final Duration duration, final long multiplier) {
-            if (multiplier < 0) {
-                return Duration.ZERO;
-            }
-            try {
-                var result = duration.multipliedBy(multiplier);
-                if (result.isNegative()) {
-                    return Duration.ZERO;
-                }
-                return result;
-            } catch (ArithmeticException e) {
-                throw new PolicyException("duration overflow multiplying by " + multiplier, e);
+                return Durations.multiplyOrZero(baseDelay, multiplier);
             }
         }
     }

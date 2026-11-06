@@ -16,6 +16,7 @@
 
 package nonapi.org.paramixel;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -64,8 +65,27 @@ public final class ActionResolver {
     private static final String BEFORE_ALL_SEQUENCE_NAME = "BeforeAll hooks";
     private static final String AFTER_ALL_SEQUENCE_NAME = "AfterAll hooks";
     private static final String FACTORY_ANNOTATION = Paramixel.Factory.class.getName();
-    private static final String BEFORE_ALL_ANNOTATION = Paramixel.BeforeAll.class.getName();
-    private static final String AFTER_ALL_ANNOTATION = Paramixel.AfterAll.class.getName();
+
+    /**
+     * Orders candidates by descending priority, then ascending package, class, and method name:
+     * configuration-annotated root-most methods run first.
+     */
+    private static final Comparator<MethodCandidate> METHOD_PRIORITY_FIRST = Comparator.comparingInt(
+                    MethodCandidate::priority)
+            .reversed()
+            .thenComparing(MethodCandidate::packageName)
+            .thenComparing(MethodCandidate::className)
+            .thenComparing(MethodCandidate::methodName);
+
+    /**
+     * Orders candidates by ascending priority, then descending package, class, and method name:
+     * configuration-annotated leaf-most methods run last.
+     */
+    private static final Comparator<MethodCandidate> METHOD_PRIORITY_LAST = Comparator.comparingInt(
+                    MethodCandidate::priority)
+            .thenComparing(MethodCandidate::packageName, Comparator.reverseOrder())
+            .thenComparing(MethodCandidate::className, Comparator.reverseOrder())
+            .thenComparing(MethodCandidate::methodName, Comparator.reverseOrder());
 
     private final Configuration configuration;
     private final Selector selector;
@@ -158,10 +178,10 @@ public final class ActionResolver {
             final boolean shuffled,
             final long seed,
             final Action body) {
-        var candidates = new ArrayList<ActionCandidate>();
+        var candidates = new ArrayList<MethodCandidate>();
         var failures = new ArrayList<DiscoveryValidationFailure>();
-        var beforeAllCandidates = new ArrayList<HookCandidate>();
-        var afterAllCandidates = new ArrayList<HookCandidate>();
+        var beforeAllCandidates = new ArrayList<MethodCandidate>();
+        var afterAllCandidates = new ArrayList<MethodCandidate>();
         try (ScanResult scanResult = classGraph
                 .enableClassInfo()
                 .enableMethodInfo()
@@ -178,63 +198,20 @@ public final class ActionResolver {
                     resolveFactoryMethod(clazz, failures).ifPresent(candidates::add);
                 }
             }
-            for (ClassInfo classInfo : scanResult.getClassesWithMethodAnnotation(BEFORE_ALL_ANNOTATION)) {
-                var clazz = classInfo.loadClass();
-                for (Method method : clazz.getDeclaredMethods()) {
-                    if (!method.isAnnotationPresent(Paramixel.BeforeAll.class)) {
-                        continue;
-                    }
-                    if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
-                        continue;
-                    }
-                    final var location = locationOf(method);
-                    validateHookMethod(method, location, "@Paramixel.BeforeAll");
-                    beforeAllCandidates.add(new HookCandidate(
-                            priorityOf(method),
-                            method.getDeclaringClass().getPackageName(),
-                            method.getDeclaringClass().getName(),
-                            method.getName(),
-                            method,
-                            location));
-                }
-            }
-            for (ClassInfo classInfo : scanResult.getClassesWithMethodAnnotation(AFTER_ALL_ANNOTATION)) {
-                var clazz = classInfo.loadClass();
-                for (Method method : clazz.getDeclaredMethods()) {
-                    if (!method.isAnnotationPresent(Paramixel.AfterAll.class)) {
-                        continue;
-                    }
-                    if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
-                        continue;
-                    }
-                    final var location = locationOf(method);
-                    validateHookMethod(method, location, "@Paramixel.AfterAll");
-                    afterAllCandidates.add(new HookCandidate(
-                            priorityOf(method),
-                            method.getDeclaringClass().getPackageName(),
-                            method.getDeclaringClass().getName(),
-                            method.getName(),
-                            method,
-                            location));
-                }
-            }
+            beforeAllCandidates.addAll(
+                    collectHookCandidates(scanResult, Paramixel.BeforeAll.class, "@Paramixel.BeforeAll"));
+            afterAllCandidates.addAll(
+                    collectHookCandidates(scanResult, Paramixel.AfterAll.class, "@Paramixel.AfterAll"));
         }
 
         var beforeActions = beforeAllCandidates.stream()
-                .sorted(Comparator.comparingInt(HookCandidate::priority)
-                        .reversed()
-                        .thenComparing(HookCandidate::packageName)
-                        .thenComparing(HookCandidate::className)
-                        .thenComparing(HookCandidate::methodName))
+                .sorted(METHOD_PRIORITY_FIRST)
                 .map(c -> invokeStaticAction(c.method(), c.location(), "@Paramixel.BeforeAll"))
                 .flatMap(Optional::stream)
                 .toList();
 
         var afterActions = afterAllCandidates.stream()
-                .sorted(Comparator.comparingInt(HookCandidate::priority)
-                        .thenComparing(HookCandidate::packageName, Comparator.reverseOrder())
-                        .thenComparing(HookCandidate::className, Comparator.reverseOrder())
-                        .thenComparing(HookCandidate::methodName, Comparator.reverseOrder()))
+                .sorted(METHOD_PRIORITY_LAST)
                 .map(c -> invokeStaticAction(c.method(), c.location(), "@Paramixel.AfterAll"))
                 .flatMap(Optional::stream)
                 .toList();
@@ -247,11 +224,7 @@ public final class ActionResolver {
             bodyAction = Optional.of(body);
         } else {
             final var actions = candidates.stream()
-                    .sorted(Comparator.comparingInt(ActionCandidate::priority)
-                            .reversed()
-                            .thenComparing(ActionCandidate::packageName)
-                            .thenComparing(ActionCandidate::className)
-                            .thenComparing(ActionCandidate::methodName))
+                    .sorted(METHOD_PRIORITY_FIRST)
                     .map(this::resolveActionFromMethod)
                     .flatMap(Optional::stream)
                     .toList();
@@ -309,7 +282,7 @@ public final class ActionResolver {
         return new ValidatedTags(tags, hasInvalidTag);
     }
 
-    private Optional<ActionCandidate> resolveFactoryMethod(
+    private Optional<MethodCandidate> resolveFactoryMethod(
             final Class<?> clazz, final List<DiscoveryValidationFailure> failures) {
         var seenSignatures = new HashSet<MethodKey>();
         var candidates = new ArrayList<ValidatedFactoryMethod>();
@@ -342,7 +315,7 @@ public final class ActionResolver {
                 if (!acceptsAnyTag(tags.tags())) {
                     continue;
                 }
-                validateFactoryMethod(method, location);
+                validateHookMethod(method, location, "@Paramixel.Factory");
                 candidates.add(new ValidatedFactoryMethod(method, location));
             }
             current = current.getSuperclass();
@@ -358,7 +331,7 @@ public final class ActionResolver {
         }
         final var candidate = candidates.get(0);
         final var method = candidate.method();
-        return Optional.of(new ActionCandidate(
+        return Optional.of(new MethodCandidate(
                 priorityOf(method),
                 method.getDeclaringClass().getPackageName(),
                 method.getDeclaringClass().getName(),
@@ -417,21 +390,41 @@ public final class ActionResolver {
         return method.getDeclaringClass().getName() + "#" + method.getName();
     }
 
-    private void validateFactoryMethod(final Method method, final String location) {
-        final var modifiers = method.getModifiers();
-        if (!Modifier.isPublic(modifiers) || !Modifier.isStatic(modifiers)) {
-            throw new ResolverException(
-                    "Invalid @Paramixel.Factory method on " + location + ": method must be public static");
+    /**
+     * Collects and validates lifecycle hook methods carrying the supplied annotation.
+     *
+     * <p>Methods are visited in declaration order per discovered class, which the callers then
+     * re-order with {@link #METHOD_PRIORITY_FIRST} or {@link #METHOD_PRIORITY_LAST}.
+     *
+     * @param scanResult the completed scan; must not be {@code null}
+     * @param annotation the hook annotation to select; must not be {@code null}
+     * @param annotationLabel the annotation name used in messages; must not be {@code null}
+     * @return the validated candidates, possibly empty
+     */
+    private List<MethodCandidate> collectHookCandidates(
+            final ScanResult scanResult, final Class<? extends Annotation> annotation, final String annotationLabel) {
+        var candidates = new ArrayList<MethodCandidate>();
+        for (ClassInfo classInfo : scanResult.getClassesWithMethodAnnotation(annotation.getName())) {
+            var clazz = classInfo.loadClass();
+            for (Method method : clazz.getDeclaredMethods()) {
+                if (!method.isAnnotationPresent(annotation)) {
+                    continue;
+                }
+                if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
+                    continue;
+                }
+                final var location = locationOf(method);
+                validateHookMethod(method, location, annotationLabel);
+                candidates.add(new MethodCandidate(
+                        priorityOf(method),
+                        method.getDeclaringClass().getPackageName(),
+                        method.getDeclaringClass().getName(),
+                        method.getName(),
+                        method,
+                        location));
+            }
         }
-        if (method.getParameterCount() != 0) {
-            throw new ResolverException(
-                    "Invalid @Paramixel.Factory method on " + location + ": method must have no parameters");
-        }
-        if (!Action.class.isAssignableFrom(method.getReturnType())
-                && !Builder.class.isAssignableFrom(method.getReturnType())) {
-            throw new ResolverException(
-                    "Invalid @Paramixel.Factory method on " + location + ": return type must be Action or Builder");
-        }
+        return candidates;
     }
 
     private static void validateHookMethod(final Method method, final String location, final String annotationLabel) {
@@ -451,7 +444,7 @@ public final class ActionResolver {
         }
     }
 
-    private Optional<Action> resolveActionFromMethod(final ActionCandidate candidate) {
+    private Optional<Action> resolveActionFromMethod(final MethodCandidate candidate) {
         return invokeStaticAction(candidate.method(), candidate.location(), "@Paramixel.Factory");
     }
 
@@ -529,7 +522,11 @@ public final class ActionResolver {
         }
     }
 
-    private record ActionCandidate(
+    /**
+     * A discovered action factory or lifecycle hook method together with the ordering data used to
+     * place it in the execution tree.
+     */
+    private record MethodCandidate(
             int priority, String packageName, String className, String methodName, Method method, String location) {}
 
     private record ValidatedTags(List<String> tags, boolean hasInvalidTag) {}
@@ -537,7 +534,4 @@ public final class ActionResolver {
     private record ValidatedFactoryMethod(Method method, String location) {}
 
     private record DiscoveryValidationFailure(String location, String message) {}
-
-    private record HookCandidate(
-            int priority, String packageName, String className, String methodName, Method method, String location) {}
 }

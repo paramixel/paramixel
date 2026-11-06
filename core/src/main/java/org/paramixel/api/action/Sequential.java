@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
-import nonapi.org.paramixel.support.Arguments;
 
 /**
  * An action that executes its children sequentially in the order they were added.
@@ -50,9 +49,8 @@ public final class Sequential implements Action {
             final boolean dependent,
             final long seed,
             final boolean shuffled) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
-        this.children = validateChildren(children);
+        this.displayName = ActionNames.requireDisplayName(displayName);
+        this.children = ActionChildren.validateChildren(children);
         this.dependent = dependent;
         this.seed = seed;
         this.shuffled = shuffled;
@@ -143,16 +141,6 @@ public final class Sequential implements Action {
         return seed;
     }
 
-    private List<Action> validateChildren(final List<Action> children) {
-        Objects.requireNonNull(children, "children is null");
-        var validated = new ArrayList<Action>(children.size());
-        for (Action child : children) {
-            Objects.requireNonNull(child, "children contains null element");
-            validated.add(child);
-        }
-        return List.copyOf(validated);
-    }
-
     /**
      * Fluent builder for {@link Sequential} actions.
      */
@@ -165,8 +153,7 @@ public final class Sequential implements Action {
         private long shuffleSeed;
 
         private Builder(final String displayName) {
-            Objects.requireNonNull(displayName, "displayName is null");
-            Arguments.requireNonBlank(displayName, "displayName is blank");
+            ActionNames.requireDisplayName(displayName);
             this.displayName = displayName;
         }
 

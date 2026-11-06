@@ -58,7 +58,7 @@
                 <configuration>
                     <java>
                         <excludes>
-                            <exclude>src/main/java/org/paramixel/api/internal/classgraph/**/*.java</exclude>
+                            <exclude>src/main/java/nonapi/org/paramixel/classgraph/**/*.java</exclude>
                         </excludes>
                     </java>
                 </configuration>
@@ -67,9 +67,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-pmd-plugin</artifactId>
                 <configuration>
-                    <excludeRoots>
-                        <excludeRoot>src/main/java/org/paramixel/api/internal/classgraph</excludeRoot>
-                    </excludeRoots>
+                    <excludes>
+                        <exclude>nonapi/org/paramixel/classgraph/**/*.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>

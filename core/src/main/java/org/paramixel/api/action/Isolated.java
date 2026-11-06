@@ -45,8 +45,7 @@ public final class Isolated implements Action {
     private final Action body;
 
     private Isolated(final String displayName, final String lockName, final Action body) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(lockName, "lockName is null");
         this.lockName = Arguments.requireNonBlank(lockName, "lockName is blank");
         this.body = Objects.requireNonNull(body, "body is null");
@@ -64,8 +63,7 @@ public final class Isolated implements Action {
      * @throws IllegalArgumentException if {@code displayName} or {@code lockName} is blank
      */
     public static Builder builder(final String displayName, final String lockName) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(lockName, "lockName is null");
         Arguments.requireNonBlank(lockName, "lockName is blank");
         return new Builder(displayName, lockName);

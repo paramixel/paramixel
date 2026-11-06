@@ -23,7 +23,6 @@
 .mtjplan/
 .workspace/
 __pycache__/
-agent/tmp/
 dependency-reduced-pom.xml
 hs_err_pid*
 java_pid*.hprof
@@ -32,8 +31,6 @@ pom.xml.versionsBackup
 release.properties
 **/.flattened-pom.xml
 stress-test.log
-.amanda/
-amanda
 .DS_Store
 website/.DS_Store
 website/.cache/
@@ -45,3 +42,5 @@ website/.env.test.local
 website/build/
 website/node_modules/
 website/static/javadoc/
+.agents/
+plans/

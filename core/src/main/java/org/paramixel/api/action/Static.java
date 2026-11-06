@@ -18,7 +18,6 @@ package org.paramixel.api.action;
 
 import java.util.Objects;
 import java.util.Optional;
-import nonapi.org.paramixel.support.Arguments;
 
 /**
  * An action that executes a before action, a single body action, and an after action
@@ -41,17 +40,10 @@ import nonapi.org.paramixel.support.Arguments;
 @Deprecated(forRemoval = true, since = "6.2.0")
 public final class Static implements Action {
 
-    private final String displayName;
-    private final Action before;
-    private final Action body;
-    private final Action after;
+    private final Scope delegate;
 
-    private Static(final String displayName, final Action before, final Action body, final Action after) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
-        this.before = before;
-        this.body = Objects.requireNonNull(body, "body is null");
-        this.after = after;
+    private Static(final Scope delegate) {
+        this.delegate = Objects.requireNonNull(delegate, "delegate is null");
     }
 
     /**
@@ -64,14 +56,13 @@ public final class Static implements Action {
      */
     @Deprecated(forRemoval = true)
     public static Builder builder(final String displayName) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         return new Builder(displayName);
     }
 
     @Override
     public String displayName() {
-        return displayName;
+        return delegate.displayName();
     }
 
     /**
@@ -80,7 +71,7 @@ public final class Static implements Action {
      * @return the before action, or empty if none is declared
      */
     public Optional<Action> before() {
-        return Optional.ofNullable(before);
+        return delegate.before();
     }
 
     /**
@@ -89,7 +80,7 @@ public final class Static implements Action {
      * @return the body action; never {@code null}
      */
     public Action body() {
-        return body;
+        return delegate.body();
     }
 
     /**
@@ -98,7 +89,7 @@ public final class Static implements Action {
      * @return the after action, or empty if none is declared
      */
     public Optional<Action> after() {
-        return Optional.ofNullable(after);
+        return delegate.after();
     }
 
     /**
@@ -109,13 +100,10 @@ public final class Static implements Action {
     @Deprecated(forRemoval = true)
     public static final class Builder implements org.paramixel.api.action.Builder {
 
-        private final String displayName;
-        private Action before;
-        private Action body;
-        private Action after;
+        private final Scope.Builder delegate;
 
         private Builder(final String displayName) {
-            this.displayName = displayName;
+            this.delegate = Scope.builder(displayName);
         }
 
         /**
@@ -127,7 +115,7 @@ public final class Static implements Action {
          * @throws NullPointerException if {@code action} is {@code null}
          */
         public Builder before(final Action action) {
-            this.before = Objects.requireNonNull(action, "action is null");
+            delegate.before(action);
             return this;
         }
 
@@ -140,8 +128,7 @@ public final class Static implements Action {
          * @throws NullPointerException if {@code builder} is {@code null}
          */
         public Builder before(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.before = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+            delegate.before(builder);
             return this;
         }
 
@@ -154,7 +141,7 @@ public final class Static implements Action {
          * @throws NullPointerException if {@code action} is {@code null}
          */
         public Builder body(final Action action) {
-            this.body = Objects.requireNonNull(action, "action is null");
+            delegate.body(action);
             return this;
         }
 
@@ -167,8 +154,7 @@ public final class Static implements Action {
          * @throws NullPointerException if {@code builder} is {@code null}
          */
         public Builder body(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.body = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+            delegate.body(builder);
             return this;
         }
 
@@ -181,7 +167,7 @@ public final class Static implements Action {
          * @throws NullPointerException if {@code action} is {@code null}
          */
         public Builder after(final Action action) {
-            this.after = Objects.requireNonNull(action, "action is null");
+            delegate.after(action);
             return this;
         }
 
@@ -194,8 +180,7 @@ public final class Static implements Action {
          * @throws NullPointerException if {@code builder} is {@code null}
          */
         public Builder after(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.after = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+            delegate.after(builder);
             return this;
         }
 
@@ -206,10 +191,7 @@ public final class Static implements Action {
          */
         @Override
         public Static build() {
-            if (body == null) {
-                throw new IllegalStateException("body action must be configured");
-            }
-            return new Static(displayName, before, body, after);
+            return new Static(delegate.build());
         }
     }
 }

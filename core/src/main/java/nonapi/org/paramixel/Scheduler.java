@@ -16,12 +16,13 @@
 
 package nonapi.org.paramixel;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -115,6 +116,14 @@ public final class Scheduler implements AutoCloseable {
     private static final long MANAGED_JOIN_BACKOFF_CEILING_NANOS = 1_000_000_000L; // 1 second
     private static final double MANAGED_JOIN_BACKOFF_GROWTH_FACTOR = 4.0;
     private static final long ISOLATION_JOIN_PARK_CEILING_NANOS = 10_000_000L; // 10 ms
+
+    /**
+     * Maximum nesting of continuations executed inline. Bounds stack depth when a continuation
+     * synchronously executes skipped or aborted descendants, each of which may complete inline in
+     * turn.
+     */
+    private static final int INLINE_CONTINUATION_MAX_DEPTH = 16;
+
     private static final Comparator<Runnable> PRIORITY_COMPARATOR = (left, right) -> {
         var leftKey = priorityKeyOf(left);
         var rightKey = priorityKeyOf(right);
@@ -133,30 +142,21 @@ public final class Scheduler implements AutoCloseable {
                 + (right != null ? right.getClass().getName() : "null"));
     };
 
+    /**
+     * Total order over queued descriptor tasks: structural key, then submission sequence.
+     *
+     * <p>Deferred-work queues (isolation deferrals and relinquished ready tasks) use this order so
+     * that depth-first preference (R3) survives deferral, not just the ready queue.
+     */
+    private static final Comparator<PrioritizedTask> TASK_ORDER =
+            (left, right) -> PRIORITY_COMPARATOR.compare(left, right);
+
     private static SchedulerPriorityKey priorityKeyOf(final Runnable task) {
-        if (task instanceof PrioritizedTask pt) {
-            return pt.priorityKey;
-        }
-        if (task instanceof ContinuationTask ct) {
-            return ct.priorityKey;
-        }
-        if (task instanceof AdmissionWakeupTask at) {
-            return at.priorityKey;
-        }
-        return null;
+        return task instanceof ScheduledTask scheduled ? scheduled.priorityKey() : null;
     }
 
     private static long sequenceOf(final Runnable task) {
-        if (task instanceof PrioritizedTask pt) {
-            return pt.sequence;
-        }
-        if (task instanceof ContinuationTask ct) {
-            return ct.sequence;
-        }
-        if (task instanceof AdmissionWakeupTask at) {
-            return at.sequence;
-        }
-        return 0L;
+        return task instanceof ScheduledTask scheduled ? scheduled.sequence() : 0L;
     }
 
     private final int queueCapacity;
@@ -171,6 +171,20 @@ public final class Scheduler implements AutoCloseable {
     private final AtomicInteger runningLeafCounter = new AtomicInteger();
     private final AtomicLong taskSequence = new AtomicLong(0);
     private final ThreadLocal<Boolean> schedulerWorker = ThreadLocal.withInitial(() -> false);
+    private final ThreadLocal<Integer> inlineContinuationDepth = ThreadLocal.withInitial(() -> 0);
+    private final ThreadLocal<Integer> managedJoinDepth = ThreadLocal.withInitial(() -> 0);
+
+    /**
+     * Threads currently parked in {@link #managedJoin}. Waking them when work becomes available
+     * bounds hand-off latency by the enqueue path instead of by the park backoff ceiling (up to
+     * one second, or ten milliseconds while isolation frames are held).
+     */
+    private final Set<Thread> parkedWaiters = ConcurrentHashMap.newKeySet();
+
+    private final AtomicLong parkedWaiterWakeupCounter = new AtomicLong();
+    private final AtomicLong inlineChildExecutionCounter = new AtomicLong();
+
+    private final AtomicLong inlineContinuationCounter = new AtomicLong();
     private final ThreadLocal<ArrayList<IsolationFrame>> isolationFrames = ThreadLocal.withInitial(ArrayList::new);
 
     /**
@@ -191,7 +205,7 @@ public final class Scheduler implements AutoCloseable {
      * available. A relinquished task has released its queue permit without executing or
      * terminalizing; it is redispatched by re-acquiring a permit.
      */
-    private final ArrayDeque<PrioritizedTask> parkedReadyTasks = new ArrayDeque<>();
+    private final Queue<PrioritizedTask> parkedReadyTasks = new PriorityQueue<>(TASK_ORDER);
 
     /**
      * Result of an internal child admission attempt.
@@ -205,6 +219,37 @@ public final class Scheduler implements AutoCloseable {
         /** The scheduler is closing or the child was already terminal; the child was
          * terminalized and {@code childCompleted} was published. */
         REJECTED
+    }
+
+    /**
+     * A task submitted to this scheduler's priority queue.
+     *
+     * <p>Every queued task exposes the ordering key, the submission sequence, and the descriptor
+     * it advances. Modeling the three properties as one type keeps the priority comparator and the
+     * work-stealing eligibility check free of per-implementation type tests.
+     */
+    private interface ScheduledTask extends Runnable {
+
+        /**
+         * Returns the ordering key derived from the descriptor path.
+         *
+         * @return the ordering key; never {@code null}
+         */
+        SchedulerPriorityKey priorityKey();
+
+        /**
+         * Returns the submission sequence used to break ordering-key ties.
+         *
+         * @return the submission sequence
+         */
+        long sequence();
+
+        /**
+         * Returns the descriptor this task advances.
+         *
+         * @return the descriptor; never {@code null}
+         */
+        MutableDescriptor descriptor();
     }
 
     /**
@@ -617,15 +662,16 @@ public final class Scheduler implements AutoCloseable {
         closingLock.lock();
         try {
             if (closing) {
-                rejectNeverStartedTask(task, new IllegalStateException("Scheduler is closing"));
+                rejectTask(task, new IllegalStateException("Scheduler is closing"));
                 return;
             }
             try {
                 executor.execute(task);
+                wakeParkedWaiters();
             } catch (RejectedExecutionException rejected) {
-                rejectNeverStartedTask(task, rejected);
+                rejectTask(task, rejected);
             } catch (Throwable t) {
-                rejectNeverStartedTask(task, t);
+                rejectTask(task, t);
                 recordUnrecoverableFailure(t);
                 UnrecoverableErrors.rethrowIfUnrecoverable(t);
             }
@@ -674,6 +720,42 @@ public final class Scheduler implements AutoCloseable {
      */
     public int readyQueueSize() {
         return executor.getQueue().size();
+    }
+
+    /**
+     * Returns how many continuations have been advanced inline on a completing thread rather than
+     * submitted to the executor.
+     *
+     * <p>Observability for tests and benchmarks: inline continuations avoid a queue submission and
+     * a hand-off, so this counter distinguishes the inline path from the queued path.
+     *
+     * @return the number of inline continuation executions since construction
+     */
+    long inlineContinuations() {
+        return inlineContinuationCounter.get();
+    }
+
+    /**
+     * Returns how many times parked waiters have been woken because work became available or a
+     * node completed.
+     *
+     * <p>Observability for tests: without the wakeups, a waiter only re-checks when its backoff
+     * park expires.
+     *
+     * @return the number of wakeup broadcasts since construction
+     */
+    long parkedWaiterWakeups() {
+        return parkedWaiterWakeupCounter.get();
+    }
+
+    /**
+     * Returns how many leaf children have been executed inline on a completing thread rather than
+     * submitted to the executor.
+     *
+     * @return the number of inline leaf executions since construction
+     */
+    long inlineChildren() {
+        return inlineChildExecutionCounter.get();
     }
 
     /**
@@ -775,7 +857,7 @@ public final class Scheduler implements AutoCloseable {
                 return true;
             }
             if (state.ownerDescriptor != null && isSameOrDescendant(task.descriptor, state.ownerDescriptor)) {
-                state.ownerTasks.addLast(task);
+                state.ownerTasks.add(task);
                 LockSupport.unpark(state.ownerThread);
                 return false;
             }
@@ -813,20 +895,20 @@ public final class Scheduler implements AutoCloseable {
         PrioritizedTask nextTask = null;
         synchronized (state) {
             if (state.ownerDescriptor == descriptor) {
-                while (!state.ownerTasks.isEmpty()) {
-                    state.deferredTasks.addFirst(state.ownerTasks.removeLast());
-                }
+                state.deferredTasks.addAll(state.ownerTasks);
+                state.ownerTasks.clear();
                 state.ownerDescriptor = null;
                 state.ownerThread = null;
-                nextTask = state.deferredTasks.pollFirst();
+                nextTask = state.deferredTasks.poll();
                 state.dispatchedTask = nextTask;
             }
         }
         if (nextTask != null) {
             try {
                 executor.execute(nextTask);
+                wakeParkedWaiters();
             } catch (RejectedExecutionException e) {
-                rejectDeferredIsolationTask(nextTask, e);
+                rejectTask(nextTask, e);
             }
         }
         // Lock release may free capacity for relinquished tasks that were parked while this
@@ -834,14 +916,16 @@ public final class Scheduler implements AutoCloseable {
         signalCapacityAvailable();
     }
 
-    private void rejectDeferredIsolationTask(final PrioritizedTask task, final Throwable error) {
-        releaseReservationIfHeld(task);
-        ensureTerminalStatus(task.context, error);
-        completeExceptionally(task.descriptor, task.future, error);
-        publishRejectedCompletion(task.descriptor, task.callback, error);
-    }
-
-    private void rejectNeverStartedTask(final PrioritizedTask task, final Throwable cause) {
+    /**
+     * Terminalizes a task that will never execute: its reservation (if any) is released, its
+     * descriptor is given a terminal status, its scheduling future is failed, and the parent is
+     * notified. Used for tasks relinquished before dispatch and for tasks deferred behind an
+     * isolation lock whose redispatch was rejected during shutdown.
+     *
+     * @param task the task that will not run; must not be {@code null}
+     * @param cause the reason the task will not run; must not be {@code null}
+     */
+    private void rejectTask(final PrioritizedTask task, final Throwable cause) {
         releaseReservationIfHeld(task);
         ensureTerminalStatus(task.context, cause);
         completeExceptionally(task.descriptor, task.future, cause);
@@ -867,11 +951,11 @@ public final class Scheduler implements AutoCloseable {
         for (var task : removed) {
             try {
                 if (task instanceof PrioritizedTask pt) {
-                    rejectNeverStartedTask(pt, schedulerClosingException());
+                    rejectTask(pt, schedulerClosingException());
                 } else if (task instanceof ContinuationTask ct) {
-                    runContinuationOnce(ct.node);
+                    runContinuationOnce(ct.node());
                 } else if (task instanceof AdmissionWakeupTask at) {
-                    admissionDrain.add(at.node);
+                    admissionDrain.add(at.node());
                 }
                 // Unexpected runnable type: skip (defensive)
             } catch (Throwable t) {
@@ -943,6 +1027,7 @@ public final class Scheduler implements AutoCloseable {
         var sequence = taskSequence.getAndIncrement();
         try {
             executor.execute(new AdmissionWakeupTask(priorityKey, sequence, node, this));
+            wakeParkedWaiters();
         } catch (RejectedExecutionException e) {
             node.admissionWakeupPending.set(false);
             admissionDrain.add(node);
@@ -995,7 +1080,7 @@ public final class Scheduler implements AutoCloseable {
             return false;
         }
         synchronized (capacityMonitor) {
-            parkedReadyTasks.addLast(victim);
+            parkedReadyTasks.add(victim);
         }
         releaseReservationIfHeld(victim);
         return true;
@@ -1011,14 +1096,14 @@ public final class Scheduler implements AutoCloseable {
             if (parkedReadyTasks.isEmpty() || queuePermits.availablePermits() == 0) {
                 return;
             }
-            task = parkedReadyTasks.pollFirst();
+            task = parkedReadyTasks.poll();
         }
         if (task == null) {
             return;
         }
         if (!queuePermits.tryAcquire()) {
             synchronized (capacityMonitor) {
-                parkedReadyTasks.addFirst(task);
+                parkedReadyTasks.add(task);
             }
             return;
         }
@@ -1026,13 +1111,14 @@ public final class Scheduler implements AutoCloseable {
         closingLock.lock();
         try {
             if (closing) {
-                rejectNeverStartedTask(task, schedulerClosingException());
+                rejectTask(task, schedulerClosingException());
                 return;
             }
             try {
                 executor.execute(task);
+                wakeParkedWaiters();
             } catch (RejectedExecutionException e) {
-                rejectNeverStartedTask(task, e);
+                rejectTask(task, e);
             }
         } finally {
             closingLock.unlock();
@@ -1043,7 +1129,7 @@ public final class Scheduler implements AutoCloseable {
         if (state.dispatchedTask == task) {
             state.dispatchedTask = null;
         }
-        state.deferredTasks.addLast(task);
+        state.deferredTasks.add(task);
     }
 
     private IsolationState isolationState(final String lockName) {
@@ -1111,61 +1197,95 @@ public final class Scheduler implements AutoCloseable {
                 MANAGED_JOIN_BACKOFF_FLOOR_NANOS,
                 MANAGED_JOIN_BACKOFF_CEILING_NANOS,
                 MANAGED_JOIN_BACKOFF_GROWTH_FACTOR);
-        while (!future.isDone()) {
-            var ownedIsolationTask = pollOwnedIsolationTask();
-            if (ownedIsolationTask != null) {
-                backoff.reset();
-                runQueuedTask(ownedIsolationTask);
-                continue;
-            }
-            var task = stealEligibleReadyTask();
-            if (task != null) {
-                backoff.reset();
-                runQueuedTask(task);
-                continue;
-            }
-            // During shutdown, continuations are added to the shared shutdownDrain
-            // queue instead of the executor. Poll that queue to make progress.
-            if (executor.isShutdown()) {
-                var node = shutdownDrain.poll();
-                if (node != null) {
-                    backoff.reset();
-                    runContinuationOnce(node);
-                    continue;
-                }
-                var admissionNode = admissionDrain.poll();
-                if (admissionNode != null) {
-                    backoff.reset();
-                    runAdmissionRetryOnce(admissionNode);
-                    continue;
-                }
-            }
-            // Once the executor is fully terminated and no work remains
-            // in the drain queues, no further progress is possible. The future
-            // should already be done (all scheduler workers have terminated).
-            // If it is not, cancel it to avoid blocking forever in join().
-            if (executor.isTerminated() && shutdownDrain.isEmpty() && admissionDrain.isEmpty()) {
-                if (!future.isDone()) {
-                    future.cancel(true);
-                }
-                break;
-            }
-            // ParkNanos returns immediately without blocking when the interrupt flag
-            // is set, turning the backoff-gated park into a busy-spin. Consume any
-            // stray flag and reset the backoff so the next park actually blocks.
-            if (Thread.interrupted()) {
-                backoff.reset();
-            }
-            // A lock owner parks only when no eligible work is available; new eligible work can
-            // arrive at any time (e.g. an inter-iteration delay continuation), so cap the park so
-            // eligibility changes are noticed promptly instead of after a full backoff ceiling.
-            var parkNanos = backoff.nextDelayNanos();
-            if (framesHeld && parkNanos > ISOLATION_JOIN_PARK_CEILING_NANOS) {
-                parkNanos = ISOLATION_JOIN_PARK_CEILING_NANOS;
-            }
-            LockSupport.parkNanos(parkNanos);
+        var waitDepth = managedJoinDepth.get();
+        managedJoinDepth.set(waitDepth + 1);
+        if (waitDepth == 0) {
+            parkedWaiters.add(Thread.currentThread());
         }
-        return future.join();
+        try {
+            while (!future.isDone()) {
+                var ownedIsolationTask = pollOwnedIsolationTask();
+                if (ownedIsolationTask != null) {
+                    backoff.reset();
+                    runQueuedTask(ownedIsolationTask);
+                    continue;
+                }
+                var task = stealEligibleReadyTask();
+                if (task != null) {
+                    backoff.reset();
+                    runQueuedTask(task);
+                    continue;
+                }
+                // During shutdown, continuations are added to the shared shutdownDrain
+                // queue instead of the executor. Poll that queue to make progress.
+                if (executor.isShutdown()) {
+                    var node = shutdownDrain.poll();
+                    if (node != null) {
+                        backoff.reset();
+                        runContinuationOnce(node);
+                        continue;
+                    }
+                    var admissionNode = admissionDrain.poll();
+                    if (admissionNode != null) {
+                        backoff.reset();
+                        runAdmissionRetryOnce(admissionNode);
+                        continue;
+                    }
+                }
+                // Once the executor is fully terminated and no work remains
+                // in the drain queues, no further progress is possible. The future
+                // should already be done (all scheduler workers have terminated).
+                // If it is not, cancel it to avoid blocking forever in join().
+                if (executor.isTerminated() && shutdownDrain.isEmpty() && admissionDrain.isEmpty()) {
+                    if (!future.isDone()) {
+                        future.cancel(true);
+                    }
+                    break;
+                }
+                // ParkNanos returns immediately without blocking when the interrupt flag
+                // is set, turning the backoff-gated park into a busy-spin. Consume any
+                // stray flag and reset the backoff so the next park actually blocks.
+                if (Thread.interrupted()) {
+                    backoff.reset();
+                }
+                // A lock owner parks only when no eligible work is available; new eligible work can
+                // arrive at any time (e.g. an inter-iteration delay continuation), so cap the park so
+                // eligibility changes are noticed promptly instead of after a full backoff ceiling.
+                var parkNanos = backoff.nextDelayNanos();
+                if (framesHeld && parkNanos > ISOLATION_JOIN_PARK_CEILING_NANOS) {
+                    parkNanos = ISOLATION_JOIN_PARK_CEILING_NANOS;
+                }
+                LockSupport.parkNanos(parkNanos);
+            }
+            return future.join();
+        } finally {
+            if (waitDepth == 0) {
+                parkedWaiters.remove(Thread.currentThread());
+                managedJoinDepth.remove();
+            } else {
+                managedJoinDepth.set(waitDepth);
+            }
+        }
+    }
+
+    /**
+     * Wakes threads parked in {@link #managedJoin} so they re-check for work.
+     *
+     * <p>Called whenever new work becomes available or a node completes. Without this, a parked
+     * waiter only re-checks when its backoff park expires — up to one second, or ten milliseconds
+     * while it holds isolation frames. A thread that is not parked simply keeps the permit and
+     * returns immediately from its next park.
+     *
+     * <p>Internal API for {@link nonapi.org.paramixel.action.ExecutionNode}.
+     */
+    public void wakeParkedWaiters() {
+        if (parkedWaiters.isEmpty()) {
+            return;
+        }
+        parkedWaiterWakeupCounter.incrementAndGet();
+        for (var waiter : parkedWaiters) {
+            LockSupport.unpark(waiter);
+        }
     }
 
     /**
@@ -1227,16 +1347,7 @@ public final class Scheduler implements AutoCloseable {
     }
 
     private static MutableDescriptor taskDescriptorOf(final Runnable task) {
-        if (task instanceof PrioritizedTask pt) {
-            return pt.descriptor;
-        }
-        if (task instanceof ContinuationTask ct) {
-            return ct.node.descriptor;
-        }
-        if (task instanceof AdmissionWakeupTask at) {
-            return at.node.descriptor;
-        }
-        return null;
+        return task instanceof ScheduledTask scheduled ? scheduled.descriptor() : null;
     }
 
     /**
@@ -1291,7 +1402,7 @@ public final class Scheduler implements AutoCloseable {
                 dispatchAdmissionWakeup(node);
             }
             for (var task : parked) {
-                rejectNeverStartedTask(task, schedulerClosingException());
+                rejectTask(task, schedulerClosingException());
             }
         } finally {
             closingLock.unlock();
@@ -1345,14 +1456,124 @@ public final class Scheduler implements AutoCloseable {
             shutdownDrain.add(node);
             return;
         }
+        if (canRunContinuationInline()) {
+            // The completing thread advances its own parent; this avoids a queue submission and
+            // a hand-off per child completion. Ordering is unaffected: the continuation only
+            // admits work, and admitted work still competes by structural key.
+            runContinuationInline(node);
+            return;
+        }
         var descriptor = node.descriptor;
         var priorityKey = descriptor.schedulerPriorityKey();
         var sequence = taskSequence.getAndIncrement();
         try {
             executor.execute(new ContinuationTask(priorityKey, sequence, node, this));
+            wakeParkedWaiters();
         } catch (RejectedExecutionException e) {
             // Race: shut down between the isShutdown() check and execute().
             shutdownDrain.add(node);
+        }
+    }
+
+    /**
+     * Returns whether the current thread may advance a continuation inline.
+     *
+     * <p>Only scheduler workers inline, and only within {@link #INLINE_CONTINUATION_MAX_DEPTH}
+     * levels of nesting. The nesting bound matters because a continuation can synchronously
+     * execute skipped or aborted descendants, each of which completes and may itself inline.
+     *
+     * @return {@code true} when the current thread may run a continuation directly
+     */
+    private boolean canRunContinuationInline() {
+        return Boolean.TRUE.equals(schedulerWorker.get())
+                && inlineContinuationDepth.get() < INLINE_CONTINUATION_MAX_DEPTH;
+    }
+
+    /**
+     * Returns whether the calling scheduler worker should execute a leaf child directly instead of
+     * submitting it to the executor.
+     *
+     * <p>Eligibility is deliberately narrow:
+     *
+     * <ul>
+     *   <li>leaf children only — a coordination child would park the calling thread in
+     *       {@code managedJoin}, trading a hand-off for an occupied worker;
+     *   <li>the caller must be a scheduler worker, and inline nesting must be below
+     *       {@link #INLINE_CONTINUATION_MAX_DEPTH};
+     *   <li>the child must outrank everything already queued, so inlining cannot jump earlier
+     *       work (R3). The ready queue is a min-heap, so peeking the head answers that exactly.
+     * </ul>
+     *
+     * <p>Callers must not use this while admitting a burst of children (a {@code Parallel}
+     * window): running each child to completion inside the admission loop would serialize the
+     * fan-out.
+     *
+     * @param child the child descriptor; must not be {@code null}
+     * @return {@code true} when the child can run on the calling thread
+     */
+    boolean canExecuteChildInline(final MutableDescriptor child) {
+        if (!Boolean.TRUE.equals(schedulerWorker.get())
+                || inlineContinuationDepth.get() >= INLINE_CONTINUATION_MAX_DEPTH) {
+            return false;
+        }
+        var head = executor.getQueue().peek();
+        if (head == null) {
+            return true;
+        }
+        var headKey = priorityKeyOf(head);
+        return headKey != null && child.schedulerPriorityKey().compareTo(headKey) < 0;
+    }
+
+    /**
+     * Executes a leaf child inline on the calling thread, accounting for it as an admission.
+     *
+     * <p>The caller has already incremented the parent's pending-child count, so the child's
+     * completion decrements it and advances the parent exactly as for a queued child.
+     *
+     * @param child the child descriptor to execute; must not be {@code null}
+     * @param mode the execution mode; must not be {@code null}
+     * @param parentContext the parent's execution context; must not be {@code null}
+     */
+    void executeChildInline(
+            final MutableDescriptor child, final ExecutionMode mode, final ConcreteContext parentContext) {
+        var outcome = prepareScheduledTask(child, parentContext);
+        if (outcome.future != null) {
+            // Already terminal or the scheduler is closing; prepareScheduledTask has reported the
+            // child as completed.
+            return;
+        }
+        child.markScheduled();
+        inlineChildExecutionCounter.incrementAndGet();
+        inlineContinuationDepth.set(inlineContinuationDepth.get() + 1);
+        try {
+            executeDescriptor(child, outcome.context, mode);
+        } finally {
+            var depth = inlineContinuationDepth.get() - 1;
+            if (depth <= 0) {
+                inlineContinuationDepth.remove();
+            } else {
+                inlineContinuationDepth.set(depth);
+            }
+        }
+    }
+
+    /**
+     * Runs one continuation on the current thread and maintains the inline nesting depth.
+     *
+     * @param node the node whose continuation to advance; must not be {@code null}
+     */
+    private void runContinuationInline(final ExecutionNode node) {
+        inlineContinuationCounter.incrementAndGet();
+        inlineContinuationDepth.set(inlineContinuationDepth.get() + 1);
+        try {
+            runContinuationOnce(node);
+        } finally {
+            var depth = inlineContinuationDepth.get() - 1;
+            if (depth <= 0) {
+                inlineContinuationDepth.remove();
+            } else {
+                inlineContinuationDepth.set(depth);
+            }
         }
     }
 
@@ -1482,9 +1703,10 @@ public final class Scheduler implements AutoCloseable {
                 abortIncompleteDescendants(descriptor, cause);
             }
             descriptor.setExecutionNode(null);
-            ensureTerminalStatusFromNode(node, cause);
+            ensureTerminalStatus(descriptor, cause);
         }
         node.nodeCompletion.complete(null);
+        wakeParkedWaiters();
     }
 
     /**
@@ -1537,15 +1759,6 @@ public final class Scheduler implements AutoCloseable {
         executeDescriptorWithCompletion(descriptor, context, mode, null, null);
     }
 
-    private void executeScheduledDescriptor(
-            final MutableDescriptor descriptor,
-            final ConcreteContext context,
-            final ExecutionMode mode,
-            final CompletableFuture<Descriptor> future,
-            final ExecutionCallback callback) {
-        executeDescriptorWithCompletion(descriptor, context, mode, future, callback);
-    }
-
     private void executeDescriptorWithCompletion(
             final MutableDescriptor descriptor,
             final ConcreteContext context,
@@ -1587,19 +1800,7 @@ public final class Scheduler implements AutoCloseable {
                 Thread.currentThread().setName(Listeners.formatIdPath(descriptor));
                 context.listener().onBeforeExecution(descriptor);
                 descriptor.setStatus(Status.RUNNING);
-                var skipExecution = false;
-                if (failFast
-                        && context.descriptor()
-                                .parent()
-                                .filter(p -> p.parent().isEmpty())
-                                .isPresent()) {
-                    closingLock.lock();
-                    try {
-                        skipExecution = failureOccurred;
-                    } finally {
-                        closingLock.unlock();
-                    }
-                }
+                var skipExecution = wouldSkipForFailFast(context);
                 if (skipExecution) {
                     // Cascade SKIP to the subtree so no descendant is left PENDING,
                     // matching normal SKIP-mode propagation (skipAction -> runChildren).
@@ -1742,21 +1943,22 @@ public final class Scheduler implements AutoCloseable {
     }
 
     private static void ensureTerminalStatus(final ConcreteContext context, final Throwable throwable) {
+        var descriptor = context.descriptor();
+        if (descriptor.status().isPending()) {
+            // The descriptor state machine requires PENDING -> RUNNING -> terminal.
+            descriptor.setStatus(Status.RUNNING);
+        }
+        ensureTerminalStatus(descriptor, throwable);
+    }
+
+    private static void ensureTerminalStatus(final MutableDescriptor descriptor, final Throwable throwable) {
         try {
-            var descriptor = context.descriptor();
             var status = descriptor.status();
-            if (status.isPending()) {
-                descriptor.setStatus(Status.RUNNING);
-                status = descriptor.status();
-            }
             if (status.isPending() || status.isRunning()) {
                 descriptor.setStatus(failedStatus(throwable));
             }
         } catch (Exception e) {
-            throw new AssertionError(
-                    "Failed to set terminal status on descriptor "
-                            + context.descriptor().id(),
-                    e);
+            throw new AssertionError("Failed to set terminal status on descriptor " + descriptor.id(), e);
         }
     }
 
@@ -1902,7 +2104,7 @@ public final class Scheduler implements AutoCloseable {
             }
             synchronized (state) {
                 if (state.ownerThread == Thread.currentThread()) {
-                    var task = state.ownerTasks.pollFirst();
+                    var task = state.ownerTasks.poll();
                     if (task != null) {
                         return task;
                     }
@@ -1941,7 +2143,7 @@ public final class Scheduler implements AutoCloseable {
      * Wrapper that applies descriptor-key ordering to a task and holds execution fields directly
      * to avoid per-task lambda allocation.
      */
-    private static final class PrioritizedTask implements Runnable {
+    private static final class PrioritizedTask implements ScheduledTask {
         private final SchedulerPriorityKey priorityKey;
         private final long sequence;
         private final MutableDescriptor descriptor;
@@ -1992,10 +2194,25 @@ public final class Scheduler implements AutoCloseable {
                 reservationHeld = false;
                 queuePermits.release();
                 scheduler.signalCapacityAvailable();
-                scheduler.executeScheduledDescriptor(descriptor, context, mode, future, callback);
+                scheduler.executeDescriptorWithCompletion(descriptor, context, mode, future, callback);
             } finally {
                 scheduler.exitScheduledIsolationIfHeld(this);
             }
+        }
+
+        @Override
+        public SchedulerPriorityKey priorityKey() {
+            return priorityKey;
+        }
+
+        @Override
+        public long sequence() {
+            return sequence;
+        }
+
+        @Override
+        public MutableDescriptor descriptor() {
+            return descriptor;
         }
 
         private String scheduledIsolationLockName() {
@@ -2010,19 +2227,19 @@ public final class Scheduler implements AutoCloseable {
     }
 
     /**
-     * A work item that runs an execution node's continuation.
+     * Base class for queued tasks that advance one execution node.
      *
-     * <p>The continuation computes strategy state and terminal status, then completes the node's
-     * internal completion future. Listener, callback, scheduled-future, and parent-notification
-     * publication remains owned by the original descriptor execution thread.
+     * <p>Holds the ordering key, submission sequence, node, and owning scheduler shared by
+     * {@link ContinuationTask} and {@link AdmissionWakeupTask}; subclasses supply only the action
+     * to perform on the node.
      */
-    private static final class ContinuationTask implements Runnable {
+    private abstract static class NodeTask implements ScheduledTask {
         private final SchedulerPriorityKey priorityKey;
         private final long sequence;
         private final ExecutionNode node;
         private final Scheduler scheduler;
 
-        ContinuationTask(
+        NodeTask(
                 final SchedulerPriorityKey priorityKey,
                 final long sequence,
                 final ExecutionNode node,
@@ -2034,8 +2251,49 @@ public final class Scheduler implements AutoCloseable {
         }
 
         @Override
+        public final SchedulerPriorityKey priorityKey() {
+            return priorityKey;
+        }
+
+        @Override
+        public final long sequence() {
+            return sequence;
+        }
+
+        @Override
+        public final MutableDescriptor descriptor() {
+            return node.descriptor;
+        }
+
+        final ExecutionNode node() {
+            return node;
+        }
+
+        final Scheduler scheduler() {
+            return scheduler;
+        }
+    }
+
+    /**
+     * A work item that runs an execution node's continuation.
+     *
+     * <p>The continuation computes strategy state and terminal status, then completes the node's
+     * internal completion future. Listener, callback, scheduled-future, and parent-notification
+     * publication remains owned by the original descriptor execution thread.
+     */
+    private static final class ContinuationTask extends NodeTask {
+
+        ContinuationTask(
+                final SchedulerPriorityKey priorityKey,
+                final long sequence,
+                final ExecutionNode node,
+                final Scheduler scheduler) {
+            super(priorityKey, sequence, node, scheduler);
+        }
+
+        @Override
         public void run() {
-            scheduler.runContinuationOnce(node);
+            scheduler().runContinuationOnce(node());
         }
     }
 
@@ -2043,48 +2301,29 @@ public final class Scheduler implements AutoCloseable {
      * A work item that wakes a coordination node whose internal child admission was deferred,
      * allowing its strategy to retry the admission now that capacity is available.
      */
-    private static final class AdmissionWakeupTask implements Runnable {
-        private final SchedulerPriorityKey priorityKey;
-        private final long sequence;
-        private final ExecutionNode node;
-        private final Scheduler scheduler;
+    private static final class AdmissionWakeupTask extends NodeTask {
 
         AdmissionWakeupTask(
                 final SchedulerPriorityKey priorityKey,
                 final long sequence,
                 final ExecutionNode node,
                 final Scheduler scheduler) {
-            this.priorityKey = Objects.requireNonNull(priorityKey, "priorityKey is null");
-            this.sequence = sequence;
-            this.node = Objects.requireNonNull(node, "node is null");
-            this.scheduler = Objects.requireNonNull(scheduler, "scheduler is null");
+            super(priorityKey, sequence, node, scheduler);
         }
 
         @Override
         public void run() {
-            scheduler.runAdmissionRetryOnce(node);
+            scheduler().runAdmissionRetryOnce(node());
         }
     }
 
     private record IsolationFrame(String lockName, MutableDescriptor descriptor, ReentrantLock lock) {}
 
     private static final class IsolationState {
-        private final ArrayDeque<PrioritizedTask> deferredTasks = new ArrayDeque<>();
-        private final ArrayDeque<PrioritizedTask> ownerTasks = new ArrayDeque<>();
+        private final Queue<PrioritizedTask> deferredTasks = new PriorityQueue<>(TASK_ORDER);
+        private final Queue<PrioritizedTask> ownerTasks = new PriorityQueue<>(TASK_ORDER);
         private MutableDescriptor ownerDescriptor;
         private Thread ownerThread;
         private PrioritizedTask dispatchedTask;
-    }
-
-    private static void ensureTerminalStatusFromNode(final ExecutionNode node, final Throwable throwable) {
-        try {
-            var descriptor = node.descriptor;
-            var status = descriptor.status();
-            if (status.isPending() || status.isRunning()) {
-                descriptor.setStatus(failedStatus(throwable));
-            }
-        } catch (Exception e) {
-            throw new AssertionError("Failed to set terminal status on descriptor " + node.descriptor.id(), e);
-        }
     }
 }

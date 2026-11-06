@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.support.AnsiDetector;
 import nonapi.org.paramixel.support.ElapsedTimeFormatter;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Version;
@@ -98,7 +99,7 @@ public final class SummaryListener implements Listener {
 
         var optionalRoot = result.descriptor();
         if (optionalRoot.isEmpty()) {
-            writer.println(prefix + "No Paramixel tests found");
+            writer.println(prefix + Constants.NO_TESTS_FOUND);
             return;
         }
 
@@ -126,25 +127,47 @@ public final class SummaryListener implements Listener {
         }
 
         if (!excludeFooter) {
-            var finishedAtFormatted = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            var statusLine = "Status      : " + Listeners.formatStatus(result);
-            var finishedLine = "Finished at : " + finishedAtFormatted;
-            var timeLine = "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root));
-
-            int maxLineLength = Math.max(
-                    Math.max(versionLine.length(), statusLine.length()),
-                    Math.max(finishedLine.length(), timeLine.length()));
-            var dashes = "-".repeat(maxLineLength);
-
-            writer.println(prefix + dashes);
-            writer.println(prefix + versionLine);
-            writer.println(prefix + dashes);
-            writer.println(prefix + "Status      : " + formatStatus(result));
-            writer.println(prefix + "Finished at : " + finishedAtFormatted);
-            writer.println(
-                    prefix + "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root)));
-            writer.println(prefix + dashes);
+            printFooter(writer, prefix, versionLine, result, root);
         }
+    }
+
+    /**
+     * Prints the footer block: rule, version, status, timestamp, total time, rule.
+     *
+     * <p>The rule is sized from the plain-text lines. When ANSI is enabled the printed status
+     * line carries escape sequences, which occupy no visible columns, so measuring the plain
+     * form keeps the rules aligned with what the terminal shows.
+     *
+     * @param writer the destination writer
+     * @param prefix the console prefix for this run
+     * @param versionLine the pre-rendered {@code Paramixel v...} line
+     * @param result the completed run result
+     * @param root the root descriptor, used for elapsed time
+     */
+    private void printFooter(
+            final PrintWriter writer,
+            final String prefix,
+            final String versionLine,
+            final Result result,
+            final Descriptor root) {
+        var plainStatusLine = "Status      : " + Listeners.formatStatus(result);
+        var statusLine = "Status      : " + formatStatus(result);
+        var finishedLine =
+                "Finished at : " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        var timeLine = "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root));
+
+        var maxLineLength = Math.max(
+                Math.max(versionLine.length(), plainStatusLine.length()),
+                Math.max(finishedLine.length(), timeLine.length()));
+        var dashes = prefix + "-".repeat(maxLineLength);
+
+        writer.println(dashes);
+        writer.println(prefix + versionLine);
+        writer.println(dashes);
+        writer.println(prefix + statusLine);
+        writer.println(prefix + finishedLine);
+        writer.println(prefix + timeLine);
+        writer.println(dashes);
     }
 
     private String getPrefix() {

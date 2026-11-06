@@ -55,9 +55,8 @@ public final class Parallel implements Action {
             final List<Action> children,
             final long seed,
             final boolean shuffled) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
-        this.children = validateChildren(children);
+        this.displayName = ActionNames.requireDisplayName(displayName);
+        this.children = ActionChildren.validateChildren(children);
         this.parallelism = parallelism;
         this.seed = seed;
         this.shuffled = shuffled;
@@ -156,16 +155,6 @@ public final class Parallel implements Action {
         return seed;
     }
 
-    private static List<Action> validateChildren(final List<Action> children) {
-        Objects.requireNonNull(children, "children is null");
-        var validated = new ArrayList<Action>(children.size());
-        for (Action child : children) {
-            Objects.requireNonNull(child, "children contains null element");
-            validated.add(child);
-        }
-        return List.copyOf(validated);
-    }
-
     /**
      * Fluent builder for {@link Parallel} actions.
      *
@@ -182,8 +171,7 @@ public final class Parallel implements Action {
         private long shuffleSeed;
 
         private Builder(final String displayName) {
-            Objects.requireNonNull(displayName, "displayName is null");
-            Arguments.requireNonBlank(displayName, "displayName is blank");
+            ActionNames.requireDisplayName(displayName);
             this.displayName = displayName;
         }
 

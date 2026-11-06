@@ -50,8 +50,7 @@ public final class Assert implements Action {
             final boolean expected,
             final BooleanSupplier actualSupplier,
             final String message) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.expected = expected;
         this.actualSupplier = Objects.requireNonNull(actualSupplier, "actualSupplier is null");
         this.message = message;
@@ -68,8 +67,7 @@ public final class Assert implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Assert of(final String displayName, final boolean expected, final boolean actual) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         return new Assert(displayName, expected, () -> actual, null);
     }
 
@@ -87,8 +85,7 @@ public final class Assert implements Action {
      */
     public static Assert of(
             final String displayName, final boolean expected, final boolean actual, final String message) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(message, "message is null");
         Arguments.requireNonBlank(message, "message is blank");
         return new Assert(displayName, expected, () -> actual, message);
@@ -105,8 +102,7 @@ public final class Assert implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Assert of(final String displayName, final boolean expected, final BooleanSupplier actualSupplier) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(actualSupplier, "actualSupplier is null");
         return new Assert(displayName, expected, actualSupplier, null);
     }
@@ -129,8 +125,7 @@ public final class Assert implements Action {
             final boolean expected,
             final BooleanSupplier actualSupplier,
             final String message) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(actualSupplier, "actualSupplier is null");
         Objects.requireNonNull(message, "message is null");
         Arguments.requireNonBlank(message, "message is blank");

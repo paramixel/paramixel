@@ -51,6 +51,7 @@
         <exclude name="ControlStatementBraces"/>
         <exclude name="EmptyMethodInAbstractClassShouldBeAbstract"/>
         <exclude name="PrematureDeclaration"/>
+        <exclude name="LocalVariableDeclarationShouldBeAtStartOfBlock"/>
     </rule>
     
     <!-- Design -->

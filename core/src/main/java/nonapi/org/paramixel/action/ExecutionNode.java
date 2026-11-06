@@ -263,6 +263,7 @@ public final class ExecutionNode {
             return false;
         }
         nodeCompletion.complete(null);
+        scheduler.wakeParkedWaiters();
         return true;
     }
 

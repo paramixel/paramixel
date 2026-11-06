@@ -33,6 +33,7 @@ import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
 import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.action.Timeout;
@@ -446,12 +447,12 @@ class DescriptorBuilderTest {
     @Test
     @DisplayName("throws CycleDetectedException for self-referencing action")
     void throwsCycleDetectedExceptionForSelfReferencingAction() throws Exception {
-        // Create a Sequence that contains itself as a child, forming a cycle
+        // Create a Sequential that contains itself as a child, forming a cycle
         var step = Step.of("step", context -> {});
-        var selfRef = Sequence.builder("selfRef").child(step).build();
+        var selfRef = Sequential.builder("selfRef").child(step).build();
 
         // Use reflection to add selfRef as a child of itself
-        Field childrenField = Sequence.class.getDeclaredField("children");
+        Field childrenField = Sequential.class.getDeclaredField("children");
         childrenField.setAccessible(true);
         @SuppressWarnings("unchecked")
         var originalChildren = (List<Action>) childrenField.get(selfRef);
@@ -463,7 +464,7 @@ class DescriptorBuilderTest {
                 .isInstanceOf(org.paramixel.api.exception.CycleDetectedException.class)
                 .hasMessageContaining("Cycle detected in action tree:")
                 .hasMessageContaining("selfRef")
-                .hasMessageContaining("Sequence");
+                .hasMessageContaining("Sequential");
     }
 
     @Test
@@ -472,11 +473,11 @@ class DescriptorBuilderTest {
         // Create a cycle: A -> B -> A
         var stepA = Step.of("stepA", context -> {});
         var stepB = Step.of("stepB", context -> {});
-        var seqA = Sequence.builder("seqA").child(stepA).build();
-        var seqB = Sequence.builder("seqB").child(stepB).build();
+        var seqA = Sequential.builder("seqA").child(stepA).build();
+        var seqB = Sequential.builder("seqB").child(stepB).build();
 
         // Add seqB as child of seqA, and seqA as child of seqB
-        Field childrenField = Sequence.class.getDeclaredField("children");
+        Field childrenField = Sequential.class.getDeclaredField("children");
         childrenField.setAccessible(true);
 
         @SuppressWarnings("unchecked")
