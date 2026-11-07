@@ -48,7 +48,9 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     private volatile MutableDescriptor after;
     private volatile List<Descriptor> childrenView;
     private volatile boolean frozen;
-    private volatile SchedulerPriorityKey schedulerPriorityKey = SchedulerPriorityKey.root();
+    private volatile long orderTreeId = DescriptorOrder.UNCOMPILED;
+    private volatile long orderSubtreeStart = DescriptorOrder.UNCOMPILED;
+    private volatile long orderRank = DescriptorOrder.UNCOMPILED;
     private volatile Thread executingThread;
     private volatile CompletableFuture<Descriptor> scheduledFuture;
     private volatile String cachedIdPath;
@@ -170,7 +172,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         Objects.requireNonNull(before, "before is null");
         ensureNotFrozen();
         before.setParent(this);
-        before.setSchedulerPriorityKey(schedulerPriorityKey.child(0));
         this.before = before;
     }
 
@@ -179,8 +180,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         Objects.requireNonNull(after, "after is null");
         ensureNotFrozen();
         after.setParent(this);
-        var offset = this.before != null ? 1 + children.size() : children.size();
-        after.setSchedulerPriorityKey(schedulerPriorityKey.child(offset));
         this.after = after;
     }
 
@@ -192,8 +191,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         }
         ensureNotFrozen();
         child.setParent(this);
-        var offset = this.before != null ? 1 : 0;
-        child.setSchedulerPriorityKey(schedulerPriorityKey.child(offset + children.size()));
         children.add(child);
         childrenView = null;
     }
@@ -205,25 +202,30 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     @Override
-    public SchedulerPriorityKey schedulerPriorityKey() {
-        return schedulerPriorityKey;
+    public long orderTreeId() {
+        return orderTreeId;
     }
 
     @Override
-    public synchronized void setSchedulerPriorityKey(final SchedulerPriorityKey schedulerPriorityKey) {
-        ensureNotFrozen();
-        this.schedulerPriorityKey = Objects.requireNonNull(schedulerPriorityKey, "schedulerPriorityKey is null");
-        var offset = 0;
-        if (before != null) {
-            before.setSchedulerPriorityKey(this.schedulerPriorityKey.child(offset));
-            offset = 1;
+    public long orderSubtreeStart() {
+        return orderSubtreeStart;
+    }
+
+    @Override
+    public long orderRank() {
+        return orderRank;
+    }
+
+    @Override
+    public void setOrder(final long treeId, final long subtreeStart, final long rank) {
+        if (orderRank != DescriptorOrder.UNCOMPILED) {
+            throw new IllegalStateException("Descriptor order already compiled: " + id);
         }
-        for (var i = 0; i < children.size(); i++) {
-            children.get(i).setSchedulerPriorityKey(this.schedulerPriorityKey.child(offset + i));
-        }
-        if (after != null) {
-            after.setSchedulerPriorityKey(this.schedulerPriorityKey.child(offset + children.size()));
-        }
+        orderTreeId = treeId;
+        orderSubtreeStart = subtreeStart;
+        // Published last: a reader that sees a compiled rank also sees the tree id and subtree
+        // start that give the rank its meaning.
+        orderRank = rank;
     }
 
     @Override

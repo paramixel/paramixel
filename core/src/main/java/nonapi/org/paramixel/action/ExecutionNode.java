@@ -106,13 +106,11 @@ public final class ExecutionNode {
     public int childIndex;
 
     /**
-     * Number of currently running direct children (for Parallel admission control).
-     */
-    public int runningChildren;
-
-    /**
-     * Maximum number of concurrent direct children (Parallel cap),
-     * or dependent flag (1 = dependent, 0 = independent) for Sequential.
+     * Dependent flag for Sequential (1 = dependent, 0 = independent).
+     *
+     * <p>A {@code Parallel} node's declared {@code parallelism} is not held here: it caps how many
+     * leaf tasks in its subtree may run at the same time, which the scheduler enforces at leaf
+     * dispatch, not at child admission.
      */
     public int cap;
 
@@ -263,6 +261,7 @@ public final class ExecutionNode {
             return false;
         }
         nodeCompletion.complete(null);
+        scheduler.wakeParkedWaiters();
         return true;
     }
 

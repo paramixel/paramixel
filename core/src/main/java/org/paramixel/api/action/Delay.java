@@ -42,8 +42,7 @@ public final class Delay implements Action {
     private final LongSupplier millisecondsSupplier;
 
     private Delay(final String displayName, final LongSupplier millisecondsSupplier) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.millisecondsSupplier = Objects.requireNonNull(millisecondsSupplier, "millisecondsSupplier is null");
     }
 
@@ -57,8 +56,7 @@ public final class Delay implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank or {@code milliseconds} is negative
      */
     public static Delay of(final String displayName, final long milliseconds) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Arguments.requireNonNegative(milliseconds, "milliseconds is negative");
         return new Delay(displayName, () -> milliseconds);
     }
@@ -73,8 +71,7 @@ public final class Delay implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank or {@code duration} is negative
      */
     public static Delay of(final String displayName, final Duration duration) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(duration, "duration is null");
         Arguments.requireNonNegative(duration.toMillis(), "duration is negative");
         return new Delay(displayName, duration::toMillis);
@@ -95,8 +92,7 @@ public final class Delay implements Action {
      */
     public static Delay random(
             final String displayName, final long minimumMilliseconds, final long maximumMilliseconds) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Arguments.requireNonNegative(minimumMilliseconds, "minimumMilliseconds is negative");
         Arguments.requireTrue(
                 maximumMilliseconds >= minimumMilliseconds, "maximumMilliseconds is less than minimumMilliseconds");

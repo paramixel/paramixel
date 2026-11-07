@@ -58,8 +58,7 @@ public final class Until implements Action {
 
     private Until(
             final String displayName, final Action body, final int maxIterations, final Predicate<Context> until) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.body = Objects.requireNonNull(body, "body is null");
         Arguments.requireTrue(maxIterations > 0, "maxIterations must be positive, was: " + maxIterations);
         this.maxIterations = maxIterations;
@@ -75,8 +74,7 @@ public final class Until implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Builder builder(final String displayName) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         return new Builder(displayName);
     }
 

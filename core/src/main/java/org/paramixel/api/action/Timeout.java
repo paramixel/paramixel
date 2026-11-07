@@ -46,8 +46,7 @@ public final class Timeout implements Action {
     private final Duration timeout;
 
     private Timeout(final String displayName, final Action body, final Duration timeout) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.body = Objects.requireNonNull(body, "child is null");
         this.timeout = validateTimeout(timeout);
     }
@@ -61,8 +60,7 @@ public final class Timeout implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Builder builder(final String displayName) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         return new Builder(displayName);
     }
 

@@ -139,7 +139,7 @@ class TimeoutSubtreeCancellationTest {
             }));
         }
 
-        var outer = Parallel.builder("outer-blocking").parallelism(2).child(inner.build());
+        var outer = Parallel.builder("outer-blocking").child(inner.build());
 
         var timeout = Timeout.builder("nested-timed")
                 .body(outer.build())

@@ -63,61 +63,45 @@ public final class ConcreteConfiguration implements Configuration {
 
     @Override
     public Optional<Integer> getInteger(final String key) {
-        Objects.requireNonNull(key, "key is null");
-        var value = properties.get(key);
-        if (value == null) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Integer.parseInt(value.strip()));
-        } catch (NumberFormatException e) {
-            throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected integer but was '" + value + "'", e);
-        }
+        return parse(key, "integer", Integer::parseInt);
     }
 
     @Override
     public Optional<Long> getLong(final String key) {
-        Objects.requireNonNull(key, "key is null");
-        var value = properties.get(key);
-        if (value == null) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Long.parseLong(value.strip()));
-        } catch (NumberFormatException e) {
-            throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected long but was '" + value + "'", e);
-        }
+        return parse(key, "long", Long::parseLong);
     }
 
     @Override
     public Optional<Float> getFloat(final String key) {
-        Objects.requireNonNull(key, "key is null");
-        var value = properties.get(key);
-        if (value == null) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Float.parseFloat(value.strip()));
-        } catch (NumberFormatException e) {
-            throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected float but was '" + value + "'", e);
-        }
+        return parse(key, "float", Float::parseFloat);
     }
 
     @Override
     public Optional<Double> getDouble(final String key) {
+        return parse(key, "double", Double::parseDouble);
+    }
+
+    /**
+     * Reads and parses a typed value, reporting failures in the configuration-file format.
+     *
+     * @param <T> the parsed type
+     * @param key the configuration key; must not be {@code null}
+     * @param expected the type name used in the failure message
+     * @param parser the parser applied to the stripped raw value
+     * @return the parsed value, or empty when the key is absent
+     * @throws ConfigurationException if the value does not parse
+     */
+    private <T> Optional<T> parse(final String key, final String expected, final Function<String, T> parser) {
         Objects.requireNonNull(key, "key is null");
         var value = properties.get(key);
         if (value == null) {
             return Optional.empty();
         }
         try {
-            return Optional.of(Double.parseDouble(value.strip()));
+            return Optional.of(parser.apply(value.strip()));
         } catch (NumberFormatException e) {
             throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected double but was '" + value + "'", e);
+                    "Invalid configuration for '" + key + "': expected " + expected + " but was '" + value + "'", e);
         }
     }
 

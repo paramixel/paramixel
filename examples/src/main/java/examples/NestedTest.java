@@ -53,7 +53,7 @@ public class NestedTest {
         @Paramixel.Factory
         public static Action factory() {
             return Static.builder(Nested1.class.getName())
-                    .before(step("staticSetUp()", context -> Nested1.staticSetUp()))
+                    .before(step("staticSetUp()", context -> staticSetUp()))
                     .body(instance("Nested1", Nested1::new)
                             .body(scope("scope")
                                     .before(step("setUp()", withInstance(Nested1.class, Nested1::setUp)))
@@ -77,7 +77,7 @@ public class NestedTest {
                                                             "afterEach()",
                                                             withInstance(Nested1.class, Nested1::afterEach)))))
                                     .after(step("tearDown()", withInstance(Nested1.class, Nested1::tearDown)))))
-                    .after(step("staticTearDown()", context -> Nested1.staticTearDown()))
+                    .after(step("staticTearDown()", context -> staticTearDown()))
                     .build();
         }
 
@@ -143,7 +143,7 @@ public class NestedTest {
         @Paramixel.Factory
         public static Action factory() {
             return Static.builder(Nested2.class.getName())
-                    .before(step("staticSetUp()", context -> Nested2.staticSetUp()))
+                    .before(step("staticSetUp()", context -> staticSetUp()))
                     .body(instance("Nested2", Nested2::new)
                             .body(scope("scope")
                                     .before(step("setUp()", withInstance(Nested2.class, Nested2::setUp)))
@@ -167,7 +167,7 @@ public class NestedTest {
                                                             "afterEach()",
                                                             withInstance(Nested2.class, Nested2::afterEach)))))
                                     .after(step("tearDown()", withInstance(Nested2.class, Nested2::tearDown)))))
-                    .after(step("staticTearDown()", context -> Nested2.staticTearDown()))
+                    .after(step("staticTearDown()", context -> staticTearDown()))
                     .build();
         }
 

@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
@@ -139,40 +140,8 @@ public class TildePathExpander {
      * @throws IOException if the lookup fails
      */
     private static String lookupHomeDirectoryLinux(final String user) throws IOException {
-        var process = new ProcessBuilder("getent", "passwd", user)
-                .redirectErrorStream(true)
-                .start();
-
-        try {
-            if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                process.destroyForcibly().waitFor();
-                return null;
-            }
-
-            try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-
-                var line = reader.readLine();
-
-                if (line == null || line.isEmpty()) {
-                    return null;
-                }
-
-                // passwd format:
-                // name:x:uid:gid:gecos:home:shell
-                String[] parts = line.split(":");
-
-                if (parts.length < 6) {
-                    return null;
-                }
-
-                return parts[5];
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while waiting for getent", e);
-        } finally {
-            process.destroyForcibly();
-        }
+        return lookupUserHome(
+                new ProcessBuilder("getent", "passwd", user), "getent", TildePathExpander::parsePasswdLine);
     }
 
     /**
@@ -185,9 +154,25 @@ public class TildePathExpander {
      * @throws IOException if the lookup fails
      */
     private static String lookupHomeDirectoryMac(final String user) throws IOException {
-        var process = new ProcessBuilder("dscl", ".", "-read", "/Users/" + user, "NFSHomeDirectory")
-                .redirectErrorStream(true)
-                .start();
+        return lookupUserHome(
+                new ProcessBuilder("dscl", ".", "-read", "/Users/" + user, "NFSHomeDirectory"),
+                "dscl",
+                TildePathExpander::parseDsclLine);
+    }
+
+    /**
+     * Runs a lookup command with a bounded wait and parses its first output line.
+     *
+     * @param builder the configured process builder
+     * @param command the command name used in interruption messages
+     * @param parser extracts the home directory from the first non-empty line
+     * @return the parsed home directory, or {@code null} when the command times out or prints nothing
+     * @throws IOException if the process cannot be started or the wait is interrupted
+     */
+    private static String lookupUserHome(
+            final ProcessBuilder builder, final String command, final Function<String, String> parser)
+            throws IOException {
+        var process = builder.redirectErrorStream(true).start();
 
         try {
             if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
@@ -203,21 +188,45 @@ public class TildePathExpander {
                     return null;
                 }
 
-                // dscl output format:
-                // NFSHomeDirectory: /Users/username
-                int colonIndex = line.indexOf(": ");
-
-                if (colonIndex < 0) {
-                    return null;
-                }
-
-                return line.substring(colonIndex + 2);
+                return parser.apply(line);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while waiting for dscl", e);
+            throw new IOException("Interrupted while waiting for " + command, e);
         } finally {
             process.destroyForcibly();
         }
+    }
+
+    /**
+     * Extracts the home directory from a {@code getent passwd} line.
+     *
+     * @param line the first output line; format {@code name:x:uid:gid:gecos:home:shell}
+     * @return the home directory, or {@code null} when the line has too few fields
+     */
+    static String parsePasswdLine(final String line) {
+        String[] parts = line.split(":");
+
+        if (parts.length < 6) {
+            return null;
+        }
+
+        return parts[5];
+    }
+
+    /**
+     * Extracts the home directory from a {@code dscl} line.
+     *
+     * @param line the first output line; format {@code NFSHomeDirectory: /Users/username}
+     * @return the home directory, or {@code null} when the line lacks the separator
+     */
+    static String parseDsclLine(final String line) {
+        int colonIndex = line.indexOf(": ");
+
+        if (colonIndex < 0) {
+            return null;
+        }
+
+        return line.substring(colonIndex + 2);
     }
 }

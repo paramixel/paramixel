@@ -64,7 +64,7 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
     @Override
     public String render(final Descriptor root) {
         if (root == null) {
-            return Constants.PARAMIXEL_PLAIN + "No Paramixel tests found" + System.lineSeparator();
+            return Constants.PARAMIXEL_PLAIN + Constants.NO_TESTS_FOUND + System.lineSeparator();
         }
         var stringBuilder = new StringBuilder();
         var stack = new ArrayDeque<RenderFrame>();

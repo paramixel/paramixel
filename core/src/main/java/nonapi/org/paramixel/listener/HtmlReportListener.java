@@ -89,7 +89,7 @@ public final class HtmlReportListener extends AbstractReportFileListener {
         writer.write(LINE_SEPARATOR);
         writeSummaryLine(writer, result);
         if (result.descriptor().isEmpty()) {
-            writer.write("<p>No Paramixel tests found</p>");
+            writer.write("<p>" + Constants.NO_TESTS_FOUND + "</p>");
             writer.write(LINE_SEPARATOR);
         } else {
             writer.write("<table>");

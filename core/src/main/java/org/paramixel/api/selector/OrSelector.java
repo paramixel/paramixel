@@ -22,7 +22,7 @@ import java.util.List;
  * A {@link Selector} that combines multiple selectors with logical OR semantics.
  *
  * <p>A candidate matches an {@code OrSelector} when it matches <em>any</em> of the
- * composed selectors. The returned {{@link #selectors()}} list is unmodifiable.
+ * composed selectors. The returned {@link #selectors()} list is unmodifiable.
  *
  * @see Selector#or(Selector...)
  * @see Selector#or(List)

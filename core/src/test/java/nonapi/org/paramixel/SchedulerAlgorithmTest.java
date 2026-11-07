@@ -133,28 +133,31 @@ class SchedulerAlgorithmTest {
     }
 
     @Test
-    @DisplayName("unset Parallel parallelism inherits runner parallelism")
-    void unsetParallelParallelismInheritsRunnerParallelism() {
-        var activeNestedChildren = new AtomicInteger();
-        var maxActiveNestedChildren = new AtomicInteger();
-        var listener =
-                new NamedDirectChildConcurrencyListener("inherited", activeNestedChildren, maxActiveNestedChildren);
+    @DisplayName("unset Parallel parallelism is unbounded, so the thread count binds")
+    void unsetParallelParallelismIsBoundedByThreads() {
+        var active = new AtomicInteger();
+        var maxActive = new AtomicInteger();
 
         var inherited = Parallel.builder("inherited");
         for (var i = 0; i < 20; i++) {
             inherited.child(Sequence.builder("branch-" + i)
-                    .child(Step.of("leaf", context -> sleep(50L)))
+                    .child(Step.of("leaf", context -> {
+                        maxActive.accumulateAndGet(active.incrementAndGet(), Math::max);
+                        sleep(50L);
+                        active.decrementAndGet();
+                    }))
                     .build());
         }
 
-        var root =
-                Parallel.builder("root").parallelism(1).child(inherited.build()).build();
+        var root = Parallel.builder("root").child(inherited.build()).build();
 
         var result = assertTimeoutPreemptively(
-                Duration.ofSeconds(10), () -> runner(4, listener).run(root));
+                Duration.ofSeconds(10), () -> runner(4).run(root));
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(maxActiveNestedChildren.get()).isLessThanOrEqualTo(4);
+        assertThat(maxActive.get())
+                .as("an unset cap is unlimited, so the runner parallelism is the only bound")
+                .isLessThanOrEqualTo(4);
     }
 
     @Test
@@ -327,49 +330,61 @@ class SchedulerAlgorithmTest {
     }
 
     @Test
-    @DisplayName("top-level throttle limits root direct-child concurrency to global parallelism")
-    void topLevelThrottleLimitsRootDirectChildConcurrency() {
-        var activeRootChildren = new AtomicInteger();
-        var maxActiveRootChildren = new AtomicInteger();
-        var listener = new RootDirectChildConcurrencyListener(activeRootChildren, maxActiveRootChildren);
+    @DisplayName("global parallelism bounds concurrent leaf execution across the whole tree")
+    void globalParallelismBoundsLeafExecution() {
+        var active = new AtomicInteger();
+        var maxActive = new AtomicInteger();
+        java.util.function.Function<String, org.paramixel.api.action.Action> leaf = name -> Step.of(name, context -> {
+            maxActive.accumulateAndGet(active.incrementAndGet(), Math::max);
+            sleep(30L);
+            active.decrementAndGet();
+        });
 
         var root = Parallel.builder("root").parallelism(50);
         for (var i = 0; i < 8; i++) {
             var branch = Parallel.builder("branch-" + i)
                     .parallelism(2)
-                    .child(Step.of("leaf-a", context -> sleep(30L)))
-                    .child(Step.of("leaf-b", context -> sleep(30L)));
+                    .child(leaf.apply("leaf-a"))
+                    .child(leaf.apply("leaf-b"));
             root.child(branch.build());
         }
 
         var result = assertTimeoutPreemptively(
-                Duration.ofSeconds(10), () -> runner(1, listener).run(root.build()));
+                Duration.ofSeconds(10), () -> runner(1).run(root.build()));
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(maxActiveRootChildren.get()).isLessThanOrEqualTo(1);
+        assertThat(maxActive.get())
+                .as("one thread, so at most one leaf body runs at a time")
+                .isLessThanOrEqualTo(1);
     }
 
     @Test
-    @DisplayName("root local parallelism still limits root direct-child concurrency")
-    void rootLocalParallelismStillLimitsRootDirectChildConcurrency() {
-        var activeRootChildren = new AtomicInteger();
-        var maxActiveRootChildren = new AtomicInteger();
-        var listener = new RootDirectChildConcurrencyListener(activeRootChildren, maxActiveRootChildren);
+    @DisplayName("a cap on the root bounds leaf execution anywhere in the tree")
+    void rootCapBoundsLeafExecutionInWholeSubtree() {
+        var active = new AtomicInteger();
+        var maxActive = new AtomicInteger();
+        java.util.function.Function<String, org.paramixel.api.action.Action> leaf = name -> Step.of(name, context -> {
+            maxActive.accumulateAndGet(active.incrementAndGet(), Math::max);
+            sleep(20L);
+            active.decrementAndGet();
+        });
 
         var root = Parallel.builder("root").parallelism(1);
         for (var i = 0; i < 6; i++) {
             var branch = Parallel.builder("branch-" + i)
                     .parallelism(3)
-                    .child(Step.of("leaf-a", context -> sleep(20L)))
-                    .child(Step.of("leaf-b", context -> sleep(20L)));
+                    .child(leaf.apply("leaf-a"))
+                    .child(leaf.apply("leaf-b"));
             root.child(branch.build());
         }
 
         var result = assertTimeoutPreemptively(
-                Duration.ofSeconds(10), () -> runner(4, listener).run(root.build()));
+                Duration.ofSeconds(10), () -> runner(4).run(root.build()));
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(maxActiveRootChildren.get()).isLessThanOrEqualTo(1);
+        assertThat(maxActive.get())
+                .as("the root's cap of 1 applies to every leaf in its subtree")
+                .isLessThanOrEqualTo(1);
     }
 
     @Test

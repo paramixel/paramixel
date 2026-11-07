@@ -37,7 +37,7 @@ public final class ReportListener extends AbstractReportFileListener {
     protected void writeReport(final Writer writer, final Result result) throws IOException {
         var descriptor = result.descriptor().orElse(null);
         if (descriptor == null) {
-            writer.write("No Paramixel tests found");
+            writer.write(Constants.NO_TESTS_FOUND);
             writer.write(LINE_SEPARATOR);
             return;
         }

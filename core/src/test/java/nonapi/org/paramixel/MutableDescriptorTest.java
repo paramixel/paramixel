@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import nonapi.org.paramixel.action.ConcreteDescriptor;
-import nonapi.org.paramixel.action.SchedulerPriorityKey;
+import nonapi.org.paramixel.action.DescriptorOrder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -65,8 +65,21 @@ class MutableDescriptorTest {
     }
 
     @Test
-    @DisplayName("addChild assigns stable scheduler priority keys from tree position")
-    void addChildAssignsStableSchedulerPriorityKeysFromTreePosition() {
+    @DisplayName("order is uncompiled until the tree is compiled")
+    void orderIsUncompiledUntilTheTreeIsCompiled() {
+        var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+        var child = new ConcreteDescriptor(root, Step.of("child", v -> {}));
+        root.addChild(child);
+
+        assertThat(root.orderRank()).isEqualTo(DescriptorOrder.UNCOMPILED);
+        assertThat(root.orderSubtreeStart()).isEqualTo(DescriptorOrder.UNCOMPILED);
+        assertThat(root.orderTreeId()).isEqualTo(DescriptorOrder.UNCOMPILED);
+        assertThat(child.orderRank()).isEqualTo(DescriptorOrder.UNCOMPILED);
+    }
+
+    @Test
+    @DisplayName("compilation ranks descendants before their ancestors in slot order")
+    void compilationRanksDescendantsBeforeAncestors() {
         var root = new ConcreteDescriptor(Step.of("root", v -> {}));
         var left = new ConcreteDescriptor(root, Step.of("left", v -> {}));
         var right = new ConcreteDescriptor(root, Step.of("right", v -> {}));
@@ -75,59 +88,64 @@ class MutableDescriptorTest {
         root.addChild(left);
         root.addChild(right);
         left.addChild(leftChild);
+        DescriptorOrder.compile(root);
 
-        assertThat(root.schedulerPriorityKey().compareTo(SchedulerPriorityKey.root()))
-                .isZero();
-        assertThat(left.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0)))
-                .isZero();
-        assertThat(right.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(1)))
-                .isZero();
-        assertThat(leftChild
-                        .schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0).child(0)))
-                .isZero();
+        assertThat(leftChild.orderRank()).isEqualTo(0L);
+        assertThat(left.orderRank()).isEqualTo(1L);
+        assertThat(right.orderRank()).isEqualTo(2L);
+        assertThat(root.orderRank()).isEqualTo(3L);
+        assertThat(left.orderSubtreeStart()).isEqualTo(0L);
+        assertThat(right.orderSubtreeStart()).isEqualTo(2L);
+        assertThat(root.orderSubtreeStart()).isEqualTo(0L);
+        assertThat(left.orderTreeId()).isEqualTo(root.orderTreeId());
+        assertThat(right.orderTreeId()).isEqualTo(root.orderTreeId());
     }
 
     @Test
-    @DisplayName("setBefore assigns before slot and priority key at offset 0")
-    void setBeforeAssignsBeforeSlotAndPriorityKey() {
+    @DisplayName("setOrder rejects a descriptor that is already compiled")
+    void setOrderRejectsAlreadyCompiledDescriptor() {
+        var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+        DescriptorOrder.compile(root);
+
+        assertThatThrownBy(() -> root.setOrder(1L, 0L, 0L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Descriptor order already compiled:");
+    }
+
+    @Test
+    @DisplayName("compilation ranks the before slot ahead of body children")
+    void compilationRanksBeforeSlotAheadOfBodyChildren() {
         var parent = new ConcreteDescriptor(Step.of("parent", v -> {}));
         var before = new ConcreteDescriptor(parent, Step.of("before", v -> {}));
         var child = new ConcreteDescriptor(parent, Step.of("child", v -> {}));
 
         parent.setBefore(before);
         parent.addChild(child);
+        DescriptorOrder.compile(parent);
 
         assertThat(parent.before()).containsSame(before);
         assertThat(parent.children()).hasSize(1);
-        assertThat(before.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0)))
-                .isZero();
-        assertThat(child.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(1)))
-                .isZero();
+        assertThat(before.orderRank()).isEqualTo(0L);
+        assertThat(child.orderRank()).isEqualTo(1L);
+        assertThat(parent.orderRank()).isEqualTo(2L);
     }
 
     @Test
-    @DisplayName("setAfter assigns after slot and priority key after children")
-    void setAfterAssignsAfterSlotAndPriorityKey() {
+    @DisplayName("compilation ranks the after slot behind body children")
+    void compilationRanksAfterSlotBehindBodyChildren() {
         var parent = new ConcreteDescriptor(Step.of("parent", v -> {}));
         var child = new ConcreteDescriptor(parent, Step.of("child", v -> {}));
         var after = new ConcreteDescriptor(parent, Step.of("after", v -> {}));
 
         parent.addChild(child);
         parent.setAfter(after);
+        DescriptorOrder.compile(parent);
 
         assertThat(parent.after()).containsSame(after);
         assertThat(parent.children()).hasSize(1);
-        assertThat(child.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0)))
-                .isZero();
-        assertThat(after.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(1)))
-                .isZero();
+        assertThat(child.orderRank()).isEqualTo(0L);
+        assertThat(after.orderRank()).isEqualTo(1L);
+        assertThat(parent.orderRank()).isEqualTo(2L);
     }
 
     @Test

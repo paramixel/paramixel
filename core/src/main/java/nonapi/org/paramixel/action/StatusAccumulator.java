@@ -38,7 +38,7 @@ public final class StatusAccumulator {
     /**
      * Creates an empty status accumulator.
      *
-     * <p>Before any inputs are included, {{@link #status()}} returns {@link Status#PASSED}.
+     * <p>Before any inputs are included, {@link #status()} returns {@link Status#PASSED}.
      */
     public StatusAccumulator() {
         // Intentionally empty

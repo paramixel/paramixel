@@ -16,13 +16,8 @@
 
 package org.paramixel.api.action;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
-import java.util.concurrent.ThreadLocalRandom;
-import nonapi.org.paramixel.support.Arguments;
 
 /**
  * An action that executes its children sequentially in the order they were added.
@@ -39,24 +34,10 @@ import nonapi.org.paramixel.support.Arguments;
 @Deprecated(forRemoval = true, since = "6.2.0")
 public final class Sequence implements Action {
 
-    private final String displayName;
-    private final List<Action> children;
-    private final boolean dependent;
-    private final long seed;
-    private final boolean shuffled;
+    private final Sequential delegate;
 
-    private Sequence(
-            final String displayName,
-            final List<Action> children,
-            final boolean dependent,
-            final long seed,
-            final boolean shuffled) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
-        this.children = validateChildren(children);
-        this.dependent = dependent;
-        this.seed = seed;
-        this.shuffled = shuffled;
+    private Sequence(final Sequential delegate) {
+        this.delegate = Objects.requireNonNull(delegate, "delegate is null");
     }
 
     /**
@@ -84,7 +65,7 @@ public final class Sequence implements Action {
 
     @Override
     public String displayName() {
-        return displayName;
+        return delegate.displayName();
     }
 
     /**
@@ -95,7 +76,7 @@ public final class Sequence implements Action {
      * @return {@code true} if children are dependent
      */
     public boolean isDependent() {
-        return dependent;
+        return delegate.isDependent();
     }
 
     /**
@@ -105,7 +86,7 @@ public final class Sequence implements Action {
      * @return {@code true} if children are independent
      */
     public boolean isIndependent() {
-        return !dependent;
+        return delegate.isIndependent();
     }
 
     /**
@@ -114,7 +95,7 @@ public final class Sequence implements Action {
      * @return the child actions; never {@code null}
      */
     public List<Action> children() {
-        return children;
+        return delegate.children();
     }
 
     /**
@@ -127,7 +108,7 @@ public final class Sequence implements Action {
      * @return {@code true} if children were shuffled
      */
     public boolean isShuffled() {
-        return shuffled;
+        return delegate.isShuffled();
     }
 
     /**
@@ -141,17 +122,7 @@ public final class Sequence implements Action {
      * @return the shuffle seed, or {@code 0} when not shuffled
      */
     public long seed() {
-        return seed;
-    }
-
-    private List<Action> validateChildren(final List<Action> children) {
-        Objects.requireNonNull(children, "children is null");
-        var validated = new ArrayList<Action>(children.size());
-        for (Action child : children) {
-            Objects.requireNonNull(child, "children contains null element");
-            validated.add(child);
-        }
-        return List.copyOf(validated);
+        return delegate.seed();
     }
 
     /**
@@ -159,16 +130,10 @@ public final class Sequence implements Action {
      */
     public static final class Builder implements org.paramixel.api.action.Builder {
 
-        private final String displayName;
-        private final List<Action> children = new ArrayList<>();
-        private boolean dependent = true;
-        private boolean shuffled;
-        private long shuffleSeed;
+        private final Sequential.Builder delegate;
 
         private Builder(final String displayName) {
-            Objects.requireNonNull(displayName, "displayName is null");
-            Arguments.requireNonBlank(displayName, "displayName is blank");
-            this.displayName = displayName;
+            this.delegate = Sequential.builder(displayName);
         }
 
         /**
@@ -180,7 +145,7 @@ public final class Sequence implements Action {
          * @return this builder
          */
         public Builder dependent() {
-            dependent = true;
+            delegate.dependent();
             return this;
         }
 
@@ -191,7 +156,7 @@ public final class Sequence implements Action {
          * @return this builder
          */
         public Builder independent() {
-            dependent = false;
+            delegate.independent();
             return this;
         }
 
@@ -203,7 +168,7 @@ public final class Sequence implements Action {
          * @throws NullPointerException if {@code action} is {@code null}
          */
         public Builder child(final Action action) {
-            children.add(Objects.requireNonNull(action, "action is null"));
+            delegate.child(action);
             return this;
         }
 
@@ -216,23 +181,21 @@ public final class Sequence implements Action {
          * @throws NullPointerException if {@code builder} is {@code null}
          */
         public Builder child(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            children.add(Objects.requireNonNull(builder.build(), "builder.build() returned null"));
+            delegate.child(builder);
             return this;
         }
 
         /**
          * Configures children to be shuffled randomly at build time.
          *
-         * <p>A seed is generated from {@link ThreadLocalRandom} at build time and
+         * <p>A seed is generated from {@link java.util.concurrent.ThreadLocalRandom} at build time and
          * stored on the resulting action for reporting. For reproducible shuffling,
          * use {@link #shuffle(long)}.
          *
          * @return this builder
          */
         public Builder shuffle() {
-            this.shuffled = true;
-            this.shuffleSeed = ThreadLocalRandom.current().nextLong();
+            delegate.shuffle();
             return this;
         }
 
@@ -246,8 +209,7 @@ public final class Sequence implements Action {
          * @return this builder
          */
         public Builder shuffle(final long seed) {
-            this.shuffled = true;
-            this.shuffleSeed = seed;
+            delegate.shuffle(seed);
             return this;
         }
 
@@ -258,11 +220,7 @@ public final class Sequence implements Action {
          */
         @Override
         public Sequence build() {
-            final var mutableChildren = new ArrayList<>(children);
-            if (shuffled) {
-                Collections.shuffle(mutableChildren, new Random(shuffleSeed));
-            }
-            return new Sequence(displayName, List.copyOf(mutableChildren), dependent, shuffleSeed, shuffled);
+            return new Sequence(delegate.build());
         }
     }
 }

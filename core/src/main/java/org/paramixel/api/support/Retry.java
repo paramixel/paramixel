@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import nonapi.org.paramixel.support.Arguments;
+import nonapi.org.paramixel.support.Durations;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.ThrowingRunnable;
 import org.paramixel.api.exception.PolicyException;
@@ -340,7 +341,7 @@ public final class Retry {
             return new Policy() {
                 @Override
                 public Duration waitDuration(final int attempt, final Throwable cause) {
-                    return multiplyOrZero(initialDelay, attempt);
+                    return Durations.multiplyOrZero(initialDelay, attempt);
                 }
 
                 @Override
@@ -382,7 +383,7 @@ public final class Retry {
                     if (exponent < 0) {
                         return Duration.ZERO;
                     }
-                    return multiplyOrZero(initialDelay, 1L << Math.min(exponent, 62));
+                    return Durations.multiplyOrZero(initialDelay, 1L << Math.min(exponent, 62));
                 }
 
                 @Override
@@ -390,21 +391,6 @@ public final class Retry {
                     return maximumDuration;
                 }
             };
-        }
-
-        private static Duration multiplyOrZero(final Duration duration, final long multiplier) {
-            if (multiplier < 0) {
-                return Duration.ZERO;
-            }
-            try {
-                var result = duration.multipliedBy(multiplier);
-                if (result.isNegative()) {
-                    return Duration.ZERO;
-                }
-                return result;
-            } catch (ArithmeticException e) {
-                throw new PolicyException("duration overflow multiplying by " + multiplier, e);
-            }
         }
     }
 

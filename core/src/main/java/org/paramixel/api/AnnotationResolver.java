@@ -22,6 +22,9 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.LRUCache;
 import org.paramixel.api.action.Action;
@@ -83,22 +86,8 @@ public final class AnnotationResolver<T> {
      *     unsupported signature
      */
     public Action byId(final String id) {
-        Objects.requireNonNull(id, "id is null");
-        Arguments.requireNonBlank(id, "id is blank");
-
-        var cache = instanceCache();
-        var methods = cache.get(type);
-        if (methods == null) {
-            methods = discover(type);
-            cache.put(type, methods);
-        }
-        var method = methods.get(id);
-        if (method == null) {
-            throw new IllegalArgumentException(
-                    "no method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
-        }
-
-        return Step.of(id, reflectingConsumer(method));
+        return resolve(
+                id, instanceCache(), AnnotationResolver::discover, AnnotationResolver::reflectingConsumer, "method");
     }
 
     /**
@@ -116,24 +105,12 @@ public final class AnnotationResolver<T> {
      *     unsupported signature
      */
     public Action staticById(final String id) {
-        Objects.requireNonNull(id, "id is null");
-        Arguments.requireNonBlank(id, "id is blank");
-
-        var cache = staticCache();
-        var methods = cache.get(type);
-        if (methods == null) {
-            methods = discoverStatic(type);
-            cache.put(type, methods);
-        }
-        var method = methods.get(id);
-        if (method == null) {
-            throw new IllegalArgumentException(
-                    "no static method annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
-        }
-
-        var runnable = reflectingStaticInvocation(method);
-
-        return Step.of(id, context -> runnable.run());
+        return resolve(
+                id,
+                staticCache(),
+                AnnotationResolver::discoverStatic,
+                AnnotationResolver::reflectingStaticConsumer,
+                "static method");
     }
 
     /**
@@ -199,55 +176,40 @@ public final class AnnotationResolver<T> {
     }
 
     private static Map<String, Method> discover(final Class<?> type) {
-        var result = new HashMap<String, Method>();
-        var duplicateTracker = new HashMap<String, String>();
-
-        for (Method method : type.getMethods()) {
-            Paramixel.Id idAnnotation = method.getAnnotation(Paramixel.Id.class);
-            if (idAnnotation == null) {
-                continue;
-            }
-
-            if (Modifier.isStatic(method.getModifiers())) {
-                continue;
-            }
-
-            var id = idAnnotation.value();
-
-            validateMethodSignature(method, id);
-
-            method.trySetAccessible();
-
-            var existing = duplicateTracker.putIfAbsent(id, method.toGenericString());
-            if (existing != null) {
-                throw new IllegalArgumentException("multiple methods annotated with @Paramixel.Id(\""
-                        + id + "\") were found on " + type.getName()
-                        + ": " + existing + ", " + method.toGenericString());
-            }
-
-            result.put(id, method);
-        }
-
-        return Map.copyOf(result);
+        return discover(
+                type, method -> !Modifier.isStatic(method.getModifiers()), AnnotationResolver::validateMethodSignature);
     }
 
     private static Map<String, Method> discoverStatic(final Class<?> type) {
+        return discover(
+                type,
+                method -> Modifier.isStatic(method.getModifiers()),
+                AnnotationResolver::validateStaticMethodSignature);
+    }
+
+    /**
+     * Discovers the {@code @Paramixel.Id} methods of one kind on the supplied type.
+     *
+     * @param type the type to inspect; must not be {@code null}
+     * @param accepted selects the method kind (instance or static)
+     * @param validator validates the signature of each accepted method
+     * @return the discovered methods keyed by identifier, in declaration order
+     * @throws IllegalArgumentException if two methods share an identifier
+     */
+    private static Map<String, Method> discover(
+            final Class<?> type, final Predicate<Method> accepted, final BiConsumer<Method, String> validator) {
         var result = new HashMap<String, Method>();
         var duplicateTracker = new HashMap<String, String>();
 
         for (Method method : type.getMethods()) {
             Paramixel.Id idAnnotation = method.getAnnotation(Paramixel.Id.class);
-            if (idAnnotation == null) {
-                continue;
-            }
-
-            if (!Modifier.isStatic(method.getModifiers())) {
+            if (idAnnotation == null || !accepted.test(method)) {
                 continue;
             }
 
             var id = idAnnotation.value();
 
-            validateStaticMethodSignature(method, id);
+            validator.accept(method, id);
 
             method.trySetAccessible();
 
@@ -265,69 +227,87 @@ public final class AnnotationResolver<T> {
     }
 
     private static void validateMethodSignature(final Method method, final String id) {
-        if (method.getParameterCount() > 0) {
-            throw new IllegalArgumentException("method annotated with @Paramixel.Id(\""
-                    + id + "\") has unsupported signature: " + method.toGenericString()
-                    + "; expected an instance no-argument void method");
-        }
-        if (method.getReturnType() != void.class) {
-            throw new IllegalArgumentException("method annotated with @Paramixel.Id(\""
-                    + id + "\") has unsupported signature: " + method.toGenericString()
-                    + "; expected an instance no-argument void method");
-        }
+        validateSignature(method, id, "an instance");
     }
 
     private static void validateStaticMethodSignature(final Method method, final String id) {
         if (!Modifier.isStatic(method.getModifiers())) {
-            throw new IllegalArgumentException("method annotated with @Paramixel.Id(\""
-                    + id + "\") has unsupported signature: " + method.toGenericString()
-                    + "; expected a static no-argument void method");
+            throw new IllegalArgumentException(unsupportedSignature(method, id, "a static"));
         }
-        if (method.getParameterCount() > 0) {
-            throw new IllegalArgumentException("method annotated with @Paramixel.Id(\""
-                    + id + "\") has unsupported signature: " + method.toGenericString()
-                    + "; expected a static no-argument void method");
+        validateSignature(method, id, "a static");
+    }
+
+    private static void validateSignature(final Method method, final String id, final String kind) {
+        if (method.getParameterCount() > 0 || method.getReturnType() != void.class) {
+            throw new IllegalArgumentException(unsupportedSignature(method, id, kind));
         }
-        if (method.getReturnType() != void.class) {
-            throw new IllegalArgumentException("method annotated with @Paramixel.Id(\""
-                    + id + "\") has unsupported signature: " + method.toGenericString()
-                    + "; expected a static no-argument void method");
-        }
+    }
+
+    private static String unsupportedSignature(final Method method, final String id, final String kind) {
+        return "method annotated with @Paramixel.Id(\"" + id + "\") has unsupported signature: "
+                + method.toGenericString() + "; expected " + kind + " no-argument void method";
     }
 
     private static ContextConsumer reflectingConsumer(final Method method) {
         var owner = method.getDeclaringClass();
-        return context -> {
-            try {
-                var instance = context.requireInstance(owner);
-                method.invoke(instance);
-            } catch (InvocationTargetException e) {
-                var cause = e.getCause();
-                if (cause instanceof Error error) {
-                    throw error;
-                }
-                if (cause instanceof RuntimeException re) {
-                    throw re;
-                }
-                throw new RuntimeException(cause);
-            }
-        };
+        return context -> invoke(method, context.requireInstance(owner));
+    }
+
+    private static ContextConsumer reflectingStaticConsumer(final Method method) {
+        var runnable = reflectingStaticInvocation(method);
+        return context -> runnable.run();
     }
 
     private static ThrowingRunnable reflectingStaticInvocation(final Method method) {
-        return () -> {
-            try {
-                method.invoke(null);
-            } catch (InvocationTargetException e) {
-                var cause = e.getCause();
-                if (cause instanceof Error error) {
-                    throw error;
-                }
-                if (cause instanceof RuntimeException re) {
-                    throw re;
-                }
-                throw new RuntimeException(cause);
+        return () -> invoke(method, null);
+    }
+
+    private static void invoke(final Method method, final Object target) throws Throwable {
+        try {
+            method.invoke(target);
+        } catch (InvocationTargetException e) {
+            var cause = e.getCause();
+            if (cause instanceof Error error) {
+                throw error;
             }
-        };
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(cause);
+        }
+    }
+
+    /**
+     * Resolves an annotated method and wraps it in a named step action.
+     *
+     * @param id the method identifier; must not be {@code null} or blank
+     * @param cache the per-kind resolver cache; must not be {@code null}
+     * @param discoverer discovers the methods of the requested kind
+     * @param invoker builds the step body for the resolved method
+     * @param kind the method kind used in the not-found message
+     * @return the step action; never {@code null}
+     * @throws IllegalArgumentException if no method matches or the identifier is blank
+     */
+    private Action resolve(
+            final String id,
+            final LRUCache<Class<?>, Map<String, Method>> cache,
+            final Function<Class<?>, Map<String, Method>> discoverer,
+            final Function<Method, ContextConsumer> invoker,
+            final String kind) {
+        Objects.requireNonNull(id, "id is null");
+        Arguments.requireNonBlank(id, "id is blank");
+
+        var methods = cache.get(type);
+        if (methods == null) {
+            methods = discoverer.apply(type);
+            cache.put(type, methods);
+        }
+        var method = methods.get(id);
+        if (method == null) {
+            throw new IllegalArgumentException(
+                    "no " + kind + " annotated with @Paramixel.Id(\"" + id + "\") was found on " + type.getName());
+        }
+
+        return Step.of(id, invoker.apply(method));
     }
 }

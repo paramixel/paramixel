@@ -18,7 +18,6 @@ package org.paramixel.api.action;
 
 import java.util.Objects;
 import java.util.function.Predicate;
-import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Context;
 
 /**
@@ -51,8 +50,7 @@ public final class Conditional implements Action {
     private final Action body;
 
     private Conditional(final String displayName, final Predicate<Context> condition, final Action body) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(condition, "condition is null");
         this.condition = condition;
         this.body = Objects.requireNonNull(body, "body is null");
@@ -69,8 +67,7 @@ public final class Conditional implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Builder builder(final String displayName, final Predicate<Context> condition) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(condition, "condition is null");
         return new Builder(displayName, condition);
     }

@@ -133,6 +133,11 @@ class SchedulerManagedJoinTest {
                 taskRan.incrementAndGet();
                 watchedFuture.complete("done");
             }));
+            // Follow-up joins the tree before the first scheduling call: scheduling compiles and
+            // freezes the tree, so the structure is fixed from that point on.
+            var followUp = newChildDescriptor(root, Step.of("follow-up", innerContext -> {
+                executed.set(true);
+            }));
             scheduler.schedule(task, ExecutionMode.RUN, context);
 
             // Execute managedJoin from a non-executor thread.
@@ -147,9 +152,6 @@ class SchedulerManagedJoinTest {
             // After managedJoin returns, schedule a follow-up action on an executor thread.
             // This verifies that the scheduler still works correctly — the external thread's
             // work-stealing did not corrupt scheduler state.
-            var followUp = newChildDescriptor(root, Step.of("follow-up", innerContext -> {
-                executed.set(true);
-            }));
             scheduler.schedule(followUp, ExecutionMode.RUN, context).join();
 
             assertThat(taskRan.get()).isEqualTo(1);

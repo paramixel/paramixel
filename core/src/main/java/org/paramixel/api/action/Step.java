@@ -17,7 +17,6 @@
 package org.paramixel.api.action;
 
 import java.util.Objects;
-import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Context;
 import org.paramixel.api.ContextConsumer;
 
@@ -34,8 +33,7 @@ public final class Step implements Action {
     private final ContextConsumer consumer;
 
     private Step(final String displayName, final ContextConsumer consumer) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = ActionNames.requireDisplayName(displayName);
         this.consumer = Objects.requireNonNull(consumer, "consumer is null");
     }
 
@@ -49,8 +47,7 @@ public final class Step implements Action {
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
     public static Step of(final String displayName, final ContextConsumer consumer) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
+        ActionNames.requireDisplayName(displayName);
         Objects.requireNonNull(consumer, "consumer is null");
         return new Step(displayName, consumer);
     }

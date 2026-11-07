@@ -75,6 +75,17 @@ public interface Configuration {
     String SCHEDULER_QUEUE_CAPACITY = "paramixel.scheduler.queue.capacity";
 
     /**
+     * Configuration key controlling the maximum number of leaf actions executing at the same time across
+     * the whole tree.
+     *
+     * <p>The value must be a positive integer. This cap is independent of the thread pool size: effective
+     * global concurrency is {@code min(paramixel.parallelism, paramixel.scheduler.concurrency.cap)}. It is
+     * distinct from per-node {@code parallelism} caps, which bound the leaf concurrency of one subtree.
+     * When unset, it is treated as unlimited, so the thread pool size is the only global bound.
+     */
+    String SCHEDULER_CONCURRENCY_CAP = "paramixel.scheduler.concurrency.cap";
+
+    /**
      * Configuration key controlling ANSI escape code output in console listeners.
      *
      * <p>Valid values are {@code "true"} (force ANSI enabled), {@code "false"} (force ANSI disabled, plain text),

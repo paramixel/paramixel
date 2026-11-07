@@ -16,8 +16,10 @@
 
 package nonapi.org.paramixel.action;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Assert;
 import org.paramixel.api.action.Conditional;
@@ -42,18 +44,20 @@ final class DescriptorExpansions {
             expansion(Scope.class, DescriptorExpansions::expandScope),
             expansion(Static.class, DescriptorExpansions::expandStatic),
             expansion(Instance.class, DescriptorExpansions::expandInstance),
-            expansion(Parallel.class, DescriptorExpansions::expandParallel),
-            expansion(Sequence.class, DescriptorExpansions::expandSequence),
-            expansion(Sequential.class, DescriptorExpansions::expandSequential),
-            expansion(Loop.class, DescriptorExpansions::expandLoop),
-            expansion(Repeat.class, DescriptorExpansions::expandRepeat),
-            expansion(Until.class, DescriptorExpansions::expandUntil),
-            expansion(Timeout.class, DescriptorExpansions::expandTimeout),
-            expansion(Isolated.class, DescriptorExpansions::expandIsolated),
-            expansion(Conditional.class, DescriptorExpansions::expandConditional),
-            expansion(Step.class, DescriptorExpansions::expandTerminal),
-            expansion(Assert.class, DescriptorExpansions::expandTerminal),
-            expansion(Delay.class, DescriptorExpansions::expandTerminal));
+            expansion(Parallel.class, (parallel, context) -> addChildren(parallel.children(), context)),
+            expansion(Sequence.class, (sequence, context) -> addChildren(sequence.children(), context)),
+            expansion(Sequential.class, (sequential, context) -> addChildren(sequential.children(), context)),
+            expansion(Loop.class, (loop, context) -> addIterations(loop.body(), loop.maxIterations(), context)),
+            expansion(Repeat.class, (repeat, context) -> addIterations(repeat.body(), repeat.iterations(), context)),
+            expansion(Until.class, (until, context) -> addIterations(until.body(), until.maxIterations(), context)),
+            expansion(Timeout.class, (timeout, context) -> context.addChild(timeout.body())),
+            expansion(Isolated.class, (isolated, context) -> context.addChild(isolated.body())),
+            expansion(Conditional.class, (conditional, context) -> context.addChild(conditional.body())));
+
+    /**
+     * Actions that are supported but expand to nothing: they own no before, body, or after slots.
+     */
+    private static final Set<Class<? extends Action>> TERMINAL_ACTIONS = Set.of(Step.class, Assert.class, Delay.class);
 
     private DescriptorExpansions() {}
 
@@ -67,7 +71,7 @@ final class DescriptorExpansions {
     }
 
     static boolean supports(final Class<? extends Action> type) {
-        return EXPANSIONS.containsKey(Objects.requireNonNull(type, "type is null"));
+        return EXPANSIONS.containsKey(Objects.requireNonNull(type, "type is null")) || TERMINAL_ACTIONS.contains(type);
     }
 
     @SuppressWarnings("unchecked")
@@ -106,50 +110,14 @@ final class DescriptorExpansions {
         context.setAfter(instance.destroy());
     }
 
-    private static void expandParallel(final Parallel parallel, final DescriptorExpansionContext context) {
-        parallel.children().forEach(context::addChild);
+    private static void addChildren(final List<Action> children, final DescriptorExpansionContext context) {
+        children.forEach(context::addChild);
     }
 
-    private static void expandSequence(final Sequence sequence, final DescriptorExpansionContext context) {
-        sequence.children().forEach(context::addChild);
-    }
-
-    private static void expandSequential(final Sequential sequential, final DescriptorExpansionContext context) {
-        sequential.children().forEach(context::addChild);
-    }
-
-    private static void expandLoop(final Loop loop, final DescriptorExpansionContext context) {
-        for (int i = 0; i < loop.maxIterations(); i++) {
-            context.addChild(loop.body());
+    private static void addIterations(
+            final Action body, final int iterations, final DescriptorExpansionContext context) {
+        for (var i = 0; i < iterations; i++) {
+            context.addChild(body);
         }
-    }
-
-    private static void expandRepeat(final Repeat repeat, final DescriptorExpansionContext context) {
-        for (int i = 0; i < repeat.iterations(); i++) {
-            context.addChild(repeat.body());
-        }
-    }
-
-    private static void expandUntil(final Until until, final DescriptorExpansionContext context) {
-        for (int i = 0; i < until.maxIterations(); i++) {
-            context.addChild(until.body());
-        }
-    }
-
-    private static void expandTimeout(final Timeout timeout, final DescriptorExpansionContext context) {
-        context.addChild(timeout.body());
-    }
-
-    private static void expandIsolated(final Isolated isolated, final DescriptorExpansionContext context) {
-        context.addChild(isolated.body());
-    }
-
-    private static void expandConditional(final Conditional conditional, final DescriptorExpansionContext context) {
-        context.addChild(conditional.body());
-    }
-
-    private static void expandTerminal(final Action ignored, final DescriptorExpansionContext context) {
-        Objects.requireNonNull(ignored, "ignored is null");
-        Objects.requireNonNull(context, "context is null");
     }
 }

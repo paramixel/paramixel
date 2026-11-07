@@ -78,77 +78,80 @@ public class StatusListener implements Listener {
         Objects.requireNonNull(descriptor, "descriptor is null");
 
         if (!excludes.contains(ExcludeTarget.STATUS_FOOTER)) {
-            var stringBuilder = new StringBuilder();
-            var statusText = ansiEnabled ? Listeners.formatAnsiStatus(descriptor) : Listeners.formatStatus(descriptor);
-            stringBuilder
-                    .append(prefix())
-                    .append(statusText)
-                    .append(" | ")
-                    .append(Thread.currentThread().getName())
-                    .append(" | ")
-                    .append(displayName(descriptor))
-                    .append(' ')
-                    .append(formatTiming(Listeners.elapsedMillis(descriptor)));
-            var throwable = descriptor.throwable().orElse(null);
-            if (throwable != null) {
-                var msg = Listeners.sanitizeMessage(throwable.getMessage());
-                stringBuilder.append(" | ").append(throwable.getClass().getName());
-                if (msg != null && !msg.isBlank()) {
-                    stringBuilder.append(": ").append(msg);
-                }
-                stringBuilder.append(LINE_SEPARATOR);
-                var stringWriter = new StringWriter();
-                throwable.printStackTrace(new PrintWriter(stringWriter));
-                try (var br = new BufferedReader(new StringReader(stringWriter.toString()))) {
-                    String line;
-                    while ((line = br.readLine()) != null) {
-                        stringBuilder
-                                .append(prefix())
-                                .append(Listeners.stripUnsafe(line))
-                                .append(LINE_SEPARATOR);
-                    }
-                } catch (IOException e) {
-                    throw new AssertionError(e);
-                }
-            } else {
-                descriptor
-                        .message()
-                        .ifPresent(message -> stringBuilder.append(" | ").append(Listeners.sanitizeMessage(message)));
-                stringBuilder.append(LINE_SEPARATOR);
-            }
-            System.out.print(stringBuilder);
+            System.out.print(renderStatusLine(descriptor));
             System.out.flush();
+            return;
+        }
+
+        var details = new StringBuilder();
+        descriptor
+                .throwable()
+                .ifPresentOrElse(
+                        throwable -> appendStackTrace(details, throwable),
+                        () -> descriptor
+                                .message()
+                                .ifPresent(message -> details.append(prefix())
+                                        .append(Listeners.sanitizeMessage(message))
+                                        .append(LINE_SEPARATOR)));
+        if (details.length() > 0) {
+            System.out.print(details);
+            System.out.flush();
+        }
+    }
+
+    /**
+     * Renders the single-line outcome for a descriptor, including failure details and the
+     * prefixed stack trace when the descriptor carries a throwable.
+     *
+     * @param descriptor the completed descriptor; must not be {@code null}
+     * @return the rendered block, terminated by a line separator
+     */
+    private String renderStatusLine(final Descriptor descriptor) {
+        var statusText = ansiEnabled ? Listeners.formatAnsiStatus(descriptor) : Listeners.formatStatus(descriptor);
+        var stringBuilder = new StringBuilder();
+        stringBuilder
+                .append(prefix())
+                .append(statusText)
+                .append(" | ")
+                .append(Thread.currentThread().getName())
+                .append(" | ")
+                .append(displayName(descriptor))
+                .append(' ')
+                .append(formatTiming(Listeners.elapsedMillis(descriptor)));
+        var throwable = descriptor.throwable().orElse(null);
+        if (throwable != null) {
+            var msg = Listeners.sanitizeMessage(throwable.getMessage());
+            stringBuilder.append(" | ").append(throwable.getClass().getName());
+            if (msg != null && !msg.isBlank()) {
+                stringBuilder.append(": ").append(msg);
+            }
+            stringBuilder.append(LINE_SEPARATOR);
+            appendStackTrace(stringBuilder, throwable);
         } else {
             descriptor
-                    .throwable()
-                    .ifPresentOrElse(
-                            throwable -> {
-                                var stringBuilder = new StringBuilder();
-                                var sw = new StringWriter();
-                                throwable.printStackTrace(new PrintWriter(sw));
-                                try (var br = new BufferedReader(new StringReader(sw.toString()))) {
-                                    String line;
-                                    while ((line = br.readLine()) != null) {
-                                        stringBuilder
-                                                .append(prefix())
-                                                .append(Listeners.stripUnsafe(line))
-                                                .append(LINE_SEPARATOR);
-                                    }
-                                } catch (IOException e) {
-                                    throw new AssertionError(e);
-                                }
-                                System.out.print(stringBuilder);
-                                System.out.flush();
-                            },
-                            () -> descriptor.message().ifPresent(message -> {
-                                var stringBuilder = new StringBuilder();
-                                stringBuilder
-                                        .append(prefix())
-                                        .append(Listeners.sanitizeMessage(message))
-                                        .append(LINE_SEPARATOR);
-                                System.out.print(stringBuilder);
-                                System.out.flush();
-                            }));
+                    .message()
+                    .ifPresent(message -> stringBuilder.append(" | ").append(Listeners.sanitizeMessage(message)));
+            stringBuilder.append(LINE_SEPARATOR);
+        }
+        return stringBuilder.toString();
+    }
+
+    /**
+     * Appends the throwable's stack trace, one prefixed and sanitized line at a time.
+     *
+     * @param target the buffer to append to
+     * @param throwable the throwable whose trace to render
+     */
+    private void appendStackTrace(final StringBuilder target, final Throwable throwable) {
+        var stringWriter = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(stringWriter));
+        try (var reader = new BufferedReader(new StringReader(stringWriter.toString()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                target.append(prefix()).append(Listeners.stripUnsafe(line)).append(LINE_SEPARATOR);
+            }
+        } catch (IOException e) {
+            throw new AssertionError(e);
         }
     }
 

@@ -39,6 +39,11 @@ public class Constants {
      */
     public static final String ROOT_NAME = "Paramixel v" + Version.version();
 
+    /**
+     * Message printed or written when discovery produces no actions to run.
+     */
+    public static final String NO_TESTS_FOUND = "No Paramixel tests found";
+
     private Constants() {
         // Intentionally empty
     }

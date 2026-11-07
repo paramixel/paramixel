@@ -87,15 +87,10 @@ class SchedulerAdmissionWakeupRegressionTest {
             var e3 = newChild(root, Step.of("e3", ctx -> {}));
             var e4 = newChild(root, Step.of("e4", ctx -> {}));
 
-            var t0Future = scheduleAndAwaitStart(scheduler, t0, context, t0Started);
-            var e1Future = scheduleAndAwaitStart(scheduler, e1, context, e1Started);
-            var e2Future = scheduleAndAwaitStart(scheduler, e2, context, e2Started);
-            var e3Future = scheduler.schedule(e3, ExecutionMode.RUN, context);
-            var e4Future = scheduler.schedule(e4, ExecutionMode.RUN, context);
-
             // Sequential subtree whose first-child admission happens on this thread while it
             // holds an isolation frame: the admission finds zero permits, parks an ineligible
-            // queued task, and admits the child with the freed permit.
+            // queued task, and admits the child with the freed permit. It must join the tree
+            // before the first scheduling call, because scheduling compiles and freezes the tree.
             var sequentialAction = Sequential.builder("seq")
                     .child(Step.of("s1", ctx -> {
                         s1Started.set(true);
@@ -107,6 +102,12 @@ class SchedulerAdmissionWakeupRegressionTest {
             root.addChild(seq);
             var s1Desc = (MutableDescriptor) seq.children().get(0);
             var seqContext = new ConcreteContext(configuration, listener, seq, scheduler, new InstanceHolder());
+
+            var t0Future = scheduleAndAwaitStart(scheduler, t0, context, t0Started);
+            var e1Future = scheduleAndAwaitStart(scheduler, e1, context, e1Started);
+            var e2Future = scheduleAndAwaitStart(scheduler, e2, context, e2Started);
+            var e3Future = scheduler.schedule(e3, ExecutionMode.RUN, context);
+            var e4Future = scheduler.schedule(e4, ExecutionMode.RUN, context);
 
             scheduler.enterIsolation(lockName, lock, dummy);
             try {
