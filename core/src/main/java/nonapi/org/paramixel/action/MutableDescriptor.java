@@ -38,21 +38,49 @@ import org.paramixel.api.action.Step;
 public interface MutableDescriptor extends Descriptor {
 
     /**
-     * Returns the precomputed scheduler priority key for this descriptor.
+     * Returns the identity of the compilation that assigned this descriptor's order.
      *
-     * <p>The key is assigned during discovery and represents this descriptor's
-     * stable position in the descriptor tree.</p>
+     * <p>Ranks are tree-local: they are only comparable between descriptors that report the same
+     * tree id. An uncompiled descriptor reports {@link DescriptorOrder#UNCOMPILED}.
      *
-     * @return the scheduler priority key; never {@code null}
+     * @return the compilation identity, or {@link DescriptorOrder#UNCOMPILED}
      */
-    SchedulerPriorityKey schedulerPriorityKey();
+    long orderTreeId();
 
     /**
-     * Sets the precomputed scheduler priority key for this descriptor.
+     * Returns the lowest order rank within this descriptor's subtree.
      *
-     * @param schedulerPriorityKey the scheduler priority key; must not be {@code null}
+     * <p>Together with {@link #orderRank()} this bounds the inclusive interval occupied by this
+     * descriptor's subtree, which is what makes ancestry a constant-time test.
+     *
+     * @return the subtree's lowest rank, or {@link DescriptorOrder#UNCOMPILED}
      */
-    void setSchedulerPriorityKey(SchedulerPriorityKey schedulerPriorityKey);
+    long orderSubtreeStart();
+
+    /**
+     * Returns this descriptor's order rank, or {@link DescriptorOrder#UNCOMPILED}.
+     *
+     * <p>Compiled ranks are non-negative and totally ordered across a tree: a descriptor never
+     * outranks its own descendants, and an earlier sibling's whole subtree outranks a later
+     * sibling's. Descriptors from different trees are not comparable.
+     *
+     * @return the order rank, or {@link DescriptorOrder#UNCOMPILED}
+     */
+    long orderRank();
+
+    /**
+     * Records this descriptor's compiled order metadata.
+     *
+     * <p>Called once per descriptor by {@link DescriptorOrder#compile(MutableDescriptor)}. The
+     * rank is published last so a reader that observes a rank also observes the accompanying tree
+     * id and subtree start.
+     *
+     * @param treeId the compilation identity
+     * @param subtreeStart the lowest rank in this descriptor's subtree
+     * @param rank this descriptor's rank
+     * @throws IllegalStateException if this descriptor is already compiled
+     */
+    void setOrder(long treeId, long subtreeStart, long rank);
 
     /**
      * Sets the before-child descriptor during discovery.

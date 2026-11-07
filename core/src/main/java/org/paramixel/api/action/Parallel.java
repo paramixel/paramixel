@@ -25,19 +25,18 @@ import java.util.concurrent.ThreadLocalRandom;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Composite action that executes all direct children concurrently with bounded admission.
+ * Composite action that makes every direct child ready at once.
  *
- * <p>This implementation limits how many direct child branches are unfinished at once. Each direct child
- * consumes one branch slot from this Parallel, regardless of whether that child is a Step, Sequential, or
- * nested Parallel. Nested Parallel actions enforce their own limits inside their own execution state.</p>
+ * <p>A Parallel node never withholds a child: all direct children become ready as soon as the node
+ * starts, and the scheduler dispatches their leaf actions in depth-first priority order. What
+ * {@link #parallelism()} bounds is <em>execution</em>, not readiness: it is the maximum number of leaf
+ * actions anywhere in this node's subtree that may be running at the same time. Nested caps compose —
+ * every capped ancestor's limit applies independently, so a leaf runs only when each capped ancestor
+ * has room.</p>
  *
  * <p>{@link #parallelism()} is an upper bound, not a guarantee. Actual concurrency may be lower due to
- * global scheduler limits ({@code paramixel.parallelism}), nested branch contention, and normal task
- * timing.</p>
- *
- * <p>This prevents large Parallel actions from flooding the scheduler ready queue while avoiding the
- * over-aggressive branch-weighting behavior that caused child Parallel actions to reserve multiple parent
- * slots and accidentally cap overall execution.</p>
+ * this cap, a capped ancestor, the global thread count ({@code paramixel.parallelism}), or the global
+ * leaf concurrency cap ({@code paramixel.scheduler.concurrency.cap}).</p>
  *
  * <p>Thread-safety: instances are immutable and safe for concurrent use.</p>
  */
@@ -98,17 +97,17 @@ public final class Parallel implements Action {
     }
 
     /**
-     * Returns the declared direct-child parallelism value.
+     * Returns the declared leaf-concurrency cap for this node's subtree.
      *
      * <p>When {@link Builder#parallelism(int)} is not called, this method returns {@link
-     * Integer#MAX_VALUE} as an internal sentinel. In that case, execution-time admission inherits
-     * the scheduler parallelism (derived from {@code paramixel.parallelism}).
+     * Integer#MAX_VALUE} as an internal sentinel, meaning this node adds no cap and execution is
+     * bounded only by capped ancestors, the global thread count ({@code paramixel.parallelism}), and
+     * {@code paramixel.scheduler.concurrency.cap}.</p>
      *
-     * <p>When explicitly configured, this value is the requested maximum number of direct child
-     * branches that may be in-flight simultaneously, capped by scheduler parallelism
-     * ({@code paramixel.parallelism}). Global scheduler parallelism is enforced separately at
-     * leaf-action execution time. At the root parallel node, runner-level top-level admission may
-     * also be throttled by {@code paramixel.parallelism}.</p>
+     * <p>When explicitly configured, this value is the maximum number of leaf actions anywhere in
+     * this node's subtree that may be running at the same time. It is a cap on running leaf tasks,
+     * not on in-flight direct children: a child subtree does not consume this node's capacity while
+     * it is merely ready or waiting on a sequential dependency.</p>
      *
      * <p>This value is a cap only. Runtime concurrency is best-effort and may be lower depending on
      * global and nested contention.</p>
@@ -176,15 +175,16 @@ public final class Parallel implements Action {
         }
 
         /**
-         * Sets the maximum number of in-flight direct child branches.
+         * Sets the maximum number of leaf actions that may run at the same time in this node's
+         * subtree.
          *
-         * <p>When this method is not called, direct-child admission inherits scheduler parallelism
-         * at execution time (derived from {@code paramixel.parallelism}). When configured, the
-         * requested value is capped by scheduler parallelism. Global scheduler parallelism is
-         * enforced separately at leaf-action execution time. At the root parallel node, runner-level
-         * top-level admission may also be throttled by {@code paramixel.parallelism}.</p>
+         * <p>When this method is not called, this node adds no cap. When configured, the value
+         * bounds running leaf tasks anywhere below this node — including inside nested Sequential
+         * and Parallel children — and is combined with the caps of its own ancestors, the global
+         * thread count ({@code paramixel.parallelism}), and
+         * {@code paramixel.scheduler.concurrency.cap}. Whichever limit is tightest binds.</p>
          *
-         * @param parallelism the parallelism limit (must be positive)
+         * @param parallelism the maximum concurrent leaf count for this subtree (must be positive)
          * @return this builder
          * @throws IllegalArgumentException if {@code parallelism} is not positive
          */

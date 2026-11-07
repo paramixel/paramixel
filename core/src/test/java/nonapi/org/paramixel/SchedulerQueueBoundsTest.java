@@ -489,8 +489,11 @@ class SchedulerQueueBoundsTest {
             queuePermitsField.setAccessible(true);
             var queuePermits = (Semaphore) queuePermitsField.get(scheduler);
 
+            var tasks = new ArrayList<MutableDescriptor>(10);
             for (var i = 0; i < 10; i++) {
-                var task = newChildDescriptor(root, Step.of("task-" + i, innerContext -> {}));
+                tasks.add(newChildDescriptor(root, Step.of("task-" + i, innerContext -> {})));
+            }
+            for (var task : tasks) {
                 scheduler.schedule(task, ExecutionMode.RUN, context).join();
                 assertThat(queuePermits.availablePermits()).isLessThanOrEqualTo(queueCapacity);
             }
@@ -573,6 +576,9 @@ class SchedulerQueueBoundsTest {
                 taskStarted.countDown();
                 taskProceed.await(10, TimeUnit.SECONDS);
             }));
+            // The late task joins the tree before the first scheduling call: scheduling compiles
+            // and freezes the tree, so the structure is fixed from that point on.
+            var task = newChildDescriptor(root, Step.of("task", innerContext -> {}));
             scheduler.schedule(blockingTask, ExecutionMode.RUN, context);
             taskStarted.await();
 
@@ -584,7 +590,6 @@ class SchedulerQueueBoundsTest {
             var scheduleResult = new AtomicReference<Throwable>();
             var scheduleDone = new CountDownLatch(1);
             var scheduleThread = new Thread(() -> {
-                var task = newChildDescriptor(root, Step.of("task", innerContext -> {}));
                 try {
                     scheduler.schedule(task, ExecutionMode.RUN, context).join();
                 } catch (Throwable t) {

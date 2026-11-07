@@ -63,8 +63,11 @@ class SchedulerFailFastTest {
     @Test
     @DisplayName("fail fast skip cascades SKIPPED to descendants of the skipped action")
     void failFastSkipCascadesToDescendants() {
-        var root = Parallel.builder("root")
-                .parallelism(1)
+        // A sequential root is used deliberately: a parallel root makes both children ready at
+        // once, so "skipped-seq" is already running when the failure occurs and its children are
+        // exempt (a running subtree is never cancelled by fail fast). Sequencing puts the failure
+        // ahead of the second child's readiness, which is the situation this test is about.
+        var root = Sequence.builder("root")
                 .child(Step.of("fail", ctx -> {
                     throw new RuntimeException("boom");
                 }))

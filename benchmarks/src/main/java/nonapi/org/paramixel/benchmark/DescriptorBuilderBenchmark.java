@@ -39,8 +39,7 @@ import org.paramixel.api.action.Step;
 /**
  * Benchmark measuring descriptor tree construction time with varying depths and widths.
  *
- * <p>Isolates the cost of {@link DescriptorBuilder#discover} including cycle detection
- * and SchedulerPriorityKey assignment.
+ * <p>Isolates the cost of {@link DescriptorBuilder#discover} including cycle detection.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)

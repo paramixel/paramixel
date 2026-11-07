@@ -57,7 +57,6 @@
     <!-- Design -->
     <rule ref="category/java/design.xml">
         <exclude name="LawOfDemeter"/>
-        <exclude name="UseUtilityClass"/>
         <exclude name="LoosePackageCoupling"/>
         <exclude name="ClassWithOnlyPrivateConstructorsShouldBeFinal"/>
         <exclude name="TooManyMethods"/>
@@ -83,6 +82,16 @@
     <rule ref="category/java/design.xml/NcssCount">
         <properties>
             <property name="methodReportLevel" value="100"/>
+        </properties>
+    </rule>
+
+    <!-- The examples module is a fluent-DSL demonstration: each file statically imports the
+         framework factories it shows (up to 12 in the named-builder examples). Core, plugin, and
+         benchmark production sources use no static imports at all, so this ceiling mutes nothing
+         outside examples. -->
+    <rule ref="category/java/codestyle.xml/TooManyStaticImports">
+        <properties>
+            <property name="maximumStaticImports" value="16"/>
         </properties>
     </rule>
     

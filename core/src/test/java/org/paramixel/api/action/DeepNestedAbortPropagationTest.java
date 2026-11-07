@@ -147,13 +147,10 @@ class DeepNestedAbortPropagationTest {
             }));
         }
 
-        var level4 = Parallel.builder("level-4")
-                .parallelism(1)
-                .child(innermost.build())
-                .build();
-        var level3 = Parallel.builder("level-3").parallelism(1).child(level4).build();
-        var level2 = Parallel.builder("level-2").parallelism(1).child(level3).build();
-        var level1 = Parallel.builder("level-1").parallelism(1).child(level2).build();
+        var level4 = Parallel.builder("level-4").child(innermost.build()).build();
+        var level3 = Parallel.builder("level-3").child(level4).build();
+        var level2 = Parallel.builder("level-2").child(level3).build();
+        var level1 = Parallel.builder("level-1").child(level2).build();
 
         var timeout = Timeout.builder("outer-timeout")
                 .body(level1)
@@ -203,10 +200,8 @@ class DeepNestedAbortPropagationTest {
                 .child(innerParallel.build())
                 .build();
 
-        var outerParallel = Parallel.builder("outer-parallel")
-                .parallelism(1)
-                .child(innerSequential)
-                .build();
+        var outerParallel =
+                Parallel.builder("outer-parallel").child(innerSequential).build();
 
         var outerSequential =
                 Sequential.builder("outer-sequential").child(outerParallel).build();
@@ -303,12 +298,9 @@ class DeepNestedAbortPropagationTest {
         }
 
         // Wrap in multiple levels to force nested managedJoin calls
-        var level4 = Parallel.builder("level-4")
-                .parallelism(1)
-                .child(innerParallel.build())
-                .build();
-        var level3 = Parallel.builder("level-3").parallelism(1).child(level4).build();
-        var level2 = Parallel.builder("level-2").parallelism(1).child(level3).build();
+        var level4 = Parallel.builder("level-4").child(innerParallel.build()).build();
+        var level3 = Parallel.builder("level-3").child(level4).build();
+        var level2 = Parallel.builder("level-2").child(level3).build();
 
         var timeout = Timeout.builder("outer-timeout")
                 .body(level2)

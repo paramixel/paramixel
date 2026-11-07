@@ -47,6 +47,7 @@ public final class ConcreteRunner implements Runner {
     private final Configuration configuration;
     private final int parallelism;
     private final int schedulerQueueCapacity;
+    private final int schedulerConcurrencyCap;
     private final boolean shuffled;
     private final long seed;
 
@@ -80,6 +81,7 @@ public final class ConcreteRunner implements Runner {
         this.configuration = configuration != null ? configuration : Configuration.defaultConfiguration();
         this.parallelism = resolveParallelism(this.configuration);
         this.schedulerQueueCapacity = resolveSchedulerQueueCapacity(this.configuration);
+        this.schedulerConcurrencyCap = resolveSchedulerConcurrencyCap(this.configuration);
         this.shuffled = shuffled;
         this.seed = seed;
     }
@@ -113,7 +115,7 @@ public final class ConcreteRunner implements Runner {
             root = new DescriptorBuilder().discover(action);
             safeListener.onDiscoveryCompleted(root);
             discoveryCompleted = true;
-            scheduler = new Scheduler(parallelism, schedulerQueueCapacity);
+            scheduler = new Scheduler(parallelism, schedulerQueueCapacity, schedulerConcurrencyCap);
             scheduler.setFailFast(
                     configuration.getBoolean(Configuration.FAIL_FAST).orElse(false));
             var context = new ConcreteContext(configuration, safeListener, root, scheduler, new InstanceHolder());
@@ -180,6 +182,19 @@ public final class ConcreteRunner implements Runner {
         final int value = optionalParallelism.get();
         if (value <= 0) {
             throw new ConfigurationException("Invalid configuration for '" + Configuration.RUNNER_PARALLELISM
+                    + "': expected positive integer but was '" + value + "'");
+        }
+        return value;
+    }
+
+    private static int resolveSchedulerConcurrencyCap(final Configuration configuration) {
+        final var optionalCap = configuration.getInteger(Configuration.SCHEDULER_CONCURRENCY_CAP);
+        if (optionalCap.isEmpty()) {
+            return Integer.MAX_VALUE;
+        }
+        final int value = optionalCap.get();
+        if (value <= 0) {
+            throw new ConfigurationException("Invalid configuration for '" + Configuration.SCHEDULER_CONCURRENCY_CAP
                     + "': expected positive integer but was '" + value + "'");
         }
         return value;

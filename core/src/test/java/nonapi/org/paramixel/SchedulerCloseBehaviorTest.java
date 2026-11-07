@@ -148,8 +148,11 @@ class SchedulerCloseBehaviorTest {
             var context = newContext(scheduler);
             var root = contextRoot(context);
 
+            var leaves = new ArrayList<MutableDescriptor>(4);
             for (var i = 0; i < 4; i++) {
-                var leaf = newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {}));
+                leaves.add(newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {})));
+            }
+            for (var leaf : leaves) {
                 scheduler.schedule(leaf, ExecutionMode.RUN, context).join();
             }
 
@@ -185,11 +188,11 @@ class SchedulerCloseBehaviorTest {
                     Thread.currentThread().interrupt();
                 }
             }));
+            // Schedule a leaf that will wait for a permit (all parallelism permits used)
+            var blockedLeaf = newChildDescriptor(root, Step.of("blocked", innerContext -> {}));
             scheduler.schedule(holder, ExecutionMode.RUN, context);
             holdStarted.await(); // holder acquired one permit
 
-            // Schedule a leaf that will wait for a permit (all parallelism permits used)
-            var blockedLeaf = newChildDescriptor(root, Step.of("blocked", innerContext -> {}));
             scheduler.schedule(blockedLeaf, ExecutionMode.RUN, context);
             Thread.sleep(500); // give time for the waiter to queue
 
@@ -223,11 +226,14 @@ class SchedulerCloseBehaviorTest {
                 var root = contextRoot(context);
 
                 var started = new CountDownLatch(parallelism);
+                var leaves = new ArrayList<MutableDescriptor>(parallelism);
                 for (var i = 0; i < parallelism; i++) {
-                    var leaf = newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {
+                    leaves.add(newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {
                         started.countDown();
                         sleep(300);
-                    }));
+                    })));
+                }
+                for (var leaf : leaves) {
                     scheduler.schedule(leaf, ExecutionMode.RUN, context);
                 }
                 started.await(); // all leaves running, all permits held
@@ -253,9 +259,12 @@ class SchedulerCloseBehaviorTest {
                 var root = contextRoot(context);
 
                 var leafCount = parallelism * 3;
-                var futures = new ArrayList<CompletableFuture<org.paramixel.api.Descriptor>>(leafCount);
+                var leaves = new ArrayList<MutableDescriptor>(leafCount);
                 for (var i = 0; i < leafCount; i++) {
-                    var leaf = newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {}));
+                    leaves.add(newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {})));
+                }
+                var futures = new ArrayList<CompletableFuture<org.paramixel.api.Descriptor>>(leafCount);
+                for (var leaf : leaves) {
                     futures.add(scheduler.schedule(leaf, ExecutionMode.RUN, context));
                 }
                 CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
@@ -285,11 +294,14 @@ class SchedulerCloseBehaviorTest {
 
             // Two leaves that hold permits for a known duration
             var leafRunning = new CountDownLatch(parallelism);
+            var leaves = new ArrayList<MutableDescriptor>(parallelism);
             for (var i = 0; i < parallelism; i++) {
-                var leaf = newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {
+                leaves.add(newChildDescriptor(root, Step.of("leaf-" + i, innerContext -> {
                     leafRunning.countDown();
                     sleep(2_000);
-                }));
+                })));
+            }
+            for (var leaf : leaves) {
                 scheduler.schedule(leaf, ExecutionMode.RUN, context);
             }
             leafRunning.await(); // both leaves running, permits held, available = 0
@@ -705,11 +717,11 @@ class SchedulerCloseBehaviorTest {
                         Thread.currentThread().interrupt();
                     }
                 }));
+                // Schedule a waiter that will need a permit.
+                var blocked = newChildDescriptor(root, Step.of("blocked", innerContext -> {}));
                 scheduler.schedule(holder, ExecutionMode.RUN, context);
                 holdStarted.await();
 
-                // Schedule a waiter that will need a permit.
-                var blocked = newChildDescriptor(root, Step.of("blocked", innerContext -> {}));
                 scheduler.schedule(blocked, ExecutionMode.RUN, context);
 
                 // Interrupt before close().
@@ -757,15 +769,16 @@ class SchedulerCloseBehaviorTest {
                     Thread.currentThread().interrupt();
                 }
             }));
-            scheduler.schedule(blocker, ExecutionMode.RUN, context);
-            assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
-
-            // Second task: queues behind the blocker.
+            // Second task: queues behind the blocker. It must join the tree before the first
+            // scheduling call, because scheduling compiles and freezes the tree.
             var queuedExecuted = new AtomicBoolean();
             var callbackCount = new AtomicInteger();
             var queuedLeaf = newChildDescriptor(root, Step.of("queued", innerContext -> {
                 queuedExecuted.set(true);
             }));
+            scheduler.schedule(blocker, ExecutionMode.RUN, context);
+            assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
             var callback = new Scheduler.ExecutionCallback() {
                 @Override
                 public void onExecutionStart() {}
@@ -853,15 +866,16 @@ class SchedulerCloseBehaviorTest {
                     Thread.currentThread().interrupt();
                 }
             }));
-            scheduler.schedule(blocker, ExecutionMode.RUN, context);
-            assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
-
-            // Second task: queues behind the blocker.
+            // Second task: queues behind the blocker. It must join the tree before the first
+            // scheduling call, because scheduling compiles and freezes the tree.
             var queuedExecuted = new AtomicBoolean();
             var callbackCount = new AtomicInteger();
             var queuedLeaf = newChildDescriptor(root, Step.of("queued", innerContext -> {
                 queuedExecuted.set(true);
             }));
+            scheduler.schedule(blocker, ExecutionMode.RUN, context);
+            assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
             var callback = new Scheduler.ExecutionCallback() {
                 @Override
                 public void onExecutionStart() {}

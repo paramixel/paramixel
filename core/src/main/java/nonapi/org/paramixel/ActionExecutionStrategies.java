@@ -28,6 +28,7 @@ import nonapi.org.paramixel.action.ExecutionNode;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.action.StatusAccumulator;
 import nonapi.org.paramixel.support.Arguments;
+import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.ContextConsumer;
 import org.paramixel.api.Descriptor;
@@ -211,16 +212,14 @@ final class ActionExecutionStrategies {
             return Status.PASSED;
         }
 
-        // R2: a node's declared parallelism is a share of the global ceiling. Queue capacity is a
-        // backpressure bound on admission, not a concurrency bound, so it is deliberately absent.
-        var effectiveParallelism =
-                Math.max(1, Math.min(parallel.parallelism(), context.scheduler().parallelism()));
-
+        // Every child of a parallel node is ready at once. The node's declared parallelism is not an
+        // admission window: it is a cap on how many leaf tasks in this subtree may be running at the
+        // same time, enforced by the scheduler's leaf gate against the descriptor's action. A
+        // parallel node therefore never withholds a child, and a child subtree's own fan-out is
+        // bounded by its own caps and the global caps, never by this node's readiness.
         var node = createNode(descriptor, context);
         node.children = new ArrayList<>(children);
-        node.cap = effectiveParallelism;
         node.childIndex = 0;
-        node.runningChildren = 0;
         node.continueOnEveryChildCompletion = true;
         node.aggregator = new StatusAccumulator();
         node.continuation = () -> continueParallel(node, context);
@@ -248,21 +247,21 @@ final class ActionExecutionStrategies {
     }
 
     /**
-     * Admits parallel children while the local window has room, stopping without advancing the
-     * cursor when an admission is deferred for ready capacity.
+     * Makes every parallel child ready, stopping without advancing the cursor when an admission is
+     * deferred for ready capacity.
+     *
+     * <p>A deferred admission is a backpressure signal from the scheduler's admission permits, not a
+     * concurrency bound: the child at the cursor was not dispatched, so the cursor rolls back and a
+     * capacity wakeup resumes from it via {@code node.admissionRetry}.
      */
     private static void admitParallelChildren(final ExecutionNode node, final ConcreteContext context) {
         var children = node.children;
-        while (node.runningChildren < node.cap && node.childIndex < children.size()) {
+        while (node.childIndex < children.size()) {
             var child = Arguments.requireInstanceOf(
                     children.get(node.childIndex), MutableDescriptor.class, "child must be a MutableDescriptor");
             node.childIndex++;
-            node.runningChildren++;
             if (scheduleChild(child, ExecutionMode.RUN, node, context, false) == Admission.DEFERRED) {
-                // The child at the cursor was not dispatched; roll the cursor back and stop
-                // admitting. A capacity wakeup resumes from this cursor via node.admissionRetry.
                 node.childIndex--;
-                node.runningChildren--;
                 return;
             }
         }
@@ -273,10 +272,8 @@ final class ActionExecutionStrategies {
             if (node.descriptor.executionNode() != node) {
                 return;
             }
-            if (node.runningChildren > 0) {
-                node.runningChildren--;
-            }
-
+            // Re-evaluated on every child completion: readiness can grow (more children admitted)
+            // and the completion has already released its leaf capacity.
             admitParallelChildren(node, context);
 
             if (node.pendingChildCount() == 0 && node.childIndex >= node.children.size()) {
@@ -632,14 +629,10 @@ final class ActionExecutionStrategies {
      */
     private static void dispatchTimeoutChild(
             final ExecutionNode node, final MutableDescriptor childDescriptor, final ConcreteContext context) {
-        try {
-            // A deferred admission parks the child; the deadline timer and the capacity retry
-            // (which re-enters this method) take over. Not inlined: the deadline must be armed
-            // before the body runs.
-            scheduleChild(childDescriptor, ExecutionMode.RUN, node, context, false);
-        } catch (Throwable t) {
-            signalChildSchedulingFailure(node);
-        }
+        // A deferred admission parks the child; the deadline timer and the capacity retry (which
+        // re-enters this method) take over. Not inlined: the deadline must be armed before the
+        // body runs. Scheduling failures are accounted for inside scheduleChild.
+        scheduleChild(childDescriptor, ExecutionMode.RUN, node, context, false);
     }
 
     private static void fireTimeout(
@@ -955,6 +948,12 @@ final class ActionExecutionStrategies {
      * registered so its {@code admissionRetry} resumes the strategy's cursor-based admission when
      * capacity becomes available.
      *
+     * <p>When scheduling throws, no completion event can ever arrive for the child. The failure is
+     * therefore charged against the child: it is terminalized so status aggregation and skip
+     * propagation see a real outcome, its pending increment is rolled back exactly once, and the
+     * parent is advanced as a completion would advance it. Swallowing the throwable without that
+     * accounting would leave the parent waiting on a completion that cannot happen.
+     *
      * @param child the child descriptor to schedule; must not be {@code null}
      * @param mode the execution mode; must not be {@code null}
      * @param parentNode the coordination node whose strategy owns the cursor; must not be
@@ -977,10 +976,11 @@ final class ActionExecutionStrategies {
             if (allowInline
                     && mode == ExecutionMode.RUN
                     && mutableChild.isLeafAction()
-                    && context.scheduler().canExecuteChildInline(mutableChild)) {
-                // No hand-off: the parent is advancing a one-at-a-time child, and nothing queued
-                // outranks it.
-                context.scheduler().executeChildInline(mutableChild, mode, context);
+                    && context.scheduler().canExecuteChildInline(mutableChild)
+                    && context.scheduler().executeChildInline(mutableChild, mode, context)) {
+                // No hand-off: the parent is advancing a one-at-a-time child, nothing queued
+                // outranks it, and its leaf capacity was available. When capacity is unavailable the
+                // child falls through to dispatch, where it waits in rank order for a slot.
                 return Admission.ADMITTED;
             }
             if (context.scheduler().dispatchChild(mutableChild, mode, context, parentNode)
@@ -991,11 +991,38 @@ final class ActionExecutionStrategies {
             }
             return Admission.ADMITTED;
         } catch (Throwable t) {
-            parentNode.decrementPendingChildren();
+            var cause = Throwables.unwrap(t);
+            UnrecoverableErrors.rethrowIfUnrecoverable(cause);
+            terminalizeUnscheduledChild(mutableChild, cause);
             parentNode.attemptedChildren--;
+            // Rolls back the pending increment and schedules the continuation that advances the
+            // node, so the child is accounted for exactly once.
             signalChildSchedulingFailure(parentNode);
             return Admission.ADMITTED;
         }
+    }
+
+    /**
+     * Marks a child that could not be scheduled terminal.
+     *
+     * <p>Mirrors the scheduler's handling of a rejected submission: the descriptor state machine
+     * requires {@code PENDING -> RUNNING -> terminal}, so a pending child is moved through
+     * {@code RUNNING} first. Leaving the child pending would aggregate as non-terminal and leave
+     * the parent's own status unresolved. Idempotent: an already terminal child is left alone.
+     *
+     * @param child the child descriptor that was never dispatched; must not be {@code null}
+     * @param cause the scheduling failure; must not be {@code null}
+     */
+    private static void terminalizeUnscheduledChild(final MutableDescriptor child, final Throwable cause) {
+        if (child.isCompleted()) {
+            return;
+        }
+        if (child.status().isPending()) {
+            child.setStatus(Status.RUNNING);
+        }
+        var message = cause.getMessage() != null ? cause.getMessage() : "child could not be scheduled";
+        child.setStatus(Status.failed(message, cause));
+        child.completeFutureExceptionally(cause);
     }
 
     private static void signalChildSchedulingFailure(final ExecutionNode node) {

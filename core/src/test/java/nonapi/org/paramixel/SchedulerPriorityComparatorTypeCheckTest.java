@@ -26,8 +26,8 @@ import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.Semaphore;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.DescriptorOrder;
 import nonapi.org.paramixel.action.MutableDescriptor;
-import nonapi.org.paramixel.action.SchedulerPriorityKey;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -40,6 +40,15 @@ class SchedulerPriorityComparatorTypeCheckTest {
     private static final Scheduler SCHEDULER;
     private static final ConcreteContext CONTEXT;
 
+    /**
+     * Two sibling descriptors of one compiled tree: the earlier child has the lower rank, so a
+     * task built for it must outrank a task built for the later child regardless of the order the
+     * tasks themselves were submitted in.
+     */
+    private static final MutableDescriptor FIRST_CHILD;
+
+    private static final MutableDescriptor SECOND_CHILD;
+
     static {
         SCHEDULER = new Scheduler(1, 32);
         var configuration = Configuration.of(Map.of(
@@ -48,6 +57,13 @@ class SchedulerPriorityComparatorTypeCheckTest {
                 Configuration.ANSI, "false"));
         var descriptor = new ConcreteDescriptor(Step.of("test", ctx -> {}));
         CONTEXT = new ConcreteContext(configuration, new Listener() {}, descriptor, SCHEDULER, new InstanceHolder());
+
+        var root = new ConcreteDescriptor(Step.of("root", ctx -> {}));
+        FIRST_CHILD = new ConcreteDescriptor(Step.of("first", ctx -> {}));
+        SECOND_CHILD = new ConcreteDescriptor(Step.of("second", ctx -> {}));
+        root.addChild(FIRST_CHILD);
+        root.addChild(SECOND_CHILD);
+        DescriptorOrder.compile(root);
     }
 
     @Test
@@ -55,10 +71,9 @@ class SchedulerPriorityComparatorTypeCheckTest {
     void comparatorAcceptsPrioritizedTaskInstances() throws Exception {
         var comparator = getPriorityComparator();
 
-        var leftKey = SchedulerPriorityKey.root().child(0).child(0);
-        var rightKey = SchedulerPriorityKey.root().child(0).child(1);
-        var leftTask = createPrioritizedTask(leftKey, 1L);
-        var rightTask = createPrioritizedTask(rightKey, 2L);
+        // The later child is submitted first: rank must win over submission sequence.
+        var leftTask = createPrioritizedTask(FIRST_CHILD, 5L);
+        var rightTask = createPrioritizedTask(SECOND_CHILD, 1L);
 
         int result = comparator.compare(leftTask, rightTask);
         assertThat(result).isNegative();
@@ -70,8 +85,7 @@ class SchedulerPriorityComparatorTypeCheckTest {
         var comparator = getPriorityComparator();
 
         Runnable leftNotPrioritized = () -> {};
-        var rightKey = SchedulerPriorityKey.root().child(0);
-        var rightTask = createPrioritizedTask(rightKey, 1L);
+        var rightTask = createPrioritizedTask(FIRST_CHILD, 1L);
 
         assertThatThrownBy(() -> comparator.compare(leftNotPrioritized, rightTask))
                 .isInstanceOf(ClassCastException.class)
@@ -84,8 +98,7 @@ class SchedulerPriorityComparatorTypeCheckTest {
     void comparatorThrowsWhenRightIsNotPrioritizedTask() throws Exception {
         var comparator = getPriorityComparator();
 
-        var leftKey = SchedulerPriorityKey.root().child(0);
-        var leftTask = createPrioritizedTask(leftKey, 1L);
+        var leftTask = createPrioritizedTask(FIRST_CHILD, 1L);
         Runnable rightNotPrioritized = () -> {};
 
         assertThatThrownBy(() -> comparator.compare(leftTask, rightNotPrioritized))
@@ -114,8 +127,7 @@ class SchedulerPriorityComparatorTypeCheckTest {
         var comparator = getPriorityComparator();
         var queue = new PriorityBlockingQueue<>(11, comparator);
 
-        var key = SchedulerPriorityKey.root().child(0);
-        var prioritizedTask = createPrioritizedTask(key, 1L);
+        var prioritizedTask = createPrioritizedTask(FIRST_CHILD, 1L);
         queue.offer(prioritizedTask);
         assertThat(queue).hasSize(1);
 
@@ -130,11 +142,10 @@ class SchedulerPriorityComparatorTypeCheckTest {
         return (Comparator<Runnable>) comparatorField.get(null);
     }
 
-    private static Runnable createPrioritizedTask(SchedulerPriorityKey priorityKey, long sequence) throws Exception {
+    private static Runnable createPrioritizedTask(MutableDescriptor descriptor, long sequence) throws Exception {
         var prioritizedTaskClass =
                 Class.forName("nonapi.org.paramixel.Scheduler$PrioritizedTask", true, Scheduler.class.getClassLoader());
         var constructor = prioritizedTaskClass.getDeclaredConstructor(
-                SchedulerPriorityKey.class,
                 long.class,
                 MutableDescriptor.class,
                 ConcreteContext.class,
@@ -145,9 +156,8 @@ class SchedulerPriorityComparatorTypeCheckTest {
                 Scheduler.class);
         constructor.setAccessible(true);
         return (Runnable) constructor.newInstance(
-                priorityKey,
                 sequence,
-                CONTEXT.descriptor(),
+                descriptor,
                 CONTEXT,
                 ExecutionMode.RUN,
                 new CompletableFuture<>(),

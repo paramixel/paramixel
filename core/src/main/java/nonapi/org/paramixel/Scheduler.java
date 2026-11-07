@@ -18,6 +18,7 @@ package nonapi.org.paramixel;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -43,9 +44,9 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.DescriptorOrder;
 import nonapi.org.paramixel.action.ExecutionNode;
 import nonapi.org.paramixel.action.MutableDescriptor;
-import nonapi.org.paramixel.action.SchedulerPriorityKey;
 import nonapi.org.paramixel.exception.UserCodeException;
 import nonapi.org.paramixel.listener.Listeners;
 import nonapi.org.paramixel.support.BackoffDelay;
@@ -55,6 +56,7 @@ import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Isolated;
+import org.paramixel.api.action.Parallel;
 import org.paramixel.api.exception.FailException;
 
 /**
@@ -64,9 +66,9 @@ import org.paramixel.api.exception.FailException;
  * {@code paramixel.parallelism}. Terminal action execution is additionally bounded by permits so only
  * leaf actions consume global work capacity.
  *
- * <p>The global ready queue is ordered by immutable descriptor tree keys
- * ({@link SchedulerPriorityKey}), yielding deterministic DFS-like subtree preference
- * (continuations before lateral siblings) while preserving global and local parallelism caps.
+ * <p>The global ready queue is ordered by the compiled structural order of the descriptor tree
+ * ({@link DescriptorOrder}), yielding deterministic DFS-like subtree preference (continuations
+ * before lateral siblings) while preserving global and local parallelism caps.
  *
  * <p>Coordinator threads that block on a child future via {@link #managedJoin(CompletableFuture)}
  * work-steal from the ready queue while waiting, parking with a bounded backoff when the queue is
@@ -113,6 +115,9 @@ public final class Scheduler implements AutoCloseable {
     private static final long EXECUTOR_TERMINATION_TIMEOUT_SECONDS = 5L;
     private static final int DEFAULT_QUEUE_CAPACITY = 1_024;
     private static final long MANAGED_JOIN_BACKOFF_FLOOR_NANOS = 1_000L; // 1 microsecond
+    /** Park interval for a thread waiting on leaf capacity outside the admission path. */
+    private static final long LEAF_CAPACITY_PARK_NANOS = 1_000L; // 1 microsecond
+
     private static final long MANAGED_JOIN_BACKOFF_CEILING_NANOS = 1_000_000_000L; // 1 second
     private static final double MANAGED_JOIN_BACKOFF_GROWTH_FACTOR = 4.0;
     private static final long ISOLATION_JOIN_PARK_CEILING_NANOS = 10_000_000L; // 10 ms
@@ -125,16 +130,16 @@ public final class Scheduler implements AutoCloseable {
     private static final int INLINE_CONTINUATION_MAX_DEPTH = 16;
 
     private static final Comparator<Runnable> PRIORITY_COMPARATOR = (left, right) -> {
-        var leftKey = priorityKeyOf(left);
-        var rightKey = priorityKeyOf(right);
-        if (leftKey != null && rightKey != null) {
-            var keyComparison = leftKey.compareTo(rightKey);
-            if (keyComparison != 0) {
-                return keyComparison;
+        if (left instanceof ScheduledTask leftTask && right instanceof ScheduledTask rightTask) {
+            // Ranks are compiled per tree, so they are only comparable within one compilation.
+            // A scheduler driving more than one root tree therefore falls back to compilation
+            // order, which keeps the total order deterministic across trees.
+            var treeComparison = Long.compare(leftTask.orderTreeId(), rightTask.orderTreeId());
+            if (treeComparison != 0) {
+                return treeComparison;
             }
-            var leftSeq = sequenceOf(left);
-            var rightSeq = sequenceOf(right);
-            return Long.compare(leftSeq, rightSeq);
+            var rankComparison = Long.compare(leftTask.orderRank(), rightTask.orderRank());
+            return rankComparison != 0 ? rankComparison : Long.compare(leftTask.sequence(), rightTask.sequence());
         }
         throw new ClassCastException("PRIORITY_COMPARATOR requires PrioritizedTask or ContinuationTask, got: "
                 + (left != null ? left.getClass().getName() : "null")
@@ -143,7 +148,7 @@ public final class Scheduler implements AutoCloseable {
     };
 
     /**
-     * Total order over queued descriptor tasks: structural key, then submission sequence.
+     * Total order over queued descriptor tasks: compiled structural rank, then submission sequence.
      *
      * <p>Deferred-work queues (isolation deferrals and relinquished ready tasks) use this order so
      * that depth-first preference (R3) survives deferral, not just the ready queue.
@@ -151,18 +156,85 @@ public final class Scheduler implements AutoCloseable {
     private static final Comparator<PrioritizedTask> TASK_ORDER =
             (left, right) -> PRIORITY_COMPARATOR.compare(left, right);
 
-    private static SchedulerPriorityKey priorityKeyOf(final Runnable task) {
-        return task instanceof ScheduledTask scheduled ? scheduled.priorityKey() : null;
-    }
-
-    private static long sequenceOf(final Runnable task) {
-        return task instanceof ScheduledTask scheduled ? scheduled.sequence() : 0L;
-    }
-
     private final int queueCapacity;
     private final Semaphore queuePermits;
     private final Semaphore leafPermits;
     private final int parallelism;
+    /**
+     * Maximum number of leaf action bodies running at the same time across the whole tree.
+     *
+     * <p>Independent of the thread pool size: effective global concurrency is
+     * {@code min(parallelism, concurrencyCap)}. {@link Integer#MAX_VALUE} means unlimited, so the
+     * thread pool is the only global bound.
+     */
+    private final int concurrencyCap;
+    /**
+     * Effective global leaf concurrency: {@code min(parallelism, concurrencyCap)}.
+     */
+    private final int effectiveLeafConcurrency;
+    /**
+     * Serializes leaf-capacity reservations so that starting a leaf is atomic with respect to every
+     * capped ancestor and the global cap. Also guards {@link #cappedNodes}, {@link #leafCapChains},
+     * {@link #gatedLeaves}, and {@link #admittedLeafBodies}.
+     */
+    private final ReentrantLock leafGateLock = new ReentrantLock();
+    /**
+     * Running-leaf counters for capped nodes, keyed by the capped descriptor.
+     *
+     * <p>Guarded by {@link #leafGateLock}.
+     */
+    private final IdentityHashMap<MutableDescriptor, CapState> cappedNodes = new IdentityHashMap<>();
+    /**
+     * Cached capped-ancestor chains, keyed by leaf descriptor.
+     *
+     * <p>Guarded by {@link #leafGateLock}.
+     */
+    private final IdentityHashMap<MutableDescriptor, List<CapState>> leafCapChains = new IdentityHashMap<>();
+    /**
+     * Leaves that have been admitted but are held back because the global cap or a capped ancestor
+     * is at its limit. Ordered by compiled rank so the fill pass takes the highest-priority
+     * candidate first, exactly like the ready queue.
+     *
+     * <p>Guarded by {@link #leafGateLock}.
+     */
+    private final PriorityQueue<PrioritizedTask> gatedLeaves = new PriorityQueue<>(TASK_ORDER);
+    /**
+     * Number of leaf bodies holding a capacity reservation: running, or reserved and about to run.
+     *
+     * <p>Guarded by {@link #leafGateLock}.
+     */
+    private int admittedLeafBodies;
+    /**
+     * Coordination descriptors that are currently executing their admission step, keyed by compiled
+     * order.
+     *
+     * <p>A leaf is not promoted out of the gated ready set while an earlier-ranked coordination
+     * descriptor is still expanding, because that subtree may be about to make an earlier leaf
+     * ready. Without this, a later sibling's leaf can take the only slot during the hand-off that
+     * expands the earlier sibling, which inverts depth-first order at low thread counts. The wait is
+     * bounded by one admission step: the entry is removed as soon as the descriptor parks or
+     * completes, and removing it triggers a fill pass.
+     */
+    private final java.util.concurrent.ConcurrentSkipListSet<ExpansionKey> expandingCoordination =
+            new java.util.concurrent.ConcurrentSkipListSet<>();
+    /**
+     * The innermost coordination descriptor currently expanding on this thread, so that inline leaf
+     * execution can suspend it: a descriptor running a child body inline is no longer expanding, and
+     * holding its entry would idle later siblings for the whole duration of that body.
+     */
+    private final ThreadLocal<ExpansionKey> currentExpansion = new ThreadLocal<>();
+    /**
+     * Coordination descriptor tasks that are queued and have not started yet, keyed by compiled
+     * order.
+     *
+     * <p>Part of the same depth-first guard as {@link #expandingCoordination}: a queued coordination
+     * task may still make an earlier leaf ready, so a later sibling's leaf must not take the last
+     * slot ahead of it. A queued coordination task is never cap-blocked, so the wait it imposes is
+     * bounded by one hand-off.
+     */
+    private final java.util.concurrent.ConcurrentSkipListSet<ExpansionKey> pendingCoordination =
+            new java.util.concurrent.ConcurrentSkipListSet<>();
+
     private final boolean allowCoreThreadTimeout;
     private final ThreadPoolExecutor executor;
     private final ScheduledExecutorService delayExecutor;
@@ -224,18 +296,28 @@ public final class Scheduler implements AutoCloseable {
     /**
      * A task submitted to this scheduler's priority queue.
      *
-     * <p>Every queued task exposes the ordering key, the submission sequence, and the descriptor
-     * it advances. Modeling the three properties as one type keeps the priority comparator and the
-     * work-stealing eligibility check free of per-implementation type tests.
+     * <p>Every queued task exposes the compiled order rank, the identity of the compilation that
+     * produced it, the submission sequence, and the descriptor it advances. Modeling the four
+     * properties as one type keeps the priority comparator and the work-stealing eligibility check
+     * free of per-implementation type tests.
      */
     private interface ScheduledTask extends Runnable {
 
         /**
-         * Returns the ordering key derived from the descriptor path.
+         * Returns the identity of the compilation that produced {@link #orderRank()}.
          *
-         * @return the ordering key; never {@code null}
+         * @return the compilation identity
          */
-        SchedulerPriorityKey priorityKey();
+        long orderTreeId();
+
+        /**
+         * Returns the compiled structural rank of the descriptor this task advances.
+         *
+         * <p>Ranks are tree-local and totally ordered: a lower rank is served first.
+         *
+         * @return the order rank, always non-negative
+         */
+        long orderRank();
 
         /**
          * Returns the submission sequence used to break ordering-key ties.
@@ -314,7 +396,26 @@ public final class Scheduler implements AutoCloseable {
      *     positive
      */
     Scheduler(final int parallelism, final int queueCapacity) {
-        this(parallelism, queueCapacity, true);
+        this(parallelism, queueCapacity, true, null, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Creates a scheduler with the given parallelism, queue capacity, and maximum overall leaf
+     * concurrency.
+     *
+     * <p>{@code concurrencyCap} bounds the number of leaf action bodies running at the same time
+     * across the whole tree, independently of the thread pool size: effective global leaf
+     * concurrency is {@code min(parallelism, concurrencyCap)}. {@link Integer#MAX_VALUE} means the
+     * pool size is the only global bound.
+     *
+     * @param parallelism the maximum concurrent leaf execution count (must be positive)
+     * @param queueCapacity global admission permit count and initial queue allocation (must be
+     *     positive)
+     * @param concurrencyCap the maximum concurrent leaf count across the tree (must be positive)
+     * @throws IllegalArgumentException if any argument is not positive
+     */
+    Scheduler(final int parallelism, final int queueCapacity, final int concurrencyCap) {
+        this(parallelism, queueCapacity, true, null, concurrencyCap);
     }
 
     /**
@@ -334,23 +435,7 @@ public final class Scheduler implements AutoCloseable {
      *     positive
      */
     Scheduler(final int parallelism, final int queueCapacity, final boolean allowCoreThreadTimeout) {
-        if (parallelism <= 0) {
-            throw new IllegalArgumentException("parallelism must be positive, was: " + parallelism);
-        }
-        if (queueCapacity <= 0) {
-            throw new IllegalArgumentException("queueCapacity must be positive, was: " + queueCapacity);
-        }
-        this.parallelism = parallelism;
-        this.queueCapacity = queueCapacity;
-        this.allowCoreThreadTimeout = allowCoreThreadTimeout;
-        this.queuePermits = new Semaphore(queueCapacity);
-        this.leafPermits = new Semaphore(parallelism);
-        this.executor = createExecutor(defaultThreadFactory());
-        this.delayExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            var thread = new Thread(runnable, THREAD_NAME + "-delay");
-            thread.setDaemon(true);
-            return thread;
-        });
+        this(parallelism, queueCapacity, allowCoreThreadTimeout, null, Integer.MAX_VALUE);
     }
 
     /**
@@ -375,19 +460,45 @@ public final class Scheduler implements AutoCloseable {
             final int queueCapacity,
             final boolean allowCoreThreadTimeout,
             final ThreadFactory threadFactory) {
+        this(parallelism, queueCapacity, allowCoreThreadTimeout, threadFactory, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Creates a scheduler with every option explicit.
+     *
+     * @param parallelism the thread pool size and default global leaf bound (must be positive)
+     * @param queueCapacity global admission permit count and initial queue allocation (must be
+     *     positive)
+     * @param allowCoreThreadTimeout whether idle scheduler threads may be terminated
+     * @param threadFactory the factory for executor worker threads, or {@code null} for the default
+     * @param concurrencyCap the maximum concurrent leaf count across the tree; {@link
+     *     Integer#MAX_VALUE} for no separate overall cap
+     * @throws IllegalArgumentException if {@code parallelism}, {@code queueCapacity}, or {@code
+     *     concurrencyCap} is not positive
+     */
+    private Scheduler(
+            final int parallelism,
+            final int queueCapacity,
+            final boolean allowCoreThreadTimeout,
+            final ThreadFactory threadFactory,
+            final int concurrencyCap) {
         if (parallelism <= 0) {
             throw new IllegalArgumentException("parallelism must be positive, was: " + parallelism);
         }
         if (queueCapacity <= 0) {
             throw new IllegalArgumentException("queueCapacity must be positive, was: " + queueCapacity);
         }
-        Objects.requireNonNull(threadFactory, "threadFactory is null");
+        if (concurrencyCap <= 0) {
+            throw new IllegalArgumentException("concurrencyCap must be positive, was: " + concurrencyCap);
+        }
         this.parallelism = parallelism;
         this.queueCapacity = queueCapacity;
+        this.concurrencyCap = concurrencyCap;
+        this.effectiveLeafConcurrency = Math.min(parallelism, concurrencyCap);
         this.allowCoreThreadTimeout = allowCoreThreadTimeout;
         this.queuePermits = new Semaphore(queueCapacity);
-        this.leafPermits = new Semaphore(parallelism);
-        this.executor = createExecutor(threadFactory);
+        this.leafPermits = new Semaphore(effectiveLeafConcurrency);
+        this.executor = createExecutor(threadFactory != null ? threadFactory : defaultThreadFactory());
         this.delayExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
             var thread = new Thread(runnable, THREAD_NAME + "-delay");
             thread.setDaemon(true);
@@ -547,11 +658,10 @@ public final class Scheduler implements AutoCloseable {
 
     private PreparationOutcome prepareScheduledTask(
             final MutableDescriptor descriptor, final ConcreteContext parentContext) {
-        // Freeze is idempotent and does not interact with the scheduler's closing state,
-        // so it can be done outside the lock to reduce contention.
-        if (!descriptor.isFrozen()) {
-            descriptor.freeze();
-        }
+        // Compilation is idempotent and does not interact with the scheduler's closing state,
+        // so it can be done outside the lock to reduce contention. It also freezes the tree,
+        // which is what makes the compiled order immutable for the rest of the run.
+        DescriptorOrder.compile(descriptor);
 
         if (descriptor.isCompleted()) {
             // Descriptor was cancelled/aborted before submission (e.g. by a Timeout cascade).
@@ -655,10 +765,24 @@ public final class Scheduler implements AutoCloseable {
             final CompletableFuture<Descriptor> future,
             final ExecutionMode mode,
             final ExecutionCallback callback) {
-        var priorityKey = descriptor.schedulerPriorityKey();
         var sequence = taskSequence.getAndIncrement();
-        var task = new PrioritizedTask(
-                priorityKey, sequence, descriptor, context, mode, future, callback, queuePermits, this);
+        var task = new PrioritizedTask(sequence, descriptor, context, mode, future, callback, queuePermits, this);
+        if (descriptor.isLeafAction() && mode == ExecutionMode.RUN) {
+            // A runnable leaf is held in the gated ready set until the global cap and every capped
+            // ancestor have room, so a cap-blocked leaf can never occupy a thread or block a
+            // lower-ranked eligible leaf in the executor queue.
+            offerGatedLeaf(task);
+            return;
+        }
+        enqueueGatedTask(task);
+    }
+
+    /**
+     * Queues a leaf task whose capacity has already been reserved, or a task that is not gated.
+     *
+     * @param task the task to queue; must not be {@code null}
+     */
+    private void enqueueGatedTask(final PrioritizedTask task) {
         closingLock.lock();
         try {
             if (closing) {
@@ -666,11 +790,16 @@ public final class Scheduler implements AutoCloseable {
                 return;
             }
             try {
+                if (!task.descriptor.isLeafAction()) {
+                    pendingCoordination.add(new ExpansionKey(task.orderTreeId(), task.orderRank()));
+                }
                 executor.execute(task);
                 wakeParkedWaiters();
             } catch (RejectedExecutionException rejected) {
+                clearPendingCoordination(task);
                 rejectTask(task, rejected);
             } catch (Throwable t) {
+                clearPendingCoordination(task);
                 rejectTask(task, t);
                 recordUnrecoverableFailure(t);
                 UnrecoverableErrors.rethrowIfUnrecoverable(t);
@@ -698,6 +827,279 @@ public final class Scheduler implements AutoCloseable {
      */
     public int running() {
         return runningLeafCounter.get();
+    }
+
+    /**
+     * Attempts to reserve leaf capacity for {@code leaf}: one global slot and one slot on every
+     * capped ancestor.
+     *
+     * <p>The reservation is all-or-nothing and is made atomically with respect to every other leaf
+     * start, so a leaf can never be admitted past a cap because two threads raced.
+     *
+     * @param leaf the leaf descriptor about to run; must not be {@code null}
+     * @return {@code true} when the reservation was made and must be released with
+     *     {@link #releaseLeafCapacity(MutableDescriptor)}
+     */
+    boolean tryReserveLeafCapacity(final MutableDescriptor leaf) {
+        leafGateLock.lock();
+        try {
+            return canReserveLocked(leaf) && reserveLocked(leaf);
+        } finally {
+            leafGateLock.unlock();
+        }
+    }
+
+    /**
+     * Releases the reservation made by {@link #tryReserveLeafCapacity(MutableDescriptor)} and then
+     * fills any leaf that the release made eligible.
+     *
+     * @param leaf the leaf descriptor that finished; must not be {@code null}
+     */
+    void releaseLeafCapacity(final MutableDescriptor leaf) {
+        leafGateLock.lock();
+        try {
+            for (var state : capChainLocked(leaf)) {
+                if (state.running > 0) {
+                    state.running--;
+                }
+            }
+            if (admittedLeafBodies > 0) {
+                admittedLeafBodies--;
+            }
+        } finally {
+            leafGateLock.unlock();
+        }
+        pumpGatedLeaves();
+        wakeParkedWaiters();
+    }
+
+    /**
+     * Offers an admitted leaf to the gated ready set and fills whatever capacity is available.
+     *
+     * @param task the leaf task to hold until capacity allows it to run; must not be {@code null}
+     */
+    private void offerGatedLeaf(final PrioritizedTask task) {
+        leafGateLock.lock();
+        try {
+            gatedLeaves.add(task);
+        } finally {
+            leafGateLock.unlock();
+        }
+        pumpGatedLeaves();
+    }
+
+    /**
+     * Fills free leaf capacity from the gated ready set: the lowest-ranked leaf that is eligible
+     * right now is promoted into the executor queue, and a leaf blocked by a capped ancestor is
+     * skipped rather than dropped, so it never blocks a lower-ranked eligible leaf.
+     *
+     * <p>Promotion reserves the leaf's capacity, so a promoted leaf is guaranteed a slot by the
+     * time it runs and the gated set can never hold a leaf that a thread is waiting on.
+     */
+    private void pumpGatedLeaves() {
+        List<PrioritizedTask> promoted = null;
+        leafGateLock.lock();
+        try {
+            while (!gatedLeaves.isEmpty() && canReserveGloballyLocked()) {
+                PrioritizedTask candidate = null;
+                List<PrioritizedTask> skipped = null;
+                while (!gatedLeaves.isEmpty()) {
+                    var next = gatedLeaves.poll();
+                    if (!earlierExpansionInFlight(next.descriptor) && canReserveLocked(next.descriptor)) {
+                        candidate = next;
+                        break;
+                    }
+                    if (skipped == null) {
+                        skipped = new ArrayList<>();
+                    }
+                    skipped.add(next);
+                }
+                if (skipped != null) {
+                    gatedLeaves.addAll(skipped);
+                }
+                if (candidate == null) {
+                    break;
+                }
+                reserveLocked(candidate.descriptor);
+                if (promoted == null) {
+                    promoted = new ArrayList<>();
+                }
+                promoted.add(candidate);
+            }
+        } finally {
+            leafGateLock.unlock();
+        }
+        if (promoted != null) {
+            for (var task : promoted) {
+                task.capacityReserved = true;
+                enqueueGatedTask(task);
+            }
+            wakeParkedWaiters();
+        }
+    }
+
+    /**
+     * Returns whether the global cap has room. Callers must hold {@link #leafGateLock}.
+     *
+     * @return {@code true} when another leaf may be admitted
+     */
+    private boolean canReserveGloballyLocked() {
+        return admittedLeafBodies < effectiveLeafConcurrency;
+    }
+
+    /**
+     * Returns whether every capped ancestor of {@code leaf} has room. Callers must hold
+     * {@link #leafGateLock}.
+     *
+     * @param leaf the candidate leaf
+     * @return {@code true} when the leaf is eligible to start
+     */
+    private boolean canReserveLocked(final MutableDescriptor leaf) {
+        if (!canReserveGloballyLocked()) {
+            return false;
+        }
+        for (var state : capChainLocked(leaf)) {
+            if (state.running >= state.limit) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Increments the global and per-ancestor running counters for {@code leaf}. Callers must hold
+     * {@link #leafGateLock} and must have checked {@link #canReserveLocked}.
+     *
+     * @param leaf the leaf being admitted
+     * @return always {@code true}
+     */
+    private boolean reserveLocked(final MutableDescriptor leaf) {
+        for (var state : capChainLocked(leaf)) {
+            state.running++;
+        }
+        admittedLeafBodies++;
+        return true;
+    }
+
+    /**
+     * Returns the capped ancestors of {@code leaf}, creating their counters on first use. Callers
+     * must hold {@link #leafGateLock}.
+     *
+     * <p>The chain is computed once per leaf from the descriptor tree, so a leaf's eligibility test
+     * is a walk over a short array rather than over its ancestry.
+     *
+     * @param leaf the leaf descriptor
+     * @return the capped ancestors, root first
+     */
+    private List<CapState> capChainLocked(final MutableDescriptor leaf) {
+        var cached = leafCapChains.get(leaf);
+        if (cached != null) {
+            return cached;
+        }
+        var chain = new ArrayList<CapState>(2);
+        for (var parent = leaf.parent().orElse(null);
+                parent != null;
+                parent = parent.parent().orElse(null)) {
+            if (!(parent instanceof MutableDescriptor capped)) {
+                continue;
+            }
+            if (!(capped.action() instanceof Parallel parallel)) {
+                continue;
+            }
+            var declared = parallel.parallelism();
+            if (declared == Integer.MAX_VALUE) {
+                continue;
+            }
+            var limit = Math.max(1, Math.min(declared, parallelism));
+            chain.add(cappedNodes.computeIfAbsent(capped, ignored -> new CapState(limit)));
+        }
+        // Ancestors were collected bottom-up; reverse so the order is root-first and stable.
+        for (int i = 0, j = chain.size() - 1; i < j; i++, j--) {
+            var swap = chain.get(i);
+            chain.set(i, chain.get(j));
+            chain.set(j, swap);
+        }
+        var result = List.copyOf(chain);
+        leafCapChains.put(leaf, result);
+        return result;
+    }
+
+    /**
+     * Returns whether an earlier-ranked coordination descriptor is still expanding.
+     *
+     * <p>Only descriptors from the same compilation are comparable; an entry from another tree is
+     * ignored, matching the ready queue's ordering rule.
+     *
+     * @param leaf the candidate leaf
+     * @return {@code true} when an earlier coordination step is in flight
+     */
+    private boolean earlierExpansionInFlight(final MutableDescriptor leaf) {
+        return hasEarlierKey(expandingCoordination, leaf) || hasEarlierKey(pendingCoordination, leaf);
+    }
+
+    /**
+     * Returns whether {@code keys} holds an entry from the same compilation ranked below {@code leaf}.
+     *
+     * @param keys the candidate entries
+     * @param leaf the leaf being considered for promotion
+     * @return {@code true} when an earlier-ranked entry exists
+     */
+    private static boolean hasEarlierKey(
+            final java.util.NavigableSet<ExpansionKey> keys, final MutableDescriptor leaf) {
+        if (keys.isEmpty()) {
+            return false;
+        }
+        for (var key : keys) {
+            if (key.treeId() == leaf.orderTreeId()) {
+                if (key.rank() < leaf.orderRank()) {
+                    return true;
+                }
+            } else if (key.treeId() > leaf.orderTreeId()) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Drops the queued-coordination marker for {@code task}.
+     *
+     * @param task the task that is starting, or that was rejected
+     */
+    private void clearPendingCoordination(final PrioritizedTask task) {
+        if (!task.descriptor.isLeafAction()) {
+            pendingCoordination.remove(new ExpansionKey(task.orderTreeId(), task.orderRank()));
+        }
+    }
+
+    /**
+     * Compiled order of a descriptor whose admission step is in flight.
+     *
+     * @param treeId the compilation identity
+     * @param rank the compiled rank within that compilation
+     */
+    private record ExpansionKey(long treeId, long rank) implements Comparable<ExpansionKey> {
+
+        @Override
+        public int compareTo(final ExpansionKey other) {
+            var byTree = Long.compare(treeId, other.treeId);
+            return byTree != 0 ? byTree : Long.compare(rank, other.rank);
+        }
+    }
+
+    /**
+     * Per-capped-node running leaf count and limit.
+     *
+     * <p>Mutable {@link #running} is guarded by {@link #leafGateLock}.
+     */
+    private static final class CapState {
+
+        private final int limit;
+        private int running;
+
+        private CapState(final int limit) {
+            this.limit = limit;
+        }
     }
 
     /**
@@ -791,7 +1193,8 @@ public final class Scheduler implements AutoCloseable {
         }
         var state = isolationState(lockName);
         synchronized (state) {
-            if (state.ownerThread == Thread.currentThread() && isSameOrDescendant(descriptor, state.ownerDescriptor)) {
+            if (state.ownerThread == Thread.currentThread()
+                    && DescriptorOrder.isSameOrDescendant(descriptor, state.ownerDescriptor)) {
                 lock.lock();
                 pushIsolationFrame(lockName, descriptor, lock);
                 return;
@@ -851,12 +1254,13 @@ public final class Scheduler implements AutoCloseable {
                 return true;
             }
             if (state.ownerThread == Thread.currentThread()
-                    && isSameOrDescendant(task.descriptor, state.ownerDescriptor)) {
+                    && DescriptorOrder.isSameOrDescendant(task.descriptor, state.ownerDescriptor)) {
                 lock.lock();
                 pushIsolationFrame(lockName, task.descriptor, lock);
                 return true;
             }
-            if (state.ownerDescriptor != null && isSameOrDescendant(task.descriptor, state.ownerDescriptor)) {
+            if (state.ownerDescriptor != null
+                    && DescriptorOrder.isSameOrDescendant(task.descriptor, state.ownerDescriptor)) {
                 state.ownerTasks.add(task);
                 LockSupport.unpark(state.ownerThread);
                 return false;
@@ -958,7 +1362,7 @@ public final class Scheduler implements AutoCloseable {
                     admissionDrain.add(at.node());
                 }
                 // Unexpected runnable type: skip (defensive)
-            } catch (Throwable t) {
+            } catch (Throwable ignored) {
                 // Don't let one failing task strand the rest
             }
         }
@@ -1022,11 +1426,9 @@ public final class Scheduler implements AutoCloseable {
             admissionDrain.add(node);
             return;
         }
-        var descriptor = node.descriptor;
-        var priorityKey = descriptor.schedulerPriorityKey();
         var sequence = taskSequence.getAndIncrement();
         try {
-            executor.execute(new AdmissionWakeupTask(priorityKey, sequence, node, this));
+            executor.execute(new AdmissionWakeupTask(sequence, node, this));
             wakeParkedWaiters();
         } catch (RejectedExecutionException e) {
             node.admissionWakeupPending.set(false);
@@ -1071,7 +1473,8 @@ public final class Scheduler implements AutoCloseable {
         var queue = executor.getQueue();
         PrioritizedTask victim = null;
         for (var candidate : queue.toArray()) {
-            if (candidate instanceof PrioritizedTask pt && !isSameOrDescendant(pt.descriptor, innermostDescriptor)) {
+            if (candidate instanceof PrioritizedTask pt
+                    && !DescriptorOrder.isSameOrDescendant(pt.descriptor, innermostDescriptor)) {
                 victim = pt;
                 break;
             }
@@ -1343,7 +1746,7 @@ public final class Scheduler implements AutoCloseable {
 
     private static boolean taskEligible(final Runnable task, final MutableDescriptor innermostFrameDescriptor) {
         var descriptor = taskDescriptorOf(task);
-        return descriptor != null && isSameOrDescendant(descriptor, innermostFrameDescriptor);
+        return descriptor != null && DescriptorOrder.isSameOrDescendant(descriptor, innermostFrameDescriptor);
     }
 
     private static MutableDescriptor taskDescriptorOf(final Runnable task) {
@@ -1398,6 +1801,17 @@ public final class Scheduler implements AutoCloseable {
                 parked = new ArrayList<>(parkedReadyTasks);
                 parkedReadyTasks.clear();
             }
+            // Leaves still waiting for capacity would otherwise be stranded: the gated ready set is
+            // not visible to the executor, so shutdown must terminalize them explicitly.
+            List<PrioritizedTask> gated;
+            leafGateLock.lock();
+            try {
+                gated = new ArrayList<>(gatedLeaves);
+                gatedLeaves.clear();
+            } finally {
+                leafGateLock.unlock();
+            }
+            parked.addAll(gated);
             for (var node : waiters) {
                 dispatchAdmissionWakeup(node);
             }
@@ -1459,15 +1873,13 @@ public final class Scheduler implements AutoCloseable {
         if (canRunContinuationInline()) {
             // The completing thread advances its own parent; this avoids a queue submission and
             // a hand-off per child completion. Ordering is unaffected: the continuation only
-            // admits work, and admitted work still competes by structural key.
+            // admits work, and admitted work still competes by compiled structural rank.
             runContinuationInline(node);
             return;
         }
-        var descriptor = node.descriptor;
-        var priorityKey = descriptor.schedulerPriorityKey();
         var sequence = taskSequence.getAndIncrement();
         try {
-            executor.execute(new ContinuationTask(priorityKey, sequence, node, this));
+            executor.execute(new ContinuationTask(sequence, node, this));
             wakeParkedWaiters();
         } catch (RejectedExecutionException e) {
             // Race: shut down between the isShutdown() check and execute().
@@ -1520,8 +1932,61 @@ public final class Scheduler implements AutoCloseable {
         if (head == null) {
             return true;
         }
-        var headKey = priorityKeyOf(head);
-        return headKey != null && child.schedulerPriorityKey().compareTo(headKey) < 0;
+        if (!(head instanceof ScheduledTask scheduled)
+                || scheduled.orderTreeId() != child.orderTreeId()
+                || child.orderRank() == DescriptorOrder.UNCOMPILED) {
+            // Ranks from different compilations are not comparable, and an uncompiled descriptor
+            // has no rank yet: queue the child rather than inline it out of order.
+            return false;
+        }
+        return child.orderRank() < scheduled.orderRank();
+    }
+
+    /**
+     * Suspends the innermost expansion registered on this thread.
+     *
+     * <p>Called when a coordination descriptor runs a child body inline: it delegates a thread to
+     * user code, so it is no longer expanding its own children and must not keep later siblings
+     * waiting for a ready leaf.
+     */
+    private void suspendExpansion() {
+        var key = currentExpansion.get();
+        if (key != null) {
+            expandingCoordination.remove(key);
+            currentExpansion.remove();
+            // Leaves held back only by this entry are now dispatchable.
+            pumpGatedLeaves();
+        }
+    }
+
+    /**
+     * Restores the expansion entry of the enclosing descriptor after a nested one finished.
+     *
+     * @param key the enclosing descriptor's expansion entry, or {@code null}
+     */
+    private void restoreExpansion(final ExpansionKey key) {
+        if (key == null) {
+            currentExpansion.remove();
+        } else {
+            currentExpansion.set(key);
+        }
+    }
+
+    /**
+     * Blocks until leaf capacity has been reserved for {@code leaf}.
+     *
+     * <p>Only reachable for a leaf that arrives at execution without a promotion reservation, which
+     * in practice means the root leaf. Nothing else is running at that point, so the first attempt
+     * succeeds; the loop exists so the invariant holds even for unusual entry points.
+     *
+     * @param leaf the leaf descriptor about to run; must not be {@code null}
+     */
+    private void awaitLeafCapacity(final MutableDescriptor leaf) {
+        while (!tryReserveLeafCapacity(leaf)) {
+            // Consume a stray interrupt flag so the park below actually blocks.
+            Thread.interrupted();
+            LockSupport.parkNanos(LEAF_CAPACITY_PARK_NANOS);
+        }
     }
 
     /**
@@ -1534,19 +1999,37 @@ public final class Scheduler implements AutoCloseable {
      * @param mode the execution mode; must not be {@code null}
      * @param parentContext the parent's execution context; must not be {@code null}
      */
-    void executeChildInline(
+    boolean executeChildInline(
             final MutableDescriptor child, final ExecutionMode mode, final ConcreteContext parentContext) {
         var outcome = prepareScheduledTask(child, parentContext);
         if (outcome.future != null) {
             // Already terminal or the scheduler is closing; prepareScheduledTask has reported the
             // child as completed.
-            return;
+            return true;
         }
-        child.markScheduled();
+        var reserveCapacity = mode == ExecutionMode.RUN && child.isLeafAction();
+        if (reserveCapacity && !tryReserveLeafCapacity(child)) {
+            // The global cap or a capped ancestor is full: leave the child unscheduled so the
+            // caller queues it, where it waits in rank order for capacity instead of occupying
+            // this thread.
+            return false;
+        }
+        try {
+            child.markScheduled();
+        } catch (Throwable t) {
+            if (reserveCapacity) {
+                releaseLeafCapacity(child);
+            }
+            throw t;
+        }
         inlineChildExecutionCounter.incrementAndGet();
         inlineContinuationDepth.set(inlineContinuationDepth.get() + 1);
         try {
-            executeDescriptor(child, outcome.context, mode);
+            // Running a child body inline means the parent is no longer expanding: drop its entry so
+            // later siblings are not held back for the duration of this body. The parent re-enters
+            // the set only if it starts another admission step on this thread.
+            suspendExpansion();
+            executeDescriptorWithCompletion(child, outcome.context, mode, null, null, reserveCapacity);
         } finally {
             var depth = inlineContinuationDepth.get() - 1;
             if (depth <= 0) {
@@ -1555,6 +2038,7 @@ public final class Scheduler implements AutoCloseable {
                 inlineContinuationDepth.set(depth);
             }
         }
+        return true;
     }
 
     /**
@@ -1630,7 +2114,7 @@ public final class Scheduler implements AutoCloseable {
         }
         try {
             delayExecutor.schedule(task, delay, unit);
-        } catch (RejectedExecutionException e) {
+        } catch (RejectedExecutionException ignored) {
             // Closing raced the schedule; the task is dropped, matching close-time cancellation.
         }
     }
@@ -1756,7 +2240,7 @@ public final class Scheduler implements AutoCloseable {
      */
     public void executeDescriptor(
             final MutableDescriptor descriptor, final ConcreteContext context, final ExecutionMode mode) {
-        executeDescriptorWithCompletion(descriptor, context, mode, null, null);
+        executeDescriptorWithCompletion(descriptor, context, mode, null, null, false);
     }
 
     private void executeDescriptorWithCompletion(
@@ -1764,8 +2248,13 @@ public final class Scheduler implements AutoCloseable {
             final ConcreteContext context,
             final ExecutionMode mode,
             final CompletableFuture<Descriptor> future,
-            final ExecutionCallback callback) {
+            final ExecutionCallback callback,
+            final boolean leafCapacityReserved) {
         Objects.requireNonNull(mode, "mode is null");
+        // Entry point for descriptors that reach execution without passing admission
+        // (`executeDescriptor` on a root). Compiling here keeps every descriptor that can produce
+        // queued work — and every descriptor tested for ancestry — covered by the same gate.
+        DescriptorOrder.compile(descriptor);
         if (descriptor.isCompleted()) {
             if (future != null) {
                 completeExceptionally(
@@ -1782,8 +2271,23 @@ public final class Scheduler implements AutoCloseable {
         var executed = false;
         var callbackLifecycleStarted = false;
         var deferred = false;
+        var capacityReserved = leafCapacityReserved;
+        ExpansionKey expansion = null;
+        var priorExpansion = currentExpansion.get();
 
         try {
+            if (!leafAction && mode == ExecutionMode.RUN) {
+                expansion = new ExpansionKey(descriptor.orderTreeId(), descriptor.orderRank());
+                expandingCoordination.add(expansion);
+                currentExpansion.set(expansion);
+            }
+            if (leafAction && mode == ExecutionMode.RUN && !capacityReserved) {
+                // A leaf that reaches execution without passing admission (a root leaf, or an
+                // inline leaf whose reservation was made by its parent) reserves its capacity here
+                // so the global cap and every capped ancestor are still honoured.
+                awaitLeafCapacity(descriptor);
+                capacityReserved = true;
+            }
             if (leafAction) {
                 leafPermits.acquire();
                 acquiredPermit = true;
@@ -1833,6 +2337,14 @@ public final class Scheduler implements AutoCloseable {
                     }
                 }
                 if (deferred) {
+                    // The admission step is finished: this node is no longer expanding, so leaves
+                    // that were held back only to preserve depth-first order may proceed.
+                    if (expansion != null) {
+                        expandingCoordination.remove(expansion);
+                        expansion = null;
+                        restoreExpansion(priorExpansion);
+                        pumpGatedLeaves();
+                    }
                     // Wait for the continuation to set the descriptor's terminal status.
                     // managedJoin work-steals from the executor queue (and the shutdown
                     // drain during close()) so the worker does useful work while waiting.
@@ -1867,12 +2379,30 @@ public final class Scheduler implements AutoCloseable {
                 runningLeafCounter.decrementAndGet();
                 leafPermits.release();
             }
+            if (expansion != null) {
+                expandingCoordination.remove(expansion);
+                restoreExpansion(priorExpansion);
+                // This descriptor stopped expanding without deferring (for example it completed
+                // synchronously): leaves it was holding back may now be dispatched.
+                pumpGatedLeaves();
+            }
         }
 
         // Consume any lingering interrupt.
         Thread.interrupted();
 
-        publishDescriptorCompletion(descriptor, context, future, callback, callbackLifecycleStarted, executionError);
+        try {
+            publishDescriptorCompletion(
+                    descriptor, context, future, callback, callbackLifecycleStarted, executionError);
+        } finally {
+            if (capacityReserved) {
+                // Released only after this descriptor's completion is published, so a leaf that
+                // starts next observes this leaf's status (fail-fast in particular) instead of
+                // racing ahead of it. Frees the global and per-ancestor slots and fills whatever
+                // became eligible.
+                releaseLeafCapacity(descriptor);
+            }
+        }
     }
 
     private void publishDescriptorCompletion(
@@ -2128,23 +2658,13 @@ public final class Scheduler implements AutoCloseable {
         }
     }
 
-    private static boolean isSameOrDescendant(final Descriptor descriptor, final Descriptor ancestor) {
-        Descriptor current = descriptor;
-        while (current != null) {
-            if (current == ancestor) {
-                return true;
-            }
-            current = current.parent().orElse(null);
-        }
-        return false;
-    }
-
     /**
-     * Wrapper that applies descriptor-key ordering to a task and holds execution fields directly
+     * Wrapper that applies compiled-order ranking to a task and holds execution fields directly
      * to avoid per-task lambda allocation.
      */
     private static final class PrioritizedTask implements ScheduledTask {
-        private final SchedulerPriorityKey priorityKey;
+        private final long orderTreeId;
+        private final long orderRank;
         private final long sequence;
         private final MutableDescriptor descriptor;
         private final ConcreteContext context;
@@ -2161,8 +2681,21 @@ public final class Scheduler implements AutoCloseable {
          */
         private volatile boolean reservationHeld;
 
+        /**
+         * Whether this task holds a leaf-capacity reservation made when it was promoted out of the
+         * gated ready set. Released when the leaf body completes.
+         */
+        private volatile boolean capacityReserved;
+
+        /**
+         * Drops this task's queued-coordination marker. Idempotent: the marker is only registered
+         * for a non-leaf task and only once.
+         */
+        void clearPendingCoordination() {
+            scheduler.clearPendingCoordination(this);
+        }
+
         PrioritizedTask(
-                final SchedulerPriorityKey priorityKey,
                 final long sequence,
                 final MutableDescriptor descriptor,
                 final ConcreteContext context,
@@ -2171,9 +2704,12 @@ public final class Scheduler implements AutoCloseable {
                 final ExecutionCallback callback,
                 final Semaphore queuePermits,
                 final Scheduler scheduler) {
-            this.priorityKey = Objects.requireNonNull(priorityKey, "priorityKey is null");
-            this.sequence = sequence;
             this.descriptor = Objects.requireNonNull(descriptor, "descriptor is null");
+            // Taken from the descriptor rather than passed in: it is compiled and frozen before a
+            // task is built, so this task cannot disagree with the descriptor it ranks for.
+            this.orderTreeId = descriptor.orderTreeId();
+            this.orderRank = descriptor.orderRank();
+            this.sequence = sequence;
             this.context = Objects.requireNonNull(context, "context is null");
             this.mode = Objects.requireNonNull(mode, "mode is null");
             this.future = future;
@@ -2193,16 +2729,23 @@ public final class Scheduler implements AutoCloseable {
             try {
                 reservationHeld = false;
                 queuePermits.release();
+                clearPendingCoordination();
                 scheduler.signalCapacityAvailable();
-                scheduler.executeDescriptorWithCompletion(descriptor, context, mode, future, callback);
+                scheduler.executeDescriptorWithCompletion(
+                        descriptor, context, mode, future, callback, capacityReserved);
             } finally {
                 scheduler.exitScheduledIsolationIfHeld(this);
             }
         }
 
         @Override
-        public SchedulerPriorityKey priorityKey() {
-            return priorityKey;
+        public long orderTreeId() {
+            return orderTreeId;
+        }
+
+        @Override
+        public long orderRank() {
+            return orderRank;
         }
 
         @Override
@@ -2229,30 +2772,35 @@ public final class Scheduler implements AutoCloseable {
     /**
      * Base class for queued tasks that advance one execution node.
      *
-     * <p>Holds the ordering key, submission sequence, node, and owning scheduler shared by
-     * {@link ContinuationTask} and {@link AdmissionWakeupTask}; subclasses supply only the action
-     * to perform on the node.
+     * <p>Holds the node's compiled order metadata, submission sequence, node, and owning scheduler
+     * shared by {@link ContinuationTask} and {@link AdmissionWakeupTask}; subclasses supply only the
+     * action to perform on the node. The order is read once from the node's descriptor, which is
+     * compiled and immutable for the rest of the run.
      */
     private abstract static class NodeTask implements ScheduledTask {
-        private final SchedulerPriorityKey priorityKey;
+        private final long orderTreeId;
+        private final long orderRank;
         private final long sequence;
         private final ExecutionNode node;
         private final Scheduler scheduler;
 
-        NodeTask(
-                final SchedulerPriorityKey priorityKey,
-                final long sequence,
-                final ExecutionNode node,
-                final Scheduler scheduler) {
-            this.priorityKey = Objects.requireNonNull(priorityKey, "priorityKey is null");
+        NodeTask(final long sequence, final ExecutionNode node, final Scheduler scheduler) {
+            var requiredNode = Objects.requireNonNull(node, "node is null");
+            this.orderTreeId = requiredNode.descriptor.orderTreeId();
+            this.orderRank = requiredNode.descriptor.orderRank();
             this.sequence = sequence;
-            this.node = Objects.requireNonNull(node, "node is null");
+            this.node = requiredNode;
             this.scheduler = Objects.requireNonNull(scheduler, "scheduler is null");
         }
 
         @Override
-        public final SchedulerPriorityKey priorityKey() {
-            return priorityKey;
+        public final long orderTreeId() {
+            return orderTreeId;
+        }
+
+        @Override
+        public final long orderRank() {
+            return orderRank;
         }
 
         @Override
@@ -2283,12 +2831,8 @@ public final class Scheduler implements AutoCloseable {
      */
     private static final class ContinuationTask extends NodeTask {
 
-        ContinuationTask(
-                final SchedulerPriorityKey priorityKey,
-                final long sequence,
-                final ExecutionNode node,
-                final Scheduler scheduler) {
-            super(priorityKey, sequence, node, scheduler);
+        ContinuationTask(final long sequence, final ExecutionNode node, final Scheduler scheduler) {
+            super(sequence, node, scheduler);
         }
 
         @Override
@@ -2303,12 +2847,8 @@ public final class Scheduler implements AutoCloseable {
      */
     private static final class AdmissionWakeupTask extends NodeTask {
 
-        AdmissionWakeupTask(
-                final SchedulerPriorityKey priorityKey,
-                final long sequence,
-                final ExecutionNode node,
-                final Scheduler scheduler) {
-            super(priorityKey, sequence, node, scheduler);
+        AdmissionWakeupTask(final long sequence, final ExecutionNode node, final Scheduler scheduler) {
+            super(sequence, node, scheduler);
         }
 
         @Override

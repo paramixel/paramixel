@@ -216,6 +216,7 @@ public class ParamixelMojo extends AbstractMojo {
         try (var testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
             Throwable primary = null;
+            MojoExecutionException lingeringThreadError = null;
             try {
                 final var configuration = buildConfiguration(testClassLoader);
                 final var selector = buildSelector();
@@ -226,18 +227,15 @@ public class ParamixelMojo extends AbstractMojo {
                         .build();
 
                 var optionalResult = runner.run(selector);
-                if (optionalResult.isEmpty()) {
-                    if (failIfNoTests) {
-                        throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
+                if (optionalResult.isPresent()) {
+                    var result = optionalResult.orElseThrow();
+                    if (result.isFailed()) {
+                        throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                     }
-
+                } else if (failIfNoTests) {
+                    throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
+                } else {
                     getLog().info("No Paramixel tests found");
-                    return;
-                }
-
-                var result = optionalResult.orElseThrow();
-                if (result.isFailed()) {
-                    throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
                 }
             } catch (Throwable t) {
                 primary = t;
@@ -246,15 +244,20 @@ public class ParamixelMojo extends AbstractMojo {
                 Thread.currentThread().setContextClassLoader(originalClassLoader);
                 try {
                     warnOrErrorLingeringThreads(preExecutionThreads);
-                } catch (MojoExecutionException leakError) {
+                } catch (MojoExecutionException detected) {
                     // A strict-thread-lifecycle error must not replace an in-flight primary
-                    // exception (e.g. a test failure); attach it as suppressed instead.
+                    // exception (e.g. a test failure): attach it as suppressed. When nothing else
+                    // failed it is carried out of the finally block and thrown below, so the
+                    // finally block itself never performs a throw.
                     if (primary != null) {
-                        primary.addSuppressed(leakError);
+                        primary.addSuppressed(detected);
                     } else {
-                        throw leakError;
+                        lingeringThreadError = detected;
                     }
                 }
+            }
+            if (lingeringThreadError != null) {
+                throw lingeringThreadError;
             }
         } catch (ConfigurationException e) {
             throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);

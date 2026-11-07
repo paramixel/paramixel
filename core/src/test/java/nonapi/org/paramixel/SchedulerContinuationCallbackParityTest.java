@@ -140,18 +140,21 @@ class SchedulerContinuationCallbackParityTest {
             }
         }));
         root.addChild(blocker);
+        // The rest of the tree joins before the first scheduling call: scheduling compiles and
+        // freezes the tree, so the structure is fixed from that point on.
+        var second = new ConcreteDescriptor(root, Step.of("second", ctx -> {}));
+        root.addChild(second);
+        var third = new ConcreteDescriptor(root, Step.of("third", ctx -> {}));
+        root.addChild(third);
+
         scheduler.schedule(blocker, ExecutionMode.RUN, context);
         assertThat(blockerStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
         // Schedule a second descriptor — permit available, fills the queue.
-        var second = new ConcreteDescriptor(root, Step.of("second", ctx -> {}));
-        root.addChild(second);
         scheduler.schedule(second, ExecutionMode.RUN, context);
 
         // Now schedule a third with a throwing completion callback — should be rejected.
         var callback = new ThrowingCompletionCallback();
-        var third = new ConcreteDescriptor(root, Step.of("third", ctx -> {}));
-        root.addChild(third);
         var future = scheduler.schedule(third, ExecutionMode.RUN, context, callback);
 
         assertThatThrownBy(future::join)

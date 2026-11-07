@@ -145,10 +145,6 @@ class DescriptorBuilderTest {
         assertThatThrownBy(() -> root.addChild(new ConcreteDescriptor(Step.of("late-child", context -> {}))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Descriptor is frozen:");
-        assertThatThrownBy(() ->
-                        root.setSchedulerPriorityKey(SchedulerPriorityKey.root().child(1)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Descriptor is frozen:");
     }
 
     @Nested
