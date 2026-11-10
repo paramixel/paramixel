@@ -460,6 +460,7 @@ final class Engine implements AutoCloseable {
         return aggregator.status();
     }
 
+    @SuppressWarnings("removal")
     private Status runUntil(final ExecutionPlan.Node node, final ConcreteContext context) {
         var until = (Until) node.control;
         var aggregator = new StatusAccumulator();

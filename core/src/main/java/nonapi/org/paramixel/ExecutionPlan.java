@@ -202,6 +202,8 @@ final class ExecutionPlan {
         }
     }
 
+    // Deprecated actions remain public API until removal and must still be planned.
+    @SuppressWarnings("removal")
     private static Kind kindOf(final Action action) {
         if (action instanceof Step || action instanceof Assert || action instanceof Delay) {
             return Kind.TERMINAL;
@@ -233,6 +235,7 @@ final class ExecutionPlan {
         return Kind.LIFECYCLE;
     }
 
+    @SuppressWarnings("removal")
     private static boolean dependentOf(final Action action) {
         if (action instanceof Sequential sequential) {
             return sequential.isDependent();

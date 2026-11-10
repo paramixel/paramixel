@@ -37,7 +37,7 @@ import org.paramixel.api.Listener;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.action.Timeout;
 import org.paramixel.api.exception.FailException;
@@ -223,7 +223,7 @@ class EngineTest {
             var engine = new Engine(4);
             try {
                 var root = new DescriptorBuilder()
-                        .discover(Sequence.builder("root")
+                        .discover(Sequential.builder("root")
                                 .child(Step.of("a", context -> {}))
                                 .child(Step.of("b", context -> {}))
                                 .build());
@@ -488,7 +488,7 @@ class EngineTest {
                 }
             };
 
-            var action = Sequence.builder("root")
+            var action = Sequential.builder("root")
                     .child(Step.of("a", context -> {}))
                     .child(Step.of("b", context -> {}))
                     .build();
@@ -524,7 +524,7 @@ class EngineTest {
                     Configuration.ANSI,
                     "false"));
 
-            var action = Sequence.builder("root")
+            var action = Sequential.builder("root")
                     .child(Step.of("failing", context -> FailException.fail("boom")))
                     .child(Step.of("second", context -> secondRan.incrementAndGet()))
                     .build();
