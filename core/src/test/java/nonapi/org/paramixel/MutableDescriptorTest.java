@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import nonapi.org.paramixel.action.ConcreteDescriptor;
-import nonapi.org.paramixel.action.SchedulerPriorityKey;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -62,72 +61,6 @@ class MutableDescriptorTest {
         var descriptor = new ConcreteDescriptor(Step.of("root", v -> {}));
 
         assertThat(descriptor.parent()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("addChild assigns stable scheduler priority keys from tree position")
-    void addChildAssignsStableSchedulerPriorityKeysFromTreePosition() {
-        var root = new ConcreteDescriptor(Step.of("root", v -> {}));
-        var left = new ConcreteDescriptor(root, Step.of("left", v -> {}));
-        var right = new ConcreteDescriptor(root, Step.of("right", v -> {}));
-        var leftChild = new ConcreteDescriptor(left, Step.of("left-child", v -> {}));
-
-        root.addChild(left);
-        root.addChild(right);
-        left.addChild(leftChild);
-
-        assertThat(root.schedulerPriorityKey().compareTo(SchedulerPriorityKey.root()))
-                .isZero();
-        assertThat(left.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0)))
-                .isZero();
-        assertThat(right.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(1)))
-                .isZero();
-        assertThat(leftChild
-                        .schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0).child(0)))
-                .isZero();
-    }
-
-    @Test
-    @DisplayName("setBefore assigns before slot and priority key at offset 0")
-    void setBeforeAssignsBeforeSlotAndPriorityKey() {
-        var parent = new ConcreteDescriptor(Step.of("parent", v -> {}));
-        var before = new ConcreteDescriptor(parent, Step.of("before", v -> {}));
-        var child = new ConcreteDescriptor(parent, Step.of("child", v -> {}));
-
-        parent.setBefore(before);
-        parent.addChild(child);
-
-        assertThat(parent.before()).containsSame(before);
-        assertThat(parent.children()).hasSize(1);
-        assertThat(before.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0)))
-                .isZero();
-        assertThat(child.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(1)))
-                .isZero();
-    }
-
-    @Test
-    @DisplayName("setAfter assigns after slot and priority key after children")
-    void setAfterAssignsAfterSlotAndPriorityKey() {
-        var parent = new ConcreteDescriptor(Step.of("parent", v -> {}));
-        var child = new ConcreteDescriptor(parent, Step.of("child", v -> {}));
-        var after = new ConcreteDescriptor(parent, Step.of("after", v -> {}));
-
-        parent.addChild(child);
-        parent.setAfter(after);
-
-        assertThat(parent.after()).containsSame(after);
-        assertThat(parent.children()).hasSize(1);
-        assertThat(child.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(0)))
-                .isZero();
-        assertThat(after.schedulerPriorityKey()
-                        .compareTo(SchedulerPriorityKey.root().child(1)))
-                .isZero();
     }
 
     @Test

@@ -489,7 +489,7 @@ class SchedulerAlgorithmTest {
         var configuration = Configuration.of(Map.of(
                 Configuration.RUNNER_PARALLELISM,
                 String.valueOf(parallelism),
-                Configuration.SCHEDULER_QUEUE_CAPACITY,
+                "paramixel.scheduler.queue.capacity",
                 "32",
                 Configuration.ANSI,
                 "false"));

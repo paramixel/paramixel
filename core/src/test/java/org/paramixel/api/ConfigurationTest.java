@@ -162,12 +162,6 @@ class ConfigurationTest {
     }
 
     @Test
-    @DisplayName("SCHEDULER_QUEUE_CAPACITY constant value")
-    void schedulerQueueCapacity() {
-        assertThat(Configuration.SCHEDULER_QUEUE_CAPACITY).isEqualTo("paramixel.scheduler.queue.capacity");
-    }
-
-    @Test
     @DisplayName("FAILURE_ON_SKIP constant value")
     void failureOnSkip() {
         assertThat(Configuration.FAILURE_ON_SKIP).isEqualTo("paramixel.failureOnSkip");

@@ -19,10 +19,8 @@ package nonapi.org.paramixel.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Map;
+import java.util.Optional;
 import nonapi.org.paramixel.InstanceHolder;
-import nonapi.org.paramixel.Scheduler;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,7 +33,6 @@ import org.paramixel.api.action.Step;
 @DisplayName("ConcreteContext")
 class ConcreteContextTest {
 
-    private Scheduler scheduler;
     private InstanceHolder instanceHolder;
     private MutableDescriptor root;
     private Configuration configuration;
@@ -43,16 +40,14 @@ class ConcreteContextTest {
 
     @BeforeEach
     void setUp() {
-        scheduler = new Scheduler(1);
         instanceHolder = new InstanceHolder();
         root = new ConcreteDescriptor(Step.of("root", context -> {}));
         configuration = Configuration.defaultConfiguration();
         listener = Listener.defaultListener();
     }
 
-    @AfterEach
-    void tearDown() {
-        scheduler.close();
+    private ConcreteContext context() {
+        return new ConcreteContext(configuration, listener, root, instanceHolder);
     }
 
     @Nested
@@ -60,188 +55,78 @@ class ConcreteContextTest {
     class Constructor {
 
         @Test
-        @DisplayName("rejects null configuration")
-        void rejectsNullConfiguration() {
-            assertThatThrownBy(() -> new ConcreteContext(null, listener, root, scheduler, instanceHolder))
+        @DisplayName("rejects null arguments")
+        void rejectsNullArguments() {
+            assertThatThrownBy(() -> new ConcreteContext(null, listener, root, instanceHolder))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("configuration is null");
-        }
-
-        @Test
-        @DisplayName("rejects null listener")
-        void rejectsNullListener() {
-            assertThatThrownBy(() -> new ConcreteContext(configuration, null, root, scheduler, instanceHolder))
+            assertThatThrownBy(() -> new ConcreteContext(configuration, null, root, instanceHolder))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("listener is null");
-        }
-
-        @Test
-        @DisplayName("rejects null descriptor")
-        void rejectsNullDescriptor() {
-            assertThatThrownBy(() -> new ConcreteContext(configuration, listener, null, scheduler, instanceHolder))
+            assertThatThrownBy(() -> new ConcreteContext(configuration, listener, null, instanceHolder))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("descriptor is null");
-        }
-
-        @Test
-        @DisplayName("rejects null scheduler")
-        void rejectsNullScheduler() {
-            assertThatThrownBy(() -> new ConcreteContext(configuration, listener, root, null, instanceHolder))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessage("scheduler is null");
-        }
-
-        @Test
-        @DisplayName("rejects null instanceHolder")
-        void rejectsNullInstanceHolder() {
-            assertThatThrownBy(() -> new ConcreteContext(configuration, listener, root, scheduler, null))
+            assertThatThrownBy(() -> new ConcreteContext(configuration, listener, root, null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("instanceHolder is null");
         }
     }
 
-    @Nested
-    @DisplayName("require()")
-    class Require {
+    @Test
+    @DisplayName("exposes configuration, listener, and descriptor")
+    void exposesRunData() {
+        var context = context();
 
-        @Test
-        @DisplayName("returns ConcreteContext for valid instance")
-        void returnsConcreteContextForValidInstance() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-            assertThat(ConcreteContext.require(context)).isSameAs(context);
-        }
-
-        @Test
-        @DisplayName("throws NullPointerException for null context")
-        void throwsNullPointerExceptionForNull() {
-            assertThatThrownBy(() -> ConcreteContext.require(null))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessage("context is null");
-        }
-
-        @Test
-        @DisplayName("throws IllegalArgumentException for non-ConcreteContext")
-        void throwsIllegalArgumentExceptionForNonConcreteContext() {
-            var customContext = new Context() {
-                @Override
-                public Configuration configuration() {
-                    return Configuration.of(Map.of());
-                }
-
-                @Override
-                public <T> java.util.Optional<T> instance(Class<T> type) {
-                    return java.util.Optional.empty();
-                }
-            };
-            assertThatThrownBy(() -> ConcreteContext.require(customContext))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("context must be a ConcreteContext");
-        }
+        assertThat(context.configuration()).isSameAs(configuration);
+        assertThat(context.listener()).isSameAs(listener);
+        assertThat(context.descriptor()).isSameAs(root);
     }
 
-    @Nested
-    @DisplayName("runChildren()")
-    class RunChildren {
+    @Test
+    @DisplayName("instance lookup reads the scoped holder")
+    void instanceLookupReadsHolder() {
+        var context = context();
+        assertThat(context.instance(String.class)).isEmpty();
 
-        @Test
-        @DisplayName("rejects null mode")
-        void rejectsNullMode() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-            nonapi.org.paramixel.ExecutionMode nullMode = null;
+        instanceHolder.set("value");
 
-            assertThatThrownBy(() -> context.runChildren(nullMode))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessage("mode is null");
-        }
-
-        @Test
-        @DisplayName("rejects null modeFactory")
-        void rejectsNullModeFactory() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-            java.util.function.Function<org.paramixel.api.Descriptor, nonapi.org.paramixel.ExecutionMode> nullFactory =
-                    null;
-
-            assertThatThrownBy(() -> context.runChildren(nullFactory))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessage("modeFactory is null");
-        }
+        assertThat(context.instance(String.class)).contains("value");
+        assertThat(context.instance(Integer.class)).isEmpty();
     }
 
-    @Nested
-    @DisplayName("getters")
-    class Getters {
+    @Test
+    @DisplayName("withInstanceHolder keeps the descriptor and swaps the holder")
+    void withInstanceHolderSwapsHolder() {
+        var replacement = new InstanceHolder();
+        replacement.set("replacement");
 
-        @Test
-        @DisplayName("configuration() returns stored configuration")
-        void configurationReturnsStoredValue() {
-            var configuration = Configuration.of(Map.of("key", "value"));
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
+        var scoped = context().withInstanceHolder(replacement);
 
-            assertThat(context.configuration()).isSameAs(configuration);
-        }
-
-        @Test
-        @DisplayName("listener() returns stored listener")
-        void listenerReturnsStoredValue() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-
-            assertThat(context.listener()).isSameAs(listener);
-        }
-
-        @Test
-        @DisplayName("descriptor() returns stored descriptor")
-        void descriptorReturnsStoredValue() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-
-            assertThat(context.descriptor()).isSameAs(root);
-        }
-
-        @Test
-        @DisplayName("scheduler() returns stored scheduler")
-        void schedulerReturnsStoredValue() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-
-            assertThat(context.scheduler()).isSameAs(scheduler);
-        }
-
-        @Test
-        @DisplayName("instanceHolder() returns stored instanceHolder")
-        void instanceHolderReturnsStoredValue() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-
-            assertThat(context.instanceHolder()).isSameAs(instanceHolder);
-        }
+        assertThat(scoped.descriptor()).isSameAs(root);
+        assertThat(scoped.instanceHolder()).isSameAs(replacement);
+        assertThat(scoped.instance(String.class)).contains("replacement");
     }
 
-    @Nested
-    @DisplayName("withInstanceHolder()")
-    class WithInstanceHolder {
+    @Test
+    @DisplayName("require accepts concrete contexts and rejects foreign implementations")
+    void requireChecksType() {
+        var concrete = context();
+        assertThat(ConcreteContext.require(concrete)).isSameAs(concrete);
 
-        @Test
-        @DisplayName("returns new context with different instance holder")
-        void returnsNewContextWithDifferentInstanceHolder() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-            var newHolder = new InstanceHolder();
+        Context foreign = new Context() {
+            @Override
+            public Configuration configuration() {
+                return configuration;
+            }
 
-            var newContext = context.withInstanceHolder(newHolder);
+            @Override
+            public <T> Optional<T> instance(final Class<T> type) {
+                return Optional.empty();
+            }
+        };
 
-            assertThat(newContext).isNotSameAs(context);
-            assertThat(newContext.instanceHolder()).isSameAs(newHolder);
-            assertThat(context.instanceHolder()).isSameAs(instanceHolder);
-        }
-
-        @Test
-        @DisplayName("preserves other state when replacing instance holder")
-        void preservesOtherState() {
-            var context = new ConcreteContext(configuration, listener, root, scheduler, instanceHolder);
-            var newHolder = new InstanceHolder();
-
-            var newContext = context.withInstanceHolder(newHolder);
-
-            assertThat(newContext.configuration()).isSameAs(configuration);
-            assertThat(newContext.listener()).isSameAs(listener);
-            assertThat(newContext.descriptor()).isSameAs(root);
-            assertThat(newContext.scheduler()).isSameAs(scheduler);
-        }
+        assertThatThrownBy(() -> ConcreteContext.require(foreign))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("context must be a ConcreteContext");
     }
 }

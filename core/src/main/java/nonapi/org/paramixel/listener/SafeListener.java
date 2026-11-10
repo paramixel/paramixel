@@ -72,6 +72,11 @@ public final class SafeListener implements Listener {
     }
 
     @Override
+    public void onWarning(final String message) {
+        invoke("onWarning", () -> delegate.onWarning(message));
+    }
+
+    @Override
     public void onBeforeExecution(final Descriptor descriptor) {
         invoke("onBeforeExecution", () -> delegate.onBeforeExecution(descriptor));
     }

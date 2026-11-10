@@ -38,23 +38,6 @@ import org.paramixel.api.action.Step;
 public interface MutableDescriptor extends Descriptor {
 
     /**
-     * Returns the precomputed scheduler priority key for this descriptor.
-     *
-     * <p>The key is assigned during discovery and represents this descriptor's
-     * stable position in the descriptor tree.</p>
-     *
-     * @return the scheduler priority key; never {@code null}
-     */
-    SchedulerPriorityKey schedulerPriorityKey();
-
-    /**
-     * Sets the precomputed scheduler priority key for this descriptor.
-     *
-     * @param schedulerPriorityKey the scheduler priority key; must not be {@code null}
-     */
-    void setSchedulerPriorityKey(SchedulerPriorityKey schedulerPriorityKey);
-
-    /**
      * Sets the before-child descriptor during discovery.
      *
      * @param before the before-child descriptor; must not be {@code null}
@@ -162,24 +145,21 @@ public interface MutableDescriptor extends Descriptor {
      * a leaf action, has its executing thread interrupted.
      *
      * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel})
-     * whose coordinator is parked in the scheduler's managed join: completing the futures makes
-     * the join observe {@code isDone()} and exit, and interrupting leaf threads unblocks
-     * cooperative (interruptible) user code so its leaf permits are released.
+     * whose coordinating frame is waiting on children: completing the futures publishes terminal
+     * state, and interrupting leaf threads unblocks cooperative (interruptible) user code so its
+     * executing frame returns and releases its permit.
      *
-     * <p>For deeply nested synchronous coordination (e.g. Sequential → Parallel → Sequential
-     * → Parallel → Step), the abort propagation is bounded: the interrupt targets the leaf's
-     * executing thread, the leaf's exception unwinds through the call stack, each coordination
-     * node's {@code managedJoin} returns (either from the interrupt or the future completion),
-     * and the parent's {@code runChild} returns, allowing the next level to observe its child's
-     * terminal state. The propagation time is bounded by the nesting depth and the scheduler's
-     * backoff ceiling (1 second per {@code managedJoin} park).
+     * <p>For deeply nested coordination (e.g. Sequential → Parallel → Sequential → Parallel →
+     * Step), propagation is bounded by the nesting depth: the interrupt reaches each executing
+     * leaf, each leaf returns, and each coordinating frame observes its children's terminal state
+     * as the recursion unwinds.
      *
      * <p>Idempotent: a descriptor already in a terminal state is skipped, so concurrent
      * completion and cancellation both converge safely. Safe to call from any thread,
      * including a scheduler worker thread; this method never blocks on a future, it only
      * completes them. A leaf whose body ignores interruption (e.g. a CPU-bound loop) cannot be
-     * forcibly stopped and may leak its leaf permit and worker thread until the scheduler is
-     * closed.
+     * forcibly stopped and keeps its concurrency budget and worker thread until it returns or the
+     * engine is closed.
      *
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
      * @param cause the cause used to complete futures exceptionally; must not be {@code null}
@@ -231,23 +211,6 @@ public interface MutableDescriptor extends Descriptor {
     default boolean isLeafAction() {
         return action() instanceof Step || action() instanceof Assert || action() instanceof Delay;
     }
-
-    /**
-     * Returns the execution node attached to this descriptor, if any.
-     *
-     * <p>Coordination strategies attach execution nodes to track pending children
-     * and schedule continuations. Leaf descriptors never have execution nodes.
-     *
-     * @return the execution node, or {@code null} if not set
-     */
-    ExecutionNode executionNode();
-
-    /**
-     * Attaches an execution node to this descriptor.
-     *
-     * @param node the execution node, or {@code null} to clear it
-     */
-    void setExecutionNode(ExecutionNode node);
 
     /**
      * Returns the scheduling future for this descriptor.

@@ -21,7 +21,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.locks.ReentrantLock;
-import nonapi.org.paramixel.action.ConcreteContext;
 import nonapi.org.paramixel.action.DescriptorBuilder;
 import nonapi.org.paramixel.action.MutableDescriptor;
 import nonapi.org.paramixel.listener.SafeListener;
@@ -48,7 +47,6 @@ public final class ConcreteRunner implements Runner {
     private final SafeListener safeListener;
     private final Configuration configuration;
     private final int parallelism;
-    private final int schedulerQueueCapacity;
     private final boolean shuffled;
     private final long seed;
 
@@ -81,7 +79,6 @@ public final class ConcreteRunner implements Runner {
         this.safeListener = listener instanceof SafeListener safe ? safe : new SafeListener(listener);
         this.configuration = configuration != null ? configuration : Configuration.defaultConfiguration();
         this.parallelism = resolveParallelism(this.configuration);
-        this.schedulerQueueCapacity = resolveSchedulerQueueCapacity(this.configuration);
         this.shuffled = shuffled;
         this.seed = seed;
     }
@@ -105,31 +102,28 @@ public final class ConcreteRunner implements Runner {
 
     private Result runInternal(final Action action) {
         Objects.requireNonNull(action, "action is null");
-        safeListener.initialize(configuration);
+        initializeListener();
         safeListener.onRunStarted();
         safeListener.onDiscoveryStarted();
         MutableDescriptor root = null;
-        Scheduler scheduler = null;
+        Engine engine = null;
         boolean discoveryCompleted = false;
         try {
             root = new DescriptorBuilder().discover(action);
             safeListener.onDiscoveryCompleted(root);
             discoveryCompleted = true;
-            scheduler = new Scheduler(parallelism, schedulerQueueCapacity);
-            scheduler.setFailFast(
-                    configuration.getBoolean(Configuration.FAIL_FAST).orElse(false));
-            var context = new ConcreteContext(configuration, safeListener, root, scheduler, new InstanceHolder());
+            engine = new Engine(parallelism);
+            engine.setFailFast(configuration.getBoolean(Configuration.FAIL_FAST).orElse(false));
             root.markScheduled();
             var rootFuture = root.scheduledFuture();
-            scheduler.executeDescriptor(root, context, ExecutionMode.RUN);
-            // executeDescriptor waits for deferred coordination roots via the scheduler's
-            // managedJoin(nodeCompletion) path. The root future should therefore already be done;
-            // join() remains as an idempotent safety guard for unusual external-completion paths.
+            engine.execute(root, configuration, safeListener);
+            // execute() returns after the root subtree is terminal; join() remains an
+            // idempotent safety guard for unusual external-completion paths.
             //
             // join() blocks indefinitely — timeouts are the responsibility of the
             // Timeout action, not the runner. join() is interruptible: if the calling
             // thread is interrupted (e.g. by JUnit @Timeout), the interrupt propagates
-            // and close() in the finally block handles executor shutdown.
+            // and close() in the finally block handles engine shutdown.
             if (rootFuture != null) {
                 try {
                     rootFuture.join();
@@ -141,7 +135,7 @@ public final class ConcreteRunner implements Runner {
                     // Root failed; status is already set on the descriptor.
                 }
             }
-            var unrecoverableFailure = scheduler.unrecoverableFailure();
+            var unrecoverableFailure = engine.unrecoverableFailure();
             if (unrecoverableFailure instanceof Error error) {
                 throw error;
             }
@@ -170,7 +164,7 @@ public final class ConcreteRunner implements Runner {
             safeListener.onRunCompleted(result);
             return result;
         } finally {
-            closeScheduler(scheduler);
+            closeEngine(engine);
         }
     }
 
@@ -187,22 +181,16 @@ public final class ConcreteRunner implements Runner {
         return value;
     }
 
-    private static int resolveSchedulerQueueCapacity(final Configuration configuration) {
-        final var optionalCapacity = configuration.getInteger(Configuration.SCHEDULER_QUEUE_CAPACITY);
-        if (optionalCapacity.isEmpty()) {
-            return 1_024;
+    private void initializeListener() {
+        safeListener.initialize(configuration);
+        for (var warning : RemovedConfigurationKeys.detect(configuration)) {
+            safeListener.onWarning(warning);
         }
-        final int value = optionalCapacity.get();
-        if (value <= 0) {
-            throw new ConfigurationException("Invalid configuration for '" + Configuration.SCHEDULER_QUEUE_CAPACITY
-                    + "': expected positive integer but was '" + value + "'");
-        }
-        return value;
     }
 
-    private static void closeScheduler(final Scheduler scheduler) {
-        if (scheduler != null) {
-            scheduler.close();
+    private static void closeEngine(final Engine engine) {
+        if (engine != null) {
+            engine.close();
         }
     }
 
@@ -300,7 +288,7 @@ public final class ConcreteRunner implements Runner {
     }
 
     private void fireNoTestsLifecycle() {
-        safeListener.initialize(configuration);
+        initializeListener();
         safeListener.onRunStarted();
         safeListener.onDiscoveryStarted();
         safeListener.onDiscoveryCompleted(null);

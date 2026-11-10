@@ -97,6 +97,12 @@ public class CompositeListener implements Listener {
     }
 
     @Override
+    public void onWarning(final String message) {
+        Objects.requireNonNull(message, "message is null");
+        invokeEach("onWarning", listener -> listener.onWarning(message));
+    }
+
+    @Override
     public void onDiscoveryCompleted(final Descriptor root) {
         invokeEach("onDiscoveryCompleted", listener -> listener.onDiscoveryCompleted(root));
     }

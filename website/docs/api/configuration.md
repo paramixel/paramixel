@@ -39,8 +39,7 @@ reflect mid-JVM property changes.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `paramixel.parallelism` | available processors | Runner-wide parallelism. Must be a positive integer. |
-| `paramixel.scheduler.queue.capacity` | `1024` | Maximum scheduler-ready descriptor executions. Must be positive. |
+| `paramixel.parallelism` | available processors | Maximum concurrently executing branches, including the coordinating threads that hold them. Must be a positive integer. |
 | `paramixel.ansi` | `auto` | Console ANSI mode: `true`, `false`, or `auto`. |
 | `paramixel.failureOnSkip` | `false` | Treat skipped aggregate results as failing exit codes. |
 | `paramixel.failureOnAbort` | `true` | Treat aborted aggregate results as failing exit codes. |

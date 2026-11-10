@@ -48,12 +48,10 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     private volatile MutableDescriptor after;
     private volatile List<Descriptor> childrenView;
     private volatile boolean frozen;
-    private volatile SchedulerPriorityKey schedulerPriorityKey = SchedulerPriorityKey.root();
     private volatile Thread executingThread;
     private volatile CompletableFuture<Descriptor> scheduledFuture;
     private volatile String cachedIdPath;
     volatile MutableDescriptor parent;
-    volatile ExecutionNode executionNode;
 
     /**
      * Creates a root descriptor.
@@ -170,7 +168,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         Objects.requireNonNull(before, "before is null");
         ensureNotFrozen();
         before.setParent(this);
-        before.setSchedulerPriorityKey(schedulerPriorityKey.child(0));
         this.before = before;
     }
 
@@ -179,8 +176,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         Objects.requireNonNull(after, "after is null");
         ensureNotFrozen();
         after.setParent(this);
-        var offset = this.before != null ? 1 + children.size() : children.size();
-        after.setSchedulerPriorityKey(schedulerPriorityKey.child(offset));
         this.after = after;
     }
 
@@ -192,8 +187,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         }
         ensureNotFrozen();
         child.setParent(this);
-        var offset = this.before != null ? 1 : 0;
-        child.setSchedulerPriorityKey(schedulerPriorityKey.child(offset + children.size()));
         children.add(child);
         childrenView = null;
     }
@@ -202,28 +195,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     public void setParent(final MutableDescriptor parent) {
         ensureNotFrozen();
         this.parent = Objects.requireNonNull(parent, "parent is null");
-    }
-
-    @Override
-    public SchedulerPriorityKey schedulerPriorityKey() {
-        return schedulerPriorityKey;
-    }
-
-    @Override
-    public synchronized void setSchedulerPriorityKey(final SchedulerPriorityKey schedulerPriorityKey) {
-        ensureNotFrozen();
-        this.schedulerPriorityKey = Objects.requireNonNull(schedulerPriorityKey, "schedulerPriorityKey is null");
-        var offset = 0;
-        if (before != null) {
-            before.setSchedulerPriorityKey(this.schedulerPriorityKey.child(offset));
-            offset = 1;
-        }
-        for (var i = 0; i < children.size(); i++) {
-            children.get(i).setSchedulerPriorityKey(this.schedulerPriorityKey.child(offset + i));
-        }
-        if (after != null) {
-            after.setSchedulerPriorityKey(this.schedulerPriorityKey.child(offset + children.size()));
-        }
     }
 
     @Override
@@ -359,16 +330,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     @Override
-    public ExecutionNode executionNode() {
-        return executionNode;
-    }
-
-    @Override
-    public void setExecutionNode(final ExecutionNode node) {
-        this.executionNode = node;
-    }
-
-    @Override
     public CompletableFuture<Descriptor> scheduledFuture() {
         return scheduledFuture;
     }
@@ -404,14 +365,12 @@ public final class ConcreteDescriptor implements MutableDescriptor {
      * {@code startedAt}/{@code completedAt} bookkeeping.
      *
      * <p>Only leaf descriptors run user code on their executing thread; coordination nodes are
-     * unblocked solely by future completion, so interrupting only leaves avoids stranding an
-     * interrupt flag on a coordinator parked in the scheduler's managed join. For deeply nested
-     * synchronous coordination (e.g. Sequential → Parallel → Sequential → Parallel → Step),
-     * the interrupt propagates through the chain: each coordination node's {@code managedJoin}
-     * observes the future completion (or the interrupt waking it from park), unwinds through
-     * the call stack, and the parent's {@code runChild} returns, allowing the next level to
-     * observe its child's terminal state. This propagation is bounded by the depth of the
-     * nesting and the scheduler's backoff ceiling (1 second per {@code managedJoin} park).
+     * unblocked by their children completing, so interrupting only leaves avoids stranding an
+     * interrupt flag on a coordinating stack. For deeply nested coordination
+     * (e.g. Sequential → Parallel → Sequential → Parallel → Step), the interrupt reaches every
+     * executing leaf in the subtree, each leaf returns, and each coordinating frame observes its
+     * children's terminal state as the recursion unwinds. Propagation is therefore bounded by the
+     * nesting depth plus the time an uncooperative leaf takes to return.
      *
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
      * @param cause the cause used to complete the scheduling future exceptionally; must not be
@@ -428,11 +387,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         }
         setStatus(rootStatus);
         completeFutureExceptionally(cause);
-        var node = executionNode;
-        if (node != null) {
-            executionNode = null;
-            node.completeExternally();
-        }
         // Only leaf descriptors run user code on their executing thread; coordination nodes are
         // unblocked solely by future completion, so interrupting only leaves avoids stranding an
         // interrupt flag on a coordinator parked in the scheduler's managed join.

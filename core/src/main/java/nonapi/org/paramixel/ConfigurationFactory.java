@@ -38,8 +38,6 @@ import org.paramixel.api.exception.ConfigurationException;
  */
 public final class ConfigurationFactory {
 
-    private static final int DEFAULT_SCHEDULER_QUEUE_CAPACITY = 1_024;
-
     private ConfigurationFactory() {
         // Intentionally empty
     }
@@ -132,7 +130,6 @@ public final class ConfigurationFactory {
         map.putIfAbsent(
                 Configuration.RUNNER_PARALLELISM,
                 String.valueOf(Runtime.getRuntime().availableProcessors()));
-        map.putIfAbsent(Configuration.SCHEDULER_QUEUE_CAPACITY, String.valueOf(DEFAULT_SCHEDULER_QUEUE_CAPACITY));
         map.putIfAbsent(Configuration.FAILURE_ON_ABORT, "true");
     }
 

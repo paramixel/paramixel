@@ -111,14 +111,12 @@ class ConfigurationFactoryTest {
     }
 
     @Test
-    @DisplayName("defaultConfiguration contains SCHEDULER_QUEUE_CAPACITY")
-    void defaultConfigurationContainsSchedulerQueueCapacity() {
+    @DisplayName("defaultConfiguration omits the removed scheduler queue capacity key")
+    void defaultConfigurationOmitsRemovedSchedulerQueueCapacity() {
         var configuration = ConfigurationFactory.defaultConfiguration();
 
-        assertThat(configuration.getString(Configuration.SCHEDULER_QUEUE_CAPACITY))
-                .isPresent();
-        assertThat(configuration.getString(Configuration.SCHEDULER_QUEUE_CAPACITY))
-                .contains("1024");
+        assertThat(configuration.getString("paramixel.scheduler.queue.capacity"))
+                .isEmpty();
     }
 
     // --- H1 cache-staleness reproduction tests ---

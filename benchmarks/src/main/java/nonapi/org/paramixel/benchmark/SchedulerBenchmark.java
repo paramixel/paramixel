@@ -210,13 +210,8 @@ public class SchedulerBenchmark {
     }
 
     private static Runner createRunner(final int parallelism) {
-        var configuration = Configuration.of(Map.of(
-                Configuration.RUNNER_PARALLELISM,
-                String.valueOf(parallelism),
-                Configuration.SCHEDULER_QUEUE_CAPACITY,
-                "4096",
-                Configuration.ANSI,
-                "false"));
+        var configuration = Configuration.of(
+                Map.of(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism), Configuration.ANSI, "false"));
         return Runner.builder().configuration(configuration).build();
     }
 }

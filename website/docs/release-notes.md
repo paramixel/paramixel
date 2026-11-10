@@ -6,6 +6,21 @@ description: Current documentation-facing release notes.
 # Release Notes
 
 ## Unreleased
+
+- **Scheduler replaced by a depth-first execution engine** — Actions are compiled into a per-run
+  execution plan before execution starts, and the plan is executed by recursive depth-first descent
+  with a hard concurrency budget. `paramixel.parallelism` now bounds concurrently executing branches
+  (including coordinating nodes that hold resources) rather than only leaf bodies, and there is no
+  work-stealing or ready queue.
+- **`paramixel.scheduler.queue.capacity` removed** — The scheduler ready queue no longer exists, so
+  the property has no effect. Delete the property from build scripts and `paramixel.properties` files; it
+  is now reported once per JVM through `Listener.onWarning`. Use `paramixel.parallelism` to bound
+  concurrency.
+- **`Listener.onWarning(String)` added** — Listeners can receive non-fatal diagnostics that do not
+  fail a run.
+- **Delays occupy their branch** — Inter-iteration `Loop` delays and `Delay` actions now run on the
+  branch that owns them instead of yielding their thread, so they consume concurrency budget while
+  waiting.
 - **`Conditional.reason()` removed** — The configurable skip reason has been removed
   from `Conditional` and `Conditional.Builder`. When the predicate returns `false`,
   the skip-status message now includes the conditional's display name. Use a
