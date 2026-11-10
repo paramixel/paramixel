@@ -68,13 +68,6 @@ public interface Configuration {
     String RUNNER_PARALLELISM = "paramixel.parallelism";
 
     /**
-     * Configuration key controlling the maximum number of scheduler-ready descriptor executions.
-     *
-     * <p>The value must be a positive integer. When unset, the default is {@code 1024}.
-     */
-    String SCHEDULER_QUEUE_CAPACITY = "paramixel.scheduler.queue.capacity";
-
-    /**
      * Configuration key controlling ANSI escape code output in console listeners.
      *
      * <p>Valid values are {@code "true"} (force ANSI enabled), {@code "false"} (force ANSI disabled, plain text),

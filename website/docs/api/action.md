@@ -29,13 +29,13 @@ All action subtypes are immutable after construction. For configurable actions, 
 | `Assert` | Terminal action evaluating a boolean condition. |
 | `Sequential` | Composite: executes children sequentially. Dependent/independent modes. |
 | `Parallel` | Composite: executes children concurrently with bounded admission. |
-| `Scope` | Composite: before-body-after with lifecycle guarantee (after always runs). |
+| `Scope` | Composite: before-body-after with lifecycle guarantee (after always runs once before has been attempted). |
 | `Static` | Composite: before-body-after without a fixture instance. _(Deprecated since 6.2 — use `Scope` instead.)_ |
-| `Instance` | Composite: creates a fixture instance, runs body, destroys instance. |
+| `Instance` | Composite: creates a fixture instance, runs body, destroys instance (destroy always runs once creation has been attempted). |
 | `Isolated` | Composite: executes body under a named re-entrant lock. Compose with Instance for state isolation. |
 | `Delay` | Terminal: pauses for a duration. |
 | `Repeat` | Decorator: executes a child action N times. |
-| `Timeout` | Decorator: executes a child action with a wall-clock deadline. |
+| `Timeout` | Decorator: executes a child action with a wall-clock deadline; on timeout the child is cancelled but started lifecycle cleanup still runs. |
 | `Conditional` | Composite: evaluates a `Predicate<Context>`; runs body when true, passes (body subtree skipped) when false. Does not disrupt dependent sibling execution. |
 | `Until` | Decorator: executes child repeatedly until predicate satisfied, body passes, or iterations exhausted. |
 

@@ -31,6 +31,11 @@ import org.paramixel.api.Context;
  * available to all child actions via {@link Context#instance(Class)}. If the
  * instance implements {@link AutoCloseable}, it is closed in the after phase.
  *
+ * <p>Creation and destruction occupy the lifecycle before and after slots. Once creation has
+ * been attempted, destruction always runs, regardless of earlier outcomes — including when an
+ * enclosing {@link Timeout} cancels creation or the body. If the action is cancelled before
+ * creation is attempted, the factory is never called and destruction does not run.
+ *
  * <p>To execute multiple body actions, wrap a {@link Sequential} or {@link Parallel}
  * in {@link Builder#body(Action)}.
  */

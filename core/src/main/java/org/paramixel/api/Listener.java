@@ -125,6 +125,21 @@ public interface Listener {
     }
 
     /**
+     * Invoked when the runner detects a condition that does not fail the run but affects behavior.
+     *
+     * <p>Warnings report conditions that are silently ignored otherwise, such as a configuration
+     * key that was removed and now has no effect. The runner invokes this method at most once per
+     * detected condition per JVM, before execution begins.
+     *
+     * <p>Implementations must not throw; {@link SafeListener} isolates recoverable failures.
+     *
+     * @param message the human-readable warning; never {@code null}
+     */
+    default void onWarning(final String message) {
+        // Intentionally empty
+    }
+
+    /**
      * Invoked by an action immediately before its descriptor execution logic runs.
      *
      * @param descriptor the descriptor about to execute; never {@code null}

@@ -81,6 +81,115 @@ class ConcreteDescriptorTest {
             assertThat(childStatus.message()).isPresent();
             assertThat(childStatus.message().orElseThrow()).doesNotContain("null");
         }
+
+        private ConcreteDescriptor lifecycle(final boolean withBefore) {
+            var root = new ConcreteDescriptor(Parallel.builder("lifecycle").build());
+            if (withBefore) {
+                root.setBefore(new ConcreteDescriptor(root, Step.of("before", context -> {})));
+            }
+            root.addChild(new ConcreteDescriptor(root, Step.of("body", context -> {})));
+            root.setAfter(new ConcreteDescriptor(root, Step.of("after", context -> {})));
+            root.freeze();
+            return root;
+        }
+
+        private MutableDescriptor slot(final Descriptor descriptor) {
+            return (MutableDescriptor) descriptor;
+        }
+
+        @Test
+        @DisplayName("never-started lifecycle: before and after are aborted")
+        void pendingLifecycleAbortsAfter() {
+            var root = lifecycle(true);
+
+            var started = root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
+
+            assertThat(started).isFalse();
+            assertThat(root.before().orElseThrow().isAborted()).isTrue();
+            assertThat(root.children().get(0).isAborted()).isTrue();
+            assertThat(root.after().orElseThrow().isAborted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("before running: before is aborted and after is preserved")
+        void runningBeforePreservesAfter() {
+            var root = lifecycle(true);
+            root.tryStart();
+            slot(root.before().orElseThrow()).tryStart();
+
+            var started = root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
+
+            assertThat(started).isTrue();
+            assertThat(root.isFailed()).isTrue();
+            assertThat(root.before().orElseThrow().isAborted()).isTrue();
+            assertThat(root.children().get(0).isAborted()).isTrue();
+            assertThat(slot(root.after().orElseThrow()).status().isPending()).isTrue();
+        }
+
+        @Test
+        @DisplayName("before completed: after is preserved")
+        void completedBeforePreservesAfter() {
+            var root = lifecycle(true);
+            root.tryStart();
+            var before = slot(root.before().orElseThrow());
+            before.tryStart();
+            before.setStatus(Status.PASSED);
+
+            root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
+
+            assertThat(before.isPassed()).isTrue();
+            assertThat(slot(root.after().orElseThrow()).status().isPending()).isTrue();
+        }
+
+        @Test
+        @DisplayName("lifecycle started but before not yet attempted: after is aborted")
+        void startedLifecycleWithUnattemptedBeforeAbortsAfter() {
+            var root = lifecycle(true);
+            root.tryStart();
+
+            root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
+
+            assertThat(root.before().orElseThrow().isAborted()).isTrue();
+            assertThat(root.after().orElseThrow().isAborted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("no before: after is preserved only once the lifecycle has started")
+        void lifecycleWithoutBeforeUsesOwnStart() {
+            var pending = lifecycle(false);
+            pending.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
+            assertThat(pending.after().orElseThrow().isAborted()).isTrue();
+
+            var running = lifecycle(false);
+            running.tryStart();
+            running.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
+            assertThat(slot(running.after().orElseThrow()).status().isPending()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("tryStart")
+    class TryStart {
+
+        @Test
+        @DisplayName("starts a pending descriptor")
+        void startsPending() {
+            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
+
+            assertThat(descriptor.tryStart()).isTrue();
+            assertThat(descriptor.status().isRunning()).isTrue();
+            assertThat(descriptor.tryStart()).as("already running").isTrue();
+        }
+
+        @Test
+        @DisplayName("refuses a descriptor aborted before it started")
+        void refusesAborted() {
+            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
+            descriptor.abort(Status.ABORTED, new IllegalStateException("cancelled"));
+
+            assertThat(descriptor.tryStart()).isFalse();
+            assertThat(descriptor.isAborted()).isTrue();
+        }
     }
 
     @Nested

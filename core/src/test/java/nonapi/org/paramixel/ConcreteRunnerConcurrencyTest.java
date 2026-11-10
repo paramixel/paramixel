@@ -151,13 +151,8 @@ class ConcreteRunnerConcurrencyTest {
     }
 
     private static Runner createRunner(int parallelism, Listener listener) {
-        var configuration = Configuration.of(Map.of(
-                Configuration.RUNNER_PARALLELISM,
-                String.valueOf(parallelism),
-                Configuration.SCHEDULER_QUEUE_CAPACITY,
-                "32",
-                Configuration.ANSI,
-                "false"));
+        var configuration = Configuration.of(
+                Map.of(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism), Configuration.ANSI, "false"));
         return Runner.builder().configuration(configuration).listener(listener).build();
     }
 

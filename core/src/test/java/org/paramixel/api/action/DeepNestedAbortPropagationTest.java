@@ -70,7 +70,7 @@ class DeepNestedAbortPropagationTest {
     @DisplayName("5-level nested Sequential with blocking leaf: abort propagates within timeout")
     void deeplyNestedSequentialAbortPropagatesWithinTimeout() throws Exception {
         var blockingStarted = new CountDownLatch(1);
-        var blockingInterrupted = new AtomicBoolean(false);
+        var blockingInterrupted = new CountDownLatch(1);
 
         // Build 5 levels of nested Sequential, each containing one child.
         // The innermost child is a blocking Step.
@@ -80,7 +80,7 @@ class DeepNestedAbortPropagationTest {
                     try {
                         Thread.sleep(60_000);
                     } catch (InterruptedException e) {
-                        blockingInterrupted.set(true);
+                        blockingInterrupted.countDown();
                         Thread.currentThread().interrupt();
                     }
                 }))
@@ -105,7 +105,7 @@ class DeepNestedAbortPropagationTest {
 
         var result = runnerFuture.get(30, TimeUnit.SECONDS);
 
-        assertThat(blockingInterrupted.get())
+        assertThat(blockingInterrupted.await(10, TimeUnit.SECONDS))
                 .as("blocking leaf was interrupted")
                 .isTrue();
 
@@ -129,7 +129,7 @@ class DeepNestedAbortPropagationTest {
     @DisplayName("5-level nested Parallel with blocking leaves: abort propagates within timeout")
     void deeplyNestedParallelAbortPropagatesWithinTimeout() throws Exception {
         var leavesStarted = new CountDownLatch(PARALLELISM);
-        var leavesInterrupted = new AtomicInteger(0);
+        var leavesInterrupted = new CountDownLatch(PARALLELISM);
 
         // Build 5 levels of nested Parallel.
         // The innermost Parallel has blocking Step leaves.
@@ -141,7 +141,7 @@ class DeepNestedAbortPropagationTest {
                 try {
                     Thread.sleep(60_000);
                 } catch (InterruptedException e) {
-                    leavesInterrupted.incrementAndGet();
+                    leavesInterrupted.countDown();
                     Thread.currentThread().interrupt();
                 }
             }));
@@ -169,9 +169,9 @@ class DeepNestedAbortPropagationTest {
 
         var result = runnerFuture.get(30, TimeUnit.SECONDS);
 
-        assertThat(leavesInterrupted.get())
+        assertThat(leavesInterrupted.await(10, TimeUnit.SECONDS))
                 .as("all blocking leaves were interrupted")
-                .isEqualTo(PARALLELISM);
+                .isTrue();
 
         var root = result.descriptor().orElseThrow();
         assertThat(root.isFailed()).isTrue();
@@ -181,7 +181,7 @@ class DeepNestedAbortPropagationTest {
     @DisplayName("Mixed Sequential/Parallel nesting: abort propagates through all layers")
     void mixedNestingAbortPropagatesThroughAllLayers() throws Exception {
         var leavesStarted = new CountDownLatch(PARALLELISM);
-        var leavesInterrupted = new AtomicInteger(0);
+        var leavesInterrupted = new CountDownLatch(PARALLELISM);
 
         // Build a complex nested structure:
         // Sequential -> Parallel -> Sequential -> Parallel -> Step (blocking leaves)
@@ -193,7 +193,7 @@ class DeepNestedAbortPropagationTest {
                 try {
                     Thread.sleep(60_000);
                 } catch (InterruptedException e) {
-                    leavesInterrupted.incrementAndGet();
+                    leavesInterrupted.countDown();
                     Thread.currentThread().interrupt();
                 }
             }));
@@ -225,9 +225,9 @@ class DeepNestedAbortPropagationTest {
 
         var result = runnerFuture.get(30, TimeUnit.SECONDS);
 
-        assertThat(leavesInterrupted.get())
+        assertThat(leavesInterrupted.await(10, TimeUnit.SECONDS))
                 .as("all blocking leaves were interrupted")
-                .isEqualTo(PARALLELISM);
+                .isTrue();
 
         var root = result.descriptor().orElseThrow();
         assertThat(root.isFailed()).isTrue();
@@ -237,7 +237,7 @@ class DeepNestedAbortPropagationTest {
     @DisplayName("Sequential with multiple children: blocking first child interrupted, " + "remaining children aborted")
     void sequentialMultipleChildrenBlockingFirstInterruptedRemainingAborted() throws Exception {
         var blockingStarted = new CountDownLatch(1);
-        var blockingInterrupted = new AtomicBoolean(false);
+        var blockingInterrupted = new CountDownLatch(1);
         var secondRan = new AtomicBoolean(false);
         var thirdRan = new AtomicBoolean(false);
 
@@ -248,7 +248,7 @@ class DeepNestedAbortPropagationTest {
             try {
                 Thread.sleep(60_000);
             } catch (InterruptedException e) {
-                blockingInterrupted.set(true);
+                blockingInterrupted.countDown();
                 Thread.currentThread().interrupt();
             }
         }));
@@ -269,7 +269,7 @@ class DeepNestedAbortPropagationTest {
 
         var result = runnerFuture.get(30, TimeUnit.SECONDS);
 
-        assertThat(blockingInterrupted.get())
+        assertThat(blockingInterrupted.await(10, TimeUnit.SECONDS))
                 .as("blocking leaf was interrupted")
                 .isTrue();
         assertThat(secondRan.get()).as("second child did not run").isFalse();
@@ -283,7 +283,7 @@ class DeepNestedAbortPropagationTest {
     @DisplayName("Deeply nested Parallel with work-stealing: abort propagates within timeout")
     void deeplyNestedParallelWithWorkStealingAbortPropagates() throws Exception {
         var leavesStarted = new CountDownLatch(PARALLELISM);
-        var leavesInterrupted = new AtomicInteger(0);
+        var leavesInterrupted = new CountDownLatch(PARALLELISM);
         var permitTesterRan = new AtomicBoolean(false);
 
         // Build a deeply nested Parallel structure that forces work-stealing
@@ -296,7 +296,7 @@ class DeepNestedAbortPropagationTest {
                 try {
                     Thread.sleep(60_000);
                 } catch (InterruptedException e) {
-                    leavesInterrupted.incrementAndGet();
+                    leavesInterrupted.countDown();
                     Thread.currentThread().interrupt();
                 }
             }));
@@ -333,9 +333,9 @@ class DeepNestedAbortPropagationTest {
 
         var result = runnerFuture.get(30, TimeUnit.SECONDS);
 
-        assertThat(leavesInterrupted.get())
+        assertThat(leavesInterrupted.await(10, TimeUnit.SECONDS))
                 .as("all blocking leaves were interrupted")
-                .isEqualTo(PARALLELISM);
+                .isTrue();
         assertThat(permitTesterRan.get())
                 .as("permit-demanding step executed (permits reclaimed)")
                 .isTrue();
@@ -352,7 +352,7 @@ class DeepNestedAbortPropagationTest {
 
         for (var depth = 1; depth <= maxNestingDepth; depth++) {
             var leavesStarted = new CountDownLatch(1);
-            var leavesInterrupted = new AtomicBoolean(false);
+            var leavesInterrupted = new CountDownLatch(1);
 
             // Build N levels of nested Sequential
             var innermost = (Object) Sequential.builder("level-" + depth)
@@ -361,7 +361,7 @@ class DeepNestedAbortPropagationTest {
                         try {
                             Thread.sleep(60_000);
                         } catch (InterruptedException e) {
-                            leavesInterrupted.set(true);
+                            leavesInterrupted.countDown();
                             Thread.currentThread().interrupt();
                         }
                     }))
@@ -389,7 +389,7 @@ class DeepNestedAbortPropagationTest {
             var result = runnerFuture.get(30, TimeUnit.SECONDS);
             var elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime);
 
-            assertThat(leavesInterrupted.get())
+            assertThat(leavesInterrupted.await(10, TimeUnit.SECONDS))
                     .as("depth %d: blocking leaf was interrupted", depth)
                     .isTrue();
 

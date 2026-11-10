@@ -74,6 +74,13 @@ public class StatusListener implements Listener {
     }
 
     @Override
+    public void onWarning(final String message) {
+        Objects.requireNonNull(message, "message is null");
+        System.out.print(prefix() + "WARN | " + Listeners.stripUnsafe(message) + LINE_SEPARATOR);
+        System.out.flush();
+    }
+
+    @Override
     public void onAfterExecution(final Descriptor descriptor) {
         Objects.requireNonNull(descriptor, "descriptor is null");
 

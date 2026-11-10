@@ -29,13 +29,24 @@ import org.paramixel.api.Status;
  * fails with {@link Status#FAILED} and a message indicating the timeout.
  *
  * <p>On timeout, the child's subtree is cancelled best-effort: each still-running descendant
- * is marked terminal and has its scheduled future completed exceptionally (unblocking any
- * coordinator parked in the scheduler's managed join), and each leaf descendant has its
- * executing thread interrupted. Cooperative (interruptible) bodies — {@code Thread.sleep},
- * blocking {@code java.util.concurrent} operations, NIO, etc. — terminate and release their leaf
- * permits promptly. A leaf whose body ignores interruption (e.g. a CPU-bound loop) cannot be
- * forcibly stopped and may leak its leaf permit and worker thread until the scheduler is closed;
- * because scheduler worker threads are daemon threads, such leaks cannot prevent JVM shutdown.
+ * is marked terminal and has its scheduled future completed exceptionally, and each leaf
+ * descendant has its executing thread interrupted. Cooperative (interruptible) bodies —
+ * {@code Thread.sleep}, blocking {@code java.util.concurrent} operations, NIO, etc. — terminate
+ * and release their leaf permits promptly.
+ *
+ * <p>Lifecycle cleanup is not cancelled. Within the subtree, the after action of any
+ * {@link Scope}, {@link Instance}, or {@code Static} whose before action had been attempted still
+ * runs (uninterrupted, even if it was already running at the deadline), and this action completes
+ * only after that cleanup has finished. Cleanup is therefore not bounded by the timeout. A
+ * lifecycle that had not started when the deadline passed is cancelled without running its
+ * before or after action.
+ *
+ * <p>A leaf whose body ignores interruption (e.g. a CPU-bound loop) cannot be forcibly stopped.
+ * If the cancelled subtree makes no cleanup progress for a grace period of five seconds, this
+ * action stops waiting, marks the remaining descendants (including unreachable after actions)
+ * {@link Status#ABORTED}, and completes; the stuck thread may keep its leaf permit until it
+ * returns or the scheduler is closed. Because scheduler threads are daemon threads, such leaks
+ * cannot prevent JVM shutdown.
  *
  * <p>Skipped executions short-circuit without executing the child.
  */

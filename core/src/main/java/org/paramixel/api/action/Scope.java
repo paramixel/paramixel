@@ -25,7 +25,11 @@ import nonapi.org.paramixel.support.Arguments;
  * in sequence, with lifecycle-style guarantees.
  *
  * <p>A before action runs first. If the before action fails, the body action is
- * skipped. The after action always runs, regardless of earlier outcomes.
+ * skipped. Once the before action has been attempted, the after action always runs,
+ * regardless of earlier outcomes — including when an enclosing {@link Timeout} cancels the
+ * before or body action. If the scope is cancelled before it starts, neither the before nor
+ * the after action runs. A scope without a before action runs its after action once the scope
+ * has started.
  *
  * <p>To execute multiple body actions, wrap a {@link Sequential} or {@link Parallel}
  * in {@link Builder#body(Action)}.

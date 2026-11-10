@@ -34,7 +34,7 @@ class ConcreteRunnerExceptionHandlingTest {
     @DisplayName("recoverable exception after root discovery marks root as failed with throwable")
     void recoverableExceptionAfterRootDiscoveryMarksRootAsFailedWithThrowable() throws Exception {
         var runner = (ConcreteRunner) Runner.builder().build();
-        setIntField(runner, "schedulerQueueCapacity", 0);
+        setIntField(runner, "parallelism", 0);
 
         var result = runner.run(Step.of("root-step", context -> {}));
         var root = result.descriptor().orElseThrow();
@@ -43,7 +43,7 @@ class ConcreteRunnerExceptionHandlingTest {
         assertThat(root.isFailed()).isTrue();
         assertThat(root.throwable()).hasValueSatisfying(throwable -> {
             assertThat(throwable).isInstanceOf(IllegalArgumentException.class);
-            assertThat(throwable.getMessage()).contains("queueCapacity must be positive");
+            assertThat(throwable.getMessage()).contains("parallelism must be positive");
         });
     }
 
@@ -62,7 +62,7 @@ class ConcreteRunnerExceptionHandlingTest {
         };
 
         var runner = (ConcreteRunner) Runner.builder().listener(listener).build();
-        setIntField(runner, "schedulerQueueCapacity", 0);
+        setIntField(runner, "parallelism", 0);
 
         var result = runner.run(Step.of("test", ctx -> {}));
 

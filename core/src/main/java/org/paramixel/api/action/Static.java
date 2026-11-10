@@ -29,8 +29,9 @@ import nonapi.org.paramixel.support.Arguments;
  *
  * <p>Unlike {@link Instance}, this action does not create or destroy a fixture. It is
  * suitable for standalone test steps that do not require a shared instance. A before action
- * runs first. If the before action fails, the body action is skipped. The after action
- * always runs, regardless of earlier outcomes.
+ * runs first. If the before action fails, the body action is skipped. Once the before action
+ * has been attempted, the after action always runs, regardless of earlier outcomes, with the
+ * same cancellation semantics as {@link Scope}.
  *
  * <p>To execute multiple body actions, wrap a {@link Sequential} or {@link Parallel}
  * in {@link Builder#body(Action)}.

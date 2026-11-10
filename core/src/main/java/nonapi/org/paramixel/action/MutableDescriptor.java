@@ -38,23 +38,6 @@ import org.paramixel.api.action.Step;
 public interface MutableDescriptor extends Descriptor {
 
     /**
-     * Returns the precomputed scheduler priority key for this descriptor.
-     *
-     * <p>The key is assigned during discovery and represents this descriptor's
-     * stable position in the descriptor tree.</p>
-     *
-     * @return the scheduler priority key; never {@code null}
-     */
-    SchedulerPriorityKey schedulerPriorityKey();
-
-    /**
-     * Sets the precomputed scheduler priority key for this descriptor.
-     *
-     * @param schedulerPriorityKey the scheduler priority key; must not be {@code null}
-     */
-    void setSchedulerPriorityKey(SchedulerPriorityKey schedulerPriorityKey);
-
-    /**
      * Sets the before-child descriptor during discovery.
      *
      * @param before the before-child descriptor; must not be {@code null}
@@ -152,39 +135,64 @@ public interface MutableDescriptor extends Descriptor {
     void interruptExecutingThread();
 
     /**
+     * Atomically starts this descriptor.
+     *
+     * <p>Transitions {@link Status#PENDING} to {@link Status#RUNNING}. The engine executes an
+     * action only when this method returns {@code true}, so a descriptor aborted before it
+     * started never runs its action. The transition is atomic with respect to
+     * {@link #abort(Status, Throwable)}.
+     *
+     * @return {@code true} if the descriptor is now (or was already) {@link Status#RUNNING};
+     *     {@code false} if it is already terminal
+     */
+    boolean tryStart();
+
+    /**
+     * Returns whether a thread is currently recorded as executing this descriptor's action.
+     *
+     * @return {@code true} while a leaf action's thread is recorded
+     */
+    boolean isExecuting();
+
+    /**
      * Cancels this descriptor's subtree best-effort.
      *
      * <p>Marks this descriptor terminal with {@code rootStatus} (if not already terminal),
      * completes its scheduled future exceptionally with {@code cause}, interrupts this
      * descriptor's executing thread when it is a leaf action, and recurses into
-     * {@link #before()}, {@link #children()}, and {@link #after()}: each descendant is marked
+     * {@link #before()} and {@link #children()}: each descendant is marked
      * {@link Status#ABORTED}, has its scheduled future completed exceptionally, and, when it is
      * a leaf action, has its executing thread interrupted.
      *
-     * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel})
-     * whose coordinator is parked in the scheduler's managed join: completing the futures makes
-     * the join observe {@code isDone()} and exit, and interrupting leaf threads unblocks
-     * cooperative (interruptible) user code so its leaf permits are released.
+     * <p>Lifecycle cleanup is preserved: {@link #after()} is aborted only when its lifecycle never
+     * attempted its {@link #before()} (or, without a {@code before}, never started). Otherwise the
+     * {@code after} action is left untouched and not interrupted, so it still runs once the
+     * cancelled work has unwound — matching the documented guarantee that {@code after} always
+     * runs once {@code before} has been attempted.
      *
-     * <p>For deeply nested synchronous coordination (e.g. Sequential → Parallel → Sequential
-     * → Parallel → Step), the abort propagation is bounded: the interrupt targets the leaf's
-     * executing thread, the leaf's exception unwinds through the call stack, each coordination
-     * node's {@code managedJoin} returns (either from the interrupt or the future completion),
-     * and the parent's {@code runChild} returns, allowing the next level to observe its child's
-     * terminal state. The propagation time is bounded by the nesting depth and the scheduler's
-     * backoff ceiling (1 second per {@code managedJoin} park).
+     * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel})
+     * whose coordinating frame is waiting on children: completing the futures publishes terminal
+     * state, and interrupting leaf threads unblocks cooperative (interruptible) user code so its
+     * executing frame returns and releases its permit.
+     *
+     * <p>For deeply nested coordination (e.g. Sequential → Parallel → Sequential → Parallel →
+     * Step), propagation is bounded by the nesting depth: the interrupt reaches each executing
+     * leaf, each leaf returns, and each coordinating frame observes its children's terminal state
+     * as the recursion unwinds.
      *
      * <p>Idempotent: a descriptor already in a terminal state is skipped, so concurrent
      * completion and cancellation both converge safely. Safe to call from any thread,
      * including a scheduler worker thread; this method never blocks on a future, it only
      * completes them. A leaf whose body ignores interruption (e.g. a CPU-bound loop) cannot be
-     * forcibly stopped and may leak its leaf permit and worker thread until the scheduler is
-     * closed.
+     * forcibly stopped and keeps its concurrency budget and worker thread until it returns or the
+     * engine is closed.
      *
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
      * @param cause the cause used to complete futures exceptionally; must not be {@code null}
+     * @return {@code true} if this descriptor had already started (was running or terminal) when
+     *     the abort reached it; {@code false} if the abort prevented it from ever starting
      */
-    void abort(Status rootStatus, Throwable cause);
+    boolean abort(Status rootStatus, Throwable cause);
 
     /**
      * Returns the descriptor depth from the root.
@@ -231,23 +239,6 @@ public interface MutableDescriptor extends Descriptor {
     default boolean isLeafAction() {
         return action() instanceof Step || action() instanceof Assert || action() instanceof Delay;
     }
-
-    /**
-     * Returns the execution node attached to this descriptor, if any.
-     *
-     * <p>Coordination strategies attach execution nodes to track pending children
-     * and schedule continuations. Leaf descriptors never have execution nodes.
-     *
-     * @return the execution node, or {@code null} if not set
-     */
-    ExecutionNode executionNode();
-
-    /**
-     * Attaches an execution node to this descriptor.
-     *
-     * @param node the execution node, or {@code null} to clear it
-     */
-    void setExecutionNode(ExecutionNode node);
 
     /**
      * Returns the scheduling future for this descriptor.
