@@ -31,7 +31,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import nonapi.org.paramixel.action.ConcreteContext;
@@ -45,6 +44,7 @@ import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.ContextConsumer;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
@@ -75,8 +75,11 @@ import org.paramixel.api.action.Until;
  *
  * <p>A {@code Timeout} runs its child on a dedicated thread that takes over the slot of the parked
  * waiting thread, so the deadline can always preempt the child and no permit is needed. Only
- * executing work is bounded by {@code parallelism}; parked waiters are not counted. A child that
- * ignores interruption may keep running briefly after its deadline.
+ * executing work is bounded by {@code parallelism}; parked waiters are not counted. At the deadline
+ * the child's subtree is cancelled, but lifecycle {@code after} actions whose {@code before} was
+ * attempted still run, and the {@code Timeout} completes only after that cleanup has finished. If
+ * the subtree makes no cleanup progress for a grace period (a leaf ignoring interruption), the
+ * {@code Timeout} abandons it and that thread may keep running in the background.
  *
  * <p>Deliberate behavioral differences from the previous queue-based scheduler: inter-iteration
  * delays occupy the executing branch, and there is no work stealing.
@@ -86,6 +89,8 @@ final class Engine implements AutoCloseable {
     private static final String THREAD_NAME = "paramixel-engine";
     private static final String TIMED_THREAD_NAME = "paramixel-timed";
     private static final long TERMINATION_TIMEOUT_SECONDS = 5L;
+    private static final long CANCELLATION_GRACE_SECONDS = 5L;
+    private static final long CANCELLATION_POLL_MILLIS = 25L;
 
     private final int parallelism;
     private final Dispatcher dispatcher;
@@ -216,8 +221,10 @@ final class Engine implements AutoCloseable {
                 concrete.setExecutingThread(thread);
             }
             context.listener().onBeforeExecution(descriptor);
-            descriptor.setStatus(Status.RUNNING);
-            status = execute(node, context, mode);
+            // Atomic with abort(): a descriptor cancelled after the check above must not run.
+            if (descriptor.tryStart()) {
+                status = execute(node, context, mode);
+            }
         } catch (Throwable t) {
             failure = Throwables.unwrap(t);
             if (failure instanceof InterruptedException) {
@@ -496,17 +503,16 @@ final class Engine implements AutoCloseable {
         var child = node.children[0];
         var millis = TimeUnit.NANOSECONDS.toMillis(node.timeoutNanos);
         var message = "timed out after " + millis + " ms";
-        var timedOut = new AtomicBoolean();
+        // Completed with the System.nanoTime() at which the child's subtree was cancelled.
+        var timedOut = new CompletableFuture<Long>();
         var settled = new CompletableFuture<Void>();
         ScheduledFuture<?> deadline = null;
         if (!closing) {
             try {
                 deadline = timers.schedule(
                         () -> {
-                            if (timedOut.compareAndSet(false, true)) {
-                                child.descriptor.abort(Status.failed(message), new TimeoutException(message));
-                                settled.complete(null);
-                            }
+                            child.descriptor.abort(Status.failed(message), new TimeoutException(message));
+                            timedOut.complete(System.nanoTime());
                         },
                         node.timeoutNanos,
                         TimeUnit.NANOSECONDS);
@@ -535,7 +541,7 @@ final class Engine implements AutoCloseable {
                 run(child, childContext, ExecutionMode.RUN);
                 settled.complete(null);
             }
-            awaitSettled(settled);
+            awaitTimedChild(child.descriptor, settled, timedOut, message);
             return child.descriptor.status();
         } finally {
             if (deadline != null) {
@@ -545,14 +551,86 @@ final class Engine implements AutoCloseable {
         }
     }
 
-    private static void awaitSettled(final CompletableFuture<Void> settled) {
+    /**
+     * Waits for a timed child to settle.
+     *
+     * <p>Before the deadline this simply waits. Once the deadline has cancelled the subtree, the
+     * cancelled work unwinds and any lifecycle cleanup it still owes runs on the child's thread;
+     * this method keeps waiting while cleanup is executing, so cleanup completes before the
+     * {@code Timeout} does. If the child has not settled and no cleanup has executed for a
+     * continuous {@link #CANCELLATION_GRACE_SECONDS} (for example a leaf that ignores interruption),
+     * the remaining subtree is abandoned: every non-terminal descendant is aborted and this method
+     * returns, leaving the stuck thread to finish on its own.
+     */
+    private static void awaitTimedChild(
+            final MutableDescriptor child,
+            final CompletableFuture<Void> settled,
+            final CompletableFuture<Long> timedOut,
+            final String message) {
         try {
-            settled.get();
+            CompletableFuture.anyOf(settled, timedOut).get();
+            if (settled.isDone()) {
+                return;
+            }
+            var graceNanos = TimeUnit.SECONDS.toNanos(CANCELLATION_GRACE_SECONDS);
+            var idleSince = timedOut.get();
+            while (true) {
+                try {
+                    settled.get(CANCELLATION_POLL_MILLIS, TimeUnit.MILLISECONDS);
+                    return;
+                } catch (TimeoutException stillRunning) {
+                    var now = System.nanoTime();
+                    if (isCleanupExecuting(child)) {
+                        idleSince = now;
+                    } else if (now - idleSince >= graceNanos) {
+                        abandon(child, message);
+                        return;
+                    }
+                }
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (ExecutionException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /**
+     * Returns whether lifecycle cleanup is executing in a cancelled subtree. Cancellation makes
+     * every cancelled leaf terminal immediately (even one still stuck executing), so the only
+     * leaves that are executing and not yet terminal are preserved {@code after} actions.
+     */
+    private static boolean isCleanupExecuting(final Descriptor descriptor) {
+        if (descriptor instanceof MutableDescriptor mutable
+                && mutable.isLeafAction()
+                && mutable.isExecuting()
+                && !mutable.isCompleted()) {
+            return true;
+        }
+        if (descriptor.before().map(Engine::isCleanupExecuting).orElse(false)) {
+            return true;
+        }
+        for (var child : descriptor.children()) {
+            if (isCleanupExecuting(child)) {
+                return true;
+            }
+        }
+        return descriptor.after().map(Engine::isCleanupExecuting).orElse(false);
+    }
+
+    /**
+     * Aborts every non-terminal descriptor in an abandoned subtree, including preserved
+     * {@code after} actions that can no longer be reached, so the result tree stays terminal.
+     */
+    private static void abandon(final Descriptor descriptor, final String message) {
+        if (descriptor instanceof MutableDescriptor mutable && !mutable.isCompleted()) {
+            mutable.abort(Status.aborted("cancelled by ancestor: " + message), new TimeoutException(message));
+        }
+        descriptor.before().ifPresent(before -> abandon(before, message));
+        for (var child : descriptor.children()) {
+            abandon(child, message);
+        }
+        descriptor.after().ifPresent(after -> abandon(after, message));
     }
 
     private Status runIsolated(final ExecutionPlan.Node node, final ConcreteContext context) {

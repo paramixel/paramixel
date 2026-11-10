@@ -389,7 +389,7 @@ class EngineTest {
                         .child(Step.of("blocker-a", context -> Thread.sleep(2_000)))
                         .child(Step.of("blocker-b", context -> Thread.sleep(2_000)))
                         .child(Timeout.builder("timeout")
-                                .body(Step.of("stubborn", context -> ignoreInterruptsFor(Duration.ofSeconds(6))))
+                                .body(Step.of("stubborn", context -> ignoreInterruptsFor(Duration.ofSeconds(20))))
                                 .timeout(Duration.ofMillis(200))
                                 .build())
                         .build();
@@ -401,7 +401,10 @@ class EngineTest {
                 var elapsed = Duration.ofNanos(System.nanoTime() - start);
 
                 assertThat(tree.isFailed()).isTrue();
-                assertThat(elapsed).isLessThan(Duration.ofSeconds(5));
+                // The blockers hold both permits for 2 s; the timeout then fires after 200 ms and,
+                // because the child ignores interruption, is abandoned after the 5 s cancellation
+                // grace (about 7.2 s in total) — long before the stubborn child itself would finish.
+                assertThat(elapsed).isLessThan(Duration.ofSeconds(12));
             } finally {
                 engine.close();
             }

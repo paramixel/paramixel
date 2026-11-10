@@ -335,34 +335,64 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     @Override
-    public void abort(final Status rootStatus, final Throwable cause) {
+    public synchronized boolean tryStart() {
+        if (status.isPending()) {
+            setStatus(Status.RUNNING);
+            return true;
+        }
+        return status.isRunning();
+    }
+
+    @Override
+    public boolean isExecuting() {
+        return executingThread != null;
+    }
+
+    @Override
+    public boolean abort(final Status rootStatus, final Throwable cause) {
         Objects.requireNonNull(rootStatus, "rootStatus is null");
         Objects.requireNonNull(cause, "cause is null");
-        if (!beginAbort(rootStatus, cause)) {
-            return; // already terminal — idempotent
+        var transition = beginAbort(rootStatus, cause);
+        if (transition == AbortTransition.ALREADY_TERMINAL) {
+            return true; // already terminal — idempotent; it necessarily started earlier
         }
         // Recurse without holding this node's monitor: children()/before()/after() are immutable
         // post-freeze, and releasing avoids holding a lock across the recursive walk.
         var message = cause.getMessage() != null ? cause.getMessage() : "cancelled";
         var abortedDescendant = Status.aborted("cancelled by ancestor: " + message);
-        if (before != null) {
-            before.abort(abortedDescendant, cause);
-        }
+        // The before slot is aborted first: its own atomic transition reports whether it had been
+        // attempted, which decides whether the after slot still owes cleanup.
+        var beforeAttempted = before != null && before.abort(abortedDescendant, cause);
         for (var child : children()) {
             Arguments.requireInstanceOf(child, MutableDescriptor.class, "child must be a MutableDescriptor")
                     .abort(abortedDescendant, cause);
         }
-        if (after != null) {
+        var cleanupOwed = before != null ? beforeAttempted : transition == AbortTransition.STARTED;
+        if (after != null && !cleanupOwed) {
             after.abort(abortedDescendant, cause);
         }
+        return transition == AbortTransition.STARTED;
+    }
+
+    /**
+     * Outcome of this node's own abort transition.
+     */
+    private enum AbortTransition {
+        /** The descriptor was already terminal; nothing changed. */
+        ALREADY_TERMINAL,
+        /** The descriptor was pending and has now been made terminal without ever starting. */
+        NOT_STARTED,
+        /** The descriptor was running and has now been made terminal. */
+        STARTED
     }
 
     /**
      * Performs this node's own terminal transition and leaf interrupt.
      *
-     * <p>Returns {@code false} when this descriptor is already terminal, making {@link #abort}
-     * idempotent. Uses {@link #setStatus} to preserve the documented status state machine and
-     * {@code startedAt}/{@code completedAt} bookkeeping.
+     * <p>Returns {@link AbortTransition#ALREADY_TERMINAL} when this descriptor is already terminal,
+     * making {@link #abort} idempotent. Uses {@link #setStatus} to preserve the documented status
+     * state machine and {@code startedAt}/{@code completedAt} bookkeeping. Runs under this
+     * descriptor's monitor, so it is atomic with respect to {@link #tryStart()}.
      *
      * <p>Only leaf descriptors run user code on their executing thread; coordination nodes are
      * unblocked by their children completing, so interrupting only leaves avoids stranding an
@@ -375,12 +405,13 @@ public final class ConcreteDescriptor implements MutableDescriptor {
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
      * @param cause the cause used to complete the scheduling future exceptionally; must not be
      *     {@code null}
-     * @return {@code true} if this node transitioned (or was running and now completes)
+     * @return the transition that occurred
      */
-    private synchronized boolean beginAbort(final Status rootStatus, final Throwable cause) {
+    private synchronized AbortTransition beginAbort(final Status rootStatus, final Throwable cause) {
         if (isCompleted()) {
-            return false;
+            return AbortTransition.ALREADY_TERMINAL;
         }
+        var transition = status.isRunning() ? AbortTransition.STARTED : AbortTransition.NOT_STARTED;
         if (status.isPending()) {
             // State machine requires PENDING -> RUNNING -> terminal.
             setStatus(Status.RUNNING);
@@ -393,6 +424,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         if (isLeafAction()) {
             interruptExecutingThread();
         }
-        return true;
+        return transition;
     }
 }

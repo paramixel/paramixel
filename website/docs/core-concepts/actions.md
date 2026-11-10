@@ -20,14 +20,14 @@ public sealed interface Action
 - `Step` wraps a `ContextConsumer` for user logic.
 - `Sequential` runs children one after another in dependent or independent mode, optionally shuffled. In dependent mode (the default), a `FAILED` or `SKIPPED` child short-circuits the sequence (remaining children are skipped); an `ABORTED` child does **not** short-circuit, so siblings still run and the sequence aggregates to `ABORTED`. In independent mode, all children run regardless of outcome. See [Exception Reference](../api/exception-reference) for how each outcome exception affects siblings.
 - `Parallel` runs children concurrently with configurable parallelism, optionally shuffled.
-- `Scope` provides before-body-after execution with lifecycle guarantee; the after action always runs.
+- `Scope` provides before-body-after execution with lifecycle guarantee: once the before action has been attempted, the after action always runs, regardless of earlier outcomes. A scope cancelled before it starts runs neither.
 - `Static` provides before-body-after without a fixture instance. _(Deprecated since 6.2 — use `Scope` instead.)_
-- `Instance` creates a fixture instance, runs the body, and destroys it.
+- `Instance` creates a fixture instance, runs the body, and destroys it. Creation and destruction follow the same guarantee as `Scope` before and after: once creation has been attempted, destruction always runs.
 - `Assert` evaluates a boolean condition against an expected value. Passes when the actual value equals the expected value; fails with `FailException` otherwise. Created via static factories, not a builder: `assertTrue(name, actual)`, `assertFalse(name, actual)`, `assertThat(name, expected, actual)`, `assertThat(name, expected, () -> compute(), "message")`.
 - `Delay` pauses execution for a fixed or random duration. Created via static factories: `delay(name, millis)` or `delay(name, Duration)`.
 - `Isolated` executes its body under a named re-entrant lock. Same-named nodes serialize. Nested same-name nodes are re-entrant.
 - `Repeat` executes a child action a configurable number of times.
-- `Timeout` executes a child action with a wall-clock deadline.
+- `Timeout` executes a child action with a wall-clock deadline. On timeout the child is cancelled, but lifecycle cleanup still runs: see [Timeouts and cleanup](#timeouts-and-cleanup).
 - `Conditional` evaluates a runtime predicate and gates body execution. When the predicate is false, the node reports `PASSED` and the body subtree is skipped. Because the node passes, it does not disrupt dependent siblings in `Sequential`.
 - `Until` executes a child action repeatedly until a `Predicate<Context>` returns `true`, the body action passes, or `maxIterations` is exhausted. Individual iteration failures continue the loop. When `until()` is configured, only `ABORTED` or predicate satisfaction stops early; exhaustion reports `FAILED`. When `until()` is absent, the loop stops when the body passes and reports `PASSED`.
 
@@ -74,6 +74,15 @@ browser test
 ```
 
 Use `Scope` when setup and teardown belong to a specific action tree. Use [`@Paramixel.BeforeAll` and `@Paramixel.AfterAll`](discovery#beforeall-and-afterall-hooks) only for runner-wide lifecycle around all discovered factory actions.
+
+### Timeouts and cleanup
+
+When a `Timeout` deadline passes, its child subtree is cancelled: running leaf actions are interrupted and actions that have not started are marked `ABORTED`. Lifecycle cleanup is preserved:
+
+- A `Scope`, `Instance`, or `Static` whose before action had been attempted still runs its after action, even if the before action or the body was interrupted. An after action that is already running is not interrupted.
+- A lifecycle that had not started when the deadline passed runs neither its before nor its after action.
+- The `Timeout` completes only after that cleanup has finished, so teardown such as stopping containers or removing networks never outlives the `Timeout`. Cleanup is not bounded by the deadline.
+- If cancelled work ignores interruption and the subtree makes no cleanup progress for five seconds, the `Timeout` stops waiting, marks the remaining actions `ABORTED`, and completes.
 
 Use the corresponding `Builder` nested class for each action type. See [Builder](../api/builder) for details.
 

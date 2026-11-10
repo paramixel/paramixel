@@ -135,14 +135,40 @@ public interface MutableDescriptor extends Descriptor {
     void interruptExecutingThread();
 
     /**
+     * Atomically starts this descriptor.
+     *
+     * <p>Transitions {@link Status#PENDING} to {@link Status#RUNNING}. The engine executes an
+     * action only when this method returns {@code true}, so a descriptor aborted before it
+     * started never runs its action. The transition is atomic with respect to
+     * {@link #abort(Status, Throwable)}.
+     *
+     * @return {@code true} if the descriptor is now (or was already) {@link Status#RUNNING};
+     *     {@code false} if it is already terminal
+     */
+    boolean tryStart();
+
+    /**
+     * Returns whether a thread is currently recorded as executing this descriptor's action.
+     *
+     * @return {@code true} while a leaf action's thread is recorded
+     */
+    boolean isExecuting();
+
+    /**
      * Cancels this descriptor's subtree best-effort.
      *
      * <p>Marks this descriptor terminal with {@code rootStatus} (if not already terminal),
      * completes its scheduled future exceptionally with {@code cause}, interrupts this
      * descriptor's executing thread when it is a leaf action, and recurses into
-     * {@link #before()}, {@link #children()}, and {@link #after()}: each descendant is marked
+     * {@link #before()} and {@link #children()}: each descendant is marked
      * {@link Status#ABORTED}, has its scheduled future completed exceptionally, and, when it is
      * a leaf action, has its executing thread interrupted.
+     *
+     * <p>Lifecycle cleanup is preserved: {@link #after()} is aborted only when its lifecycle never
+     * attempted its {@link #before()} (or, without a {@code before}, never started). Otherwise the
+     * {@code after} action is left untouched and not interrupted, so it still runs once the
+     * cancelled work has unwound — matching the documented guarantee that {@code after} always
+     * runs once {@code before} has been attempted.
      *
      * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel})
      * whose coordinating frame is waiting on children: completing the futures publishes terminal
@@ -163,8 +189,10 @@ public interface MutableDescriptor extends Descriptor {
      *
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
      * @param cause the cause used to complete futures exceptionally; must not be {@code null}
+     * @return {@code true} if this descriptor had already started (was running or terminal) when
+     *     the abort reached it; {@code false} if the abort prevented it from ever starting
      */
-    void abort(Status rootStatus, Throwable cause);
+    boolean abort(Status rootStatus, Throwable cause);
 
     /**
      * Returns the descriptor depth from the root.
