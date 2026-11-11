@@ -42,7 +42,7 @@ public class LoopWithPredicateTest {
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**

@@ -31,7 +31,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("new descriptor starts PENDING")
     void newDescriptorStartsPending() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
 
         assertThat(descriptor.status()).isEqualTo(Status.PENDING);
         assertThat(descriptor.isCompleted()).isFalse();
@@ -40,7 +40,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("PENDING to RUNNING is valid")
     void pendingToRunningIsValid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
 
         descriptor.setStatus(Status.RUNNING);
 
@@ -51,55 +51,55 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("RUNNING to PASSED is valid")
     void runningToPassedIsValid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
 
         descriptor.setStatus(Status.PASSED);
 
-        assertThat(descriptor.isPassed()).isTrue();
+        assertThat(descriptor.status().isPassed()).isTrue();
         assertThat(descriptor.isCompleted()).isTrue();
     }
 
     @Test
     @DisplayName("RUNNING to FAILED is valid")
     void runningToFailedIsValid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
 
         descriptor.setStatus(Status.FAILED);
 
-        assertThat(descriptor.isFailed()).isTrue();
+        assertThat(descriptor.status().isFailed()).isTrue();
         assertThat(descriptor.isCompleted()).isTrue();
     }
 
     @Test
     @DisplayName("RUNNING to SKIPPED is valid")
     void runningToSkippedIsValid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
 
         descriptor.setStatus(Status.SKIPPED);
 
-        assertThat(descriptor.isSkipped()).isTrue();
+        assertThat(descriptor.status().isSkipped()).isTrue();
         assertThat(descriptor.isCompleted()).isTrue();
     }
 
     @Test
     @DisplayName("RUNNING to ABORTED is valid")
     void runningToAbortedIsValid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
 
         descriptor.setStatus(Status.ABORTED);
 
-        assertThat(descriptor.isAborted()).isTrue();
+        assertThat(descriptor.status().isAborted()).isTrue();
         assertThat(descriptor.isCompleted()).isTrue();
     }
 
     @Test
     @DisplayName("PENDING to terminal status is invalid")
     void pendingToTerminalIsInvalid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
 
         assertThatThrownBy(() -> descriptor.setStatus(Status.PASSED))
                 .isInstanceOf(IllegalStateException.class)
@@ -109,7 +109,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("setting PENDING status is invalid")
     void settingPendingIsInvalid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
 
         assertThatThrownBy(() -> descriptor.setStatus(Status.PENDING))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -119,7 +119,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("setting null status is invalid")
     void settingNullStatusIsInvalid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
 
         assertThatThrownBy(() -> descriptor.setStatus(null))
                 .isInstanceOf(NullPointerException.class)
@@ -129,7 +129,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("RUNNING to RUNNING is invalid")
     void runningToRunningIsInvalid() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
 
         assertThatThrownBy(() -> descriptor.setStatus(Status.RUNNING)).isInstanceOf(IllegalStateException.class);
@@ -138,7 +138,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("terminal to any status is a no-op")
     void terminalToAnyStatusIsNoOp() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 
@@ -148,36 +148,36 @@ class DescriptorStatusLifecycleTest {
         descriptor.setStatus(Status.SKIPPED);
 
         // Descriptor retains original terminal state
-        assertThat(descriptor.isPassed()).isTrue();
+        assertThat(descriptor.status().isPassed()).isTrue();
         assertThat(descriptor.isCompleted()).isTrue();
     }
 
     @Test
     @DisplayName("setting terminal status with Status factory records message")
     void settingTerminalStatusWithStatusFactoryRecordsMessage() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("error message"));
 
-        assertThat(descriptor.message()).contains("error message");
-        assertThat(descriptor.throwable()).isEmpty();
+        assertThat(descriptor.status().message()).contains("error message");
+        assertThat(descriptor.status().throwable()).isEmpty();
     }
 
     @Test
     @DisplayName("setting terminal status with Status factory records throwable")
     void settingTerminalStatusWithStatusFactoryRecordsThrowable() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
         var exception = new RuntimeException("boom");
         descriptor.setStatus(Status.failed("boom", exception));
 
-        assertThat(descriptor.throwable()).containsSame(exception);
+        assertThat(descriptor.status().throwable()).containsSame(exception);
     }
 
     @Test
     @DisplayName("timestamps are empty before execution")
     void timestampsAreEmptyBeforeExecution() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
 
         assertThat(descriptor.startedAt()).isEmpty();
         assertThat(descriptor.completedAt()).isEmpty();
@@ -186,7 +186,7 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("timestamps are recorded during execution")
     void timestampsAreRecordedDuringExecution() throws InterruptedException {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
         assertThat(descriptor.startedAt()).isPresent();
         assertThat(descriptor.completedAt()).isEmpty();
@@ -201,40 +201,12 @@ class DescriptorStatusLifecycleTest {
     @Test
     @DisplayName("descriptor exposes action")
     void descriptorExposesAction() {
-        var action = Step.of("test", context -> {});
+        var action = Step.step("test", context -> {});
         var descriptor = new ConcreteDescriptor(action);
 
         assertThat(descriptor.action()).isSameAs(action);
         assertThat(descriptor.action().displayName()).isEqualTo("test");
         assertThat(descriptor.action().getClass().getName()).contains("Step");
-    }
-
-    @Test
-    @DisplayName("markScheduled rejects duplicate scheduling")
-    void markScheduledRejectsDuplicateScheduling() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
-        descriptor.markScheduled();
-
-        assertThatThrownBy(() -> descriptor.markScheduled())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("already scheduled");
-    }
-
-    @Test
-    @DisplayName("isScheduled returns false before scheduling")
-    void isScheduledReturnsFalseBeforeScheduling() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
-
-        assertThat(descriptor.isScheduled()).isFalse();
-    }
-
-    @Test
-    @DisplayName("isScheduled returns true after scheduling")
-    void isScheduledReturnsTrueAfterScheduling() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
-        descriptor.markScheduled();
-
-        assertThat(descriptor.isScheduled()).isTrue();
     }
 
     @Test
@@ -244,7 +216,7 @@ class DescriptorStatusLifecycleTest {
         //   - Descriptor completed normally (PASSED)
         //   - A listener throws after completion
         //   - Catch block defensively calls setStatus(FAILED)
-        var root = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        var root = new ConcreteDescriptor(Step.step("test", ctx -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
 
@@ -252,14 +224,14 @@ class DescriptorStatusLifecycleTest {
         root.setStatus(Status.failed("listener error", new RuntimeException("original listener exception")));
 
         // Descriptor retains its original terminal state (PASSED — not changed to FAILED)
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.isCompleted()).isTrue();
     }
 
     @Test
     @DisplayName("no-op on terminal descriptor does not change timestamps")
     void noOpOnTerminalDescriptorDoesNotChangeTimestamps() throws InterruptedException {
-        var descriptor = new ConcreteDescriptor(Step.of("test", context -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", context -> {}));
         descriptor.setStatus(Status.RUNNING);
         Thread.sleep(10);
         descriptor.setStatus(Status.PASSED);
@@ -279,31 +251,31 @@ class DescriptorStatusLifecycleTest {
     @DisplayName("no-op on all terminal states (PASSED, FAILED, SKIPPED, ABORTED)")
     void noOpOnAllTerminalStates() {
         // PASSED → no-op on setStatus(FAILED)
-        var passed = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        var passed = new ConcreteDescriptor(Step.step("test", ctx -> {}));
         passed.setStatus(Status.RUNNING);
         passed.setStatus(Status.PASSED);
         passed.setStatus(Status.FAILED);
-        assertThat(passed.isPassed()).isTrue();
+        assertThat(passed.status().isPassed()).isTrue();
 
         // FAILED → no-op on setStatus(PASSED)
-        var failed = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        var failed = new ConcreteDescriptor(Step.step("test", ctx -> {}));
         failed.setStatus(Status.RUNNING);
         failed.setStatus(Status.FAILED);
         failed.setStatus(Status.PASSED);
-        assertThat(failed.isFailed()).isTrue();
+        assertThat(failed.status().isFailed()).isTrue();
 
         // SKIPPED → no-op on setStatus(ABORTED)
-        var skipped = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        var skipped = new ConcreteDescriptor(Step.step("test", ctx -> {}));
         skipped.setStatus(Status.RUNNING);
         skipped.setStatus(Status.SKIPPED);
         skipped.setStatus(Status.ABORTED);
-        assertThat(skipped.isSkipped()).isTrue();
+        assertThat(skipped.status().isSkipped()).isTrue();
 
         // ABORTED → no-op on setStatus(SKIPPED)
-        var aborted = new ConcreteDescriptor(Step.of("test", ctx -> {}));
+        var aborted = new ConcreteDescriptor(Step.step("test", ctx -> {}));
         aborted.setStatus(Status.RUNNING);
         aborted.setStatus(Status.ABORTED);
         aborted.setStatus(Status.SKIPPED);
-        assertThat(aborted.isAborted()).isTrue();
+        assertThat(aborted.status().isAborted()).isTrue();
     }
 }

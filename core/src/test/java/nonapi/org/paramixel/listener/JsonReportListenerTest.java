@@ -26,7 +26,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.MockDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class JsonReportListenerTest {
     private JsonReportListener createListener(String reportFilePath) {
         var listener = new JsonReportListener();
         var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
-        listener.initialize(configuration);
+        listener.onRunStarted(configuration);
         return listener;
     }
 
@@ -67,7 +67,7 @@ class JsonReportListenerTest {
     void writesRootDescriptor() throws Exception {
         var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("root-action", v -> {}));
+        var root = new MockDescriptor(Step.step("root-action", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -85,17 +85,17 @@ class JsonReportListenerTest {
     void writesDescriptorTreeWithChildren() throws Exception {
         var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("parent", v -> {}));
+        var root = new MockDescriptor(Step.step("parent", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        var child1 = new ConcreteDescriptor(Step.of("child-a", v -> {}));
+        var child1 = new MockDescriptor(Step.step("child-a", v -> {}));
         child1.setStatus(Status.RUNNING);
         child1.setStatus(Status.PASSED);
-        var child2 = new ConcreteDescriptor(Step.of("child-b", v -> {}));
+        var child2 = new MockDescriptor(Step.step("child-b", v -> {}));
         child2.setStatus(Status.RUNNING);
         child2.setStatus(Status.SKIPPED);
-        root.addChild(child1);
-        root.addChild(child2);
+        root.child(child1);
+        root.child(child2);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
@@ -112,7 +112,7 @@ class JsonReportListenerTest {
     void escapesJsonSpecialCharacters() throws Exception {
         var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("a\\b\"c", v -> {}));
+        var root = new MockDescriptor(Step.step("a\\b\"c", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -129,7 +129,7 @@ class JsonReportListenerTest {
     void encodesUnsupportedControlCharactersAsUnicodeEscapes() throws Exception {
         var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("a\u0001b\u001fc", v -> {}));
+        var root = new MockDescriptor(Step.step("a\u0001b\u001fc", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -167,7 +167,7 @@ class JsonReportListenerTest {
                 .hasMessageContaining("json report file");
     }
 
-    private String reportContent(ConcreteDescriptor root) throws Exception {
+    private String reportContent(MockDescriptor root) throws Exception {
         var reportFile = tempDir.resolve("report.json");
         var listener = createListener(reportFile.toString());
         root.setStatus(Status.RUNNING);
@@ -191,7 +191,7 @@ class JsonReportListenerTest {
         @Test
         @DisplayName("escapes named whitespace escapes as short forms")
         void escapesNamedWhitespaceAsShortForms() throws Exception {
-            var content = reportContent(new ConcreteDescriptor(Step.of("a\nb\rc\td\be\ff", v -> {})));
+            var content = reportContent(new MockDescriptor(Step.step("a\nb\rc\td\be\ff", v -> {})));
 
             assertThat(content).contains("\"name\":\"a\\nb\\rc\\td\\be\\ff\"");
         }
@@ -199,7 +199,7 @@ class JsonReportListenerTest {
         @Test
         @DisplayName("detects quote as first escaped character")
         void detectsQuoteAsFirstEscapedCharacter() throws Exception {
-            var content = reportContent(new ConcreteDescriptor(Step.of("a\"b", v -> {})));
+            var content = reportContent(new MockDescriptor(Step.step("a\"b", v -> {})));
 
             assertThat(content).contains("\"name\":\"a\\\"b\"");
         }
@@ -212,10 +212,10 @@ class JsonReportListenerTest {
         @Test
         @DisplayName("writes before, child, and after slots with separating commas")
         void writesBeforeChildAndAfterWithSeparatingCommas() throws Exception {
-            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
-            root.setBefore(new ConcreteDescriptor(Step.of("before", v -> {})));
-            root.addChild(new ConcreteDescriptor(Step.of("child", v -> {})));
-            root.setAfter(new ConcreteDescriptor(Step.of("after", v -> {})));
+            var root = new MockDescriptor(Step.step("root", v -> {}));
+            root.before(new MockDescriptor(Step.step("before", v -> {})));
+            root.child(new MockDescriptor(Step.step("child", v -> {})));
+            root.after(new MockDescriptor(Step.step("after", v -> {})));
 
             var content = reportContent(root);
 
@@ -228,8 +228,8 @@ class JsonReportListenerTest {
         @Test
         @DisplayName("writes lone after slot without leading comma")
         void writesLoneAfterWithoutLeadingComma() throws Exception {
-            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
-            root.setAfter(new ConcreteDescriptor(Step.of("after", v -> {})));
+            var root = new MockDescriptor(Step.step("root", v -> {}));
+            root.after(new MockDescriptor(Step.step("after", v -> {})));
 
             var content = reportContent(root);
 

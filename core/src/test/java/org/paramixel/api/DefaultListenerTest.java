@@ -31,8 +31,8 @@ class DefaultListenerTest {
     @Test
     @DisplayName("prints action kind before and after execution")
     void printsActionKindBeforeAndAfterExecution() {
-        var listener = Listener.defaultListener();
-        var action = Step.of("direct", context -> {});
+        var listener = Listener.defaultListener(Configuration.of(java.util.Map.of()));
+        var action = Step.step("direct", context -> {});
 
         var output = new ByteArrayOutputStream();
         var originalOut = System.out;

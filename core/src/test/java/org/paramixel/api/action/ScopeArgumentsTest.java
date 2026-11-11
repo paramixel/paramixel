@@ -23,15 +23,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Scope arguments")
-@SuppressWarnings("removal")
 class ScopeArgumentsTest {
 
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Scope.builder(null)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Scope.builder(" ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Scope.builder("empty").build())
+        assertThatThrownBy(() -> Scope.scope(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Scope.scope(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Scope.scope("empty").build())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("body action must be configured");
     }
@@ -39,43 +38,43 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("before(Action) rejects null builder")
     void beforeBuilderRejectsNull() {
-        var builder = Scope.builder("scope");
+        var builder = Scope.scope("scope");
         assertThatThrownBy(() -> builder.before((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("Step.of() rejects null name")
+    @DisplayName("Step.step() rejects null name")
     void stepOfRejectsNullName() {
-        assertThatThrownBy(() -> Step.of(null, s -> {})).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Step.step(null, s -> {})).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("Step.of() rejects blank name")
+    @DisplayName("Step.step() rejects blank name")
     void stepOfRejectsBlankName() {
-        assertThatThrownBy(() -> Step.of(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Step.step(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("Step.of() rejects null consumer")
+    @DisplayName("Step.step() rejects null consumer")
     void stepOfRejectsNullConsumer() {
-        assertThatThrownBy(() -> Step.of("before", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Step.step("before", null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("after(Action) rejects null builder")
     void afterBuilderRejectsNull() {
-        var builder = Scope.builder("scope");
+        var builder = Scope.scope("scope");
         assertThatThrownBy(() -> builder.after((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("before(Action) after build affects future snapshots")
     void beforeAfterBuildAffectsFutureSnapshots() {
-        var builder = Scope.builder("scope");
-        builder.body(Step.of("body", s -> {}));
-        builder.before(Step.of("test", s -> {}));
+        var builder = Scope.scope("scope");
+        builder.body(Step.step("body", s -> {}));
+        builder.before(Step.step("test", s -> {}));
         var first = builder.build();
-        builder.before(Step.of("before", s -> {}));
+        builder.before(Step.step("before", s -> {}));
         var second = builder.build();
 
         assertThat(first.before()).isPresent();
@@ -87,11 +86,11 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("after(Action) after build affects future snapshots")
     void afterAfterBuildAffectsFutureSnapshots() {
-        var builder = Scope.builder("scope");
-        builder.body(Step.of("body", s -> {}));
-        builder.after(Step.of("test", s -> {}));
+        var builder = Scope.scope("scope");
+        builder.body(Step.step("body", s -> {}));
+        builder.after(Step.step("test", s -> {}));
         var first = builder.build();
-        builder.after(Step.of("after", s -> {}));
+        builder.after(Step.step("after", s -> {}));
         var second = builder.build();
 
         assertThat(first.after()).isPresent();
@@ -103,11 +102,11 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("before(Action) overwrites previous before")
     void beforeBuilderOverwritesBefore() {
-        var builder = Scope.builder("scope");
-        builder.body(Step.of("body", s -> {}));
-        builder.before(Step.of("first", s -> {}));
-        builder.before(Step.of("second", s -> {}));
-        var scope = builder.after(Step.of("after", s -> {})).build();
+        var builder = Scope.scope("scope");
+        builder.body(Step.step("body", s -> {}));
+        builder.before(Step.step("first", s -> {}));
+        builder.before(Step.step("second", s -> {}));
+        var scope = builder.after(Step.step("after", s -> {})).build();
         assertThat(scope.before()).isPresent();
         assertThat(scope.before().get().displayName()).isEqualTo("second");
     }
@@ -115,11 +114,11 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("after(Action) overwrites previous after")
     void afterBuilderOverwritesAfter() {
-        var builder = Scope.builder("scope");
-        builder.body(Step.of("body", s -> {}));
-        builder.after(Step.of("first", s -> {}));
-        builder.after(Step.of("second", s -> {}));
-        var scope = builder.before(Step.of("before", s -> {})).build();
+        var builder = Scope.scope("scope");
+        builder.body(Step.step("body", s -> {}));
+        builder.after(Step.step("first", s -> {}));
+        builder.after(Step.step("second", s -> {}));
+        var scope = builder.before(Step.step("before", s -> {})).build();
         assertThat(scope.after()).isPresent();
         assertThat(scope.after().get().displayName()).isEqualTo("second");
     }
@@ -127,12 +126,12 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("builder can build multiple immutable snapshots")
     void builderCanBuildMultipleImmutableSnapshots() {
-        var action = Scope.builder("scope");
-        action.body(Step.of("body", s -> {}));
-        action.before(Step.of("test", s -> {}));
+        var action = Scope.scope("scope");
+        action.body(Step.step("body", s -> {}));
+        action.before(Step.step("test", s -> {}));
         var first = action.build();
-        action.body(Step.of("child", s -> {}));
-        action.after(Step.of("after", s -> {}));
+        action.body(Step.step("child", s -> {}));
+        action.after(Step.step("after", s -> {}));
         var second = action.build();
 
         assertThat(first.body()).isNotNull();
@@ -145,9 +144,9 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("before(Builder) builds and sets before action")
     void beforeBuilderBuildsAndSetsBeforeAction() {
-        var action = Scope.builder("scope")
-                .before(Sequence.builder("before-seq").child(Step.of("step", context -> {})))
-                .body(Step.of("body", context -> {}))
+        var action = Scope.scope("scope")
+                .before(Sequential.sequential("before-seq").child(Step.step("step", context -> {})))
+                .body(Step.step("body", context -> {}))
                 .build();
         assertThat(action.before()).isPresent();
         assertThat(action.before().get().displayName()).isEqualTo("before-seq");
@@ -156,8 +155,8 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("body(Builder) builds and sets body action")
     void bodyBuilderBuildsAndSetsBodyAction() {
-        var action = Scope.builder("scope")
-                .body(Sequence.builder("body-seq").child(Step.of("step", context -> {})))
+        var action = Scope.scope("scope")
+                .body(Sequential.sequential("body-seq").child(Step.step("step", context -> {})))
                 .build();
         assertThat(action.body()).isNotNull();
         assertThat(action.body().displayName()).isEqualTo("body-seq");
@@ -166,9 +165,9 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("after(Builder) builds and sets after action")
     void afterBuilderBuildsAndSetsAfterAction() {
-        var action = Scope.builder("scope")
-                .body(Step.of("body", context -> {}))
-                .after(Sequence.builder("after-seq").child(Step.of("step", context -> {})))
+        var action = Scope.scope("scope")
+                .body(Step.step("body", context -> {}))
+                .after(Sequential.sequential("after-seq").child(Step.step("step", context -> {})))
                 .build();
         assertThat(action.after()).isPresent();
         assertThat(action.after().get().displayName()).isEqualTo("after-seq");
@@ -177,24 +176,24 @@ class ScopeArgumentsTest {
     @Test
     @DisplayName("before(Builder) rejects null builder")
     void beforeBuilderOverloadRejectsNull() {
-        var builder = Scope.builder("scope");
-        assertThatThrownBy(() -> builder.before((org.paramixel.api.action.Builder) null))
+        var builder = Scope.scope("scope");
+        assertThatThrownBy(() -> builder.before((org.paramixel.api.action.ActionBuilder) null))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("body(Builder) rejects null builder")
     void bodyBuilderOverloadRejectsNull() {
-        var builder = Scope.builder("scope");
-        assertThatThrownBy(() -> builder.body((org.paramixel.api.action.Builder) null))
+        var builder = Scope.scope("scope");
+        assertThatThrownBy(() -> builder.body((org.paramixel.api.action.ActionBuilder) null))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("after(Builder) rejects null builder")
     void afterBuilderOverloadRejectsNull() {
-        var builder = Scope.builder("scope");
-        assertThatThrownBy(() -> builder.after((org.paramixel.api.action.Builder) null))
+        var builder = Scope.scope("scope");
+        assertThatThrownBy(() -> builder.after((org.paramixel.api.action.ActionBuilder) null))
                 .isInstanceOf(NullPointerException.class);
     }
 }

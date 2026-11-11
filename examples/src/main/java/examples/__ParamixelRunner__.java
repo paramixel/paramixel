@@ -32,6 +32,9 @@ public class __ParamixelRunner__ {
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(Selector.packageTreeOf(__ParamixelRunner__.class));
+        System.exit(Runner.builder()
+                .build()
+                .run(Selector.builder().packageTreeOf(__ParamixelRunner__.class).build())
+                .exitCode());
     }
 }

@@ -108,12 +108,12 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = createRunner(parallelism);
-            var parallel = Parallel.builder("root").parallelism(parallelism);
+            var parallel = Parallel.parallel("root", "bench");
             for (var i = 0; i < childCount; i++) {
                 final int index = i;
                 // Mix of fast (1ms) and slow (20ms) children
                 long sleepMs = (index % 4 == 0) ? 20 : 1;
-                parallel.child(Step.of("child-" + index, context -> {
+                parallel.child(Step.step("child-" + index, context -> {
                     Blackhole.consumeCPU(1);
                     try {
                         Thread.sleep(sleepMs);
@@ -152,9 +152,9 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = createRunner(parallelism);
-            var parallel = Parallel.builder("root").parallelism(parallelism);
+            var parallel = Parallel.parallel("root", "bench");
             for (var i = 0; i < taskCount; i++) {
-                parallel.child(Step.of("task-" + i, context -> Blackhole.consumeCPU(1)));
+                parallel.child(Step.step("task-" + i, context -> Blackhole.consumeCPU(1)));
             }
             root = parallel.build();
         }
@@ -186,9 +186,9 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = createRunner(parallelism);
-            var parallel = Parallel.builder("root").parallelism(parallelism);
+            var parallel = Parallel.parallel("root", "bench");
             for (var i = 0; i < childCount; i++) {
-                parallel.child(Step.of("child-" + i, context -> {
+                parallel.child(Step.step("child-" + i, context -> {
                     Blackhole.consumeCPU(1);
                     try {
                         Thread.sleep(5);
@@ -211,7 +211,7 @@ public class SchedulerBenchmark {
 
     private static Runner createRunner(final int parallelism) {
         var configuration = Configuration.of(
-                Map.of(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism), Configuration.ANSI, "false"));
+                Map.of("paramixel.parallelism.bench", String.valueOf(parallelism), Configuration.ANSI, "false"));
         return Runner.builder().configuration(configuration).build();
     }
 }

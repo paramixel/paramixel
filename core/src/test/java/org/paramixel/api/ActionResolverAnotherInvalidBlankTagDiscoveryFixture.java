@@ -27,8 +27,8 @@ public final class ActionResolverAnotherInvalidBlankTagDiscoveryFixture {
     @Paramixel.Factory
     @Paramixel.Tag("  ")
     public static Action factory() {
-        return Instance.builder("another-invalid-blank-tag-discovery", () -> new Object())
-                .body(Step.of("test", context -> {}))
+        return Instance.of("another-invalid-blank-tag-discovery", Object.class, () -> new Object())
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

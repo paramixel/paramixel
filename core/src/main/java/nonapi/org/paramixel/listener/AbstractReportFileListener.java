@@ -41,7 +41,7 @@ abstract class AbstractReportFileListener implements Listener {
     protected AbstractReportFileListener() {}
 
     @Override
-    public void initialize(final Configuration configuration) {
+    public void onRunStarted(final Configuration configuration) {
         var file = configuration
                 .getString(Configuration.REPORT_FILE)
                 .orElseThrow(() -> new ConfigurationException("No report file configured"));

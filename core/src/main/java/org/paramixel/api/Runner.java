@@ -17,34 +17,43 @@
 package org.paramixel.api;
 
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import nonapi.org.paramixel.ConcreteRunner;
+import nonapi.org.paramixel.listener.DefaultListeners;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
-import org.paramixel.api.exception.CycleDetectedException;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Executes Paramixel actions and returns results containing descriptor trees and effective aggregate status.
+ * Executes Paramixel actions and returns a {@link Result} for every run.
  *
- * <p>Implementations are not required to be thread-safe. Concurrent use of a single {@code Runner} instance
- * from multiple threads is undefined unless the implementation documents otherwise.
+ * <p>There is one entry point per intent:
+ *
+ * <ul>
+ *   <li>{@link #run(Action)} executes a tree you already built. It performs <strong>no</strong> discovery, no
+ *       classpath scan and runs no {@code @BeforeAll}/{@code @AfterAll} hooks: the tree is the complete
+ *       definition. Wrap it in a {@link org.paramixel.api.action.Scope} when it needs setup and teardown.</li>
+ *   <li>{@link #run(Selector)} discovers factories using exactly the supplied selector and nothing else. If a
+ *       {@code paramixel.match.*} key is set but the selector does not use {@link Selector#configured()}, the
+ *       runner reports {@link Listener#onWarning(String)} rather than merging the key silently.</li>
+ *   <li>{@link #run()} discovers factories using {@link Selector#configured()}.</li>
+ * </ul>
+ *
+ * <p>Every entry point returns a {@link Result}; {@link Result#exitCode()} is the single source of truth for a
+ * process exit code. Terminating the JVM is the caller's decision, which makes it visible at the call site:
+ * {@code System.exit(Runner.builder().build().run().exitCode())}. {@link Launcher} does this for command-line use.
+ *
+ * <p>In a discovery run, hooks are global: {@code @BeforeAll} and {@code @AfterAll} methods are found across the
+ * whole classpath, not just in the selected packages, because they wrap the entire run rather than individual
+ * factories.
+ *
+ * <p>Implementations are not required to be thread-safe. Concurrent use of a single {@code Runner} instance from
+ * multiple threads is undefined.
  *
  * @see Result
+ * @see Launcher
  */
 public interface Runner {
-
-    /**
-     * Creates a runner using the default configuration and listener chain.
-     *
-     * @return a configured runner
-     * @throws ConfigurationException if the classpath resource exists but cannot be loaded
-     */
-    static Runner defaultRunner() {
-        final var configuration = Configuration.defaultConfiguration();
-        return new ConcreteRunner(configuration, Listener.defaultListener(configuration));
-    }
 
     /**
      * Creates a builder for runner instances.
@@ -63,74 +72,40 @@ public interface Runner {
     Configuration configuration();
 
     /**
-     * Executes the action.
+     * Executes the supplied action tree.
+     *
+     * <p>No discovery and no classpath scan happen, and no {@code @BeforeAll}/{@code @AfterAll} hook runs: the
+     * supplied tree is the complete run. {@link Configuration#FAIL_FAST} applies to the direct children of the
+     * root, which for a direct tree is the tree's own first level.
      *
      * @param action the action to execute; must not be {@code null}
-     * @return the run result containing the root descriptor and effective aggregate status; never {@code null}
+     * @return the run result; never {@code null}
      * @throws NullPointerException if {@code action} is {@code null}
-     * @throws IllegalStateException if the builder has already been resolved
-     * @throws CycleDetectedException if discovery detects a cycle
      * @throws ConfigurationException if the configuration is invalid
      */
     Result run(Action action);
 
     /**
-     * Resolves an action with the supplied selector and executes it when present.
+     * Discovers factories with exactly the supplied selector and executes them.
      *
-     * @param selector the selector used to locate an action; must not be {@code null}
-     * @return the run result, or empty when no action is resolved
+     * <p>The selector is used as given: no configuration key is merged into it. When any {@code paramixel.match.*}
+     * key is set and the selector does not use {@link Selector#configured()}, the runner reports a warning through
+     * {@link Listener#onWarning(String)} so the ignored key is not silent.
+     *
+     * @param selector the selector to use; must not be {@code null}
+     * @return the run result, with an empty root descriptor when nothing was discovered; never {@code null}
      * @throws NullPointerException if {@code selector} is {@code null}
+     * @throws ConfigurationException if the configuration is invalid
      */
-    Optional<Result> run(Selector selector);
+    Result run(Selector selector);
 
     /**
-     * Executes the action and converts the result
-     * outcome to an exit code.
+     * Discovers factories with {@link Selector#configured()} and executes them.
      *
-     * @param action the action to execute; must not be {@code null}
-     * @return {@code 0} for success and {@code 1} for failure
-     * @throws NullPointerException if {@code action} is {@code null}
-     * @throws IllegalStateException if the builder has already been resolved
+     * @return the run result, with an empty root descriptor when nothing was discovered; never {@code null}
+     * @throws ConfigurationException if the configuration is invalid
      */
-    int runAndReturnExitCode(Action action);
-
-    /**
-     * Resolves an action matching the supplied selector, executes it, and converts
-     * the result outcome to an exit code.
-     *
-     * @param selector the selector used to locate an action; must not be {@code null}
-     * @return {@code 0} for success and {@code 1} for failure
-     * @throws NullPointerException if {@code selector} is {@code null}
-     */
-    int runAndReturnExitCode(Selector selector);
-
-    /**
-     * Executes the action and terminates the JVM
-     * with the derived exit code.
-     *
-     * @param action the action to execute; must not be {@code null}
-     * @throws NullPointerException if {@code action} is {@code null}
-     * @throws IllegalStateException if the builder has already been resolved
-     * @throws SecurityException if a security manager prevents {@link System#exit}
-     */
-    void runAndExit(Action action);
-
-    /**
-     * Resolves an action matching the supplied selector and terminates the JVM
-     * with the derived exit code.
-     *
-     * @param selector the selector used to locate an action; must not be {@code null}
-     * @throws NullPointerException if {@code selector} is {@code null}
-     * @throws SecurityException if a security manager prevents {@link System#exit}
-     */
-    void runAndExit(Selector selector);
-
-    /**
-     * Discovers actions from the classpath and executes them.
-     *
-     * @return {@code 0} for success and {@code 1} for failure
-     */
-    int run();
+    Result run();
 
     /**
      * Fluent builder for {@link Runner} instances.
@@ -213,16 +188,7 @@ public interface Runner {
                 return new ConcreteRunner(effectiveConfiguration, listener, shuffled, shuffleSeed);
             }
             return new ConcreteRunner(
-                    effectiveConfiguration, Listener.defaultListener(effectiveConfiguration), shuffled, shuffleSeed);
+                    effectiveConfiguration, DefaultListeners.create(effectiveConfiguration), shuffled, shuffleSeed);
         }
-    }
-
-    /**
-     * Resolves and executes discovered actions using default configuration.
-     *
-     * @param args command-line arguments
-     */
-    static void main(final String[] args) {
-        System.exit(builder().build().run());
     }
 }

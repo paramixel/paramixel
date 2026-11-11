@@ -17,6 +17,7 @@
 package nonapi.org.paramixel.benchmark;
 
 import java.util.concurrent.TimeUnit;
+import nonapi.org.paramixel.CompiledPlans;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -32,13 +33,11 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.paramixel.api.Status;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 /**
- * Micro-benchmark measuring throughput of {@link ConcreteDescriptor#children()} calls.
- *
- * <p>Measures the cost of {@code List.copyOf()} on every call vs. a cached unmodifiable view.
+ * Micro-benchmark measuring throughput of {@link ConcreteDescriptor#children()} calls on a compiled tree.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -68,14 +67,11 @@ public class ChildrenAccessBenchmark {
 
         @Setup(Level.Trial)
         public void setup() {
-            var parentAction = Step.of("parent", ctx -> {});
-            parent = new ConcreteDescriptor(parentAction);
-            parent.setStatus(Status.RUNNING);
+            var builder = Sequential.sequential("parent");
             for (var i = 0; i < childCount; i++) {
-                var childAction = Step.of("child-" + i, ctx -> {});
-                var child = new ConcreteDescriptor(parent, childAction);
-                parent.addChild(child);
+                builder.child(Step.step("child-" + i, ctx -> {}));
             }
+            parent = CompiledPlans.compile(builder.build());
         }
     }
 }

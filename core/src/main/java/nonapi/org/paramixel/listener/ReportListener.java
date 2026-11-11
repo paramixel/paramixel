@@ -54,7 +54,7 @@ public final class ReportListener extends AbstractReportFileListener {
         writer.write(Listeners.formatStatus(descriptor));
         writer.write(" | ");
         writer.write(descriptor.action().displayName());
-        var message = descriptor.message();
+        var message = descriptor.status().message();
         if (message.isPresent()) {
             writer.write(" | ");
             writer.write(Listeners.sanitizeMessage(message.orElseThrow()));

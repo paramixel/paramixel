@@ -28,17 +28,19 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import nonapi.org.paramixel.action.RootParallels;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ClassGraph;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ClassInfo;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ScanResult;
 import nonapi.org.paramixel.listener.Constants;
+import nonapi.org.paramixel.selector.ConcreteSelector;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Builder;
+import org.paramixel.api.action.ActionBuilder;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
@@ -68,14 +70,14 @@ public final class ActionResolver {
     private static final String AFTER_ALL_ANNOTATION = Paramixel.AfterAll.class.getName();
 
     private final Configuration configuration;
-    private final Selector selector;
+    private final ConcreteSelector selector;
     private final boolean shuffled;
     private final long seed;
 
     /**
      * Creates a resolver with the supplied configuration and selector.
      *
-     * @param configuration the configuration used for discovered root parallelism
+     * @param configuration the configuration used for discovery
      * @param selector the selector used for discovery filtering; must not be {@code null}
      * @throws NullPointerException if {@code configuration} or {@code selector} is {@code null}
      */
@@ -91,7 +93,7 @@ public final class ActionResolver {
      * two-argument constructor delegates to this one with {@code shuffled = false}
      * and {@code seed = 0L}.
      *
-     * @param configuration the configuration used for discovered root parallelism
+     * @param configuration the configuration used for discovery
      * @param selector the selector used for discovery filtering; must not be {@code null}
      * @param shuffled whether to shuffle the root action's children
      * @param seed the PRNG seed when {@code shuffled} is {@code true}
@@ -100,7 +102,7 @@ public final class ActionResolver {
     public ActionResolver(
             final Configuration configuration, final Selector selector, final boolean shuffled, final long seed) {
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
-        this.selector = Objects.requireNonNull(selector, "selector is null");
+        this.selector = ConcreteSelector.require(selector);
         this.shuffled = shuffled;
         this.seed = seed;
     }
@@ -111,8 +113,7 @@ public final class ActionResolver {
      * @return the resolved root action, or an empty {@link Optional} when no factories match
      */
     public Optional<Action> resolveRootAction() {
-        final var parallelism = resolveParallelism();
-        return scan(new ClassGraph(), parallelism, shuffled, seed, null);
+        return scan(new ClassGraph(), shuffled, seed, null);
     }
 
     /**
@@ -125,14 +126,7 @@ public final class ActionResolver {
      */
     public Optional<Action> resolveRootAction(final Action body) {
         Objects.requireNonNull(body, "body is null");
-        final var parallelism = resolveParallelism();
-        return scan(new ClassGraph(), parallelism, shuffled, seed, body);
-    }
-
-    private int resolveParallelism() {
-        return configuration
-                .getInteger(Configuration.RUNNER_PARALLELISM)
-                .orElse(Runtime.getRuntime().availableProcessors());
+        return scan(new ClassGraph(), shuffled, seed, body);
     }
 
     /**
@@ -146,18 +140,12 @@ public final class ActionResolver {
      * a {@link Scope} wrapping the body when present.
      *
      * @param classGraph the ClassGraph instance to configure and scan
-     * @param parallelism the parallelism of the root parallel action when factories are discovered
      * @param shuffled whether to shuffle the root action's children when factories are discovered
      * @param seed the PRNG seed when {@code shuffled} is {@code true}
      * @param body the body action when factory discovery is skipped, or {@code null}
      * @return the root action, or an empty {@link Optional} when no factories match and no body is supplied
      */
-    Optional<Action> scan(
-            final ClassGraph classGraph,
-            final int parallelism,
-            final boolean shuffled,
-            final long seed,
-            final Action body) {
+    Optional<Action> scan(final ClassGraph classGraph, final boolean shuffled, final long seed, final Action body) {
         var candidates = new ArrayList<ActionCandidate>();
         var failures = new ArrayList<DiscoveryValidationFailure>();
         var beforeAllCandidates = new ArrayList<HookCandidate>();
@@ -261,36 +249,30 @@ public final class ActionResolver {
             if (allActions.isEmpty()) {
                 return Optional.empty();
             }
-            bodyAction = collapse(allActions, parallelism, shuffled, seed);
+            bodyAction = collapse(allActions, shuffled, seed);
         }
 
         if (beforeHook.isEmpty() && afterHook.isEmpty()) {
             return bodyAction;
         }
 
-        var scope = Scope.builder(ROOT_NAME);
+        var scope = Scope.scope(ROOT_NAME);
         beforeHook.ifPresent(scope::before);
         scope.body(bodyAction.orElseThrow());
         afterHook.ifPresent(scope::after);
         return Optional.of(scope.build());
     }
 
-    Optional<Action> scan(final ClassGraph classGraph, final int parallelism, final boolean shuffled, final long seed) {
-        return scan(classGraph, parallelism, shuffled, seed, null);
+    Optional<Action> scan(final ClassGraph classGraph, final boolean shuffled, final long seed) {
+        return scan(classGraph, shuffled, seed, null);
     }
 
     private boolean acceptsClass(final ClassInfo classInfo) {
-        if (!selector.matchesPackage(classInfo.getPackageName())) {
-            return false;
-        }
-        return selector.matchesClass(classInfo.getName());
+        return selector.acceptsClass(classInfo.getPackageName(), classInfo.getName());
     }
 
-    private boolean acceptsAnyTag(final List<String> tags) {
-        if (tags.isEmpty()) {
-            return selector.matchesTag("");
-        }
-        return tags.stream().anyMatch(selector::matchesTag);
+    private boolean accepts(final Class<?> clazz, final List<String> tags) {
+        return selector.test(clazz.getPackageName(), clazz.getName(), tags);
     }
 
     private ValidatedTags validateAndExtractTags(
@@ -339,7 +321,7 @@ public final class ActionResolver {
                 if (tags.hasInvalidTag()) {
                     continue;
                 }
-                if (!acceptsAnyTag(tags.tags())) {
+                if (!accepts(clazz, tags.tags())) {
                     continue;
                 }
                 validateFactoryMethod(method, location);
@@ -387,7 +369,7 @@ public final class ActionResolver {
                     final var messages = entry.getValue().stream()
                             .map(DiscoveryValidationFailure::message)
                             .toList();
-                    return Step.of("Discovery validation failure: " + location, context -> {
+                    return Step.step("Discovery validation failure: " + location, context -> {
                         throw new ResolverException(
                                 "Invalid @Paramixel.Tag on " + location + ": " + String.join(", ", messages));
                     });
@@ -396,14 +378,11 @@ public final class ActionResolver {
     }
 
     private Optional<Action> collapse(
-            final List<? extends Action> factoryActions,
-            final int parallelism,
-            final boolean shuffled,
-            final long seed) {
+            final List<? extends Action> factoryActions, final boolean shuffled, final long seed) {
         if (factoryActions.isEmpty()) {
             return Optional.empty();
         }
-        var bodyVar = Parallel.builder(BODY_NAME).parallelism(parallelism);
+        var bodyVar = RootParallels.create(BODY_NAME);
         if (shuffled) {
             bodyVar.shuffle(seed);
         }
@@ -427,10 +406,9 @@ public final class ActionResolver {
             throw new ResolverException(
                     "Invalid @Paramixel.Factory method on " + location + ": method must have no parameters");
         }
-        if (!Action.class.isAssignableFrom(method.getReturnType())
-                && !Builder.class.isAssignableFrom(method.getReturnType())) {
-            throw new ResolverException(
-                    "Invalid @Paramixel.Factory method on " + location + ": return type must be Action or Builder");
+        if (!ActionBuilder.class.isAssignableFrom(method.getReturnType())) {
+            throw new ResolverException("Invalid @Paramixel.Factory method on " + location
+                    + ": return type must be Action or ActionBuilder");
         }
     }
 
@@ -444,10 +422,9 @@ public final class ActionResolver {
             throw new ResolverException(
                     "Invalid " + annotationLabel + " method on " + location + ": method must have no parameters");
         }
-        if (!Action.class.isAssignableFrom(method.getReturnType())
-                && !Builder.class.isAssignableFrom(method.getReturnType())) {
+        if (!ActionBuilder.class.isAssignableFrom(method.getReturnType())) {
             throw new ResolverException("Invalid " + annotationLabel + " method on " + location
-                    + ": return type must be Action or Builder");
+                    + ": return type must be Action or ActionBuilder");
         }
     }
 
@@ -474,9 +451,7 @@ public final class ActionResolver {
                 return Optional.empty();
             }
             Action action;
-            if (result instanceof Action a) {
-                action = a;
-            } else if (result instanceof Builder b) {
+            if (result instanceof ActionBuilder b) {
                 action = b.build();
                 if (action == null) {
                     throw new ResolverException(
@@ -484,7 +459,7 @@ public final class ActionResolver {
                 }
             } else {
                 throw new ResolverException("Invalid " + annotationLabel + " method on " + location
-                        + ": return type must be Action or Builder");
+                        + ": return type must be Action or ActionBuilder");
             }
             return Optional.of(action);
         } catch (InvocationTargetException e) {
@@ -496,7 +471,6 @@ public final class ActionResolver {
         }
     }
 
-    @SuppressWarnings("removal")
     private static Optional<Action> buildHookSequence(final List<Action> actions, final String displayName) {
         if (actions.isEmpty()) {
             return Optional.empty();
@@ -504,7 +478,7 @@ public final class ActionResolver {
         if (actions.size() == 1) {
             return Optional.of(actions.get(0));
         }
-        var builder = Sequence.builder(displayName);
+        var builder = Sequential.sequential(displayName);
         for (Action action : actions) {
             builder.child(action);
         }

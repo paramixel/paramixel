@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import nonapi.org.paramixel.TestPools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -44,7 +45,7 @@ class TimeoutLifecycleCleanupTest {
 
     private static Runner runner() {
         return Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "4")))
+                .configuration(TestPools.configuration(Map.of(Configuration.RUNNER_PARALLELISM, "4")))
                 .build();
     }
 
@@ -56,21 +57,21 @@ class TimeoutLifecycleCleanupTest {
     @DisplayName("deadline during body: body is cancelled and after runs before the Timeout completes")
     void bodyTimeoutRunsAfter() {
         var afterCalls = new AtomicInteger();
-        var scope = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Step.of("body", context -> block()))
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+        var scope = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Step.step("body", context -> block()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
-        var timeout = Timeout.builder("timeout").body(scope).timeout(DEADLINE).build();
+        var timeout = Timeout.timeout("timeout").body(scope).timeout(DEADLINE).build();
 
         var root = runner().run(timeout).descriptor().orElseThrow();
 
         assertThat(afterCalls.get()).as("after ran before run() returned").isEqualTo(1);
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         var scopeDescriptor = root.children().get(0);
-        assertThat(scopeDescriptor.before().orElseThrow().isPassed()).isTrue();
-        assertThat(scopeDescriptor.children().get(0).isAborted()).isTrue();
-        assertThat(scopeDescriptor.after().orElseThrow().isPassed()).isTrue();
+        assertThat(scopeDescriptor.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(scopeDescriptor.children().get(0).status().isAborted()).isTrue();
+        assertThat(scopeDescriptor.after().orElseThrow().status().isPassed()).isTrue();
     }
 
     @Test
@@ -79,8 +80,8 @@ class TimeoutLifecycleCleanupTest {
         var beforeInterrupted = new AtomicBoolean();
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
-        var scope = Scope.builder("scope")
-                .before(Step.of("before", context -> {
+        var scope = Scope.scope("scope")
+                .before(Step.step("before", context -> {
                     try {
                         block();
                     } catch (InterruptedException e) {
@@ -88,17 +89,18 @@ class TimeoutLifecycleCleanupTest {
                         throw e;
                     }
                 }))
-                .body(Step.of("body", context -> bodyCalls.incrementAndGet()))
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .body(Step.step("body", context -> bodyCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
-        var timeout = Timeout.builder("timeout").body(scope).timeout(DEADLINE).build();
+        var timeout = Timeout.timeout("timeout").body(scope).timeout(DEADLINE).build();
 
         var root = runner().run(timeout).descriptor().orElseThrow();
 
         assertThat(beforeInterrupted.get()).as("before interrupted").isTrue();
         assertThat(bodyCalls.get()).as("body never ran").isZero();
         assertThat(afterCalls.get()).as("after ran").isEqualTo(1);
-        assertThat(root.children().get(0).after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.children().get(0).after().orElseThrow().status().isPassed())
+                .isTrue();
     }
 
     @Test
@@ -106,14 +108,14 @@ class TimeoutLifecycleCleanupTest {
     void unstartedScopeSkipsAfter() {
         var beforeCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
-        var scope = Scope.builder("scope")
-                .before(Step.of("before", context -> beforeCalls.incrementAndGet()))
-                .body(Step.of("body", context -> {}))
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+        var scope = Scope.scope("scope")
+                .before(Step.step("before", context -> beforeCalls.incrementAndGet()))
+                .body(Step.step("body", context -> {}))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
-        var timeout = Timeout.builder("timeout")
-                .body(Sequential.builder("sequential")
-                        .child(Step.of("blocking", context -> block()))
+        var timeout = Timeout.timeout("timeout")
+                .body(Sequential.sequential("sequential")
+                        .child(Step.step("blocking", context -> block()))
                         .child(scope)
                         .build())
                 .timeout(DEADLINE)
@@ -124,8 +126,8 @@ class TimeoutLifecycleCleanupTest {
         assertThat(beforeCalls.get()).as("before never ran").isZero();
         assertThat(afterCalls.get()).as("after never ran").isZero();
         var scopeDescriptor = root.children().get(0).children().get(1);
-        assertThat(scopeDescriptor.before().orElseThrow().isAborted()).isTrue();
-        assertThat(scopeDescriptor.after().orElseThrow().isAborted()).isTrue();
+        assertThat(scopeDescriptor.before().orElseThrow().status().isAborted()).isTrue();
+        assertThat(scopeDescriptor.after().orElseThrow().status().isAborted()).isTrue();
     }
 
     @Test
@@ -133,10 +135,10 @@ class TimeoutLifecycleCleanupTest {
     void runningAfterIsNotInterrupted() {
         var afterInterrupted = new AtomicBoolean();
         var afterCompleted = new AtomicBoolean();
-        var scope = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Step.of("body", context -> {}))
-                .after(Step.of("after", context -> {
+        var scope = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Step.step("body", context -> {}))
+                .after(Step.step("after", context -> {
                     try {
                         Thread.sleep(DEADLINE.toMillis() * 3);
                         afterCompleted.set(true);
@@ -146,7 +148,7 @@ class TimeoutLifecycleCleanupTest {
                     }
                 }))
                 .build();
-        var timeout = Timeout.builder("timeout").body(scope).timeout(DEADLINE).build();
+        var timeout = Timeout.timeout("timeout").body(scope).timeout(DEADLINE).build();
 
         var root = runner().run(timeout).descriptor().orElseThrow();
 
@@ -154,8 +156,9 @@ class TimeoutLifecycleCleanupTest {
         assertThat(afterCompleted.get())
                 .as("after completed before run() returned")
                 .isTrue();
-        assertThat(root.isFailed()).as("timeout still reported").isTrue();
-        assertThat(root.children().get(0).after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.status().isFailed()).as("timeout still reported").isTrue();
+        assertThat(root.children().get(0).after().orElseThrow().status().isPassed())
+                .isTrue();
     }
 
     @Test
@@ -163,16 +166,16 @@ class TimeoutLifecycleCleanupTest {
     void instanceIsClosedOnTimeout() {
         var closed = new AtomicBoolean();
         AutoCloseable fixture = () -> closed.set(true);
-        var instance = Instance.builder("instance", () -> fixture)
-                .body(Step.of("body", context -> block()))
+        var instance = Instance.of("instance", AutoCloseable.class, () -> fixture)
+                .body(Step.step("body", context -> block()))
                 .build();
         var timeout =
-                Timeout.builder("timeout").body(instance).timeout(DEADLINE).build();
+                Timeout.timeout("timeout").body(instance).timeout(DEADLINE).build();
 
         var root = runner().run(timeout).descriptor().orElseThrow();
 
         assertThat(closed.get()).as("fixture closed").isTrue();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     @Test
@@ -180,15 +183,15 @@ class TimeoutLifecycleCleanupTest {
     void unstartedInstanceSkipsDestroy() {
         var factoryCalls = new AtomicInteger();
         var closed = new AtomicBoolean();
-        var instance = Instance.builder("instance", () -> {
+        var instance = Instance.of("instance", AutoCloseable.class, () -> {
                     factoryCalls.incrementAndGet();
                     return (AutoCloseable) () -> closed.set(true);
                 })
-                .body(Step.of("body", context -> {}))
+                .body(Step.step("body", context -> {}))
                 .build();
-        var timeout = Timeout.builder("timeout")
-                .body(Sequential.builder("sequential")
-                        .child(Step.of("blocking", context -> block()))
+        var timeout = Timeout.timeout("timeout")
+                .body(Sequential.sequential("sequential")
+                        .child(Step.step("blocking", context -> block()))
                         .child(instance)
                         .build())
                 .timeout(DEADLINE)
@@ -199,8 +202,10 @@ class TimeoutLifecycleCleanupTest {
         assertThat(factoryCalls.get()).as("factory never ran").isZero();
         assertThat(closed.get()).as("destroy never ran").isFalse();
         var instanceDescriptor = root.children().get(0).children().get(1);
-        assertThat(instanceDescriptor.before().orElseThrow().isAborted()).isTrue();
-        assertThat(instanceDescriptor.after().orElseThrow().isAborted()).isTrue();
+        assertThat(instanceDescriptor.before().orElseThrow().status().isAborted())
+                .isTrue();
+        assertThat(instanceDescriptor.after().orElseThrow().status().isAborted())
+                .isTrue();
     }
 
     @Test
@@ -209,15 +214,15 @@ class TimeoutLifecycleCleanupTest {
         var scopes = 3;
         var started = new AtomicInteger();
         var afterCalls = new AtomicInteger();
-        var parallel = Parallel.builder("parallel").parallelism(scopes);
+        var parallel = Parallel.parallel("parallel", "pscopes");
         for (var i = 0; i < scopes; i++) {
-            parallel.child(Scope.builder("scope-" + i)
-                    .before(Step.of("before", context -> started.incrementAndGet()))
-                    .body(Step.of("body", context -> block()))
-                    .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+            parallel.child(Scope.scope("scope-" + i)
+                    .before(Step.step("before", context -> started.incrementAndGet()))
+                    .body(Step.step("body", context -> block()))
+                    .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                     .build());
         }
-        var timeout = Timeout.builder("timeout")
+        var timeout = Timeout.timeout("timeout")
                 .body(parallel.build())
                 .timeout(Duration.ofSeconds(1))
                 .build();
@@ -232,9 +237,9 @@ class TimeoutLifecycleCleanupTest {
     @DisplayName("leaf ignoring interruption: Timeout abandons after the grace period with a terminal tree")
     void uncooperativeLeafAbandonsWithTerminalTree() {
         var stop = new AtomicBoolean();
-        var scope = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Step.of("stuck", context -> {
+        var scope = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Step.step("stuck", context -> {
                     while (!stop.get()) {
                         try {
                             Thread.sleep(20);
@@ -243,9 +248,9 @@ class TimeoutLifecycleCleanupTest {
                         }
                     }
                 }))
-                .after(Step.of("after", context -> {}))
+                .after(Step.step("after", context -> {}))
                 .build();
-        var timeout = Timeout.builder("timeout").body(scope).timeout(DEADLINE).build();
+        var timeout = Timeout.timeout("timeout").body(scope).timeout(DEADLINE).build();
 
         try {
             var start = System.nanoTime();
@@ -253,7 +258,7 @@ class TimeoutLifecycleCleanupTest {
             var elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
             assertThat(elapsedMillis).as("bounded by deadline plus grace").isLessThan(15_000L);
-            assertThat(root.isFailed()).isTrue();
+            assertThat(root.status().isFailed()).isTrue();
             for (var descriptor : flatten(root)) {
                 assertThat(descriptor.isCompleted())
                         .as("descriptor %s is terminal", descriptor.action().displayName())

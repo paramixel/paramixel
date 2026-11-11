@@ -12,8 +12,7 @@ import org.paramixel.api.action.Action;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Step.step;
 
-Action spec = parallel("browser matrix")
-        .parallelism(3)
+Action spec = parallel("browser matrix", "examples")
         .child(step("chrome", ctx -> runChrome()))
         .child(step("firefox", ctx -> runFirefox()))
         .child(step("webkit", ctx -> runWebkit()))
@@ -27,36 +26,42 @@ browser matrix
 └── webkit
 ```
 
-## Runner parallelism
+## Pools
 
-`paramixel.parallelism` is the runner-wide concurrency budget, and it is the only global
-concurrency knob. Each executing branch — a `Parallel` child, a `Step` leaf, an `Isolated` body —
-holds one unit of that budget for as long as it runs, and the thread that calls the runner holds one for the whole run, so the budget bounds both the number of
-scheduler threads and the number of concurrently allocated resources such as containers.
+Every `Parallel` names a **pool**: a run-wide concurrency budget whose size is configuration.
 
-Execution is depth-first. The thread that reaches a `Parallel` runs its first child itself and
-starts additional workers for the remaining children while budget is available. Every worker simply
-takes the next unstarted child, so children start in declaration order, and a child that blocks
-never prevents its later siblings from starting. If no budget is free, a sibling starts as soon as
-any branch elsewhere in the tree finishes and releases its budget; nothing ever waits for budget
-while holding a resource. `Parallel.parallel(...).parallelism(n)` bounds how many direct children
-of that `Parallel` may be in flight; it is a local window inside the global budget, and it is how
-you reserve room for nested parallelism.
+```properties
+# the root pool: the top-level Parallel Paramixel builds when it discovers your factories
+paramixel.parallelism=8
+# a named pool
+paramixel.parallelism.docker=4
+# a pool sized from the CPU count: @cores, @cores*N or @cores/N (never below 1)
+paramixel.parallelism.environments=@cores
+```
 
-A `Timeout` runs its child on its own thread, which takes over the slot of the thread waiting for it, so
-the deadline always applies even when the whole budget is in use. A child that ignores interruption may
-keep running briefly after its deadline.
+```java
+parallel("environments", "docker").each(environments, env -> ...)
+```
 
-Siblings that must run at the same time (for example, children that wait on a shared latch) need
-enough budget to actually run together: `paramixel.parallelism` must cover every branch that is
-running concurrently, including the ones above them in the tree.
+Each direct child takes one permit from its pool before it starts and returns it when its whole subtree is
+finished, so across every `Parallel` that names `docker`, at most four children are alive at once, including
+their `before` and `after` actions. This is how a guarantee such as "no more than four environments exist at a
+time" is expressed and enforced.
 
-Because the budget counts branches rather than only leaf bodies, a suite that previously peaked at
-`N` concurrent leaves will now peak at `N` concurrent branches. Raise `paramixel.parallelism` if a
-plan needs more concurrent work.
+- **Children are admitted in declaration order**, and a later sibling waits only for a permit, never for an
+  earlier sibling to finish. A pool of size one runs its children serially, in order.
+- **Execution is depth-first**: a child's subtree runs (`before`, then its children, then `after`) with listener
+  events nested accordingly, each descriptor on one thread.
+- **Name pools for what they limit** (`docker`, `environments`, `database`), not for where they sit in the tree.
+- **A pool must be defined.** An undefined pool fails the run before anything executes and names the key to add.
+  A pool may be defined before anything uses it.
+- **A pool cannot be nested under itself.** An inner `Parallel` needs its own pool. The runner also rejects, up
+  front, pools and `Isolated` locks that could be taken in conflicting order in different branches, so a plan
+  that could deadlock on them does not start. It cannot see locks you take inside a `Step`.
+- `paramixel.parallelism` sizes only the root pool; it does not bound nested `Parallel` nodes.
 
-The former `paramixel.scheduler.queue.capacity` property was removed: the scheduler no longer has a
-ready queue. Setting it now logs a warning and has no effect.
+A `Timeout` runs its child on its own thread so the deadline always applies. A child that ignores interruption may
+keep running after its deadline, and until it exits it keeps the pool permits of its subtree.
 
 ## Best practices
 
@@ -68,7 +73,7 @@ ready queue. Setting it now logs a warning and has no effect.
 
 ## Serializing subgroups with Isolated
 
-`Isolated` serializes its body under a named lock, allowing controlled serialization within a `Parallel`. Combine with `Parallel.parallelism()` to bound concurrent execution of the body's children:
+`Isolated` serializes its body under a named lock, allowing controlled serialization within a `Parallel`. Give the inner `Parallel` its own pool to bound concurrent execution of the body's children:
 
 ```java
 import org.paramixel.api.action.Action;
@@ -76,11 +81,9 @@ import static org.paramixel.api.action.Isolated.isolated;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Sequential.sequential;
 
-Action spec = parallel("suite")
-        .parallelism(4)
+Action spec = parallel("suite", "examples")
         .child(isolated("database-tests", "db-lock")
-                .body(parallel("db")
-                        .parallelism(2)
+                .body(parallel("db", "examples")
                         .child(queryTest1())
                         .child(queryTest2())
                         .build())
@@ -106,7 +109,7 @@ suite
         └── updateUser
 ```
 
-Two `Isolated` nodes share `"db-lock"`; only one body executes at a time. Each body internally controls its own parallelism via `Parallel.parallelism()`.
+Two `Isolated` nodes share `"db-lock"`; only one body executes at a time. Each body bounds its own parallelism through the pool its `Parallel` names.
 
 ## Shuffled execution order
 
@@ -116,8 +119,7 @@ Use `.shuffle()` on `Parallel.Builder` to randomize the order children enter the
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Step.step;
 
-Action spec = parallel("matrix")
-        .parallelism(3)
+Action spec = parallel("matrix", "examples")
         .shuffle()
         .child(step("chrome", ctx -> runChrome()))
         .child(step("firefox", ctx -> runFirefox()))
@@ -131,8 +133,7 @@ For reproducible flaky-test investigations, supply an explicit seed:
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Step.step;
 
-Action spec = parallel("matrix")
-        .parallelism(3)
+Action spec = parallel("matrix", "examples")
         .shuffle(42L)
         .child(step("chrome", ctx -> runChrome()))
         .child(step("firefox", ctx -> runFirefox()))

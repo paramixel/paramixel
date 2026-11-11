@@ -26,11 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Loop;
+import org.paramixel.api.support.Backoff;
 
 /**
  * Demonstrates the {@link org.paramixel.api.action.Loop} action with an
- * exponential inter-iteration delay ({@link org.paramixel.api.action.Loop.DelayPolicy.Exponential}).
+ * exponential inter-iteration delay ({@link org.paramixel.api.support.Backoff#exponential}).
  * Verifies that the loop runs all iterations with the delay policy applied.
  */
 public class LoopWithExponentialDelayTest {
@@ -44,7 +44,7 @@ public class LoopWithExponentialDelayTest {
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -59,7 +59,7 @@ public class LoopWithExponentialDelayTest {
                 .child(loop("poll")
                         .body(step("check", context -> iterationCount.incrementAndGet()))
                         .maxIterations(4)
-                        .delay(new Loop.DelayPolicy.Exponential(Duration.ofMillis(50))))
+                        .delay(Backoff.exponential(Duration.ofMillis(50), Duration.ofSeconds(1))))
                 .child(step("validate", context -> {
                     assertThat(iterationCount.get()).isEqualTo(4);
                 }))

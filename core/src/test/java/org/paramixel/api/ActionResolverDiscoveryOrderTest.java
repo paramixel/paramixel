@@ -19,6 +19,7 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 import nonapi.org.paramixel.ActionResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,7 +39,9 @@ class ActionResolverDiscoveryOrderTest {
     @Test
     @DisplayName("action name is not used as a discovery sort key")
     void actionNameIsNotUsedAsDiscoverySortKey() {
-        var selector = Selector.classRegex(".*ActionResolverMetadata.*");
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*ActionResolverMetadata.*"))
+                .build();
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
 
@@ -51,7 +54,9 @@ class ActionResolverDiscoveryOrderTest {
     @Test
     @DisplayName("factories are invoked after metadata sorting")
     void factoriesAreInvokedAfterMetadataSorting() {
-        var selector = Selector.classRegex(".*ActionResolverFactoryTiming.*");
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*ActionResolverFactoryTiming.*"))
+                .build();
         var configuration = Configuration.defaultConfiguration();
         new ActionResolver(configuration, selector).resolveRootAction();
 
@@ -61,7 +66,9 @@ class ActionResolverDiscoveryOrderTest {
     @Test
     @DisplayName("step run contains actual work and is not executed during discovery")
     void stepRunContainsActualWorkAndIsNotExecutedDuringDiscovery() {
-        var selector = Selector.classRegex(".*ActionResolverFactoryTiming.*");
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*ActionResolverFactoryTiming.*"))
+                .build();
         var configuration = Configuration.defaultConfiguration();
         var root = new ActionResolver(configuration, selector).resolveRootAction();
 

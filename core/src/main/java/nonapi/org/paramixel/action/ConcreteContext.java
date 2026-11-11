@@ -18,7 +18,6 @@ package nonapi.org.paramixel.action;
 
 import java.util.Objects;
 import java.util.Optional;
-import nonapi.org.paramixel.InstanceHolder;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Context;
 import org.paramixel.api.Listener;
@@ -27,7 +26,7 @@ import org.paramixel.api.Listener;
  * Concrete execution context for one descriptor invocation.
  *
  * <p>The context carries the data user code may read: the effective configuration, the run
- * listener, the active descriptor, and the scoped instance holder. Traversal is owned by the
+ * listener, the active descriptor, and the scope frame. Traversal is owned by the
  * execution engine, so the context exposes no scheduling operations.
  */
 public final class ConcreteContext implements Context {
@@ -35,7 +34,7 @@ public final class ConcreteContext implements Context {
     private final Configuration configuration;
     private final Listener listener;
     private final MutableDescriptor descriptor;
-    private final InstanceHolder instanceHolder;
+    private final ScopeFrame frame;
 
     /**
      * Creates an execution context.
@@ -43,17 +42,17 @@ public final class ConcreteContext implements Context {
      * @param configuration the run configuration; must not be {@code null}
      * @param listener the run listener; must not be {@code null}
      * @param descriptor the active descriptor; must not be {@code null}
-     * @param instanceHolder the instance holder for this scope; must not be {@code null}
+     * @param frame the scope frame for this execution; must not be {@code null}
      */
     public ConcreteContext(
             final Configuration configuration,
             final Listener listener,
             final MutableDescriptor descriptor,
-            final InstanceHolder instanceHolder) {
+            final ScopeFrame frame) {
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
         this.listener = Objects.requireNonNull(listener, "listener is null");
         this.descriptor = Objects.requireNonNull(descriptor, "descriptor is null");
-        this.instanceHolder = Objects.requireNonNull(instanceHolder, "instanceHolder is null");
+        this.frame = Objects.requireNonNull(frame, "frame is null");
     }
 
     @Override
@@ -75,13 +74,14 @@ public final class ConcreteContext implements Context {
      *
      * @return the descriptor; never {@code null}
      */
+    @Override
     public MutableDescriptor descriptor() {
         return descriptor;
     }
 
     @Override
     public <T> Optional<T> instance(final Class<T> type) {
-        return Optional.ofNullable(instanceHolder.get(type));
+        return Optional.ofNullable(frame.find(type));
     }
 
     /**
@@ -100,21 +100,21 @@ public final class ConcreteContext implements Context {
     }
 
     /**
-     * Returns a context for the same descriptor using a different instance holder.
+     * Returns a context for the same descriptor using a different scope frame.
      *
-     * @param newInstanceHolder the holder to use; must not be {@code null}
+     * @param newFrame the frame to use; must not be {@code null}
      * @return the scoped context
      */
-    public ConcreteContext withInstanceHolder(final InstanceHolder newInstanceHolder) {
-        return new ConcreteContext(configuration, listener, descriptor, newInstanceHolder);
+    public ConcreteContext withFrame(final ScopeFrame newFrame) {
+        return new ConcreteContext(configuration, listener, descriptor, newFrame);
     }
 
     /**
-     * Returns the holder used to propagate fixture instances to child executions.
+     * Returns the scope frame that holds the values bound by enclosing scopes.
      *
-     * @return the instance holder
+     * @return the scope frame; never {@code null}
      */
-    public InstanceHolder instanceHolder() {
-        return instanceHolder;
+    public ScopeFrame frame() {
+        return frame;
     }
 }

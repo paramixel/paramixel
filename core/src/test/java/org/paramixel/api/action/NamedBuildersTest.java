@@ -17,13 +17,8 @@
 package org.paramixel.api.action;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Assert.assertFalse;
-import static org.paramixel.api.action.Assert.assertThat;
-import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Conditional.conditional;
-import static org.paramixel.api.action.Delay.delay;
-import static org.paramixel.api.action.Delay.delayRandom;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Isolated.isolated;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Scope.scope;
@@ -36,7 +31,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Named builders")
-@SuppressWarnings("removal")
 class NamedBuildersTest {
 
     @Nested
@@ -46,20 +40,21 @@ class NamedBuildersTest {
         @Test
         @DisplayName("returns builder with correct name")
         void returnsBuilderWithCorrectName() {
-            var action = scope("test").body(Step.of("body", ctx -> {})).build();
+            var action = scope("test").body(Step.step("body", ctx -> {})).build();
             assertThat(action.displayName()).isEqualTo("test");
         }
     }
 
     @Nested
-    @DisplayName("sequence")
-    class SequenceTests {
+    @DisplayName("sequential")
+    class SequentialTests {
 
         @Test
         @DisplayName("returns builder with correct default dependent mode")
         void returnsBuilderWithCorrectDefaults() {
-            var action =
-                    Sequence.sequence("test").child(Step.of("a", ctx -> {})).build();
+            var action = Sequential.sequential("test")
+                    .child(Step.step("a", ctx -> {}))
+                    .build();
             assertThat(action.displayName()).isEqualTo("test");
             assertThat(action.isDependent()).isTrue();
         }
@@ -67,9 +62,9 @@ class NamedBuildersTest {
         @Test
         @DisplayName("accepts children and builds")
         void acceptsChildrenAndBuilds() {
-            var action = Sequence.sequence("s")
-                    .child(Step.of("a", ctx -> {}))
-                    .child(Step.of("b", ctx -> {}))
+            var action = Sequential.sequential("s")
+                    .child(Step.step("a", ctx -> {}))
+                    .child(Step.step("b", ctx -> {}))
                     .build();
             assertThat(action.displayName()).isEqualTo("s");
             assertThat(action.children()).hasSize(2);
@@ -83,36 +78,20 @@ class NamedBuildersTest {
         @Test
         @DisplayName("returns builder with MAX_VALUE parallelism sentinel")
         void returnsBuilderWithDefaults() {
-            var action = parallel("test").child(Step.of("a", ctx -> {})).build();
+            var action = parallel("test", "t0").child(Step.step("a", ctx -> {})).build();
             assertThat(action.displayName()).isEqualTo("test");
-            assertThat(action.parallelism()).isEqualTo(Integer.MAX_VALUE);
+            assertThat(action.pool()).isNotBlank();
         }
 
         @Test
-        @DisplayName("accepts parallelism configuration")
-        void acceptsParallelismConfiguration() {
-            var action = parallel("p")
-                    .parallelism(4)
-                    .child(Step.of("a", ctx -> {}))
-                    .child(Step.of("b", ctx -> {}))
+        @DisplayName("keeps the pool name")
+        void keepsPoolName() {
+            var action = parallel("p", "p4x1")
+                    .child(Step.step("a", ctx -> {}))
+                    .child(Step.step("b", ctx -> {}))
                     .build();
-            assertThat(action.parallelism()).isEqualTo(4);
+            assertThat(action.pool()).startsWith("p4");
             assertThat(action.children()).hasSize(2);
-        }
-    }
-
-    @Nested
-    @DisplayName("repeat")
-    class RepeatTests {
-
-        @Test
-        @DisplayName("returns builder with iterations and body")
-        void returnsBuilderWithIterationsAndBody() {
-            var body = Step.of("body", ctx -> {});
-            var action = Repeat.repeat("rep").body(body).iterations(5).build();
-            assertThat(action.displayName()).isEqualTo("rep");
-            assertThat(action.iterations()).isEqualTo(5);
-            assertThat(action.body()).isSameAs(body);
         }
     }
 
@@ -123,7 +102,7 @@ class NamedBuildersTest {
         @Test
         @DisplayName("returns builder with condition and body")
         void returnsBuilderWithConditionAndBody() {
-            var body = Step.of("body", ctx -> {});
+            var body = Step.step("body", ctx -> {});
             var action = conditional("cond", ctx -> true).body(body).build();
             assertThat(action.displayName()).isEqualTo("cond");
             assertThat(action.body()).isSameAs(body);
@@ -137,24 +116,26 @@ class NamedBuildersTest {
         @Test
         @DisplayName("with name and factory creates instance")
         void withNameAndFactoryCreatesInstance() {
-            var body = Step.of("body", ctx -> {});
-            var action = instance("my-fixture", () -> new Object()).body(body).build();
+            var body = Step.step("body", ctx -> {});
+            var action = of("my-fixture", Object.class, () -> new Object())
+                    .body(body)
+                    .build();
             assertThat(action.displayName()).isEqualTo("my-fixture");
         }
 
         @Test
         @DisplayName("with class creates instance using simple name")
         void withClassCreatesInstanceUsingSimpleName() {
-            var body = Step.of("body", ctx -> {});
-            var action = instance(Object.class).body(body).build();
+            var body = Step.step("body", ctx -> {});
+            var action = of(Object.class).body(body).build();
             assertThat(action.displayName()).isEqualTo("Object");
         }
 
         @Test
         @DisplayName("with name and class creates instance")
         void withNameAndClassCreatesInstance() {
-            var body = Step.of("body", ctx -> {});
-            var action = instance("my-fixture", Object.class).body(body).build();
+            var body = Step.step("body", ctx -> {});
+            var action = of("my-fixture", Object.class).body(body).build();
             assertThat(action.displayName()).isEqualTo("my-fixture");
         }
     }
@@ -166,7 +147,7 @@ class NamedBuildersTest {
         @Test
         @DisplayName("returns builder with lock name")
         void returnsBuilderWithLockName() {
-            var body = Step.of("body", ctx -> {});
+            var body = Step.step("body", ctx -> {});
             var action = isolated("iso", "db-lock").body(body).build();
             assertThat(action.displayName()).isEqualTo("iso");
             assertThat(action.lockName()).isEqualTo("db-lock");
@@ -181,31 +162,23 @@ class NamedBuildersTest {
         @Test
         @DisplayName("returns builder with timeout and body")
         void returnsBuilderWithTimeoutAndBody() {
-            var body = Step.of("body", ctx -> {});
+            var body = Step.step("body", ctx -> {});
             var action = timeout("tm").timeout(Duration.ofSeconds(2)).body(body).build();
             assertThat(action.displayName()).isEqualTo("tm");
             assertThat(action.timeout()).isEqualTo(Duration.ofSeconds(2));
             assertThat(action.body()).isSameAs(body);
         }
-
-        @Test
-        @DisplayName("accepts milliseconds")
-        void acceptsMillis() {
-            var body = Step.of("body", ctx -> {});
-            var action = timeout("tm").timeoutMillis(3_000).body(body).build();
-            assertThat(action.timeout()).isEqualTo(Duration.ofMillis(3_000));
-        }
     }
 
     @Nested
-    @DisplayName("until")
-    class UntilTests {
+    @DisplayName("loop")
+    class LoopTests {
 
         @Test
         @DisplayName("with maxIterations creates action")
         void withMaxIterationsCreatesAction() {
-            var body = Step.of("body", ctx -> {});
-            var action = Until.until("u").maxIterations(10).body(body).build();
+            var body = Step.step("body", ctx -> {});
+            var action = Loop.loop("u").maxIterations(10).body(body).build();
             assertThat(action.displayName()).isEqualTo("u");
             assertThat(action.maxIterations()).isEqualTo(10);
             assertThat(action.body()).isSameAs(body);
@@ -220,13 +193,11 @@ class NamedBuildersTest {
                     return true;
                 }
             };
-            var body = Step.of("body", ctx -> {});
-            var action = Until.until("u")
-                    .maxIterations(10)
-                    .until(predicate)
-                    .body(body)
-                    .build();
-            assertThat(action.until()).containsSame(predicate);
+            var body = Step.step("body", ctx -> {});
+            var action =
+                    Loop.loop("u").maxIterations(10).until(predicate).body(body).build();
+            assertThat(action.until().orElseThrow().test(null, org.paramixel.api.Status.PASSED))
+                    .isTrue();
         }
     }
 
@@ -239,95 +210,6 @@ class NamedBuildersTest {
         void returnsStepWithCorrectName() {
             var action = step("my-step", ctx -> {});
             assertThat(action.displayName()).isEqualTo("my-step");
-        }
-    }
-
-    @Nested
-    @DisplayName("delay")
-    class DelayTests {
-
-        @Test
-        @DisplayName("delay with milliseconds creates fixed delay")
-        void delayWithMillis() {
-            var action = delay("pause", 500);
-            assertThat(action.displayName()).isEqualTo("pause");
-        }
-
-        @Test
-        @DisplayName("delay with duration creates fixed delay")
-        void delayWithDuration() {
-            var action = delay("pause", Duration.ofSeconds(2));
-            assertThat(action.displayName()).isEqualTo("pause");
-        }
-
-        @Test
-        @DisplayName("delayRandom creates random delay")
-        void delayRandomCreatesRandomDelay() {
-            var action = delayRandom("pause", 100, 500);
-            assertThat(action.displayName()).isEqualTo("pause");
-        }
-    }
-
-    @Nested
-    @DisplayName("assertThat / assertTrue / assertFalse")
-    class AssertTests {
-
-        @Test
-        @DisplayName("assertThat with boolean values")
-        void assertThatBoolean() {
-            var action = assertThat("check", true, true);
-            assertThat(action.displayName()).isEqualTo("check");
-        }
-
-        @Test
-        @DisplayName("assertThat with boolean and message")
-        void assertThatBooleanWithMessage() {
-            var action = assertThat("check", true, true, "msg");
-            assertThat(action.displayName()).isEqualTo("check");
-        }
-
-        @Test
-        @DisplayName("assertThat with supplier")
-        void assertThatSupplier() {
-            java.util.function.BooleanSupplier supplier = () -> true;
-            var action = assertThat("check", true, supplier);
-            assertThat(action.displayName()).isEqualTo("check");
-        }
-
-        @Test
-        @DisplayName("assertThat with supplier and message")
-        void assertThatSupplierWithMessage() {
-            java.util.function.BooleanSupplier supplier = () -> true;
-            var action = assertThat("check", true, supplier, "msg");
-            assertThat(action.displayName()).isEqualTo("check");
-        }
-
-        @Test
-        @DisplayName("assertTrue with boolean")
-        void assertTrueBoolean() {
-            var action = assertTrue("check", true);
-            assertThat(action.displayName()).isEqualTo("check");
-        }
-
-        @Test
-        @DisplayName("assertTrue with supplier")
-        void assertTrueSupplier() {
-            var action = assertTrue("check", () -> true);
-            assertThat(action.displayName()).isEqualTo("check");
-        }
-
-        @Test
-        @DisplayName("assertFalse with boolean")
-        void assertFalseBoolean() {
-            var action = assertFalse("check", false);
-            assertThat(action.displayName()).isEqualTo("check");
-        }
-
-        @Test
-        @DisplayName("assertFalse with supplier")
-        void assertFalseSupplier() {
-            var action = assertFalse("check", () -> false);
-            assertThat(action.displayName()).isEqualTo("check");
         }
     }
 }

@@ -68,12 +68,29 @@ Execution refreshes origin and validates the prerequisites for the remaining ste
 # Execute the release
 ./scripts/release.sh 1.2.3 --execute
 
+# Execute a pre-release
+./scripts/release.sh 7.0.0-ALPHA-1 --execute
+
 # Skip Gradle validation
 ./scripts/release.sh 1.2.3 --execute --skip-gradle
 
 # Skip documentation build (use if docs already built)
 ./scripts/release.sh 1.2.3 --execute --skip-docs-build
 ```
+
+### Accepted versions
+
+- `x.y.z` — a final release (for example `1.2.3`).
+- `x.y.z-ALPHA-<n>` — a pre-release, where `<n>` is a positive integer without a leading zero
+  (for example `7.0.0-ALPHA-1`). Alphas are released in sequence: after `7.0.0-ALPHA-1`, the next
+  pre-release is `7.0.0-ALPHA-2`, taken from the `7.0.0-ALPHA-1-POST` development version.
+
+Every other form is rejected before any mutation, including `7.0.0-ALPHA`, `7.0.0-ALPHA-0`,
+`7.0.0-alpha-1`, `7.0.0-RC-1` and any version that already ends in `-POST`.
+
+A release always creates branch `release/<version>`, tag `v<version>` and, after step 7, the
+development version `<version>-POST` on `main`. For example, `./scripts/release.sh 7.0.0-ALPHA-1 --execute`
+creates `release/7.0.0-ALPHA-1`, tag `v7.0.0-ALPHA-1` and `main` at `7.0.0-ALPHA-1-POST`.
 
 ### Options
 
@@ -185,7 +202,8 @@ git push
 - Release tag: `v<VERSION>`
 - Release branch: `release/<VERSION>`
 - Post-release development version: `<VERSION>-POST`
-- Accepted version format for the release script: `x.y.z` (e.g. `1.2.3`)
+- Accepted version formats for the release script: `x.y.z` (e.g. `1.2.3`) and `x.y.z-ALPHA-<n>`
+  (e.g. `7.0.0-ALPHA-1`, `<n>` a positive integer without a leading zero)
 - The release version must not already end in `-POST`
 
 ## Manual Release

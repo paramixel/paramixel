@@ -17,10 +17,8 @@
 package examples.testcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Step.step;
 
 import com.mongodb.client.MongoClients;
@@ -48,7 +46,7 @@ public class MongoDBTest {
      * @throws Throwable if environment creation fails
      */
     public static void main(final String[] args) throws Throwable {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -60,17 +58,14 @@ public class MongoDBTest {
      */
     @Paramixel.Factory
     public static Action factory() throws Throwable {
-        var parallel = parallel(MongoDBTest.class.getName());
-        for (MongoDBTestEnvironment environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            parallel.child(instance(environment.name(), () -> new MongoDBTest(environment))
-                    .body(scope("[scenario]")
-                            .before(step("setUp()", withInstance(MongoDBTest.class, MongoDBTest::setUp)))
-                            .body(step(
-                                    "testInsertAndQuery()",
-                                    withInstance(MongoDBTest.class, MongoDBTest::testInsertAndQuery)))
-                            .after(step("tearDown()", withInstance(MongoDBTest.class, MongoDBTest::tearDown)))));
-        }
-        return parallel.build();
+        return parallel(MongoDBTest.class.getName(), "environments")
+                .each(
+                        MongoDBTestEnvironment.createTestEnvironments(),
+                        environment -> of(environment.name(), MongoDBTest.class, () -> new MongoDBTest(environment))
+                                .before("setUp()", MongoDBTest::setUp)
+                                .body(step("testInsertAndQuery()", MongoDBTest.class, MongoDBTest::testInsertAndQuery))
+                                .after("tearDown()", MongoDBTest::tearDown))
+                .build();
     }
 
     private MongoDBTest(final MongoDBTestEnvironment environment) {

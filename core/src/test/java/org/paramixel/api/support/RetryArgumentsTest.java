@@ -22,24 +22,38 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.exception.PolicyException;
-import org.paramixel.api.support.Retry.Policy;
 
 @DisplayName("Retry arguments")
 class RetryArgumentsTest {
 
     @Test
-    @DisplayName("of rejects null policy")
-    void ofRejectsNullPolicy() {
-        assertThatThrownBy(() -> Retry.of(null))
+    @DisplayName("of rejects a null backoff")
+    void ofRejectsNullBackoff() {
+        assertThatThrownBy(() -> Retry.of(null, Duration.ofSeconds(1)))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("policy is null");
+                .hasMessage("backoff is null");
     }
 
     @Test
-    @DisplayName("retryOn rejects null predicate")
-    void retryOnRejectsNullPredicate() {
-        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+    @DisplayName("of rejects a null budget")
+    void ofRejectsNullBudget() {
+        assertThatThrownBy(() -> Retry.of(Backoff.fixed(Duration.ZERO), null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("maximumDuration is null");
+    }
+
+    @Test
+    @DisplayName("of rejects a negative budget")
+    void ofRejectsNegativeBudget() {
+        assertThatThrownBy(() -> Retry.of(Backoff.fixed(Duration.ZERO), Duration.ofMillis(-1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maximumDuration is negative");
+    }
+
+    @Test
+    @DisplayName("retryOn rejects null")
+    void retryOnRejectsNull() {
+        var retry = Retry.of(Backoff.fixed(Duration.ZERO), Duration.ZERO);
 
         assertThatThrownBy(() -> retry.retryOn(null))
                 .isInstanceOf(NullPointerException.class)
@@ -47,9 +61,9 @@ class RetryArgumentsTest {
     }
 
     @Test
-    @DisplayName("onRetry rejects null callback")
-    void onRetryRejectsNullCallback() {
-        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+    @DisplayName("onRetry rejects null")
+    void onRetryRejectsNull() {
+        var retry = Retry.of(Backoff.fixed(Duration.ZERO), Duration.ZERO);
 
         assertThatThrownBy(() -> retry.onRetry(null))
                 .isInstanceOf(NullPointerException.class)
@@ -57,20 +71,9 @@ class RetryArgumentsTest {
     }
 
     @Test
-    @DisplayName("onRetry throws IllegalStateException after run")
-    void onRetryThrowsIllegalStateExceptionAfterRun() {
-        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
-        retry.run(() -> {});
-
-        assertThatThrownBy(() -> retry.onRetry((attempt, cause) -> {}))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("onRetry is called after run");
-    }
-
-    @Test
-    @DisplayName("run rejects null executable")
-    void runRejectsNullThrowableRunnable() {
-        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+    @DisplayName("run rejects a null runnable")
+    void runRejectsNullRunnable() {
+        var retry = Retry.of(Backoff.fixed(Duration.ZERO), Duration.ZERO);
 
         assertThatThrownBy(() -> retry.run(null))
                 .isInstanceOf(NullPointerException.class)
@@ -78,101 +81,9 @@ class RetryArgumentsTest {
     }
 
     @Test
-    @DisplayName("Policy.fixed rejects null initialDelay")
-    void policyFixedRejectsNullInitialDelay() {
-        assertThatThrownBy(() -> Policy.fixed(null, Duration.ofSeconds(1)))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("initialDelay is null");
-    }
-
-    @Test
-    @DisplayName("Policy.fixed rejects null maximumDuration")
-    void policyFixedRejectsNullMaximumDuration() {
-        assertThatThrownBy(() -> Policy.fixed(Duration.ofMillis(100), null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("maximumDuration is null");
-    }
-
-    @Test
-    @DisplayName("Policy.fixed rejects negative initialDelay")
-    void policyFixedRejectsNegativeInitialDelay() {
-        assertThatThrownBy(() -> Policy.fixed(Duration.ofMillis(-1), Duration.ofSeconds(1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay is negative");
-    }
-
-    @Test
-    @DisplayName("Policy.fixed rejects negative maximumDuration")
-    void policyFixedRejectsNegativeMaximumDuration() {
-        assertThatThrownBy(() -> Policy.fixed(Duration.ZERO, Duration.ofMillis(-1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("maximumDuration is negative");
-    }
-
-    @Test
-    @DisplayName("Policy.fixed rejects initialDelay greater than maximumDuration")
-    void policyFixedRejectsInitialGreaterThanMax() {
-        assertThatThrownBy(() -> Policy.fixed(Duration.ofSeconds(2), Duration.ofSeconds(1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay is greater than maximumDuration");
-    }
-
-    @Test
-    @DisplayName("Policy.exponential rejects null initialDelay")
-    void policyExponentialRejectsNullInitialDelay() {
-        assertThatThrownBy(() -> Policy.exponential(null, Duration.ofSeconds(1)))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("initialDelay is null");
-    }
-
-    @Test
-    @DisplayName("Policy.exponential rejects null maximumDuration")
-    void policyExponentialRejectsNullMaximumDuration() {
-        assertThatThrownBy(() -> Policy.exponential(Duration.ofMillis(100), null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("maximumDuration is null");
-    }
-
-    @Test
-    @DisplayName("Policy.exponential rejects negative initialDelay")
-    void policyExponentialRejectsNegativeInitialDelay() {
-        assertThatThrownBy(() -> Policy.exponential(Duration.ofMillis(-1), Duration.ofSeconds(1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay is negative");
-    }
-
-    @Test
-    @DisplayName("Policy.exponential rejects negative maximumDuration")
-    void policyExponentialRejectsNegativeMaximumDuration() {
-        assertThatThrownBy(() -> Policy.exponential(Duration.ZERO, Duration.ofMillis(-1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("maximumDuration is negative");
-    }
-
-    @Test
-    @DisplayName("Policy.exponential rejects initialDelay greater than maximumDuration")
-    void policyExponentialRejectsInitialGreaterThanMax() {
-        assertThatThrownBy(() -> Policy.exponential(Duration.ofSeconds(2), Duration.ofSeconds(1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("initialDelay is greater than maximumDuration");
-    }
-
-    @Test
-    @DisplayName("run throws on second call")
-    void runThrowsOnSecondCall() {
-        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ofSeconds(10)));
-
-        retry.run(() -> {});
-
-        assertThatThrownBy(() -> retry.run(() -> {}))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Retry has already run");
-    }
-
-    @Test
-    @DisplayName("runAndThrow rejects null executable")
-    void runAndThrowRejectsNullThrowableRunnable() {
-        var retry = Retry.of(Policy.fixed(Duration.ZERO, Duration.ZERO));
+    @DisplayName("runAndThrow rejects a null runnable")
+    void runAndThrowRejectsNullRunnable() {
+        var retry = Retry.of(Backoff.fixed(Duration.ZERO), Duration.ZERO);
 
         assertThatThrownBy(() -> retry.runAndThrow(null))
                 .isInstanceOf(NullPointerException.class)
@@ -180,38 +91,38 @@ class RetryArgumentsTest {
     }
 
     @Test
-    @DisplayName("Policy.exponential throws PolicyException on duration overflow")
-    void policyExponentialThrowsPolicyExceptionOnDurationOverflow() {
-        // Use a large initial delay that will overflow when multiplied exponentially
-        // Long.MAX_VALUE / 1000 seconds is the largest that doesn't overflow toMillis()
-        // Attempt 21 has multiplier 1L << 20 = 1048576, which causes overflow
-        var policy = Policy.exponential(Duration.ofSeconds(Long.MAX_VALUE / 1000), Duration.ofSeconds(Long.MAX_VALUE));
+    @DisplayName("configuration is immutable: retryOn and onRetry return a new instance")
+    void configurationIsImmutable() {
+        var base = Retry.of(Backoff.fixed(Duration.ZERO), Duration.ofSeconds(1));
 
-        assertThatThrownBy(() -> policy.waitDuration(21, new RuntimeException()))
-                .isInstanceOf(PolicyException.class)
-                .hasMessageContaining("duration overflow")
-                .hasCauseInstanceOf(ArithmeticException.class);
+        var configured = base.retryOn(t -> false).onRetry((attempt, cause) -> {});
+
+        assertThat(configured).isNotSameAs(base);
+        // The configured instance stops after the first failure; the base instance keeps the default predicate.
+        assertThat(configured
+                        .run(() -> {
+                            throw new IllegalStateException("once");
+                        })
+                        .attemptCount())
+                .isEqualTo(1);
     }
 
     @Test
-    @DisplayName("Policy.fixed throws PolicyException on duration overflow")
-    void policyFixedThrowsPolicyExceptionOnDurationOverflow() {
-        // Use a large initial delay that will overflow when multiplied by attempt number
-        // Long.MAX_VALUE / 1000 seconds is the largest that doesn't overflow toMillis()
-        // Attempt 1001 will overflow since 1001 * (Long.MAX_VALUE / 1000) > Long.MAX_VALUE
-        var policy = Policy.fixed(Duration.ofSeconds(Long.MAX_VALUE / 1000), Duration.ofSeconds(Long.MAX_VALUE));
+    @DisplayName("a configuration can be run more than once")
+    void configurationIsReusable() {
+        var retry =
+                Retry.of(Backoff.fixed(Duration.ZERO), Duration.ofSeconds(1)).retryOn(t -> false);
 
-        assertThatThrownBy(() -> policy.waitDuration(1001, new RuntimeException()))
-                .isInstanceOf(PolicyException.class)
-                .hasMessageContaining("duration overflow")
-                .hasCauseInstanceOf(ArithmeticException.class);
-    }
+        var first = retry.run(() -> {
+            throw new IllegalStateException("first");
+        });
+        var second = retry.run(() -> {
+            throw new IllegalStateException("second");
+        });
 
-    @Test
-    @DisplayName("Policy.exponential returns zero for negative attempt")
-    void policyExponentialReturnsZeroForNegativeAttempt() {
-        var policy = Policy.exponential(Duration.ofMillis(100), Duration.ofSeconds(10));
-
-        assertThat(policy.waitDuration(-1, new RuntimeException())).isEqualTo(Duration.ZERO);
+        assertThat(first.successful()).isFalse();
+        assertThat(second.successful()).isFalse();
+        assertThat(first.exceptions().get(0)).hasMessage("first");
+        assertThat(second.exceptions().get(0)).hasMessage("second");
     }
 }

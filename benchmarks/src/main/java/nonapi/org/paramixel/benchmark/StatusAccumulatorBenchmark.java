@@ -72,7 +72,7 @@ public class StatusAccumulatorBenchmark {
         public void setup() {
             descriptors = new ConcreteDescriptor[descriptorCount];
             for (var i = 0; i < descriptorCount; i++) {
-                var action = Step.of("bench-" + i, ctx -> {});
+                var action = Step.step("bench-" + i, ctx -> {});
                 var d = new ConcreteDescriptor(action);
                 d.setStatus(Status.RUNNING);
                 // Alternate between terminal statuses

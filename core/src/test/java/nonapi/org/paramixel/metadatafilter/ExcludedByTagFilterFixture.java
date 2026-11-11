@@ -28,8 +28,8 @@ public final class ExcludedByTagFilterFixture {
     @Paramixel.Factory
     @Paramixel.Tag("slow")
     public static Action factory() {
-        return Instance.builder("excluded-by-tag-action", () -> new Object())
-                .body(Step.of("test", context -> {}))
+        return Instance.of("excluded-by-tag-action", Object.class, () -> new Object())
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

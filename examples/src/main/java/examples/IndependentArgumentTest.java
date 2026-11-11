@@ -17,9 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Each.sequential;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
@@ -50,7 +48,7 @@ public class IndependentArgumentTest {
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -67,37 +65,32 @@ public class IndependentArgumentTest {
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
         return scope(testName)
-                .body(sequential(
-                                testName,
+                .body(sequential(testName)
+                        .each(
                                 arguments,
-                                value -> instance(value, IndependentArgumentTest::new)
+                                value -> of(value, IndependentArgumentTest.class, IndependentArgumentTest::new)
                                         .body(scope("scope")
                                                 .before(step(
                                                         "before()",
-                                                        withInstance(
-                                                                IndependentArgumentTest.class,
-                                                                IndependentArgumentTest::before)))
+                                                        IndependentArgumentTest.class,
+                                                        IndependentArgumentTest::before))
                                                 .body(sequential(value)
                                                         .child(step(
                                                                 "test()",
-                                                                withInstance(
-                                                                        IndependentArgumentTest.class,
-                                                                        IndependentArgumentTest::test)))
+                                                                IndependentArgumentTest.class,
+                                                                IndependentArgumentTest::test))
                                                         .child(step(
                                                                 "test()",
-                                                                withInstance(
-                                                                        IndependentArgumentTest.class,
-                                                                        IndependentArgumentTest::test)))
+                                                                IndependentArgumentTest.class,
+                                                                IndependentArgumentTest::test))
                                                         .child(step(
                                                                 "test()",
-                                                                withInstance(
-                                                                        IndependentArgumentTest.class,
-                                                                        IndependentArgumentTest::test))))
+                                                                IndependentArgumentTest.class,
+                                                                IndependentArgumentTest::test)))
                                                 .after(step(
                                                         "after()",
-                                                        withInstance(
-                                                                IndependentArgumentTest.class,
-                                                                IndependentArgumentTest::after)))))
+                                                        IndependentArgumentTest.class,
+                                                        IndependentArgumentTest::after))))
                         .independent())
                 .after(step("validate", ignored -> validate()))
                 .build();

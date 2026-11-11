@@ -50,8 +50,8 @@ public final class LingeringFailingMojoFixture {
 
     @Paramixel.Factory
     public static Action action() {
-        return Sequential.builder("lingering-fail")
-                .child(Step.of("spawn-lingering-thread", context -> {
+        return Sequential.sequential("lingering-fail")
+                .child(Step.step("spawn-lingering-thread", context -> {
                     var thread = new Thread(
                             () -> {
                                 try {
@@ -66,7 +66,7 @@ public final class LingeringFailingMojoFixture {
                     LINGERING_THREAD.set(thread);
                     thread.start();
                 }))
-                .child(Step.of("fail", context -> {
+                .child(Step.step("fail", context -> {
                     throw new RuntimeException("boom");
                 }))
                 .build();

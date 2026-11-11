@@ -29,8 +29,8 @@ public final class RunnerTaggedFixture {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Action factory() {
-        return Instance.builder("runner-tagged-fixture", () -> new Object())
-                .body(Step.of("test", context -> {}))
+        return Instance.of("runner-tagged-fixture", Object.class, () -> new Object())
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

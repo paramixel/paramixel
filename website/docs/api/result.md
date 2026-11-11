@@ -1,25 +1,35 @@
 ---
 title: Result
-description: Result returned by a Paramixel run.
+description: The outcome of a Paramixel run.
 ---
 
 # Result
 
-`Result` is returned from `Runner.run(...)`.
+Every `Runner` entry point returns a `Result`.
 
 It exposes:
 
 - the optional root `Descriptor` through `descriptor()`
-- aggregate outcome predicates: `isPassed()`, `isFailed()`, `isSkipped()`, and `isAborted()`
-- aggregate `startedAt()` and `completedAt()` timestamps
+- the effective status through `status()`
+- the process exit code through `exitCode()`
+- the earliest start and latest completion instants through `startedAt()` and `completedAt()`
 
-Use it to decide whether a programmatic run should fail a surrounding tool:
+The effective status is the **root** descriptor's aggregated status after configuration promotion, not the most
+severe status anywhere in the tree: a `Loop` that retried and then passed has `FAILED` iterations beneath a
+`PASSED` root, and the run passed.
+
+`exitCode()` is the single exit-code authority: `0` when the effective status is `PASSED`, `SKIPPED` or `ABORTED`
+(after promotion), and `1` when it is `FAILED`:
 
 ```java
-var result = Runner.defaultRunner().run(action);
-if (result.isFailed()) {
-    throw new AssertionError("Paramixel run failed");
+var result = Runner.builder().build().run(action);
+if (result.exitCode() != 0) {
+    throw new AssertionError("Paramixel run failed: " + result.status().message().orElse(""));
 }
 ```
 
-For process exit codes, prefer `Runner.runAndReturnExitCode(...)` or `Runner.runAndExit(...)`.
+For a process exit code, make the exit visible at the call site:
+
+```java
+System.exit(Runner.builder().build().run().exitCode());
+```

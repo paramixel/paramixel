@@ -18,6 +18,7 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Scope;
@@ -32,12 +33,12 @@ class RunnerBuilderOverloadTest {
         var listener = new NoOpListener();
         var runner = Runner.builder().listener(listener).build();
         var action =
-                Scope.builder("lifecycle").body(Step.of("step", context -> {})).build();
+                Scope.scope("lifecycle").body(Step.step("step", context -> {})).build();
 
         var result = runner.run(action);
 
         assertThat(result.descriptor()).isPresent();
-        assertThat(result.isPassed()).isTrue();
+        assertThat(result.status().isPassed()).isTrue();
     }
 
     @Test
@@ -45,38 +46,38 @@ class RunnerBuilderOverloadTest {
     void runActionWithPreBuiltAction() {
         var listener = new NoOpListener();
         var runner = Runner.builder().listener(listener).build();
-        var step = Step.of("step", context -> {});
+        var step = Step.step("step", context -> {});
 
         var result = runner.run(step);
 
-        assertThat(result.isPassed()).isTrue();
+        assertThat(result.status().isPassed()).isTrue();
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Action) resolves and returns exit code for passing action")
-    void runAndReturnExitCodeActionReturnsZeroForPassingAction() {
+    @DisplayName("run(Action).exitCode() resolves and returns exit code for passing action")
+    void runActionReturnsZeroExitCodeForPassingAction() {
         var listener = new NoOpListener();
         var runner = Runner.builder().listener(listener).build();
         var action =
-                Scope.builder("lifecycle").body(Step.of("step", context -> {})).build();
+                Scope.scope("lifecycle").body(Step.step("step", context -> {})).build();
 
-        int exitCode = runner.runAndReturnExitCode(action);
+        int exitCode = runner.run(action).exitCode();
 
         assertThat(exitCode).isZero();
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Action) returns non-zero for failing action")
-    void runAndReturnExitCodeActionReturnsNonZeroForFailingAction() {
+    @DisplayName("run(Action).exitCode() returns non-zero for failing action")
+    void runActionReturnsNonZeroExitCodeForFailingAction() {
         var listener = new NoOpListener();
         var runner = Runner.builder().listener(listener).build();
-        var action = Scope.builder("lifecycle")
-                .body(Step.of("failing", context -> {
+        var action = Scope.scope("lifecycle")
+                .body(Step.step("failing", context -> {
                     throw new RuntimeException("failure");
                 }))
                 .build();
 
-        int exitCode = runner.runAndReturnExitCode(action);
+        int exitCode = runner.run(action).exitCode();
 
         assertThat(exitCode).isNotZero();
     }
@@ -86,7 +87,7 @@ class RunnerBuilderOverloadTest {
     void runActionLeavesAccumulatingBuilderReusable() {
         var listener = new NoOpListener();
         var runner = Runner.builder().listener(listener).build();
-        var builder = Scope.builder("lifecycle").body(Step.of("step", context -> {}));
+        var builder = Scope.scope("lifecycle").body(Step.step("step", context -> {}));
 
         runner.run(builder.build());
 
@@ -96,16 +97,13 @@ class RunnerBuilderOverloadTest {
     private static final class NoOpListener implements Listener {
 
         @Override
-        public void initialize(final Configuration configuration) {}
+        public void onRunStarted(final Configuration configuration) {}
 
         @Override
         public void onDiscoveryStarted() {}
 
         @Override
-        public void onDiscoveryCompleted(final Descriptor root) {}
-
-        @Override
-        public void onRunStarted() {}
+        public void onDiscoveryCompleted(final Optional<Descriptor> root) {}
 
         @Override
         public void onBeforeExecution(final Descriptor descriptor) {}

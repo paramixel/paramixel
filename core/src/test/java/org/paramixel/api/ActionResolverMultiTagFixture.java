@@ -30,8 +30,8 @@ public final class ActionResolverMultiTagFixture {
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
     public static Action factory() {
-        return Instance.builder("multi-tag-action", () -> new Object())
-                .body(Step.of("test", context -> {}))
+        return Instance.of("multi-tag-action", Object.class, () -> new Object())
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

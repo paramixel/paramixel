@@ -17,6 +17,7 @@
 package nonapi.org.paramixel.benchmark;
 
 import java.util.concurrent.TimeUnit;
+import nonapi.org.paramixel.CompiledPlans;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -54,8 +55,8 @@ public class DescriptorStatusReadBenchmark {
         var d = state.descriptor;
         for (var i = 0; i < state.readCount; i++) {
             blackhole.consume(d.status());
-            blackhole.consume(d.isPassed());
-            blackhole.consume(d.isFailed());
+            blackhole.consume(d.status().isPassed());
+            blackhole.consume(d.status().isFailed());
             blackhole.consume(d.isCompleted());
         }
     }
@@ -70,8 +71,8 @@ public class DescriptorStatusReadBenchmark {
 
         @Setup(Level.Trial)
         public void setup() {
-            var action = Step.of("bench", ctx -> {});
-            descriptor = new ConcreteDescriptor(action);
+            var action = Step.step("bench", ctx -> {});
+            descriptor = CompiledPlans.compile(action);
             descriptor.setStatus(Status.RUNNING);
             descriptor.setStatus(Status.PASSED);
         }

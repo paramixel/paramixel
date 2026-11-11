@@ -17,10 +17,8 @@
 package examples.testcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Step.step;
 
 import examples.support.Logger;
@@ -50,27 +48,28 @@ public class NginxTest {
      * @throws Throwable if environment creation fails
      */
     public static void main(final String[] args) throws Throwable {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
-     * Builds a parallel action tree with one instance branch per Nginx Docker image,
-     * each managing a {@code NginxTest} instance with setUp, test, and tearDown lifecycle.
+     * Builds a parallel action tree with one typed fixture per Nginx Docker image.
+     *
+     * <p>Each fixture declares its type once; every step names only its method, and the pool named
+     * {@code environments} bounds how many fixtures are alive at once.
      *
      * @return the action tree for this test
      * @throws Throwable if environment creation fails
      */
     @Paramixel.Factory
     public static Action factory() throws Throwable {
-        var parallel = parallel(NginxTest.class.getName());
-        for (NginxTestEnvironment environment : NginxTestEnvironment.createTestEnvironments()) {
-            parallel.child(instance(environment.name(), () -> new NginxTest(environment))
-                    .body(scope("[scenario]")
-                            .before(step("setUp()", withInstance(NginxTest.class, NginxTest::setUp)))
-                            .body(step("testGet()", withInstance(NginxTest.class, NginxTest::testGet)))
-                            .after(step("tearDown()", withInstance(NginxTest.class, NginxTest::tearDown)))));
-        }
-        return parallel.build();
+        return parallel(NginxTest.class.getName(), "environments")
+                .each(
+                        NginxTestEnvironment.createTestEnvironments(),
+                        environment -> of(environment.name(), NginxTest.class, () -> new NginxTest(environment))
+                                .before("setUp()", NginxTest::setUp)
+                                .body(step("testGet()", NginxTest.class, NginxTest::testGet))
+                                .after("tearDown()", NginxTest::tearDown))
+                .build();
     }
 
     private NginxTest(final NginxTestEnvironment environment) {

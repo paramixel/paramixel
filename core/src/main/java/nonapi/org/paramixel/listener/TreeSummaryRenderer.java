@@ -23,14 +23,10 @@ import java.util.List;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Conditional;
-import org.paramixel.api.action.Instance;
 import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Loop;
-import org.paramixel.api.action.Repeat;
 import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Static;
 import org.paramixel.api.action.Timeout;
-import org.paramixel.api.action.Until;
 
 /**
  * Renders a descriptor tree as a tree-style summary with connectors, timing, and failure information.
@@ -40,7 +36,6 @@ import org.paramixel.api.action.Until;
  * <p>The renderer does <em>not</em> add the {@code [PARAMIXEL]} line prefix; that responsibility belongs to
  * {@link SummaryListener}.
  */
-@SuppressWarnings("removal")
 public final class TreeSummaryRenderer implements SummaryRenderer {
 
     private final boolean ansiEnabled;
@@ -109,14 +104,10 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
 
     private static boolean supportsBody(final Action action) {
         return action instanceof Conditional
-                || action instanceof Instance
                 || action instanceof Isolated
-                || action instanceof Repeat
                 || action instanceof Loop
                 || action instanceof Scope
-                || action instanceof Static
-                || action instanceof Timeout
-                || action instanceof Until;
+                || action instanceof Timeout;
     }
 
     private static void pushInReverse(final Deque<RenderFrame> stack, final List<RenderFrame> frames) {
@@ -167,9 +158,9 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
     }
 
     private String formatFailureInfo(final Descriptor descriptor) {
-        if (descriptor.isFailed()) {
-            return descriptor
-                    .throwable()
+        var status = descriptor.status();
+        if (status.isFailed()) {
+            return status.throwable()
                     .map(f -> {
                         var msg = Listeners.sanitizeMessage(f.getMessage());
                         if (msg == null || msg.isBlank()) {
@@ -177,16 +168,10 @@ public final class TreeSummaryRenderer implements SummaryRenderer {
                         }
                         return " \u2192 " + f.getClass().getName() + ": " + msg;
                     })
-                    .or(() -> descriptor.message().map(m -> " \u2192 " + Listeners.sanitizeMessage(m)))
+                    .or(() -> status.message().map(m -> " \u2192 " + Listeners.sanitizeMessage(m)))
                     .orElse("");
-        } else if (descriptor.isAborted()) {
-            return descriptor
-                    .message()
-                    .map(reason -> " \u2192 " + Listeners.sanitizeMessage(reason))
-                    .orElse("");
-        } else if (descriptor.isSkipped()) {
-            return descriptor
-                    .message()
+        } else if (status.isAborted() || status.isSkipped()) {
+            return status.message()
                     .map(reason -> " \u2192 " + Listeners.sanitizeMessage(reason))
                     .orElse("");
         }

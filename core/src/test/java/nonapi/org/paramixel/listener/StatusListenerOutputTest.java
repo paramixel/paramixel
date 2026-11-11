@@ -30,7 +30,7 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Step;
-import org.paramixel.api.exception.AbortedException;
+import org.paramixel.api.exception.AbortException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
@@ -49,7 +49,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints before-action line with action details")
     void printsBeforeActionLineWithActionDetails() {
         var listener = new StatusListener();
-        var noop = Step.of("my-action", context -> {});
+        var noop = Step.step("my-action", context -> {});
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -70,8 +70,8 @@ class StatusListenerOutputTest {
     @DisplayName("suppresses output for root action")
     void suppressesOutputForRoot() {
         var listener = new StatusListener();
-        var child = Step.of("child", context -> {});
-        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var child = Step.step("child", context -> {});
+        var parallel = Parallel.parallel(ROOT_NAME, "p1x0").child(child).build();
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -91,7 +91,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints PASSED status with green color")
     void printsSuccessfulStatusWithGreenColor() {
         var listener = new StatusListener();
-        var noop = Step.of("passing-action", context -> {});
+        var noop = Step.step("passing-action", context -> {});
         var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.ANSI, "true")))
                 .listener(listener)
@@ -114,7 +114,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints FAILED status with red color")
     void printsFailStatusWithRedColor() {
         var listener = new StatusListener();
-        var action = Step.of("failing-action", context -> {
+        var action = Step.step("failing-action", context -> {
             throw new RuntimeException("fail");
         });
         var runner = Runner.builder()
@@ -139,7 +139,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints SKIPPED status with orange color")
     void printsSkipStatusWithOrangeColor() {
         var listener = new StatusListener();
-        var action = Step.of("skipping-action", context -> {
+        var action = Step.step("skipping-action", context -> {
             throw new SkipException("skipped");
         });
         var runner = Runner.builder()
@@ -164,9 +164,8 @@ class StatusListenerOutputTest {
     @DisplayName("suppresses output for root in afterAction")
     void suppressesOutputForRootInAfterAction() {
         var listener = new StatusListener();
-        var parallel = Parallel.builder(ROOT_NAME)
-                .parallelism(1)
-                .child(Step.of("child", context -> {}))
+        var parallel = Parallel.parallel(ROOT_NAME, "p1x1")
+                .child(Step.step("child", context -> {}))
                 .build();
         var runner = Runner.builder().listener(listener).build();
 
@@ -187,7 +186,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints exception details appended to FAILED status line")
     void printsExceptionDetailsAppendedToFailedStatusLine() {
         var listener = new StatusListener();
-        var action = Step.of("error-action", context -> {
+        var action = Step.step("error-action", context -> {
             throw new RuntimeException("action error");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -211,7 +210,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints EXCEPTION stack trace with prefix on each line")
     void printsExceptionStackTraceWithPrefixOnEachLine() {
         var listener = new StatusListener();
-        var action = Step.of("error-action", context -> {
+        var action = Step.step("error-action", context -> {
             throw new RuntimeException("action error");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -260,8 +259,8 @@ class StatusListenerOutputTest {
     @DisplayName("prints FailException message and exception class in status line")
     void printsFailExceptionMessageAndExceptionClass() {
         var listener = new StatusListener();
-        var action = Step.of("fail-action", context -> {
-            FailException.fail("custom failure");
+        var action = Step.step("fail-action", context -> {
+            throw FailException.fail("custom failure");
         });
         var runner = Runner.builder().listener(listener).build();
 
@@ -284,7 +283,7 @@ class StatusListenerOutputTest {
     @DisplayName("prints SkipException message and exception class in status line")
     void printsSkipExceptionMessageAndExceptionClass() {
         var listener = new StatusListener();
-        var action = Step.of("skip-action", context -> {
+        var action = Step.step("skip-action", context -> {
             throw new SkipException("skipped reason");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -305,11 +304,11 @@ class StatusListenerOutputTest {
     }
 
     @Test
-    @DisplayName("prints AbortedException message and exception class in status line")
-    void printsAbortedExceptionMessageAndExceptionClass() {
+    @DisplayName("prints AbortException message and exception class in status line")
+    void printsAbortExceptionMessageAndExceptionClass() {
         var listener = new StatusListener();
-        var action = Step.of("abort-action", context -> {
-            throw new AbortedException("abort reason");
+        var action = Step.step("abort-action", context -> {
+            throw new AbortException("abort reason");
         });
         var runner = Runner.builder().listener(listener).build();
 
@@ -325,14 +324,14 @@ class StatusListenerOutputTest {
         var result = output.toString(StandardCharsets.UTF_8);
         assertThat(result).contains("ABORTED");
         assertThat(result).contains("abort-action");
-        assertThat(result).contains(AbortedException.class.getName() + ": abort reason");
+        assertThat(result).contains(AbortException.class.getName() + ": abort reason");
     }
 
     @Test
     @DisplayName("FAILED status line ends with newline before stack trace")
     void failedStatusLineEndsWithNewlineBeforeStackTrace() {
         var listener = new StatusListener();
-        var action = Step.of("error-action", context -> {
+        var action = Step.step("error-action", context -> {
             throw new RuntimeException("action error");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -375,11 +374,10 @@ class StatusListenerOutputTest {
     @DisplayName("suppresses output for root in actionThrowable")
     void suppressesOutputForRootInActionThrowable() {
         var listener = new StatusListener();
-        var failingChild = Step.of("child-fail", context -> {
+        var failingChild = Step.step("child-fail", context -> {
             throw new RuntimeException("child error");
         });
-        var parallel =
-                Parallel.builder(ROOT_NAME).parallelism(1).child(failingChild).build();
+        var parallel = Parallel.parallel(ROOT_NAME, "p1x2").child(failingChild).build();
         var runner = Runner.builder().listener(listener).build();
 
         var outputOut = new ByteArrayOutputStream();
@@ -399,7 +397,7 @@ class StatusListenerOutputTest {
     @DisplayName("exception message with ANSI sequences is sanitized in output")
     void exceptionMessageWithAnsiSequencesIsSanitized() {
         var listener = new StatusListener();
-        var action = Step.of("ansi-fail-action", context -> {
+        var action = Step.step("ansi-fail-action", context -> {
             throw new RuntimeException("\u001B[31merror\u001B[0m");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -423,7 +421,7 @@ class StatusListenerOutputTest {
     @DisplayName("action display name with control characters is sanitized in output")
     void actionDisplayNameWithControlCharactersIsSanitized() {
         var listener = new StatusListener();
-        var action = Step.of("clean\u0000name", context -> {});
+        var action = Step.step("clean\u0000name", context -> {});
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -444,7 +442,7 @@ class StatusListenerOutputTest {
     @DisplayName("exception message with null bytes is sanitized in output")
     void exceptionMessageWithNullBytesIsSanitized() {
         var listener = new StatusListener();
-        var action = Step.of("null-fail-action", context -> {
+        var action = Step.step("null-fail-action", context -> {
             throw new RuntimeException("bad\u0000message\u0000");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -468,7 +466,7 @@ class StatusListenerOutputTest {
     @DisplayName("stack trace preserves tab indentation while stripping control characters")
     void stackTracePreservesTabIndentationWhileStrippingControlCharacters() {
         var listener = new StatusListener();
-        var action = Step.of("indent-action", context -> {
+        var action = Step.step("indent-action", context -> {
             throw new RuntimeException("boom\u0000");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -492,7 +490,7 @@ class StatusListenerOutputTest {
     @DisplayName("stack trace first line strips ANSI escapes from exception message")
     void stackTraceFirstLineStripsAnsiFromExceptionMessage() {
         var listener = new StatusListener();
-        var action = Step.of("ansi-trace-action", context -> {
+        var action = Step.step("ansi-trace-action", context -> {
             throw new RuntimeException("\u001B[31mboom\u001B[0m");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -516,7 +514,7 @@ class StatusListenerOutputTest {
     @DisplayName("output is free of grep-binary triggers for a control-char exception message")
     void outputIsFreeOfGrepBinaryTriggers() {
         var listener = new StatusListener();
-        var action = Step.of("grep-action", context -> {
+        var action = Step.step("grep-action", context -> {
             throw new RuntimeException("bad\u0000\u0007\u001B[31mmsg\u001B[0m");
         });
         var runner = Runner.builder().listener(listener).build();
@@ -540,12 +538,12 @@ class StatusListenerOutputTest {
     @Test
     @DisplayName("null throwable message does not render null text")
     void nullThrowableMessageDoesNotRenderNullText() {
-        var action = Step.of("throws", context -> {
+        var action = Step.step("throws", context -> {
             throw new RuntimeException();
         });
         var listener = new StatusListener();
         var configuration = new ConcreteConfiguration(Map.of(Configuration.ANSI, "false"));
-        listener.initialize(configuration);
+        listener.onRunStarted(configuration);
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();

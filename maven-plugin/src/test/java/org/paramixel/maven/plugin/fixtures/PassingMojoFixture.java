@@ -36,8 +36,8 @@ public final class PassingMojoFixture {
      */
     @Paramixel.Factory
     public static Action action() {
-        return Instance.builder("mojo-pass", Object::new)
-                .body(Step.of("test", context -> {}))
+        return Instance.of("mojo-pass", Object.class, Object::new)
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

@@ -19,86 +19,81 @@ package org.paramixel.api.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Instance arguments")
-@SuppressWarnings("removal")
 class InstanceArgumentsTest {
 
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Instance.builder(null, (Supplier<?>) () -> ""))
-                .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Instance.builder(" ", (Supplier<?>) () -> ""))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Instance.builder("instance", (Supplier<?>) null))
-                .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Instance.builder(null, String.class)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Instance.builder(" ", String.class)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Instance.builder("instance", (Class<?>) null))
-                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.of(null, String.class, () -> "")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.of(" ", String.class, () -> "")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Instance.of("instance", null, () -> "")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.of("instance", String.class, null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.of(null, String.class)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Instance.of(" ", String.class)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Instance.of("instance", (Class<?>) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("builder(Class<T>) rejects class without public no-arg constructor")
     void builderClassRejectsNoPublicConstructor() {
-        assertThatThrownBy(() -> Instance.builder(Integer.class)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Instance.of(Integer.class)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("builder(Class<T>) uses simple name as action name")
     void builderClassUsesSimpleName() {
         var instance =
-                Instance.builder(String.class).body(Step.of("test", s -> {})).build();
+                Instance.of(String.class).body(Step.step("test", s -> {})).build();
         assertThat(instance.displayName()).isEqualTo("String");
     }
 
     @Test
     @DisplayName("wrap(Action) rejects null builder")
     void wrapBuilderRejectsNull() {
-        var builder = Instance.builder("instance", Object::new);
+        var builder = Instance.of("instance", Object.class, Object::new);
         assertThatThrownBy(() -> builder.body((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("wrap(Action) sets child")
     void wrapBuilderSetsBody() {
-        var instance = Instance.builder("instance", Object::new)
-                .body(Step.of("step", s -> {}))
+        var instance = Instance.of("instance", Object.class, Object::new)
+                .body(Step.step("step", s -> {}))
                 .build();
         assertThat(instance.body()).isNotNull();
         assertThat(instance.body().displayName()).isEqualTo("step");
     }
 
     @Test
-    @DisplayName("Step.of() rejects null name")
+    @DisplayName("Step.step() rejects null name")
     void stepOfRejectsNullName() {
-        assertThatThrownBy(() -> Step.of(null, s -> {})).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Step.step(null, s -> {})).isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    @DisplayName("Step.of() rejects blank name")
+    @DisplayName("Step.step() rejects blank name")
     void stepOfRejectsBlankName() {
-        assertThatThrownBy(() -> Step.of(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Step.step(" ", s -> {})).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("Step.of() rejects null consumer")
+    @DisplayName("Step.step() rejects null consumer")
     void stepOfRejectsNullConsumer() {
-        assertThatThrownBy(() -> Step.of("child", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Step.step("child", null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("builder accumulates multiple children")
     void builderAccumulatesMultipleChildren() {
-        var instance = Instance.builder("instance", Object::new)
-                .body(Sequence.builder("body")
-                        .child(Step.of("first", s -> {}))
-                        .child(Step.of("second", s -> {}))
-                        .child(Step.of("third", s -> {}))
+        var instance = Instance.of("instance", Object.class, Object::new)
+                .body(Sequential.sequential("body")
+                        .child(Step.step("first", s -> {}))
+                        .child(Step.step("second", s -> {}))
+                        .child(Step.step("third", s -> {}))
                         .build())
                 .build();
         assertThat(instance.body()).isNotNull();
@@ -108,10 +103,10 @@ class InstanceArgumentsTest {
     @Test
     @DisplayName("builder can build multiple immutable snapshots")
     void builderCanBuildMultipleImmutableSnapshots() {
-        var builder = Instance.builder("instance", Object::new);
-        builder.body(Step.of("test", s -> {}));
+        var builder = Instance.of("instance", Object.class, Object::new);
+        builder.body(Step.step("test", s -> {}));
         var first = builder.build();
-        builder.body(Step.of("other", s -> {}));
+        builder.body(Step.step("other", s -> {}));
         var second = builder.build();
 
         assertThat(first.body().displayName()).isEqualTo("test");

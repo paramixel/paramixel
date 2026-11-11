@@ -22,8 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import nonapi.org.paramixel.ConcreteConfiguration;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.MockDescriptor;
 import nonapi.org.paramixel.support.AnsiColor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,22 +33,21 @@ import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Instance;
 import org.paramixel.api.action.Parallel;
 import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequence;
-import org.paramixel.api.action.Static;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("TreeSummaryRenderer")
-@SuppressWarnings("removal")
 class TreeSummaryRendererTest {
 
     private static final String ROOT_NAME = Constants.ROOT_NAME;
 
     private String runAndCaptureOutput(final Action action) {
         var listener = new SummaryListener();
-        var configuration = new ConcreteConfiguration(Map.of(Configuration.ANSI, "true"));
-        listener.initialize(configuration);
-        var runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder()
+                .configuration(nonapi.org.paramixel.TestPools.configuration(Map.of(Configuration.ANSI, "true")))
+                .listener(listener)
+                .build();
 
         var output = new ByteArrayOutputStream();
         var originalOut = System.out;
@@ -65,9 +63,10 @@ class TreeSummaryRendererTest {
 
     private String runAndCapturePlainOutput(final Action action) {
         var listener = new SummaryListener();
-        var configuration = new ConcreteConfiguration(Map.of(Configuration.ANSI, "false"));
-        listener.initialize(configuration);
-        var runner = Runner.builder().listener(listener).build();
+        var runner = Runner.builder()
+                .configuration(nonapi.org.paramixel.TestPools.configuration(Map.of(Configuration.ANSI, "false")))
+                .listener(listener)
+                .build();
 
         var output = new ByteArrayOutputStream();
         var originalOut = System.out;
@@ -83,8 +82,8 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("synthetic root node is hidden")
     void syntheticRootNodeIsHidden() {
-        var child = Step.of("visible-child", context -> {});
-        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var child = Step.step("visible-child", context -> {});
+        var parallel = Parallel.parallel(ROOT_NAME, "p1x0").child(child).build();
         var output = runAndCapturePlainOutput(parallel);
 
         assertThat(output).contains("visible-child");
@@ -94,26 +93,26 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("synthetic root renders lifecycle slots as top-level siblings")
     void syntheticRootRendersLifecycleSlotsAsTopLevelSiblings() {
-        var root = Scope.builder(ROOT_NAME)
-                .before(Sequence.builder("BeforeAll hooks")
-                        .child(Step.of("beforeOne", context -> {}))
-                        .child(Step.of("beforeTwo", context -> {}))
+        var root = Scope.scope(ROOT_NAME)
+                .before(Sequential.sequential("BeforeAll hooks")
+                        .child(Step.step("beforeOne", context -> {}))
+                        .child(Step.step("beforeTwo", context -> {}))
                         .build())
-                .body(Step.of("testOne()", context -> {}))
-                .after(Sequence.builder("AfterAll hooks")
-                        .child(Step.of("afterOne", context -> {}))
-                        .child(Step.of("afterTwo", context -> {}))
+                .body(Step.step("testOne()", context -> {}))
+                .after(Sequential.sequential("AfterAll hooks")
+                        .child(Step.step("afterOne", context -> {}))
+                        .child(Step.step("afterTwo", context -> {}))
                         .build())
                 .build();
         var output = runAndCapturePlainOutput(root);
 
         assertThat(output).doesNotContain("PASSED " + ROOT_NAME);
         assertThat(output).contains("PASSED Run");
-        assertThat(output).contains("\u251C\u2500 before[sequence]: PASSED BeforeAll hooks");
+        assertThat(output).contains("\u251C\u2500 before[sequential]: PASSED BeforeAll hooks");
         assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED beforeOne");
         assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED beforeTwo");
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED testOne()");
-        assertThat(output).contains("\u2514\u2500 after[sequence]: PASSED AfterAll hooks");
+        assertThat(output).contains("\u2514\u2500 after[sequential]: PASSED AfterAll hooks");
         assertThat(output).contains("   \u251C\u2500 step: PASSED afterOne");
         assertThat(output).contains("   \u2514\u2500 step: PASSED afterTwo");
     }
@@ -121,14 +120,13 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("synthetic root labels parallel body action type")
     void syntheticRootLabelsParallelBodyActionType() {
-        var root = Scope.builder(ROOT_NAME)
-                .before(Step.of("before", context -> {}))
-                .body(Parallel.builder("actions")
-                        .parallelism(1)
-                        .child(Step.of("FullLifecycleTest", context -> {}))
-                        .child(Step.of("FakeTest", context -> {}))
+        var root = Scope.scope(ROOT_NAME)
+                .before(Step.step("before", context -> {}))
+                .body(Parallel.parallel("actions", "p1x1")
+                        .child(Step.step("FullLifecycleTest", context -> {}))
+                        .child(Step.step("FakeTest", context -> {}))
                         .build())
-                .after(Step.of("after", context -> {}))
+                .after(Step.step("after", context -> {}))
                 .build();
         var output = runAndCapturePlainOutput(root);
 
@@ -143,7 +141,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("non-hidden root rendered")
     void nonHiddenRootRendered() {
-        var noop = Step.of("my-root", context -> {});
+        var noop = Step.step("my-root", context -> {});
         var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("my-root");
@@ -152,7 +150,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("single action renders with PASSED status")
     void singleActionWithNoChildren() {
-        var noop = Step.of("leaf", context -> {});
+        var noop = Step.step("leaf", context -> {});
         var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("leaf");
@@ -162,7 +160,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("PASSED status rendered with green")
     void successfulStatusRenderedWithGreen() {
-        var noop = Step.of("passing", context -> {});
+        var noop = Step.step("passing", context -> {});
         var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains(AnsiColor.BOLD_GREEN_TEXT.format("PASSED"));
@@ -171,7 +169,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("FAILED status rendered with red")
     void failStatusRenderedWithRed() {
-        var failing = Step.of("failing", context -> {
+        var failing = Step.step("failing", context -> {
             throw new RuntimeException("error");
         });
         var output = runAndCaptureOutput(failing);
@@ -182,7 +180,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("SKIPPED status rendered with bold yellow")
     void skipStatusRenderedWithBoldYellow() {
-        var skipping = Step.of("skipper", context -> {
+        var skipping = Step.step("skipper", context -> {
             throw new SkipException("reason");
         });
         var output = runAndCaptureOutput(skipping);
@@ -193,7 +191,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("plain output disables ANSI formatting")
     void plainOutputDisablesAnsiFormatting() {
-        var output = runAndCapturePlainOutput(Step.of("plain", context -> {}));
+        var output = runAndCapturePlainOutput(Step.step("plain", context -> {}));
 
         assertThat(output).contains(Constants.PARAMIXEL_PLAIN);
         assertThat(output).contains("PASSED");
@@ -203,7 +201,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("failure info shows exception class and message on same line")
     void failureInfoWithThrowable() {
-        var failing = Step.of("fail-action", context -> {
+        var failing = Step.step("fail-action", context -> {
             throw new IllegalStateException("bad state");
         });
         var output = runAndCaptureOutput(failing);
@@ -215,7 +213,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("failure info with multi-line message renders on single line")
     void failureInfoWithMultiLineMessageRendersOnSingleLine() {
-        var failing = Step.of("multiline-fail", context -> {
+        var failing = Step.step("multiline-fail", context -> {
             throw new RuntimeException("\nline2\nline3");
         });
         var output = runAndCaptureOutput(failing);
@@ -227,7 +225,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("renders core action name without kind")
     void rendersCoreActionNameWithoutKind() {
-        var noop = Step.of("noop-action", context -> {});
+        var noop = Step.step("noop-action", context -> {});
         var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("noop-action");
@@ -236,7 +234,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("timing shows milliseconds")
     void timingShowsMilliseconds() {
-        var noop = Step.of("timed", context -> {});
+        var noop = Step.step("timed", context -> {});
         var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains("ms");
@@ -246,7 +244,7 @@ class TreeSummaryRendererTest {
     @DisplayName("full action names are preserved without truncation")
     void fullActionNamesPreserved() {
         var thirtyFiveCharName = "a".repeat(35);
-        var noop = Step.of(thirtyFiveCharName, context -> {});
+        var noop = Step.step(thirtyFiveCharName, context -> {});
         var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains(thirtyFiveCharName);
@@ -255,9 +253,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("two children rendered with tree connectors")
     void twoChildrenRenderedWithTreeConnectors() {
-        var child1 = Step.of("child-1", context -> {});
-        var child2 = Step.of("child-2", context -> {});
-        var seq = Sequence.builder("parent").child(child1).child(child2).build();
+        var child1 = Step.step("child-1", context -> {});
+        var child2 = Step.step("child-2", context -> {});
+        var seq = Sequential.sequential("parent").child(child1).child(child2).build();
         var output = runAndCaptureOutput(seq);
 
         assertThat(output).contains("child-1");
@@ -268,10 +266,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before and after renders with standard connectors")
     void lifecycleWithBeforeAndAfterRendersStandardConnectors() {
-        var before = Step.of("before", context -> {});
-        var body = Step.of("body", context -> {});
-        var after = Step.of("after", context -> {});
-        var scope = Scope.builder("myLifecycle")
+        var before = Step.step("before", context -> {});
+        var body = Step.step("body", context -> {});
+        var after = Step.step("after", context -> {});
+        var scope = Scope.scope("myLifecycle")
                 .before(before)
                 .body(body)
                 .after(after)
@@ -286,10 +284,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before, body, and after renders as siblings")
     void lifecycleWithBeforeBodyAfterRendersAsSiblings() {
-        var before = Step.of("setUp()", context -> {});
-        var body = Step.of("testGet()", context -> {});
-        var after = Step.of("tearDown()", context -> {});
-        var scope = Scope.builder("myLifecycle")
+        var before = Step.step("setUp()", context -> {});
+        var body = Step.step("testGet()", context -> {});
+        var after = Step.step("tearDown()", context -> {});
+        var scope = Scope.scope("myLifecycle")
                 .before(before)
                 .body(body)
                 .after(after)
@@ -304,19 +302,19 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before, multiple body, and after renders as siblings")
     void lifecycleWithBeforeMultipleBodyAfterRendersAsSiblings() {
-        var before = Step.of("setUp()", context -> {});
-        var body1 = Step.of("testA()", context -> {});
-        var body2 = Step.of("testB()", context -> {});
-        var after = Step.of("tearDown()", context -> {});
-        var scope = Scope.builder("myLifecycle")
+        var before = Step.step("setUp()", context -> {});
+        var body1 = Step.step("testA()", context -> {});
+        var body2 = Step.step("testB()", context -> {});
+        var after = Step.step("tearDown()", context -> {});
+        var scope = Scope.scope("myLifecycle")
                 .before(before)
-                .body(Sequence.builder("body").child(body1).child(body2).build())
+                .body(Sequential.sequential("body").child(body1).child(body2).build())
                 .after(after)
                 .build();
         var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
-        assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
+        assertThat(output).contains("\u251C\u2500 body[sequential]: PASSED body");
         assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED testA()");
         assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED testB()");
         assertThat(output).contains("\u2514\u2500 after[step]: PASSED tearDown()");
@@ -325,9 +323,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before and no after renders with standard connectors")
     void lifecycleWithBeforeNoAfterRendersStandardConnectors() {
-        var before = Step.of("before", context -> {});
-        var body = Step.of("body", context -> {});
-        var scope = Scope.builder("myLifecycle").before(before).body(body).build();
+        var before = Step.step("before", context -> {});
+        var body = Step.step("body", context -> {});
+        var scope = Scope.scope("myLifecycle").before(before).body(body).build();
         var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED before");
@@ -337,9 +335,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with before, body, and no after renders as siblings")
     void lifecycleWithBeforeBodyNoAfterRendersAsSiblings() {
-        var before = Step.of("setUp()", context -> {});
-        var body = Step.of("testGet()", context -> {});
-        var scope = Scope.builder("myLifecycle").before(before).body(body).build();
+        var before = Step.step("setUp()", context -> {});
+        var body = Step.step("testGet()", context -> {});
+        var scope = Scope.scope("myLifecycle").before(before).body(body).build();
         var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED setUp()");
@@ -349,9 +347,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with after and no before renders with standard connectors")
     void lifecycleWithAfterNoBeforeRendersStandardConnectors() {
-        var body = Step.of("body", context -> {});
-        var after = Step.of("after", context -> {});
-        var scope = Scope.builder("myLifecycle").body(body).after(after).build();
+        var body = Step.step("body", context -> {});
+        var after = Step.step("after", context -> {});
+        var scope = Scope.scope("myLifecycle").body(body).after(after).build();
         var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED body");
@@ -361,9 +359,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with body and after but no before renders body flat with after last")
     void lifecycleWithBodyAfterNoBeforeRendersBodyFlatWithAfterLast() {
-        var body = Step.of("testGet()", context -> {});
-        var after = Step.of("tearDown()", context -> {});
-        var scope = Scope.builder("myLifecycle").body(body).after(after).build();
+        var body = Step.step("testGet()", context -> {});
+        var after = Step.step("tearDown()", context -> {});
+        var scope = Scope.scope("myLifecycle").body(body).after(after).build();
         var output = runAndCapturePlainOutput(scope);
 
         assertThat(output).contains("\u251C\u2500 body[step]: PASSED testGet()");
@@ -373,10 +371,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("lifecycle with setUp and tearDown names renders with standard connectors")
     void lifecycleWithSetUpTearDownNamesRendersStandardConnectors() {
-        var before = Step.of("setUp()", context -> {});
-        var body = Step.of("body", context -> {});
-        var after = Step.of("tearDown()", context -> {});
-        var scope = Scope.builder("myLifecycle")
+        var before = Step.step("setUp()", context -> {});
+        var body = Step.step("body", context -> {});
+        var after = Step.step("tearDown()", context -> {});
+        var scope = Scope.scope("myLifecycle")
                 .before(before)
                 .body(body)
                 .after(after)
@@ -391,17 +389,18 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("instance with lifecycle body child renders lifecycle slots as siblings")
     void instanceWithLifecycleBodyChildRendersLifecycleSlotsAsSiblings() {
-        var lifecycleBefore = Step.of("setUp()", context -> {});
-        var lifecycleBody = Step.of("testGet()", context -> {});
-        var lifecycleAfter = Step.of("tearDown()", context -> {});
-        var scope = Scope.builder("lifecycle")
+        var lifecycleBefore = Step.step("setUp()", context -> {});
+        var lifecycleBody = Step.step("testGet()", context -> {});
+        var lifecycleAfter = Step.step("tearDown()", context -> {});
+        var scope = Scope.scope("lifecycle")
                 .before(lifecycleBefore)
                 .body(lifecycleBody)
                 .after(lifecycleAfter)
                 .build();
-        var instance =
-                Instance.builder("nginx:1.29.5", () -> "instance").body(scope).build();
-        var parallel = Parallel.builder("root").parallelism(1).child(instance).build();
+        var instance = Instance.of("nginx:1.29.5", String.class, () -> "instance")
+                .body(scope)
+                .build();
+        var parallel = Parallel.parallel("root", "p1x2").child(instance).build();
         var output = runAndCapturePlainOutput(parallel);
 
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED [instantiate]");
@@ -413,37 +412,17 @@ class TreeSummaryRendererTest {
     }
 
     @Test
-    @DisplayName("static with before and after renders body as sibling")
-    void staticWithBeforeAndAfterRendersBodyAsSibling() {
-        var staticAction = Static.builder("myStatic")
-                .before(Step.of("staticSetUp", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("testOne", context -> {}))
-                        .child(Step.of("testTwo", context -> {}))
-                        .build())
-                .after(Step.of("staticTearDown", context -> {}))
-                .build();
-        var output = runAndCapturePlainOutput(staticAction);
-
-        assertThat(output).contains("\u251C\u2500 before[step]: PASSED staticSetUp");
-        assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
-        assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED testOne");
-        assertThat(output).contains("\u2502  \u2514\u2500 step: PASSED testTwo");
-        assertThat(output).contains("\u2514\u2500 after[step]: PASSED staticTearDown");
-    }
-
-    @Test
     @DisplayName("instance renders instantiate, body, and destroy as siblings")
     void instanceRendersInstantiateBodyAndDestroyAsSiblings() {
-        var instance = Instance.builder("myInstance", () -> "instance")
-                .body(Sequence.builder("body")
-                        .child(Step.of("setUp", s -> {}))
-                        .child(Step.of("test produce", s -> {}))
-                        .child(Step.of("test consume", s -> {}))
-                        .child(Step.of("tearDown", s -> {}))
+        var instance = Instance.of("myInstance", String.class, () -> "instance")
+                .body(Sequential.sequential("body")
+                        .child(Step.step("setUp", s -> {}))
+                        .child(Step.step("test produce", s -> {}))
+                        .child(Step.step("test consume", s -> {}))
+                        .child(Step.step("tearDown", s -> {}))
                         .build())
                 .build();
-        var parallel = Parallel.builder("root").parallelism(1).child(instance).build();
+        var parallel = Parallel.parallel("root", "p1x0").child(instance).build();
         var output = runAndCapturePlainOutput(parallel);
 
         assertThat(output).contains("myInstance");
@@ -454,7 +433,7 @@ class TreeSummaryRendererTest {
         assertThat(output).contains("tearDown");
         assertThat(output).contains("[destroy]");
         assertThat(output).contains("\u251C\u2500 before[step]: PASSED [instantiate]");
-        assertThat(output).contains("\u251C\u2500 body[sequence]: PASSED body");
+        assertThat(output).contains("\u251C\u2500 body[sequential]: PASSED body");
         assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED setUp");
         assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED test produce");
         assertThat(output).contains("\u2502  \u251C\u2500 step: PASSED test consume");
@@ -479,7 +458,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("onRunStarted prints starting banner")
     void onRunStartedPrintsStartingBanner() {
-        var noop = Step.of("banner-test", context -> {});
+        var noop = Step.step("banner-test", context -> {});
         var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("Paramixel v" + Version.version() + " starting...");
@@ -488,7 +467,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("onRunCompleted prints footer with status, finished-at, and total time")
     void onRunCompletedPrintsFooter() {
-        var noop = Step.of("footer-test", context -> {});
+        var noop = Step.step("footer-test", context -> {});
         var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("Status      : PASSED");
@@ -499,7 +478,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("footer uses ANSI-colored status when ANSI is enabled")
     void footerUsesAnsiStatusWhenEnabled() {
-        var noop = Step.of("ansi-footer", context -> {});
+        var noop = Step.step("ansi-footer", context -> {});
         var output = runAndCaptureOutput(noop);
 
         assertThat(output).contains(AnsiColor.BOLD_GREEN_TEXT.format("PASSED"));
@@ -508,7 +487,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("footer uses plain status when ANSI is disabled")
     void footerUsesPlainStatusWhenDisabled() {
-        var noop = Step.of("plain-footer", context -> {});
+        var noop = Step.step("plain-footer", context -> {});
         var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("Status      : PASSED");
@@ -518,7 +497,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("onRunCompleted prints dashed separators around footer")
     void onRunCompletedPrintsDashedSeparators() {
-        var noop = Step.of("separator-test", context -> {});
+        var noop = Step.step("separator-test", context -> {});
         var output = runAndCapturePlainOutput(noop);
 
         assertThat(output).contains("----------");
@@ -527,7 +506,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("each output line is prefixed with [PARAMIXEL]")
     void eachLinePrefixedWithParamixel() {
-        var noop = Step.of("prefix-test", context -> {});
+        var noop = Step.step("prefix-test", context -> {});
         var output = runAndCapturePlainOutput(noop);
 
         for (var line : output.split(System.lineSeparator())) {
@@ -540,7 +519,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("passed status lines have no trailing whitespace")
     void passedStatusLinesHaveNoTrailingWhitespace() {
-        var noop = Step.of("trailing-space-test", context -> {});
+        var noop = Step.step("trailing-space-test", context -> {});
         var output = runAndCapturePlainOutput(noop);
 
         for (var line : output.split(System.lineSeparator())) {
@@ -561,7 +540,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("action display names with ANSI sequences are sanitized in tree")
     void actionDisplayNamesWithAnsiSequencesAreSanitizedInTree() {
-        var action = Step.of("\u001B[31mred-name\u001B[0m", context -> {});
+        var action = Step.step("\u001B[31mred-name\u001B[0m", context -> {});
         var output = runAndCapturePlainOutput(action);
 
         assertThat(output).contains("red-name");
@@ -571,7 +550,7 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("failure info with control characters in throwable message is sanitized")
     void failureInfoWithControlCharsInThrowableMessageIsSanitized() {
-        var failing = Step.of("ctrl-fail", context -> {
+        var failing = Step.step("ctrl-fail", context -> {
             throw new RuntimeException("msg\u0000with\u0007controls");
         });
         var output = runAndCapturePlainOutput(failing);
@@ -584,10 +563,10 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("tree output is free of control characters with mixed input")
     void treeOutputIsFreeOfControlCharactersWithMixedInput() {
-        var child = Step.of("\u0000inner\u001B[1m", context -> {
+        var child = Step.step("\u0000inner\u001B[1m", context -> {
             throw new RuntimeException("\u0007bad\u0080state");
         });
-        var parent = Sequence.builder("outer\u001B[0m").child(child).build();
+        var parent = Sequential.sequential("outer\u001B[0m").child(child).build();
         var output = runAndCapturePlainOutput(parent);
 
         assertThat(output).contains("outer");
@@ -602,11 +581,9 @@ class TreeSummaryRendererTest {
     @Test
     @DisplayName("null throwable message does not render null text")
     void nullThrowableMessageDoesNotRenderNullText() {
-        var root = new ConcreteDescriptor(Step.of("root", context -> {
+        var root = new MockDescriptor(Step.step("root", context -> {
             throw new RuntimeException();
         }));
-        root.freeze();
-        root.markScheduled();
         root.setStatus(org.paramixel.api.Status.RUNNING);
         root.setStatus(org.paramixel.api.Status.failed("fail", new RuntimeException()));
 
@@ -617,12 +594,12 @@ class TreeSummaryRendererTest {
         assertThat(output).contains("RuntimeException");
     }
 
-    private static ConcreteDescriptor createDeepLinearDescriptorTree(final int depth) {
-        var root = new ConcreteDescriptor(Step.of("depth-0", context -> {}));
+    private static MockDescriptor createDeepLinearDescriptorTree(final int depth) {
+        var root = new MockDescriptor(Step.step("depth-0", context -> {}));
         var current = root;
         for (var index = 1; index < depth; index++) {
-            var child = new ConcreteDescriptor(Step.of("depth-" + index, context -> {}));
-            current.addChild(child);
+            var child = new MockDescriptor(Step.step("depth-" + index, context -> {}));
+            current.child(child);
             current = child;
         }
         return root;

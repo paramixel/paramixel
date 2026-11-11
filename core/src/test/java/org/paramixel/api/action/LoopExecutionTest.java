@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
-import org.paramixel.api.exception.AbortedException;
+import org.paramixel.api.exception.AbortException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
@@ -34,11 +34,11 @@ class LoopExecutionTest {
     void skipExceptionInBodyContinuesLoopNoPredicate() {
         var counter = new AtomicInteger();
 
-        var action = Loop.builder("loop")
-                .body(Step.of("step", context -> {
+        var action = Loop.loop("loop")
+                .body(Step.step("step", context -> {
                     int count = counter.incrementAndGet();
                     if (count == 1) {
-                        SkipException.skip("skip");
+                        throw SkipException.skip("skip");
                     }
                 }))
                 .maxIterations(3)
@@ -46,7 +46,7 @@ class LoopExecutionTest {
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isSkipped()).isTrue();
+        assertThat(root.status().isSkipped()).isTrue();
         assertThat(counter.get()).isEqualTo(3);
     }
 
@@ -55,8 +55,8 @@ class LoopExecutionTest {
     void runtimeExceptionInBodyContinuesLoopNoPredicate() {
         var counter = new AtomicInteger();
 
-        var action = Loop.builder("loop")
-                .body(Step.of("step", context -> {
+        var action = Loop.loop("loop")
+                .body(Step.step("step", context -> {
                     int count = counter.incrementAndGet();
                     if (count == 1) {
                         throw new RuntimeException("error");
@@ -67,7 +67,7 @@ class LoopExecutionTest {
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         assertThat(counter.get()).isEqualTo(3);
     }
 
@@ -76,8 +76,8 @@ class LoopExecutionTest {
     void predicateThrowsFailsLoopImmediately() {
         var counter = new AtomicInteger();
 
-        var action = Loop.builder("loop")
-                .body(Step.of("step", context -> counter.incrementAndGet()))
+        var action = Loop.loop("loop")
+                .body(Step.step("step", context -> counter.incrementAndGet()))
                 .until(context -> {
                     throw new RuntimeException("error");
                 })
@@ -86,9 +86,9 @@ class LoopExecutionTest {
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.message()).isPresent();
-        assertThat(root.message().get()).contains("until predicate failed");
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.status().message()).isPresent();
+        assertThat(root.status().message().get()).contains("until predicate failed");
         assertThat(counter.get()).isEqualTo(1);
     }
 
@@ -97,23 +97,23 @@ class LoopExecutionTest {
     void abortOnFirstIteration() {
         var counter = new AtomicInteger();
 
-        var action = Loop.builder("loop")
-                .body(Step.of("step", context -> {
+        var action = Loop.loop("loop")
+                .body(Step.step("step", context -> {
                     counter.incrementAndGet();
-                    AbortedException.abort("abort");
+                    throw AbortException.abort("abort");
                 }))
                 .maxIterations(5)
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isAborted()).isTrue();
+        assertThat(root.status().isAborted()).isTrue();
         assertThat(counter.get()).isEqualTo(1);
-        assertThat(root.children().get(0).isAborted()).isTrue();
-        assertThat(root.children().get(1).isSkipped()).isTrue();
-        assertThat(root.children().get(2).isSkipped()).isTrue();
-        assertThat(root.children().get(3).isSkipped()).isTrue();
-        assertThat(root.children().get(4).isSkipped()).isTrue();
+        assertThat(root.children().get(0).status().isAborted()).isTrue();
+        assertThat(root.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.children().get(2).status().isSkipped()).isTrue();
+        assertThat(root.children().get(3).status().isSkipped()).isTrue();
+        assertThat(root.children().get(4).status().isSkipped()).isTrue();
     }
 
     @Test
@@ -121,20 +121,20 @@ class LoopExecutionTest {
     void abortOnLastIteration() {
         var counter = new AtomicInteger();
 
-        var action = Loop.builder("loop")
-                .body(Step.of("step", context -> {
+        var action = Loop.loop("loop")
+                .body(Step.step("step", context -> {
                     int count = counter.incrementAndGet();
                     if (count == 5) {
-                        AbortedException.abort("abort");
+                        throw AbortException.abort("abort");
                     }
-                    FailException.fail("fail");
+                    throw FailException.fail("fail");
                 }))
                 .maxIterations(5)
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isAborted()).isTrue();
+        assertThat(root.status().isAborted()).isTrue();
         assertThat(counter.get()).isEqualTo(5);
     }
 
@@ -143,15 +143,15 @@ class LoopExecutionTest {
     void executionCountMatchesExpected() {
         var counter = new AtomicInteger();
 
-        var action = Loop.builder("loop")
-                .body(Step.of("step", context -> counter.incrementAndGet()))
+        var action = Loop.loop("loop")
+                .body(Step.step("step", context -> counter.incrementAndGet()))
                 .until(context -> false)
                 .maxIterations(7)
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         assertThat(counter.get()).isEqualTo(7);
     }
 }

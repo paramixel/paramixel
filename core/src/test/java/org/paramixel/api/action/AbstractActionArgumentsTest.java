@@ -27,7 +27,7 @@ class AbstractActionArgumentsTest {
     @Test
     @DisplayName("null name throws NullPointerException")
     void nullNameThrowsNpe() {
-        assertThatThrownBy(() -> Step.of(null, context -> {}))
+        assertThatThrownBy(() -> Step.step(null, context -> {}))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("displayName is null");
     }
@@ -35,7 +35,7 @@ class AbstractActionArgumentsTest {
     @Test
     @DisplayName("blank name throws IllegalArgumentException")
     void blankNameThrowsIae() {
-        assertThatThrownBy(() -> Step.of("   ", context -> {}))
+        assertThatThrownBy(() -> Step.step("   ", context -> {}))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("displayName is blank");
     }

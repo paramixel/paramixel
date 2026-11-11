@@ -28,7 +28,7 @@ public final class ActionResolverOrderingHighFixture {
 
     @Paramixel.Factory
     public static Action factory() {
-        return Step.of("high", context -> {
+        return Step.step("high", context -> {
             throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
         });
     }

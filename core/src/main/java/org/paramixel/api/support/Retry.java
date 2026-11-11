@@ -26,121 +26,107 @@ import java.util.function.Predicate;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.ThrowingRunnable;
-import org.paramixel.api.exception.PolicyException;
 
 /**
- * Retries a runnable operation with configurable backoff and a wall-clock duration budget.
+ * Retries a runnable operation with a {@link Backoff} schedule and a wall-clock duration budget.
  *
- * <p>This utility is intended for operations that may fail transiently and succeed on a subsequent attempt.
- * Callers provide a {@link Policy} that defines both the inter-attempt delay schedule and the total
- * wall-clock duration budget. When the elapsed time exceeds the budget, retry attempts stop.
+ * <p>The type is an immutable configuration: {@link #retryOn(Predicate)} and
+ * {@link #onRetry(BiConsumer)} return a new instance, and {@link #run(ThrowingRunnable)} may be called any number of
+ * times, so a single {@code Retry} can be reused across tests without {@code reset()} or {@code clear()}.
  *
- * <p>This class is <strong>not thread-safe</strong>. Instances must not be shared across threads
- * or accessed concurrently. Typical usage confines a {@code Retry} instance to a single
- * method call or lifecycle scope.
+ * <p>Usage:
+ *
+ * <pre>{@code
+ * var retry = Retry.of(Backoff.exponential(Duration.ofMillis(50), Duration.ofSeconds(1)), Duration.ofSeconds(10))
+ *         .retryOn(t -> t instanceof AssertionError);
+ * var result = retry.run(this::flakyOperation);
+ * }</pre>
+ *
+ * <p>Instances are immutable and safe to share between threads.
  */
 public final class Retry {
 
     private static final Predicate<Throwable> DEFAULT_RETRY_ON = t -> !(t instanceof Error);
 
-    private static final int STATE_INITIAL = 0;
-    private static final int STATE_RUNNING = 1;
-    private static final int STATE_COMPLETED = 2;
-
-    private final Policy backoffPolicy;
-    private Predicate<Throwable> retryOn;
+    private final Backoff backoff;
+    private final Duration maximumDuration;
+    private final Predicate<Throwable> retryOn;
     private final List<BiConsumer<Integer, Throwable>> onRetryCallbacks;
-    private int state;
+
+    private Retry(
+            final Backoff backoff,
+            final Duration maximumDuration,
+            final Predicate<Throwable> retryOn,
+            final List<BiConsumer<Integer, Throwable>> onRetryCallbacks) {
+        this.backoff = Objects.requireNonNull(backoff, "backoff is null");
+        this.maximumDuration = Objects.requireNonNull(maximumDuration, "maximumDuration is null");
+        this.retryOn = Objects.requireNonNull(retryOn, "retryOn is null");
+        this.onRetryCallbacks = List.copyOf(onRetryCallbacks);
+    }
 
     /**
-     * Creates a retry sequence with the supplied backoff policy.
+     * Creates a retry configuration.
      *
-     * <p>The policy defines both the delay schedule between attempts and the total wall-clock
-     * duration budget. The default retry predicate retries on any throwable that is not an
-     * {@link Error}.
+     * <p>The default retry predicate retries on any throwable that is not an {@link Error}.
      *
-     * @param policy the backoff strategy defining inter-attempt delays and the duration budget
-     * @return a new retry sequence
-     * @throws NullPointerException if {@code policy} is {@code null}
+     * @param backoff the delay schedule between attempts; must not be {@code null}
+     * @param maximumDuration the total wall-clock duration budget; must not be {@code null} or negative
+     * @return a new retry configuration; never {@code null}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code maximumDuration} is negative
      */
-    public static Retry of(final Policy policy) {
-        Objects.requireNonNull(policy, "policy is null");
-        return new Retry(policy);
-    }
-
-    private Retry(final Policy policy) {
-        this.backoffPolicy = policy;
-        this.retryOn = DEFAULT_RETRY_ON;
-        this.onRetryCallbacks = new ArrayList<>();
+    public static Retry of(final Backoff backoff, final Duration maximumDuration) {
+        Objects.requireNonNull(maximumDuration, "maximumDuration is null");
+        Arguments.requireFalse(maximumDuration.isNegative(), "maximumDuration is negative");
+        return new Retry(backoff, maximumDuration, DEFAULT_RETRY_ON, List.of());
     }
 
     /**
-     * Sets the predicate that determines whether a throwable is retryable.
+     * Returns a retry configuration that uses the supplied retry predicate.
      *
-     * <p>When the predicate returns {@code false} for a given throwable, the retry sequence
-     * stops immediately and the result reflects the failure. When the predicate returns
-     * {@code true}, the next attempt proceeds (if the duration budget has not been exhausted).
+     * <p>When the predicate returns {@code false} for a throwable, the sequence stops immediately and the result
+     * reflects that failure.
      *
-     * @param predicate the predicate that decides whether a throwable warrants a retry attempt
-     * @return this retry sequence
+     * @param predicate the predicate that decides whether a throwable warrants another attempt; must not be
+     *     {@code null}
+     * @return a new retry configuration; never {@code null}
      * @throws NullPointerException if {@code predicate} is {@code null}
      */
     public Retry retryOn(final Predicate<Throwable> predicate) {
         Objects.requireNonNull(predicate, "predicate is null");
-        if (state != STATE_INITIAL) {
-            throw new IllegalStateException("retryOn is called after run");
-        }
-        this.retryOn = predicate;
-        return this;
+        return new Retry(backoff, maximumDuration, predicate, onRetryCallbacks);
     }
 
     /**
-     * Registers a callback invoked before each retry attempt.
+     * Returns a retry configuration that also invokes the supplied callback before each retry.
      *
-     * <p>The callback receives the 1-based attempt number about to be executed and the
-     * throwable from the previous failed attempt. Multiple callbacks can be registered;
-     * they are invoked in registration order.
-     *
-     * @param callback the callback invoked with the next attempt number and the previous failure
-     * @return this retry sequence
+     * @param callback the callback invoked with the next, 1-based attempt number and the previous failure; must not be
+     *     {@code null}
+     * @return a new retry configuration; never {@code null}
      * @throws NullPointerException if {@code callback} is {@code null}
-     * @throws IllegalStateException if this retry sequence has already run
      */
     public Retry onRetry(final BiConsumer<Integer, Throwable> callback) {
         Objects.requireNonNull(callback, "callback is null");
-        if (state != STATE_INITIAL) {
-            throw new IllegalStateException("onRetry is called after run");
-        }
-        onRetryCallbacks.add(callback);
-        return this;
+        var callbacks = new ArrayList<>(onRetryCallbacks);
+        callbacks.add(callback);
+        return new Retry(backoff, maximumDuration, retryOn, callbacks);
     }
 
     /**
-     * Runs the supplied throwable runnable with retry behavior and returns the result.
+     * Runs the supplied operation with retries and returns the result.
      *
-     * <p>On each failed attempt where the {@link #retryOn(Predicate) retry predicate} returns
-     * {@code true} and the wall-clock duration budget has not been exhausted, the on-retry callbacks
-     * are invoked and the backoff delay is applied before the next attempt. The delay is capped at
-     * the remaining budget. A non-{@link StackOverflowError} {@link VirtualMachineError} is rethrown
-     * immediately without retry; {@link StackOverflowError} and other {@link Error} subtypes are captured
-     * and may be retried depending on the retry predicate.
+     * <p>On each failed attempt where the retry predicate returns {@code true} and the budget is not exhausted, the
+     * on-retry callbacks run and the backoff delay is applied before the next attempt; the delay is capped at the
+     * remaining budget. A {@link VirtualMachineError} other than {@link StackOverflowError} is rethrown immediately.
      *
-     * @param throwableRunnable the operation to run
-     * @return the retry result describing success, attempt count, elapsed duration, and captured exceptions
-     * @throws IllegalStateException if this retry sequence has already run
-     * @throws VirtualMachineError if the throwableRunnable throws a non-{@code StackOverflowError}
-     *     {@code VirtualMachineError}
+     * @param throwableRunnable the operation to run; must not be {@code null}
+     * @return the retry result; never {@code null}
      * @throws NullPointerException if {@code throwableRunnable} is {@code null}
+     * @throws VirtualMachineError if the operation throws an unrecoverable error
      */
     public Result run(final ThrowingRunnable throwableRunnable) {
         Objects.requireNonNull(throwableRunnable, "throwableRunnable is null");
-        if (state != STATE_INITIAL) {
-            throw new IllegalStateException("Retry has already run");
-        }
-        state = STATE_RUNNING;
 
-        List<BiConsumer<Integer, Throwable>> callbacks = List.copyOf(onRetryCallbacks);
-        var maximumDuration = maximumDurationOrZero();
         long startNanos = System.nanoTime();
         var exceptions = new ArrayList<Throwable>();
         int attempt = 0;
@@ -150,14 +136,12 @@ public final class Retry {
 
             try {
                 throwableRunnable.run();
-                state = STATE_COMPLETED;
                 return new Result(maximumDuration, attempt, elapsedDuration(startNanos), true, List.of());
             } catch (Throwable e) {
                 UnrecoverableErrors.rethrowIfUnrecoverable(e);
                 exceptions.add(e);
 
                 if (!retryOn.test(e)) {
-                    state = STATE_COMPLETED;
                     return new Result(
                             maximumDuration, attempt, elapsedDuration(startNanos), false, List.copyOf(exceptions));
                 }
@@ -166,15 +150,14 @@ public final class Retry {
                 var remaining = maximumDuration.minus(elapsed);
 
                 if (remaining.isZero() || remaining.isNegative()) {
-                    state = STATE_COMPLETED;
                     return new Result(maximumDuration, attempt, elapsed, false, List.copyOf(exceptions));
                 }
 
-                for (var callback : callbacks) {
+                for (var callback : onRetryCallbacks) {
                     callback.accept(attempt + 1, e);
                 }
 
-                var waitDuration = waitDurationOrZero(attempt, e);
+                var waitDuration = backoff.delayFor(attempt + 1);
                 if (waitDuration.compareTo(remaining) > 0) {
                     waitDuration = remaining;
                 }
@@ -185,7 +168,6 @@ public final class Retry {
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         exceptions.add(ie);
-                        state = STATE_COMPLETED;
                         return new Result(
                                 maximumDuration, attempt, elapsedDuration(startNanos), false, List.copyOf(exceptions));
                     }
@@ -194,48 +176,21 @@ public final class Retry {
         }
     }
 
-    private Duration maximumDurationOrZero() {
-        try {
-            var maximumDuration = backoffPolicy.maximumDuration();
-            if (maximumDuration == null || maximumDuration.isNegative()) {
-                return Duration.ZERO;
-            }
-            return maximumDuration;
-        } catch (PolicyException e) {
-            return Duration.ZERO;
-        }
-    }
-
-    private Duration waitDurationOrZero(int attempt, Throwable cause) {
-        try {
-            var waitDuration = backoffPolicy.waitDuration(attempt, cause);
-            if (waitDuration == null || waitDuration.isNegative()) {
-                return Duration.ZERO;
-            }
-            return waitDuration;
-        } catch (PolicyException e) {
-            return Duration.ZERO;
-        }
-    }
-
     /**
-     * Runs the supplied throwable runnable with retry behavior and rethrows the last captured
-     * exception when the duration budget is exhausted or the retry predicate returns {@code false}.
+     * Runs the supplied operation with retries and rethrows the last captured exception when the budget is exhausted
+     * or the retry predicate returns {@code false}.
      *
-     * <p>Earlier exceptions are added to the last exception as suppressed throwables
-     * in attempt order.
+     * <p>Earlier exceptions are added to the last exception as suppressed throwables in attempt order.
      *
-     * @param throwableRunnable the operation to run
-     * @throws Throwable the last captured exception when all retries are exhausted, with earlier exceptions suppressed
-     * @throws IllegalStateException if this retry sequence has already run
-     * @throws VirtualMachineError if the throwableRunnable throws a non-{@code StackOverflowError}
-     *     {@code VirtualMachineError}
+     * @param throwableRunnable the operation to run; must not be {@code null}
+     * @throws Throwable the last captured exception, with earlier exceptions suppressed
      * @throws NullPointerException if {@code throwableRunnable} is {@code null}
+     * @throws VirtualMachineError if the operation throws an unrecoverable error
      */
     public void runAndThrow(final ThrowingRunnable throwableRunnable) throws Throwable {
         Result result = run(throwableRunnable);
 
-        if (!result.isSuccessful() && result.hasExceptions()) {
+        if (!result.successful() && result.hasExceptions()) {
             List<Throwable> exceptions = result.exceptions();
             var lastException = exceptions.get(exceptions.size() - 1);
             for (int i = 0; i < exceptions.size() - 1; i++) {
@@ -245,230 +200,39 @@ public final class Retry {
         }
     }
 
-    /**
-     * Returns whether this retry sequence has already been run.
-     *
-     * @return {@code true} when {@link #run(ThrowingRunnable)} or {@link #runAndThrow(ThrowingRunnable)} has already been called
-     */
-    public boolean hasRun() {
-        return state != STATE_INITIAL;
-    }
-
-    /**
-     * Marks this retry sequence as not yet run without removing registered on-retry callbacks.
-     *
-     * @return this retry sequence
-     */
-    public Retry reset() {
-        state = STATE_INITIAL;
-        return this;
-    }
-
-    /**
-     * Removes all registered on-retry callbacks and resets execution state.
-     *
-     * @return this retry sequence
-     */
-    public Retry clear() {
-        onRetryCallbacks.clear();
-        retryOn = DEFAULT_RETRY_ON;
-        state = STATE_INITIAL;
-        return this;
-    }
-
     private static Duration elapsedDuration(final long startNanos) {
         return Duration.ofNanos(System.nanoTime() - startNanos);
     }
 
     /**
-     * Computes the delay duration before a retry attempt and provides the total wall-clock duration budget.
-     *
-     * <p>The {@code attempt} parameter is the 1-based number of the just-failed attempt.
-     * The returned duration is the time to wait before the next attempt. The {@link Retry}
-     * loop caps the wait duration at the remaining budget if it exceeds it.
-     *
-     * <p>If a policy computation fails — for example, due to {@link ArithmeticException arithmetic
-     * overflow} in {@link java.time.Duration Duration} operations — implementations should throw
-     * {@link PolicyException} rather than an unrelated {@link RuntimeException}. The {@link Retry}
-     * loop catches {@code PolicyException} and treats the failed computation as zero, allowing
-     * the retry sequence to continue without hanging. Other {@link RuntimeException} subtypes
-     * propagate out of the retry loop, terminating the sequence.
-     */
-    public interface Policy {
-
-        /**
-         * The delay duration before the next retry attempt.
-         *
-         * @param attempt the 1-based number of the just-failed attempt
-         * @param cause the throwable from the failed attempt
-         * @return the duration to wait before the next attempt; negative values are treated as zero
-         * @throws PolicyException if the duration computation fails
-         */
-        Duration waitDuration(int attempt, Throwable cause);
-
-        /**
-         * The total wall-clock duration budget for the retry sequence.
-         *
-         * @return the maximum duration
-         * @throws PolicyException if the duration computation fails
-         */
-        Duration maximumDuration();
-
-        /**
-         * Creates a backoff policy that escalates linearly from the initial delay with a
-         * wall-clock duration budget.
-         *
-         * <p>Each retry waits {@code initialDelay * attempt}. The {@link Retry} loop caps the
-         * wait duration at the remaining budget. For example, {@code fixed(100ms, 1s)} produces
-         * 100ms, 200ms, 300ms, 400ms (capped at remaining budget), etc. for up to 1 second total.
-         *
-         * @param initialDelay the delay after the first failed attempt
-         * @param maximumDuration the total wall-clock duration budget
-         * @return a fixed-step backoff policy
-         * @throws NullPointerException if {@code initialDelay} or {@code maximumDuration} is {@code null}
-         * @throws IllegalArgumentException if {@code initialDelay} is negative,
-         *     {@code maximumDuration} is negative, or {@code initialDelay} is greater than
-         *     {@code maximumDuration}
-         */
-        static Policy fixed(final Duration initialDelay, final Duration maximumDuration) {
-            Objects.requireNonNull(initialDelay, "initialDelay is null");
-            Objects.requireNonNull(maximumDuration, "maximumDuration is null");
-            Arguments.requireFalse(initialDelay.isNegative(), "initialDelay is negative");
-            Arguments.requireFalse(maximumDuration.isNegative(), "maximumDuration is negative");
-            Arguments.requireTrue(
-                    initialDelay.compareTo(maximumDuration) <= 0, "initialDelay is greater than maximumDuration");
-            return new Policy() {
-                @Override
-                public Duration waitDuration(final int attempt, final Throwable cause) {
-                    return multiplyOrZero(initialDelay, attempt);
-                }
-
-                @Override
-                public Duration maximumDuration() {
-                    return maximumDuration;
-                }
-            };
-        }
-
-        /**
-         * Creates a backoff policy that escalates exponentially from the initial delay with a
-         * wall-clock duration budget.
-         *
-         * <p>Each retry waits {@code initialDelay * 2^(attempt-1)}. The multiplier is capped at
-         * {@code 2^62} to prevent long-overflow for high attempt numbers; in practice the
-         * {@link Retry} loop caps the wait duration at the remaining budget long before this
-         * limit is reached. For example, {@code exponential(100ms, 5s)} produces 100ms, 200ms,
-         * 400ms, 800ms, 1.6s, 3.2s (capped at remaining budget), etc. for up to 5 seconds total.
-         *
-         * @param initialDelay the delay after the first failed attempt
-         * @param maximumDuration the total wall-clock duration budget
-         * @return an exponential backoff policy
-         * @throws NullPointerException if {@code initialDelay} or {@code maximumDuration} is {@code null}
-         * @throws IllegalArgumentException if {@code initialDelay} is negative,
-         *     {@code maximumDuration} is negative, or {@code initialDelay} is greater than
-         *     {@code maximumDuration}
-         */
-        static Policy exponential(final Duration initialDelay, final Duration maximumDuration) {
-            Objects.requireNonNull(initialDelay, "initialDelay is null");
-            Objects.requireNonNull(maximumDuration, "maximumDuration is null");
-            Arguments.requireFalse(initialDelay.isNegative(), "initialDelay is negative");
-            Arguments.requireFalse(maximumDuration.isNegative(), "maximumDuration is negative");
-            Arguments.requireTrue(
-                    initialDelay.compareTo(maximumDuration) <= 0, "initialDelay is greater than maximumDuration");
-            return new Policy() {
-                @Override
-                public Duration waitDuration(final int attempt, final Throwable cause) {
-                    int exponent = attempt - 1;
-                    if (exponent < 0) {
-                        return Duration.ZERO;
-                    }
-                    return multiplyOrZero(initialDelay, 1L << Math.min(exponent, 62));
-                }
-
-                @Override
-                public Duration maximumDuration() {
-                    return maximumDuration;
-                }
-            };
-        }
-
-        private static Duration multiplyOrZero(final Duration duration, final long multiplier) {
-            if (multiplier < 0) {
-                return Duration.ZERO;
-            }
-            try {
-                var result = duration.multipliedBy(multiplier);
-                if (result.isNegative()) {
-                    return Duration.ZERO;
-                }
-                return result;
-            } catch (ArithmeticException e) {
-                throw new PolicyException("duration overflow multiplying by " + multiplier, e);
-            }
-        }
-    }
-
-    /**
      * Describes the outcome of a {@link Retry} run.
      *
-     * <p>The result captures whether the operation ultimately succeeded, how many attempts
-     * were made, the elapsed wall-clock duration, and the exceptions from each failed attempt.
+     * @param maximumDuration the configured wall-clock duration budget; never {@code null}
+     * @param attemptCount the number of attempts that were executed
+     * @param elapsedDuration the total wall-clock duration from the first attempt to termination; never {@code null}
+     * @param successful whether the operation succeeded within the budget
+     * @param exceptions every captured exception in attempt order; never {@code null}
      */
-    public static final class Result {
-
-        private final Duration maximumDuration;
-        private final int attemptCount;
-        private final Duration elapsedDuration;
-        private final boolean successful;
-        private final List<Throwable> exceptions;
-
-        Result(
-                final Duration maximumDuration,
-                final int attemptCount,
-                final Duration elapsedDuration,
-                final boolean successful,
-                final List<Throwable> exceptions) {
-            this.maximumDuration = maximumDuration;
-            this.attemptCount = attemptCount;
-            this.elapsedDuration = elapsedDuration;
-            this.successful = successful;
-            this.exceptions = exceptions;
-        }
+    public record Result(
+            Duration maximumDuration,
+            int attemptCount,
+            Duration elapsedDuration,
+            boolean successful,
+            List<Throwable> exceptions) {
 
         /**
-         * Returns the configured wall-clock duration budget.
+         * Creates a result.
          *
-         * @return the maximum duration
+         * @param maximumDuration the configured wall-clock duration budget; must not be {@code null}
+         * @param attemptCount the number of attempts that were executed
+         * @param elapsedDuration the elapsed wall-clock duration; must not be {@code null}
+         * @param successful whether the operation succeeded
+         * @param exceptions every captured exception in attempt order; must not be {@code null}
          */
-        public Duration maximumDuration() {
-            return maximumDuration;
-        }
-
-        /**
-         * Returns the number of attempts that were executed.
-         *
-         * @return the actual attempt count
-         */
-        public int attemptCount() {
-            return attemptCount;
-        }
-
-        /**
-         * Returns the total wall-clock duration from the first attempt to termination.
-         *
-         * @return the elapsed duration
-         */
-        public Duration elapsedDuration() {
-            return elapsedDuration;
-        }
-
-        /**
-         * Returns whether the operation succeeded within the duration budget.
-         *
-         * @return {@code true} when the operation succeeded
-         */
-        public boolean isSuccessful() {
-            return successful;
+        public Result {
+            Objects.requireNonNull(maximumDuration, "maximumDuration is null");
+            Objects.requireNonNull(elapsedDuration, "elapsedDuration is null");
+            exceptions = List.copyOf(exceptions);
         }
 
         /**
@@ -484,22 +248,13 @@ public final class Retry {
          * Returns the exception captured for the attempt at the supplied index.
          *
          * @param index the 0-based attempt index
-         * @return the captured exception, or an empty {@link Optional} when the index is out of range
+         * @return the captured exception, or empty when the index is out of range
          */
         public Optional<Throwable> exception(final int index) {
             if (index < 0 || index >= exceptions.size()) {
                 return Optional.empty();
             }
             return Optional.ofNullable(exceptions.get(index));
-        }
-
-        /**
-         * Returns every captured exception in attempt order.
-         *
-         * @return an immutable list of exceptions from failed attempts
-         */
-        public List<Throwable> exceptions() {
-            return exceptions;
         }
     }
 }

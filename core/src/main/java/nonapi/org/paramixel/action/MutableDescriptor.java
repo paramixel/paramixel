@@ -16,95 +16,33 @@
 
 package nonapi.org.paramixel.action;
 
-import java.util.concurrent.CompletableFuture;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Assert;
-import org.paramixel.api.action.Delay;
 import org.paramixel.api.action.Isolated;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequence;
 import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 /**
- * Internal mutable extension of {@link Descriptor} for framework use during
- * discovery and execution.
+ * Internal extension of {@link Descriptor} for framework use during compilation and execution.
  *
- * <p>Public consumers interact with the read-only {@link Descriptor} view.
- * This interface exposes mutation operations needed by the framework to build
- * descriptor trees and manage execution state.
+ * <p>Public consumers interact with the read-only {@link Descriptor} view. This interface adds only what the
+ * framework needs: a single {@link #attach(MutableDescriptor)} during compilation and the execution-state
+ * transitions of one descriptor occurrence. The tree itself is immutable.
  */
 public interface MutableDescriptor extends Descriptor {
 
     /**
-     * Sets the before-child descriptor during discovery.
+     * Attaches this descriptor to its parent.
      *
-     * @param before the before-child descriptor; must not be {@code null}
-     */
-    void setBefore(MutableDescriptor before);
-
-    /**
-     * Sets the after-child descriptor during discovery.
-     *
-     * @param after the after-child descriptor; must not be {@code null}
-     */
-    void setAfter(MutableDescriptor after);
-
-    /**
-     * Adds a child action descriptor during discovery.
-     *
-     * @param child the child descriptor; must not be {@code null}
-     * @throws NullPointerException if {@code child} is {@code null}
-     * @throws IllegalArgumentException if {@code child} is this descriptor
-     */
-    void addChild(MutableDescriptor child);
-
-    /**
-     * Sets the parent descriptor. Called during discovery to establish
-     * the tree relationship.
+     * <p>The compile pass builds a tree bottom-up, so a child is created before its parent and attached exactly
+     * once, before the tree is published to the engine.
      *
      * @param parent the parent descriptor; must not be {@code null}
+     * @throws NullPointerException if {@code parent} is {@code null}
+     * @throws IllegalStateException if this descriptor is already attached
      */
-    void setParent(MutableDescriptor parent);
-
-    /**
-     * Freezes this descriptor's tree structure and caches immutable child views.
-     *
-     * <p>After freeze, structural mutations such as adding children or re-parenting
-     * are rejected with {@link IllegalStateException}. Implementations should apply
-     * freeze recursively to descendants.
-     */
-    void freeze();
-
-    /**
-     * Returns whether this descriptor is frozen.
-     *
-     * @return {@code true} when the descriptor is frozen
-     */
-    boolean isFrozen();
-
-    /**
-     * Prepares this descriptor for scheduling.
-     *
-     * @return a future associated with this scheduled descriptor
-     * @throws IllegalStateException if already scheduled
-     */
-    CompletableFuture<Descriptor> markScheduled();
-
-    /**
-     * Returns whether this descriptor has already been scheduled.
-     *
-     * @return {@code true} when scheduled
-     */
-    boolean isScheduled();
-
-    /**
-     * Returns this descriptor's internal execution status.
-     *
-     * @return the execution status; never {@code null}
-     */
-    Status status();
+    void attach(MutableDescriptor parent);
 
     /**
      * Sets this descriptor's local execution status.
@@ -115,16 +53,17 @@ public interface MutableDescriptor extends Descriptor {
     void setStatus(Status newStatus);
 
     /**
-     * Completes the scheduling future.
-     */
-    void completeFuture();
-
-    /**
-     * Completes the scheduling future exceptionally.
+     * Replaces a terminal status with a more descriptive one.
      *
-     * @param throwable the failure; must not be {@code null}
+     * <p>Used by the engine when a skipped subtree should carry the reason it did not run, for example
+     * {@code "loop satisfied"} or {@code "condition not met"}. Only a terminal status can be replaced, and the
+     * replacement must be terminal too.
+     *
+     * @param newStatus the replacement status; must not be {@code null}
+     * @throws NullPointerException if {@code newStatus} is {@code null}
+     * @throws IllegalStateException if the descriptor is not terminal or {@code newStatus} is not terminal
      */
-    void completeFutureExceptionally(Throwable throwable);
+    void replaceStatus(Status newStatus);
 
     /**
      * Interrupts the thread executing this descriptor's action, if one is recorded.
@@ -157,12 +96,10 @@ public interface MutableDescriptor extends Descriptor {
     /**
      * Cancels this descriptor's subtree best-effort.
      *
-     * <p>Marks this descriptor terminal with {@code rootStatus} (if not already terminal),
-     * completes its scheduled future exceptionally with {@code cause}, interrupts this
-     * descriptor's executing thread when it is a leaf action, and recurses into
-     * {@link #before()} and {@link #children()}: each descendant is marked
-     * {@link Status#ABORTED}, has its scheduled future completed exceptionally, and, when it is
-     * a leaf action, has its executing thread interrupted.
+     * <p>Marks this descriptor terminal with {@code rootStatus} (if not already terminal), interrupts this
+     * descriptor's executing thread when it is a leaf action, and recurses into {@link #before()} and
+     * {@link #children()}: each descendant is marked {@link Status#ABORTED} and, when it is a leaf action, has its
+     * executing thread interrupted.
      *
      * <p>Lifecycle cleanup is preserved: {@link #after()} is aborted only when its lifecycle never
      * attempted its {@link #before()} (or, without a {@code before}, never started). Otherwise the
@@ -170,25 +107,23 @@ public interface MutableDescriptor extends Descriptor {
      * cancelled work has unwound — matching the documented guarantee that {@code after} always
      * runs once {@code before} has been attempted.
      *
-     * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel})
-     * whose coordinating frame is waiting on children: completing the futures publishes terminal
-     * state, and interrupting leaf threads unblocks cooperative (interruptible) user code so its
-     * executing frame returns and releases its permit.
+     * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel}) whose coordinating
+     * frame is waiting on children: terminal state lets each waiting frame observe completion, and interrupting leaf
+     * threads unblocks cooperative (interruptible) user code so its executing frame returns and releases its
+     * permit.
      *
      * <p>For deeply nested coordination (e.g. Sequential → Parallel → Sequential → Parallel →
      * Step), propagation is bounded by the nesting depth: the interrupt reaches each executing
      * leaf, each leaf returns, and each coordinating frame observes its children's terminal state
      * as the recursion unwinds.
      *
-     * <p>Idempotent: a descriptor already in a terminal state is skipped, so concurrent
-     * completion and cancellation both converge safely. Safe to call from any thread,
-     * including a scheduler worker thread; this method never blocks on a future, it only
-     * completes them. A leaf whose body ignores interruption (e.g. a CPU-bound loop) cannot be
-     * forcibly stopped and keeps its concurrency budget and worker thread until it returns or the
-     * engine is closed.
+     * <p>Idempotent: a descriptor already in a terminal state is skipped, so concurrent completion and cancellation
+     * both converge safely. Safe to call from any thread, including a worker thread; this method never blocks. A leaf
+     * whose body ignores interruption (e.g. a CPU-bound loop) cannot be forcibly stopped and keeps its concurrency
+     * budget and worker thread until it returns or the engine is closed.
      *
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
-     * @param cause the cause used to complete futures exceptionally; must not be {@code null}
+     * @param cause the cause of the cancellation; must not be {@code null}
      * @return {@code true} if this descriptor had already started (was running or terminal) when
      *     the abort reached it; {@code false} if the abort prevented it from ever starting
      */
@@ -220,10 +155,8 @@ public interface MutableDescriptor extends Descriptor {
      *
      * @return {@code true} when the wrapped action is coordination-only
      */
-    @SuppressWarnings("removal")
     default boolean isCoordinationAction() {
         return action() instanceof Parallel
-                || action() instanceof Sequence
                 || action() instanceof Sequential
                 || action() instanceof Isolated
                 || before().isPresent()
@@ -237,16 +170,6 @@ public interface MutableDescriptor extends Descriptor {
      * @return {@code true} when the wrapped action is leaf work
      */
     default boolean isLeafAction() {
-        return action() instanceof Step || action() instanceof Assert || action() instanceof Delay;
+        return action() instanceof Step;
     }
-
-    /**
-     * Returns the scheduling future for this descriptor.
-     *
-     * <p>The future is created by {@link #markScheduled()} and completed when
-     * the descriptor reaches a terminal status (or fails to start).
-     *
-     * @return the scheduling future, or {@code null} if not yet scheduled
-     */
-    CompletableFuture<Descriptor> scheduledFuture();
 }

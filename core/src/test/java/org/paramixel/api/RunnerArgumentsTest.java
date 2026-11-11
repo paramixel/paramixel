@@ -28,82 +28,17 @@ import org.paramixel.api.selector.Selector;
 class RunnerArgumentsTest {
 
     @Test
-    @DisplayName("run(Selector) rejects null selector")
-    void runRejectsNullSelector() {
-        assertThatThrownBy(() -> Runner.defaultRunner().run((Selector) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector is null");
-    }
-
-    @Test
-    @DisplayName("runAndReturnExitCode(Selector) rejects null selector")
-    void runAndReturnExitCodeRejectsNullSelector() {
-        assertThatThrownBy(() -> Runner.defaultRunner().runAndReturnExitCode((Selector) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector is null");
-    }
-
-    @Test
-    @DisplayName("runAndReturnExitCode(Action) rejects null action")
-    void runAndReturnExitCodeRejectsNullAction() {
-        assertThatThrownBy(() -> Runner.defaultRunner().runAndReturnExitCode((Action) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("action is null");
-    }
-
-    @Test
-    @DisplayName("runAndExit(Action) rejects null action")
-    void runAndExitRejectsNullAction() {
-        assertThatThrownBy(() -> Runner.defaultRunner().runAndExit((Action) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("action is null");
-    }
-
-    @Test
-    @DisplayName("runAndExit(Selector) rejects null selector")
-    void runAndExitRejectsNullSelector() {
-        assertThatThrownBy(() -> Runner.defaultRunner().runAndExit((Selector) null))
-                .isInstanceOf(NullPointerException.class);
-    }
-
-    @Test
     @DisplayName("run(Action) rejects null action")
     void runRejectsNullAction() {
-        assertThatThrownBy(() -> Runner.defaultRunner().run((Action) null))
+        assertThatThrownBy(() -> Runner.builder().build().run((Action) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("action is null");
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Action) null action throws NPE")
-    void runAndReturnExitCodeNullActionThrowsNPE() {
-        var runner = Runner.builder().build();
-        assertThatThrownBy(() -> runner.runAndReturnExitCode((Action) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("action is null");
-    }
-
-    @Test
-    @DisplayName("runAndReturnExitCode(Selector) null selector throws NPE")
-    void nullSelectorThrowsNPE() {
-        var runner = Runner.builder().build();
-        assertThatThrownBy(() -> runner.runAndReturnExitCode((Selector) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("selector is null");
-    }
-
-    @Test
-    @DisplayName("runAndExit(Action) null action throws NPE")
-    void runAndExitNullActionThrowsNPE() {
-        assertThatThrownBy(() -> Runner.builder().build().runAndExit((Action) null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("action is null");
-    }
-
-    @Test
-    @DisplayName("runAndExit(Selector) null selector throws NPE")
-    void runAndExitSelectorNullThrowsNPE() {
-        assertThatThrownBy(() -> Runner.builder().build().runAndExit((Selector) null))
+    @DisplayName("run(Selector) rejects null selector")
+    void runRejectsNullSelector() {
+        assertThatThrownBy(() -> Runner.builder().build().run((Selector) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("selector is null");
     }

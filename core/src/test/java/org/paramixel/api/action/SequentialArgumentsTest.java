@@ -23,29 +23,28 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Sequential arguments")
-@SuppressWarnings("removal")
 class SequentialArgumentsTest {
 
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Sequential.builder(null)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Sequential.builder(" ")).isInstanceOf(IllegalArgumentException.class);
-        var seq = Sequential.builder("empty").build();
+        assertThatThrownBy(() -> Sequential.sequential(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Sequential.sequential(" ")).isInstanceOf(IllegalArgumentException.class);
+        var seq = Sequential.sequential("empty").build();
         assertThat(seq.children()).isEmpty();
     }
 
     @Test
     @DisplayName("child(Action) rejects null builder")
     void childBuilderRejectsNull() {
-        var builder = Sequential.builder("seq");
+        var builder = Sequential.sequential("seq");
         assertThatThrownBy(() -> builder.child((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("child(Action) adds child from builder")
     void childBuilderAddsChild() {
-        var seq = Sequential.builder("seq").child(Step.of("step", s -> {})).build();
+        var seq = Sequential.sequential("seq").child(Step.step("step", s -> {})).build();
         assertThat(seq.children()).hasSize(1);
         assertThat(seq.children().get(0).displayName()).isEqualTo("step");
     }
@@ -53,10 +52,10 @@ class SequentialArgumentsTest {
     @Test
     @DisplayName("builder accumulates multiple children")
     void builderAccumulatesMultipleChildren() {
-        var seq = Sequential.builder("seq")
-                .child(Step.of("first", s -> {}))
-                .child(Step.of("second", s -> {}))
-                .child(Step.of("third", s -> {}))
+        var seq = Sequential.sequential("seq")
+                .child(Step.step("first", s -> {}))
+                .child(Step.step("second", s -> {}))
+                .child(Step.step("third", s -> {}))
                 .build();
         assertThat(seq.children()).hasSize(3);
         assertThat(seq.children().get(0).displayName()).isEqualTo("first");
@@ -67,96 +66,95 @@ class SequentialArgumentsTest {
     @Test
     @DisplayName("builder can build multiple immutable snapshots")
     void builderCanBuildMultipleImmutableSnapshots() {
-        var builder = Sequential.builder("seq");
-        builder.child(Step.of("test", s -> {}));
+        var builder = Sequential.sequential("seq");
+        builder.child(Step.step("test", s -> {}));
         var first = builder.build();
-        builder.child(Step.of("other", s -> {}));
+        builder.child(Step.step("other", s -> {}));
         builder.independent();
         var second = builder.build();
 
         assertThat(first.children()).extracting(Action::displayName).containsExactly("test");
         assertThat(first.isDependent()).isTrue();
         assertThat(second.children()).extracting(Action::displayName).containsExactly("test", "other");
-        assertThat(second.isIndependent()).isTrue();
+        assertThat(second.isDependent()).isFalse();
     }
 
     @Test
     @DisplayName("default is dependent")
     void defaultIsDependent() {
-        var seq = Sequential.builder("seq").child(Step.of("test", s -> {})).build();
+        var seq = Sequential.sequential("seq").child(Step.step("test", s -> {})).build();
         assertThat(seq.isDependent()).isTrue();
-        assertThat(seq.isIndependent()).isFalse();
+        assertThat(seq.isDependent()).isTrue();
     }
 
     @Test
     @DisplayName("independent() configures as independent")
     void independentConfiguresAsIndependent() {
-        var seq = Sequential.builder("seq")
+        var seq = Sequential.sequential("seq")
                 .independent()
-                .child(Step.of("test", s -> {}))
+                .child(Step.step("test", s -> {}))
                 .build();
-        assertThat(seq.isIndependent()).isTrue();
+        assertThat(seq.isDependent()).isFalse();
         assertThat(seq.isDependent()).isFalse();
     }
 
     @Test
     @DisplayName("dependent() after independent() restores dependent")
     void dependentAfterIndependentRestoresDependent() {
-        var seq = Sequential.builder("seq")
+        var seq = Sequential.sequential("seq")
                 .independent()
                 .dependent()
-                .child(Step.of("test", s -> {}))
+                .child(Step.step("test", s -> {}))
                 .build();
         assertThat(seq.isDependent()).isTrue();
     }
 
     @Test
-    @DisplayName("default isShuffled is false, seed is 0")
+    @DisplayName("default shuffleSeed is empty")
     void defaultNotShuffled() {
-        var seq = Sequential.builder("seq").child(Step.of("a", s -> {})).build();
-        assertThat(seq.isShuffled()).isFalse();
-        assertThat(seq.seed()).isZero();
+        var seq = Sequential.sequential("seq").child(Step.step("a", s -> {})).build();
+        assertThat(seq.shuffleSeed()).isEmpty();
     }
 
     @Test
-    @DisplayName("shuffle() sets isShuffled and non-zero seed")
+    @DisplayName("shuffle() sets a non-zero shuffleSeed")
     void shuffleSetsShuffledAndSeed() {
-        var seq = Sequential.builder("seq")
+        var seq = Sequential.sequential("seq")
                 .shuffle()
-                .child(Step.of("a", s -> {}))
-                .child(Step.of("b", s -> {}))
+                .child(Step.step("a", s -> {}))
+                .child(Step.step("b", s -> {}))
                 .build();
-        assertThat(seq.isShuffled()).isTrue();
-        assertThat(seq.seed()).isNotZero();
+        assertThat(seq.shuffleSeed()).isPresent();
+        assertThat(seq.shuffleSeed().orElseThrow()).isNotZero();
     }
 
     @Test
     @DisplayName("shuffle(long seed) stores explicit seed")
     void shuffleWithSeedStoresSeed() {
-        var seq = Sequential.builder("seq")
+        var seq = Sequential.sequential("seq")
                 .shuffle(42L)
-                .child(Step.of("a", s -> {}))
-                .child(Step.of("b", s -> {}))
+                .child(Step.step("a", s -> {}))
+                .child(Step.step("b", s -> {}))
                 .build();
-        assertThat(seq.isShuffled()).isTrue();
-        assertThat(seq.seed()).isEqualTo(42L);
+        assertThat(seq.shuffleSeed()).isPresent();
+        assertThat(seq.shuffleSeed().orElseThrow()).isEqualTo(42L);
     }
 
     @Test
     @DisplayName("shuffle with known seed produces predictable order")
     void shuffleWithKnownSeedProducesPredictableOrder() {
-        var seq = Sequential.builder("seq")
+        var seq = Sequential.sequential("seq")
                 .shuffle(42L)
-                .child(Step.of("a", s -> {}))
-                .child(Step.of("b", s -> {}))
-                .child(Step.of("c", s -> {}))
+                .child(Step.step("a", s -> {}))
+                .child(Step.step("b", s -> {}))
+                .child(Step.step("c", s -> {}))
                 .build();
         var names = seq.children().stream().map(Action::displayName).toList();
-        var seq2 = Sequential.builder("seq")
+        var seq2 = Sequential.sequential("seq")
                 .shuffle(42L)
-                .child(Step.of("a", s -> {}))
-                .child(Step.of("b", s -> {}))
-                .child(Step.of("c", s -> {}))
+                .child(Step.step("a", s -> {}))
+                .child(Step.step("b", s -> {}))
+                .child(Step.step("c", s -> {}))
                 .build();
         assertThat(seq2.children().stream().map(Action::displayName).toList()).isEqualTo(names);
     }
@@ -164,73 +162,77 @@ class SequentialArgumentsTest {
     @Test
     @DisplayName("shuffle with 0 children still reports shuffled")
     void shuffleWithZeroChildrenStillShuffled() {
-        var seq = Sequential.builder("seq").shuffle().build();
-        assertThat(seq.isShuffled()).isTrue();
-        assertThat(seq.seed()).isNotZero();
+        var seq = Sequential.sequential("seq").shuffle().build();
+        assertThat(seq.shuffleSeed()).isPresent();
+        assertThat(seq.shuffleSeed().orElseThrow()).isNotZero();
         assertThat(seq.children()).isEmpty();
     }
 
     @Test
     @DisplayName("shuffle with 1 child is no-op but still shuffled")
     void shuffleSingleChildStillShuffled() {
-        var seq =
-                Sequential.builder("seq").shuffle().child(Step.of("a", s -> {})).build();
-        assertThat(seq.isShuffled()).isTrue();
-        assertThat(seq.seed()).isNotZero();
+        var seq = Sequential.sequential("seq")
+                .shuffle()
+                .child(Step.step("a", s -> {}))
+                .build();
+        assertThat(seq.shuffleSeed()).isPresent();
+        assertThat(seq.shuffleSeed().orElseThrow()).isNotZero();
         assertThat(seq.children()).hasSize(1);
     }
 
     @Test
     @DisplayName("shuffle preserves immutability/reusability of builder")
     void shufflePreservesImmutability() {
-        var builder = Sequential.builder("seq").shuffle(42L).child(Step.of("a", s -> {}));
+        var builder = Sequential.sequential("seq").shuffle(42L).child(Step.step("a", s -> {}));
         var first = builder.build();
-        builder.child(Step.of("b", s -> {}));
+        builder.child(Step.step("b", s -> {}));
         var second = builder.build();
         assertThat(first.children()).hasSize(1);
         assertThat(second.children()).hasSize(2);
-        assertThat(first.isShuffled()).isTrue();
-        assertThat(second.isShuffled()).isTrue();
+        assertThat(first.shuffleSeed()).isPresent();
+        assertThat(second.shuffleSeed()).isPresent();
     }
 
     @Test
     @DisplayName("shuffle works with dependent")
     void shuffleWorksWithDependent() {
-        var seq =
-                Sequential.builder("seq").shuffle().child(Step.of("a", s -> {})).build();
+        var seq = Sequential.sequential("seq")
+                .shuffle()
+                .child(Step.step("a", s -> {}))
+                .build();
         assertThat(seq.isDependent()).isTrue();
-        assertThat(seq.isShuffled()).isTrue();
+        assertThat(seq.shuffleSeed()).isPresent();
     }
 
     @Test
     @DisplayName("shuffle works with independent")
     void shuffleWorksWithIndependent() {
-        var seq = Sequential.builder("seq")
+        var seq = Sequential.sequential("seq")
                 .independent()
                 .shuffle()
-                .child(Step.of("a", s -> {}))
+                .child(Step.step("a", s -> {}))
                 .build();
-        assertThat(seq.isIndependent()).isTrue();
-        assertThat(seq.isShuffled()).isTrue();
+        assertThat(seq.isDependent()).isFalse();
+        assertThat(seq.shuffleSeed()).isPresent();
     }
 
     @Test
     @DisplayName("shuffle with seed 0 is valid")
     void shuffleWithSeedZeroIsValid() {
-        var seq = Sequential.builder("seq")
+        var seq = Sequential.sequential("seq")
                 .shuffle(0L)
-                .child(Step.of("a", s -> {}))
+                .child(Step.step("a", s -> {}))
                 .build();
-        assertThat(seq.isShuffled()).isTrue();
-        assertThat(seq.seed()).isZero();
+        assertThat(seq.shuffleSeed()).isPresent();
+        assertThat(seq.shuffleSeed().orElseThrow()).isZero();
     }
 
     @Test
     @DisplayName("child(Builder) builds and adds child action")
     void childBuilderBuildsAndAddsChildAction() {
-        var seq = Sequential.builder("seq")
-                .child(Step.of("a", s -> {}))
-                .child(Sequence.builder("nested").child(Step.of("b", s -> {})))
+        var seq = Sequential.sequential("seq")
+                .child(Step.step("a", s -> {}))
+                .child(Sequential.sequential("nested").child(Step.step("b", s -> {})))
                 .build();
         assertThat(seq.children()).hasSize(2);
         assertThat(seq.children().get(1).displayName()).isEqualTo("nested");
@@ -239,15 +241,15 @@ class SequentialArgumentsTest {
     @Test
     @DisplayName("child(Builder) rejects null builder")
     void childBuilderOverloadRejectsNull() {
-        var builder = Sequential.builder("seq");
-        assertThatThrownBy(() -> builder.child((org.paramixel.api.action.Builder) null))
+        var builder = Sequential.sequential("seq");
+        assertThatThrownBy(() -> builder.child((org.paramixel.api.action.ActionBuilder) null))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("sequential() is alias for builder()")
     void sequentialIsAliasForBuilder() {
-        var seq = Sequential.sequential("seq").child(Step.of("step", s -> {})).build();
+        var seq = Sequential.sequential("seq").child(Step.step("step", s -> {})).build();
         assertThat(seq.displayName()).isEqualTo("seq");
         assertThat(seq.children()).hasSize(1);
     }

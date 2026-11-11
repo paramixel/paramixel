@@ -31,7 +31,7 @@ class AbstractActionTest {
     @Test
     @DisplayName("getName returns the same value on repeated calls")
     void getNameReturnsSameValueOnRepeatedCalls() {
-        var action = Step.of("stable-name-test", context -> {});
+        var action = Step.step("stable-name-test", context -> {});
 
         var first = action.displayName();
         var second = action.displayName();
@@ -49,7 +49,7 @@ class AbstractActionTest {
         var results = Collections.synchronizedList(new ArrayList<String>());
         var done = new CountDownLatch(threadCount);
 
-        var action = Step.of("test-name", context -> {});
+        var action = Step.step("test-name", context -> {});
 
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {

@@ -16,12 +16,11 @@
 
 package org.paramixel.api.action;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
@@ -50,8 +49,7 @@ public final class Sequential implements Action {
             final boolean dependent,
             final long seed,
             final boolean shuffled) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = Objects.requireNonNull(displayName, "displayName is null");
         this.children = validateChildren(children);
         this.dependent = dependent;
         this.seed = seed;
@@ -64,21 +62,8 @@ public final class Sequential implements Action {
      * @param displayName the action display name; must not be {@code null} or blank
      * @return a new builder
      */
-    public static Builder builder(final String displayName) {
-        return new Builder(displayName);
-    }
-
-    /**
-     * Creates a new builder for a {@code Sequential} action with the given display name.
-     *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank
-     * @see Builder
-     */
     public static Builder sequential(final String displayName) {
-        return builder(displayName);
+        return new Builder(displayName);
     }
 
     @Override
@@ -98,16 +83,6 @@ public final class Sequential implements Action {
     }
 
     /**
-     * Returns whether children are independent — i.e., all run regardless of
-     * individual outcomes.
-     *
-     * @return {@code true} if children are independent
-     */
-    public boolean isIndependent() {
-        return !dependent;
-    }
-
-    /**
      * Returns the child actions.
      *
      * @return the child actions; never {@code null}
@@ -117,52 +92,34 @@ public final class Sequential implements Action {
     }
 
     /**
-     * Returns whether children were shuffled at build time.
+     * Returns the seed that shuffled the children at build time.
      *
-     * <p>When {@code true}, the {@link #children()} list reflects the shuffled order,
-     * and {@link #seed()} returns the PRNG seed that produced it. When {@code false},
+     * <p>When present, the {@link #children()} list reflects the shuffled order and the value is the
+     * seed passed to {@code new Random(seed)} before shuffling, enabling reproduction. When empty, the
      * children are in insertion order.
      *
-     * @return {@code true} if children were shuffled
+     * @return the shuffle seed, or empty when the children were not shuffled
      */
-    public boolean isShuffled() {
-        return shuffled;
+    public Optional<Long> shuffleSeed() {
+        return shuffled ? Optional.of(seed) : Optional.empty();
     }
 
-    /**
-     * Returns the PRNG seed used to shuffle children.
-     *
-     * <p>Returns {@code 0} when this action was not shuffled. When
-     * {@link #isShuffled()} returns {@code true}, this value is the seed
-     * passed to {@code new Random(seed)} before shuffling, enabling
-     * reproducible reordering.
-     *
-     * @return the shuffle seed, or {@code 0} when not shuffled
-     */
-    public long seed() {
-        return seed;
-    }
-
-    private List<Action> validateChildren(final List<Action> children) {
+    private static List<Action> validateChildren(final List<Action> children) {
         Objects.requireNonNull(children, "children is null");
-        var validated = new ArrayList<Action>(children.size());
         for (Action child : children) {
             Objects.requireNonNull(child, "children contains null element");
-            validated.add(child);
         }
-        return List.copyOf(validated);
+        return List.copyOf(children);
     }
 
     /**
      * Fluent builder for {@link Sequential} actions.
      */
-    public static final class Builder implements org.paramixel.api.action.Builder {
+    public static final class Builder implements ActionBuilder {
 
         private final String displayName;
-        private final List<Action> children = new ArrayList<>();
+        private final Children children = new Children();
         private boolean dependent = true;
-        private boolean shuffled;
-        private long shuffleSeed;
 
         private Builder(final String displayName) {
             Objects.requireNonNull(displayName, "displayName is null");
@@ -195,28 +152,45 @@ public final class Sequential implements Action {
         }
 
         /**
-         * Adds a child action.
+         * Adds a child action. A builder argument is built immediately and the resulting
+         * action snapshot is stored; an action argument is used as is.
          *
-         * @param action the child action; must not be {@code null}
+         * @param action the child action action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder child(final Action action) {
-            children.add(Objects.requireNonNull(action, "action is null"));
+        public Builder child(final ActionBuilder action) {
+            children.add(action);
             return this;
         }
 
         /**
-         * Adds a child action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
+         * Adds one child per supplied action or builder, in iteration order.
          *
-         * @param builder the child action builder; must not be {@code null}
+         * @param actions the child actions or builders; must not be {@code null}
          * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
+         * @throws NullPointerException if {@code actions} or an element is {@code null}
          */
-        public Builder child(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            children.add(Objects.requireNonNull(builder.build(), "builder.build() returned null"));
+        public Builder children(final Iterable<? extends ActionBuilder> actions) {
+            children.addAll(actions);
+            return this;
+        }
+
+        /**
+         * Adds one child per item, mapping each item at define time.
+         *
+         * <p>{@code each} is {@code child(...)} called once per item in iteration order, so it mixes with fixed
+         * {@code child(...)} calls. The mapper runs eagerly, during definition; a throw from it is a define-time
+         * failure, and the mapper must not touch a fixture (use an {@code Instance} supplier for that).
+         *
+         * @param <T> the item type
+         * @param items the items to map; must not be {@code null}
+         * @param mapper the mapper from item to child; must not be {@code null} or return {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code items}, {@code mapper}, or a mapped result is {@code null}
+         */
+        public <T> Builder each(final Iterable<T> items, final Function<? super T, ? extends ActionBuilder> mapper) {
+            children.each(items, mapper);
             return this;
         }
 
@@ -230,8 +204,7 @@ public final class Sequential implements Action {
          * @return this builder
          */
         public Builder shuffle() {
-            this.shuffled = true;
-            this.shuffleSeed = ThreadLocalRandom.current().nextLong();
+            children.shuffle();
             return this;
         }
 
@@ -245,8 +218,7 @@ public final class Sequential implements Action {
          * @return this builder
          */
         public Builder shuffle(final long seed) {
-            this.shuffled = true;
-            this.shuffleSeed = seed;
+            children.shuffle(seed);
             return this;
         }
 
@@ -257,11 +229,7 @@ public final class Sequential implements Action {
          */
         @Override
         public Sequential build() {
-            final var mutableChildren = new ArrayList<>(children);
-            if (shuffled) {
-                Collections.shuffle(mutableChildren, new Random(shuffleSeed));
-            }
-            return new Sequential(displayName, List.copyOf(mutableChildren), dependent, shuffleSeed, shuffled);
+            return new Sequential(displayName, children.snapshot(), dependent, children.seed(), children.isShuffled());
         }
     }
 }

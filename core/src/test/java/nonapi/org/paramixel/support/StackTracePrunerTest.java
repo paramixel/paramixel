@@ -75,8 +75,7 @@ class StackTracePrunerTest {
         void removesOrgParamixelFrames() {
             var exception = new RuntimeException("test");
             StackTraceElement[] frames = {
-                frame("org.paramixel.api.action.Step", "throwableConsumer", 68),
-                frame("com.example.MyTest", "myMethod", 25)
+                frame("org.paramixel.api.action.Step", "accept", 68), frame("com.example.MyTest", "myMethod", 25)
             };
             exception.setStackTrace(frames);
             StackTracePruner.prune(exception);
@@ -89,7 +88,7 @@ class StackTracePrunerTest {
             var exception = new RuntimeException("test");
             StackTraceElement[] frames = {
                 frame("nonapi.org.paramixel.Scheduler", "runStep", 598),
-                frame("org.paramixel.api.action.Step", "throwableConsumer", 68),
+                frame("org.paramixel.api.action.Step", "accept", 68),
                 frame("com.example.MyTest", "myMethod", 25),
                 frame("java.lang.RuntimeException", "<init>", 64)
             };

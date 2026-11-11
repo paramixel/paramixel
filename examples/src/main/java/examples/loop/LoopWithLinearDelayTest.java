@@ -26,11 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Loop;
+import org.paramixel.api.support.Backoff;
 
 /**
  * Demonstrates the {@link org.paramixel.api.action.Loop} action with a
- * constant inter-iteration delay ({@link org.paramixel.api.action.Loop.DelayPolicy.Linear}).
+ * constant inter-iteration delay ({@link org.paramixel.api.support.Backoff#fixed}).
  * Verifies that the loop execution accounts for the configured delay between iterations.
  */
 public class LoopWithLinearDelayTest {
@@ -44,7 +44,7 @@ public class LoopWithLinearDelayTest {
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -59,7 +59,7 @@ public class LoopWithLinearDelayTest {
                 .child(loop("poll")
                         .body(step("check", context -> iterationCount.incrementAndGet()))
                         .maxIterations(3)
-                        .delay(new Loop.DelayPolicy.Linear(Duration.ofMillis(100))))
+                        .delay(Backoff.fixed(Duration.ofMillis(100))))
                 .child(step("validate", context -> {
                     assertThat(iterationCount.get()).isEqualTo(3);
                 }))

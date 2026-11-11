@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class ParamixelMojoSelectorTest {
 
     @Test
-    @DisplayName("returns Selector.all() when no match params are set")
+    @DisplayName("returns Selector.builder().build() when no match params are set")
     void returnsAllWhenNoMatchParamsAreSet() throws Exception {
         var mojo = new ParamixelMojo();
 

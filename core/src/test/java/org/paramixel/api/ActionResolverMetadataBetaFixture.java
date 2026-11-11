@@ -25,6 +25,6 @@ public final class ActionResolverMetadataBetaFixture {
 
     @Paramixel.Factory
     public static Action factory() {
-        return Step.of("a-action", context -> {});
+        return Step.step("a-action", context -> {});
     }
 }

@@ -24,8 +24,9 @@ import nonapi.org.paramixel.support.Arguments;
  *
  * <p>This is a deliberate, author-initiated failure — distinct from an uncaught runtime exception.
  * The Paramixel runtime catches {@code FailException} and records the action as failed with the
- * provided message. This exception can be instantiated directly through {@link #FailException(String)} or
- * thrown immediately with {@link #fail()} and {@link #fail(String)}.
+ * provided message. This exception can be instantiated directly through {@link #FailException(String)},
+ * {@link #FailException(String, Throwable)}, or the factory methods {@link #fail()} and {@link #fail(String)},
+ * which return the exception so that it can be thrown at the call site ({@code throw fail("x")}).
  */
 public final class FailException extends RuntimeException {
 
@@ -42,25 +43,56 @@ public final class FailException extends RuntimeException {
     }
 
     /**
-     * Throws a failure exception with the default message {@code "failed"}.
+     * Creates a failure exception with the supplied message and cause.
      *
-     * @throws FailException always
+     * @param message the exception message
+     * @param cause the cause of the failure; must not be {@code null}
+     * @throws NullPointerException if {@code message} or {@code cause} is {@code null}
+     * @throws IllegalArgumentException if {@code message} is blank
      */
-    public static void fail() {
-        throw new FailException("failed");
+    public FailException(final String message, final Throwable cause) {
+        super(Objects.requireNonNull(message, "message is null"), Objects.requireNonNull(cause, "cause is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 
     /**
-     * Throws a failure exception with the supplied message.
+     * Returns a failure exception with the default message {@code "failed"}.
+     *
+     * <p>Use it as {@code throw fail()}; returning the exception rather than throwing it keeps the
+     * call site explicit and helps the compiler's definite-assignment analysis.
+     *
+     * @return the failure exception; never {@code null}
+     */
+    public static FailException fail() {
+        return new FailException("failed");
+    }
+
+    /**
+     * Returns a failure exception with the supplied message.
+     *
+     * <p>Use it as {@code throw fail("x")}.
      *
      * @param message the exception message
+     * @return the failure exception; never {@code null}
      * @throws NullPointerException if {@code message} is {@code null}
      * @throws IllegalArgumentException if {@code message} is blank
-     * @throws FailException always
      */
-    public static void fail(final String message) {
-        Objects.requireNonNull(message, "message is null");
-        Arguments.requireNonBlank(message, "message is blank");
-        throw new FailException(message);
+    public static FailException fail(final String message) {
+        return new FailException(message);
+    }
+
+    /**
+     * Returns a failure exception with the supplied message and cause.
+     *
+     * <p>Use it as {@code throw fail("x", cause)}.
+     *
+     * @param message the exception message
+     * @param cause the cause of the failure; must not be {@code null}
+     * @return the failure exception; never {@code null}
+     * @throws NullPointerException if {@code message} or {@code cause} is {@code null}
+     * @throws IllegalArgumentException if {@code message} is blank
+     */
+    public static FailException fail(final String message, final Throwable cause) {
+        return new FailException(message, cause);
     }
 }

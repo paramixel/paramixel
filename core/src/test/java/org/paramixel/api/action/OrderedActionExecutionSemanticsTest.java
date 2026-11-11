@@ -29,32 +29,13 @@ import org.paramixel.api.Runner;
 import org.paramixel.api.exception.FailException;
 
 @DisplayName("Ordered action execution semantics")
-@SuppressWarnings("removal")
 class OrderedActionExecutionSemanticsTest {
-
-    @Test
-    @DisplayName("Sequence children run in descriptor order without overlap")
-    void sequenceChildrenRunInDescriptorOrderWithoutOverlap() {
-        var probe = new ConcurrencyProbe();
-        var action = Sequence.builder("sequence")
-                .independent()
-                .child(probe.step("one", 1))
-                .child(probe.step("two", 2))
-                .child(probe.step("three", 3))
-                .child(probe.step("four", 4))
-                .build();
-
-        var root = runner().run(action).descriptor().orElseThrow();
-
-        assertThat(root.isPassed()).isTrue();
-        probe.assertSequentialOrder(1, 2, 3, 4);
-    }
 
     @Test
     @DisplayName("Sequential independent children still run in descriptor order without overlap")
     void sequentialIndependentChildrenRunInDescriptorOrderWithoutOverlap() {
         var probe = new ConcurrencyProbe();
-        var action = Sequential.builder("sequential")
+        var action = Sequential.sequential("sequential")
                 .independent()
                 .child(probe.step("one", 1))
                 .child(probe.step("two", 2))
@@ -64,23 +45,7 @@ class OrderedActionExecutionSemanticsTest {
 
         var root = runner().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
-        probe.assertSequentialOrder(1, 2, 3, 4);
-    }
-
-    @Test
-    @DisplayName("Repeat iterations run in descriptor order without overlap")
-    void repeatIterationsRunInDescriptorOrderWithoutOverlap() {
-        var probe = new ConcurrencyProbe();
-        var iteration = new AtomicInteger();
-        var action = Repeat.builder("repeat")
-                .body(Step.of("body", context -> probe.record(iteration.incrementAndGet())))
-                .iterations(4)
-                .build();
-
-        var root = runner().run(action).descriptor().orElseThrow();
-
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         probe.assertSequentialOrder(1, 2, 3, 4);
     }
 
@@ -89,36 +54,14 @@ class OrderedActionExecutionSemanticsTest {
     void loopIterationsRunInDescriptorOrderWithoutOverlap() {
         var probe = new ConcurrencyProbe();
         var iteration = new AtomicInteger();
-        var action = Loop.builder("loop")
-                .body(Step.of("body", context -> probe.record(iteration.incrementAndGet())))
+        var action = Loop.loop("loop")
+                .body(Step.step("body", context -> probe.record(iteration.incrementAndGet())))
                 .maxIterations(4)
                 .build();
 
         var root = runner().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
-        probe.assertSequentialOrder(1, 2, 3, 4);
-    }
-
-    @Test
-    @DisplayName("Until attempts run in descriptor order without overlap")
-    void untilAttemptsRunInDescriptorOrderWithoutOverlap() {
-        var probe = new ConcurrencyProbe();
-        var iteration = new AtomicInteger();
-        var action = Until.builder("until")
-                .body(Step.of("body", context -> {
-                    var current = iteration.incrementAndGet();
-                    probe.record(current);
-                    if (current < 4) {
-                        FailException.fail("not yet");
-                    }
-                }))
-                .maxIterations(4)
-                .build();
-
-        var root = runner().run(action).descriptor().orElseThrow();
-
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         probe.assertSequentialOrder(1, 2, 3, 4);
     }
 
@@ -126,53 +69,55 @@ class OrderedActionExecutionSemanticsTest {
     @DisplayName("Scope runs before, full body, then after in order")
     void scopeRunsBeforeBodyAfterInOrder() {
         var order = Collections.synchronizedList(new ArrayList<String>());
-        var body = Sequential.builder("body")
+        var body = Sequential.sequential("body")
                 .independent()
-                .child(Step.of("body-1", context -> order.add("body-1")))
-                .child(Step.of("body-2", context -> order.add("body-2")))
+                .child(Step.step("body-1", context -> order.add("body-1")))
+                .child(Step.step("body-2", context -> order.add("body-2")))
                 .build();
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> order.add("before")))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> order.add("before")))
                 .body(body)
-                .after(Step.of("after", context -> order.add("after")))
+                .after(Step.step("after", context -> order.add("after")))
                 .build();
 
         var root = runner().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(order).containsExactly("before", "body-1", "body-2", "after");
     }
 
     @Test
     @DisplayName("Scope before failure contributes to aggregate status")
     void scopeBeforeFailureContributesToAggregateStatus() {
-        var body = Sequential.builder("body")
+        var body = Sequential.sequential("body")
                 .independent()
-                .child(Step.of("body-1", context -> {}))
+                .child(Step.step("body-1", context -> {}))
                 .build();
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
                     throw new org.paramixel.api.exception.FailException("before failed");
                 }))
                 .body(body)
-                .after(Step.of("after", context -> {}))
+                .after(Step.step("after", context -> {}))
                 .build();
 
         var root = runner().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed())
+        assertThat(root.status().isFailed())
                 .as("aggregate must be FAILED when before fails, not SKIPPED")
                 .isTrue();
     }
 
+    @Test
+    @DisplayName("Loop early satisfaction skips remaining composite descendants")
     void loopEarlySatisfactionSkipsRemainingCompositeDescendants() {
         var iteration = new AtomicInteger();
-        var body = Sequential.builder("body")
+        var body = Sequential.sequential("body")
                 .independent()
-                .child(Step.of("leaf-1", context -> iteration.incrementAndGet()))
-                .child(Step.of("leaf-2", context -> {}))
+                .child(Step.step("leaf-1", context -> iteration.incrementAndGet()))
+                .child(Step.step("leaf-2", context -> {}))
                 .build();
-        var action = Loop.builder("loop")
+        var action = Loop.loop("loop")
                 .body(body)
                 .until(context -> iteration.get() >= 1)
                 .maxIterations(3)
@@ -180,28 +125,9 @@ class OrderedActionExecutionSemanticsTest {
 
         var root = runner().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(3);
-        assertThat(root.children().get(0).isPassed()).isTrue();
-        assertCompositeSkipped(root.children().get(1));
-        assertCompositeSkipped(root.children().get(2));
-    }
-
-    @Test
-    @DisplayName("Until early satisfaction skips remaining composite descendants")
-    void untilEarlySatisfactionSkipsRemainingCompositeDescendants() {
-        var body = Sequential.builder("body")
-                .independent()
-                .child(Step.of("leaf-1", context -> {}))
-                .child(Step.of("leaf-2", context -> {}))
-                .build();
-        var action = Until.builder("until").body(body).maxIterations(3).build();
-
-        var root = runner().run(action).descriptor().orElseThrow();
-
-        assertThat(root.isPassed()).isTrue();
-        assertThat(root.children()).hasSize(3);
-        assertThat(root.children().get(0).isPassed()).isTrue();
+        assertThat(root.children().get(0).status().isPassed()).isTrue();
         assertCompositeSkipped(root.children().get(1));
         assertCompositeSkipped(root.children().get(2));
     }
@@ -210,23 +136,25 @@ class OrderedActionExecutionSemanticsTest {
     @DisplayName("Scope before failure skips body composite descendants and still runs after")
     void scopeBeforeFailureSkipsBodyCompositeDescendantsAndStillRunsAfter() {
         var afterRan = new AtomicInteger();
-        var body = Sequential.builder("body")
+        var body = Sequential.sequential("body")
                 .independent()
-                .child(Step.of("leaf-1", context -> {}))
-                .child(Step.of("leaf-2", context -> {}))
+                .child(Step.step("leaf-1", context -> {}))
+                .child(Step.step("leaf-2", context -> {}))
                 .build();
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> FailException.fail("before failed")))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
+                    throw FailException.fail("before failed");
+                }))
                 .body(body)
-                .after(Step.of("after", context -> afterRan.incrementAndGet()))
+                .after(Step.step("after", context -> afterRan.incrementAndGet()))
                 .build();
 
         var root = runner().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before()).get().matches(before -> before.isFailed(), "before failed");
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before()).get().matches(before -> before.status().isFailed(), "before failed");
         assertCompositeSkipped(root.children().get(0));
-        assertThat(root.after()).get().matches(after -> after.isPassed(), "after passed");
+        assertThat(root.after()).get().matches(after -> after.status().isPassed(), "after passed");
         assertThat(afterRan.get()).isEqualTo(1);
     }
 
@@ -237,9 +165,9 @@ class OrderedActionExecutionSemanticsTest {
     }
 
     private static void assertCompositeSkipped(final org.paramixel.api.Descriptor descriptor) {
-        assertThat(descriptor.isSkipped()).isTrue();
+        assertThat(descriptor.status().isSkipped()).isTrue();
         for (var child : descriptor.children()) {
-            assertThat(child.isSkipped()).isTrue();
+            assertThat(child.status().isSkipped()).isTrue();
         }
     }
 
@@ -249,7 +177,7 @@ class OrderedActionExecutionSemanticsTest {
         private final java.util.List<Integer> order = Collections.synchronizedList(new ArrayList<>());
 
         Step step(final String name, final int value) {
-            return Step.of(name, context -> record(value));
+            return Step.step(name, context -> record(value));
         }
 
         void record(final int value) throws InterruptedException {

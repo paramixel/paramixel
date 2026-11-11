@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -30,7 +31,6 @@ import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
 
 @DisplayName("Custom action")
-@SuppressWarnings("removal")
 class CustomActionTest {
 
     @Test
@@ -40,14 +40,14 @@ class CustomActionTest {
         var events = new ArrayList<String>();
         var listener = new RecordingListener(events);
 
-        var action = Step.of("solo", context -> {
+        var action = Step.step("solo", context -> {
             messages.add("solo executed");
         });
         var result = Runner.builder().listener(listener).build().run(action);
         var root = result.descriptor().orElseThrow();
 
         assertThat(root).isNotNull();
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(messages).containsExactly("solo executed");
         assertThat(events).contains("before: solo", "after: solo [PASSED]");
     }
@@ -59,20 +59,20 @@ class CustomActionTest {
         var events = new ArrayList<String>();
         var listener = new RecordingListener(events);
 
-        var body = Sequence.builder("body");
+        var body = Sequential.sequential("body");
         for (int i = 1; i <= 5; i++) {
             final int index = i;
-            body.child(Step.of("child-" + index, context -> {
+            body.child(Step.step("child-" + index, context -> {
                 messages.add("child-" + index + " executed");
             }));
         }
 
-        var action = Static.builder("parent")
-                .before(Step.of("parent-setup", context -> {
+        var action = Scope.scope("parent")
+                .before(Step.step("parent-setup", context -> {
                     messages.add("parent before-children");
                 }))
                 .body(body.build())
-                .after(Step.of("parent-teardown", context -> {
+                .after(Step.step("parent-teardown", context -> {
                     messages.add("parent after-children");
                 }))
                 .build();
@@ -85,7 +85,7 @@ class CustomActionTest {
                 .orElseThrow();
 
         assertThat(root).isNotNull();
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.before()).isPresent();
         assertThat(root.children()).hasSize(1);
         var bodyDescriptor = root.children().get(0);
@@ -112,16 +112,16 @@ class CustomActionTest {
     }
 
     private static String statusName(final Descriptor descriptor) {
-        if (descriptor.isFailed()) {
+        if (descriptor.status().isFailed()) {
             return "FAILED";
         }
-        if (descriptor.isAborted()) {
+        if (descriptor.status().isAborted()) {
             return "ABORTED";
         }
-        if (descriptor.isSkipped()) {
+        if (descriptor.status().isSkipped()) {
             return "SKIPPED";
         }
-        return descriptor.isPassed() ? "PASSED" : "RUNNING";
+        return descriptor.status().isPassed() ? "PASSED" : "RUNNING";
     }
 
     private static final class RecordingListener implements Listener {
@@ -133,19 +133,16 @@ class CustomActionTest {
         }
 
         @Override
-        public void initialize(final Configuration configuration) {}
+        public void onRunStarted(final Configuration configuration) {
+            events.add("run-started");
+        }
 
         @Override
         public void onDiscoveryStarted() {}
 
         @Override
-        public void onRunStarted() {
-            events.add("run-started");
-        }
-
-        @Override
-        public void onDiscoveryCompleted(final Descriptor root) {
-            events.add("discovery-completed: " + root.action().displayName());
+        public void onDiscoveryCompleted(final Optional<Descriptor> root) {
+            events.add("discovery-completed: " + root.orElseThrow().action().displayName());
         }
 
         @Override

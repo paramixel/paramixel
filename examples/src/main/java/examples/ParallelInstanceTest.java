@@ -17,8 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Step.step;
@@ -58,7 +57,7 @@ public class ParallelInstanceTest {
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -74,28 +73,13 @@ public class ParallelInstanceTest {
         var testName = ParallelInstanceTest.class.getName();
 
         return scope(testName)
-                .body(instance(testName, ParallelInstanceTest::new)
-                        .body(scope("scope")
-                                .before(step(
-                                        "before()",
-                                        withInstance(ParallelInstanceTest.class, ParallelInstanceTest::before)))
-                                .body(parallel("parallel-methods")
-                                        .parallelism(PARALLELISM)
-                                        .child(step(
-                                                "method1()",
-                                                withInstance(
-                                                        ParallelInstanceTest.class, ParallelInstanceTest::method1)))
-                                        .child(step(
-                                                "method2()",
-                                                withInstance(
-                                                        ParallelInstanceTest.class, ParallelInstanceTest::method2)))
-                                        .child(step(
-                                                "method3()",
-                                                withInstance(
-                                                        ParallelInstanceTest.class, ParallelInstanceTest::method3))))
-                                .after(step(
-                                        "after()",
-                                        withInstance(ParallelInstanceTest.class, ParallelInstanceTest::after)))))
+                .body(of(testName, ParallelInstanceTest.class, ParallelInstanceTest::new)
+                        .before("before()", ParallelInstanceTest::before)
+                        .body(parallel("parallel-methods", "methods")
+                                .child(step("method1()", ParallelInstanceTest.class, ParallelInstanceTest::method1))
+                                .child(step("method2()", ParallelInstanceTest.class, ParallelInstanceTest::method2))
+                                .child(step("method3()", ParallelInstanceTest.class, ParallelInstanceTest::method3)))
+                        .after("after()", ParallelInstanceTest::after))
                 .after(step("validate", ignored -> validate()))
                 .build();
     }

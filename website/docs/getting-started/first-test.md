@@ -12,9 +12,9 @@ package com.example;
 
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.exception.FailException.fail;
 
 public final class LoginSmokeTest {
     @Paramixel.Factory
@@ -22,7 +22,11 @@ public final class LoginSmokeTest {
         return sequential("login smoke")
                 .child(step("open login page", ctx -> openLoginPage()))
                 .child(step("submit credentials", ctx -> submitCredentials()))
-                .child(assertTrue("user is signed in", LoginSmokeTest::isSignedIn))
+                .child(step("user is signed in", ctx -> {
+                    if (!isSignedIn()) {
+                        throw fail("user is not signed in");
+                    }
+                }))
                 .build();
     }
 
@@ -65,13 +69,13 @@ mvn paramixel:test
 ```java
 import org.paramixel.api.Runner;
 
-var result = Runner.defaultRunner().run(LoginSmokeTest.test());
-if (result.isFailed()) {
-    throw new AssertionError("Paramixel run failed");
+var result = Runner.builder().build().run(LoginSmokeTest.test());
+if (result.exitCode() != 0) {
+    throw new AssertionError("Paramixel run failed: " + result.status().message().orElse(""));
 }
 ```
 
-The returned `Result` exposes the root `Descriptor` and effective aggregate status.
+The returned `Result` exposes the root `Descriptor`, the effective status (`status().kind()`) and the exit code.
 
 ## Using named builders
 
@@ -79,15 +83,19 @@ The same test can be written with static imports from each action class:
 
 ```java
 import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.exception.FailException.fail;
 
 @Paramixel.Factory
 public static Action test() {
     return sequential("login smoke")
         .child(step("open login page", ctx -> openLoginPage()))
         .child(step("submit credentials", ctx -> submitCredentials()))
-        .child(assertTrue("user is signed in", LoginSmokeTest::isSignedIn))
+        .child(step("user is signed in", ctx -> {
+            if (!isSignedIn()) {
+                throw fail("user is not signed in");
+            }
+        }))
         .build();
 }
 ```

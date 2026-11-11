@@ -32,6 +32,8 @@ import org.paramixel.api.Configuration;
 @DisplayName("SummaryListener getWriter")
 class SummaryListenerTest {
 
+    private static final Configuration CONFIGURATION = Configuration.of(Map.of());
+
     @Test
     @DisplayName("concurrent getWriter does not close System.out")
     void concurrentGetWriterDoesNotCloseSystemOut() throws Exception {
@@ -40,7 +42,7 @@ class SummaryListenerTest {
         var errors = new AtomicInteger();
 
         var listener = new SummaryListener();
-        listener.initialize(new ConcreteConfiguration(Map.of(Configuration.ANSI, "false")));
+        listener.onRunStarted(new ConcreteConfiguration(Map.of(Configuration.ANSI, "false")));
 
         var threads = new Thread[threadCount];
         for (var i = 0; i < threadCount; i++) {
@@ -48,7 +50,7 @@ class SummaryListenerTest {
                     () -> {
                         try {
                             barrier.await();
-                            listener.onRunStarted();
+                            listener.onRunStarted(Configuration.of(Map.of()));
                         } catch (Throwable t) {
                             errors.incrementAndGet();
                         }
@@ -87,13 +89,12 @@ class SummaryListenerTest {
     @DisplayName("onRunStarted produces output to System.out")
     void onRunStartedProducesOutput() {
         var listener = new SummaryListener();
-        listener.initialize(new ConcreteConfiguration(Map.of(Configuration.ANSI, "false")));
 
         var capture = new ByteArrayOutputStream();
         var originalOut = System.out;
         try {
             System.setOut(new PrintStream(capture, true, StandardCharsets.UTF_8));
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
         } finally {
             System.setOut(originalOut);
         }

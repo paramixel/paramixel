@@ -166,13 +166,13 @@ public final class HtmlReportListener extends AbstractReportFileListener {
     }
 
     private static String statusClass(final Descriptor descriptor) {
-        if (descriptor.isFailed()) {
+        if (descriptor.status().isFailed()) {
             return "failed";
         }
-        if (descriptor.isAborted()) {
+        if (descriptor.status().isAborted()) {
             return "aborted";
         }
-        if (descriptor.isSkipped()) {
+        if (descriptor.status().isSkipped()) {
             return "skipped";
         }
         if (descriptor.isCompleted()) {

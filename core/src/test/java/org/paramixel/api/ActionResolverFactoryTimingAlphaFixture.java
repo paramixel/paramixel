@@ -27,6 +27,6 @@ public final class ActionResolverFactoryTimingAlphaFixture {
     @Paramixel.Factory
     public static Action factory() {
         ActionResolverFactoryTimingLog.FACTORY_LOG.add("alpha-factory");
-        return Step.of("alpha-action", context -> ActionResolverFactoryTimingLog.RUN_LOG.add("alpha-run"));
+        return Step.step("alpha-action", context -> ActionResolverFactoryTimingLog.RUN_LOG.add("alpha-run"));
     }
 }

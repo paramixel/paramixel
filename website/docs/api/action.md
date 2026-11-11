@@ -9,7 +9,7 @@ description: The sealed interface for all Paramixel action types.
 
 ```java
 public sealed interface Action
-        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequential, Static, Step, Timeout, Until {
+        permits Conditional, Isolated, Loop, Parallel, Scope, Sequential, Step, Timeout {
 
     String displayName();
 }
@@ -25,19 +25,15 @@ All action subtypes are immutable after construction. For configurable actions, 
 
 | Type | Description |
 |------|-------------|
-| `Step` | Terminal action wrapping a `ContextConsumer`. |
-| `Assert` | Terminal action evaluating a boolean condition. |
+| `Step` | Terminal action wrapping a `ContextConsumer`, or a typed step that receives the enclosing fixture. |
 | `Sequential` | Composite: executes children sequentially. Dependent/independent modes. |
 | `Parallel` | Composite: executes children concurrently with bounded admission. |
 | `Scope` | Composite: before-body-after with lifecycle guarantee (after always runs once before has been attempted). |
-| `Static` | Composite: before-body-after without a fixture instance. _(Deprecated since 6.2 — use `Scope` instead.)_ |
-| `Instance` | Composite: creates a fixture instance, runs body, destroys instance (destroy always runs once creation has been attempted). |
+| `Instance` | Builder that produces a `Scope`: creates a typed fixture lazily, runs before/body/after, destroys it (destroy always runs once creation has been attempted). |
 | `Isolated` | Composite: executes body under a named re-entrant lock. Compose with Instance for state isolation. |
-| `Delay` | Terminal: pauses for a duration. |
-| `Repeat` | Decorator: executes a child action N times. |
-| `Timeout` | Decorator: executes a child action with a wall-clock deadline; on timeout the child is cancelled but started lifecycle cleanup still runs. |
+| `Loop` | Composite: repeats its body up to `maxIterations`, with an optional `until` predicate and a `Backoff` delay. |
+| `Timeout` | Decorator: executes its body under a wall-clock deadline; on timeout the body is cancelled but started lifecycle cleanup still runs. |
 | `Conditional` | Composite: evaluates a `Predicate<Context>`; runs body when true, passes (body subtree skipped) when false. Does not disrupt dependent sibling execution. |
-| `Until` | Decorator: executes child repeatedly until predicate satisfied, body passes, or iterations exhausted. |
 
 ## Composition
 
@@ -67,8 +63,7 @@ Most composite actions provide a public static method named after the action
 (e.g., `Scope.scope(name)`) that returns the corresponding `Builder`. Import
 these statically for concise action tree definitions.
 
-Terminal actions `Step` and `Delay` also provide named factory methods
-(`step(name, consumer)`, `delay(name, ms)`, `delayRandom(name, min, max)`) that
-return the action directly.
+`Step` also provides named factory methods (`step(name, consumer)` and
+`step(name, type, consumer)`) that return the action directly.
 
 For details and usage examples, see [Named Builders](named-builders).

@@ -17,9 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Each.sequential;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
@@ -56,7 +54,7 @@ public class DependentArgumentTest {
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -73,29 +71,22 @@ public class DependentArgumentTest {
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
         return scope(testName)
-                .body(sequential(testName, arguments, value -> {
+                .body(sequential(testName).each(arguments, value -> {
                     int argumentIndex = Integer.parseInt(value.substring("string-".length()));
-                    return instance(value, () -> new DependentArgumentTest(argumentIndex))
+                    return of(value, DependentArgumentTest.class, () -> new DependentArgumentTest(argumentIndex))
                             .body(scope("scope")
                                     .before(step(
-                                            "before()",
-                                            withInstance(DependentArgumentTest.class, DependentArgumentTest::before)))
+                                            "before()", DependentArgumentTest.class, DependentArgumentTest::before))
                                     .body(sequential(value)
                                             .child(step(
-                                                    "test()",
-                                                    withInstance(
-                                                            DependentArgumentTest.class, DependentArgumentTest::test)))
+                                                    "test()", DependentArgumentTest.class, DependentArgumentTest::test))
+                                            .child(step(
+                                                    "test()", DependentArgumentTest.class, DependentArgumentTest::test))
                                             .child(step(
                                                     "test()",
-                                                    withInstance(
-                                                            DependentArgumentTest.class, DependentArgumentTest::test)))
-                                            .child(step(
-                                                    "test()",
-                                                    withInstance(
-                                                            DependentArgumentTest.class, DependentArgumentTest::test))))
-                                    .after(step(
-                                            "after()",
-                                            withInstance(DependentArgumentTest.class, DependentArgumentTest::after))));
+                                                    DependentArgumentTest.class,
+                                                    DependentArgumentTest::test)))
+                                    .after(step("after()", DependentArgumentTest.class, DependentArgumentTest::after)));
                 }))
                 .after(step("validate", ignored -> validate()))
                 .build();

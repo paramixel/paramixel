@@ -31,7 +31,7 @@ import org.paramixel.api.Context;
  * executed in {@code SKIP} mode, so the subtree appears as skipped in reports. Because
  * this node reports {@code PASSED} when the condition is not met, it does not disrupt
  * dependent sibling execution in {@link org.paramixel.api.action.Sequential} or
- * {@link org.paramixel.api.action.Sequence}.
+ * {@link org.paramixel.api.action.Sequential}.
  *
  * <p>If the predicate throws, this node is set to {@code FAILED} with a descriptive
  * message that includes the exception, and the body action is skipped.
@@ -51,8 +51,7 @@ public final class Conditional implements Action {
     private final Action body;
 
     private Conditional(final String displayName, final Predicate<Context> condition, final Action body) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = Objects.requireNonNull(displayName, "displayName is null");
         Objects.requireNonNull(condition, "condition is null");
         this.condition = condition;
         this.body = Objects.requireNonNull(body, "body is null");
@@ -68,26 +67,11 @@ public final class Conditional implements Action {
      * @throws NullPointerException if {@code displayName} or {@code condition} is {@code null}
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    public static Builder builder(final String displayName, final Predicate<Context> condition) {
+    public static Builder conditional(final String displayName, final Predicate<Context> condition) {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
         Objects.requireNonNull(condition, "condition is null");
         return new Builder(displayName, condition);
-    }
-
-    /**
-     * Creates a new builder for a {@code Conditional} action with the given display name
-     * and condition predicate.
-     *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @param condition the predicate evaluated before the body; must not be {@code null}
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} or {@code condition} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank
-     * @see Builder
-     */
-    public static Builder conditional(final String displayName, final Predicate<Context> condition) {
-        return builder(displayName, condition);
     }
 
     @Override
@@ -116,7 +100,7 @@ public final class Conditional implements Action {
     /**
      * Fluent builder for {@link Conditional} actions.
      */
-    public static final class Builder implements org.paramixel.api.action.Builder {
+    public static final class Builder implements ActionBuilder {
 
         private final String displayName;
         private final Predicate<Context> condition;
@@ -128,29 +112,16 @@ public final class Conditional implements Action {
         }
 
         /**
-         * Sets the body action. Calling this method again overwrites the previous
-         * body action.
+         * Sets the body action. A builder argument is built immediately and the resulting
+         * action snapshot is stored; an action argument is used as is.
          *
-         * @param action the body action; must not be {@code null}
+         * @param action the body action action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder body(final Action action) {
-            this.body = Objects.requireNonNull(action, "action is null");
-            return this;
-        }
-
-        /**
-         * Sets the body action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
-         *
-         * @param builder the body action builder; must not be {@code null}
-         * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
-         */
-        public Builder body(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.body = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+        public Builder body(final ActionBuilder action) {
+            Objects.requireNonNull(action, "action is null");
+            this.body = Objects.requireNonNull(action.build(), "action.build() returned null");
             return this;
         }
 

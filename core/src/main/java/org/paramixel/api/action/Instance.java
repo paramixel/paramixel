@@ -19,143 +19,117 @@ package org.paramixel.api.action;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Objects;
 import java.util.function.Supplier;
-import nonapi.org.paramixel.action.ConcreteContext;
+import nonapi.org.paramixel.action.FixtureConsumer;
+import nonapi.org.paramixel.action.FixtureCreator;
+import nonapi.org.paramixel.action.FixtureDestroyer;
 import nonapi.org.paramixel.support.Arguments;
-import org.paramixel.api.Context;
+import org.paramixel.api.InstanceConsumer;
 
 /**
- * An action that manages the lifecycle of a test fixture instance, including its creation,
- * a body action, and destruction.
+ * A typed fixture: one object created for one subtree and shared by every step in it.
  *
- * <p>The instance is created by a {@link Supplier} at the beginning of execution and is
- * available to all child actions via {@link Context#instance(Class)}. If the
- * instance implements {@link AutoCloseable}, it is closed in the after phase.
+ * <p>{@code Instance} is not an action type of its own. {@link Builder#build()} returns an ordinary {@link Scope}
+ * whose {@code before} creates the fixture, binds it under its declared type, and runs the optional
+ * {@link Builder#before(String, InstanceConsumer) before} step, and whose {@code after} runs the optional
+ * {@link Builder#after(String, InstanceConsumer) after} step and closes the fixture.
  *
- * <p>Creation and destruction occupy the lifecycle before and after slots. Once creation has
- * been attempted, destruction always runs, regardless of earlier outcomes — including when an
- * enclosing {@link Timeout} cancels creation or the body. If the action is cancelled before
- * creation is attempted, the factory is never called and destruction does not run.
+ * <pre>{@code
+ * Instance.of("metrics", MetricsTest.class, () -> new MetricsTest(environment))
+ *         .before("setUp()", MetricsTest::setUp)
+ *         .body(sequential("tests")
+ *                 .child(step("testHealthy()", MetricsTest.class, MetricsTest::testHealthy))
+ *                 .child(step("testMetrics()", MetricsTest.class, MetricsTest::testMetrics)))
+ *         .after("tearDown()", MetricsTest::tearDown);
+ * }</pre>
  *
- * <p>To execute multiple body actions, wrap a {@link Sequential} or {@link Parallel}
- * in {@link Builder#body(Action)}.
+ * <p><strong>Creation is lazy and node-local.</strong> The factory runs inside the node's own {@code before} step,
+ * on the thread executing that node, and nowhere else: defining, validating and compiling the tree never call it.
+ * A node that is skipped (dependent sibling failed, {@code Conditional} false, fail-fast), aborted, or cancelled by
+ * an enclosing {@link Timeout} before it starts never calls the factory, and its {@code after} does not run. Once
+ * creation has been attempted, {@code after} always runs and releases whatever the fixture holds; a failed
+ * creation binds nothing, so the destroy step is a no-op.
+ *
+ * <p><strong>Declared type.</strong> The fixture is bound under the {@code type} given to {@link #of} and under its
+ * runtime class, and every typed step in the subtree resolves to it by declared type. A typed step whose type no
+ * enclosing {@code Instance} provides is rejected before any user code runs, as is a level that declares two
+ * fixtures of the same type.
+ *
+ * <p><strong>Bounding live fixtures</strong> uses the existing pool model: a fixture is created under whichever
+ * {@link Parallel} admitted its branch, so that pool already bounds it. Name the pool for the resource it limits,
+ * for example {@code Parallel.parallel("Metrics", "docker").each(environments, env -> Instance.of(...))}, and note
+ * that heavy fixtures at two nested levels multiply rather than share a budget.
+ *
+ * <p><strong>Thread safety.</strong> All steps in one {@code Instance} share one fixture object, so running them
+ * under a {@code Parallel} is safe only if the fixture is thread-safe. When each test needs its own fixture, use one
+ * {@code Instance} per test inside {@code Parallel.parallel(name, pool).each(...)}.
  */
-public final class Instance implements Action {
+public final class Instance {
 
-    private final String displayName;
-    private final Action instantiate;
-    private final Action body;
-    private final Action destroy;
+    private static final String INSTANTIATE_NAME = "[instantiate]";
+    private static final String DESTROY_NAME = "[destroy]";
 
-    private Instance(final String displayName, final Action instantiate, final Action body, final Action destroy) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
-        this.instantiate = Objects.requireNonNull(instantiate);
-        this.body = Objects.requireNonNull(body, "body is null");
-        this.destroy = Objects.requireNonNull(destroy);
+    private Instance() {
+        // Intentionally empty
     }
 
     /**
-     * Creates a new builder for an {@code Instance} that uses the supplied factory to create
-     * the test fixture.
+     * Creates a builder for a fixture created by the supplied factory.
      *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @param factory the supplier that creates the test fixture; must not be {@code null} and must not return
+     * @param <T> the fixture type
+     * @param displayName the scope display name; must not be {@code null} or blank
+     * @param type the fixture type the fixture is declared and bound as; must not be {@code null}
+     * @param factory the supplier that creates the fixture; must not be {@code null} and must not return
      *     {@code null}
      * @return a new builder
-     * @throws NullPointerException if {@code displayName} or {@code factory} is {@code null}
+     * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    public static Builder builder(final String displayName, final Supplier<?> factory) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
-        Objects.requireNonNull(factory, "factory is null");
-        return new Builder(displayName, factory);
+    public static <T> Builder<T> of(
+            final String displayName, final Class<T> type, final Supplier<? extends T> factory) {
+        return new Builder<>(displayName, type, factory);
     }
 
     /**
-     * Creates a new builder for an {@code Instance} that uses the supplied factory
-     * to create the test fixture.
+     * Creates a builder for a fixture created with the type's public no-argument constructor, displayed with the
+     * type's simple name.
      *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @param factory the supplier that creates the test fixture; must not be {@code null}
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} or {@code factory} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank
-     * @see Builder
-     */
-    public static Builder instance(final String displayName, final Supplier<?> factory) {
-        return builder(displayName, factory);
-    }
-
-    /**
-     * Creates a new builder for an {@code Instance} that uses the class's simple name as the
-     * action display name and its default constructor as the factory.
-     *
-     * @param type the class of the test fixture; must have a public no-argument constructor
+     * @param <T> the fixture type
+     * @param type the fixture type; must have a public no-argument constructor
      * @return a new builder
      * @throws NullPointerException if {@code type} is {@code null}
      * @throws IllegalArgumentException if {@code type} does not have a public no-argument constructor
      */
-    public static Builder builder(final Class<?> type) {
-        return builder(type.getSimpleName(), type);
+    public static <T> Builder<T> of(final Class<T> type) {
+        Objects.requireNonNull(type, "type is null");
+        return of(type.getSimpleName(), type, defaultConstructorSupplier(type));
     }
 
     /**
-     * Creates a new builder for an {@code Instance} that uses the class's simple name
-     * as the action display name and its default constructor as the factory.
+     * Creates a builder for a fixture created with the type's public no-argument constructor.
      *
-     * @param type the class of the test fixture; must have a public no-argument constructor
+     * @param <T> the fixture type
+     * @param displayName the scope display name; must not be {@code null} or blank
+     * @param type the fixture type; must have a public no-argument constructor
      * @return a new builder
-     * @throws NullPointerException if {@code type} is {@code null}
-     * @throws IllegalArgumentException if {@code type} does not have a public no-argument constructor
-     * @see Builder
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank or {@code type} does not have a public
+     *     no-argument constructor
      */
-    public static Builder instance(final Class<?> type) {
-        return builder(type);
-    }
-
-    /**
-     * Creates a new builder for an {@code Instance} with the given display name that uses the class's
-     * default constructor as the factory.
-     *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @param type the class of the test fixture; must have a public no-argument constructor
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} or {@code type} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank or {@code type} does not have a
-     *     public no-argument constructor
-     */
-    public static Builder builder(final String displayName, final Class<?> type) {
+    public static <T> Builder<T> of(final String displayName, final Class<T> type) {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
         Objects.requireNonNull(type, "type is null");
-        return new Builder(displayName, defaultConstructorSupplier(type));
+        return of(displayName, type, defaultConstructorSupplier(type));
     }
 
-    /**
-     * Creates a new builder for an {@code Instance} with the given display name
-     * that uses the class's default constructor as the factory.
-     *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @param type the class of the test fixture; must have a public no-argument constructor
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} or {@code type} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank or {@code type} does not
-     *     have a public no-argument constructor
-     * @see Builder
-     */
-    public static Builder instance(final String displayName, final Class<?> type) {
-        return builder(displayName, type);
-    }
-
-    private static Supplier<?> defaultConstructorSupplier(final Class<?> type) {
+    private static <T> Supplier<T> defaultConstructorSupplier(final Class<T> type) {
         try {
             var constructor = type.getConstructor();
             return () -> {
                 try {
                     return constructor.newInstance();
                 } catch (InvocationTargetException | InstantiationException | IllegalAccessException e) {
-                    throw new RuntimeException("Failed to instantiate " + type.getName(), e);
+                    throw new IllegalStateException("Failed to instantiate " + type.getName(), e);
                 }
             };
         } catch (NoSuchMethodException e) {
@@ -164,105 +138,122 @@ public final class Instance implements Action {
         }
     }
 
-    @Override
-    public String displayName() {
-        return displayName;
-    }
-
     /**
-     * Returns the synthetic instantiation action.
+     * Fluent builder for a typed fixture {@link Scope}.
      *
-     * @return the instantiation action
+     * @param <T> the fixture type
      */
-    public Action instantiate() {
-        return instantiate;
-    }
-
-    /**
-     * Returns the body action.
-     *
-     * @return the body action; never {@code null}
-     */
-    public Action body() {
-        return body;
-    }
-
-    /**
-     * Returns the synthetic destroy action.
-     *
-     * @return the destroy action
-     */
-    public Action destroy() {
-        return destroy;
-    }
-
-    /**
-     * Fluent builder for {@link Instance} actions.
-     */
-    public static final class Builder implements org.paramixel.api.action.Builder {
+    public static final class Builder<T> implements ActionBuilder {
 
         private final String displayName;
-        private final Supplier<?> factory;
+        private final Class<T> type;
+        private final Supplier<? extends T> factory;
 
-        private Action body;
+        private String beforeName;
+        private InstanceConsumer<? super T> beforeConsumer;
+        private InstanceConsumer<? super T> afterConsumer;
+        private String afterName;
+        private ActionBuilder body;
 
-        private Builder(final String displayName, final Supplier<?> factory) {
+        private Builder(final String displayName, final Class<T> type, final Supplier<? extends T> factory) {
+            Objects.requireNonNull(displayName, "displayName is null");
+            Arguments.requireNonBlank(displayName, "displayName is blank");
+            this.type = Objects.requireNonNull(type, "type is null");
+            this.factory = Objects.requireNonNull(factory, "factory is null");
             this.displayName = displayName;
-            this.factory = factory;
         }
 
         /**
-         * Sets the body action. Calling this method
-         * again overwrites the previous body action.
+         * Sets the lifecycle step that runs against the fixture before the body.
          *
-         * @param action the body action; must not be {@code null}
+         * <p>It runs after the fixture is created, as part of the scope's before phase, so a failure skips the body
+         * and still runs the after phase. Calling this method again replaces the previous step.
+         *
+         * @param name the step display name; must not be {@code null} or blank
+         * @param consumer the action to perform on the fixture; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if any argument is {@code null}
+         * @throws IllegalArgumentException if {@code name} is blank
+         */
+        public Builder<T> before(final String name, final InstanceConsumer<? super T> consumer) {
+            this.beforeName = requireName(name);
+            this.beforeConsumer = Objects.requireNonNull(consumer, "consumer is null");
+            return this;
+        }
+
+        /**
+         * Sets the body action. A builder argument is built immediately and the resulting action snapshot is
+         * stored; an action argument is used as is. Calling this method again replaces the previous body.
+         *
+         * @param action the body action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder body(final Action action) {
-            this.body = Objects.requireNonNull(action, "action is null");
+        public Builder<T> body(final ActionBuilder action) {
+            Objects.requireNonNull(action, "action is null");
+            this.body = Objects.requireNonNull(action.build(), "action.build() returned null");
             return this;
         }
 
         /**
-         * Sets the body action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
+         * Sets the lifecycle step that runs against the fixture after the body.
          *
-         * @param builder the body action builder; must not be {@code null}
+         * <p>It runs as part of the scope's after phase, before the fixture is closed, and only when the after phase
+         * runs at all. The fixture is closed even if this step fails.
+         *
+         * @param name the step display name; must not be {@code null} or blank
+         * @param consumer the action to perform on the fixture; must not be {@code null}
          * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
+         * @throws NullPointerException if any argument is {@code null}
+         * @throws IllegalArgumentException if {@code name} is blank
          */
-        public Builder body(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.body = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+        public Builder<T> after(final String name, final InstanceConsumer<? super T> consumer) {
+            this.afterName = requireName(name);
+            this.afterConsumer = Objects.requireNonNull(consumer, "consumer is null");
             return this;
         }
 
         /**
-         * Builds the instance action.
+         * Builds the fixture scope.
          *
-         * @return a new instance action
+         * @return a {@link Scope} whose before creates and binds the fixture and whose after closes it; never
+         *     {@code null}
+         * @throws IllegalStateException if no body action has been configured
          */
         @Override
-        public Instance build() {
+        public Scope build() {
             if (body == null) {
                 throw new IllegalStateException("body action must be configured");
             }
-            var instantiate = Step.of("[instantiate]", context -> {
-                var instance = Objects.requireNonNull(factory.get(), "factory returned null");
-                ConcreteContext.require(context).instanceHolder().set(instance);
-            });
-            var destroy = Step.of("[destroy]", context -> {
-                try {
-                    var instanceOpt = context.instance(AutoCloseable.class);
-                    if (instanceOpt.isPresent()) {
-                        instanceOpt.get().close();
-                    }
-                } finally {
-                    ConcreteContext.require(context).instanceHolder().clear();
-                }
-            });
-            return new Instance(displayName, instantiate, body, destroy);
+            var instantiate = Step.step(INSTANTIATE_NAME, new FixtureCreator(type, factory));
+            var destroy = Step.step(DESTROY_NAME, new FixtureDestroyer(type));
+
+            var scope = Scope.scope(displayName);
+            if (beforeConsumer == null) {
+                scope.before(instantiate);
+            } else {
+                var beforeStep = Step.step(beforeName, new FixtureConsumer<>(type, beforeConsumer));
+                scope.before(Sequential.sequential(beforeName + " phase")
+                        .child(instantiate)
+                        .child(beforeStep));
+            }
+            scope.body(body);
+            if (afterConsumer == null) {
+                scope.after(destroy);
+            } else {
+                var afterStep = Step.step(afterName, new FixtureConsumer<>(type, afterConsumer));
+                // Independent so the fixture is closed even when the user's after step fails.
+                scope.after(Sequential.sequential(afterName + " phase")
+                        .independent()
+                        .child(afterStep)
+                        .child(destroy));
+            }
+            return scope.build();
+        }
+
+        private static String requireName(final String name) {
+            Objects.requireNonNull(name, "name is null");
+            return Arguments.requireNonBlank(name, "name is blank");
         }
     }
 }

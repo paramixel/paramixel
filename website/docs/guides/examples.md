@@ -27,31 +27,33 @@ public static Action smoke() {
 }
 ```
 
-## AnnotationResolver pattern
+## Typed fixture pattern
 
 ```java
-import org.paramixel.api.AnnotationResolver;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Sequential.sequential;
+import static org.paramixel.api.action.Step.step;
 
 final class LoginFixture {
-    @Paramixel.Id("open")
-    public void open() {}
-
-    @Paramixel.Id("submit")
-    public void submit() {}
+    void open() {}
+    void submit() {}
 }
 
-var resolver = AnnotationResolver.create(LoginFixture.class);
-Action fixture = instance(LoginFixture.class)
-        .body(sequential("login")
-                .child(resolver.byId("open"))
-                .child(resolver.byId("submit"))
-                .build())
-        .build();
+@Paramixel.Factory
+public static Action factory() {
+    return of(LoginFixture.class)
+            .before("open()", LoginFixture::open)
+            .body(sequential("login")
+                    .child(step("submit()", LoginFixture.class, LoginFixture::submit))
+                    .build())
+            .build();
+}
 ```
+
+The fixture type appears once, in `of(...)`; every step names only the method it calls, and the compile step
+rejects a step whose fixture is missing.
 
 ## Disabled factory
 
@@ -73,9 +75,7 @@ The `ActionsExample` in the repository demonstrates the named builder factories:
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Repeat.repeat;
 import static org.paramixel.api.action.Timeout.timeout;
 
 @Paramixel.Factory
@@ -83,7 +83,7 @@ public static Action factory() {
     return scope("root")
         .body(sequential("tests")
             .child(step("step-demo", ctx -> {}))
-            .child(parallel("parallel-demo")
+            .child(parallel("parallel-demo", "examples")
                 .child(step("branch-1", ctx -> {}))
                 .child(step("branch-2", ctx -> {}))
                 .child(step("branch-3", ctx -> {}))

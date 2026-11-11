@@ -17,6 +17,7 @@
 package nonapi.org.paramixel.listener;
 
 import java.util.Objects;
+import java.util.Optional;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
@@ -52,23 +53,18 @@ public final class SafeListener implements Listener {
     }
 
     @Override
-    public void initialize(final Configuration configuration) {
-        invoke("initialize", () -> delegate.initialize(configuration));
-    }
-
-    @Override
     public void onDiscoveryStarted() {
         invoke("onDiscoveryStarted", delegate::onDiscoveryStarted);
     }
 
     @Override
-    public void onDiscoveryCompleted(final Descriptor root) {
+    public void onDiscoveryCompleted(final Optional<Descriptor> root) {
         invoke("onDiscoveryCompleted", () -> delegate.onDiscoveryCompleted(root));
     }
 
     @Override
-    public void onRunStarted() {
-        invoke("onRunStarted", delegate::onRunStarted);
+    public void onRunStarted(final Configuration configuration) {
+        invoke("onRunStarted", () -> delegate.onRunStarted(configuration));
     }
 
     @Override

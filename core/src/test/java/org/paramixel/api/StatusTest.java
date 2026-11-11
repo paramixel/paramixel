@@ -17,24 +17,12 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.IOException;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
-import nonapi.org.paramixel.exception.UserCodeException;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Step;
-import org.paramixel.api.exception.AbortedException;
-import org.paramixel.api.exception.FailException;
-import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Status")
 class StatusTest {
@@ -108,12 +96,12 @@ class StatusTest {
     @Test
     @DisplayName("status names match constants")
     void statusNames() {
-        assertThat(Status.PENDING.name()).isEqualTo("PENDING");
-        assertThat(Status.RUNNING.name()).isEqualTo("RUNNING");
-        assertThat(Status.PASSED.name()).isEqualTo("PASSED");
-        assertThat(Status.FAILED.name()).isEqualTo("FAILED");
-        assertThat(Status.SKIPPED.name()).isEqualTo("SKIPPED");
-        assertThat(Status.ABORTED.name()).isEqualTo("ABORTED");
+        assertThat(Status.PENDING.kind().name()).isEqualTo("PENDING");
+        assertThat(Status.RUNNING.kind().name()).isEqualTo("RUNNING");
+        assertThat(Status.PASSED.kind().name()).isEqualTo("PASSED");
+        assertThat(Status.FAILED.kind().name()).isEqualTo("FAILED");
+        assertThat(Status.SKIPPED.kind().name()).isEqualTo("SKIPPED");
+        assertThat(Status.ABORTED.kind().name()).isEqualTo("ABORTED");
     }
 
     @Test
@@ -133,7 +121,7 @@ class StatusTest {
         var status = Status.failed("timeout");
 
         assertThat(status.isFailed()).isTrue();
-        assertThat(status.name()).isEqualTo("FAILED");
+        assertThat(status.kind()).isEqualTo(Status.Kind.FAILED);
         assertThat(status.message()).contains("timeout");
         assertThat(status.throwable()).isEmpty();
     }
@@ -145,7 +133,7 @@ class StatusTest {
         var status = Status.failed("boom", exception);
 
         assertThat(status.isFailed()).isTrue();
-        assertThat(status.name()).isEqualTo("FAILED");
+        assertThat(status.kind()).isEqualTo(Status.Kind.FAILED);
         assertThat(status.throwable()).containsSame(exception);
         assertThat(status.message()).contains("boom");
     }
@@ -161,7 +149,7 @@ class StatusTest {
     }
 
     @Test
-    @DisplayName("Status equals and hashCode include message and throwable")
+    @DisplayName("Status equals and hashCode include the kind and message, not the throwable")
     void statusEqualsAndHashCode() {
         var failedWithMessage = Status.failed("err");
         var failedWithOtherMessage = Status.failed("other");
@@ -175,18 +163,11 @@ class StatusTest {
         assertThat(failedWithMessage).isEqualTo(failedWithSameMessage);
         assertThat(failedWithMessage.hashCode()).isEqualTo(failedWithSameMessage.hashCode());
 
-        var exception1 = new RuntimeException("boom");
-        var exception2 = new RuntimeException("bang");
-        var exception3 = new RuntimeException("boom");
-        var failedWithThrowable1 = Status.failed("err", exception1);
-        var failedWithThrowable2 = Status.failed("err", exception2);
-        var failedWithThrowable3 = Status.failed("err", exception3);
+        var failedWithThrowable = Status.failed("err", new RuntimeException("boom"));
 
-        assertThat(failedWithThrowable1).isNotEqualTo(failedWithThrowable2);
-        assertThat(failedWithThrowable1).isNotEqualTo(failedWithMessage);
-        assertThat(failedWithThrowable1).isEqualTo(Status.failed("err", exception1));
-        assertThat(failedWithThrowable1).isNotEqualTo(failedWithThrowable3);
-        assertThat(failedWithThrowable1).isNotEqualTo(Status.failed("err", new IllegalStateException("boom")));
+        assertThat(failedWithThrowable).isEqualTo(failedWithMessage);
+        assertThat(failedWithThrowable).isEqualTo(Status.failed("err", new IllegalStateException("boom")));
+        assertThat(failedWithThrowable).isNotEqualTo(Status.FAILED);
     }
 
     @Test
@@ -225,12 +206,13 @@ class StatusTest {
     }
 
     @Test
-    @DisplayName("equals respects Throwable subclass inequality")
-    void equalsWithDifferentThrowableInstances() {
+    @DisplayName("equals ignores the throwable")
+    void equalsIgnoresThrowable() {
         var s1 = Status.failed("boom", new EquatableThrowable("one"));
         var s2 = Status.failed("boom", new EquatableThrowable("two"));
 
-        assertThat(s1).isNotEqualTo(s2);
+        assertThat(s1).isEqualTo(s2);
+        assertThat(s1.hashCode()).isEqualTo(s2.hashCode());
     }
 
     @Test
@@ -269,261 +251,35 @@ class StatusTest {
         assertThat(map.get(s2)).isEqualTo("second");
     }
 
-    @Nested
-    @DisplayName("fromThrowable()")
-    class FromThrowable {
+    @Test
+    @DisplayName("kind identifies the outcome and supports switch")
+    void kindIdentifiesOutcome() {
+        assertThat(Status.failed("x").kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(Status.failed("x", new RuntimeException()).kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(Status.skipped("x").kind()).isEqualTo(Status.Kind.SKIPPED);
+        assertThat(Status.aborted("x").kind()).isEqualTo(Status.Kind.ABORTED);
+        assertThat(Status.PASSED.kind()).isEqualTo(Status.Kind.PASSED);
 
-        @Test
-        @DisplayName("FailException wrapped in UserCodeException returns failed with message and throwable")
-        void failExceptionWrappedInUserCodeException() {
-            var failException = new FailException("assertion");
-            var status = Status.fromThrowable(new UserCodeException(failException));
-
-            assertThat(status.isFailed()).isTrue();
-            assertThat(status.message()).contains("assertion");
-            assertThat(status.throwable()).containsSame(failException);
-        }
-
-        @Test
-        @DisplayName("SkipException wrapped in UserCodeException returns skipped with message and throwable")
-        void skipExceptionWrappedInUserCodeException() {
-            var skipException = new SkipException("not ready");
-            var status = Status.fromThrowable(new UserCodeException(skipException));
-
-            assertThat(status.isSkipped()).isTrue();
-            assertThat(status.message()).contains("not ready");
-            assertThat(status.throwable()).containsSame(skipException);
-        }
-
-        @Test
-        @DisplayName("AbortedException wrapped in UserCodeException returns aborted with message and throwable")
-        void abortedExceptionWrappedInUserCodeException() {
-            var abortedException = new AbortedException("precondition");
-            var status = Status.fromThrowable(new UserCodeException(abortedException));
-
-            assertThat(status.isAborted()).isTrue();
-            assertThat(status.message()).contains("precondition");
-            assertThat(status.throwable()).containsSame(abortedException);
-        }
-
-        @Test
-        @DisplayName("RuntimeException wrapping FailException without UserCodeException is treated as failure")
-        void runtimeExceptionWrappingFailExceptionWithoutUserCodeExceptionIsTreatedAsFailure() {
-            var status = Status.fromThrowable(new RuntimeException(new FailException("assertion")));
-
-            assertThat(status.isFailed()).isTrue();
-            assertThat(status.throwable()).containsInstanceOf(RuntimeException.class);
-        }
-
-        @Test
-        @DisplayName("UserCodeException unwraps checked exception and preserves cause")
-        void userCodeExceptionUnwrapsCheckedExceptionAndPreservesCause() {
-            var cause = new IOException("disk offline");
-            var status = Status.fromThrowable(new UserCodeException(cause));
-
-            assertThat(status.isFailed()).isTrue();
-            assertThat(status.message()).contains("disk offline");
-            assertThat(status.throwable()).containsSame(cause);
-        }
-
-        @Test
-        @DisplayName("plain checked exception is treated as failure with same throwable")
-        void plainCheckedExceptionIsTreatedAsFailureWithSameThrowable() {
-            var cause = new IOException("io failure");
-            var status = Status.fromThrowable(cause);
-
-            assertThat(status.isFailed()).isTrue();
-            assertThat(status.message()).contains("io failure");
-            assertThat(status.throwable()).containsSame(cause);
-        }
-
-        @Test
-        @DisplayName("RuntimeException without UserCodeException is not unwrapped")
-        void runtimeExceptionWithoutUserCodeExceptionIsNotUnwrapped() {
-            var cause = new IOException("inner");
-            var runtimeException = new RuntimeException("outer", cause);
-            var status = Status.fromThrowable(runtimeException);
-
-            assertThat(status.isFailed()).isTrue();
-            assertThat(status.message()).contains("outer");
-            assertThat(status.throwable()).containsSame(runtimeException);
-        }
-
-        @Test
-        @DisplayName("UserCodeException wrapping InterruptedException restores interrupt flag")
-        void userCodeExceptionWrappingInterruptedExceptionRestoresInterruptFlag() {
-            Thread.interrupted();
-            try {
-                var status = Status.fromThrowable(new UserCodeException(new InterruptedException("interrupted")));
-
-                assertThat(status.isFailed()).isTrue();
-                assertThat(status.throwable()).containsInstanceOf(InterruptedException.class);
-                assertThat(Thread.currentThread().isInterrupted()).isTrue();
-            } finally {
-                Thread.interrupted();
-            }
-        }
-
-        @Test
-        @DisplayName("UserCodeException with null cause falls back to original wrapper")
-        void userCodeExceptionWithNullCauseFallsBackToOriginalWrapper() throws Exception {
-            var wrapper = new UserCodeException(new RuntimeException("original"));
-            var causeField = UserCodeException.class.getDeclaredField("cause");
-            causeField.setAccessible(true);
-            causeField.set(wrapper, null);
-
-            var status = Status.fromThrowable(wrapper);
-
-            assertThat(status.isFailed()).isTrue();
-            assertThat(status.throwable()).containsSame(wrapper);
-            assertThat(status.message()).contains("original");
-        }
-
-        @Test
-        @DisplayName("fromThrowable rejects null with descriptive NullPointerException")
-        void fromThrowableRejectsNull() {
-            assertThatThrownBy(() -> Status.fromThrowable(null))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessageContaining("throwable is null");
-        }
+        var description =
+                switch (Status.failed("x").kind()) {
+                    case PASSED -> "passed";
+                    case FAILED -> "failed";
+                    case SKIPPED -> "skipped";
+                    case ABORTED -> "aborted";
+                    case PENDING -> "pending";
+                    case RUNNING -> "running";
+                };
+        assertThat(description).isEqualTo("failed");
     }
 
-    @Nested
-    @DisplayName("aggregate()")
-    class Aggregate {
-
-        @Test
-        @DisplayName("empty list returns PASSED")
-        void emptyReturnsPassed() {
-            assertThat(Status.aggregate(List.of())).isSameAs(Status.PASSED);
-        }
-
-        @Test
-        @DisplayName("all PASSED returns PASSED")
-        void allPassedReturnsPassed() {
-            assertThat(Status.aggregate(descriptorsWith(Status.PASSED, Status.PASSED)))
-                    .isSameAs(Status.PASSED);
-        }
-
-        @Test
-        @DisplayName("ABORTED before FAILED returns FAILED")
-        void abortedBeforeFailedReturnsFailed() {
-            assertThat(Status.aggregate(descriptorsWith(Status.ABORTED, Status.FAILED)))
-                    .isSameAs(Status.FAILED);
-        }
-
-        @Test
-        @DisplayName("SKIPPED, ABORTED, FAILED returns FAILED")
-        void skippedAbortedFailedReturnsFailed() {
-            assertThat(Status.aggregate(descriptorsWith(Status.SKIPPED, Status.ABORTED, Status.FAILED)))
-                    .isSameAs(Status.FAILED);
-        }
-
-        @Test
-        @DisplayName("PASSED, ABORTED, PASSED returns ABORTED")
-        void passedAbortedPassedReturnsAborted() {
-            assertThat(Status.aggregate(descriptorsWith(Status.PASSED, Status.ABORTED, Status.PASSED)))
-                    .isSameAs(Status.ABORTED);
-        }
-
-        @Test
-        @DisplayName("SKIPPED, ABORTED returns ABORTED")
-        void skippedAbortedReturnsAborted() {
-            assertThat(Status.aggregate(descriptorsWith(Status.SKIPPED, Status.ABORTED)))
-                    .isSameAs(Status.ABORTED);
-        }
-
-        @Test
-        @DisplayName("non-terminal before terminal returns RUNNING")
-        void nonTerminalReturnsRunning() {
-            assertThat(Status.aggregate(descriptorsWith(Status.PENDING, Status.PASSED)))
-                    .isSameAs(Status.RUNNING);
-        }
-
-        @Test
-        @DisplayName("SKIPPED without FAILED or ABORTED returns SKIPPED")
-        void skippedWithoutFailedOrAbortedReturnsSkipped() {
-            assertThat(Status.aggregate(descriptorsWith(Status.SKIPPED, Status.PASSED)))
-                    .isSameAs(Status.SKIPPED);
-        }
-
-        private List<Descriptor> descriptorsWith(final Status... statuses) {
-            var descriptors = new Descriptor[statuses.length];
-            for (int i = 0; i < statuses.length; i++) {
-                descriptors[i] = stubDescriptor(statuses[i]);
-            }
-            return List.of(descriptors);
-        }
-
-        private Descriptor stubDescriptor(final Status status) {
-            return new Descriptor() {
-                private final Action action = Step.of("stub", ignored -> {});
-
-                @Override
-                public Optional<Descriptor> parent() {
-                    return Optional.empty();
-                }
-
-                @Override
-                public Action action() {
-                    return action;
-                }
-
-                @Override
-                public String id() {
-                    return "stub";
-                }
-
-                @Override
-                public boolean isPassed() {
-                    return status.isPassed();
-                }
-
-                @Override
-                public boolean isFailed() {
-                    return status.isFailed();
-                }
-
-                @Override
-                public boolean isSkipped() {
-                    return status.isSkipped();
-                }
-
-                @Override
-                public boolean isAborted() {
-                    return status.isAborted();
-                }
-
-                @Override
-                public Optional<Instant> startedAt() {
-                    return Optional.empty();
-                }
-
-                @Override
-                public Optional<Instant> completedAt() {
-                    return Optional.empty();
-                }
-
-                @Override
-                public Optional<String> message() {
-                    return Optional.empty();
-                }
-
-                @Override
-                public Optional<Throwable> throwable() {
-                    return Optional.empty();
-                }
-
-                @Override
-                public boolean isCompleted() {
-                    return !status.isPending() && !status.isRunning();
-                }
-
-                @Override
-                public List<Descriptor> children() {
-                    return List.of();
-                }
-            };
-        }
+    @Test
+    @DisplayName("Kind.isTerminal covers the four terminal kinds")
+    void kindIsTerminal() {
+        assertThat(Status.Kind.PENDING.isTerminal()).isFalse();
+        assertThat(Status.Kind.RUNNING.isTerminal()).isFalse();
+        assertThat(Status.Kind.PASSED.isTerminal()).isTrue();
+        assertThat(Status.Kind.FAILED.isTerminal()).isTrue();
+        assertThat(Status.Kind.SKIPPED.isTerminal()).isTrue();
+        assertThat(Status.Kind.ABORTED.isTerminal()).isTrue();
     }
 }

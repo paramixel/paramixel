@@ -31,30 +31,30 @@ class ParallelTest {
     @DisplayName("child RuntimeException preserves instance and stack trace")
     void childRuntimeExceptionPreservesInstance() {
         var exception = new RuntimeException("intentional failure");
-        var action = Parallel.builder("failing-parallel")
-                .child(Step.of("fail-step", context -> {
+        var action = Parallel.parallel("failing-parallel", "t0")
+                .child(Step.step("fail-step", context -> {
                     throw exception;
                 }))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         var child = root.children().get(0);
-        assertThat(child.isFailed()).isTrue();
-        assertThat(child.throwable()).isPresent();
-        assertThat(child.throwable().get()).isSameAs(exception);
+        assertThat(child.status().isFailed()).isTrue();
+        assertThat(child.status().throwable()).isPresent();
+        assertThat(child.status().throwable().get()).isSameAs(exception);
     }
 
     @Test
     @DisplayName("shuffled parallel children execute")
     void shuffledParallelChildrenExecute() {
         var executionOrder = Collections.synchronizedList(new ArrayList<String>());
-        var action = Parallel.builder("p")
+        var action = Parallel.parallel("p", "t1")
                 .shuffle(123L)
-                .child(Step.of("a", ctx -> executionOrder.add("a")))
-                .child(Step.of("b", ctx -> executionOrder.add("b")))
-                .child(Step.of("c", ctx -> executionOrder.add("c")))
+                .child(Step.step("a", ctx -> executionOrder.add("a")))
+                .child(Step.step("b", ctx -> executionOrder.add("b")))
+                .child(Step.step("c", ctx -> executionOrder.add("c")))
                 .build();
         Runner.builder().build().run(action);
         assertThat(executionOrder).containsExactlyInAnyOrder("a", "b", "c");

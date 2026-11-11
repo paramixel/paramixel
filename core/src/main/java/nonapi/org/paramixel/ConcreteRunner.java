@@ -17,15 +17,16 @@
 package nonapi.org.paramixel;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletionException;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
-import nonapi.org.paramixel.action.DescriptorBuilder;
-import nonapi.org.paramixel.action.MutableDescriptor;
+import java.util.function.Supplier;
+import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.listener.SafeListener;
+import nonapi.org.paramixel.selector.ConcreteSelector;
 import nonapi.org.paramixel.support.StackTracePruner;
-import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
@@ -33,7 +34,6 @@ import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.selector.Selector;
 
 /**
@@ -43,10 +43,11 @@ public final class ConcreteRunner implements Runner {
 
     private static final String NO_TESTS_FOUND = "No Paramixel tests found";
 
+    private static final String PARAMIXEL_PREFIX = "paramixel.";
+
     private final ReentrantLock lock = new ReentrantLock();
     private final SafeListener safeListener;
     private final Configuration configuration;
-    private final int parallelism;
     private final boolean shuffled;
     private final long seed;
 
@@ -78,7 +79,6 @@ public final class ConcreteRunner implements Runner {
         Objects.requireNonNull(listener, "listener is null");
         this.safeListener = listener instanceof SafeListener safe ? safe : new SafeListener(listener);
         this.configuration = configuration != null ? configuration : Configuration.defaultConfiguration();
-        this.parallelism = resolveParallelism(this.configuration);
         this.shuffled = shuffled;
         this.seed = seed;
     }
@@ -90,56 +90,109 @@ public final class ConcreteRunner implements Runner {
 
     @Override
     public Result run(final Action action) {
+        Objects.requireNonNull(action, "action is null");
+        return execute(() -> Optional.of(action), unknownKeyWarnings());
+    }
+
+    @Override
+    public Result run(final Selector selector) {
+        Objects.requireNonNull(selector, "selector is null");
+        var concrete = ConcreteSelector.require(selector);
+        var warnings = new ArrayList<>(unknownKeyWarnings());
+        if (!concrete.usesConfiguration()) {
+            warnings.addAll(ignoredMatchKeyWarnings());
+        }
+        return execute(
+                () -> new ActionResolver(configuration, concrete.resolve(configuration), shuffled, seed)
+                        .resolveRootAction(),
+                warnings);
+    }
+
+    @Override
+    public Result run() {
+        return execute(
+                () -> new ActionResolver(
+                                configuration, ConcreteSelector.fromConfiguration(configuration), shuffled, seed)
+                        .resolveRootAction(),
+                unknownKeyWarnings());
+    }
+
+    /**
+     * Runs one entry point: resolves the action, then executes it with the no-tests lifecycle when resolution finds
+     * nothing. The listener is initialized and warned exactly once, before discovery, for every outcome.
+     */
+    private Result execute(final Supplier<Optional<Action>> resolution, final List<String> warnings) {
         lock.lock();
         try {
-            Objects.requireNonNull(action, "action is null");
-            var effective = new ActionResolver(configuration, Selector.all(), shuffled, seed).resolveRootAction(action);
-            return runInternal(effective.orElseThrow());
+            var resolved = resolution.get();
+            return resolved.map(action -> runInternal(action, warnings)).orElseGet(() -> noTestsResult(warnings));
         } finally {
             lock.unlock();
         }
     }
 
-    private Result runInternal(final Action action) {
-        Objects.requireNonNull(action, "action is null");
-        initializeListener();
-        safeListener.onRunStarted();
+    private static final Set<String> KNOWN_KEYS = Set.of(
+            Configuration.RUNNER_PARALLELISM,
+            Configuration.ANSI,
+            Configuration.FAILURE_ON_SKIP,
+            Configuration.FAILURE_ON_ABORT,
+            Configuration.FAIL_IF_NO_TESTS,
+            Configuration.FAIL_FAST,
+            Configuration.REPORT_FILE,
+            Configuration.MATCH_PACKAGE_REGEX,
+            Configuration.MATCH_CLASS_REGEX,
+            Configuration.MATCH_TAG_REGEX,
+            Configuration.LISTENER_EXCLUDE);
+
+    /**
+     * Returns one warning per {@code paramixel.*} key the framework does not recognize, so a typo in a properties
+     * file or a removed key does not fail silently.
+     */
+    private List<String> unknownKeyWarnings() {
+        var warnings = new ArrayList<String>();
+        configuration.keySet().stream()
+                .filter(key -> key.startsWith(PARAMIXEL_PREFIX) && !isKnownKey(key))
+                .sorted()
+                .forEach(key -> warnings.add("Unknown configuration key '" + key + "' has no effect"));
+        return warnings;
+    }
+
+    private static boolean isKnownKey(final String key) {
+        return KNOWN_KEYS.contains(key) || key.startsWith(Configuration.PARALLELISM_POOL_PREFIX);
+    }
+
+    private List<String> ignoredMatchKeyWarnings() {
+        var warnings = new ArrayList<String>();
+        for (var key : List.of(
+                Configuration.MATCH_PACKAGE_REGEX, Configuration.MATCH_CLASS_REGEX, Configuration.MATCH_TAG_REGEX)) {
+            if (configuration.getString(key).isPresent()) {
+                warnings.add(key + " is set but the selector given to run(Selector) does not use"
+                        + " Selector.configured(); the key is ignored");
+            }
+        }
+        return warnings;
+    }
+
+    private Result runInternal(final Action action, final List<String> warnings) {
+        initializeListener(warnings);
         safeListener.onDiscoveryStarted();
-        MutableDescriptor root = null;
+        ConcreteDescriptor root = null;
         Engine engine = null;
         boolean discoveryCompleted = false;
         try {
-            root = new DescriptorBuilder().discover(action);
-            safeListener.onDiscoveryCompleted(root);
+            var plan = CompiledPlan.compile(action);
+            root = plan.root().descriptor;
+            safeListener.onDiscoveryCompleted(Optional.of(root));
             discoveryCompleted = true;
-            engine = new Engine(parallelism);
+            warnAboutUnusedPoolKeys(plan);
+            engine = new Engine(new Pools(configuration));
             engine.setFailFast(configuration.getBoolean(Configuration.FAIL_FAST).orElse(false));
-            root.markScheduled();
-            var rootFuture = root.scheduledFuture();
-            engine.execute(root, configuration, safeListener);
-            // execute() returns after the root subtree is terminal; join() remains an
-            // idempotent safety guard for unusual external-completion paths.
-            //
-            // join() blocks indefinitely — timeouts are the responsibility of the
-            // Timeout action, not the runner. join() is interruptible: if the calling
-            // thread is interrupted (e.g. by JUnit @Timeout), the interrupt propagates
-            // and close() in the finally block handles engine shutdown.
-            if (rootFuture != null) {
-                try {
-                    rootFuture.join();
-                } catch (CompletionException e) {
-                    var cause = Throwables.unwrap(e);
-                    if (UnrecoverableErrors.isUnrecoverable(cause) && cause instanceof Error error) {
-                        throw error;
-                    }
-                    // Root failed; status is already set on the descriptor.
-                }
-            }
+            engine.execute(plan, configuration, safeListener);
             var unrecoverableFailure = engine.unrecoverableFailure();
             if (unrecoverableFailure instanceof Error error) {
                 throw error;
             }
-            var result = new ConcreteResult(root, configuration);
+            var result = new ConcreteResult(root, configuration, engine.poolStats());
             safeListener.onRunCompleted(result);
             return result;
         } catch (Throwable t) {
@@ -159,7 +212,7 @@ public final class ConcreteRunner implements Runner {
                     ? new ConcreteResult(root, configuration)
                     : new ConcreteResult(configuration, Status.failed(message, t));
             if (!discoveryCompleted) {
-                safeListener.onDiscoveryCompleted(root);
+                safeListener.onDiscoveryCompleted(Optional.ofNullable(root));
             }
             safeListener.onRunCompleted(result);
             return result;
@@ -168,22 +221,27 @@ public final class ConcreteRunner implements Runner {
         }
     }
 
-    private static int resolveParallelism(final Configuration configuration) {
-        final var optionalParallelism = configuration.getInteger(Configuration.RUNNER_PARALLELISM);
-        if (optionalParallelism.isEmpty()) {
-            return Runtime.getRuntime().availableProcessors();
-        }
-        final int value = optionalParallelism.get();
-        if (value <= 0) {
-            throw new ConfigurationException("Invalid configuration for '" + Configuration.RUNNER_PARALLELISM
-                    + "': expected positive integer but was '" + value + "'");
-        }
-        return value;
+    /**
+     * Warns about every {@code paramixel.parallelism.<name>} key that names a pool no {@code Parallel} in the plan
+     * uses, which is the usual symptom of a typo in a properties file.
+     */
+    private void warnAboutUnusedPoolKeys(final CompiledPlan plan) {
+        var used = plan.poolNames();
+        configuration.keySet().stream()
+                .filter(key -> key.startsWith(Configuration.PARALLELISM_POOL_PREFIX))
+                .sorted()
+                .forEach(key -> {
+                    var name = key.substring(Configuration.PARALLELISM_POOL_PREFIX.length());
+                    if (!used.contains(name)) {
+                        safeListener.onWarning("Configuration key '" + key + "' names pool '" + name
+                                + "', but no Parallel in this run uses it");
+                    }
+                });
     }
 
-    private void initializeListener() {
-        safeListener.initialize(configuration);
-        for (var warning : RemovedConfigurationKeys.detect(configuration)) {
+    private void initializeListener(final List<String> warnings) {
+        safeListener.onRunStarted(configuration);
+        for (var warning : warnings) {
             safeListener.onWarning(warning);
         }
     }
@@ -194,166 +252,12 @@ public final class ConcreteRunner implements Runner {
         }
     }
 
-    @Override
-    public Optional<Result> run(final Selector selector) {
-        lock.lock();
-        try {
-            Objects.requireNonNull(selector, "selector is null");
-            var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
-            if (optionalAction.isEmpty()) {
-                fireNoTestsLifecycle();
-                return Optional.empty();
-            }
-            return Optional.of(runInternal(optionalAction.get()));
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    @Override
-    public int runAndReturnExitCode(final Action action) {
-        lock.lock();
-        try {
-            Objects.requireNonNull(action, "action is null");
-            var effective = new ActionResolver(configuration, Selector.all(), shuffled, seed).resolveRootAction(action);
-            return exitCode(runInternal(effective.orElseThrow()));
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    @Override
-    public int runAndReturnExitCode(final Selector selector) {
-        lock.lock();
-        try {
-            Objects.requireNonNull(selector, "selector is null");
-            var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
-            if (optionalAction.isEmpty()) {
-                fireNoTestsLifecycle();
-                return noTestsExitCode();
-            }
-            return exitCode(runInternal(optionalAction.get()));
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    @Override
-    public void runAndExit(final Action action) {
-        final int exitCode;
-        lock.lock();
-        try {
-            Objects.requireNonNull(action, "action is null");
-            var effective = new ActionResolver(configuration, Selector.all(), shuffled, seed).resolveRootAction(action);
-            exitCode = exitCode(runInternal(effective.orElseThrow()));
-        } finally {
-            lock.unlock();
-        }
-        System.exit(exitCode);
-    }
-
-    @Override
-    public void runAndExit(final Selector selector) {
-        final int exitCode;
-        lock.lock();
-        try {
-            Objects.requireNonNull(selector, "selector is null");
-            var optionalAction = new ActionResolver(configuration, selector, shuffled, seed).resolveRootAction();
-            if (optionalAction.isEmpty()) {
-                fireNoTestsLifecycle();
-                exitCode = noTestsExitCode();
-            } else {
-                exitCode = exitCode(runInternal(optionalAction.get()));
-            }
-        } finally {
-            lock.unlock();
-        }
-        System.exit(exitCode);
-    }
-
-    @Override
-    public int run() {
-        lock.lock();
-        try {
-            var optionalAction =
-                    new ActionResolver(configuration, buildSelector(configuration), shuffled, seed).resolveRootAction();
-            if (optionalAction.isEmpty()) {
-                fireNoTestsLifecycle();
-                return noTestsExitCode();
-            }
-            return exitCode(runInternal(optionalAction.get()));
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    private void fireNoTestsLifecycle() {
-        initializeListener();
-        safeListener.onRunStarted();
+    private Result noTestsResult(final List<String> warnings) {
+        initializeListener(warnings);
         safeListener.onDiscoveryStarted();
-        safeListener.onDiscoveryCompleted(null);
+        safeListener.onDiscoveryCompleted(Optional.empty());
         var result = new ConcreteResult(configuration);
         safeListener.onRunCompleted(result);
-    }
-
-    private static Selector buildSelector(final Configuration configuration) {
-        var pkg = configuration.getString(Configuration.MATCH_PACKAGE_REGEX);
-        var cls = configuration.getString(Configuration.MATCH_CLASS_REGEX);
-        var tag = configuration.getString(Configuration.MATCH_TAG_REGEX);
-
-        if (pkg.isEmpty() && cls.isEmpty() && tag.isEmpty()) {
-            return Selector.all();
-        }
-        var selectors = new ArrayList<Selector>();
-        var pkgRegex = pkg.filter(s -> !s.isBlank()).orElse(null);
-        if (pkgRegex != null) {
-            try {
-                selectors.add(Selector.packageRegex(pkgRegex));
-            } catch (Exception e) {
-                throw new ConfigurationException(
-                        "Invalid package regex pattern '" + pkgRegex + "': " + e.getMessage(), e);
-            }
-        }
-        var clsRegex = cls.filter(s -> !s.isBlank()).orElse(null);
-        if (clsRegex != null) {
-            try {
-                selectors.add(Selector.classRegex(clsRegex));
-            } catch (Exception e) {
-                throw new ConfigurationException(
-                        "Invalid class regex pattern '" + clsRegex + "': " + e.getMessage(), e);
-            }
-        }
-        var tagRegex = tag.filter(s -> !s.isBlank()).orElse(null);
-        if (tagRegex != null) {
-            try {
-                selectors.add(Selector.tagRegex(tagRegex));
-            } catch (Exception e) {
-                throw new ConfigurationException("Invalid tag regex pattern '" + tagRegex + "': " + e.getMessage(), e);
-            }
-        }
-        return selectors.size() == 1 ? selectors.get(0) : Selector.and(selectors);
-    }
-
-    private int noTestsExitCode() {
-        final var failIfNoTests =
-                configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(false);
-        return failIfNoTests ? 1 : 0;
-    }
-
-    private int exitCode(final Result result) {
-        if (result.isPassed()) {
-            return 0;
-        }
-        if (result.isSkipped()) {
-            final var failureOnSkip =
-                    configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(false);
-            return failureOnSkip ? 1 : 0;
-        }
-        if (result.isAborted()) {
-            final var failureOnAbort =
-                    configuration.getBoolean(Configuration.FAILURE_ON_ABORT).orElse(true);
-            return failureOnAbort ? 1 : 0;
-        }
-        return 1;
+        return result;
     }
 }

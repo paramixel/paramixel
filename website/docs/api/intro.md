@@ -9,27 +9,30 @@ Paramixel's public API is under `org.paramixel.api`.
 
 ## Main entry points
 
-- `Runner` executes actions, selectors, or classpath-discovered factories.
+- `Runner` executes one run: a direct action tree, a selector, or the configured discovery.
+- `Launcher` is the command-line `main` for a discovered run.
 - `Configuration` provides typed access to properties.
 - `Listener` receives discovery, run, and descriptor callbacks.
 - `Result` exposes the root `Descriptor` and aggregate outcome.
 - `Descriptor` represents one execution occurrence in the tree.
 - `Context` provides runtime services to actions (configuration, fixture access).
-- `Status` represents execution state with severity aggregation.
-- `Paramixel` contains annotations used by discovery and annotation resolution.
+- `Status` is the outcome value: a `Kind` plus optional message and throwable.
+- `Paramixel` contains the discovery annotations.
 
 ## Action package
 
-`org.paramixel.api.action` contains `Action` (sealed interface with 13 subtypes), `Builder` (sealed interface with 10 subtypes), and built-in action types: `Step`, `Assert`, `Sequential`, `Parallel`, `Scope`, `Static` _(deprecated — use `Scope`)_, `Instance`, `Delay`, `Repeat`, `Timeout`, `Conditional`, `Isolated`, `Until`, and the `Each` data-driven utility.
+`org.paramixel.api.action` contains `Action` (sealed interface with 8 subtypes: `Step`, `Sequential`, `Parallel`, `Scope`, `Loop`, `Timeout`, `Isolated`, `Conditional`), `ActionBuilder` (sealed interface implemented by every builder and by `Action`), and `Instance`, which is a typed-fixture builder that produces a `Scope`.
 
 ## Selector package
 
-`org.paramixel.api.selector` contains discovery selectors for package, class, tag, and boolean composition.
+`org.paramixel.api.selector` contains `Selector` and its `Builder`: package, class and tag criteria, each with an
+`exclude…` twin, composed with `and`.
 
 ## Support package
 
-`org.paramixel.api.support` contains `Retry` and `CleanUp` utilities.
+`org.paramixel.api.support` contains `Backoff`, `Retry` and `CleanUp`.
 
 ## Exception package
 
-`org.paramixel.api.exception` contains framework and outcome exceptions.
+`org.paramixel.api.exception` contains the outcome exceptions (`FailException`, `SkipException`,
+`AbortException`) and the framework exceptions (`ConfigurationException`, `ResolverException`).

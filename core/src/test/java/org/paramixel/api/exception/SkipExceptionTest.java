@@ -28,7 +28,9 @@ class SkipExceptionTest {
     @Test
     @DisplayName("skip() throws with default message")
     void skipNoArgsThrowsWithDefaultMessage() {
-        assertThatThrownBy(() -> SkipException.skip())
+        assertThatThrownBy(() -> {
+                    throw SkipException.skip();
+                })
                 .isInstanceOf(SkipException.class)
                 .hasMessage("skipped");
     }
@@ -36,7 +38,9 @@ class SkipExceptionTest {
     @Test
     @DisplayName("skip(String) throws with provided message")
     void skipWithMessageThrowsWithProvidedMessage() {
-        assertThatThrownBy(() -> SkipException.skip("not available"))
+        assertThatThrownBy(() -> {
+                    throw SkipException.skip("not available");
+                })
                 .isInstanceOf(SkipException.class)
                 .hasMessage("not available");
     }

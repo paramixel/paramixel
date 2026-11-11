@@ -22,25 +22,28 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.Context;
+import org.paramixel.api.Status;
+import org.paramixel.api.support.Backoff;
 
 @DisplayName("Loop arguments")
 class LoopArgumentsTest {
 
-    private static final Action STEP = Step.of("step", s -> {});
+    private static final Action STEP = Step.step("step", s -> {});
 
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Loop.builder(null).maxIterations(1)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Loop.builder(" ").maxIterations(1)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Loop.builder("loop").maxIterations(1).body((Action) null))
+        assertThatThrownBy(() -> Loop.loop(null).maxIterations(1)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Loop.loop(" ").maxIterations(1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Loop.loop("loop").maxIterations(1).body((Action) null))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("bodyAcceptsAction()")
     void bodyAcceptsAction() {
-        var loop = Loop.builder("loop").body(STEP).maxIterations(1).build();
+        var loop = Loop.loop("loop").body(STEP).maxIterations(1).build();
         assertThat(loop.body()).isNotNull();
         assertThat(loop.body().displayName()).isEqualTo("step");
     }
@@ -48,104 +51,73 @@ class LoopArgumentsTest {
     @Test
     @DisplayName("maxIterations() rejects zero")
     void maxIterationsRejectsZero() {
-        var builder = Loop.builder("loop").body(STEP);
+        var builder = Loop.loop("loop").body(STEP);
         assertThatThrownBy(() -> builder.maxIterations(0)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("maxIterations() rejects negative")
     void maxIterationsRejectsNegative() {
-        var builder = Loop.builder("loop").body(STEP);
+        var builder = Loop.loop("loop").body(STEP);
         assertThatThrownBy(() -> builder.maxIterations(-1)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("maxIterations() sets value")
     void maxIterationsSetsValue() {
-        var loop = Loop.builder("loop").body(STEP).maxIterations(5).build();
+        var loop = Loop.loop("loop").body(STEP).maxIterations(5).build();
         assertThat(loop.maxIterations()).isEqualTo(5);
     }
 
     @Test
     @DisplayName("until() rejects null")
     void untilRejectsNull() {
-        var builder = Loop.builder("loop").body(STEP);
-        assertThatThrownBy(() -> builder.until(null))
+        var builder = Loop.loop("loop").body(STEP);
+        assertThatThrownBy(() -> builder.until((java.util.function.Predicate<Context>) null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("predicate is null");
     }
 
     @Test
-    @DisplayName("delay policy rejects null")
-    void delayPolicyRejectsNull() {
-        var builder = Loop.builder("loop").body(STEP);
-        assertThatThrownBy(() -> builder.delay((Loop.DelayPolicy) null))
+    @DisplayName("until(BiPredicate) rejects null")
+    void untilBiPredicateRejectsNull() {
+        var builder = Loop.loop("loop").body(STEP);
+        assertThatThrownBy(() -> builder.until((java.util.function.BiPredicate<Context, Status>) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("policy is null");
+                .hasMessage("predicate is null");
     }
 
     @Test
-    @DisplayName("delay duration rejects null")
-    void delayDurationRejectsNull() {
-        var builder = Loop.builder("loop").body(STEP);
-        assertThatThrownBy(() -> builder.delay((Duration) null))
+    @DisplayName("untilPassed configures a predicate")
+    void untilPassedConfiguresPredicate() {
+        var action = Loop.loop("loop").body(STEP).maxIterations(2).untilPassed().build();
+
+        assertThat(action.until()).isPresent();
+    }
+
+    @Test
+    @DisplayName("delay rejects null")
+    void delayRejectsNull() {
+        var builder = Loop.loop("loop").body(STEP);
+        assertThatThrownBy(() -> builder.delay(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("fixedDelay is null");
+                .hasMessage("backoff is null");
     }
 
     @Test
-    @DisplayName("delay duration rejects negative")
-    void delayDurationRejectsNegative() {
-        var builder = Loop.builder("loop").body(STEP);
-        assertThatThrownBy(() -> builder.delay(Duration.ofMillis(-1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fixedDelay is negative");
-    }
-
-    @Test
-    @DisplayName("delay duration rejects negative sub-millisecond duration")
-    void delayDurationRejectsNegativeSubMillisecondDuration() {
-        var builder = Loop.builder("loop").body(STEP);
-        assertThatThrownBy(() -> builder.delay(Duration.ofNanos(-1)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fixedDelay is negative");
-    }
-
-    @Test
-    @DisplayName("delay millis rejects negative")
-    void delayMillisRejectsNegative() {
-        var builder = Loop.builder("loop").body(STEP);
-        assertThatThrownBy(() -> builder.delay(-1L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fixedDelayMillis is negative");
-    }
-
-    @Test
-    @DisplayName("delay millis wraps in Linear policy")
-    void delayMillisWrapsInLinear() {
+    @DisplayName("delay stores the backoff schedule")
+    void delayStoresBackoff() {
+        var backoff = Backoff.fixed(Duration.ofMillis(500));
         var action =
-                Loop.builder("loop").body(STEP).maxIterations(1).delay(500L).build();
-        assertThat(action.delay()).isPresent();
-        assertThat(action.delay().get()).isInstanceOf(Loop.DelayPolicy.Linear.class);
-        assertThat(((Loop.DelayPolicy.Linear) action.delay().get()).delay()).isEqualTo(Duration.ofMillis(500));
-    }
+                Loop.loop("loop").body(STEP).maxIterations(1).delay(backoff).build();
 
-    @Test
-    @DisplayName("delay convenience wraps in Linear")
-    void delayConvenienceWrapsInLinear() {
-        var action = Loop.builder("loop")
-                .body(STEP)
-                .maxIterations(1)
-                .delay(Duration.ofMillis(500))
-                .build();
-        assertThat(action.delay()).isPresent();
-        assertThat(action.delay().get()).isInstanceOf(Loop.DelayPolicy.Linear.class);
+        assertThat(action.delay()).containsSame(backoff);
     }
 
     @Test
     @DisplayName("builder can build multiple immutable snapshots")
     void builderCanBuildMultipleImmutableSnapshots() {
-        var builder = Loop.builder("loop").body(STEP);
+        var builder = Loop.loop("loop").body(STEP);
         var first = builder.maxIterations(1).build();
         builder.maxIterations(3);
         var second = builder.build();

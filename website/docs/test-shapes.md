@@ -14,12 +14,16 @@ Use a sequence when steps must run in order.
 ```java
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Assert.assertTrue;
+import static org.paramixel.api.exception.FailException.fail;
 
 Action spec = sequential("login smoke")
         .child(step("open login page", ctx -> openLoginPage()))
         .child(step("submit credentials", ctx -> submitCredentials()))
-        .child(assertTrue("user is signed in", true))
+        .child(step("user is signed in", ctx -> {
+                    if (!isSignedIn()) {
+                        throw fail("user is not signed in");
+                    }
+                }))
         .build();
 ```
 
@@ -38,6 +42,7 @@ Use a lifecycle shape when setup and cleanup belong to a specific subtree.
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.exception.FailException.fail;
 
 Action spec = scope("database workflow")
         .before(step("start database", ctx -> startDatabase()))
@@ -65,9 +70,9 @@ Use parallel branches when independent scenarios can run concurrently.
 ```java
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.exception.FailException.fail;
 
-Action spec = parallel("browser matrix")
-        .parallelism(3)
+Action spec = parallel("browser matrix", "examples")
         .child(step("chrome", ctx -> runChrome()))
         .child(step("firefox", ctx -> runFirefox()))
         .child(step("webkit", ctx -> runWebkit()))
@@ -88,13 +93,14 @@ Use generated scenarios when plain Java code should create many related actions.
 ```java
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.exception.FailException.fail;
 
 var users = List.of("ada", "grace", "linus");
 
-Action spec = Each.sequential("user checks", users,
-        user -> sequential("check " + user)
-                .child(step("load", ctx -> loadUser(user)))
-                .child(step("verify", ctx -> verifyUser(user))))
+Action spec = sequential("user checks")
+        .each(users, user -> sequential("check " + user)
+                .child(step("load " + user, ctx -> loadUser(user)))
+                .child(step("verify " + user, ctx -> verifyUser(user))))
         .build();
 ```
 
@@ -116,20 +122,22 @@ user checks
 Use a compatibility shape when the same behavior must be checked across versions, configurations, or environments.
 
 ```java
-import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Instance.of;
+import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.exception.FailException.fail;
 
 var versions = List.of("Java 17", "Java 21", "Java 25");
 
-Action spec = Each.parallel("compatibility matrix", versions,
-        version -> scope(version + " scenario")
-                .before(step("start " + version, ctx -> start(version)))
+Action spec = parallel("compatibility matrix", "test")
+        .each(versions, version -> of(version + " scenario", CompatibilityFixture.class,
+                        () -> new CompatibilityFixture(version))
+                .before("start " + version, CompatibilityFixture::start)
                 .body(sequential("checks")
-                        .child(step("write", ctx -> write(version)))
-                        .child(step("read", ctx -> read(version))))
-                .after(step("stop " + version, ctx -> stop(version))))
-        .parallelism(3)
+                        .child(step("write " + version, CompatibilityFixture.class, CompatibilityFixture::write))
+                        .child(step("read " + version, CompatibilityFixture.class, CompatibilityFixture::read)))
+                .after("stop " + version, CompatibilityFixture::stop))
         .build();
 ```
 
@@ -152,6 +160,7 @@ Use the default dependent sequence when later steps should stop after an earlier
 ```java
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.exception.FailException.fail;
 
 Action failFast = sequential("checkout")
         .child(step("create cart", ctx -> createCart()))

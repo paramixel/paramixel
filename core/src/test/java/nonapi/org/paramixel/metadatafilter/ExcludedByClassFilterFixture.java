@@ -28,8 +28,8 @@ public final class ExcludedByClassFilterFixture {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Action factory() {
-        return Instance.builder("excluded-by-class-action", () -> new Object())
-                .body(Step.of("test", context -> {}))
+        return Instance.of("excluded-by-class-action", Object.class, () -> new Object())
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

@@ -56,9 +56,10 @@ class FactoryArgumentsTest {
     }
 
     @Test
-    @DisplayName("defaultRunner returns non-null runner")
-    void defaultRunnerReturnsNonNull() {
-        var runner = Runner.defaultRunner();
+    @DisplayName("Runner.builder().build() returns a non-null runner")
+    void builderReturnsNonNull() {
+        var runner = Runner.builder().build();
         assertThat(runner).isNotNull();
+        assertThat(runner.configuration()).isNotNull();
     }
 }

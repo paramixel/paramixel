@@ -19,30 +19,39 @@ package nonapi.org.paramixel.action;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Parallel;
+import org.paramixel.api.action.Scope;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 @DisplayName("ConcreteDescriptor")
 class ConcreteDescriptorTest {
 
     @Nested
-    @DisplayName("addChild validation")
-    class AddChildValidation {
+    @DisplayName("structure")
+    class Structure {
 
         @Test
-        @DisplayName("rejects adding a descriptor as its own child")
-        void rejectsAddingDescriptorAsOwnChild() {
-            var descriptor = new ConcreteDescriptor(Step.of("self", context -> {}));
+        @DisplayName("a compiled descriptor exposes its final slots")
+        void exposesFinalSlots() {
+            var before = TestDescriptors.of(Step.step("before", context -> {}));
+            var body = TestDescriptors.of(Step.step("body", context -> {}));
+            var after = TestDescriptors.of(Step.step("after", context -> {}));
 
-            assertThatThrownBy(() -> descriptor.addChild(descriptor))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("child is this descriptor");
+            var descriptor = TestDescriptors.tree(Step.step("descriptor", context -> {}), before, List.of(body), after);
+
+            assertThat(descriptor.before()).containsSame(before);
+            assertThat(descriptor.children()).containsExactly(body);
+            assertThat(descriptor.after()).containsSame(after);
+            assertThat(before.parent()).containsSame(descriptor);
+            assertThat(body.parent()).containsSame(descriptor);
+            assertThat(after.parent()).containsSame(descriptor);
         }
     }
 
@@ -53,7 +62,7 @@ class ConcreteDescriptorTest {
         @Test
         @DisplayName("rejects re-entering RUNNING from a RUNNING state")
         void rejectsReenteringRunningFromRunning() {
-            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
+            var descriptor = new ConcreteDescriptor(Step.step("step", context -> {}));
             descriptor.setStatus(Status.RUNNING);
 
             assertThatThrownBy(() -> descriptor.setStatus(Status.RUNNING))
@@ -69,10 +78,12 @@ class ConcreteDescriptorTest {
         @Test
         @DisplayName("handles cause with null message")
         void handlesNullCauseMessage() {
-            var root = new ConcreteDescriptor(Parallel.builder("root").build());
-            var child = new ConcreteDescriptor(Step.of("child", context -> {}));
-            root.addChild(child);
-            root.freeze();
+            var child = TestDescriptors.of(Step.step("child", context -> {}));
+            var root = TestDescriptors.tree(
+                    Parallel.parallel("root", "t0")
+                            .child(Step.step("x", context -> {}))
+                            .build(),
+                    List.of(child));
 
             root.abort(Status.ABORTED, new AssertionError());
 
@@ -82,15 +93,23 @@ class ConcreteDescriptorTest {
             assertThat(childStatus.message().orElseThrow()).doesNotContain("null");
         }
 
+        /**
+         * Builds a lifecycle-shaped descriptor: an optional before slot, one body child, and an after slot.
+         *
+         * <p>The Parallel action is only a container carrier here; the descriptor shape is what the abort rules
+         * depend on.
+         */
         private ConcreteDescriptor lifecycle(final boolean withBefore) {
-            var root = new ConcreteDescriptor(Parallel.builder("lifecycle").build());
-            if (withBefore) {
-                root.setBefore(new ConcreteDescriptor(root, Step.of("before", context -> {})));
-            }
-            root.addChild(new ConcreteDescriptor(root, Step.of("body", context -> {})));
-            root.setAfter(new ConcreteDescriptor(root, Step.of("after", context -> {})));
-            root.freeze();
-            return root;
+            var before = withBefore ? TestDescriptors.of(Step.step("before", context -> {})) : null;
+            var body = TestDescriptors.of(Step.step("body", context -> {}));
+            var after = TestDescriptors.of(Step.step("after", context -> {}));
+            return TestDescriptors.tree(
+                    Parallel.parallel("lifecycle", "t1")
+                            .child(Step.step("x", context -> {}))
+                            .build(),
+                    before,
+                    List.of(body),
+                    after);
         }
 
         private MutableDescriptor slot(final Descriptor descriptor) {
@@ -105,9 +124,9 @@ class ConcreteDescriptorTest {
             var started = root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
 
             assertThat(started).isFalse();
-            assertThat(root.before().orElseThrow().isAborted()).isTrue();
-            assertThat(root.children().get(0).isAborted()).isTrue();
-            assertThat(root.after().orElseThrow().isAborted()).isTrue();
+            assertThat(root.before().orElseThrow().status().isAborted()).isTrue();
+            assertThat(root.children().get(0).status().isAborted()).isTrue();
+            assertThat(root.after().orElseThrow().status().isAborted()).isTrue();
         }
 
         @Test
@@ -120,9 +139,9 @@ class ConcreteDescriptorTest {
             var started = root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
 
             assertThat(started).isTrue();
-            assertThat(root.isFailed()).isTrue();
-            assertThat(root.before().orElseThrow().isAborted()).isTrue();
-            assertThat(root.children().get(0).isAborted()).isTrue();
+            assertThat(root.status().isFailed()).isTrue();
+            assertThat(root.before().orElseThrow().status().isAborted()).isTrue();
+            assertThat(root.children().get(0).status().isAborted()).isTrue();
             assertThat(slot(root.after().orElseThrow()).status().isPending()).isTrue();
         }
 
@@ -137,7 +156,7 @@ class ConcreteDescriptorTest {
 
             root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
 
-            assertThat(before.isPassed()).isTrue();
+            assertThat(before.status().isPassed()).isTrue();
             assertThat(slot(root.after().orElseThrow()).status().isPending()).isTrue();
         }
 
@@ -149,8 +168,8 @@ class ConcreteDescriptorTest {
 
             root.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
 
-            assertThat(root.before().orElseThrow().isAborted()).isTrue();
-            assertThat(root.after().orElseThrow().isAborted()).isTrue();
+            assertThat(root.before().orElseThrow().status().isAborted()).isTrue();
+            assertThat(root.after().orElseThrow().status().isAborted()).isTrue();
         }
 
         @Test
@@ -158,7 +177,7 @@ class ConcreteDescriptorTest {
         void lifecycleWithoutBeforeUsesOwnStart() {
             var pending = lifecycle(false);
             pending.abort(Status.failed("timed out"), new IllegalStateException("timed out"));
-            assertThat(pending.after().orElseThrow().isAborted()).isTrue();
+            assertThat(pending.after().orElseThrow().status().isAborted()).isTrue();
 
             var running = lifecycle(false);
             running.tryStart();
@@ -174,7 +193,7 @@ class ConcreteDescriptorTest {
         @Test
         @DisplayName("starts a pending descriptor")
         void startsPending() {
-            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
+            var descriptor = new ConcreteDescriptor(Step.step("step", context -> {}));
 
             assertThat(descriptor.tryStart()).isTrue();
             assertThat(descriptor.status().isRunning()).isTrue();
@@ -184,56 +203,58 @@ class ConcreteDescriptorTest {
         @Test
         @DisplayName("refuses a descriptor aborted before it started")
         void refusesAborted() {
-            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
+            var descriptor = new ConcreteDescriptor(Step.step("step", context -> {}));
             descriptor.abort(Status.ABORTED, new IllegalStateException("cancelled"));
 
             assertThat(descriptor.tryStart()).isFalse();
-            assertThat(descriptor.isAborted()).isTrue();
+            assertThat(descriptor.status().isAborted()).isTrue();
         }
     }
 
     @Nested
-    @DisplayName("scheduled future lifecycle")
-    class ScheduledFutureLifecycle {
+    @DisplayName("read-only accessors")
+    class ReadOnlyAccessors {
 
         @Test
-        @DisplayName("completeFuture completes the scheduled future with the descriptor")
-        void completeFutureCompletesScheduledFuture() {
-            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
-            CompletableFuture<Descriptor> future = descriptor.markScheduled();
-            assertThat(future).isNotDone();
+        @DisplayName("displayName is the bound action display name")
+        void displayName() {
+            var descriptor = new ConcreteDescriptor(null, Step.step("step", context -> {}));
 
-            descriptor.completeFuture();
-
-            assertThat(future).isCompleted();
-            assertThat(future.getNow(null)).isSameAs(descriptor);
+            assertThat(descriptor.displayName()).isEqualTo("step");
+            assertThat(descriptor.displayName()).isEqualTo(descriptor.action().displayName());
         }
 
         @Test
-        @DisplayName("completeFuture is a no-op when the scheduled future is already done")
-        void completeFutureIsNoOpWhenAlreadyDone() {
-            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
-            CompletableFuture<Descriptor> future = descriptor.markScheduled();
-            // Externally complete the future with a distinct sentinel so it is already
-            // done when completeFuture runs.
-            var sentinel = new ConcreteDescriptor(Step.of("sentinel", context -> {}));
-            future.complete(sentinel);
+        @DisplayName("path joins the display names of the ancestors, excluding the run root")
+        void path() {
+            var root = new ConcreteDescriptor(
+                    null,
+                    Scope.scope(nonapi.org.paramixel.listener.Constants.ROOT_NAME)
+                            .body(Step.step("body", c -> {}))
+                            .build());
+            var middle = new ConcreteDescriptor(
+                    root,
+                    Sequential.sequential("suite")
+                            .child(Step.step("x", c -> {}))
+                            .build());
+            var leaf = new ConcreteDescriptor(middle, Step.step("leaves", context -> {}));
 
-            descriptor.completeFuture();
-
-            // The original completion value is preserved; completeFuture did not override it.
-            assertThat(future).isCompleted();
-            assertThat(future.getNow(null)).isSameAs(sentinel);
+            assertThat(root.path()).isEmpty();
+            assertThat(middle.path()).isEqualTo("suite");
+            assertThat(leaf.path()).isEqualTo("suite / leaves");
+            assertThat(leaf.path()).isEqualTo(leaf.path());
         }
 
         @Test
-        @DisplayName("completeFuture is a no-op when no scheduled future exists")
-        void completeFutureIsNoOpWhenUnscheduled() {
-            var descriptor = new ConcreteDescriptor(Step.of("step", context -> {}));
+        @DisplayName("duration is empty until the descriptor both starts and completes")
+        void duration() {
+            var descriptor = new ConcreteDescriptor(null, Step.step("step", context -> {}));
+            assertThat(descriptor.duration()).isEmpty();
 
-            // No exception and no observable state change for an unscheduled descriptor.
-            descriptor.completeFuture();
-            assertThat(descriptor.isScheduled()).isFalse();
+            descriptor.setStatus(Status.RUNNING);
+            descriptor.setStatus(Status.PASSED);
+            assertThat(descriptor.duration()).isPresent();
+            assertThat(descriptor.duration().orElseThrow()).isGreaterThanOrEqualTo(java.time.Duration.ZERO);
         }
     }
 }

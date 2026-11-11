@@ -21,51 +21,44 @@ import java.util.Optional;
 import org.paramixel.api.action.Action;
 
 /**
- * Represents the outcome of a Paramixel run, providing access to the root descriptor
- * and effective aggregate state derived from the descriptor tree and configuration.
+ * The outcome of a Paramixel run: the root descriptor tree plus the effective status and exit code.
  *
- * <p>The effective outcome is the most-severe outcome found across the descriptor tree,
- * with configuration-based promotion rules applied:
+ * <p>The effective status is the <em>root</em> descriptor's already-aggregated status, with these
+ * configuration-based promotions applied:
  * <ul>
- *   <li>skipped is promoted to failed when {@link Configuration#FAILURE_ON_SKIP} is {@code true}</li>
- *   <li>aborted is promoted to failed when {@link Configuration#FAILURE_ON_ABORT} is {@code true} (the default)</li>
- *   <li>when no descriptor was discovered, the effective outcome is failed when
- *       {@link Configuration#FAIL_IF_NO_TESTS} is {@code true}, otherwise skipped</li>
+ *   <li>{@code SKIPPED} becomes {@code FAILED} when {@link Configuration#FAILURE_ON_SKIP} is {@code true}</li>
+ *   <li>{@code ABORTED} becomes {@code FAILED} when {@link Configuration#FAILURE_ON_ABORT} is {@code true}
+ *       (the default)</li>
+ *   <li>when no descriptor was discovered, the effective status is {@code FAILED} when
+ *       {@link Configuration#FAIL_IF_NO_TESTS} is {@code true}, otherwise {@code SKIPPED}</li>
  * </ul>
+ * A promotion keeps the original message and throwable.
  *
- * <p>Severity ordering for tree aggregation: failed &gt; aborted &gt; pending/running &gt; skipped &gt; passed.
+ * <p>This is deliberately not "the most severe status anywhere in the tree": a {@link
+ * org.paramixel.api.action.Loop} that retried and then passed has {@code FAILED} iterations beneath a
+ * {@code PASSED} root, and the run passed.
  *
  * @see Runner#run(Action)
  */
 public interface Result {
 
     /**
-     * Returns whether the effective run outcome completed successfully.
+     * Returns the effective status of this run.
      *
-     * @return {@code true} when the effective outcome is passed
+     * @return the effective status; never {@code null}
      */
-    boolean isPassed();
+    Status status();
 
     /**
-     * Returns whether the effective run outcome is failed.
+     * Returns the process exit code for this run.
      *
-     * @return {@code true} when the effective outcome is failed
-     */
-    boolean isFailed();
-
-    /**
-     * Returns whether the effective run outcome is skipped.
+     * <p>This is the single authority for exit codes: {@code 0} when the effective status is
+     * {@code PASSED}, {@code SKIPPED} or {@code ABORTED}, and {@code 1} when it is {@code FAILED}.
+     * Every configuration promotion is already reflected in {@link #status()}.
      *
-     * @return {@code true} when the effective outcome is skipped
+     * @return the exit code
      */
-    boolean isSkipped();
-
-    /**
-     * Returns whether the effective run outcome is aborted.
-     *
-     * @return {@code true} when the effective outcome is aborted
-     */
-    boolean isAborted();
+    int exitCode();
 
     /**
      * Returns the earliest start instant found in the descriptor tree.

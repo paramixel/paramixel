@@ -28,8 +28,8 @@ public final class DisabledOnlyFixture {
     @Paramixel.Factory
     @Paramixel.Disabled
     public static Action factory() {
-        return Instance.builder("disabled-action", () -> new Object())
-                .body(Step.of("test", context -> {}))
+        return Instance.of("disabled-action", Object.class, () -> new Object())
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

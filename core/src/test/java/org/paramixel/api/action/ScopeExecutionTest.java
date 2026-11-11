@@ -23,36 +23,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
-import org.paramixel.api.exception.AbortedException;
+import org.paramixel.api.exception.AbortException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Scope execution")
-@SuppressWarnings("removal")
 class ScopeExecutionTest {
 
     @Test
     @DisplayName("all pass with before, dependent body, and after")
     void allPass() {
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
                         .build())
-                .after(Step.of("after", context -> {}))
+                .after(Step.step("after", context -> {}))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isPassed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isPassed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
     }
 
     @Test
@@ -61,25 +60,27 @@ class ScopeExecutionTest {
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> FailException.fail("before failed")))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> bodyCalls.incrementAndGet()))
-                        .child(Step.of("child-2", context -> bodyCalls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
+                    throw FailException.fail("before failed");
+                }))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> bodyCalls.incrementAndGet()))
+                        .child(Step.step("child-2", context -> bodyCalls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isSkipped()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isSkipped()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(bodyCalls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -90,25 +91,27 @@ class ScopeExecutionTest {
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> AbortedException.abort("before aborted")))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> bodyCalls.incrementAndGet()))
-                        .child(Step.of("child-2", context -> bodyCalls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
+                    throw AbortException.abort("before aborted");
+                }))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> bodyCalls.incrementAndGet()))
+                        .child(Step.step("child-2", context -> bodyCalls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isAborted()).isTrue();
-        assertThat(root.before().orElseThrow().isAborted()).isTrue();
+        assertThat(root.status().isAborted()).isTrue();
+        assertThat(root.before().orElseThrow().status().isAborted()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isSkipped()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isSkipped()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(bodyCalls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -119,25 +122,27 @@ class ScopeExecutionTest {
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> SkipException.skip("before skipped")))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> bodyCalls.incrementAndGet()))
-                        .child(Step.of("child-2", context -> bodyCalls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
+                    throw SkipException.skip("before skipped");
+                }))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> bodyCalls.incrementAndGet()))
+                        .child(Step.step("child-2", context -> bodyCalls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isSkipped()).isTrue();
-        assertThat(root.before().orElseThrow().isSkipped()).isTrue();
+        assertThat(root.status().isSkipped()).isTrue();
+        assertThat(root.before().orElseThrow().status().isSkipped()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isSkipped()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isSkipped()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(bodyCalls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -148,28 +153,28 @@ class ScopeExecutionTest {
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
                     throw new RuntimeException("before threw");
                 }))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> bodyCalls.incrementAndGet()))
-                        .child(Step.of("child-2", context -> bodyCalls.incrementAndGet()))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> bodyCalls.incrementAndGet()))
+                        .child(Step.step("child-2", context -> bodyCalls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().message()).contains("before threw");
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().message()).contains("before threw");
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isSkipped()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isSkipped()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(bodyCalls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -179,21 +184,23 @@ class ScopeExecutionTest {
     void beforeThrowsAndAfterThrows() {
         var bodyCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
                     throw new RuntimeException("before threw");
                 }))
-                .body(Step.of("child", context -> bodyCalls.incrementAndGet()))
-                .after(Step.of("after", context -> FailException.fail("after failed")))
+                .body(Step.step("child", context -> bodyCalls.incrementAndGet()))
+                .after(Step.step("after", context -> {
+                    throw FailException.fail("after failed");
+                }))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isFailed()).isTrue();
+        assertThat(root.children().get(0).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isFailed()).isTrue();
         assertThat(bodyCalls.get()).isZero();
     }
 
@@ -203,25 +210,27 @@ class ScopeExecutionTest {
         var child2Calls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> FailException.fail("child failed")))
-                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {
+                            throw FailException.fail("child failed");
+                        }))
+                        .child(Step.step("child-2", context -> child2Calls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isFailed()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isFailed()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(child2Calls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -232,25 +241,27 @@ class ScopeExecutionTest {
         var child2Calls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> AbortedException.abort("child aborted")))
-                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {
+                            throw AbortException.abort("child aborted");
+                        }))
+                        .child(Step.step("child-2", context -> child2Calls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isAborted()).isTrue();
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.status().isAborted()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isAborted()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isAborted()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(child2Calls.get()).isEqualTo(1);
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -261,25 +272,27 @@ class ScopeExecutionTest {
         var child2Calls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> SkipException.skip("child skipped")))
-                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {
+                            throw SkipException.skip("child skipped");
+                        }))
+                        .child(Step.step("child-2", context -> child2Calls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isSkipped()).isTrue();
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.status().isSkipped()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isSkipped()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isSkipped()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(child2Calls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -290,27 +303,27 @@ class ScopeExecutionTest {
         var child2Calls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> {
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {
                             throw new RuntimeException("runtime error");
                         }))
-                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .child(Step.step("child-2", context -> child2Calls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isFailed()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isFailed()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(child2Calls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -318,45 +331,47 @@ class ScopeExecutionTest {
     @Test
     @DisplayName("after fails aggregates FAILED")
     void afterFailsAggregatesFailed() {
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
                         .build())
-                .after(Step.of("after", context -> FailException.fail("after failed")))
+                .after(Step.step("after", context -> {
+                    throw FailException.fail("after failed");
+                }))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isPassed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isFailed()).isTrue();
+        assertThat(body.children().get(0).status().isPassed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("no before, no after with dependent body passes")
     void noBeforeNoAfterWithBodyPasses() {
-        var action = Scope.builder("scope")
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
+        var action = Scope.scope("scope")
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
                         .build())
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isPassed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isPassed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
     }
 
     @Test
@@ -364,52 +379,52 @@ class ScopeExecutionTest {
     void noBeforeAfterPresentWithBodyPasses() {
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
+        var action = Scope.scope("scope")
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isPassed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isPassed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("no after, before present with dependent body passes")
     void noAfterBeforePresentWithBodyPasses() {
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
                         .build())
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(body.children().get(0).isPassed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isPassed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
     }
 
     @Test
     @DisplayName("no before, no after, no children passes")
     void noBeforeNoAfterNoChildrenPasses() {
-        assertThatThrownBy(() -> Scope.builder("scope").build())
+        assertThatThrownBy(() -> Scope.scope("scope").build())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("body action must be configured");
     }
@@ -419,19 +434,19 @@ class ScopeExecutionTest {
     void singleBodyPasses() {
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Step.of("child-1", context -> {}))
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Step.step("child-1", context -> {}))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(root.children().get(0).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(root.children().get(0).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
 
@@ -440,45 +455,47 @@ class ScopeExecutionTest {
     void singleBodyFailsRunsAfter() {
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Step.of("child-1", context -> FailException.fail("child failed")))
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Step.step("child-1", context -> {
+                    throw FailException.fail("child failed");
+                }))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(root.children().get(0).isFailed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(root.children().get(0).status().isFailed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("independent body: all pass")
     void independentBodyAllPass() {
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
                         .independent()
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
                         .build())
-                .after(Step.of("after", context -> {}))
+                .after(Step.step("after", context -> {}))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(body.children().get(0).isPassed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isPassed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
     }
 
     @Test
@@ -487,26 +504,28 @@ class ScopeExecutionTest {
         var bodyCalls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> FailException.fail("before failed")))
-                .body(Sequence.builder("body")
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {
+                    throw FailException.fail("before failed");
+                }))
+                .body(Sequential.sequential("body")
                         .independent()
-                        .child(Step.of("child-1", context -> bodyCalls.incrementAndGet()))
-                        .child(Step.of("child-2", context -> bodyCalls.incrementAndGet()))
+                        .child(Step.step("child-1", context -> bodyCalls.incrementAndGet()))
+                        .child(Step.step("child-2", context -> bodyCalls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.before().orElseThrow().isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(body.children().get(0).isSkipped()).isTrue();
-        assertThat(body.children().get(1).isSkipped()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isSkipped()).isTrue();
+        assertThat(body.children().get(1).status().isSkipped()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(bodyCalls.get()).isZero();
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -517,26 +536,28 @@ class ScopeExecutionTest {
         var child2Calls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
                         .independent()
-                        .child(Step.of("child-1", context -> FailException.fail("child failed")))
-                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .child(Step.step("child-1", context -> {
+                            throw FailException.fail("child failed");
+                        }))
+                        .child(Step.step("child-2", context -> child2Calls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(body.children().get(0).isFailed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isFailed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(child2Calls.get()).isEqualTo(1);
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -547,26 +568,28 @@ class ScopeExecutionTest {
         var child2Calls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
                         .independent()
-                        .child(Step.of("child-1", context -> AbortedException.abort("child aborted")))
-                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .child(Step.step("child-1", context -> {
+                            throw AbortException.abort("child aborted");
+                        }))
+                        .child(Step.step("child-2", context -> child2Calls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isAborted()).isTrue();
+        assertThat(root.status().isAborted()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(body.children().get(0).isAborted()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isAborted()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(child2Calls.get()).isEqualTo(1);
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -577,26 +600,28 @@ class ScopeExecutionTest {
         var child2Calls = new AtomicInteger();
         var afterCalls = new AtomicInteger();
 
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
                         .independent()
-                        .child(Step.of("child-1", context -> SkipException.skip("child skipped")))
-                        .child(Step.of("child-2", context -> child2Calls.incrementAndGet()))
+                        .child(Step.step("child-1", context -> {
+                            throw SkipException.skip("child skipped");
+                        }))
+                        .child(Step.step("child-2", context -> child2Calls.incrementAndGet()))
                         .build())
-                .after(Step.of("after", context -> afterCalls.incrementAndGet()))
+                .after(Step.step("after", context -> afterCalls.incrementAndGet()))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isSkipped()).isTrue();
+        assertThat(root.status().isSkipped()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(body.children().get(0).isSkipped()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isPassed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isSkipped()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isPassed()).isTrue();
         assertThat(child2Calls.get()).isEqualTo(1);
         assertThat(afterCalls.get()).isEqualTo(1);
     }
@@ -604,25 +629,27 @@ class ScopeExecutionTest {
     @Test
     @DisplayName("independent body: after fails aggregates FAILED")
     void independentBodyAfterFailsAggregatesFailed() {
-        var action = Scope.builder("scope")
-                .before(Step.of("before", context -> {}))
-                .body(Sequence.builder("body")
+        var action = Scope.scope("scope")
+                .before(Step.step("before", context -> {}))
+                .body(Sequential.sequential("body")
                         .independent()
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
                         .build())
-                .after(Step.of("after", context -> FailException.fail("after failed")))
+                .after(Step.step("after", context -> {
+                    throw FailException.fail("after failed");
+                }))
                 .build();
 
         var root = Runner.builder().build().run(action).descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
         assertThat(body.children()).hasSize(2);
-        assertThat(root.before().orElseThrow().isPassed()).isTrue();
-        assertThat(body.children().get(0).isPassed()).isTrue();
-        assertThat(body.children().get(1).isPassed()).isTrue();
-        assertThat(root.after().orElseThrow().isFailed()).isTrue();
+        assertThat(root.before().orElseThrow().status().isPassed()).isTrue();
+        assertThat(body.children().get(0).status().isPassed()).isTrue();
+        assertThat(body.children().get(1).status().isPassed()).isTrue();
+        assertThat(root.after().orElseThrow().status().isFailed()).isTrue();
     }
 }

@@ -26,7 +26,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.MockDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class XmlReportListenerTest {
     private XmlReportListener createListener(String reportFilePath) {
         var listener = new XmlReportListener();
         var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
-        listener.initialize(configuration);
+        listener.onRunStarted(configuration);
         return listener;
     }
 
@@ -68,7 +68,7 @@ class XmlReportListenerTest {
     void writesRootDescriptor() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("root-action", v -> {}));
+        var root = new MockDescriptor(Step.step("root-action", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -88,17 +88,17 @@ class XmlReportListenerTest {
     void writesDescriptorTreeWithChildren() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("parent", v -> {}));
+        var root = new MockDescriptor(Step.step("parent", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        var child1 = new ConcreteDescriptor(Step.of("child-a", v -> {}));
+        var child1 = new MockDescriptor(Step.step("child-a", v -> {}));
         child1.setStatus(Status.RUNNING);
         child1.setStatus(Status.PASSED);
-        var child2 = new ConcreteDescriptor(Step.of("child-b", v -> {}));
+        var child2 = new MockDescriptor(Step.step("child-b", v -> {}));
         child2.setStatus(Status.RUNNING);
         child2.setStatus(Status.FAILED);
-        root.addChild(child1);
-        root.addChild(child2);
+        root.child(child1);
+        root.child(child2);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
@@ -116,17 +116,17 @@ class XmlReportListenerTest {
     void rendersNestedDescriptorsWithConsistentIndentation() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+        var root = new MockDescriptor(Step.step("root", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        var child = new ConcreteDescriptor(Step.of("child", v -> {}));
+        var child = new MockDescriptor(Step.step("child", v -> {}));
         child.setStatus(Status.RUNNING);
         child.setStatus(Status.PASSED);
-        var grandchild = new ConcreteDescriptor(Step.of("grandchild", v -> {}));
+        var grandchild = new MockDescriptor(Step.step("grandchild", v -> {}));
         grandchild.setStatus(Status.RUNNING);
         grandchild.setStatus(Status.FAILED);
-        child.addChild(grandchild);
-        root.addChild(child);
+        child.child(grandchild);
+        root.child(child);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
@@ -146,7 +146,7 @@ class XmlReportListenerTest {
     void escapesXmlSpecialCharacters() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("a&b<c>d\"e", v -> {}));
+        var root = new MockDescriptor(Step.step("a&b<c>d\"e", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -163,7 +163,7 @@ class XmlReportListenerTest {
     void stripsIllegalXmlControlCharacters() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("test\u0001\u0008\u000b\u000c\u001fvalue", v -> {}));
+        var root = new MockDescriptor(Step.step("test\u0001\u0008\u000b\u000c\u001fvalue", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -184,7 +184,7 @@ class XmlReportListenerTest {
     void preservesLegalXmlControlCharacters() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("a\tb\nc\rd", v -> {}));
+        var root = new MockDescriptor(Step.step("a\tb\nc\rd", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -200,7 +200,7 @@ class XmlReportListenerTest {
     void escapesSingleQuote() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("it's", v -> {}));
+        var root = new MockDescriptor(Step.step("it's", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -217,7 +217,7 @@ class XmlReportListenerTest {
     void escapesMixedContentWithControlChars() throws Exception {
         var reportFile = tempDir.resolve("report.xml");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("a&b<c\u0001d\te", v -> {}));
+        var root = new MockDescriptor(Step.step("a&b<c\u0001d\te", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -263,21 +263,21 @@ class XmlReportListenerTest {
         void writesBeforeAndAfterSlots() throws Exception {
             var reportFile = tempDir.resolve("report.xml");
             var listener = createListener(reportFile.toString());
-            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            var root = new MockDescriptor(Step.step("root", v -> {}));
             root.setStatus(Status.RUNNING);
             root.setStatus(Status.PASSED);
-            var before = new ConcreteDescriptor(Step.of("before", v -> {}));
+            var before = new MockDescriptor(Step.step("before", v -> {}));
             before.setStatus(Status.RUNNING);
             before.setStatus(Status.PASSED);
-            root.setBefore(before);
-            var child = new ConcreteDescriptor(Step.of("child", v -> {}));
+            root.before(before);
+            var child = new MockDescriptor(Step.step("child", v -> {}));
             child.setStatus(Status.RUNNING);
             child.setStatus(Status.PASSED);
-            root.addChild(child);
-            var after = new ConcreteDescriptor(Step.of("after", v -> {}));
+            root.child(child);
+            var after = new MockDescriptor(Step.step("after", v -> {}));
             after.setStatus(Status.RUNNING);
             after.setStatus(Status.PASSED);
-            root.setAfter(after);
+            root.after(after);
             var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
             listener.onRunCompleted(result);

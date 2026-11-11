@@ -5,6 +5,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -118,8 +119,14 @@ class ReleaseTests(unittest.TestCase):
         entries = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
         return [entry for entry in entries if name is None or entry[0] == name]
 
-    def state(self):
-        return (self.root / '.git/release-state/1.0.0').read_text().splitlines()
+    def state(self, version='1.0.0'):
+        return (self.root / '.git/release-state' / version).read_text().splitlines()
+
+    def set_revision(self, revision):
+        pom = self.root / 'pom.xml'
+        pom.write_text(re.sub(r'<revision>.*?</revision>', '<revision>'+revision+'</revision>', pom.read_text()))
+        self.git('commit', '-am', 'Set revision ' + revision)
+        self.git('push', 'origin', 'main')
 
     def deployments(self):
         return [e for e in self.commands('mvnw') if 'deploy' in e[2]]
@@ -131,6 +138,15 @@ class ReleaseTests(unittest.TestCase):
     def test_invalid_arguments(self):
         for args in ((), ('abc',), ('1.0.0', '2.0.0'), ('1.0.0', '--unknown')):
             self.run_release(*args, success=False)
+
+    def test_invalid_alpha_versions_are_rejected_before_mutation(self):
+        for version in ('7.0.0-ALPHA', '1.0.0-ALPHA-0', '1.0.0-ALPHA-01', '1.0.0-alpha-1',
+                        '1.0.0-RC-1', '1.0.0-POST', '1.0.0-ALPHA-1-POST'):
+            output = self.run_release(version, success=False)
+            self.assertIn('Version must be', output)
+        self.assertEqual(self.commands('mvnw'), [])
+        self.assertIn('0.9.0-POST', (self.root / 'pom.xml').read_text())
+        self.assertFalse((self.root / '.git/release-state').exists())
 
     def test_dry_run_is_offline_and_does_not_build_or_write_state(self):
         self.env.pop(HOST)
@@ -313,6 +329,23 @@ class ReleaseTests(unittest.TestCase):
     def test_eof_at_publication_preserves_pending_release(self):
         self.run_release('1.0.0', '--execute', answers='y\ny\n', success=False)
         self.assertEqual(self.state()[0], '4')
+        self.assertEqual(len(self.deployments()), 1)
+
+    def test_alpha_release_flow(self):
+        self.run_release('1.0.0-ALPHA-1', '--execute')
+        self.assertEqual(self.state('1.0.0-ALPHA-1')[0], '8')
+        self.assertEqual(self.git('rev-parse', 'v1.0.0-ALPHA-1^{commit}'),
+                         self.git('rev-parse', 'release/1.0.0-ALPHA-1'))
+        self.assertIn('<revision>1.0.0-ALPHA-1-POST</revision>', (self.root / 'pom.xml').read_text())
+        self.assertEqual(len(self.deployments()), 1)
+
+    def test_second_alpha_releases_from_post_revision(self):
+        self.set_revision('1.0.0-ALPHA-1-POST')
+        self.run_release('1.0.0-ALPHA-2', '--execute')
+        self.assertEqual(self.state('1.0.0-ALPHA-2')[0], '8')
+        self.assertEqual(self.git('rev-parse', 'v1.0.0-ALPHA-2^{commit}'),
+                         self.git('rev-parse', 'release/1.0.0-ALPHA-2'))
+        self.assertIn('<revision>1.0.0-ALPHA-2-POST</revision>', (self.root / 'pom.xml').read_text())
         self.assertEqual(len(self.deployments()), 1)
 
     def test_gradle_option(self):

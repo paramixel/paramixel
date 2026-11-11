@@ -17,8 +17,7 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
@@ -28,59 +27,51 @@ import java.util.List;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Static;
+import org.paramixel.api.action.Scope;
 
-@SuppressWarnings("removal")
 public class FullLifecycleTest {
 
     private static final List<String> callOrder = new ArrayList<>();
 
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     @Paramixel.Factory
     public static Action factory() {
-        return Static.builder(FullLifecycleTest.class.getName())
+        return Scope.scope(FullLifecycleTest.class.getName())
                 .before(step("staticSetUp()", context -> staticSetUp()))
-                .body(instance("FullLifecycleTest", FullLifecycleTest::new)
+                .body(of("FullLifecycleTest", FullLifecycleTest.class, FullLifecycleTest::new)
                         .body(scope("scope")
-                                .before(step(
-                                        "setUp()", withInstance(FullLifecycleTest.class, FullLifecycleTest::setUp)))
+                                .before(step("setUp()", FullLifecycleTest.class, FullLifecycleTest::setUp))
                                 .body(sequential("tests")
                                         .child(scope("testOne")
                                                 .before(step(
                                                         "beforeEach()",
-                                                        withInstance(
-                                                                FullLifecycleTest.class,
-                                                                FullLifecycleTest::beforeEach)))
+                                                        FullLifecycleTest.class,
+                                                        FullLifecycleTest::beforeEach))
                                                 .body(step(
                                                         "testOne()",
-                                                        withInstance(
-                                                                FullLifecycleTest.class, FullLifecycleTest::testOne)))
+                                                        FullLifecycleTest.class,
+                                                        FullLifecycleTest::testOne))
                                                 .after(step(
                                                         "afterEach()",
-                                                        withInstance(
-                                                                FullLifecycleTest.class,
-                                                                FullLifecycleTest::afterEach))))
+                                                        FullLifecycleTest.class,
+                                                        FullLifecycleTest::afterEach)))
                                         .child(scope("testTwo")
                                                 .before(step(
                                                         "beforeEach()",
-                                                        withInstance(
-                                                                FullLifecycleTest.class,
-                                                                FullLifecycleTest::beforeEach)))
+                                                        FullLifecycleTest.class,
+                                                        FullLifecycleTest::beforeEach))
                                                 .body(step(
                                                         "testTwo()",
-                                                        withInstance(
-                                                                FullLifecycleTest.class, FullLifecycleTest::testTwo)))
+                                                        FullLifecycleTest.class,
+                                                        FullLifecycleTest::testTwo))
                                                 .after(step(
                                                         "afterEach()",
-                                                        withInstance(
-                                                                FullLifecycleTest.class,
-                                                                FullLifecycleTest::afterEach)))))
-                                .after(step(
-                                        "tearDown()",
-                                        withInstance(FullLifecycleTest.class, FullLifecycleTest::tearDown)))))
+                                                        FullLifecycleTest.class,
+                                                        FullLifecycleTest::afterEach))))
+                                .after(step("tearDown()", FullLifecycleTest.class, FullLifecycleTest::tearDown))))
                 .after(step("staticTearDown()", context -> staticTearDown()))
                 .build();
     }

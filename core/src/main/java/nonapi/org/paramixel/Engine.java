@@ -17,26 +17,27 @@
 package nonapi.org.paramixel;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import nonapi.org.paramixel.action.ConcreteContext;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.MutableDescriptor;
+import nonapi.org.paramixel.action.ScopeFrame;
 import nonapi.org.paramixel.action.StatusAccumulator;
+import nonapi.org.paramixel.action.Statuses;
+import nonapi.org.paramixel.action.StepAccessors;
 import nonapi.org.paramixel.exception.UserCodeException;
 import nonapi.org.paramixel.listener.Listeners;
 import nonapi.org.paramixel.support.StackTracePruner;
@@ -48,43 +49,33 @@ import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Assert;
 import org.paramixel.api.action.Conditional;
-import org.paramixel.api.action.Delay;
-import org.paramixel.api.action.Instance;
 import org.paramixel.api.action.Loop;
 import org.paramixel.api.action.Step;
-import org.paramixel.api.action.Until;
 
 /**
- * Depth-first execution engine for a compiled {@link ExecutionPlan}.
+ * Depth-first execution engine for a compiled {@link CompiledPlan}.
  *
- * <p>Execution is recursive. A {@code Parallel} node is run by up to {@code cap} <em>lanes</em> that
- * share a cursor over its children (see {@link ParallelFrame}): the coordinating thread is always
- * the first lane, and further lanes run on worker threads while permits are available. A lane
- * that finishes a child immediately claims the next unstarted one, so children start in declaration
- * order and a child that blocks can never keep its later siblings from starting.
+ * <p>Execution is recursive and depth-first: a node reports to the listener, runs its subtree, and then reports
+ * completion, all on one thread. A {@code Parallel} node is run by a coordinating thread that admits its
+ * children in declaration order, taking one permit from the node's named {@link Pool} per child and starting the
+ * child on a worker thread (see {@link #runParallel}). The child's own thread returns the permit when its subtree
+ * is terminal. Because admission waits only for a permit, a later sibling never waits for an earlier sibling to
+ * finish, and a pool of size one yields exactly serial depth-first order.
  *
- * <p>{@code parallelism} is a hard ceiling on executing stacks: the calling thread holds one permit
- * for the whole run and every worker holds one while it runs.
- * Nothing ever blocks waiting for a permit. A frame that wants another lane when none is free
- * registers with the {@link Dispatcher}, and the next worker that runs out of work serves it on an
- * empty stack instead of releasing its permit. Coordinators wait only for lanes that are already
- * running, so the wait-for graph always ends at an executing stack. Resource-holding branches are
- * therefore bounded by {@code parallelism}.
+ * <p>Blocking on a permit is safe because {@link PoolValidator} rejects, before anything runs, every plan in which
+ * a pool could be waited on while an ancestor already holds it, or in which pools and {@code Isolated} locks can
+ * be taken in conflicting order.
  *
- * <p>A {@code Timeout} runs its child on a dedicated thread that takes over the slot of the parked
- * waiting thread, so the deadline can always preempt the child and no permit is needed. Only
- * executing work is bounded by {@code parallelism}; parked waiters are not counted. At the deadline
- * the child's subtree is cancelled, but lifecycle {@code after} actions whose {@code before} was
- * attempted still run, and the {@code Timeout} completes only after that cleanup has finished. If
- * the subtree makes no cleanup progress for a grace period (a leaf ignoring interruption), the
- * {@code Timeout} abandons it and that thread may keep running in the background.
- *
- * <p>Deliberate behavioral differences from the previous queue-based scheduler: inter-iteration
- * delays occupy the executing branch, and there is no work stealing.
+ * <p>A {@code Timeout} runs its child on a dedicated thread so the deadline can always preempt the child. At the
+ * deadline the child's subtree is cancelled, but lifecycle {@code after} actions whose {@code before} was
+ * attempted still run, and the {@code Timeout} completes only after that cleanup has finished. If the subtree
+ * makes no cleanup progress for a grace period (a leaf ignoring interruption), the {@code Timeout} abandons it and
+ * that thread may keep running in the background, still holding the pool permits of its subtree until it exits.
  */
 final class Engine implements AutoCloseable {
+
+    private static final String LOOP_SATISFIED = "loop satisfied";
 
     private static final String THREAD_NAME = "paramixel-engine";
     private static final String TIMED_THREAD_NAME = "paramixel-timed";
@@ -92,14 +83,11 @@ final class Engine implements AutoCloseable {
     private static final long CANCELLATION_GRACE_SECONDS = 5L;
     private static final long CANCELLATION_POLL_MILLIS = 25L;
 
-    private final int parallelism;
-    private final Dispatcher dispatcher;
-    private final ThreadPoolExecutor pool;
+    private final Pools pools;
+    private final ExecutorService workers;
     private final ExecutorService timedBranches;
     private final ScheduledExecutorService timers;
-    private final Set<ParallelFrame> liveFrames = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
-    private final ThreadLocal<Integer> isolationDepth = ThreadLocal.withInitial(() -> 0);
     private final AtomicInteger threadCounter = new AtomicInteger();
 
     private volatile boolean closing;
@@ -107,19 +95,13 @@ final class Engine implements AutoCloseable {
     private volatile boolean failureOccurred;
     private volatile Throwable unrecoverableFailure;
 
-    Engine(final int parallelism) {
-        if (parallelism <= 0) {
-            throw new IllegalArgumentException("parallelism must be positive, was: " + parallelism);
-        }
-        this.parallelism = parallelism;
-        this.dispatcher = new Dispatcher(parallelism);
-        this.pool = new ThreadPoolExecutor(
-                parallelism,
-                parallelism,
-                0L,
-                TimeUnit.MILLISECONDS,
-                new java.util.concurrent.LinkedBlockingQueue<>(),
-                threadFactory());
+    Engine(final Pools pools) {
+        this.pools = Objects.requireNonNull(pools, "pools is null");
+        this.workers = Executors.newCachedThreadPool(runnable -> {
+            var thread = new Thread(runnable, THREAD_NAME + "-" + threadCounter.getAndIncrement());
+            thread.setDaemon(true);
+            return thread;
+        });
         this.timedBranches = Executors.newCachedThreadPool(runnable -> {
             var thread = new Thread(runnable, TIMED_THREAD_NAME + "-" + threadCounter.getAndIncrement());
             thread.setDaemon(true);
@@ -132,25 +114,14 @@ final class Engine implements AutoCloseable {
         });
     }
 
-    private ThreadFactory threadFactory() {
-        return runnable -> {
-            var thread = new Thread(runnable, THREAD_NAME + "-" + threadCounter.getAndIncrement());
-            thread.setDaemon(true);
-            return thread;
-        };
-    }
-
-    int parallelism() {
-        return parallelism;
-    }
-
     /**
-     * Returns the number of unallocated permits.
+     * Returns the number of free permits in a pool.
      *
+     * @param pool the pool name; must not be {@code null}
      * @return the free permit count
      */
-    int availablePermits() {
-        return dispatcher.availablePermits();
+    int availablePermits(final String pool) {
+        return pools.pool(pool).availablePermits();
     }
 
     void setFailFast(final boolean failFast) {
@@ -162,31 +133,33 @@ final class Engine implements AutoCloseable {
     }
 
     /**
-     * Compiles and executes the supplied descriptor tree on the calling thread.
+     * Returns the pool sizes and peak usage observed by this run.
      *
-     * @param root the discovered root descriptor; must not be {@code null}
+     * @return the pool statistics; never {@code null}
+     */
+    List<Pools.PoolStats> poolStats() {
+        return pools.stats();
+    }
+
+    /**
+     * Validates and executes a compiled plan on the calling thread.
+     *
+     * @param plan the compiled plan; must not be {@code null}
      * @param configuration the run configuration; must not be {@code null}
      * @param listener the run listener; must not be {@code null}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws org.paramixel.api.exception.ConfigurationException if the configuration makes the plan invalid
      */
-    void execute(final MutableDescriptor root, final Configuration configuration, final Listener listener) {
-        Objects.requireNonNull(root, "root is null");
+    void execute(final CompiledPlan plan, final Configuration configuration, final Listener listener) {
+        Objects.requireNonNull(plan, "plan is null");
         Objects.requireNonNull(configuration, "configuration is null");
         Objects.requireNonNull(listener, "listener is null");
-        var plan = ExecutionPlan.compile(root);
-        var context = new ConcreteContext(configuration, listener, root, new InstanceHolder());
-        // The calling thread is the root lane, so it is charged against the same budget as workers.
-        var callerSlot = dispatcher.tryAcquire();
+        PlanValidator.validate(plan, pools);
+        var context = new ConcreteContext(configuration, listener, plan.root().descriptor, ScopeFrame.root());
         try {
             run(plan.root(), context, ExecutionMode.RUN);
-            root.completeFuture();
         } catch (Throwable t) {
-            var cause = Throwables.unwrap(t);
-            recordUnrecoverableFailure(cause);
-            root.completeFutureExceptionally(cause);
-        } finally {
-            if (callerSlot) {
-                dispatcher.release();
-            }
+            recordUnrecoverableFailure(Throwables.unwrap(t));
         }
     }
 
@@ -203,7 +176,7 @@ final class Engine implements AutoCloseable {
 
     // ── Node execution ─────────────────────────────────────────────────
 
-    private Status run(final ExecutionPlan.Node node, final ConcreteContext context, final ExecutionMode mode) {
+    private Status run(final CompiledPlan.Node node, final ConcreteContext context, final ExecutionMode mode) {
         var descriptor = node.descriptor;
         var currentStatus = descriptor.status();
         if (!currentStatus.isPending() && !currentStatus.isRunning()) {
@@ -211,8 +184,8 @@ final class Engine implements AutoCloseable {
         }
         var thread = Thread.currentThread();
         var originalName = thread.getName();
-        var concrete = descriptor instanceof ConcreteDescriptor c ? c : null;
-        var leaf = node.kind == ExecutionPlan.Kind.TERMINAL && concrete != null;
+        var concrete = node.descriptor;
+        var leaf = node.kind == CompiledPlan.Kind.TERMINAL;
         Throwable failure = null;
         Status status = null;
         try {
@@ -232,7 +205,7 @@ final class Engine implements AutoCloseable {
             }
             recordUnrecoverableFailure(failure);
             StackTracePruner.prune(failure);
-            status = Status.fromThrowable(UserCodeException.wrap(failure));
+            status = Statuses.fromThrowable(UserCodeException.wrap(failure));
         } finally {
             if (leaf) {
                 concrete.setExecutingThread(null);
@@ -242,6 +215,9 @@ final class Engine implements AutoCloseable {
             recordFailureForFailFast(descriptor);
             try {
                 context.listener().onAfterExecution(descriptor);
+            } catch (VirtualMachineError error) {
+                // A broken JVM must not be swallowed, even inside listener isolation.
+                throw error;
             } catch (Throwable ignored) {
                 // Listener failures are isolated by SafeListener in production wiring.
             }
@@ -250,7 +226,7 @@ final class Engine implements AutoCloseable {
         return descriptor.status();
     }
 
-    private Status execute(final ExecutionPlan.Node node, final ConcreteContext context, final ExecutionMode mode) {
+    private Status execute(final CompiledPlan.Node node, final ConcreteContext context, final ExecutionMode mode) {
         // Fail fast takes precedence over a skip mode so the reason is retained on the descriptor.
         if (shouldSkipForFailFast(node.descriptor)) {
             runDescendants(node, context, ExecutionMode.SKIP);
@@ -270,8 +246,6 @@ final class Engine implements AutoCloseable {
             case PARALLEL -> runParallel(node, context);
             case LIFECYCLE -> runLifecycle(node, context);
             case LOOP -> runLoop(node, context);
-            case REPEAT -> runRepeat(node, context);
-            case UNTIL -> runUntil(node, context);
             case TIMEOUT -> runTimeout(node, context);
             case ISOLATED -> runIsolated(node, context);
             case CONDITIONAL -> runConditional(node, context);
@@ -280,7 +254,7 @@ final class Engine implements AutoCloseable {
 
     // ── Controls ───────────────────────────────────────────────────────
 
-    private Status runTerminal(final ExecutionPlan.Node node, final ConcreteContext context) {
+    private Status runTerminal(final CompiledPlan.Node node, final ConcreteContext context) {
         try {
             consumerOf(node.control).accept(context);
         } catch (RuntimeException | Error e) {
@@ -293,19 +267,13 @@ final class Engine implements AutoCloseable {
 
     private static ContextConsumer consumerOf(final Action action) {
         if (action instanceof Step step) {
-            return step.throwableConsumer();
-        }
-        if (action instanceof Assert assertAction) {
-            return assertAction.throwableConsumer();
-        }
-        if (action instanceof Delay delay) {
-            return delay.throwableConsumer();
+            return StepAccessors.consumerOf(step);
         }
         throw new IllegalStateException(
                 "not a terminal action: " + action.getClass().getName());
     }
 
-    private Status runSequential(final ExecutionPlan.Node node, final ConcreteContext context) {
+    private Status runSequential(final CompiledPlan.Node node, final ConcreteContext context) {
         var aggregator = new StatusAccumulator();
         var mode = ExecutionMode.RUN;
         for (var child : node.children) {
@@ -318,103 +286,92 @@ final class Engine implements AutoCloseable {
         return aggregator.status();
     }
 
-    private Status runParallel(final ExecutionPlan.Node node, final ConcreteContext context) {
-        if (node.children.length == 0) {
+    /**
+     * Runs the children of a {@code Parallel} node, bounded by its pool.
+     *
+     * <p>The coordinating thread admits the children strictly in declaration order: it takes one pool permit per
+     * child (blocking, interruptibly, in FIFO order), starts the child on a worker thread, and goes on to the next
+     * child without waiting for the previous one. The child's own thread returns the permit when the child's
+     * subtree is terminal. A later sibling therefore waits only for a permit, never for an earlier sibling.
+     *
+     * <p>If the coordinator is interrupted or the engine is closing, admission stops: every child that was not
+     * started is reported {@code ABORTED} (without taking a permit) and the in-flight children are left to be
+     * interrupted by {@link #close()}.
+     */
+    private Status runParallel(final CompiledPlan.Node node, final ConcreteContext context) {
+        var children = node.children;
+        if (children.length == 0) {
             return Status.PASSED;
         }
-        var frame = new ParallelFrame(node, context, effectiveCap(node));
-        liveFrames.add(frame);
-        try {
-            var first = frame.claim();
-            recruit(frame);
-            runChild(frame, first);
-            runLane(frame);
-            if (frame.awaitWorkers()) {
-                Thread.currentThread().interrupt();
+        var pool = pools.pool(node.poolName);
+        var aggregator = new StatusAccumulator();
+        var pending = new CountDownLatch(children.length);
+        var stopped = false;
+        for (var child : children) {
+            if (!stopped && !closing) {
+                try {
+                    pool.acquire();
+                } catch (InterruptedException e) {
+                    stopped = true;
+                }
+            } else {
+                stopped = true;
             }
-            return frame.status();
-        } finally {
-            liveFrames.remove(frame);
-            dispatcher.forget(frame);
-        }
-    }
-
-    private int effectiveCap(final ExecutionPlan.Node node) {
-        var cap = Math.min(node.cap, parallelism);
-        if (isolationDepth.get() > 0) {
-            cap = 1;
-        }
-        return Math.max(1, cap);
-    }
-
-    /**
-     * Starts worker lanes for the frame while it has unstarted children, is below its cap and permits
-     * are free. If no permit is free the frame is queued with the dispatcher and will be served by
-     * the next worker that runs out of work.
-     */
-    private void recruit(final ParallelFrame frame) {
-        while (frame.tryJoin()) {
-            if (!dispatcher.acquireOrQueue(frame)) {
-                frame.leave();
-                return;
+            if (stopped || closing) {
+                stopped = true;
+                include(aggregator, run(child, childContext(context, child.descriptor), ExecutionMode.ABORT));
+                pending.countDown();
+                continue;
             }
             try {
-                pool.execute(() -> work(() -> runWorkerLane(frame)));
+                workers.execute(() -> {
+                    try {
+                        include(aggregator, run(child, childContext(context, child.descriptor), ExecutionMode.RUN));
+                    } catch (Throwable t) {
+                        recordUnrecoverableFailure(t);
+                        include(aggregator, Status.ABORTED);
+                    } finally {
+                        pool.release();
+                        pending.countDown();
+                    }
+                });
             } catch (RejectedExecutionException e) {
-                dispatcher.release();
-                frame.leave();
-                return;
+                pool.release();
+                stopped = true;
+                include(aggregator, run(child, childContext(context, child.descriptor), ExecutionMode.ABORT));
+                pending.countDown();
             }
         }
-    }
-
-    /**
-     * Body of a pool task. The caller holds one permit; after the job it keeps serving hungry frames
-     * and releases the permit only when none is waiting.
-     */
-    private void work(final Runnable job) {
+        var interrupted = stopped && !closing && Thread.currentThread().isInterrupted();
         try {
-            job.run();
-        } catch (Throwable t) {
-            recordUnrecoverableFailure(t);
+            pending.await();
+        } catch (InterruptedException e) {
+            interrupted = true;
+            include(aggregator, Status.ABORTED);
         }
-        for (var frame = dispatcher.handOffOrRelease(); frame != null; frame = dispatcher.handOffOrRelease()) {
-            try {
-                runWorkerLane(frame);
-            } catch (Throwable t) {
-                recordUnrecoverableFailure(t);
-            }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
-    }
-
-    private void runWorkerLane(final ParallelFrame frame) {
-        try {
-            recruit(frame);
-            runLane(frame);
-        } finally {
-            frame.leave();
+        synchronized (aggregator) {
+            return aggregator.status();
         }
     }
 
-    private void runLane(final ParallelFrame frame) {
-        for (var child = frame.claim(); child != null; child = frame.claim()) {
-            runChild(frame, child);
+    private static void include(final StatusAccumulator aggregator, final Status status) {
+        synchronized (aggregator) {
+            aggregator.include(status);
         }
     }
 
-    private void runChild(final ParallelFrame frame, final ExecutionPlan.Node child) {
-        frame.include(run(child, childContext(frame.context(), child.descriptor), ExecutionMode.RUN));
-    }
-
-    private Status runLifecycle(final ExecutionPlan.Node node, final ConcreteContext context) {
-        var holder = node.control instanceof Instance ? new InstanceHolder() : context.instanceHolder();
-        var scoped = new ConcreteContext(context.configuration(), context.listener(), context.descriptor(), holder);
+    private Status runLifecycle(final CompiledPlan.Node node, final ConcreteContext context) {
+        var scoped = context.withFrame(context.frame().child());
         var aggregator = new StatusAccumulator();
         if (node.before != null) {
             aggregator.include(run(node.before, childContext(scoped, node.before.descriptor), ExecutionMode.RUN));
         }
-        var bodyMode =
-                node.before == null || node.before.descriptor.isPassed() ? ExecutionMode.RUN : ExecutionMode.SKIP;
+        var bodyMode = node.before == null || node.before.descriptor.status().isPassed()
+                ? ExecutionMode.RUN
+                : ExecutionMode.SKIP;
         for (var child : node.children) {
             aggregator.include(run(child, childContext(scoped, child.descriptor), bodyMode));
         }
@@ -424,7 +381,7 @@ final class Engine implements AutoCloseable {
         return aggregator.status();
     }
 
-    private Status runLoop(final ExecutionPlan.Node node, final ConcreteContext context) {
+    private Status runLoop(final CompiledPlan.Node node, final ConcreteContext context) {
         var loop = (Loop) node.control;
         var aggregator = new StatusAccumulator();
         for (var i = 0; i < node.children.length; i++) {
@@ -438,19 +395,19 @@ final class Engine implements AutoCloseable {
             if (loop.until().isPresent()) {
                 boolean satisfied;
                 try {
-                    satisfied = loop.until().get().test(context);
+                    satisfied = loop.until().get().test(context, status);
                 } catch (Throwable t) {
                     UnrecoverableErrors.rethrowIfUnrecoverable(t);
                     skipRemaining(node, i + 1, context, aggregator);
                     return Status.failed("until predicate failed: " + t.getMessage(), t);
                 }
                 if (satisfied) {
-                    skipRemaining(node, i + 1, context, aggregator);
+                    skipRemaining(node, i + 1, context, aggregator, LOOP_SATISFIED);
                     return Status.PASSED;
                 }
             }
             if (loop.delay().isPresent() && i + 1 < node.children.length) {
-                var nanos = delayNanos(loop.delay().get().delayForIteration(i + 1));
+                var nanos = delayNanos(loop.delay().get().delayFor(i + 1));
                 if (nanos > 0) {
                     sleep(nanos);
                 }
@@ -459,47 +416,7 @@ final class Engine implements AutoCloseable {
         return loop.until().isPresent() ? Status.FAILED : aggregator.status();
     }
 
-    private Status runRepeat(final ExecutionPlan.Node node, final ConcreteContext context) {
-        var aggregator = new StatusAccumulator();
-        for (var child : node.children) {
-            aggregator.include(run(child, childContext(context, child.descriptor), ExecutionMode.RUN));
-        }
-        return aggregator.status();
-    }
-
-    @SuppressWarnings("removal")
-    private Status runUntil(final ExecutionPlan.Node node, final ConcreteContext context) {
-        var until = (Until) node.control;
-        var aggregator = new StatusAccumulator();
-        for (var i = 0; i < node.children.length; i++) {
-            var child = node.children[i];
-            var status = run(child, childContext(context, child.descriptor), ExecutionMode.RUN);
-            aggregator.include(status);
-            if (status.isAborted()) {
-                skipRemaining(node, i + 1, context, aggregator);
-                return Status.ABORTED;
-            }
-            boolean satisfied;
-            if (until.until().isPresent()) {
-                try {
-                    satisfied = until.until().get().test(context);
-                } catch (Throwable t) {
-                    UnrecoverableErrors.rethrowIfUnrecoverable(t);
-                    skipRemaining(node, i + 1, context, aggregator);
-                    return Status.failed("until predicate failed: " + t.getMessage(), t);
-                }
-            } else {
-                satisfied = status.isPassed();
-            }
-            if (satisfied) {
-                skipRemaining(node, i + 1, context, aggregator);
-                return Status.PASSED;
-            }
-        }
-        return Status.FAILED;
-    }
-
-    private Status runTimeout(final ExecutionPlan.Node node, final ConcreteContext context) {
+    private Status runTimeout(final CompiledPlan.Node node, final ConcreteContext context) {
         var child = node.children[0];
         var millis = TimeUnit.NANOSECONDS.toMillis(node.timeoutNanos);
         var message = "timed out after " + millis + " ms";
@@ -521,18 +438,15 @@ final class Engine implements AutoCloseable {
             }
         }
         var childContext = childContext(context, child.descriptor);
-        var isolation = isolationDepth.get();
         try {
             // The child always runs on its own thread so the deadline can preempt it. That thread takes
             // over this thread's execution slot while this thread is parked, so no permit is needed
             // and waiting here can never starve another branch.
             try {
                 timedBranches.execute(() -> {
-                    isolationDepth.set(isolation);
                     try {
                         run(child, childContext, ExecutionMode.RUN);
                     } finally {
-                        isolationDepth.remove();
                         settled.complete(null);
                     }
                 });
@@ -633,21 +547,22 @@ final class Engine implements AutoCloseable {
         descriptor.after().ifPresent(after -> abandon(after, message));
     }
 
-    private Status runIsolated(final ExecutionPlan.Node node, final ConcreteContext context) {
+    private Status runIsolated(final CompiledPlan.Node node, final ConcreteContext context) {
+        var child = node.children[0];
+        if (node.passThrough) {
+            // An ancestor already holds this lock name, so its exclusion covers this node.
+            return run(child, childContext(context, child.descriptor), ExecutionMode.RUN);
+        }
         var lock = lock(node.lockName);
-        var depth = isolationDepth.get();
         lock.lock();
-        isolationDepth.set(depth + 1);
         try {
-            var child = node.children[0];
             return run(child, childContext(context, child.descriptor), ExecutionMode.RUN);
         } finally {
-            isolationDepth.set(depth);
             lock.unlock();
         }
     }
 
-    private Status runConditional(final ExecutionPlan.Node node, final ConcreteContext context) {
+    private Status runConditional(final CompiledPlan.Node node, final ConcreteContext context) {
         var conditional = (Conditional) node.control;
         boolean condition;
         try {
@@ -658,7 +573,9 @@ final class Engine implements AutoCloseable {
             return Status.failed("condition evaluation failed: " + t.getMessage(), t);
         }
         if (!condition) {
+            var reason = "condition not met: " + conditional.displayName();
             runDescendants(node, context, ExecutionMode.SKIP);
+            markSkipped(node, reason);
             return Status.PASSED;
         }
         var child = node.children[0];
@@ -668,18 +585,54 @@ final class Engine implements AutoCloseable {
     // ── Helpers ────────────────────────────────────────────────────────
 
     private void skipRemaining(
-            final ExecutionPlan.Node node,
+            final CompiledPlan.Node node,
             final int from,
             final ConcreteContext context,
             final StatusAccumulator aggregator) {
+        skipRemaining(node, from, context, aggregator, null);
+    }
+
+    /**
+     * Runs the remaining children in skip mode.
+     *
+     * <p>When {@code reason} is present, every remaining child is reported {@code SKIPPED} with that message, which
+     * lets a report distinguish "this never ran because the loop was satisfied" from a real skip.
+     */
+    private void skipRemaining(
+            final CompiledPlan.Node node,
+            final int from,
+            final ConcreteContext context,
+            final StatusAccumulator aggregator,
+            final String reason) {
         for (var i = from; i < node.children.length; i++) {
             var child = node.children[i];
-            aggregator.include(run(child, childContext(context, child.descriptor), ExecutionMode.SKIP));
+            var status = run(child, childContext(context, child.descriptor), ExecutionMode.SKIP);
+            if (reason != null && status.isSkipped()) {
+                child.descriptor.replaceStatus(Status.skipped(reason));
+            }
+            aggregator.include(child.descriptor.status());
         }
     }
 
-    private void runDescendants(
-            final ExecutionPlan.Node node, final ConcreteContext context, final ExecutionMode mode) {
+    /**
+     * Replaces every skipped descendant status with a message that states why the subtree did not run.
+     */
+    private static void markSkipped(final CompiledPlan.Node node, final String reason) {
+        if (node.before != null) {
+            markSkipped(node.before, reason);
+        }
+        for (var child : node.children) {
+            markSkipped(child, reason);
+        }
+        if (node.after != null) {
+            markSkipped(node.after, reason);
+        }
+        if (node.descriptor.status().isSkipped()) {
+            node.descriptor.replaceStatus(Status.skipped(reason));
+        }
+    }
+
+    private void runDescendants(final CompiledPlan.Node node, final ConcreteContext context, final ExecutionMode mode) {
         if (node.before != null) {
             run(node.before, childContext(context, node.before.descriptor), mode);
         }
@@ -692,7 +645,7 @@ final class Engine implements AutoCloseable {
     }
 
     private ConcreteContext childContext(final ConcreteContext parent, final MutableDescriptor child) {
-        return new ConcreteContext(parent.configuration(), parent.listener(), child, parent.instanceHolder());
+        return new ConcreteContext(parent.configuration(), parent.listener(), child, parent.frame());
     }
 
     private void terminalize(final MutableDescriptor descriptor, final Status status, final Throwable failure) {
@@ -768,17 +721,13 @@ final class Engine implements AutoCloseable {
         closing = true;
         timers.shutdownNow();
         timedBranches.shutdownNow();
-        for (var frame : liveFrames) {
-            frame.abandon();
-        }
-        pool.shutdownNow();
+        workers.shutdownNow();
         try {
-            if (!pool.awaitTermination(TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                pool.shutdownNow();
+            if (!workers.awaitTermination(TERMINATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                workers.shutdownNow();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        dispatcher.close();
     }
 }

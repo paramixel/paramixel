@@ -33,20 +33,42 @@ reflect mid-JVM property changes.
 
 ## Typed getters
 
-`getString`, `getBoolean`, `getInteger`, `getLong`, `getFloat`, and `getDouble` return `Optional` values. Invalid numeric values throw `ConfigurationException`.
+`getString`, `getBoolean`, `getInteger` and `getLong` return `Optional` values, and `get(key, transformer)` covers anything else (for example `get("ratio", Double::valueOf)`). Invalid values throw `ConfigurationException`.
 
 ## Keys
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `paramixel.parallelism` | available processors | Maximum concurrently executing branches, including the coordinating threads that hold them. Must be a positive integer. |
+| `paramixel.parallelism` | available processors | Size of the root pool: the discovered top-level `Parallel`. Must be a positive integer. |
+| `paramixel.parallelism.<pool>` | none | Size of the user pool `<pool>`, which every `Parallel` that names it must find defined; a pool may be called `root`. A positive integer, or `@cores`, `@cores*N`, `@cores/N` (see below). Use `Configuration.poolKey(name)`. |
 | `paramixel.ansi` | `auto` | Console ANSI mode: `true`, `false`, or `auto`. |
 | `paramixel.failureOnSkip` | `false` | Treat skipped aggregate results as failing exit codes. |
 | `paramixel.failureOnAbort` | `true` | Treat aborted aggregate results as failing exit codes. |
 | `paramixel.failIfNoTests` | `false` | Fail when classpath discovery finds no factories. |
-| `paramixel.failFast` | `false` | Stop scheduling remaining root children after the first failed or aborted action. |
+| `paramixel.failFast` | `false` | Skip the remaining direct children of the root after the first failed or aborted action. |
 | `paramixel.report.file` | unset | Write a run report. `.json`, `.xml`, `.html`, `.log`, and `.txt` are recognized; unknown extensions use text. |
 | `paramixel.match.package.regex` | unset | Java regex, using `matches()`, matched against package names. |
 | `paramixel.match.class.regex` | unset | Java regex, using `matches()`, matched against fully qualified class names. |
 | `paramixel.match.tag.regex` | unset | Java regex, using `matches()`, matched against each `@Paramixel.Tag` value. |
 | `paramixel.listener.exclude` | unset | Comma-separated listener sections: `status.header`, `status.footer`, `summary.header`, `summary.tree`, `summary.footer`, plus shorthands `status`, `quiet`, and `all`. |
+
+An unknown key that starts with `paramixel.` is reported once through `Listener.onWarning`, as is a
+`paramixel.parallelism.<name>` key that names a pool no `Parallel` in the run uses.
+
+## Sizing a pool from the CPU count
+
+A pool size (and `paramixel.parallelism`) is a positive integer or one of:
+
+| Value | Meaning |
+| --- | --- |
+| `@cores` | the number of processors the JVM reports (`Runtime.availableProcessors()`, which honors container CPU limits) |
+| `@cores*N` | that number times `N` |
+| `@cores/N` | that number divided by `N`, rounded down |
+
+`N` is a positive integer, and the result is never less than 1. It is resolved once per run. Any other value fails
+the run before anything executes and names the key.
+
+```properties
+# start at most as many environments as the JVM reports cores
+paramixel.parallelism.environments=@cores
+```

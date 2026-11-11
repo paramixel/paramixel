@@ -27,6 +27,6 @@ public final class ActionResolverFactoryTimingZetaFixture {
     @Paramixel.Factory
     public static Action factory() {
         ActionResolverFactoryTimingLog.FACTORY_LOG.add("zeta-factory");
-        return Step.of("zeta-action", context -> ActionResolverFactoryTimingLog.RUN_LOG.add("zeta-run"));
+        return Step.step("zeta-action", context -> ActionResolverFactoryTimingLog.RUN_LOG.add("zeta-run"));
     }
 }

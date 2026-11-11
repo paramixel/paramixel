@@ -43,16 +43,16 @@ class FactoryTest {
     Path tempDir;
 
     @Test
-    @DisplayName("defaultRunner returns ConcreteRunner")
-    void defaultRunnerReturnsConcreteRunner() {
-        var runner = Runner.defaultRunner();
+    @DisplayName("Runner.builder().build() returns ConcreteRunner")
+    void builderReturnsConcreteRunner() {
+        var runner = Runner.builder().build();
         assertThat(runner).isInstanceOf(ConcreteRunner.class);
     }
 
     @Test
     @DisplayName("defaultListener returns SafeListener")
     void defaultListenerReturnsSafeListener() {
-        var listener = Listener.defaultListener();
+        var listener = Listener.defaultListener(Configuration.of(Map.of()));
         assertThat(listener).isInstanceOf(SafeListener.class);
     }
 
@@ -114,7 +114,7 @@ class FactoryTest {
                         Configuration.of(Map.of(Configuration.REPORT_FILE, reportFile.toString()))))
                 .build();
 
-        runner.run(Step.of("unknown-extension-action", context -> {}));
+        runner.run(Step.step("unknown-extension-action", context -> {}));
 
         assertThat(reportFile).exists();
         var report = Files.readString(reportFile, StandardCharsets.UTF_8);
@@ -160,7 +160,7 @@ class FactoryTest {
     @DisplayName("defaultListener with paramixel.ansi=true enables ANSI in StatusListener")
     void defaultListenerWithAnsiTrueEnablesStatusListenerAnsi() throws Exception {
         var listener = Listener.defaultListener(Configuration.of(Map.of(Configuration.ANSI, "true")));
-        listener.initialize(Configuration.of(Map.of()));
+        listener.onRunStarted(Configuration.of(Map.of()));
 
         List<Listener> inner = extractListeners(listener);
         var ansiField = StatusListener.class.getDeclaredField("ansiEnabled");
@@ -173,7 +173,7 @@ class FactoryTest {
     @DisplayName("defaultListener with paramixel.ansi=false disables ANSI in StatusListener")
     void defaultListenerWithAnsiFalseDisablesStatusListenerAnsi() throws Exception {
         var listener = Listener.defaultListener(Configuration.of(Map.of(Configuration.ANSI, "false")));
-        listener.initialize(Configuration.of(Map.of()));
+        listener.onRunStarted(Configuration.of(Map.of()));
 
         List<Listener> inner = extractListeners(listener);
         var ansiField = StatusListener.class.getDeclaredField("ansiEnabled");

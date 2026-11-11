@@ -11,7 +11,7 @@ third-party projects. The original package names have been relocated as noted
 below.
 
 - ClassGraph
-  - Version: 4.8.184
+  - Version: 4.8.184 (the forked source is under core/src/main/java/nonapi/org/paramixel/classgraph)
   - Website: https://github.com/classgraph/classgraph
   - License: MIT License
   - Original packages: io.github.classgraph, nonapi.io.github.classgraph
@@ -21,6 +21,16 @@ below.
     - Copyright (c) 2019-2021 Luke Hutchison
     - Copyright (c) 2016 Johno Crawford
     - Copyright (c) 2017 Harith Elrufaie
+  - Local modifications (fork maintenance notes):
+    - The source is vendored and relocated so Paramixel has no runtime
+      dependency and no unrelocated third-party packages.
+    - Files are excluded from Spotless, PMD and JaCoCo (see core/pom.xml) and
+      from published Javadoc; do not reformat them.
+    - To update: replace the two relocated trees with the sources of the new
+      upstream release, keep the relocation, and re-run the core test suite,
+      which exercises discovery, annotation scanning and class loading.
+    - Paramixel uses only the scanning API (ClassGraph, ScanResult, ClassInfo,
+      MethodInfo, AnnotationInfo); reflection JSON support is unused.
 
 Third-Party Notices
 

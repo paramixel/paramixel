@@ -28,62 +28,59 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
-import org.paramixel.api.exception.AbortedException;
+import org.paramixel.api.exception.AbortException;
 
 @DisplayName("Scheduler fail-fast")
-@SuppressWarnings("removal")
 class SchedulerFailFastTest {
 
     @Test
     @DisplayName("fail fast skips remaining root children after leaf failure (parallelism=1)")
     void failFastSkipsRemainingRootChildrenAfterLeafFailure() {
         var executed = new AtomicInteger();
-        var root = Parallel.builder("root")
-                .parallelism(1)
-                .child(Step.of("fail", ctx -> {
+        var root = Parallel.parallel("root", "p1x0")
+                .child(Step.step("fail", ctx -> {
                     executed.incrementAndGet();
                     throw new RuntimeException("boom");
                 }))
-                .child(Step.of("skip-1", ctx -> executed.incrementAndGet()))
-                .child(Step.of("skip-2", ctx -> executed.incrementAndGet()))
+                .child(Step.step("skip-1", ctx -> executed.incrementAndGet()))
+                .child(Step.step("skip-2", ctx -> executed.incrementAndGet()))
                 .build();
 
         var result = runner(true, 1).run(root);
 
-        assertThat(result.isFailed()).isTrue();
+        assertThat(result.status().isFailed()).isTrue();
         assertThat(executed.get()).isEqualTo(1);
         var children = result.descriptor().orElseThrow().children();
-        assertThat(children.get(0).isFailed()).isTrue();
-        assertThat(children.get(1).isSkipped()).isTrue();
-        assertThat(children.get(2).isSkipped()).isTrue();
+        assertThat(children.get(0).status().isFailed()).isTrue();
+        assertThat(children.get(1).status().isSkipped()).isTrue();
+        assertThat(children.get(2).status().isSkipped()).isTrue();
     }
 
     @Test
     @DisplayName("fail fast skip cascades SKIPPED to descendants of the skipped action")
     void failFastSkipCascadesToDescendants() {
-        var root = Parallel.builder("root")
-                .parallelism(1)
-                .child(Step.of("fail", ctx -> {
+        var root = Parallel.parallel("root", "p1x1")
+                .child(Step.step("fail", ctx -> {
                     throw new RuntimeException("boom");
                 }))
-                .child(Sequence.builder("skipped-seq")
-                        .child(Step.of("inner-1", ctx -> {}))
-                        .child(Step.of("inner-2", ctx -> {}))
+                .child(Sequential.sequential("skipped-seq")
+                        .child(Step.step("inner-1", ctx -> {}))
+                        .child(Step.step("inner-2", ctx -> {}))
                         .build())
                 .build();
 
         var result = runner(true, 1).run(root);
 
-        assertThat(result.isFailed()).isTrue();
+        assertThat(result.status().isFailed()).isTrue();
         var children = result.descriptor().orElseThrow().children();
-        assertThat(children.get(0).isFailed()).isTrue();
-        assertThat(children.get(1).isSkipped()).isTrue();
+        assertThat(children.get(0).status().isFailed()).isTrue();
+        assertThat(children.get(1).status().isSkipped()).isTrue();
         var grandchildren = children.get(1).children();
         assertThat(grandchildren).hasSize(2);
-        assertThat(grandchildren.get(0).isSkipped()).isTrue();
-        assertThat(grandchildren.get(1).isSkipped()).isTrue();
+        assertThat(grandchildren.get(0).status().isSkipped()).isTrue();
+        assertThat(grandchildren.get(1).status().isSkipped()).isTrue();
     }
 
     @Test
@@ -91,17 +88,16 @@ class SchedulerFailFastTest {
     void failFastDoesNotAffectNestedChildren() {
         var nestedExecuted = new AtomicInteger();
         var nestedStarted = new CountDownLatch(1);
-        var root = Parallel.builder("root")
-                .parallelism(2)
-                .child(Sequence.builder("nested-seq")
-                        .child(Step.of("nested-1", ctx -> {
+        var root = Parallel.parallel("root", "p2x2")
+                .child(Sequential.sequential("nested-seq")
+                        .child(Step.step("nested-1", ctx -> {
                             nestedExecuted.incrementAndGet();
                             nestedStarted.countDown();
                         }))
-                        .child(Step.of("nested-2", ctx -> nestedExecuted.incrementAndGet()))
+                        .child(Step.step("nested-2", ctx -> nestedExecuted.incrementAndGet()))
                         .independent()
                         .build())
-                .child(Step.of("fail", ctx -> {
+                .child(Step.step("fail", ctx -> {
                     if (!nestedStarted.await(5, TimeUnit.SECONDS)) {
                         throw new AssertionError("nested subtree did not start before fail step");
                     }
@@ -111,7 +107,7 @@ class SchedulerFailFastTest {
 
         var result = runner(true, 2).run(root);
 
-        assertThat(result.isFailed()).isTrue();
+        assertThat(result.status().isFailed()).isTrue();
         assertThat(nestedExecuted.get()).isEqualTo(2);
     }
 
@@ -119,19 +115,18 @@ class SchedulerFailFastTest {
     @DisplayName("fail fast disabled all children run despite failure")
     void failFastDisabledAllChildrenRun() {
         var executed = new AtomicInteger();
-        var root = Parallel.builder("root")
-                .parallelism(1)
-                .child(Step.of("fail", ctx -> {
+        var root = Parallel.parallel("root", "p1x0")
+                .child(Step.step("fail", ctx -> {
                     executed.incrementAndGet();
                     throw new RuntimeException("boom");
                 }))
-                .child(Step.of("runs-1", ctx -> executed.incrementAndGet()))
-                .child(Step.of("runs-2", ctx -> executed.incrementAndGet()))
+                .child(Step.step("runs-1", ctx -> executed.incrementAndGet()))
+                .child(Step.step("runs-2", ctx -> executed.incrementAndGet()))
                 .build();
 
         var result = runner(false, 1).run(root);
 
-        assertThat(result.isFailed()).isTrue();
+        assertThat(result.status().isFailed()).isTrue();
         assertThat(executed.get()).isEqualTo(3);
     }
 
@@ -139,16 +134,15 @@ class SchedulerFailFastTest {
     @DisplayName("fail fast with no failures all children run")
     void failFastWithNoFailuresAllChildrenRun() {
         var executed = new AtomicInteger();
-        var root = Parallel.builder("root")
-                .parallelism(1)
-                .child(Step.of("pass-1", ctx -> executed.incrementAndGet()))
-                .child(Step.of("pass-2", ctx -> executed.incrementAndGet()))
-                .child(Step.of("pass-3", ctx -> executed.incrementAndGet()))
+        var root = Parallel.parallel("root", "p1x1")
+                .child(Step.step("pass-1", ctx -> executed.incrementAndGet()))
+                .child(Step.step("pass-2", ctx -> executed.incrementAndGet()))
+                .child(Step.step("pass-3", ctx -> executed.incrementAndGet()))
                 .build();
 
         var result = runner(true, 1).run(root);
 
-        assertThat(result.isPassed()).isTrue();
+        assertThat(result.status().isPassed()).isTrue();
         assertThat(executed.get()).isEqualTo(3);
     }
 
@@ -156,28 +150,27 @@ class SchedulerFailFastTest {
     @DisplayName("fail fast with aborted action triggers skip")
     void failFastWithAbortedActionTriggersSkip() {
         var executed = new AtomicInteger();
-        var root = Parallel.builder("root")
-                .parallelism(1)
-                .child(Step.of("abort", ctx -> {
+        var root = Parallel.parallel("root", "p1x2")
+                .child(Step.step("abort", ctx -> {
                     executed.incrementAndGet();
-                    AbortedException.abort("aborted");
+                    throw AbortException.abort("aborted");
                 }))
-                .child(Step.of("skip-1", ctx -> executed.incrementAndGet()))
-                .child(Step.of("skip-2", ctx -> executed.incrementAndGet()))
+                .child(Step.step("skip-1", ctx -> executed.incrementAndGet()))
+                .child(Step.step("skip-2", ctx -> executed.incrementAndGet()))
                 .build();
 
         var result = runner(true, 1).run(root);
 
-        assertThat(result.isFailed()).isTrue();
+        assertThat(result.status().isFailed()).isTrue();
         assertThat(executed.get()).isEqualTo(1);
         var children = result.descriptor().orElseThrow().children();
-        assertThat(children.get(0).isAborted()).isTrue();
-        assertThat(children.get(1).isSkipped()).isTrue();
-        assertThat(children.get(2).isSkipped()).isTrue();
+        assertThat(children.get(0).status().isAborted()).isTrue();
+        assertThat(children.get(1).status().isSkipped()).isTrue();
+        assertThat(children.get(2).status().isSkipped()).isTrue();
     }
 
     private static Runner runner(final boolean failFast, final int parallelism) {
-        var configuration = Configuration.of(Map.of(
+        var configuration = TestPools.configuration(Map.of(
                 Configuration.RUNNER_PARALLELISM,
                 String.valueOf(parallelism),
                 "paramixel.scheduler.queue.capacity",

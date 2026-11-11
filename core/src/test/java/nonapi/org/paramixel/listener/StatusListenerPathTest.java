@@ -25,11 +25,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Sequence;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 @DisplayName("StatusListener path")
-@SuppressWarnings("removal")
 class StatusListenerPathTest {
 
     private static final String ROOT_NAME = Constants.ROOT_NAME;
@@ -38,7 +37,7 @@ class StatusListenerPathTest {
     @DisplayName("shows simple name for core action classes")
     void showsSimpleNameForCoreActionClasses() {
         var listener = new StatusListener();
-        var noop = Step.of("simple", context -> {});
+        var noop = Step.step("simple", context -> {});
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -58,7 +57,7 @@ class StatusListenerPathTest {
     @DisplayName("shows FQCN for non-core package action classes")
     void showsFQCNForNonCorePackageActionClasses() {
         var listener = new StatusListener();
-        var custom = Step.of("custom", context -> {});
+        var custom = Step.step("custom", context -> {});
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -78,8 +77,8 @@ class StatusListenerPathTest {
     @DisplayName("id path excludes root ancestors")
     void idPathExcludesRootAncestors() {
         var listener = new StatusListener();
-        var child = Step.of("visible-child", context -> {});
-        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var child = Step.step("visible-child", context -> {});
+        var parallel = Parallel.parallel(ROOT_NAME, "p1x0").child(child).build();
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -105,8 +104,8 @@ class StatusListenerPathTest {
     @DisplayName("action path excludes root ancestors")
     void actionPathExcludesRootAncestors() {
         var listener = new StatusListener();
-        var child = Step.of("visible-child", context -> {});
-        var parallel = Parallel.builder(ROOT_NAME).parallelism(1).child(child).build();
+        var child = Step.step("visible-child", context -> {});
+        var parallel = Parallel.parallel(ROOT_NAME, "p1x1").child(child).build();
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -127,8 +126,8 @@ class StatusListenerPathTest {
     @DisplayName("nested action display path includes parent name")
     void nestedActionDisplayPathIncludesParentName() {
         var listener = new StatusListener();
-        var child = Step.of("child", context -> {});
-        var parent = Sequence.builder("parent").child(child).build();
+        var child = Step.step("child", context -> {});
+        var parent = Sequential.sequential("parent").child(child).build();
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -148,8 +147,8 @@ class StatusListenerPathTest {
     @DisplayName("nested action path includes parent name")
     void nestedActionPathIncludesParentName() {
         var listener = new StatusListener();
-        var child = Step.of("child", context -> {});
-        var parent = Sequence.builder("parent").child(child).build();
+        var child = Step.step("child", context -> {});
+        var parent = Sequential.sequential("parent").child(child).build();
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -169,9 +168,9 @@ class StatusListenerPathTest {
     @DisplayName("deep nesting produces full hierarchical display path")
     void deepNestingProducesFullHierarchicalPath() {
         var listener = new StatusListener();
-        var leaf = Step.of("leaf", context -> {});
-        var mid = Sequence.builder("mid").child(leaf).build();
-        var top = Sequence.builder("top").child(mid).build();
+        var leaf = Step.step("leaf", context -> {});
+        var mid = Sequential.sequential("mid").child(leaf).build();
+        var top = Sequential.sequential("top").child(mid).build();
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -191,7 +190,7 @@ class StatusListenerPathTest {
     @DisplayName("timing shows milliseconds")
     void timingShowsMilliseconds() {
         var listener = new StatusListener();
-        var noop = Step.of("timed-action", context -> {});
+        var noop = Step.step("timed-action", context -> {});
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -211,7 +210,7 @@ class StatusListenerPathTest {
     @DisplayName("display name with ANSI sequences is sanitized in status output")
     void displayNameWithAnsiSequencesIsSanitized() {
         var listener = new StatusListener();
-        var action = Step.of("\u001B[31mred-name\u001B[0m", context -> {});
+        var action = Step.step("\u001B[31mred-name\u001B[0m", context -> {});
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -232,7 +231,7 @@ class StatusListenerPathTest {
     @DisplayName("display name with null bytes is sanitized in status output")
     void displayNameWithNullBytesIsSanitized() {
         var listener = new StatusListener();
-        var action = Step.of("test\u0000name", context -> {});
+        var action = Step.step("test\u0000name", context -> {});
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();
@@ -253,8 +252,8 @@ class StatusListenerPathTest {
     @DisplayName("nested display names with control characters are sanitized in path")
     void nestedDisplayNamesWithControlCharsAreSanitizedInPath() {
         var listener = new StatusListener();
-        var child = Step.of("\u0007leaf\u001B[0m", context -> {});
-        var parent = Sequence.builder("\u001B[1mtop\u0000").child(child).build();
+        var child = Step.step("\u0007leaf\u001B[0m", context -> {});
+        var parent = Sequential.sequential("\u001B[1mtop\u0000").child(child).build();
         var runner = Runner.builder().listener(listener).build();
 
         var output = new ByteArrayOutputStream();

@@ -17,18 +17,29 @@
 package org.paramixel.api.action;
 
 import java.util.Objects;
+import nonapi.org.paramixel.action.FixtureConsumer;
+import nonapi.org.paramixel.action.StepAccessors;
 import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Context;
 import org.paramixel.api.ContextConsumer;
+import org.paramixel.api.InstanceConsumer;
 
 /**
- * Terminal action that invokes a user-supplied consumer during run-mode execution.
+ * Terminal action that invokes user code during execution.
  *
- * <p>The consumer receives the execution {@link Context}. When wrapped in an
- * {@link Instance} action, the context provides access to the fixture instance
- * via {@link Context#instance(Class)}.
+ * <p>There are two forms. {@link #step(String, ContextConsumer)} receives the execution {@link
+ * Context}. {@link #step(String, Class, InstanceConsumer)} receives the fixture of the requested type
+ * from the nearest enclosing {@code Instance}, which is how a test method is bound to its fixture.
+ *
+ * <p>A step fails by throwing {@link org.paramixel.api.exception.FailException}, skips by throwing
+ * {@link org.paramixel.api.exception.SkipException}, and aborts by throwing
+ * {@link org.paramixel.api.exception.AbortException}. Any other throwable fails the step.
  */
 public final class Step implements Action {
+
+    static {
+        StepAccessors.register(step -> step.consumer);
+    }
 
     private final String displayName;
     private final ContextConsumer consumer;
@@ -48,40 +59,32 @@ public final class Step implements Action {
      * @throws NullPointerException if {@code displayName} or {@code consumer} is {@code null}
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    public static Step of(final String displayName, final ContextConsumer consumer) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        Arguments.requireNonBlank(displayName, "displayName is blank");
-        Objects.requireNonNull(consumer, "consumer is null");
+    public static Step step(final String displayName, final ContextConsumer consumer) {
         return new Step(displayName, consumer);
     }
 
     /**
-     * Creates a step with the supplied name and consumer.
+     * Creates a step that receives the fixture of the supplied type.
      *
-     * <p>This is a named alternative to {@link #of(String, ContextConsumer)} for
-     * use with static imports in action tree definitions.
+     * <p>The fixture comes from the nearest enclosing {@code Instance} that provides {@code type}, and
+     * is created lazily when that {@code Instance} node executes. The whole run is rejected before any
+     * user code runs when no enclosing {@code Instance} provides a compatible type.
      *
-     * @param name the action display name; must not be {@code null} or blank
-     * @param consumer the consumer to invoke; must not be {@code null}
+     * @param <T> the fixture type
+     * @param displayName the action display name; must not be {@code null} or blank
+     * @param type the fixture type the step requires; must not be {@code null}
+     * @param consumer the consumer that receives the fixture; must not be {@code null}
      * @return the step action
-     * @throws NullPointerException if {@code name} or {@code consumer} is {@code null}
-     * @throws IllegalArgumentException if {@code name} is blank
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    public static Step step(final String name, final ContextConsumer consumer) {
-        return of(name, consumer);
+    public static <T> Step step(
+            final String displayName, final Class<T> type, final InstanceConsumer<? super T> consumer) {
+        return step(displayName, new FixtureConsumer<>(type, consumer));
     }
 
     @Override
     public String displayName() {
         return displayName;
-    }
-
-    /**
-     * Returns the step executable.
-     *
-     * @return the step executable; never {@code null}
-     */
-    public ContextConsumer throwableConsumer() {
-        return consumer;
     }
 }

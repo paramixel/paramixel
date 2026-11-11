@@ -15,8 +15,6 @@ import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Delay.delay;
-import static org.paramixel.api.action.Delay.delayRandom;
 ```
 
 ## Terminal actions (named factory methods)
@@ -26,52 +24,44 @@ Terminal actions return the action directly rather than a builder:
 | Action | Factory | Description |
 |--------|---------|-------------|
 | `Step` | `step(name, consumer)` | Terminal action wrapping user logic. |
-| `Delay` | `delay(name, long)` | Fixed-duration pause in milliseconds. |
-| `Delay` | `delay(name, Duration)` | Fixed-duration pause. |
-| `Delay` | `delayRandom(name, long, long)` | Random-duration pause between bounds. |
-| `Assert` | `assertThat(name, expected, actual)` | Boolean assertion. |
-| `Assert` | `assertThat(name, expected, actual, message)` | Boolean assertion with failure message. |
-| `Assert` | `assertThat(name, expected, supplier)` | Lazy boolean assertion. |
-| `Assert` | `assertThat(name, expected, supplier, message)` | Lazy boolean assertion with failure message. |
-| `Assert` | `assertTrue(name, actual)` | Shorthand for `assertThat(name, true, actual)`. |
-| `Assert` | `assertTrue(name, supplier)` | Shorthand for `assertThat(name, true, supplier)`. |
-| `Assert` | `assertFalse(name, actual)` | Shorthand for `assertThat(name, false, actual)`. |
-| `Assert` | `assertFalse(name, supplier)` | Shorthand for `assertThat(name, false, supplier)`. |
+| `Step` | `step(name, type, consumer)` | Terminal action that receives the enclosing fixture. |
 
 ## Composite actions (named builder methods)
 
 | Action | Factory | Builder methods |
 |--------|---------|----------------|
 | `Scope` | `scope(name)` | `before`, `body`, `after` |
-| `Sequential` | `sequential(name)` | `child`, `dependent`/`independent`, `shuffle` |
-| `Parallel` | `parallel(name)` | `child`, `parallelism`, `shuffle` |
-| `Repeat` | `repeat(name)` | `body`, `iterations` |
+| `Sequential` | `sequential(name)` | `child`, `children`, `each`, `dependent`/`independent`, `shuffle` |
+| `Parallel` | `parallel(name, pool)` | `child`, `children`, `each`, `shuffle` |
 | `Conditional` | `conditional(name, condition)` | `body` |
-| `Instance` | `instance(name, factory)` / `instance(type)` / `instance(name, type)` | `body` |
+| `Instance` | `of(name, type, factory)` / `of(type)` / `of(name, type)` | `before`, `body`, `after` |
 | `Isolated` | `isolated(name, lockName)` | `body` |
-| `Timeout` | `timeout(name)` | `body`, `timeout`/`timeoutMillis` |
-| `Until` | `until(name)` | `body`, `maxIterations`, `until` |
+| `Loop` | `loop(name)` | `body`, `maxIterations`, `until`, `untilPassed`, `delay(Backoff)` |
+| `Timeout` | `timeout(name)` | `body`, `timeout` |
 
 ## Usage example
 
 ```java
+import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Delay.delay;
+import static org.paramixel.api.exception.FailException.fail;
 
 Action tree = scope("root")
     .body(sequential("suite")
         .child(step("login", ctx -> doLogin()))
-        .child(parallel("verify")
+        .child(parallel("verify", "examples")
             .child(step("ui", ctx -> checkUi()))
             .child(step("api", ctx -> checkApi()))
             .build())
-        .child(assertTrue("verified", true))
+        .child(step("verified", ctx -> {
+            if (!isVerified()) {
+                throw fail("not verified");
+            }
+        }))
+        .child(step("think-time", ctx -> Thread.sleep(200)))
         .build())
-    .body(delay("think-time", 200))
     .build();
 ```
 

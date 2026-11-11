@@ -5,26 +5,77 @@ description: Current documentation-facing release notes.
 
 # Release Notes
 
-## Unreleased
+## 7.0.0-ALPHA-1
 
-- **Scheduler replaced by a depth-first execution engine** — Actions are compiled into a per-run
-  execution plan before execution starts, and the plan is executed by recursive depth-first descent
-  with a hard concurrency budget. `paramixel.parallelism` now bounds concurrently executing branches
-  (including coordinating nodes that hold resources) rather than only leaf bodies, and there is no
-  work-stealing or ready queue.
-- **`paramixel.scheduler.queue.capacity` removed** — The scheduler ready queue no longer exists, so
-  the property has no effect. Delete the property from build scripts and `paramixel.properties` files; it
-  is now reported once per JVM through `Listener.onWarning`. Use `paramixel.parallelism` to bound
-  concurrency.
-- **`Listener.onWarning(String)` added** — Listeners can receive non-fatal diagnostics that do not
-  fail a run.
-- **Delays occupy their branch** — Inter-iteration `Loop` delays and `Delay` actions now run on the
-  branch that owns them instead of yielding their thread, so they consume concurrency budget while
-  waiting.
-- **`Conditional.reason()` removed** — The configurable skip reason has been removed
-  from `Conditional` and `Conditional.Builder`. When the predicate returns `false`,
-  the skip-status message now includes the conditional's display name. Use a
-  descriptive display name instead of a separate reason message.
+7.0.0 is a breaking release: it reduces the public API to one way to do each thing, fixes the confirmed defects, and
+keeps the execution model (define → validate → compile → execute) and the named-pool concept unchanged. There are no
+compatibility shims. See the [6.x to 7.0 migration guide](guides/migration-6-to-7.md) for the mechanical changes.
+
+**Execution and runner**
+
+- **One entry point per intent.** `Runner.run(Action)`, `run(Selector)` and `run()` all return a `Result`;
+  `Result.exitCode()` is the single exit-code authority. `runAndExit`, `runAndReturnExitCode`, `defaultRunner()` and
+  `Runner.main` are removed, and `Launcher` holds `main`.
+- **`run(Action)` does no discovery.** A direct tree is the complete definition: no classpath scan and no hooks. Setup
+  and teardown around a tree is a `Scope`. In discovery runs hooks stay global.
+- **`run(Selector)` uses exactly the selector given.** A `paramixel.match.*` key it ignores is reported through
+  `Listener.onWarning` instead of being merged silently.
+
+**Typed fixtures**
+
+- **`Instance.of(name, type, factory)` is a typed fixture builder** with `before(name, consumer)`,
+  `body(...)` and `after(name, consumer)`, and `Step.step(name, type, consumer)` runs a method on it. The fixture type
+  appears once instead of on every step, and `Context.withInstance` is removed.
+- **Creation is lazy and node-local.** The factory runs inside the node's own before step; a node that is skipped,
+  aborted or cancelled never calls it and does not run `after`.
+- **A typed step whose fixture is missing or ambiguous is rejected before any user code runs**, naming the step.
+- **`AnnotationResolver` and `@Paramixel.Id` are removed**: method references do the same job with compile-time
+  safety.
+
+**Iteration, selectors, values**
+
+- **`each(items, mapper)` on `Sequential.Builder` and `Parallel.Builder` replaces `Each`**, and
+  `children(Iterable)` adds already built children.
+- **`Selector.builder()`** offers `packageTreeOf`, `classOf`, `packagePattern`, `classPattern`, `tagPattern` and an
+  `exclude…` twin of each; dimensions are ANDed. `Selector.not(...)` of a single-dimension selector used to match
+  nothing; an exclusion is the replacement and the fix. `Selector.configured()` is the explicit configuration
+  selector.
+- **`Status` is a value**: a `Kind` (`PENDING`, `RUNNING`, `PASSED`, `FAILED`, `SKIPPED`, `ABORTED`) plus optional
+  message and throwable, with `equals` on kind and message. `isX()`, `message()` and `throwable()` are removed from
+  `Result` and `Descriptor`; `Descriptor` gains `displayName()`, `path()` and `duration()`.
+- **`Backoff`** (`fixed`, `linear`, `exponential(base, max)`, saturating and never throwing) replaces
+  `Loop.DelayPolicy`, `Retry.Policy` and `PolicyException`. `Loop` gains `until(BiPredicate<Context, Status>)` and
+  `untilPassed()`, and unreached iterations are reported "loop satisfied". `Retry` is immutable and re-entrant with a
+  `Result` record. `CleanUp.throwable()` returns `Optional`.
+- **`Conditional`** reports `"condition not met: <name>"` on the skipped body instead of a silent skip.
+
+**Concurrency and reporting**
+
+- **Named pools.** Every `Parallel` names a pool sized by `paramixel.parallelism.<name>`; `paramixel.parallelism`
+  sizes only the runner's root pool. The root pool can no longer be aliased by a user pool, so a pool may be called
+  `root`. Pool sizes may be `@cores`, `@cores*N` or `@cores/N`, resolved against the processors the JVM reports
+  (minimum 1).
+- **Validation reports every problem at once** as a `ConfigurationException`: an undefined pool, a pool nested under
+  itself, and a conflicting pool/lock order all fail before anything runs.
+- **The summary prints pool sizes and peak usage**, and a `paramixel.parallelism.<name>` key that names a pool no
+  `Parallel` uses is reported through `Listener.onWarning`.
+- **`Listener.initialize` is merged into `onRunStarted(Configuration)`**, `onDiscoveryCompleted` takes
+  `Optional<Descriptor>`, and `onBeforeExecution`/`onAfterExecution` document their concurrent invocation.
+
+**Removed**
+
+`Assert`, `Delay`, `Each`, `AnnotationResolver`, `@Paramixel.Id`, `CycleDetectedException`, `PolicyException`,
+`Loop.DelayPolicy`, `Retry.Policy`, the seven `Selector` sub-interfaces, `Context.withInstance`,
+`Configuration.getFloat`/`getDouble`, `Parallel.ROOT_POOL`, `Sequential.isIndependent()`, and the previously
+removed `Static`, `Sequence`, `Repeat` and `Until`.
+
+## Unreleased (carried from the scheduler change)
+
+- **Scheduler replaced by a depth-first execution engine** — Actions are compiled into a per-run execution plan
+  before execution starts, and the plan is executed by recursive depth-first descent with a hard concurrency budget;
+  there is no work-stealing or ready queue. Concurrency is limited with named pools.
+- **`paramixel.scheduler.queue.capacity` removed** — The scheduler ready queue no longer exists, so the property has
+  no effect. Delete it from build scripts and `paramixel.properties` files.
 
 ## 6.2.1
 

@@ -23,7 +23,7 @@ readonly PROJECT_DIR
 readonly PROJECT_NAME='Paramixel'
 readonly DOCS_HOST_VARIABLE='WWW_PARAMIXEL_ORG'
 readonly HAS_GRADLE='true'
-readonly VERSION_REGEX='^[0-9]+\.[0-9]+\.[0-9]+$'
+readonly VERSION_REGEX='^[0-9]+\.[0-9]+\.[0-9]+(-ALPHA-[1-9][0-9]*)?$'
 
 EXECUTE=false
 SKIP_DOCS_BUILD=false
@@ -42,6 +42,11 @@ Usage: ./scripts/release.sh <version> [OPTIONS]
 
 Release ${PROJECT_NAME}; Central publication requires manual portal verification.
 Default: offline dry run. Use --execute to run or resume a release.
+
+Accepted versions: x.y.z (for example 1.2.3) and x.y.z-ALPHA-<n> (for example
+7.0.0-ALPHA-1), where <n> is a positive integer without a leading zero. A release
+creates branch release/<version>, tag v<version>, and development version
+<version>-POST.
 
 Options:
   --execute          Execute, resuming the local checkpoint when present
@@ -82,7 +87,8 @@ parse_args() {
         esac
         shift
     done
-    [[ "$VERSION" =~ $VERSION_REGEX ]] || fail "Version must be x.y.z (for example 1.2.3)."
+    [[ "$VERSION" =~ $VERSION_REGEX ]] \
+        || fail "Version must be x.y.z or x.y.z-ALPHA-<n> with <n> a positive integer without a leading zero (for example 1.2.3 or 7.0.0-ALPHA-1)."
 }
 
 # Use exact namespaces: a branch must never be mistaken for a tag (or vice versa).
@@ -128,7 +134,8 @@ get_current_revision() {
         || fail "Cannot read Maven revision."
     # Some Maven versions emit ANSI reset sequences even with color disabled.
     revision=$(printf '%s' "$revision" | sed $'s/\033\\[[0-9;]*m//g')
-    [[ "$revision" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-POST)?$ ]] || fail "Unexpected Maven revision: $revision"
+    [[ "$revision" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-ALPHA-[1-9][0-9]*)?(-POST)?$ ]] \
+        || fail "Unexpected Maven revision: $revision"
     printf '%s\n' "$revision"
 }
 

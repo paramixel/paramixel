@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.Map;
 import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.MockDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -76,8 +76,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatException returns null for non-failed descriptor")
     void formatExceptionReturnsNullForNonFailedDescriptor() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 
@@ -87,8 +87,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatException returns throwable class and message for failed descriptor")
     void formatExceptionReturnsThrowableClassAndMessage() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("something broke", new RuntimeException("something broke")));
 
@@ -99,8 +99,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatException returns throwable class name when message is null")
     void formatExceptionReturnsClassNameWhenMessageNull() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("failed", new RuntimeException()));
 
@@ -111,8 +111,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatException falls back to status message when no throwable present")
     void formatExceptionFallsBackToStatusMessage() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("status-only message"));
 
@@ -123,8 +123,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatException returns null when failed with no message or throwable")
     void formatExceptionReturnsNullWhenNoDetails() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.FAILED);
 
@@ -134,8 +134,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatNamePath returns action name for single descriptor")
     void formatNamePathReturnsActionNameForSingleDescriptor() {
-        var action = Step.of("my-action", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("my-action", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 
@@ -145,11 +145,11 @@ class ListenersTest {
     @Test
     @DisplayName("formatNamePath returns path for parent and child")
     void formatNamePathReturnsPathForParentAndChild() {
-        var parentAction = Step.of("parent-action", context -> {});
-        var childAction = Step.of("child-action", context -> {});
-        var parent = new ConcreteDescriptor(parentAction);
-        var child = new ConcreteDescriptor(parent, childAction);
-        parent.addChild(child);
+        var parentAction = Step.step("parent-action", context -> {});
+        var childAction = Step.step("child-action", context -> {});
+        var parent = new MockDescriptor(parentAction);
+        var child = new MockDescriptor(parent, childAction);
+        parent.child(child);
         parent.setStatus(Status.RUNNING);
         parent.setStatus(Status.PASSED);
         child.setStatus(Status.RUNNING);
@@ -161,14 +161,14 @@ class ListenersTest {
     @Test
     @DisplayName("formatNamePath returns path for three-level tree")
     void formatNamePathReturnsPathForThreeLevelTree() {
-        var grandAction = Step.of("grand-action", context -> {});
-        var parentAction = Step.of("parent-action", context -> {});
-        var childAction = Step.of("child-action", context -> {});
-        var grand = new ConcreteDescriptor(grandAction);
-        var parent = new ConcreteDescriptor(grand, parentAction);
-        var child = new ConcreteDescriptor(parent, childAction);
-        grand.addChild(parent);
-        parent.addChild(child);
+        var grandAction = Step.step("grand-action", context -> {});
+        var parentAction = Step.step("parent-action", context -> {});
+        var childAction = Step.step("child-action", context -> {});
+        var grand = new MockDescriptor(grandAction);
+        var parent = new MockDescriptor(grand, parentAction);
+        var child = new MockDescriptor(parent, childAction);
+        grand.child(parent);
+        parent.child(child);
         grand.setStatus(Status.RUNNING);
         grand.setStatus(Status.PASSED);
         parent.setStatus(Status.RUNNING);
@@ -182,8 +182,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatIdPath returns id for single descriptor")
     void formatIdPathReturnsIdForSingleDescriptor() {
-        var action = Step.of("my-action", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("my-action", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 
@@ -193,11 +193,11 @@ class ListenersTest {
     @Test
     @DisplayName("formatIdPath returns path for parent and child")
     void formatIdPathReturnsPathForParentAndChild() {
-        var parentAction = Step.of("parent-action", context -> {});
-        var childAction = Step.of("child-action", context -> {});
-        var parent = new ConcreteDescriptor(parentAction);
-        var child = new ConcreteDescriptor(parent, childAction);
-        parent.addChild(child);
+        var parentAction = Step.step("parent-action", context -> {});
+        var childAction = Step.step("child-action", context -> {});
+        var parent = new MockDescriptor(parentAction);
+        var child = new MockDescriptor(parent, childAction);
+        parent.child(child);
         parent.setStatus(Status.RUNNING);
         parent.setStatus(Status.PASSED);
         child.setStatus(Status.RUNNING);
@@ -209,8 +209,8 @@ class ListenersTest {
     @Test
     @DisplayName("elapsedMillis returns zero when completedAt is not set")
     void elapsedMillisReturnsZeroWhenNotCompleted() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
 
         assertThat(Listeners.elapsedMillis(descriptor)).isZero();
@@ -219,8 +219,8 @@ class ListenersTest {
     @Test
     @DisplayName("elapsedMillis returns positive value when both timestamps are set")
     void elapsedMillisReturnsPositiveValueWhenBothTimestampsSet() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 
@@ -237,8 +237,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatException returns throwable class name when message is blank")
     void formatExceptionReturnsClassNameWhenMessageBlank() {
-        var action = Step.of("test", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
+        var action = Step.step("test", context -> {});
+        var descriptor = new MockDescriptor(action);
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.failed("failed", new RuntimeException("   ")));
 
@@ -249,29 +249,27 @@ class ListenersTest {
     @Test
     @DisplayName("formatIdPath returns cached value on subsequent calls")
     void formatIdPathReturnsCachedValue() {
-        var action = Step.of("test", context -> {});
-        var parent = new ConcreteDescriptor(action);
-        var child = new ConcreteDescriptor(parent, Step.of("child", context -> {}));
-        parent.addChild(child);
-        parent.freeze();
+        var action = Step.step("test", context -> {});
+        var parent = new MockDescriptor(action);
+        var child = new MockDescriptor(parent, Step.step("child", context -> {}));
+        parent.child(child);
 
         var first = Listeners.formatIdPath(child);
         var second = Listeners.formatIdPath(child);
 
-        assertThat(first).isSameAs(second);
+        assertThat(first).isEqualTo(second);
     }
 
     @Test
     @DisplayName("formatIdPath returns correct path for deep tree")
     void formatIdPathDeepTree() {
-        var root = new ConcreteDescriptor(Step.of("root", context -> {}));
+        var root = new MockDescriptor(Step.step("root", context -> {}));
         var current = root;
         for (int i = 1; i <= 10; i++) {
-            var child = new ConcreteDescriptor(current, Step.of("level-" + i, context -> {}));
-            current.addChild(child);
+            var child = new MockDescriptor(current, Step.step("level-" + i, context -> {}));
+            current.child(child);
             current = child;
         }
-        root.freeze();
 
         var path = Listeners.formatIdPath(current);
         var ids = path.split("-");
@@ -281,9 +279,8 @@ class ListenersTest {
     @Test
     @DisplayName("formatIdPath returns own id for root descriptor")
     void formatIdPathReturnsOwnIdForRoot() {
-        var action = Step.of("root", context -> {});
-        var descriptor = new ConcreteDescriptor(action);
-        descriptor.freeze();
+        var action = Step.step("root", context -> {});
+        var descriptor = new MockDescriptor(action);
 
         assertThat(Listeners.formatIdPath(descriptor)).isEqualTo(descriptor.id());
     }
@@ -293,7 +290,7 @@ class ListenersTest {
     void formatStatusFormatsAbortedResult() {
         // Disable failure-on-abort promotion so the result retains its ABORTED outcome.
         var config = new ConcreteConfiguration(Map.of(Configuration.FAILURE_ON_ABORT, "false"));
-        var root = new ConcreteDescriptor(Step.of("root", context -> {}));
+        var root = new MockDescriptor(Step.step("root", context -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.ABORTED);
         var result = new ConcreteResult(root, config);

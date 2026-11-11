@@ -28,8 +28,8 @@ public final class IncludedSmokeFixture {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Action factory() {
-        return Instance.builder("smoke-action", () -> new Object())
-                .body(Step.of("test", context -> {}))
+        return Instance.of("smoke-action", Object.class, () -> new Object())
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

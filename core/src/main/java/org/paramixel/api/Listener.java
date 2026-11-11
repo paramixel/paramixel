@@ -16,19 +16,9 @@
 
 package org.paramixel.api;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import nonapi.org.paramixel.listener.ConfiguredCompositeListener;
-import nonapi.org.paramixel.listener.HtmlReportListener;
-import nonapi.org.paramixel.listener.JsonReportListener;
-import nonapi.org.paramixel.listener.ReportListener;
+import java.util.Optional;
+import nonapi.org.paramixel.listener.DefaultListeners;
 import nonapi.org.paramixel.listener.SafeListener;
-import nonapi.org.paramixel.listener.StatusListener;
-import nonapi.org.paramixel.listener.SummaryListener;
-import nonapi.org.paramixel.listener.XmlReportListener;
-import nonapi.org.paramixel.support.AnsiDetector;
-import org.paramixel.api.action.Action;
 
 /**
  * Receives run, discovery, and descriptor execution callbacks.
@@ -40,96 +30,56 @@ import org.paramixel.api.action.Action;
 public interface Listener {
 
     /**
-     * Returns the standard listener chain using the default configuration.
-     *
-     * @return the default listener chain
-     */
-    static Listener defaultListener() {
-        return defaultListener(Configuration.defaultConfiguration());
-    }
-
-    /**
      * Returns the standard listener chain using the supplied configuration.
      *
+     * <p>The chain contains the status and summary listeners, plus a report listener when
+     * {@link Configuration#REPORT_FILE} is set. Prefer {@code Runner.builder().build()}, which wires this chain
+     * for you.
+     *
      * @param configuration the effective configuration; must not be {@code null}
-     * @return the default listener chain
+     * @return the default listener chain; never {@code null}
+     * @throws NullPointerException if {@code configuration} is {@code null}
      */
     static Listener defaultListener(final Configuration configuration) {
-        Objects.requireNonNull(configuration, "configuration is null");
-
-        final var ansiEnabled = resolveAnsiEnabled(configuration);
-        final var statusListener = new StatusListener();
-        final var summaryListener = new SummaryListener();
-
-        final var reportFile =
-                configuration.getString(Configuration.REPORT_FILE).orElse(null);
-        if (isBlank(reportFile)) {
-            return new SafeListener(
-                    new ConfiguredCompositeListener(
-                            configuration, List.of(statusListener, summaryListener), ansiEnabled),
-                    ansiEnabled);
-        }
-
-        final var format = resolveReportFormat(reportFile);
-        final var reportListener = createReportListener(format);
-        return new SafeListener(
-                new ConfiguredCompositeListener(
-                        configuration, List.of(statusListener, summaryListener, reportListener), ansiEnabled),
-                ansiEnabled);
+        return DefaultListeners.create(configuration);
     }
 
     /**
-     * Invoked once before the run begins, allowing listeners to configure themselves based on the
-     * supplied configuration.
+     * Invoked exactly once when a run starts, before any warning, discovery or execution callback.
      *
-     * <p>This method is called exactly once per {@link Runner#run(Action)} invocation, before any other
-     * listener callbacks. It is called from a synchronized context ({@code Runner.run()}).
+     * <p>This is the first callback of a run: it replaces the former separate {@code initialize} callback, so a
+     * listener configures itself here.
      *
-     * <p>Implementations are responsible for thread-safety if they maintain mutable state.
-     *
-     * @param configuration the effective configuration; never {@code null}
-     * @see SafeListener
+     * @param configuration the effective configuration of the run; never {@code null}
      */
-    default void initialize(final Configuration configuration) {
+    default void onRunStarted(final Configuration configuration) {
         // Intentionally empty
     }
 
     /**
-     * Invoked once before run discovery begins.
-     *
-     * <p>This method is called exactly once per {@link Runner#run(Action)} invocation, after
-     * {@link #initialize(Configuration)} and {@link #onRunStarted()}, but before the discovery phase.
+     * Invoked once before discovery begins, after {@link #onRunStarted(Configuration)}.
      *
      * <p>Implementations are responsible for thread-safety if they maintain mutable state.
-     *
-     * @see SafeListener
      */
     default void onDiscoveryStarted() {
         // Intentionally empty
     }
 
     /**
-     * Invoked after discovery creates the descriptor tree, or when discovery fails.
+     * Invoked after discovery creates the descriptor tree, or when discovery finds nothing.
      *
-     * @param root the discovered root descriptor, or {@code null} when discovery failed
+     * @param root the discovered root descriptor, or empty when no descriptor was discovered
      */
-    default void onDiscoveryCompleted(final Descriptor root) {
-        // Intentionally empty
-    }
-
-    /**
-     * Invoked once before the run begins, before discovery and execution.
-     */
-    default void onRunStarted() {
+    default void onDiscoveryCompleted(final Optional<Descriptor> root) {
         // Intentionally empty
     }
 
     /**
      * Invoked when the runner detects a condition that does not fail the run but affects behavior.
      *
-     * <p>Warnings report conditions that are silently ignored otherwise, such as a configuration
-     * key that was removed and now has no effect. The runner invokes this method at most once per
-     * detected condition per JVM, before execution begins.
+     * <p>Warnings report conditions that would otherwise be silently ignored: a {@code paramixel.match.*} key that
+     * the selector passed to {@code Runner.run(Selector)} does not use, and an unknown {@code paramixel.*} key.
+     * Warnings are delivered once per condition, after {@link #onRunStarted(Configuration)} and before execution.
      *
      * <p>Implementations must not throw; {@link SafeListener} isolates recoverable failures.
      *
@@ -140,7 +90,11 @@ public interface Listener {
     }
 
     /**
-     * Invoked by an action immediately before its descriptor execution logic runs.
+     * Invoked immediately before a descriptor's execution logic runs.
+     *
+     * <p>This callback and {@link #onAfterExecution(Descriptor)} are invoked <strong>concurrently</strong> from
+     * pool worker threads, because a {@link org.paramixel.api.action.Parallel} runs its children at the same time.
+     * Implementations must be thread-safe; {@link SafeListener} isolates recoverable failures.
      *
      * @param descriptor the descriptor about to execute; never {@code null}
      */
@@ -149,7 +103,9 @@ public interface Listener {
     }
 
     /**
-     * Invoked by an action after its descriptor reaches a terminal status.
+     * Invoked after a descriptor reaches a terminal status.
+     *
+     * <p>Invoked concurrently, exactly as {@link #onBeforeExecution(Descriptor)}.
      *
      * @param descriptor the completed descriptor; never {@code null}
      */
@@ -164,43 +120,5 @@ public interface Listener {
      */
     default void onRunCompleted(final Result result) {
         // Intentionally empty
-    }
-
-    private static boolean resolveAnsiEnabled(final Configuration configuration) {
-        final var value = configuration.getString(Configuration.ANSI).orElse(null);
-        if (value == null || value.isBlank()) {
-            return AnsiDetector.isAnsiAvailable();
-        }
-        final var trimmed = value.strip().toLowerCase(Locale.ROOT);
-        return switch (trimmed) {
-            case "true" -> true;
-            case "false" -> false;
-            default -> AnsiDetector.isAnsiAvailable();
-        };
-    }
-
-    private static String resolveReportFormat(final String reportFile) {
-        final var lowerReportFile = reportFile.toLowerCase(Locale.ROOT);
-        if (lowerReportFile.endsWith(".json")) {
-            return "json";
-        } else if (lowerReportFile.endsWith(".xml")) {
-            return "xml";
-        } else if (lowerReportFile.endsWith(".html") || lowerReportFile.endsWith(".htm")) {
-            return "html";
-        }
-        return "text";
-    }
-
-    private static boolean isBlank(final String value) {
-        return value == null || value.isBlank();
-    }
-
-    private static Listener createReportListener(final String format) {
-        return switch (format.toLowerCase(Locale.ROOT)) {
-            case "json" -> new JsonReportListener();
-            case "xml" -> new XmlReportListener();
-            case "html" -> new HtmlReportListener();
-            default -> new ReportListener();
-        };
     }
 }

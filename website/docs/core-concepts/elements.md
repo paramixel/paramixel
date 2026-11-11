@@ -11,36 +11,38 @@ See [Built-in Actions and When to Use Them](actions) for the complete list of 13
 
 ## Fixture access
 
-`Context` exposes fixture instances by type where an `Instance` action provides the fixture:
+A typed step receives its fixture directly; the type appears once, in `Instance.of`:
 
 ```java
-import org.paramixel.api.Context;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Step.step;
 
-var verify = step(
-        "verify fixture",
-        Context.withInstance(MyFixture.class, fixture -> fixture.verify()));
+var fixture = of("my fixture", MyFixture.class, MyFixture::new)
+        .before("start", MyFixture::start)
+        .body(step("verify fixture", MyFixture.class, MyFixture::verify))
+        .after("stop", MyFixture::stop);
 ```
 
-Use `context.instance(Type.class)` for an `Optional` or `context.requireInstance(Type.class)` when the fixture is required.
+Inside an untyped step, use `context.instance(Type.class)` for an `Optional` or `context.requireInstance(Type.class)`
+when the fixture is required.
 
 ## Data-driven subtrees
 
-`Each` is a utility class in `org.paramixel.api.action` for generating action subtrees from iterable inputs. It is not an `Action` subtype; it is a factory that produces action trees ready for composition.
+`each(items, mapper)` on a container builder adds one child per item, in iteration order; it mixes with fixed
+`child(...)` calls:
 
 ```java
 import java.util.List;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Each;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
 var users = List.of("ada", "grace", "linus");
 
-Action spec = Each.sequential("user checks", users,
-        user -> sequential("check " + user)
-                .child(step("load", ctx -> loadUser(user)))
-                .child(step("verify", ctx -> verifyUser(user))))
+Action spec = sequential("user checks")
+        .each(users, user -> sequential("check " + user)
+                .child(step("load " + user, ctx -> loadUser(user)))
+                .child(step("verify " + user, ctx -> verifyUser(user))))
         .build();
 ```
 
@@ -57,4 +59,4 @@ user checks
     └── verify
 ```
 
-See [Data-Driven Testing](data-driven-testing) for details on `Each.sequential()` and `Each.parallel()`.
+See [Data-Driven Testing](data-driven-testing) for the `each` semantics and the fixture-per-item shape.

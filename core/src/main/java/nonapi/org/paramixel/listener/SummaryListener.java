@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicReference;
+import nonapi.org.paramixel.ConcreteResult;
 import nonapi.org.paramixel.support.AnsiDetector;
 import nonapi.org.paramixel.support.ElapsedTimeFormatter;
 import org.paramixel.api.Configuration;
@@ -36,14 +36,14 @@ import org.paramixel.api.Version;
  * <p>The action tree rendering is delegated to a {@link SummaryRenderer}. Each rendered line is
  * prefixed with the {@code [PARAMIXEL]} tag (ANSI-colored or plain depending on configuration).
  *
- * <p><strong>Thread safety:</strong> The output writer is lazily initialized using an
- * {@code AtomicReference} with compare-and-set semantics to ensure single initialization.
- * Once initialized, concurrent writes to the underlying {@link PrintWriter} are safe.
+ * <p><strong>Thread safety:</strong> the renderer and the exclude set are published by
+ * {@link #onRunStarted(Configuration)} before any execution callback, and the tree is rendered once on
+ * {@link #onRunCompleted(Result)}. Output is written to {@code System.out} at the moment of writing, so a
+ * caller that redirects {@code System.out} before a run sees the whole output.
  */
 public final class SummaryListener implements Listener {
 
     private volatile SummaryRenderer renderer;
-    private final AtomicReference<PrintWriter> out = new AtomicReference<>();
     private volatile boolean ansiEnabled;
     private volatile EnumSet<ExcludeTarget> excludes = EnumSet.noneOf(ExcludeTarget.class);
 
@@ -53,26 +53,25 @@ public final class SummaryListener implements Listener {
     public SummaryListener() {}
 
     @Override
-    public void initialize(final Configuration configuration) {
-        if (renderer != null) {
-            return;
+    public void onRunStarted(final Configuration configuration) {
+        if (renderer == null) {
+            var value = configuration.getString(Configuration.ANSI).orElse(null);
+            if (value == null || value.isBlank()) {
+                this.ansiEnabled = AnsiDetector.isAnsiAvailable();
+            } else {
+                this.ansiEnabled = "true".equals(value.strip().toLowerCase(Locale.ROOT));
+            }
+            this.renderer = new TreeSummaryRenderer(ansiEnabled);
+            this.excludes = Listeners.parseExcludes(
+                    configuration.getString(Configuration.LISTENER_EXCLUDE).orElse(null));
         }
-        var value = configuration.getString(Configuration.ANSI).orElse(null);
-        if (value == null || value.isBlank()) {
-            this.ansiEnabled = AnsiDetector.isAnsiAvailable();
-        } else {
-            this.ansiEnabled = "true".equals(value.strip().toLowerCase(Locale.ROOT));
-        }
-        this.renderer = new TreeSummaryRenderer(ansiEnabled);
-        this.excludes = Listeners.parseExcludes(
-                configuration.getString(Configuration.LISTENER_EXCLUDE).orElse(null));
+        printBanner();
     }
 
     /**
-     * Prints a version banner and starting message to the output writer.
+     * Prints the version banner and starting message to the output writer.
      */
-    @Override
-    public void onRunStarted() {
+    private void printBanner() {
         if (excludes.contains(ExcludeTarget.SUMMARY_HEADER)) {
             return;
         }
@@ -130,10 +129,11 @@ public final class SummaryListener implements Listener {
             var statusLine = "Status      : " + Listeners.formatStatus(result);
             var finishedLine = "Finished at : " + finishedAtFormatted;
             var timeLine = "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root));
+            var poolLine = poolLine(result);
 
             int maxLineLength = Math.max(
                     Math.max(versionLine.length(), statusLine.length()),
-                    Math.max(finishedLine.length(), timeLine.length()));
+                    Math.max(finishedLine.length(), Math.max(timeLine.length(), poolLine.length())));
             var dashes = "-".repeat(maxLineLength);
 
             writer.println(prefix + dashes);
@@ -143,8 +143,31 @@ public final class SummaryListener implements Listener {
             writer.println(prefix + "Finished at : " + finishedAtFormatted);
             writer.println(
                     prefix + "Total time  : " + ElapsedTimeFormatter.formatElapsedTime(Listeners.elapsedMillis(root)));
+            if (!poolLine.isEmpty()) {
+                writer.println(prefix + poolLine);
+            }
             writer.println(prefix + dashes);
         }
+    }
+
+    /**
+     * Formats the pool line: the size of every pool the run used and its peak usage.
+     *
+     * <p>A peak that equals the size means the pool was saturated; a peak of one means the work serialized. Both are
+     * the usual reason a parallel run was slower than expected.
+     *
+     * @param result the run result; must not be {@code null}
+     * @return the line, or an empty string when no pool was used
+     */
+    private static String poolLine(final Result result) {
+        if (!(result instanceof ConcreteResult concrete) || concrete.poolStats().isEmpty()) {
+            return "";
+        }
+        var parts = new java.util.ArrayList<String>();
+        for (var stats : concrete.poolStats()) {
+            parts.add(stats.name() + " " + stats.peakInUse() + "/" + stats.size());
+        }
+        return "Pools       : " + String.join(", ", parts);
     }
 
     private String getPrefix() {
@@ -152,20 +175,15 @@ public final class SummaryListener implements Listener {
     }
 
     /**
-     * Returns the shared PrintWriter, lazily initializing it from System.out.
+     * Returns a writer for the current {@code System.out}.
      *
-     * <p>The CAS-losing writer is intentionally discarded without closing, because closing it
-     * would close System.out (the underlying OutputStream).
+     * <p>A summary is printed in three callbacks per run, so a writer is created per callback rather than cached;
+     * that keeps the output bound to the stream that is current when the text is written.
      *
-     * @return the shared PrintWriter; never {@code null}
+     * @return a writer for {@code System.out}; never {@code null}
      */
     private PrintWriter getWriter() {
-        var writer = out.get();
-        if (writer == null) {
-            var newWriter = new PrintWriter(System.out, true);
-            out.compareAndSet(null, newWriter);
-        }
-        return out.get();
+        return new PrintWriter(System.out, true);
     }
 
     private String formatStatus(final Result result) {

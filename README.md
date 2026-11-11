@@ -133,18 +133,18 @@ import org.paramixel.api.action.Step;
 public final class MyTest {
 
     public static void main(String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     @Paramixel.Factory
     public static Action factory() {
         return Scope.scope(MyTest.class.getName())
-                .before(Step.of("setUp()", ctx -> { /* setup */ }))
+                .before(Step.step("setUp()", ctx -> { /* setup */ }))
                 .body(Sequential.sequential("tests")
-                        .child(Step.of("test1()", ctx -> { /* test something */ }))
-                        .child(Step.of("test2()", ctx -> { /* test something else */ }))
+                        .child(Step.step("test1()", ctx -> { /* test something */ }))
+                        .child(Step.step("test2()", ctx -> { /* test something else */ }))
                         .build())
-                .after(Step.of("tearDown()", ctx -> { /* teardown */ }))
+                .after(Step.step("tearDown()", ctx -> { /* teardown */ }))
                 .build();
     }
 }

@@ -37,7 +37,10 @@ public class DisabledTest {
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(Selector.packageTreeOf(DisabledTest.class));
+        System.exit(Runner.builder()
+                .build()
+                .run(Selector.builder().packageTreeOf(DisabledTest.class).build())
+                .exitCode());
     }
 
     /**
@@ -51,7 +54,7 @@ public class DisabledTest {
     public static Action factory() {
         return scope("[scenario]")
                 .body(step("should-not-run", context -> {
-                    FailException.fail("@Paramixel.Disabled action factory was invoked");
+                    throw FailException.fail("@Paramixel.Disabled action factory was invoked");
                 }))
                 .build();
     }

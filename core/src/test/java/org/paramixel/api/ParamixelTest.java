@@ -77,20 +77,4 @@ class ParamixelTest {
 
         assertThat(method.getReturnType()).isEqualTo(Paramixel.Tag[].class);
     }
-
-    @Test
-    @DisplayName("@Paramixel.Id targets METHOD")
-    void idTargetsMethod() {
-        var target = Paramixel.Id.class.getAnnotation(Target.class);
-
-        assertThat(target.value()).containsExactly(ElementType.METHOD);
-    }
-
-    @Test
-    @DisplayName("@Paramixel.Id has RUNTIME retention")
-    void idHasRuntimeRetention() {
-        var retention = Paramixel.Id.class.getAnnotation(Retention.class);
-
-        assertThat(retention.value()).isEqualTo(RetentionPolicy.RUNTIME);
-    }
 }

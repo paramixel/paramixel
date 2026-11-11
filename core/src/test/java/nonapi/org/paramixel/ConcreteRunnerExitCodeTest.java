@@ -24,8 +24,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
-import org.paramixel.api.Listener;
-import org.paramixel.api.Result;
 import org.paramixel.api.Status;
 import org.paramixel.api.action.Step;
 
@@ -41,57 +39,39 @@ class ConcreteRunnerExitCodeTest {
     }
 
     private static ConcreteDescriptor passedDescriptor() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", v -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", v -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
         return descriptor;
     }
 
     private static ConcreteDescriptor failedDescriptor() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", v -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", v -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.FAILED);
         return descriptor;
     }
 
     private static ConcreteDescriptor skippedDescriptor() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", v -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", v -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.SKIPPED);
         return descriptor;
     }
 
     private static ConcreteDescriptor abortedDescriptor() {
-        var descriptor = new ConcreteDescriptor(Step.of("test", v -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step("test", v -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.ABORTED);
         return descriptor;
     }
 
     private int exitCode(Configuration configuration, ConcreteDescriptor descriptor) {
-        var result = new ConcreteResult(descriptor, configuration);
-        var runner = new ConcreteRunner(configuration, noOpListener());
-        return exitCodeMethod(runner, result);
+        return new ConcreteResult(descriptor, configuration).exitCode();
     }
 
     private int exitCode(Configuration configuration, Status statusOverride) {
-        var result = new ConcreteResult(configuration, statusOverride);
-        var runner = new ConcreteRunner(configuration, noOpListener());
-        return exitCodeMethod(runner, result);
-    }
-
-    private Listener noOpListener() {
-        return new Listener() {};
-    }
-
-    private int exitCodeMethod(ConcreteRunner runner, ConcreteResult result) {
-        try {
-            var method = ConcreteRunner.class.getDeclaredMethod("exitCode", Result.class);
-            method.setAccessible(true);
-            return (int) method.invoke(runner, result);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return new ConcreteResult(configuration, statusOverride).exitCode();
     }
 
     @Nested

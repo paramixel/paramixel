@@ -16,8 +16,7 @@
 
 package examples;
 
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
@@ -27,7 +26,8 @@ import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
 
 /**
- * Demonstrates using provided {@link Step} actions with a fixture instance managed by {@link org.paramixel.api.action.Instance}.
+ * Demonstrates using provided {@link org.paramixel.api.action.Step} actions with a fixture instance managed by
+ * {@link org.paramixel.api.action.Instance}.
  */
 public class CustomActionTest {
 
@@ -42,7 +42,7 @@ public class CustomActionTest {
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -54,10 +54,10 @@ public class CustomActionTest {
     public static Action factory() {
         var testName = CustomActionTest.class.getName();
 
-        return instance(testName, CustomActionTest::new)
+        return of(testName, CustomActionTest.class, CustomActionTest::new)
                 .body(sequential("body")
-                        .child(step("test", withInstance(CustomActionTest.class, CustomActionTest::setValue)))
-                        .child(step("validate", withInstance(CustomActionTest.class, CustomActionTest::validate))))
+                        .child(step("test", CustomActionTest.class, CustomActionTest::setValue))
+                        .child(step("validate", CustomActionTest.class, CustomActionTest::validate)))
                 .build();
     }
 

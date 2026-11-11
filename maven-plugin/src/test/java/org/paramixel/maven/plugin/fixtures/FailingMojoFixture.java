@@ -37,8 +37,8 @@ public final class FailingMojoFixture {
      */
     @Paramixel.Factory
     public static Action action() {
-        return Instance.builder("mojo-fail", Object::new)
-                .body(Step.of("fail", context -> {
+        return Instance.of("mojo-fail", Object.class, Object::new)
+                .body(Step.step("fail", context -> {
                     throw new RuntimeException("boom");
                 }))
                 .build();

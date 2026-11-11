@@ -44,7 +44,7 @@
     </modules>
 
     <properties>
-        <revision>6.2.6-POST</revision>
+        <revision>7.0.0-ALPHA-1</revision>
         <!-- Build settings -->
         <jacoco.skip>false</jacoco.skip>
         <maven.compiler.release>17</maven.compiler.release>

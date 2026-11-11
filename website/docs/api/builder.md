@@ -5,20 +5,21 @@ description: Mutable builders that produce immutable Action snapshots.
 
 # Builder
 
-`Builder` is a sealed interface for constructing immutable `Action` instances.
+`ActionBuilder` is a sealed interface: anything that can produce an immutable `Action`. A built `Action` is its own
+builder, so an action and a builder can be passed interchangeably wherever a child, body, before or after is
+accepted.
 
 ```java
-public sealed interface Builder
-        permits Conditional.Builder,
+public sealed interface ActionBuilder
+        permits Action,
+                Conditional.Builder,
                 Instance.Builder,
                 Isolated.Builder,
+                Loop.Builder,
                 Parallel.Builder,
-                Repeat.Builder,
                 Scope.Builder,
                 Sequential.Builder,
-                Static.Builder, // Deprecated since 6.2 — use Scope.Builder instead
-                Timeout.Builder,
-                Until.Builder {
+                Timeout.Builder {
 
     Action build();
 }
@@ -26,33 +27,32 @@ public sealed interface Builder
 
 ## Design
 
-Each `Action` subtype that requires configuration exposes a corresponding `Builder` nested class. Callers configure the builder, then call `build()` to produce an immutable action snapshot. Builders are reusable — `build()` may be called multiple times.
+Each `Action` subtype that needs configuration exposes a `Builder`. Configure it, then call `build()` for an
+immutable snapshot. Builders are reusable: `build()` may be called multiple times and produces a new snapshot each
+time. Builder inputs are built when they are accepted, not retained for deferred building.
 
 ## Builder subtypes
 
 | Builder | Produces | Description |
 |---------|----------|-------------|
-| `Sequential.Builder` | `Sequential` | Sequential execution; `.child(action)` adds children, `.dependent()`/`.independent()` controls failure propagation. |
-| `Parallel.Builder` | `Parallel` | Concurrent execution; `.parallelism(int)` controls in-flight count. |
-| `Scope.Builder` | `Scope` | Before-body-after with lifecycle guarantee. |
-| `Static.Builder` | `Static` | Before-body-after without fixture instance. _(Deprecated since 6.2 — use `Scope.Builder` instead.)_ |
-| `Instance.Builder` | `Instance` | Fixture instance lifecycle; `.body(action)` sets the body. |
-| `Isolated.Builder` | `Isolated` | Named-lock execution; `.body(action)` sets the protected child. |
-| `Repeat.Builder` | `Repeat` | Executes child action N times. |
-| `Timeout.Builder` | `Timeout` | Executes child action with wall-clock deadline. |
+| `Sequential.Builder` | `Sequential` | Sequential execution; `child`, `children`, `each`, `dependent`/`independent`, `shuffle`. |
+| `Parallel.Builder` | `Parallel` | Concurrent execution bounded by the named pool given to `parallel(name, pool)`; `child`, `children`, `each`, `shuffle`. |
+| `Scope.Builder` | `Scope` | `before`/`body`/`after` with lifecycle guarantees. |
+| `Instance.Builder<T>` | `Scope` | A typed fixture: `of(name, type, factory)`, `before(name, consumer)`, `body`, `after(name, consumer)`. |
+| `Loop.Builder` | `Loop` | Bounded repetition with `until`, `untilPassed` and a `Backoff` delay. |
+| `Isolated.Builder` | `Isolated` | Named-lock execution; `body(action)` sets the protected body. |
+| `Timeout.Builder` | `Timeout` | Runs its body under a wall-clock deadline. |
 | `Conditional.Builder` | `Conditional` | Evaluates a runtime predicate and gates body execution. |
-| `Until.Builder` | `Until` | Executes child repeatedly until predicate satisfied, body passes, or iterations exhausted; `.until(Predicate)` optional, rejects `null`. Without `.until()`, the loop stops when the body passes and reports `PASSED`. |
-
 
 ## Named builder entry points
-For common configurations that need quick action tree definitions, each composite action
-provides a static method named after the action (e.g.,
-`Scope.scope(name)`, `Parallel.parallel(name)`) that returns its `Builder`.
-Import these statically as a shorthand. See [Named Builders](named-builders).
 
-Terminal actions `Step` and `Delay` provide named factory methods
-(`step(name, consumer)`, `delay(name, ms)`, `delayRandom(name, min, max)`) that
-return the action directly, also suitable for static imports.
+Every composite action provides a static method named after the action that returns its `Builder`:
+`scope(name)`, `sequential(name)`, `parallel(name, pool)`, `instance`… replaced by `Instance.of(...)`,
+`loop(name)`, `timeout(name)`, `isolated(name, lock)`, `conditional(name, predicate)`.
+
+`Step` provides `step(name, consumer)` and `step(name, type, consumer)` and returns the action directly. Both forms
+are convenient to import statically. See [Named Builders](named-builders).
+
 ## Usage
 
 ```java
@@ -60,79 +60,22 @@ import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
 Action action = sequential("flow")
-        .child(step("step one", ctx -> stepOne()))
-        .child(step("step two", ctx -> stepTwo()))
+        .child(step("step one", context -> stepOne()))
+        .child(step("step two", context -> stepTwo()))
         .build();
 
-var result = Runner.defaultRunner().run(action);
+var result = Runner.builder().build().run(action);
 ```
 
-Each action factory method returns a `Builder`:
+A fixture is a typed builder rather than a nested scope:
 
 ```java
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Step.step;
 
-Action scoped = scope("browser test")
-        .before(step("start", ctx -> start()))
-        .body(step("test", ctx -> test()))
-        .after(step("stop", ctx -> stop()))
-        .build();
-
-Action fixture = instance("user test", UserFixture::new)
-        .body(step("verify", Context.withInstance(UserFixture.class, f -> f.verify())))
+Action fixture = of("user test", UserFixture.class, UserFixture::new)
+        .before("start", UserFixture::start)
+        .body(step("verify", UserFixture.class, UserFixture::verify))
+        .after("stop", UserFixture::stop)
         .build();
 ```
-
-`Sequential.Builder` supports dependent/independent failure propagation:
-
-```java
-import static org.paramixel.api.action.Sequential.sequential;
-
-var dependent = sequential("flow")
-        .dependent()
-        .child(failingStep)
-        .child(skippedStep)
-        .build();
-
-var independent = sequential("flow")
-        .independent()
-        .child(failingStep)
-        .child(stillRunsStep)
-        .build();
-```
-
-## Shuffled execution
-
-Both `Sequential.Builder` and `Parallel.Builder` support randomizing child execution order with `.shuffle()`:
-
-```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-var seq = sequential("checkout")
-        .shuffle()
-        .child(step("add to cart", ctx -> addToCart()))
-        .child(step("checkout", ctx -> checkout()))
-        .child(step("verify", ctx -> verify()))
-        .build();
-```
-
-`.shuffle()` generates a seed from `ThreadLocalRandom` at build time. For reproducible ordering — essential when investigating flaky order-dependent failures — use `.shuffle(long seed)`:
-
-```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-var seq = sequential("checkout")
-        .shuffle(42L)
-        .child(step("add to cart", ctx -> addToCart()))
-        .child(step("checkout", ctx -> checkout()))
-        .child(step("verify", ctx -> verify()))
-        .build();
-```
-
-The stored seed is accessible via `Sequential.seed()` and `Parallel.seed()`. When `.shuffle()` is not called, `isShuffled()` returns `false` and children execute in insertion order.
-
-See [Action](action) for the `Action` sealed interface and its subtypes.

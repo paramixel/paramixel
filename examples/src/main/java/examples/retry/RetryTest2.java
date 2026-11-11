@@ -17,8 +17,7 @@
 package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Step.step;
 
 import java.time.Duration;
@@ -26,8 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
+import org.paramixel.api.support.Backoff;
 import org.paramixel.api.support.Retry;
-import org.paramixel.api.support.Retry.Policy;
 
 /**
  * Demonstrates the {@link Retry} support with a fixed-delay policy when the
@@ -45,7 +44,7 @@ public class RetryTest2 {
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -56,8 +55,8 @@ public class RetryTest2 {
      */
     @Paramixel.Factory
     public static Action factory() {
-        return instance("retry-example", RetryTest2::new)
-                .body(step("retry()", withInstance(RetryTest2.class, RetryTest2::retry)))
+        return of("retry-example", RetryTest2.class, RetryTest2::new)
+                .body(step("retry()", RetryTest2.class, RetryTest2::retry))
                 .build();
     }
 
@@ -66,7 +65,7 @@ public class RetryTest2 {
     }
 
     public void retry() {
-        Retry.Result result = Retry.of(Policy.fixed(Duration.ofMillis(100), Duration.ofSeconds(1)))
+        Retry.Result result = Retry.of(Backoff.linear(Duration.ofMillis(100)), Duration.ofSeconds(1))
                 .onRetry((attempt, cause) ->
                         System.out.println("Retry attempt " + attempt + " after: " + cause.getMessage()))
                 .run(() -> {
@@ -76,7 +75,7 @@ public class RetryTest2 {
                     }
                 });
 
-        assertThat(result.isSuccessful()).isTrue();
+        assertThat(result.successful()).isTrue();
         assertThat(result.attemptCount()).isEqualTo(3);
     }
 }

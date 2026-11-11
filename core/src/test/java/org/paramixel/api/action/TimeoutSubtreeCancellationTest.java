@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import nonapi.org.paramixel.TestPools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -46,7 +47,8 @@ class TimeoutSubtreeCancellationTest {
 
     private static Runner runner(final int parallelism) {
         return Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism))))
+                .configuration(
+                        TestPools.configuration(Map.of(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism))))
                 .build();
     }
 
@@ -60,10 +62,10 @@ class TimeoutSubtreeCancellationTest {
 
         // First child: a Timeout wrapping a Parallel of N blocking leaves that all acquire a
         // leaf permit and then block. This times out.
-        var timedParallel = Parallel.builder("blocking-parallel").parallelism(PARALLELISM);
+        var timedParallel = Parallel.parallel("blocking-parallel", "pparallelism");
         for (var i = 0; i < PARALLELISM; i++) {
             final var index = i;
-            timedParallel.child(Step.of("blocking-" + index, context -> {
+            timedParallel.child(Step.step("blocking-" + index, context -> {
                 leavesStarted.countDown();
                 try {
                     mayProceed.await();
@@ -74,7 +76,7 @@ class TimeoutSubtreeCancellationTest {
             }));
         }
 
-        var timeout = Timeout.builder("timed")
+        var timeout = Timeout.timeout("timed")
                 .body(timedParallel.build())
                 .timeout(Duration.ofMillis(200))
                 .build();
@@ -82,9 +84,9 @@ class TimeoutSubtreeCancellationTest {
         // Second child: a single Step that needs a leaf permit. If the timed-out subtree leaked
         // its permits, this step could never be admitted. The Sequential (independent) runs both
         // children regardless of the timeout's outcome.
-        var permitTester = Step.of("permit-ok", context -> permitTesterRan.set(true));
+        var permitTester = Step.step("permit-ok", context -> permitTesterRan.set(true));
 
-        var sequence = Sequential.builder("nc2-permit-leak")
+        var sequence = Sequential.sequential("nc2-permit-leak")
                 .independent()
                 .child(timeout)
                 .child(permitTester)
@@ -106,18 +108,18 @@ class TimeoutSubtreeCancellationTest {
         assertThat(permitTesterRan.get()).as("permit-demanding step executed").isTrue();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         var timeoutNode = root.children().get(0);
-        assertThat(timeoutNode.isFailed()).isTrue();
+        assertThat(timeoutNode.status().isFailed()).isTrue();
         var parallelNode = timeoutNode.children().get(0);
-        assertThat(parallelNode.isFailed()).isTrue();
+        assertThat(parallelNode.status().isFailed()).isTrue();
         for (var leaf : parallelNode.children()) {
-            assertThat(leaf.isAborted())
+            assertThat(leaf.status().isAborted())
                     .as("leaf aborted: %s", leaf.action().displayName())
                     .isTrue();
         }
         var permitTesterNode = root.children().get(1);
-        assertThat(permitTesterNode.isPassed()).isTrue();
+        assertThat(permitTesterNode.status().isPassed()).isTrue();
     }
 
     @Test
@@ -126,10 +128,10 @@ class TimeoutSubtreeCancellationTest {
         var interruptedCount = new AtomicInteger(0);
         var permitTesterRan = new AtomicBoolean(false);
 
-        var inner = Parallel.builder("inner-blocking").parallelism(PARALLELISM);
+        var inner = Parallel.parallel("inner-blocking", "pparallelism");
         for (var i = 0; i < PARALLELISM; i++) {
             final var index = i;
-            inner.child(Step.of("inner-" + index, context -> {
+            inner.child(Step.step("inner-" + index, context -> {
                 try {
                     Thread.sleep(60_000);
                 } catch (InterruptedException e) {
@@ -139,16 +141,16 @@ class TimeoutSubtreeCancellationTest {
             }));
         }
 
-        var outer = Parallel.builder("outer-blocking").parallelism(2).child(inner.build());
+        var outer = Parallel.parallel("outer-blocking", "p2x0").child(inner.build());
 
-        var timeout = Timeout.builder("nested-timed")
+        var timeout = Timeout.timeout("nested-timed")
                 .body(outer.build())
                 .timeout(Duration.ofMillis(200))
                 .build();
 
-        var permitTester = Step.of("permit-ok", context -> permitTesterRan.set(true));
+        var permitTester = Step.step("permit-ok", context -> permitTesterRan.set(true));
 
-        var sequence = Sequential.builder("nc2-nested")
+        var sequence = Sequential.sequential("nc2-nested")
                 .independent()
                 .child(timeout)
                 .child(permitTester)
@@ -163,7 +165,7 @@ class TimeoutSubtreeCancellationTest {
         assertThat(permitTesterRan.get()).as("permit-demanding step executed").isTrue();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     @Test
@@ -173,8 +175,8 @@ class TimeoutSubtreeCancellationTest {
         var secondRan = new AtomicBoolean(false);
         var blockingInterrupted = new AtomicBoolean(false);
 
-        var timedSequence = Sequential.builder("timed-sequence").dependent();
-        timedSequence.child(Step.of("blocking", context -> {
+        var timedSequence = Sequential.sequential("timed-sequence").dependent();
+        timedSequence.child(Step.step("blocking", context -> {
             blockingStarted.countDown();
             try {
                 Thread.sleep(60_000);
@@ -183,9 +185,9 @@ class TimeoutSubtreeCancellationTest {
                 Thread.currentThread().interrupt();
             }
         }));
-        timedSequence.child(Step.of("never-reached", context -> secondRan.set(true)));
+        timedSequence.child(Step.step("never-reached", context -> secondRan.set(true)));
 
-        var timeout = Timeout.builder("seq-timed")
+        var timeout = Timeout.timeout("seq-timed")
                 .body(timedSequence.build())
                 .timeout(Duration.ofMillis(200))
                 .build();
@@ -202,13 +204,15 @@ class TimeoutSubtreeCancellationTest {
         assertThat(secondRan.get()).as("never-reached leaf did not run").isFalse();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         var timedSeqNode = root.children().get(0);
-        assertThat(timedSeqNode.isFailed()).isTrue();
+        assertThat(timedSeqNode.status().isFailed()).isTrue();
         var blockingLeaf = timedSeqNode.children().get(0);
-        assertThat(blockingLeaf.isAborted()).as("blocking leaf aborted").isTrue();
+        assertThat(blockingLeaf.status().isAborted())
+                .as("blocking leaf aborted")
+                .isTrue();
         var neverReachedLeaf = timedSeqNode.children().get(1);
-        assertThat(neverReachedLeaf.isAborted())
+        assertThat(neverReachedLeaf.status().isAborted())
                 .as("never-reached leaf aborted")
                 .isTrue();
     }
@@ -217,8 +221,8 @@ class TimeoutSubtreeCancellationTest {
     @DisplayName("Timeout over a single blocking leaf still interrupts (regression)")
     void timeoutOverSingleBlockingLeafStillInterrupts() throws Exception {
         var interrupted = new AtomicBoolean(false);
-        var action = Timeout.builder("single-leaf")
-                .body(Step.of("blocking", context -> {
+        var action = Timeout.timeout("single-leaf")
+                .body(Step.step("blocking", context -> {
                     try {
                         Thread.sleep(60_000);
                     } catch (InterruptedException e) {
@@ -235,23 +239,23 @@ class TimeoutSubtreeCancellationTest {
 
         assertThat(interrupted.get()).as("leaf interrupted").isTrue();
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.children().get(0).isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.children().get(0).status().isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("Timeout leaf that completes within timeout — PASSED propagates (idempotency)")
     void timeoutLeafCompletingWithinTimeoutPasses() {
-        var action = Timeout.builder("fast-leaf")
-                .body(Step.of("quick", context -> {}))
+        var action = Timeout.timeout("fast-leaf")
+                .body(Step.step("quick", context -> {}))
                 .timeout(Duration.ofSeconds(5))
                 .build();
 
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
-        assertThat(root.children().get(0).isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
+        assertThat(root.children().get(0).status().isPassed()).isTrue();
     }
 
     @Test
@@ -262,12 +266,12 @@ class TimeoutSubtreeCancellationTest {
 
         // A Sequential of several (Timeout(blocking Parallel), permit-demanding Step) pairs. If
         // permits leak, an early pair starves all later permit-demanding steps and the run hangs.
-        var sequence = Sequential.builder("repeated").independent();
+        var sequence = Sequential.sequential("repeated").independent();
         for (var pair = 0; pair < pairCount; pair++) {
-            var blockingParallel = Parallel.builder("blocking-" + pair).parallelism(PARALLELISM);
+            var blockingParallel = Parallel.parallel("blocking-" + pair, "pparallelism");
             for (var i = 0; i < PARALLELISM; i++) {
                 final var index = i;
-                blockingParallel.child(Step.of("block-" + pair + "-" + index, context -> {
+                blockingParallel.child(Step.step("block-" + pair + "-" + index, context -> {
                     try {
                         Thread.sleep(60_000);
                     } catch (InterruptedException e) {
@@ -275,14 +279,14 @@ class TimeoutSubtreeCancellationTest {
                     }
                 }));
             }
-            var timeout = Timeout.builder("timed-" + pair)
+            var timeout = Timeout.timeout("timed-" + pair)
                     .body(blockingParallel.build())
                     .timeout(Duration.ofMillis(50))
                     .build();
             sequence.child(timeout);
 
             final var p = pair;
-            sequence.child(Step.of("pass-" + p, context -> permitTestRan.incrementAndGet()));
+            sequence.child(Step.step("pass-" + p, context -> permitTestRan.incrementAndGet()));
         }
 
         var runnerFuture =
@@ -294,7 +298,7 @@ class TimeoutSubtreeCancellationTest {
                 .as("all permit-demanding steps executed")
                 .isEqualTo(pairCount);
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     /**
@@ -313,8 +317,8 @@ class TimeoutSubtreeCancellationTest {
     @DisplayName("documents JVM ceiling: uncooperative leaf leaks permits (not fixable)")
     void uncooperativeLeafLeaksPermitsDocumentsCeiling() throws Exception {
         var secondRan = new AtomicInteger(0);
-        var timeout = Timeout.builder("uncooperative-timed")
-                .body(Step.of("cpu-bound-loop", context -> {
+        var timeout = Timeout.timeout("uncooperative-timed")
+                .body(Step.step("cpu-bound-loop", context -> {
                     // Ignores interruption entirely — the JVM cannot safely stop this.
                     while (true) {
                         // busy spin
@@ -322,8 +326,8 @@ class TimeoutSubtreeCancellationTest {
                 }))
                 .timeout(Duration.ofMillis(100))
                 .build();
-        var permitTester = Step.of("needs-permit", context -> secondRan.incrementAndGet());
-        var sequence = Sequential.builder("ceiling")
+        var permitTester = Step.step("needs-permit", context -> secondRan.incrementAndGet());
+        var sequence = Sequential.sequential("ceiling")
                 .independent()
                 .child(timeout)
                 .child(permitTester)
@@ -342,17 +346,16 @@ class TimeoutSubtreeCancellationTest {
     @Test
     @DisplayName("Timeout over Parallel aborts every leaf with ABORTED status")
     void timeoutOverParallelAbortsEveryLeaf() throws Exception {
-        var action = Timeout.builder("abort-status")
-                .body(Parallel.builder("p")
-                        .parallelism(2)
-                        .child(Step.of("a", context -> {
+        var action = Timeout.timeout("abort-status")
+                .body(Parallel.parallel("p", "p2x1")
+                        .child(Step.step("a", context -> {
                             try {
                                 Thread.sleep(60_000);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             }
                         }))
-                        .child(Step.of("b", context -> {
+                        .child(Step.step("b", context -> {
                             try {
                                 Thread.sleep(60_000);
                             } catch (InterruptedException e) {
@@ -367,11 +370,11 @@ class TimeoutSubtreeCancellationTest {
 
         var result = runnerFuture.get(30, TimeUnit.SECONDS);
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         var parallel = root.children().get(0);
-        assertThat(parallel.isFailed()).isTrue();
+        assertThat(parallel.status().isFailed()).isTrue();
         for (var leaf : parallel.children()) {
-            assertThat(leaf.isAborted()).as("leaf aborted").isTrue();
+            assertThat(leaf.status().isAborted()).as("leaf aborted").isTrue();
         }
     }
 }

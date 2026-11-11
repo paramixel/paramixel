@@ -51,10 +51,10 @@ class SchedulerTimeoutDeferredAbortTest {
                 }
             }
         };
-        var action = Timeout.builder("timeout")
+        var action = Timeout.timeout("timeout")
                 .timeout(Duration.ofMillis(200))
-                .body(Sequential.builder("body-sequential")
-                        .child(Step.of("blocking-leaf", context -> {
+                .body(Sequential.sequential("body-sequential")
+                        .child(Step.step("blocking-leaf", context -> {
                             blockingLeafStarted.countDown();
                             try {
                                 Thread.sleep(5_000);
@@ -62,7 +62,7 @@ class SchedulerTimeoutDeferredAbortTest {
                                 Thread.currentThread().interrupt();
                             }
                         }))
-                        .child(Step.of("after-timeout", context -> {}))
+                        .child(Step.step("after-timeout", context -> {}))
                         .build())
                 .build();
         var configuration = Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "2"));
@@ -74,7 +74,7 @@ class SchedulerTimeoutDeferredAbortTest {
                 .run(action);
 
         assertThat(blockingLeafStarted.await(1, TimeUnit.SECONDS)).isTrue();
-        assertThat(result.descriptor().orElseThrow().isFailed()).isTrue();
+        assertThat(result.descriptor().orElseThrow().status().isFailed()).isTrue();
         assertThat(bodySequentialAfter.await(5, TimeUnit.SECONDS))
                 .as("started deferred child coordinator should close its listener bracket")
                 .isTrue();

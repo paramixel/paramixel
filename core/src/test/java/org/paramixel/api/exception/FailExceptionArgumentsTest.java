@@ -27,19 +27,28 @@ class FailExceptionArgumentsTest {
     @Test
     @DisplayName("fail(null) throws NullPointerException")
     void failWithNullThrowsNullPointerException() {
-        assertThatThrownBy(() -> FailException.fail(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> {
+                    throw FailException.fail(null);
+                })
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("fail(empty) throws IllegalArgumentException")
     void failWithEmptyThrowsIllegalArgumentException() {
-        assertThatThrownBy(() -> FailException.fail("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> {
+                    throw FailException.fail("");
+                })
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("fail(blank) throws IllegalArgumentException")
     void failWithBlankThrowsIllegalArgumentException() {
-        assertThatThrownBy(() -> FailException.fail("   ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> {
+                    throw FailException.fail("   ");
+                })
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

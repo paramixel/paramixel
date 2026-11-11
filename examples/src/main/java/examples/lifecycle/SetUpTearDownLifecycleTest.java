@@ -17,9 +17,7 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Scope.scope;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
@@ -37,31 +35,20 @@ public class SetUpTearDownLifecycleTest {
     private static final AtomicInteger tearDownCount = new AtomicInteger();
 
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     @Paramixel.Factory
     public static Action factory() {
         resetCounts();
 
-        return instance("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
-                .body(scope("scope")
-                        .before(step(
-                                "setUp()",
-                                withInstance(SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::setUp)))
-                        .body(sequential("tests")
-                                .child(step(
-                                        "testOne()",
-                                        withInstance(
-                                                SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::testOne)))
-                                .child(step(
-                                        "testTwo()",
-                                        withInstance(
-                                                SetUpTearDownLifecycleTest.class,
-                                                SetUpTearDownLifecycleTest::testTwo))))
-                        .after(step(
-                                "tearDown()",
-                                withInstance(SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::tearDown))))
+        return of("FullLifecycleTest", SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::new)
+                .before("setUp()", SetUpTearDownLifecycleTest::setUp)
+                .body(sequential("tests")
+                        .child(step("testOne()", SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::testOne))
+                        .child(step(
+                                "testTwo()", SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::testTwo)))
+                .after("tearDown()", SetUpTearDownLifecycleTest::tearDown)
                 .build();
     }
 

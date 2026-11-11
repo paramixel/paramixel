@@ -18,11 +18,11 @@ package nonapi.org.paramixel.action;
 
 import java.time.Instant;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
+import nonapi.org.paramixel.listener.Constants;
+import nonapi.org.paramixel.listener.Listeners;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.FastId;
 import org.paramixel.api.Descriptor;
@@ -30,47 +30,73 @@ import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
 
 /**
- * Mutable descriptor for all action occurrences in a descriptor tree.
+ * The framework's descriptor: an immutable tree node plus the descriptor's own execution state.
  *
- * <p>Structurally mirrors {@link Action}: {@link #before()} and {@link #after()} are
- * separate slots, not included in {@link #children()}. Tree structure, occurrence identity,
- * and execution state are held directly.
+ * <p>Structurally mirrors {@link Action}: {@link #before()} and {@link #after()} are separate slots, not included in
+ * {@link #children()}. The structure ({@code action}, {@code before}, {@code children}, {@code after}) is final and
+ * built bottom-up by the compile pass, so nothing can reshape a tree once it exists. The only mutable state is the
+ * execution state of this occurrence: status, start and completion instants, and the thread running its leaf body.
+ *
+ * <p>{@code parent} is assigned exactly once during compilation, before the tree is published to the engine; the
+ * guard in {@link #attach(MutableDescriptor)} enforces the single assignment.
  */
 public final class ConcreteDescriptor implements MutableDescriptor {
 
     private final Action action;
     private final String id;
+    private final MutableDescriptor before;
+    private final List<Descriptor> children;
+    private final MutableDescriptor after;
+
+    private volatile MutableDescriptor parent;
     private volatile Status status = Status.PENDING;
     private volatile Instant startedAt;
     private volatile Instant completedAt;
-    private volatile MutableDescriptor before;
-    private final List<MutableDescriptor> children = new ArrayList<>();
-    private volatile MutableDescriptor after;
-    private volatile List<Descriptor> childrenView;
-    private volatile boolean frozen;
     private volatile Thread executingThread;
-    private volatile CompletableFuture<Descriptor> scheduledFuture;
     private volatile String cachedIdPath;
-    volatile MutableDescriptor parent;
+    private volatile String cachedPath;
 
     /**
-     * Creates a root descriptor.
+     * Creates a standalone descriptor that is its own root and has no lifecycle slots or children.
      *
      * @param action the action bound to the descriptor; must not be {@code null}
      */
     public ConcreteDescriptor(final Action action) {
-        this(null, action);
+        this(action, null, List.of(), null);
     }
 
     /**
-     * Creates a descriptor with an optional parent.
+     * Creates a parented descriptor with no lifecycle slots or children.
      *
-     * @param parent the parent descriptor, or {@code null} for root
+     * @param parent the parent descriptor, or {@code null} for a root
      * @param action the action bound to the descriptor; must not be {@code null}
      */
     public ConcreteDescriptor(final MutableDescriptor parent, final Action action) {
+        this(action, null, List.of(), null);
         this.parent = parent;
+    }
+
+    /**
+     * Creates a fully shaped descriptor.
+     *
+     * <p>The compile pass builds children before their parent, so this constructor does not link the parent
+     * relationship; it calls {@link #attach(MutableDescriptor)} on the parent afterwards.
+     *
+     * @param action the action bound to this descriptor; must not be {@code null}
+     * @param before the before slot, or {@code null}
+     * @param children the body children in discovery order; must not be {@code null} or contain {@code null}
+     * @param after the after slot, or {@code null}
+     * @throws NullPointerException if {@code action} or {@code children} is {@code null}, or a child is {@code null}
+     */
+    public ConcreteDescriptor(
+            final Action action,
+            final MutableDescriptor before,
+            final List<? extends Descriptor> children,
+            final MutableDescriptor after) {
         this.action = Objects.requireNonNull(action, "action is null");
+        this.before = before;
+        this.children = List.copyOf(Objects.requireNonNull(children, "children is null"));
+        this.after = after;
         this.id = FastId.generateId();
     }
 
@@ -90,26 +116,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     @Override
-    public boolean isPassed() {
-        return status.isPassed();
-    }
-
-    @Override
-    public boolean isFailed() {
-        return status.isFailed();
-    }
-
-    @Override
-    public boolean isSkipped() {
-        return status.isSkipped();
-    }
-
-    @Override
-    public boolean isAborted() {
-        return status.isAborted();
-    }
-
-    @Override
     public Optional<Instant> startedAt() {
         return Optional.ofNullable(startedAt);
     }
@@ -117,21 +123,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     @Override
     public Optional<Instant> completedAt() {
         return Optional.ofNullable(completedAt);
-    }
-
-    @Override
-    public Optional<String> message() {
-        return status.message();
-    }
-
-    @Override
-    public Optional<Throwable> throwable() {
-        return status.throwable();
-    }
-
-    @Override
-    public boolean isCompleted() {
-        return !status.isPending() && !status.isRunning();
     }
 
     @Override
@@ -146,16 +137,7 @@ public final class ConcreteDescriptor implements MutableDescriptor {
 
     @Override
     public List<Descriptor> children() {
-        var view = childrenView;
-        if (view != null) {
-            return view;
-        }
-        synchronized (this) {
-            if (childrenView == null) {
-                childrenView = List.copyOf(children);
-            }
-            return childrenView;
-        }
+        return children;
     }
 
     @Override
@@ -164,91 +146,32 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     @Override
-    public synchronized void setBefore(final MutableDescriptor before) {
-        Objects.requireNonNull(before, "before is null");
-        ensureNotFrozen();
-        before.setParent(this);
-        this.before = before;
-    }
-
-    @Override
-    public synchronized void setAfter(final MutableDescriptor after) {
-        Objects.requireNonNull(after, "after is null");
-        ensureNotFrozen();
-        after.setParent(this);
-        this.after = after;
-    }
-
-    @Override
-    public synchronized void addChild(final MutableDescriptor child) {
-        Objects.requireNonNull(child, "child is null");
-        if (child == this) {
-            throw new IllegalArgumentException("child is this descriptor");
+    public void attach(final MutableDescriptor parent) {
+        Objects.requireNonNull(parent, "parent is null");
+        if (this.parent != null) {
+            throw new IllegalStateException("Descriptor already attached to a parent: " + id);
         }
-        ensureNotFrozen();
-        child.setParent(this);
-        children.add(child);
-        childrenView = null;
+        this.parent = parent;
     }
 
-    @Override
-    public void setParent(final MutableDescriptor parent) {
-        ensureNotFrozen();
-        this.parent = Objects.requireNonNull(parent, "parent is null");
-    }
-
-    @Override
-    public void freeze() {
-        MutableDescriptor beforeSnapshot;
-        List<Descriptor> childrenSnapshot;
-        MutableDescriptor afterSnapshot;
-        synchronized (this) {
-            beforeSnapshot = before;
-            if (childrenView != null) {
-                childrenSnapshot = childrenView;
-            } else {
-                childrenView = List.copyOf(children);
-                childrenSnapshot = childrenView;
-            }
-            frozen = true;
-            afterSnapshot = after;
+    /**
+     * Links every structural slot to this descriptor, which publishes the subtree.
+     *
+     * <p>Called once by the compile pass after this descriptor and its slots exist.
+     *
+     * @throws IllegalStateException if a slot was already attached to another parent
+     */
+    public void attachSlots() {
+        if (before != null) {
+            before.attach(this);
         }
-
-        if (beforeSnapshot != null) {
-            beforeSnapshot.freeze();
-        }
-        for (var child : childrenSnapshot) {
+        for (var child : children) {
             Arguments.requireInstanceOf(child, MutableDescriptor.class, "child must be a MutableDescriptor")
-                    .freeze();
+                    .attach(this);
         }
-        if (afterSnapshot != null) {
-            afterSnapshot.freeze();
+        if (after != null) {
+            after.attach(this);
         }
-    }
-
-    @Override
-    public boolean isFrozen() {
-        return frozen;
-    }
-
-    private void ensureNotFrozen() {
-        if (frozen) {
-            throw new IllegalStateException("Descriptor is frozen: " + id);
-        }
-    }
-
-    @Override
-    public synchronized CompletableFuture<Descriptor> markScheduled() {
-        if (scheduledFuture != null) {
-            throw new IllegalStateException("Descriptor already scheduled: " + id);
-        }
-        scheduledFuture = new CompletableFuture<>();
-        return scheduledFuture;
-    }
-
-    @Override
-    public synchronized boolean isScheduled() {
-        return scheduledFuture != null;
     }
 
     @Override
@@ -273,20 +196,14 @@ public final class ConcreteDescriptor implements MutableDescriptor {
             status = newStatus;
             completedAt = Instant.now();
         }
-        // Descriptor already in a terminal state — no-op.
+        // Descriptor already in a terminal state: no-op.
     }
 
     @Override
-    public synchronized void completeFuture() {
-        if (scheduledFuture != null && !scheduledFuture.isDone()) {
-            scheduledFuture.complete(this);
-        }
-    }
-
-    @Override
-    public synchronized void completeFutureExceptionally(final Throwable throwable) {
-        if (scheduledFuture != null && !scheduledFuture.isDone()) {
-            scheduledFuture.completeExceptionally(throwable);
+    public synchronized void replaceStatus(final Status newStatus) {
+        Objects.requireNonNull(newStatus, "status is null");
+        if (!status.isPending() && !status.isRunning() && newStatus.kind().isTerminal()) {
+            status = newStatus;
         }
     }
 
@@ -308,9 +225,34 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     /**
+     * Returns the human-readable display path from the run root to this descriptor, cached after first
+     * computation.
+     *
+     * <p>The parent chain is fixed once the tree is compiled, so the path is a stable value.
+     *
+     * @return the display-name path; empty for the run root
+     */
+    @Override
+    public String path() {
+        var path = cachedPath;
+        if (path != null) {
+            return path;
+        }
+        var names = new ArrayDeque<String>();
+        for (var d = this; d != null; d = d.parent instanceof ConcreteDescriptor cd ? cd : null) {
+            var name = Listeners.sanitizeMessage(d.action.displayName());
+            if (!Constants.ROOT_NAME.equals(name)) {
+                names.addFirst(name);
+            }
+        }
+        cachedPath = String.join(" / ", names);
+        return cachedPath;
+    }
+
+    /**
      * Returns the id path from root to this descriptor, cached after first computation.
      *
-     * <p>The parent chain is immutable post-freeze, so the id path is a stable value.
+     * <p>The parent chain is fixed once the tree is compiled, so the id path is a stable value.
      * Uses a volatile field with benign races: two threads may compute the same string,
      * but {@link String} is immutable and the computation is pure.
      *
@@ -327,11 +269,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         }
         cachedIdPath = String.join("-", ids);
         return cachedIdPath;
-    }
-
-    @Override
-    public CompletableFuture<Descriptor> scheduledFuture() {
-        return scheduledFuture;
     }
 
     @Override
@@ -356,14 +293,14 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         if (transition == AbortTransition.ALREADY_TERMINAL) {
             return true; // already terminal — idempotent; it necessarily started earlier
         }
-        // Recurse without holding this node's monitor: children()/before()/after() are immutable
-        // post-freeze, and releasing avoids holding a lock across the recursive walk.
+        // Recurse without holding this node's monitor: the structural slots are final, and releasing
+        // the monitor avoids holding a lock across the recursive walk.
         var message = cause.getMessage() != null ? cause.getMessage() : "cancelled";
         var abortedDescendant = Status.aborted("cancelled by ancestor: " + message);
         // The before slot is aborted first: its own atomic transition reports whether it had been
         // attempted, which decides whether the after slot still owes cleanup.
         var beforeAttempted = before != null && before.abort(abortedDescendant, cause);
-        for (var child : children()) {
+        for (var child : children) {
             Arguments.requireInstanceOf(child, MutableDescriptor.class, "child must be a MutableDescriptor")
                     .abort(abortedDescendant, cause);
         }
@@ -403,8 +340,7 @@ public final class ConcreteDescriptor implements MutableDescriptor {
      * nesting depth plus the time an uncooperative leaf takes to return.
      *
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
-     * @param cause the cause used to complete the scheduling future exceptionally; must not be
-     *     {@code null}
+     * @param cause the cause of the cancellation; must not be {@code null}
      * @return the transition that occurred
      */
     private synchronized AbortTransition beginAbort(final Status rootStatus, final Throwable cause) {
@@ -417,10 +353,6 @@ public final class ConcreteDescriptor implements MutableDescriptor {
             setStatus(Status.RUNNING);
         }
         setStatus(rootStatus);
-        completeFutureExceptionally(cause);
-        // Only leaf descriptors run user code on their executing thread; coordination nodes are
-        // unblocked solely by future completion, so interrupting only leaves avoids stranding an
-        // interrupt flag on a coordinator parked in the scheduler's managed join.
         if (isLeafAction()) {
             interruptExecutingThread();
         }

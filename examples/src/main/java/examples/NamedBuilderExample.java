@@ -17,10 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Assert.assertFalse;
-import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Conditional.conditional;
-import static org.paramixel.api.action.Delay.delay;
 import static org.paramixel.api.action.Isolated.isolated;
 import static org.paramixel.api.action.Loop.loop;
 import static org.paramixel.api.action.Parallel.parallel;
@@ -28,6 +25,7 @@ import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 import static org.paramixel.api.action.Timeout.timeout;
+import static org.paramixel.api.exception.FailException.fail;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,7 +40,7 @@ import org.paramixel.api.action.Action;
  * (e.g., {@code scope("name")}, {@code sequential("name")}) that returns the
  * corresponding {@code Builder}.
  *
- * <p>Contrast with {@link CustomActionTest} and {@link SequentialEachExample}
+ * <p>Contrast with {@link CustomActionTest} and {@link SequentialIterationExample}
  * to see the same patterns expressed with typed builders.
  */
 public class NamedBuilderExample {
@@ -58,7 +56,7 @@ public class NamedBuilderExample {
      */
     public static void main(final String[] args) {
         reset();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -75,14 +73,14 @@ public class NamedBuilderExample {
                 .body(sequential("tests")
                         .child(sequential("suite")
                                 .child(step("step-demo", context -> stepCounter.incrementAndGet()))
-                                .child(parallel("parallel-demo")
+                                .child(parallel("parallel-demo", "examples")
                                         .child(step("branch-1", context -> parallelCounter.incrementAndGet()))
                                         .child(step("branch-2", context -> parallelCounter.incrementAndGet()))
                                         .child(step("branch-3", context -> parallelCounter.incrementAndGet())))
                                 .child(loop("repeat-demo")
                                         .body(step("repeated", context -> repeatCounter.incrementAndGet()))
                                         .maxIterations(3))
-                                .child(delay("delay-demo", 10L))
+                                .child(step("sleep-demo", context -> Thread.sleep(10)))
                                 .child(timeout("timeout-demo")
                                         .timeout(Duration.ofSeconds(1))
                                         .body(step("within-timeout", context -> {})))
@@ -94,8 +92,18 @@ public class NamedBuilderExample {
                                         .body(step("body", context -> {}))
                                         .after(step("cleanup", context -> {})))
                                 .child(sequential("assert-demo")
-                                        .child(assertTrue("true-is-true", true))
-                                        .child(assertFalse("false-is-false", false))))
+                                        .child(step("true-is-true", context -> {
+                                            boolean actual = 1 == 1;
+                                            if (!actual) {
+                                                throw fail("expected true");
+                                            }
+                                        }))
+                                        .child(step("false-is-false", context -> {
+                                            boolean actual = 1 == 2;
+                                            if (actual) {
+                                                throw fail("expected false");
+                                            }
+                                        }))))
                         .child(step("validate", context -> {
                             assertThat(stepCounter.get()).isGreaterThanOrEqualTo(1);
                             assertThat(parallelCounter.get()).isEqualTo(3);

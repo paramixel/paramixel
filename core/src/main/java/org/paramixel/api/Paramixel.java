@@ -23,7 +23,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Builder;
+import org.paramixel.api.action.ActionBuilder;
 import org.paramixel.api.selector.Selector;
 
 /**
@@ -42,14 +42,14 @@ public final class Paramixel {
     /**
      * Marks a method as a factory discovered by classpath scanning.
      *
-     * <p>Factory methods must produce {@link Action} or {@link Builder} instances, or
-     * {@code null} to indicate that the factory should be skipped. When a {@link Builder}
+     * <p>Factory methods must produce {@link Action} or {@link ActionBuilder} instances, or
+     * {@code null} to indicate that the factory should be skipped. When a {@link ActionBuilder}
      * is returned, it is built immediately to produce an {@link Action}. The framework
      * invokes these methods during discovery to build the root action tree.
      *
      * @see Runner
      * @see Action
-     * @see Builder
+     * @see ActionBuilder
      */
     @Documented
     @Retention(RetentionPolicy.RUNTIME)
@@ -61,7 +61,7 @@ public final class Paramixel {
      * within a runner invocation.
      *
      * <p>The method must be {@code public static}, take zero parameters, and
-     * return {@link Action} or {@link Builder}. Multiple {@code @BeforeAll}
+     * return {@link Action} or {@link ActionBuilder}. Multiple {@code @BeforeAll}
      * methods are ordered by {@link Priority @Priority} on the declaring
      * class, then by package, class, and method name.
      *
@@ -81,7 +81,7 @@ public final class Paramixel {
      * within a runner invocation.
      *
      * <p>The method must be {@code public static}, take zero parameters, and
-     * return {@link Action} or {@link Builder}. Multiple {@code @AfterAll}
+     * return {@link Action} or {@link ActionBuilder}. Multiple {@code @AfterAll}
      * methods are ordered in reverse of {@code @BeforeAll} ordering. Every
      * {@code @AfterAll} method executes regardless of whether preceding
      * hooks or test actions failed.
@@ -159,35 +159,6 @@ public final class Paramixel {
          * Returns the tag value declared for the annotated factory method.
          *
          * @return the tag value
-         */
-        String value();
-    }
-
-    /**
-     * Assigns a stable identifier to a method that may be registered as an action.
-     *
-     * <p>The identifier is used by {@link AnnotationResolver#byId(String)} and
-     * {@link AnnotationResolver#staticById(String)} to resolve annotated methods into named
-     * step actions. The annotated method must satisfy the same invocation signature rules as
-     * the corresponding method-reference API: it must be a public method that accepts no
-     * arguments and returns {@code void}. Instance methods are resolved by
-     * {@link AnnotationResolver#byId(String)}; static methods are resolved by
-     * {@link AnnotationResolver#staticById(String)}.
-     *
-     * <p>IDs are resolved against the concrete type supplied to
-     * {@link AnnotationResolver#create(Class)} and must be unique across the class hierarchy
-     * visible through that type. Instance and static methods are resolved independently; the
-     * same ID may appear on both a static and an instance method within the same class.
-     */
-    @Documented
-    @Retention(RetentionPolicy.RUNTIME)
-    @Target(ElementType.METHOD)
-    public @interface Id {
-
-        /**
-         * Returns the stable method identifier used for action lookup.
-         *
-         * @return the method identifier
          */
         String value();
     }

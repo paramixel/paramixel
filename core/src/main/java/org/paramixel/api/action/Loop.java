@@ -16,14 +16,15 @@
 
 package org.paramixel.api.action;
 
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Context;
-import org.paramixel.api.exception.AbortedException;
-import org.paramixel.api.exception.PolicyException;
+import org.paramixel.api.Status;
+import org.paramixel.api.exception.AbortException;
+import org.paramixel.api.support.Backoff;
 
 /**
  * An action that executes a body action repeatedly for up to {@link #maxIterations()}
@@ -32,19 +33,23 @@ import org.paramixel.api.exception.PolicyException;
  * <p>When no predicate is configured, all iterations run regardless of individual
  * outcomes. This provides simple bounded repetition.
  *
- * <p>When a {@link Predicate}{@code <Context>} is configured via
- * {@link Builder#until(Predicate)}, the predicate is evaluated after each
- * iteration. A return value of {@code true} signals satisfaction and stops
- * the loop with {@code PASSED} status.
+ * <p>When a predicate is configured through {@link Builder#until(java.util.function.BiPredicate)},
+ * {@link Builder#until(Predicate)} or {@link Builder#untilPassed()}, it is evaluated after each
+ * iteration and a {@code true} answer stops the loop with {@code PASSED} status. The
+ * {@code BiPredicate} form also receives the iteration's {@link org.paramixel.api.Status}, so
+ * "stop when it passed" needs nothing else.
  *
- * <p>When a {@link DelayPolicy} is configured via {@link Builder#delay(DelayPolicy)},
- * the loop pauses between iterations according to the policy. The delay is applied
+ * <p>Iterations that never run because the predicate was satisfied carry
+ * {@code Status.skipped("loop satisfied")}, so a report can collapse them instead of counting them as real skips.
+ *
+ * <p>When a {@link org.paramixel.api.support.Backoff} is configured via {@link Builder#delay(Backoff)},
+ * the loop pauses between iterations according to the schedule. The delay is applied
  * after iteration N completes and before iteration N+1 starts. Delay never fires
  * before the first iteration, never after the last iteration, never after abort,
  * and never after predicate satisfaction.
  *
  * <p>Individual iteration failures do not terminate the loop &mdash; they are treated
- * as &quot;try again&quot; signals. Only an {@link AbortedException}
+ * as &quot;try again&quot; signals. Only an {@link AbortException}
  * from the body causes an immediate stop with {@code ABORTED} status.
  *
  * <p>If all iterations are exhausted without satisfaction, the action reports
@@ -61,22 +66,21 @@ public final class Loop implements Action {
     private final String displayName;
     private final Action body;
     private final int maxIterations;
-    private final Predicate<Context> until;
-    private final DelayPolicy delayPolicy;
+    private final BiPredicate<Context, Status> until;
+    private final Backoff delay;
 
     private Loop(
             final String displayName,
             final Action body,
             final int maxIterations,
-            final Predicate<Context> until,
-            final DelayPolicy delayPolicy) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+            final BiPredicate<Context, Status> until,
+            final Backoff delay) {
+        this.displayName = Objects.requireNonNull(displayName, "displayName is null");
         this.body = Objects.requireNonNull(body, "body is null");
         Arguments.requireTrue(maxIterations > 0, "maxIterations must be positive, was: " + maxIterations);
         this.maxIterations = maxIterations;
         this.until = until;
-        this.delayPolicy = delayPolicy;
+        this.delay = delay;
     }
 
     /**
@@ -87,23 +91,10 @@ public final class Loop implements Action {
      * @throws NullPointerException if {@code displayName} is {@code null}
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    public static Builder builder(final String displayName) {
+    public static Builder loop(final String displayName) {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
         return new Builder(displayName);
-    }
-
-    /**
-     * Creates a new builder for a {@code Loop} action with the given display name.
-     *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank
-     * @see Builder
-     */
-    public static Builder loop(final String displayName) {
-        return builder(displayName);
     }
 
     @Override
@@ -135,239 +126,111 @@ public final class Loop implements Action {
     /**
      * Returns the termination predicate, if configured.
      *
-     * <p>When present, the predicate is evaluated after each iteration; a return value of
-     * {@code true} signals satisfaction and stops the loop. When absent, all iterations
-     * are executed regardless of individual outcomes.
+     * <p>When present, the predicate is evaluated after each iteration with the execution context and that
+     * iteration's status; a return value of {@code true} signals satisfaction and stops the loop.
      *
-     * @return the termination predicate; never {@code null} (wrapped in {@code Optional})
+     * @return the termination predicate, or empty when all iterations run
      */
-    public Optional<Predicate<Context>> until() {
+    public Optional<BiPredicate<Context, Status>> until() {
         return Optional.ofNullable(until);
     }
 
     /**
-     * Returns the inter-iteration delay policy, if configured.
+     * Returns the inter-iteration delay schedule, if configured.
      *
-     * <p>When present, the loop pauses between iterations according to the policy.
-     * Delay is applied after iteration N completes and before iteration N+1 starts.
-     * Delay never fires before the first iteration, never after the last iteration,
-     * never after abort, and never after predicate satisfaction.
-     *
-     * @return the delay policy; never {@code null} (wrapped in {@code Optional})
-     */
-    public Optional<DelayPolicy> delay() {
-        return Optional.ofNullable(delayPolicy);
-    }
-
-    /**
-     * Defines a delay schedule applied between loop iterations.
-     *
-     * <p>A delay policy determines how long to pause after a completed iteration
-     * before starting the next one. Delay is never applied before the first
-     * iteration, after the last iteration, after abort, or after predicate
+     * <p>Delay is applied after iteration N completes and before iteration N+1 starts. Delay never fires
+     * before the first iteration, never after the last iteration, never after abort, and never after predicate
      * satisfaction.
      *
-     * <p>Two built-in implementations are provided:
-     * <ul>
-     *   <li>{@link Linear} &mdash; constant delay between every iteration</li>
-     *   <li>{@link Exponential} &mdash; doubling delay (baseDelay, 2*baseDelay, 4*baseDelay, ...)</li>
-     * </ul>
+     * @return the delay schedule, or empty when iterations follow each other immediately
      */
-    public sealed interface DelayPolicy permits DelayPolicy.Linear, DelayPolicy.Exponential {
-
-        /**
-         * Returns the delay after a completed iteration, before the next begins.
-         *
-         * @param completedIteration 1-based number of the iteration just completed
-         * @return the delay duration; never null, negative values return {@link Duration#ZERO}
-         */
-        Duration delayForIteration(int completedIteration);
-
-        /**
-         * Constant delay between every iteration.
-         *
-         * @param delay the delay duration between iterations; must not be {@code null} or negative
-         */
-        record Linear(Duration delay) implements DelayPolicy {
-            /**
-             * Creates a linear (constant) delay policy.
-             *
-             * @param delay the delay duration between iterations; must not be {@code null} or negative
-             * @throws NullPointerException if {@code delay} is {@code null}
-             * @throws IllegalArgumentException if {@code delay} is negative
-             */
-            public Linear {
-                Objects.requireNonNull(delay, "delay is null");
-                Arguments.requireFalse(delay.isNegative(), "delay is negative");
-            }
-
-            @Override
-            public Duration delayForIteration(int completedIteration) {
-                if (completedIteration < 1) {
-                    return Duration.ZERO;
-                }
-                return delay;
-            }
-        }
-
-        /**
-         * Doubling delay: baseDelay, 2*baseDelay, 4*baseDelay, ...
-         *
-         * @param baseDelay the base delay duration before exponential backoff; must not be {@code null} or negative
-         */
-        record Exponential(Duration baseDelay) implements DelayPolicy {
-            /**
-             * Creates an exponential delay policy.
-             *
-             * @param baseDelay the base delay duration; must not be {@code null} or negative
-             * @throws NullPointerException if {@code baseDelay} is {@code null}
-             * @throws IllegalArgumentException if {@code baseDelay} is negative
-             */
-            public Exponential {
-                Objects.requireNonNull(baseDelay, "baseDelay is null");
-                Arguments.requireFalse(baseDelay.isNegative(), "baseDelay is negative");
-            }
-
-            @Override
-            public Duration delayForIteration(int completedIteration) {
-                if (completedIteration < 1) {
-                    return Duration.ZERO;
-                }
-                int exponent = completedIteration - 1;
-                long multiplier = 1L << Math.min(exponent, 62);
-                return multiplyOrZero(baseDelay, multiplier);
-            }
-        }
-
-        /**
-         * Multiplies a duration by a multiplier, returning {@link Duration#ZERO} on overflow.
-         *
-         * @param duration the duration to multiply
-         * @param multiplier the multiplier
-         * @return the multiplied duration
-         * @throws PolicyException if the multiplication overflows
-         */
-        private static Duration multiplyOrZero(final Duration duration, final long multiplier) {
-            if (multiplier < 0) {
-                return Duration.ZERO;
-            }
-            try {
-                var result = duration.multipliedBy(multiplier);
-                if (result.isNegative()) {
-                    return Duration.ZERO;
-                }
-                return result;
-            } catch (ArithmeticException e) {
-                throw new PolicyException("duration overflow multiplying by " + multiplier, e);
-            }
-        }
+    public Optional<Backoff> delay() {
+        return Optional.ofNullable(delay);
     }
 
     /**
      * Fluent builder for {@link Loop} actions.
      */
-    public static final class Builder implements org.paramixel.api.action.Builder {
+    public static final class Builder implements ActionBuilder {
 
         private final String displayName;
         private Action body;
         private int maxIterations = -1;
-        private Predicate<Context> until;
-        private DelayPolicy delayPolicy;
+        private BiPredicate<Context, Status> until;
+        private Backoff delay;
 
         private Builder(final String displayName) {
             this.displayName = displayName;
         }
 
         /**
-         * Sets the child action.
+         * Sets the child action. A builder argument is built immediately and the resulting
+         * action snapshot is stored; an action argument is used as is.
          *
-         * @param action the child action; must not be {@code null}
+         * @param action the child action action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder body(final Action action) {
-            this.body = Objects.requireNonNull(action, "action is null");
+        public Builder body(final ActionBuilder action) {
+            Objects.requireNonNull(action, "action is null");
+            this.body = Objects.requireNonNull(action.build(), "action.build() returned null");
             return this;
         }
 
         /**
-         * Sets the child action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
+         * Sets the termination predicate over the iteration status.
          *
-         * @param builder the child action builder; must not be {@code null}
+         * <p>The predicate receives the execution context and the status of the iteration that just completed.
+         * Returning {@code true} stops the loop with {@code PASSED} status.
+         *
+         * @param predicate the termination predicate; must not be {@code null}
          * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
+         * @throws NullPointerException if {@code predicate} is {@code null}
          */
-        public Builder body(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.body = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+        public Builder until(final BiPredicate<Context, Status> predicate) {
+            this.until = Objects.requireNonNull(predicate, "predicate is null");
             return this;
         }
 
         /**
          * Sets the termination predicate.
          *
-         * <p>When configured, the predicate is evaluated after each iteration; a return
-         * value of {@code true} signals satisfaction and stops the loop. When not
-         * configured, all iterations are executed regardless of individual outcomes.
-         *
          * @param predicate the termination predicate; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code predicate} is {@code null}
          */
         public Builder until(final Predicate<Context> predicate) {
-            this.until = Objects.requireNonNull(predicate, "predicate is null");
+            Objects.requireNonNull(predicate, "predicate is null");
+            this.until = (context, status) -> predicate.test(context);
             return this;
         }
 
         /**
-         * Sets the inter-iteration delay policy.
+         * Stops the loop after the first iteration that passes.
          *
-         * <p>When configured, the loop pauses between iterations according to the
-         * policy. The delay is applied after iteration N completes and before
-         * iteration N+1 starts, never before the first iteration, never after the
-         * last iteration, never after abort, and never after predicate satisfaction.
+         * <p>Equivalent to {@code until((context, status) -> status.isPassed())}, and the usual way to retry until
+         * something works.
          *
-         * @param policy the delay policy; must not be {@code null}
          * @return this builder
-         * @throws NullPointerException if {@code policy} is {@code null}
          */
-        public Builder delay(final DelayPolicy policy) {
-            this.delayPolicy = Objects.requireNonNull(policy, "policy is null");
+        public Builder untilPassed() {
+            this.until = (context, status) -> status.isPassed();
             return this;
         }
 
         /**
-         * Sets a constant inter-iteration delay.
+         * Sets the inter-iteration delay schedule.
          *
-         * <p>This is a convenience overload that wraps the duration in a
-         * {@link DelayPolicy.Linear} policy.
+         * <p>The delay is applied after iteration N completes and before iteration N+1 starts, never before the
+         * first iteration, never after the last iteration, never after an abort, and never after the predicate
+         * was satisfied.
          *
-         * @param fixedDelay the fixed delay between iterations; must not be {@code null} or negative
+         * @param backoff the delay schedule; must not be {@code null}
          * @return this builder
-         * @throws NullPointerException if {@code fixedDelay} is {@code null}
-         * @throws IllegalArgumentException if {@code fixedDelay} is negative
+         * @throws NullPointerException if {@code backoff} is {@code null}
          */
-        public Builder delay(final Duration fixedDelay) {
-            Objects.requireNonNull(fixedDelay, "fixedDelay is null");
-            Arguments.requireFalse(fixedDelay.isNegative(), "fixedDelay is negative");
-            this.delayPolicy = new DelayPolicy.Linear(fixedDelay);
-            return this;
-        }
-
-        /**
-         * Sets a constant inter-iteration delay in milliseconds.
-         *
-         * <p>This is a convenience overload that wraps the millisecond value in a
-         * {@link DelayPolicy.Linear} policy.
-         *
-         * @param fixedDelayMillis the fixed delay in milliseconds; must not be negative
-         * @return this builder
-         * @throws IllegalArgumentException if {@code fixedDelayMillis} is negative
-         */
-        public Builder delay(final long fixedDelayMillis) {
-            Arguments.requireNonNegative(fixedDelayMillis, "fixedDelayMillis is negative");
-            this.delayPolicy = new DelayPolicy.Linear(Duration.ofMillis(fixedDelayMillis));
+        public Builder delay(final Backoff backoff) {
+            this.delay = Objects.requireNonNull(backoff, "backoff is null");
             return this;
         }
 
@@ -399,7 +262,7 @@ public final class Loop implements Action {
             if (maxIterations <= 0) {
                 throw new IllegalStateException("maxIterations must be configured");
             }
-            return new Loop(displayName, body, maxIterations, until, delayPolicy);
+            return new Loop(displayName, body, maxIterations, until, delay);
         }
     }
 }

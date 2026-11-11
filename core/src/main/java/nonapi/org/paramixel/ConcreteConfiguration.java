@@ -92,36 +92,6 @@ public final class ConcreteConfiguration implements Configuration {
     }
 
     @Override
-    public Optional<Float> getFloat(final String key) {
-        Objects.requireNonNull(key, "key is null");
-        var value = properties.get(key);
-        if (value == null) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Float.parseFloat(value.strip()));
-        } catch (NumberFormatException e) {
-            throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected float but was '" + value + "'", e);
-        }
-    }
-
-    @Override
-    public Optional<Double> getDouble(final String key) {
-        Objects.requireNonNull(key, "key is null");
-        var value = properties.get(key);
-        if (value == null) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(Double.parseDouble(value.strip()));
-        } catch (NumberFormatException e) {
-            throw new ConfigurationException(
-                    "Invalid configuration for '" + key + "': expected double but was '" + value + "'", e);
-        }
-    }
-
-    @Override
     public <T> Optional<T> get(final String key, final Function<String, T> transformer) {
         Objects.requireNonNull(key, "key is null");
         Objects.requireNonNull(transformer, "transformer is null");

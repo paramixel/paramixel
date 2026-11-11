@@ -19,6 +19,7 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -48,7 +49,7 @@ class ConcreteRunnerConcurrencyTest {
         var listener = new InterleavingDetectorListener(callbackLog, activeRun, maxConcurrentRuns);
         var runner = createRunner(2, listener);
 
-        var builder = Step.of("concurrent-step", context -> {});
+        var builder = Step.step("concurrent-step", context -> {});
 
         var latch = new CountDownLatch(threadCount);
         var threads = new Thread[threadCount];
@@ -59,7 +60,7 @@ class ConcreteRunnerConcurrencyTest {
                         try {
                             barrier.await();
                             var result = runner.run(builder);
-                            assertThat(result.isPassed()).isTrue();
+                            assertThat(result.status().isPassed()).isTrue();
                         } catch (Throwable t) {
                             errors.incrementAndGet();
                         } finally {
@@ -81,7 +82,7 @@ class ConcreteRunnerConcurrencyTest {
     }
 
     @Test
-    @DisplayName("concurrent runAndReturnExitCode(Action) calls serialize execution")
+    @DisplayName("concurrent run(Action) calls serialize execution")
     void concurrentRunAndReturnExitCodeCallsSerialize() throws Exception {
         var threadCount = 4;
         var barrier = new CyclicBarrier(threadCount);
@@ -92,7 +93,7 @@ class ConcreteRunnerConcurrencyTest {
         var listener = new ConcurrencyCountingListener(activeRun, maxConcurrentRuns);
         var runner = createRunner(2, listener);
 
-        var builder = Step.of("exit-code-step", context -> {});
+        var builder = Step.step("exit-code-step", context -> {});
 
         var latch = new CountDownLatch(threadCount);
         var threads = new Thread[threadCount];
@@ -100,7 +101,7 @@ class ConcreteRunnerConcurrencyTest {
             threads[i] = new Thread(() -> {
                 try {
                     barrier.await();
-                    var exitCode = runner.runAndReturnExitCode(builder);
+                    var exitCode = runner.run(builder).exitCode();
                     assertThat(exitCode).isZero();
                 } catch (Throwable t) {
                     errors.incrementAndGet();
@@ -174,12 +175,7 @@ class ConcreteRunnerConcurrencyTest {
         }
 
         @Override
-        public void initialize(Configuration configuration) {
-            callbackLog.add(new CallbackEntry("initialize"));
-        }
-
-        @Override
-        public void onRunStarted() {
+        public void onRunStarted(final Configuration configuration) {
             var current = activeRun.incrementAndGet();
             maxConcurrentRuns.accumulateAndGet(current, Math::max);
             callbackLog.add(new CallbackEntry("onRunStarted"));
@@ -191,7 +187,7 @@ class ConcreteRunnerConcurrencyTest {
         }
 
         @Override
-        public void onDiscoveryCompleted(Descriptor root) {
+        public void onDiscoveryCompleted(final Optional<Descriptor> root) {
             callbackLog.add(new CallbackEntry("onDiscoveryCompleted"));
         }
 
@@ -223,7 +219,7 @@ class ConcreteRunnerConcurrencyTest {
         }
 
         @Override
-        public void onRunStarted() {
+        public void onRunStarted(final Configuration configuration) {
             var current = activeRun.incrementAndGet();
             maxConcurrentRuns.accumulateAndGet(current, Math::max);
         }

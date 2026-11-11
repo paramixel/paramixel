@@ -21,6 +21,6 @@ import org.paramixel.api.ContextConsumer;
 class SequentialTestSupport {
 
     static <T> Step step(final String name, final ContextConsumer consumer) {
-        return Step.of(name, consumer);
+        return Step.step(name, consumer);
     }
 }

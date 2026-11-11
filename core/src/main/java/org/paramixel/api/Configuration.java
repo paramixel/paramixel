@@ -17,12 +17,14 @@
 package org.paramixel.api;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import nonapi.org.paramixel.ConfigurationFactory;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.ConfigurationException;
+import org.paramixel.api.selector.Selector;
 
 /**
  * Provides typed access to Paramixel configuration properties.
@@ -33,9 +35,45 @@ import org.paramixel.api.exception.ConfigurationException;
  *
  * <p><strong>Security Note:</strong> When using {@link #defaultConfiguration()} or
  * {@link #systemConfiguration()}, all JVM system properties are copied into the returned
- * configuration. This includes potentially sensitive properties such as {@code java.home},
- * {@code user.name}, and {@code user.password}. Use {@link #classpathConfiguration()} or
- * access system properties directly via {@link System#getProperty(String)} if this is a concern.
+ * configuration. That includes values an application may consider sensitive, such as
+ * {@code java.home} or a credential the application itself set as a system property. Use
+ * {@link #classpathConfiguration()} or read a specific property with
+ * {@link System#getProperty(String)} if this is a concern; Paramixel never reads credentials.
+ *
+ * <h2>Keys and defaults</h2>
+ *
+ * <table>
+ *   <caption>Configuration keys</caption>
+ *   <tr><th>Key</th><th>Purpose</th><th>Default when unset</th></tr>
+ *   <tr><td>{@code paramixel.parallelism}</td><td>size of the runner's root pool</td>
+ *       <td>number of available processors</td></tr>
+ *   <tr><td>{@code paramixel.parallelism.<name>}</td><td>size of the user pool {@code <name>}</td>
+ *       <td>none: an undefined pool fails validation</td></tr>
+ *   <tr><td>{@code paramixel.ansi}</td><td>{@code true}, {@code false} or {@code auto}</td>
+ *       <td>{@code auto}</td></tr>
+ *   <tr><td>{@code paramixel.failureOnSkip}</td><td>promote {@code SKIPPED} to {@code FAILED}</td>
+ *       <td>{@code false}</td></tr>
+ *   <tr><td>{@code paramixel.failureOnAbort}</td><td>promote {@code ABORTED} to {@code FAILED}</td>
+ *       <td>{@code true}</td></tr>
+ *   <tr><td>{@code paramixel.failIfNoTests}</td><td>fail a run that discovers nothing</td>
+ *       <td>{@code false}</td></tr>
+ *   <tr><td>{@code paramixel.failFast}</td><td>skip the remaining direct children of the root after a
+ *       failure</td><td>{@code false}</td></tr>
+ *   <tr><td>{@code paramixel.report.file}</td><td>report file; the format follows the extension</td>
+ *       <td>none: no report</td></tr>
+ *   <tr><td>{@code paramixel.match.package.regex}</td><td>package filter for {@link Selector#configured()}</td>
+ *       <td>none: unconstrained</td></tr>
+ *   <tr><td>{@code paramixel.match.class.regex}</td><td>class filter for {@link Selector#configured()}</td>
+ *       <td>none: unconstrained</td></tr>
+ *   <tr><td>{@code paramixel.match.tag.regex}</td><td>tag filter for {@link Selector#configured()}</td>
+ *       <td>none: unconstrained</td></tr>
+ *   <tr><td>{@code paramixel.listener.exclude}</td><td>console sections to suppress</td>
+ *       <td>none: print everything</td></tr>
+ * </table>
+ *
+ * <p>An unrecognized key that starts with {@code paramixel.} is reported once through
+ * {@link Listener#onWarning(String)} so a typo such as {@code paramixel.parallelism.enviroments} does not fail
+ * silently.
  *
  * <p>All typed getters return {@link Optional}; absent keys produce empty optionals rather than
  * exceptions. Invalid values — for example, a non-numeric string for {@link #getInteger(String)} —
@@ -68,6 +106,14 @@ public interface Configuration {
     String RUNNER_PARALLELISM = "paramixel.parallelism";
 
     /**
+     * Prefix of the configuration key that sizes a named user pool.
+     *
+     * <p>The key for pool {@code <name>} is {@code paramixel.parallelism.<name>}; use {@link #poolKey(String)}
+     * instead of building the string by hand.
+     */
+    String PARALLELISM_POOL_PREFIX = RUNNER_PARALLELISM + ".";
+
+    /**
      * Configuration key controlling ANSI escape code output in console listeners.
      *
      * <p>Valid values are {@code "true"} (force ANSI enabled), {@code "false"} (force ANSI disabled, plain text),
@@ -78,22 +124,22 @@ public interface Configuration {
     String ANSI = "paramixel.ansi";
 
     /**
-     * Configuration key controlling whether skipped results should produce a failing exit code.
+     * Configuration key controlling whether a skipped run should produce a failing exit code.
      *
      * <p>The value is trimmed and compared case-insensitively; only {@code "true"} enables this option (see
-     * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it.
-     * When {@code true}, skipped results are treated as failures by {@link Runner#runAndReturnExitCode(Action)} and
-     * related methods.
+     * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it, so a skipped run exits
+     * {@code 0} by default. When {@code true}, a skipped root status is promoted to {@code FAILED} and
+     * {@link Result#exitCode()} returns {@code 1}.
      */
     String FAILURE_ON_SKIP = "paramixel.failureOnSkip";
 
     /**
-     * Configuration key controlling whether aborted results should produce a failing exit code.
+     * Configuration key controlling whether a run whose root status is aborted should produce a failing exit code.
      *
-     * <p>The value is trimmed and compared case-insensitively; only {@code "true"} enables this option (see
-     * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it.
-     * When {@code true}, aborted results are treated as failures by {@link Runner#runAndReturnExitCode(Action)} and
-     * related methods. Default is {@code "true"} (aborted is treated as failure by default, more severe than skip).
+     * <p>The value is trimmed and compared case-insensitively; only {@code "false"} disables this option (see
+     * {@link #parseBoolean(String)}). The default is {@code true}: an aborted root status is promoted to
+     * {@code FAILED} and {@link Result#exitCode()} returns {@code 1}. Set it to {@code false} to let an aborted run
+     * exit {@code 0}.
      */
     String FAILURE_ON_ABORT = "paramixel.failureOnAbort";
 
@@ -103,19 +149,22 @@ public interface Configuration {
      *
      * <p>The value is trimmed and compared case-insensitively; only {@code "true"} enables this option (see
      * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it.
-     * When {@code true}, {@link Runner#main} exits with code {@code 1} when no action factories are discovered.
+     * When {@code true}, a discovery run that finds no factory (through {@link Runner#run()} or
+     * {@link Runner#run(Selector)}) reports a {@code FAILED} status and {@link Result#exitCode()} returns {@code 1}.
+     * {@link Runner#run(Action)} always runs the supplied tree, so this key does not apply to it.
      */
     String FAIL_IF_NO_TESTS = "paramixel.failIfNoTests";
 
     /**
-     * Configuration key controlling whether the scheduler skips remaining unscheduled root children
-     * after the first failed or aborted action.
+     * Configuration key controlling whether the engine skips the remaining direct children of the root after the
+     * first failed or aborted action.
      *
      * <p>The value is trimmed and compared case-insensitively; only {@code "true"} enables this option (see
      * {@link #parseBoolean(String)}). Any other value, including {@code null}, disables it.
-     * When {@code true}, the scheduler stops scheduling new direct children of the root descriptor
-     * once a failure or abort is detected. Already-running subtrees complete normally. Skipped children
-     * are aggregated into the result with {@link Status#SKIPPED} status.
+     * When {@code true}, a failure or abort stops new direct children of the root descriptor from starting;
+     * already-running subtrees complete normally and skipped children are reported {@code SKIPPED}. The scope is
+     * deliberately limited to the root's direct children, so a failure deep inside one branch does not cancel
+     * unrelated branches.
      */
     String FAIL_FAST = "paramixel.failFast";
 
@@ -207,26 +256,6 @@ public interface Configuration {
     Optional<Long> getLong(String key);
 
     /**
-     * Returns the configuration value for the supplied key parsed as a float.
-     *
-     * @param key the configuration key; must not be {@code null}
-     * @return the parsed float, or an empty {@link Optional} when the key is absent
-     * @throws NullPointerException if {@code key} is {@code null}
-     * @throws ConfigurationException if the value is present but cannot be parsed as a float
-     */
-    Optional<Float> getFloat(String key);
-
-    /**
-     * Returns the configuration value for the supplied key parsed as a double.
-     *
-     * @param key the configuration key; must not be {@code null}
-     * @return the parsed double, or an empty {@link Optional} when the key is absent
-     * @throws NullPointerException if {@code key} is {@code null}
-     * @throws ConfigurationException if the value is present but cannot be parsed as a double
-     */
-    Optional<Double> getDouble(String key);
-
-    /**
      * Returns the configuration value for the supplied key transformed by the supplied function.
      *
      * <p>When the key is absent, returns an empty {@link Optional}. When the key is present, the
@@ -261,6 +290,17 @@ public interface Configuration {
      */
     static boolean parseBoolean(final String value) {
         return value != null && "true".equalsIgnoreCase(value.strip());
+    }
+
+    /**
+     * Returns the configuration key that sizes the named pool.
+     *
+     * @param pool the pool name; must not be {@code null}
+     * @return {@code paramixel.parallelism.<pool>}; never {@code null}
+     * @throws NullPointerException if {@code pool} is {@code null}
+     */
+    static String poolKey(final String pool) {
+        return PARALLELISM_POOL_PREFIX + Objects.requireNonNull(pool, "pool is null");
     }
 
     /**

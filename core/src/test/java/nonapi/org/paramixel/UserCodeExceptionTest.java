@@ -19,13 +19,12 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.exception.UserCodeException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.paramixel.api.exception.AbortedException;
+import org.paramixel.api.exception.AbortException;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.exception.SkipException;
 
@@ -101,9 +100,9 @@ class UserCodeExceptionTest {
         }
 
         @Test
-        @DisplayName("wraps SQLException cause")
+        @DisplayName("wraps a checked cause")
         void wrapsSqlExceptionCause() {
-            var cause = new SQLException("table not found");
+            var cause = new IOException("table not found");
             var runtimeException = new RuntimeException(cause);
 
             var result = UserCodeException.wrap(runtimeException);
@@ -215,7 +214,7 @@ class UserCodeExceptionTest {
         @Test
         @DisplayName("handles semantic exceptions as cause")
         void handlesSemanticExceptionsAsCause() {
-            var cause = new AbortedException("precondition failed");
+            var cause = new AbortException("precondition failed");
             var exception = new UserCodeException(cause);
 
             assertThat(exception.getCause()).isSameAs(cause);
@@ -230,7 +229,7 @@ class UserCodeExceptionTest {
         @Test
         @DisplayName("returns the cause passed to constructor")
         void returnsCausePassedToConstructor() {
-            var cause = new SQLException("data error");
+            var cause = new IOException("data error");
             var exception = new UserCodeException(cause);
 
             assertThat(exception.getCause()).isSameAs(cause);
@@ -251,15 +250,15 @@ class UserCodeExceptionTest {
     class SemanticExceptionHandling {
 
         @Test
-        @DisplayName("AbortedException cause is preserved through wrap")
+        @DisplayName("AbortException cause is preserved through wrap")
         void abortedExceptionCauseIsPreserved() {
-            var cause = new AbortedException("setup failed");
+            var cause = new AbortException("setup failed");
             var runtimeException = new RuntimeException(cause);
 
             var result = UserCodeException.wrap(runtimeException);
 
             assertThat(result).isInstanceOf(UserCodeException.class);
-            assertThat(result.getCause()).isInstanceOf(AbortedException.class);
+            assertThat(result.getCause()).isInstanceOf(AbortException.class);
             assertThat(result.getCause().getMessage()).isEqualTo("setup failed");
         }
 

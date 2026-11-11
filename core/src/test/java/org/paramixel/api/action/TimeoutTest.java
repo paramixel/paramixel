@@ -36,23 +36,23 @@ class TimeoutTest {
     @Test
     @DisplayName("child completes within timeout — child's status propagates")
     void bodyCompletesWithinTimeout() {
-        var action = Timeout.builder("fast-child")
-                .body(Step.of("step", context -> {}))
+        var action = Timeout.timeout("fast-child")
+                .body(Step.step("step", context -> {}))
                 .timeout(Duration.ofSeconds(5))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isPassed()).isTrue();
+        assertThat(root.children().get(0).status().isPassed()).isTrue();
     }
 
     @Test
     @DisplayName("child exceeds timeout — action FAILED, child FAILED")
     void bodyExceedsTimeout() {
-        var action = Timeout.builder("slow-child")
-                .body(Step.of("blocking-step", context -> {
+        var action = Timeout.timeout("slow-child")
+                .body(Step.step("blocking-step", context -> {
                     Thread.sleep(5_000);
                 }))
                 .timeout(Duration.ofMillis(50))
@@ -60,9 +60,9 @@ class TimeoutTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isFailed()).isTrue();
+        assertThat(root.children().get(0).status().isFailed()).isTrue();
     }
 
     @Test
@@ -71,8 +71,8 @@ class TimeoutTest {
         var interrupted = new AtomicBoolean(false);
         var latch = new CountDownLatch(1);
 
-        var action = Timeout.builder("interrupt-child")
-                .body(Step.of("sleep-step", context -> {
+        var action = Timeout.timeout("interrupt-child")
+                .body(Step.step("sleep-step", context -> {
                     try {
                         Thread.sleep(5_000);
                     } catch (InterruptedException e) {
@@ -90,14 +90,14 @@ class TimeoutTest {
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
         assertThat(interrupted.get()).isTrue();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("child fails on its own within timeout — child's FAILED propagates")
     void bodyFailsWithinTimeout() {
-        var action = Timeout.builder("failing-child")
-                .body(Step.of("fail-step", context -> {
+        var action = Timeout.timeout("failing-child")
+                .body(Step.step("fail-step", context -> {
                     throw new RuntimeException("intentional failure");
                 }))
                 .timeout(Duration.ofSeconds(5))
@@ -105,16 +105,16 @@ class TimeoutTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.children().get(0).isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.children().get(0).status().isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("child RuntimeException preserves instance and stack trace")
     void bodyRuntimeExceptionPreservesInstance() {
         var exception = new RuntimeException("intentional failure");
-        var action = Timeout.builder("failing-child")
-                .body(Step.of("fail-step", context -> {
+        var action = Timeout.timeout("failing-child")
+                .body(Step.step("fail-step", context -> {
                     throw exception;
                 }))
                 .timeout(Duration.ofSeconds(5))
@@ -122,19 +122,19 @@ class TimeoutTest {
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         var child = root.children().get(0);
-        assertThat(child.isFailed()).isTrue();
-        assertThat(child.throwable()).isPresent();
-        assertThat(child.throwable().get()).isSameAs(exception);
+        assertThat(child.status().isFailed()).isTrue();
+        assertThat(child.status().throwable()).isPresent();
+        assertThat(child.status().throwable().get()).isSameAs(exception);
     }
 
     @Test
     @DisplayName("child checked exception within timeout preserves original cause")
     void bodyCheckedExceptionWithinTimeoutPreservesOriginalCause() {
         var exception = new IOException("checked failure");
-        var action = Timeout.builder("failing-child")
-                .body(Step.of("fail-step", context -> {
+        var action = Timeout.timeout("failing-child")
+                .body(Step.step("fail-step", context -> {
                     throw exception;
                 }))
                 .timeout(Duration.ofSeconds(5))
@@ -144,38 +144,38 @@ class TimeoutTest {
         var root = result.descriptor().orElseThrow();
         var child = root.children().get(0);
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.message()).contains("checked failure");
-        assertThat(child.isFailed()).isTrue();
-        assertThat(child.message()).contains("checked failure");
-        assertThat(child.throwable()).isPresent();
-        assertThat(child.throwable().get()).isSameAs(exception);
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.status().message()).contains("checked failure");
+        assertThat(child.status().isFailed()).isTrue();
+        assertThat(child.status().message()).contains("checked failure");
+        assertThat(child.status().throwable()).isPresent();
+        assertThat(child.status().throwable().get()).isSameAs(exception);
     }
 
     @Test
     @DisplayName("child throws SkipException within timeout — SKIPPED propagates")
     void bodySkipsWithinTimeout() {
-        var action = Timeout.builder("skipping-child")
-                .body(Step.of("skip-step", context -> {
-                    SkipException.skip("skip reason");
+        var action = Timeout.timeout("skipping-child")
+                .body(Step.step("skip-step", context -> {
+                    throw SkipException.skip("skip reason");
                 }))
                 .timeout(Duration.ofSeconds(5))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isSkipped()).isTrue();
-        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.status().isSkipped()).isTrue();
+        assertThat(root.children().get(0).status().isSkipped()).isTrue();
     }
 
     @Test
     @DisplayName("accessors return configured values")
     void accessorsReturnConfiguredValues() {
-        var child = Step.of("child", context -> {});
+        var child = Step.step("child", context -> {});
         var duration = Duration.ofMillis(123);
 
         var action =
-                Timeout.builder("accessor-test").body(child).timeout(duration).build();
+                Timeout.timeout("accessor-test").body(child).timeout(duration).build();
 
         assertThat(action.displayName()).isEqualTo("accessor-test");
         assertThat(action.body()).isSameAs(child);
@@ -185,8 +185,8 @@ class TimeoutTest {
     @Test
     @DisplayName("descriptor tree contains timed child")
     void descriptorTreeContainsTimedBody() {
-        var action = Timeout.builder("tree-test")
-                .body(Step.of("leaf", context -> {}))
+        var action = Timeout.timeout("tree-test")
+                .body(Step.step("leaf", context -> {}))
                 .timeout(Duration.ofSeconds(5))
                 .build();
 
@@ -205,19 +205,19 @@ class TimeoutTest {
         @Test
         @DisplayName("build throws when body not configured")
         void buildThrowsWhenBodyNotConfigured() {
-            assertThatThrownBy(() -> Timeout.builder("bad-timeout")
+            assertThatThrownBy(() -> Timeout.timeout("bad-timeout")
                             .timeout(Duration.ofSeconds(1))
                             .build())
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("child action must be configured");
+                    .hasMessage("body action must be configured");
         }
 
         @Test
         @DisplayName("body accepts another Builder")
         void bodyAcceptsAnotherBuilder() {
-            var child = Step.of("inner-step", context -> {});
-            var timeout = Timeout.builder("from-builder")
-                    .body(Instance.builder("inner", Object::new).body(child))
+            var child = Step.step("inner-step", context -> {});
+            var timeout = Timeout.timeout("from-builder")
+                    .body(Instance.of("inner", Object.class, Object::new).body(child))
                     .timeout(Duration.ofSeconds(5))
                     .build();
 

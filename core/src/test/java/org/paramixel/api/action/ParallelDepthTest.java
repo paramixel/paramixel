@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import nonapi.org.paramixel.TestPools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -39,10 +40,10 @@ class ParallelDepthTest {
 
     private static Action buildTree(final int remainingDepth, final AtomicInteger executionCount) {
         if (remainingDepth == 0) {
-            return Step.of("leaf", context -> executionCount.incrementAndGet());
+            return Step.step("leaf", context -> executionCount.incrementAndGet());
         }
         var depthFromRoot = DEPTH - remainingDepth;
-        var builder = Parallel.builder("depth-" + depthFromRoot).parallelism(BRANCHING_FACTOR);
+        var builder = Parallel.parallel("depth-" + depthFromRoot, "t" + depthFromRoot);
         for (var i = 0; i < BRANCHING_FACTOR; i++) {
             builder.child(buildTree(remainingDepth - 1, executionCount));
         }
@@ -55,9 +56,9 @@ class ParallelDepthTest {
         var executionCount = new AtomicInteger();
         var root = buildTree(DEPTH, executionCount);
 
-        var result = Runner.defaultRunner().run(root);
+        var result = Runner.builder().build().run(root);
 
-        assertThat(result.isPassed()).isTrue();
+        assertThat(result.status().isPassed()).isTrue();
         assertThat(executionCount.get()).isEqualTo(LEAF_COUNT);
     }
 
@@ -68,12 +69,12 @@ class ParallelDepthTest {
         var root = buildTree(DEPTH, executionCount);
 
         var runner = Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "2")))
+                .configuration(TestPools.configuration(Map.of(Configuration.RUNNER_PARALLELISM, "2")))
                 .build();
 
         var result = assertTimeoutPreemptively(Duration.ofMinutes(2), () -> runner.run(root));
 
-        assertThat(((Result) result).isPassed()).isTrue();
+        assertThat(((Result) result).status().isPassed()).isTrue();
         assertThat(executionCount.get()).isEqualTo(LEAF_COUNT);
     }
 
@@ -84,12 +85,12 @@ class ParallelDepthTest {
         var root = buildTree(DEPTH, executionCount);
 
         var runner = Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "2")))
+                .configuration(TestPools.configuration(Map.of(Configuration.RUNNER_PARALLELISM, "2")))
                 .build();
 
         var result = assertTimeoutPreemptively(Duration.ofMinutes(2), () -> runner.run(root));
 
-        assertThat(((Result) result).isPassed()).isTrue();
+        assertThat(((Result) result).status().isPassed()).isTrue();
         assertThat(executionCount.get()).isEqualTo(LEAF_COUNT);
     }
 }

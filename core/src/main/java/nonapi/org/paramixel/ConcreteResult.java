@@ -18,25 +18,30 @@ package nonapi.org.paramixel;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import nonapi.org.paramixel.action.MutableDescriptor;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Result;
 import org.paramixel.api.Status;
 
 /**
- * Concrete implementation of {@link Result} that applies configuration-based
- * status promotion to the root descriptor's already-aggregated status.
+ * Concrete implementation of {@link Result}.
+ *
+ * <p>The tree is terminal when a result is created, so the effective status, its exit code, and the
+ * run's start and completion instants are computed once in the constructor and never recomputed.
  *
  * <p>Instances are immutable and thread-safe.
  */
 public final class ConcreteResult implements Result {
 
     private final Descriptor root;
-    private final Configuration configuration;
-    private final Status statusOverride;
+    private final Status status;
+    private final int exitCode;
+    private final Instant startedAt;
+    private final Instant completedAt;
+    private final List<Pools.PoolStats> poolStats;
 
     /**
      * Creates a result for a run that produced a descriptor tree.
@@ -46,9 +51,26 @@ public final class ConcreteResult implements Result {
      * @throws NullPointerException if {@code configuration} is {@code null}
      */
     public ConcreteResult(final Descriptor root, final Configuration configuration) {
-        this.configuration = Objects.requireNonNull(configuration, "configuration is null");
+        this(root, configuration, List.of());
+    }
+
+    /**
+     * Creates a result for a run that produced a descriptor tree and pool statistics.
+     *
+     * @param root the root descriptor; may be {@code null} when no descriptor was discovered
+     * @param configuration the run configuration; must not be {@code null}
+     * @param poolStats the pool sizes and peak usage observed by the run; must not be {@code null}
+     * @throws NullPointerException if {@code configuration} or {@code poolStats} is {@code null}
+     */
+    public ConcreteResult(
+            final Descriptor root, final Configuration configuration, final List<Pools.PoolStats> poolStats) {
+        Objects.requireNonNull(configuration, "configuration is null");
+        this.poolStats = List.copyOf(Objects.requireNonNull(poolStats, "poolStats is null"));
         this.root = root;
-        this.statusOverride = null;
+        this.status = effectiveStatus(root, configuration);
+        this.exitCode = exitCodeFor(status);
+        this.startedAt = root == null ? null : earliestStartedAt(root).orElse(null);
+        this.completedAt = root == null ? null : latestCompletedAt(root).orElse(null);
     }
 
     /**
@@ -69,9 +91,25 @@ public final class ConcreteResult implements Result {
      * @throws NullPointerException if any argument is {@code null}
      */
     ConcreteResult(final Configuration configuration, final Status statusOverride) {
-        this.configuration = Objects.requireNonNull(configuration, "configuration is null");
-        this.statusOverride = Objects.requireNonNull(statusOverride, "statusOverride is null");
+        Objects.requireNonNull(configuration, "configuration is null");
+        this.poolStats = List.of();
         this.root = null;
+        this.status = Objects.requireNonNull(statusOverride, "statusOverride is null");
+        this.exitCode = exitCodeFor(status);
+        this.startedAt = null;
+        this.completedAt = null;
+    }
+
+    /**
+     * Returns the pool sizes and peak usage observed by this run.
+     *
+     * <p>Internal: the summary listener reads it; the public {@link Result} interface deliberately stays free of
+     * framework-internal types.
+     *
+     * @return the pool statistics; never {@code null}
+     */
+    public List<Pools.PoolStats> poolStats() {
+        return poolStats;
     }
 
     @Override
@@ -80,119 +118,55 @@ public final class ConcreteResult implements Result {
     }
 
     @Override
-    public boolean isPassed() {
-        return status().isPassed();
+    public Status status() {
+        return status;
     }
 
     @Override
-    public boolean isFailed() {
-        return status().isFailed();
-    }
-
-    @Override
-    public boolean isSkipped() {
-        return status().isSkipped();
-    }
-
-    @Override
-    public boolean isAborted() {
-        return status().isAborted();
+    public int exitCode() {
+        return exitCode;
     }
 
     @Override
     public Optional<Instant> startedAt() {
-        return root == null ? Optional.empty() : earliestStartedAt(root);
+        return Optional.ofNullable(startedAt);
     }
 
     @Override
     public Optional<Instant> completedAt() {
-        return root == null ? Optional.empty() : latestCompletedAt(root);
+        return Optional.ofNullable(completedAt);
     }
 
-    /**
-     * Returns the effective internal status for framework code.
-     *
-     * @return the effective status; never {@code null}
-     */
-    public Status status() {
-        if (statusOverride != null) {
-            return statusOverride;
-        }
+    private static int exitCodeFor(final Status status) {
+        return status.isFailed() ? 1 : 0;
+    }
+
+    private static Status effectiveStatus(final Descriptor root, final Configuration configuration) {
         if (root == null) {
             final var failIfNoTests =
                     configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(false);
-            return failIfNoTests ? Status.FAILED : Status.SKIPPED;
+            return failIfNoTests ? Status.failed("No Paramixel tests found") : Status.SKIPPED;
         }
-        return promote(statusOf(root));
+        return promote(root.status(), configuration);
     }
 
-    private Status promote(final Status status) {
-        if (status.isSkipped()) {
-            final var failureOnSkip =
-                    configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(false);
-            if (failureOnSkip) {
-                return Status.FAILED;
-            }
+    private static Status promote(final Status status, final Configuration configuration) {
+        if (status.isSkipped()
+                && configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(false)) {
+            return promotedToFailed(status, "skipped");
         }
-        if (status.isAborted()) {
-            final var failureOnAbort =
-                    configuration.getBoolean(Configuration.FAILURE_ON_ABORT).orElse(true);
-            if (failureOnAbort) {
-                return Status.FAILED;
-            }
+        if (status.isAborted()
+                && configuration.getBoolean(Configuration.FAILURE_ON_ABORT).orElse(true)) {
+            return promotedToFailed(status, "aborted");
         }
         return status;
     }
 
-    private static Status statusOf(final Descriptor descriptor) {
-        if (descriptor instanceof MutableDescriptor mutableDescriptor) {
-            return mutableDescriptor.status();
-        }
-        if (descriptor.isFailed()) {
-            return statusFor(descriptor, () -> Status.FAILED, Status::failed, Status::failed, "action failed");
-        }
-        if (descriptor.isAborted()) {
-            return statusFor(descriptor, () -> Status.ABORTED, Status::aborted, Status::aborted, "action aborted");
-        }
-        if (!descriptor.isCompleted()) {
-            return Status.RUNNING;
-        }
-        if (descriptor.isSkipped()) {
-            return statusFor(descriptor, () -> Status.SKIPPED, Status::skipped, Status::skipped, "action skipped");
-        }
-        return Status.PASSED;
-    }
-
-    /**
-     * Reconstructs a detail-preserving {@link Status} from a {@link Descriptor} that does
-     * not implement {@link MutableDescriptor}.
-     *
-     * <p>Uses {@link Descriptor#message()} and {@link Descriptor#throwable()} to preserve
-     * outcome detail. Falls back to the canonical constant when neither is present.
-     *
-     * @param descriptor   the descriptor providing status detail; must not be {@code null}
-     * @param canonical    supplies the canonical constant (no message, no throwable)
-     * @param withMessage  creates a status carrying a message only
-     * @param withThrowable creates a status carrying a message and throwable
-     * @param defaultMessage fallback message when a throwable is present but no message
-     *                       is available
-     * @return a status instance carrying any available message and throwable
-     */
-    private static Status statusFor(
-            final Descriptor descriptor,
-            final java.util.function.Supplier<Status> canonical,
-            final java.util.function.Function<String, Status> withMessage,
-            final java.util.function.BiFunction<String, Throwable, Status> withThrowable,
-            final String defaultMessage) {
-        var messageOpt = descriptor.message();
-        var throwableOpt = descriptor.throwable();
-        if (throwableOpt.isPresent()) {
-            return withThrowable.apply(messageOpt.orElse(defaultMessage), throwableOpt.orElseThrow());
-        }
-        if (messageOpt.isPresent()) {
-            return withMessage.apply(messageOpt.orElseThrow());
-        }
-        return canonical.get();
+    private static Status promotedToFailed(final Status status, final String defaultMessage) {
+        var message = status.message().orElse(defaultMessage);
+        return status.throwable()
+                .map(throwable -> Status.failed(message, throwable))
+                .orElseGet(() -> Status.failed(message));
     }
 
     private static Optional<Instant> earliestStartedAt(final Descriptor descriptor) {

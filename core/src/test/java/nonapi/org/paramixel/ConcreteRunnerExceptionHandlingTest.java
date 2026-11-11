@@ -18,6 +18,7 @@ package nonapi.org.paramixel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
@@ -34,16 +35,17 @@ class ConcreteRunnerExceptionHandlingTest {
     @DisplayName("recoverable exception after root discovery marks root as failed with throwable")
     void recoverableExceptionAfterRootDiscoveryMarksRootAsFailedWithThrowable() throws Exception {
         var runner = (ConcreteRunner) Runner.builder().build();
-        setIntField(runner, "parallelism", 0);
 
-        var result = runner.run(Step.of("root-step", context -> {}));
+        var result = runner.run(org.paramixel.api.action.Parallel.parallel("p", "undefined-pool")
+                .child(Step.step("root-step", context -> {}))
+                .build());
         var root = result.descriptor().orElseThrow();
 
-        assertThat(result.isFailed()).isTrue();
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.throwable()).hasValueSatisfying(throwable -> {
-            assertThat(throwable).isInstanceOf(IllegalArgumentException.class);
-            assertThat(throwable.getMessage()).contains("parallelism must be positive");
+        assertThat(result.status().isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.status().throwable()).hasValueSatisfying(throwable -> {
+            assertThat(throwable).isInstanceOf(org.paramixel.api.exception.ConfigurationException.class);
+            assertThat(throwable.getMessage()).contains("undefined-pool");
         });
     }
 
@@ -55,25 +57,20 @@ class ConcreteRunnerExceptionHandlingTest {
 
         var listener = new Listener() {
             @Override
-            public void onDiscoveryCompleted(Descriptor root) {
+            public void onDiscoveryCompleted(final Optional<Descriptor> root) {
                 discoveryCount.incrementAndGet();
-                lastRootWasNull.set(root == null);
+                lastRootWasNull.set(root.isEmpty());
             }
         };
 
         var runner = (ConcreteRunner) Runner.builder().listener(listener).build();
-        setIntField(runner, "parallelism", 0);
 
-        var result = runner.run(Step.of("test", ctx -> {}));
+        var result = runner.run(org.paramixel.api.action.Parallel.parallel("p", "undefined-pool")
+                .child(Step.step("test", ctx -> {}))
+                .build());
 
         assertThat(discoveryCount.get()).isEqualTo(1);
         assertThat(lastRootWasNull.get()).isFalse();
-        assertThat(result.isFailed()).isTrue();
-    }
-
-    private static void setIntField(final Object target, final String fieldName, final int value) throws Exception {
-        var field = target.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.setInt(target, value);
+        assertThat(result.status().isFailed()).isTrue();
     }
 }

@@ -29,20 +29,17 @@ import org.paramixel.api.action.Action;
 /**
  * Demonstrates that nested Parallel actions complete without deadlock.
  *
- * <p>This test verifies that the scheduler correctly handles deeply nested Parallel
- * structures. The scheduler uses a single shared {@link java.util.concurrent.ThreadPoolExecutor}
- * with semaphore-based admission control (see {@link nonapi.org.paramixel.Scheduler}).
- * When a thread blocks waiting for a child Parallel to complete, it releases its semaphore
- * permit, allowing other leaf actions at any depth to proceed. This prevents deadlock even
- * with multiple levels of nested Parallels sharing the same executor thread pool.</p>
+ * <p>This test verifies that the execution engine handles deeply nested Parallel structures. Each
+ * {@code Parallel} names its own pool, and admission blocks only for a pool permit, so a nested
+ * {@code Parallel} never waits for an ancestor that is itself waiting for a permit.
  *
  * <p>Test structure:
  * <ul>
- *   <li>Root Parallel (parallelism=2)</li>
- *   <li>Two mid-level Parallels (parallelism=2 each)</li>
+ *   <li>Root Parallel</li>
+ *   <li>Two mid-level Parallels</li>
  *   <li>Four leaf Parallels with 2 children each</li>
  * </ul>
- * This creates three levels of nesting, all sharing the single scheduler executor.</p>
+ * This creates three levels of nesting, each bounded by its own named pool.
  */
 public class NestedParallelDeadlockTest {
 
@@ -56,7 +53,7 @@ public class NestedParallelDeadlockTest {
      */
     public static void main(final String[] args) {
         executedCount.set(0);
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -71,11 +68,9 @@ public class NestedParallelDeadlockTest {
         var testName = NestedParallelDeadlockTest.class.getName();
 
         return scope(testName)
-                .body(parallel("root")
-                        .parallelism(2)
-                        .child(parallel("mid1")
-                                .parallelism(2)
-                                .child(parallel("leaf1")
+                .body(parallel("root", "outer")
+                        .child(parallel("mid1", "middle")
+                                .child(parallel("leaf1", "inner")
                                         .child(step("l1-1", context -> {
                                             executedCount.incrementAndGet();
                                             sleep(10);
@@ -84,7 +79,7 @@ public class NestedParallelDeadlockTest {
                                             executedCount.incrementAndGet();
                                             sleep(10);
                                         })))
-                                .child(parallel("leaf2")
+                                .child(parallel("leaf2", "inner")
                                         .child(step("l2-1", context -> {
                                             executedCount.incrementAndGet();
                                             sleep(10);
@@ -93,9 +88,8 @@ public class NestedParallelDeadlockTest {
                                             executedCount.incrementAndGet();
                                             sleep(10);
                                         }))))
-                        .child(parallel("mid2")
-                                .parallelism(2)
-                                .child(parallel("leaf3")
+                        .child(parallel("mid2", "middle")
+                                .child(parallel("leaf3", "inner")
                                         .child(step("l3-1", context -> {
                                             executedCount.incrementAndGet();
                                             sleep(10);
@@ -104,7 +98,7 @@ public class NestedParallelDeadlockTest {
                                             executedCount.incrementAndGet();
                                             sleep(10);
                                         })))
-                                .child(parallel("leaf4")
+                                .child(parallel("leaf4", "inner")
                                         .child(step("l4-1", context -> {
                                             executedCount.incrementAndGet();
                                             sleep(10);

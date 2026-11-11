@@ -22,13 +22,13 @@ import nonapi.org.paramixel.support.Arguments;
 import org.paramixel.api.Status;
 
 /**
- * An action that executes a single child with a wall-clock deadline.
+ * An action that executes a single body action with a wall-clock deadline.
  *
- * <p>If the child completes within the configured duration, the child's status
- * propagates. If the child does not complete within the duration, the action
+ * <p>If the body completes within the configured duration, the body's status
+ * propagates. If the body does not complete within the duration, the action
  * fails with {@link Status#FAILED} and a message indicating the timeout.
  *
- * <p>On timeout, the child's subtree is cancelled best-effort: each still-running descendant
+ * <p>On timeout, the body's subtree is cancelled best-effort: each still-running descendant
  * is marked terminal and has its scheduled future completed exceptionally, and each leaf
  * descendant has its executing thread interrupted. Cooperative (interruptible) bodies —
  * {@code Thread.sleep}, blocking {@code java.util.concurrent} operations, NIO, etc. — terminate
@@ -48,7 +48,7 @@ import org.paramixel.api.Status;
  * returns or the scheduler is closed. Because scheduler threads are daemon threads, such leaks
  * cannot prevent JVM shutdown.
  *
- * <p>Skipped executions short-circuit without executing the child.
+ * <p>Skipped executions short-circuit without executing the body.
  */
 public final class Timeout implements Action {
 
@@ -57,9 +57,8 @@ public final class Timeout implements Action {
     private final Duration timeout;
 
     private Timeout(final String displayName, final Action body, final Duration timeout) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
-        this.body = Objects.requireNonNull(body, "child is null");
+        this.displayName = Objects.requireNonNull(displayName, "displayName is null");
+        this.body = Objects.requireNonNull(body, "body is null");
         this.timeout = validateTimeout(timeout);
     }
 
@@ -71,23 +70,10 @@ public final class Timeout implements Action {
      * @throws NullPointerException if {@code displayName} is {@code null}
      * @throws IllegalArgumentException if {@code displayName} is blank
      */
-    public static Builder builder(final String displayName) {
+    public static Builder timeout(final String displayName) {
         Objects.requireNonNull(displayName, "displayName is null");
         Arguments.requireNonBlank(displayName, "displayName is blank");
         return new Builder(displayName);
-    }
-
-    /**
-     * Creates a new builder for a {@code Timeout} action with the given display name.
-     *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank
-     * @see Builder
-     */
-    public static Builder timeout(final String displayName) {
-        return builder(displayName);
     }
 
     @Override
@@ -105,9 +91,9 @@ public final class Timeout implements Action {
     }
 
     /**
-     * Returns the child action.
+     * Returns the body action.
      *
-     * @return the child action; never {@code null}
+     * @return the body action; never {@code null}
      */
     public Action body() {
         return body;
@@ -122,7 +108,7 @@ public final class Timeout implements Action {
     /**
      * Fluent builder for {@link Timeout} actions.
      */
-    public static final class Builder implements org.paramixel.api.action.Builder {
+    public static final class Builder implements ActionBuilder {
 
         private final String displayName;
         private Action body;
@@ -133,35 +119,23 @@ public final class Timeout implements Action {
         }
 
         /**
-         * Sets the child action.
+         * Sets the body action. A builder argument is built immediately and the resulting
+         * action snapshot is stored; an action argument is used as is.
          *
-         * @param action the child action; must not be {@code null}
+         * @param action the body action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder body(final Action action) {
-            this.body = Objects.requireNonNull(action, "action is null");
-            return this;
-        }
-
-        /**
-         * Sets the child action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
-         *
-         * @param builder the child action builder; must not be {@code null}
-         * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
-         */
-        public Builder body(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.body = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+        public Builder body(final ActionBuilder action) {
+            Objects.requireNonNull(action, "action is null");
+            this.body = Objects.requireNonNull(action.build(), "action.build() returned null");
             return this;
         }
 
         /**
          * Sets the timeout duration.
          *
-         * @param timeout the maximum duration for the child to complete; must not be {@code null} or non-positive
+         * @param timeout the maximum duration for the body to complete; must not be {@code null} or non-positive
          * @return this builder
          * @throws NullPointerException if {@code timeout} is {@code null}
          * @throws IllegalArgumentException if {@code timeout} is zero or negative
@@ -175,22 +149,11 @@ public final class Timeout implements Action {
         }
 
         /**
-         * Sets the timeout duration in milliseconds.
-         *
-         * @param milliseconds the maximum duration in milliseconds; must be positive
-         * @return this builder
-         * @throws IllegalArgumentException if {@code milliseconds} is not positive
-         */
-        public Builder timeoutMillis(final long milliseconds) {
-            return timeout(Duration.ofMillis(milliseconds));
-        }
-
-        /**
          * Builds the timeout action.
          *
          * @return a new timeout action
          * @throws IllegalStateException if no timeout is configured
-         * @throws IllegalStateException if no child action was configured
+         * @throws IllegalStateException if no body action was configured
          */
         @Override
         public Timeout build() {
@@ -198,7 +161,7 @@ public final class Timeout implements Action {
                 throw new IllegalStateException("timeout duration must be configured");
             }
             if (body == null) {
-                throw new IllegalStateException("child action must be configured");
+                throw new IllegalStateException("body action must be configured");
             }
             return new Timeout(displayName, body, timeout);
         }

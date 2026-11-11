@@ -28,7 +28,9 @@ class FailExceptionTest {
     @Test
     @DisplayName("fail() throws with default message")
     void failNoArgsThrowsWithDefaultMessage() {
-        assertThatThrownBy(() -> FailException.fail())
+        assertThatThrownBy(() -> {
+                    throw FailException.fail();
+                })
                 .isInstanceOf(FailException.class)
                 .hasMessage("failed");
     }
@@ -36,7 +38,9 @@ class FailExceptionTest {
     @Test
     @DisplayName("fail(String) throws with provided message")
     void failWithMessageThrowsWithProvidedMessage() {
-        assertThatThrownBy(() -> FailException.fail("something broke"))
+        assertThatThrownBy(() -> {
+                    throw FailException.fail("something broke");
+                })
                 .isInstanceOf(FailException.class)
                 .hasMessage("something broke");
     }

@@ -87,9 +87,6 @@
                         <manifest>
                             <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
-                        <manifestEntries>
-                            <Automatic-Module-Name>org.paramixel.api</Automatic-Module-Name>
-                        </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>
@@ -114,6 +111,99 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <excludedGroups>integration</excludedGroups>
+                    <!-- Concurrency pools used by the unit tests; see Parallel and the pool documentation. -->
+                    <systemPropertyVariables>
+                        <paramixel.parallelism.test>8</paramixel.parallelism.test>
+                        <paramixel.parallelism.punbounded>1000</paramixel.parallelism.punbounded>
+                        <paramixel.parallelism.pparallelism>4</paramixel.parallelism.pparallelism>
+                        <paramixel.parallelism.pbranching_factor>2</paramixel.parallelism.pbranching_factor>
+                        <paramixel.parallelism.pouterparallelism>20</paramixel.parallelism.pouterparallelism>
+                        <paramixel.parallelism.pinnerparallelism>10</paramixel.parallelism.pinnerparallelism>
+                        <paramixel.parallelism.pscopes>3</paramixel.parallelism.pscopes>
+                        <paramixel.parallelism.pcap>2</paramixel.parallelism.pcap>
+                        <paramixel.parallelism.t0>8</paramixel.parallelism.t0>
+                        <paramixel.parallelism.t1>8</paramixel.parallelism.t1>
+                        <paramixel.parallelism.t2>8</paramixel.parallelism.t2>
+                        <paramixel.parallelism.t3>8</paramixel.parallelism.t3>
+                        <paramixel.parallelism.t4>8</paramixel.parallelism.t4>
+                        <paramixel.parallelism.t5>8</paramixel.parallelism.t5>
+                        <paramixel.parallelism.t6>8</paramixel.parallelism.t6>
+                        <paramixel.parallelism.t7>8</paramixel.parallelism.t7>
+                        <paramixel.parallelism.t8>8</paramixel.parallelism.t8>
+                        <paramixel.parallelism.t9>8</paramixel.parallelism.t9>
+                        <paramixel.parallelism.t10>8</paramixel.parallelism.t10>
+                        <paramixel.parallelism.t11>8</paramixel.parallelism.t11>
+                        <paramixel.parallelism.p1x0>1</paramixel.parallelism.p1x0>
+                        <paramixel.parallelism.p1x1>1</paramixel.parallelism.p1x1>
+                        <paramixel.parallelism.p1x2>1</paramixel.parallelism.p1x2>
+                        <paramixel.parallelism.p1>1</paramixel.parallelism.p1>
+                        <paramixel.parallelism.p2x0>2</paramixel.parallelism.p2x0>
+                        <paramixel.parallelism.p2x1>2</paramixel.parallelism.p2x1>
+                        <paramixel.parallelism.p2x2>2</paramixel.parallelism.p2x2>
+                        <paramixel.parallelism.p2>2</paramixel.parallelism.p2>
+                        <paramixel.parallelism.p3x0>3</paramixel.parallelism.p3x0>
+                        <paramixel.parallelism.p3x1>3</paramixel.parallelism.p3x1>
+                        <paramixel.parallelism.p3x2>3</paramixel.parallelism.p3x2>
+                        <paramixel.parallelism.p3>3</paramixel.parallelism.p3>
+                        <paramixel.parallelism.p4x0>4</paramixel.parallelism.p4x0>
+                        <paramixel.parallelism.p4x1>4</paramixel.parallelism.p4x1>
+                        <paramixel.parallelism.p4x2>4</paramixel.parallelism.p4x2>
+                        <paramixel.parallelism.p4>4</paramixel.parallelism.p4>
+                        <paramixel.parallelism.p5x0>5</paramixel.parallelism.p5x0>
+                        <paramixel.parallelism.p5x1>5</paramixel.parallelism.p5x1>
+                        <paramixel.parallelism.p5x2>5</paramixel.parallelism.p5x2>
+                        <paramixel.parallelism.p5>5</paramixel.parallelism.p5>
+                        <paramixel.parallelism.p6x0>6</paramixel.parallelism.p6x0>
+                        <paramixel.parallelism.p6x1>6</paramixel.parallelism.p6x1>
+                        <paramixel.parallelism.p6x2>6</paramixel.parallelism.p6x2>
+                        <paramixel.parallelism.p6>6</paramixel.parallelism.p6>
+                        <paramixel.parallelism.p7x0>7</paramixel.parallelism.p7x0>
+                        <paramixel.parallelism.p7x1>7</paramixel.parallelism.p7x1>
+                        <paramixel.parallelism.p7x2>7</paramixel.parallelism.p7x2>
+                        <paramixel.parallelism.p7>7</paramixel.parallelism.p7>
+                        <paramixel.parallelism.p8x0>8</paramixel.parallelism.p8x0>
+                        <paramixel.parallelism.p8x1>8</paramixel.parallelism.p8x1>
+                        <paramixel.parallelism.p8x2>8</paramixel.parallelism.p8x2>
+                        <paramixel.parallelism.p8>8</paramixel.parallelism.p8>
+                        <paramixel.parallelism.p9x0>9</paramixel.parallelism.p9x0>
+                        <paramixel.parallelism.p9x1>9</paramixel.parallelism.p9x1>
+                        <paramixel.parallelism.p9x2>9</paramixel.parallelism.p9x2>
+                        <paramixel.parallelism.p9>9</paramixel.parallelism.p9>
+                        <paramixel.parallelism.p10x0>10</paramixel.parallelism.p10x0>
+                        <paramixel.parallelism.p10x1>10</paramixel.parallelism.p10x1>
+                        <paramixel.parallelism.p10x2>10</paramixel.parallelism.p10x2>
+                        <paramixel.parallelism.p10>10</paramixel.parallelism.p10>
+                        <paramixel.parallelism.p11x0>11</paramixel.parallelism.p11x0>
+                        <paramixel.parallelism.p11x1>11</paramixel.parallelism.p11x1>
+                        <paramixel.parallelism.p11x2>11</paramixel.parallelism.p11x2>
+                        <paramixel.parallelism.p11>11</paramixel.parallelism.p11>
+                        <paramixel.parallelism.p12x0>12</paramixel.parallelism.p12x0>
+                        <paramixel.parallelism.p12x1>12</paramixel.parallelism.p12x1>
+                        <paramixel.parallelism.p12x2>12</paramixel.parallelism.p12x2>
+                        <paramixel.parallelism.p12>12</paramixel.parallelism.p12>
+                        <paramixel.parallelism.p13x0>13</paramixel.parallelism.p13x0>
+                        <paramixel.parallelism.p13x1>13</paramixel.parallelism.p13x1>
+                        <paramixel.parallelism.p13x2>13</paramixel.parallelism.p13x2>
+                        <paramixel.parallelism.p13>13</paramixel.parallelism.p13>
+                        <paramixel.parallelism.p14x0>14</paramixel.parallelism.p14x0>
+                        <paramixel.parallelism.p14x1>14</paramixel.parallelism.p14x1>
+                        <paramixel.parallelism.p14x2>14</paramixel.parallelism.p14x2>
+                        <paramixel.parallelism.p14>14</paramixel.parallelism.p14>
+                        <paramixel.parallelism.p15x0>15</paramixel.parallelism.p15x0>
+                        <paramixel.parallelism.p15x1>15</paramixel.parallelism.p15x1>
+                        <paramixel.parallelism.p15x2>15</paramixel.parallelism.p15x2>
+                        <paramixel.parallelism.p15>15</paramixel.parallelism.p15>
+                        <paramixel.parallelism.p16x0>16</paramixel.parallelism.p16x0>
+                        <paramixel.parallelism.p16x1>16</paramixel.parallelism.p16x1>
+                        <paramixel.parallelism.p16x2>16</paramixel.parallelism.p16x2>
+                        <paramixel.parallelism.p16>16</paramixel.parallelism.p16>
+                        <paramixel.parallelism.p20x0>20</paramixel.parallelism.p20x0>
+                        <paramixel.parallelism.p20x1>20</paramixel.parallelism.p20x1>
+                        <paramixel.parallelism.p20x2>20</paramixel.parallelism.p20x2>
+                        <paramixel.parallelism.p50x0>50</paramixel.parallelism.p50x0>
+                        <paramixel.parallelism.p50x1>50</paramixel.parallelism.p50x1>
+                        <paramixel.parallelism.p50x2>50</paramixel.parallelism.p50x2>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
             <plugin>

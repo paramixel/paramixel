@@ -16,6 +16,7 @@
 
 package examples.annotation.tags;
 
+import java.util.regex.Pattern;
 import org.paramixel.api.selector.Selector;
 
 /**
@@ -35,6 +36,9 @@ public final class TaggedSelectorExample {
      * @return a tag-filtered selector
      */
     public static Selector smokeSelector() {
-        return Selector.and(Selector.packageTreeOf(TaggedSelectorExample.class), Selector.tagRegex("^smoke$"));
+        return Selector.builder()
+                .packageTreeOf(TaggedSelectorExample.class)
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("^smoke$")).build());
     }
 }

@@ -114,7 +114,6 @@ class UnrecoverableErrorsTest {
 
     @Test
     @DisplayName("does not rethrow ThreadDeath")
-    @SuppressWarnings("removal")
     void doesNotRethrowThreadDeath() {
         UnrecoverableErrors.rethrowIfUnrecoverable(new ThreadDeath());
     }

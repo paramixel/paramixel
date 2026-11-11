@@ -19,6 +19,7 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.regex.Pattern;
 import nonapi.org.paramixel.metadatafilter.InvalidNonPublicFixture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("class filter resolves included fixture and excludes non-matching")
     void classFilterResolvesIncludedFixtureAndExcludesNonMatching() {
-        var selector = Selector.and(Selector.classRegex(".*IncludedSmokeFixture$"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*IncludedSmokeFixture$"))
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("^smoke$")).build());
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -45,7 +49,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("package filter excludes metadatafilter package")
     void packageFilterExcludesMetadataFilterPackage() {
-        var selector = Selector.and(Selector.packageRegex("^org\\.paramixel\\.api$"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.builder()
+                .packagePattern(Pattern.compile("^org\\.paramixel\\.api$"))
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("^smoke$")).build());
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -56,7 +63,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("tag filter excludes non-matching fixture")
     void tagFilterExcludesNonMatchingFixture() {
-        var selector = Selector.and(Selector.classRegex(".*ExcludedByTagFilter.*"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*ExcludedByTagFilter.*"))
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("^smoke$")).build());
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -67,7 +77,10 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("tag filter includes matching fixture")
     void tagFilterIncludesMatchingFixture() {
-        var selector = Selector.and(Selector.classRegex(".*IncludedSmokeFixture.*"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*IncludedSmokeFixture.*"))
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("^smoke$")).build());
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -78,7 +91,9 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("disabled-only fixture is not resolved")
     void disabledOnlyFixtureIsNotResolved() {
-        var selector = Selector.classRegex(".*DisabledOnlyFixture.*");
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*DisabledOnlyFixture.*"))
+                .build();
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -89,7 +104,7 @@ class ActionResolverMetadataFilterTest {
     @Test
     @DisplayName("non-public factory that passes metadata filter still throws ResolverException")
     void nonPublicFactoryThatPassesMetadataFilterStillThrows() {
-        var selector = Selector.classOf(InvalidNonPublicFixture.class);
+        var selector = Selector.builder().classOf(InvalidNonPublicFixture.class).build();
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())

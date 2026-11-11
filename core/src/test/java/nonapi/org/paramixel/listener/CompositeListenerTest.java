@@ -34,6 +34,7 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
+import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
@@ -41,8 +42,12 @@ import org.paramixel.api.action.Step;
 class CompositeListenerTest {
 
     private static final Descriptor STUB_DESCRIPTOR = new Descriptor() {
+        @Override
+        public Status status() {
+            return Status.PASSED;
+        }
 
-        private final Action action = Step.of("test-action", ignored -> {});
+        private final Action action = Step.step("test-action", ignored -> {});
 
         @Override
         public Action action() {
@@ -55,23 +60,8 @@ class CompositeListenerTest {
         }
 
         @Override
-        public boolean isPassed() {
-            return true;
-        }
-
-        @Override
-        public boolean isFailed() {
-            return false;
-        }
-
-        @Override
-        public boolean isSkipped() {
-            return false;
-        }
-
-        @Override
-        public boolean isAborted() {
-            return false;
+        public String path() {
+            return "test-action";
         }
 
         @Override
@@ -82,21 +72,6 @@ class CompositeListenerTest {
         @Override
         public Optional<Instant> completedAt() {
             return Optional.of(Instant.ofEpochMilli(1L));
-        }
-
-        @Override
-        public Optional<String> message() {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<Throwable> throwable() {
-            return Optional.empty();
-        }
-
-        @Override
-        public boolean isCompleted() {
-            return true;
         }
 
         @Override
@@ -111,30 +86,19 @@ class CompositeListenerTest {
     };
 
     private static final Result STUB_RESULT = new Result() {
+        @Override
+        public Status status() {
+            return Status.PASSED;
+        }
+
+        @Override
+        public int exitCode() {
+            return 0;
+        }
 
         @Override
         public Optional<Descriptor> descriptor() {
             return Optional.of(STUB_DESCRIPTOR);
-        }
-
-        @Override
-        public boolean isPassed() {
-            return true;
-        }
-
-        @Override
-        public boolean isFailed() {
-            return false;
-        }
-
-        @Override
-        public boolean isSkipped() {
-            return false;
-        }
-
-        @Override
-        public boolean isAborted() {
-            return false;
         }
 
         @Override
@@ -149,6 +113,8 @@ class CompositeListenerTest {
     };
 
     private static final Configuration STUB_CONFIGURATION = new ConcreteConfiguration(Map.of());
+
+    private static final Configuration CONFIGURATION = Configuration.of(Map.of());
 
     @Test
     @DisplayName("List constructor rejects null listeners")
@@ -239,12 +205,12 @@ class CompositeListenerTest {
         var listener = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("onRunStarted");
             }
         };
 
-        new CompositeListener(true, listener).onRunStarted();
+        new CompositeListener(true, listener).onRunStarted(CONFIGURATION);
 
         assertThat(calls).containsExactly("onRunStarted");
     }
@@ -256,12 +222,12 @@ class CompositeListenerTest {
         var listener = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("onRunStarted");
             }
         };
 
-        new CompositeListener(false, listener).onRunStarted();
+        new CompositeListener(false, listener).onRunStarted(CONFIGURATION);
 
         assertThat(calls).containsExactly("onRunStarted");
     }
@@ -273,12 +239,12 @@ class CompositeListenerTest {
         var listener = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("onRunStarted");
             }
         };
 
-        new CompositeListener(List.of(listener)).onRunStarted();
+        new CompositeListener(List.of(listener)).onRunStarted(CONFIGURATION);
 
         assertThat(calls).containsExactly("onRunStarted");
     }
@@ -290,19 +256,19 @@ class CompositeListenerTest {
         var l1 = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("l1-onRunStarted");
             }
         };
         var l2 = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("l2-onRunStarted");
             }
         };
 
-        new CompositeListener(l1, l2).onRunStarted();
+        new CompositeListener(l1, l2).onRunStarted(CONFIGURATION);
 
         assertThat(calls).containsExactly("l1-onRunStarted", "l2-onRunStarted");
     }
@@ -314,19 +280,19 @@ class CompositeListenerTest {
         var l1 = new Listener() {
 
             @Override
-            public void onDiscoveryCompleted(Descriptor root) {
+            public void onDiscoveryCompleted(final Optional<Descriptor> root) {
                 calls.add("l1-onDiscoveryCompleted");
             }
         };
         var l2 = new Listener() {
 
             @Override
-            public void onDiscoveryCompleted(Descriptor root) {
+            public void onDiscoveryCompleted(final Optional<Descriptor> root) {
                 calls.add("l2-onDiscoveryCompleted");
             }
         };
 
-        new CompositeListener(l1, l2).onDiscoveryCompleted(STUB_DESCRIPTOR);
+        new CompositeListener(l1, l2).onDiscoveryCompleted(Optional.of(STUB_DESCRIPTOR));
 
         assertThat(calls).containsExactly("l1-onDiscoveryCompleted", "l2-onDiscoveryCompleted");
     }
@@ -338,19 +304,19 @@ class CompositeListenerTest {
         var l1 = new Listener() {
 
             @Override
-            public void onDiscoveryCompleted(Descriptor root) {
-                calls.add("l1:" + (root == null ? "null" : "non-null"));
+            public void onDiscoveryCompleted(final Optional<Descriptor> root) {
+                calls.add("l1:" + (root.isEmpty() ? "null" : "non-null"));
             }
         };
         var l2 = new Listener() {
 
             @Override
-            public void onDiscoveryCompleted(Descriptor root) {
-                calls.add("l2:" + (root == null ? "null" : "non-null"));
+            public void onDiscoveryCompleted(final Optional<Descriptor> root) {
+                calls.add("l2:" + (root.isEmpty() ? "null" : "non-null"));
             }
         };
 
-        new CompositeListener(l1, l2).onDiscoveryCompleted(null);
+        new CompositeListener(l1, l2).onDiscoveryCompleted(Optional.empty());
 
         assertThat(calls).containsExactly("l1:null", "l2:null");
     }
@@ -362,19 +328,19 @@ class CompositeListenerTest {
         var l1 = new Listener() {
 
             @Override
-            public void initialize(Configuration configuration) {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("l1-initialize");
             }
         };
         var l2 = new Listener() {
 
             @Override
-            public void initialize(Configuration configuration) {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("l2-initialize");
             }
         };
 
-        new CompositeListener(l1, l2).initialize(STUB_CONFIGURATION);
+        new CompositeListener(l1, l2).onRunStarted(STUB_CONFIGURATION);
 
         assertThat(calls).containsExactly("l1-initialize", "l2-initialize");
     }
@@ -382,10 +348,10 @@ class CompositeListenerTest {
     @Test
     @DisplayName("initialize rejects null configuration")
     void initializeRejectsNullConfiguration() {
-        var noop = Listener.defaultListener();
+        var noop = Listener.defaultListener(Configuration.of(Map.of()));
         var cl = new CompositeListener(noop);
 
-        assertThatThrownBy(() -> cl.initialize(null))
+        assertThatThrownBy(() -> cl.onRunStarted(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("configuration is null");
     }
@@ -441,7 +407,7 @@ class CompositeListenerTest {
     @Test
     @DisplayName("onBeforeExecution rejects null descriptor")
     void onBeforeExecutionRejectsNullDescriptor() {
-        var noop = Listener.defaultListener();
+        var noop = Listener.defaultListener(Configuration.of(Map.of()));
         var cl = new CompositeListener(noop);
 
         assertThatThrownBy(() -> cl.onBeforeExecution(null))
@@ -476,7 +442,7 @@ class CompositeListenerTest {
     @Test
     @DisplayName("onAfterExecution rejects null descriptor")
     void onAfterExecutionRejectsNullDescriptor() {
-        var noop = Listener.defaultListener();
+        var noop = Listener.defaultListener(Configuration.of(Map.of()));
         var cl = new CompositeListener(noop);
 
         assertThatThrownBy(() -> cl.onAfterExecution(null))
@@ -515,7 +481,7 @@ class CompositeListenerTest {
         var failing = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("failing-onRunStarted");
                 throw new RuntimeException("delegate failure");
             }
@@ -523,7 +489,7 @@ class CompositeListenerTest {
         var succeeding = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("succeeding-onRunStarted");
             }
         };
@@ -532,7 +498,7 @@ class CompositeListenerTest {
         var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
-            new CompositeListener(failing, succeeding).onRunStarted();
+            new CompositeListener(failing, succeeding).onRunStarted(CONFIGURATION);
         } finally {
             System.setErr(originalErr);
         }
@@ -547,7 +513,7 @@ class CompositeListenerTest {
         var failing = new Listener() {
 
             @Override
-            public void initialize(Configuration configuration) {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("failing-initialize");
                 throw new RuntimeException("delegate failure");
             }
@@ -555,7 +521,7 @@ class CompositeListenerTest {
         var succeeding = new Listener() {
 
             @Override
-            public void initialize(Configuration configuration) {
+            public void onRunStarted(final Configuration configuration) {
                 calls.add("succeeding-initialize");
             }
         };
@@ -564,7 +530,7 @@ class CompositeListenerTest {
         var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
-            new CompositeListener(failing, succeeding).initialize(STUB_CONFIGURATION);
+            new CompositeListener(failing, succeeding).onRunStarted(STUB_CONFIGURATION);
         } finally {
             System.setErr(originalErr);
         }
@@ -610,7 +576,7 @@ class CompositeListenerTest {
         var failing = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 throw new RuntimeException("delegate oops");
             }
         };
@@ -619,7 +585,7 @@ class CompositeListenerTest {
         var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
-            new CompositeListener(true, failing).onRunStarted();
+            new CompositeListener(true, failing).onRunStarted(CONFIGURATION);
         } finally {
             System.setErr(originalErr);
         }
@@ -635,7 +601,7 @@ class CompositeListenerTest {
         var failing = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 throw new RuntimeException("delegate oops");
             }
         };
@@ -644,7 +610,7 @@ class CompositeListenerTest {
         var errContent = new ByteArrayOutputStream();
         try {
             System.setErr(new PrintStream(errContent, true, StandardCharsets.UTF_8));
-            new CompositeListener(false, failing).onRunStarted();
+            new CompositeListener(false, failing).onRunStarted(CONFIGURATION);
         } finally {
             System.setErr(originalErr);
         }
@@ -660,12 +626,12 @@ class CompositeListenerTest {
         var failing = new Listener() {
 
             @Override
-            public void onRunStarted() {
+            public void onRunStarted(final Configuration configuration) {
                 throw new OutOfMemoryError("simulated OOM");
             }
         };
 
-        assertThatThrownBy(() -> new CompositeListener(failing).onRunStarted())
+        assertThatThrownBy(() -> new CompositeListener(failing).onRunStarted(CONFIGURATION))
                 .isInstanceOf(OutOfMemoryError.class)
                 .hasMessage("simulated OOM");
     }

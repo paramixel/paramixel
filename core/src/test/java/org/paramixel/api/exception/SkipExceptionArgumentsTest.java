@@ -27,19 +27,28 @@ class SkipExceptionArgumentsTest {
     @Test
     @DisplayName("skip(null) throws NullPointerException")
     void skipWithNullThrowsNullPointerException() {
-        assertThatThrownBy(() -> SkipException.skip(null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> {
+                    throw SkipException.skip(null);
+                })
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("skip(empty) throws IllegalArgumentException")
     void skipWithEmptyThrowsIllegalArgumentException() {
-        assertThatThrownBy(() -> SkipException.skip("")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> {
+                    throw SkipException.skip("");
+                })
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("skip(blank) throws IllegalArgumentException")
     void skipWithBlankThrowsIllegalArgumentException() {
-        assertThatThrownBy(() -> SkipException.skip("   ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> {
+                    throw SkipException.skip("   ");
+                })
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

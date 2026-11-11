@@ -37,7 +37,7 @@ class RunnerBoundedCompletionTest {
     @DisplayName("Timeout action aborts a non-cooperative leaf and the runner returns")
     void timeoutActionAbortsNonCooperativeLeaf() {
         var stop = new AtomicBoolean(false);
-        var stuckStep = Step.of("stuck", ctx -> {
+        var stuckStep = Step.step("stuck", ctx -> {
             while (!stop.get()) {
                 try {
                     Thread.sleep(50);
@@ -46,10 +46,10 @@ class RunnerBoundedCompletionTest {
                 }
             }
         });
-        var action = Timeout.builder("timeout")
-                .body(Sequential.builder("root")
+        var action = Timeout.timeout("timeout")
+                .body(Sequential.sequential("root")
                         .child(stuckStep)
-                        .child(Step.of("after", ctx -> {}))
+                        .child(Step.step("after", ctx -> {}))
                         .build())
                 .timeout(Duration.ofSeconds(2))
                 .build();
@@ -59,7 +59,7 @@ class RunnerBoundedCompletionTest {
         var elapsedSeconds = (System.nanoTime() - start) / 1_000_000_000.0;
 
         assertThat(result).isNotNull();
-        assertThat(result.descriptor().orElseThrow().isFailed()).isTrue();
+        assertThat(result.descriptor().orElseThrow().status().isFailed()).isTrue();
         assertThat(elapsedSeconds)
                 .as("runner should return shortly after the Timeout fires")
                 .isLessThan(15.0);

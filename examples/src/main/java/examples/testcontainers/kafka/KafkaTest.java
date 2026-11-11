@@ -17,10 +17,8 @@
 package examples.testcontainers.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Step.step;
 
@@ -48,7 +46,6 @@ import org.paramixel.api.action.Action;
  */
 public class KafkaTest {
 
-    private static final int PARALLELISM = 2;
     private static final Logger LOGGER = Logger.createLogger(KafkaTest.class);
     private static final String TOPIC = "test";
     private static final String GROUP_ID = "test-group-id";
@@ -64,7 +61,7 @@ public class KafkaTest {
      * @throws Throwable if environment creation fails
      */
     public static void main(final String[] args) throws Throwable {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -77,17 +74,16 @@ public class KafkaTest {
      */
     @Paramixel.Factory
     public static Action factory() throws Throwable {
-        var parallel = parallel(KafkaTest.class.getName()).parallelism(PARALLELISM);
-        for (KafkaTestEnvironment environment : KafkaTestEnvironment.createTestEnvironments()) {
-            parallel.child(instance(environment.name(), () -> new KafkaTest(environment))
-                    .body(scope("[scenario]")
-                            .before(step("setUp()", withInstance(KafkaTest.class, KafkaTest::setUp)))
-                            .body(sequential("tests")
-                                    .child(step("produce()", withInstance(KafkaTest.class, KafkaTest::produce)))
-                                    .child(step("consume()", withInstance(KafkaTest.class, KafkaTest::consume))))
-                            .after(step("tearDown()", withInstance(KafkaTest.class, KafkaTest::tearDown)))));
-        }
-        return parallel.build();
+        return parallel(KafkaTest.class.getName(), "environments")
+                .each(
+                        KafkaTestEnvironment.createTestEnvironments(),
+                        environment -> of(environment.name(), KafkaTest.class, () -> new KafkaTest(environment))
+                                .before("setUp()", KafkaTest::setUp)
+                                .body(sequential("tests")
+                                        .child(step("produce()", KafkaTest.class, KafkaTest::produce))
+                                        .child(step("consume()", KafkaTest.class, KafkaTest::consume)))
+                                .after("tearDown()", KafkaTest::tearDown))
+                .build();
     }
 
     private KafkaTest(final KafkaTestEnvironment environment) {

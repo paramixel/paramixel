@@ -25,10 +25,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Context;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Status;
 import org.paramixel.api.exception.SkipException;
 
 @DisplayName("Conditional action")
-@SuppressWarnings("removal")
 class ConditionalTest {
 
     private static final Predicate<Context> ALWAYS_TRUE = ctx -> true;
@@ -36,164 +36,135 @@ class ConditionalTest {
     @Test
     @DisplayName("condition true — body passes, node passes")
     void conditionTrueBodyPasses() {
-        var action = Conditional.builder("true-pass", ALWAYS_TRUE)
-                .body(Step.of("step", context -> {}))
+        var action = Conditional.conditional("true-pass", ALWAYS_TRUE)
+                .body(Step.step("step", context -> {}))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isPassed()).isTrue();
+        assertThat(root.children().get(0).status().isPassed()).isTrue();
     }
 
     @Test
     @DisplayName("condition true — body fails, node fails")
     void conditionTrueBodyFails() {
-        var action = Conditional.builder("true-fail", ALWAYS_TRUE)
-                .body(Step.of("step", context -> {
+        var action = Conditional.conditional("true-fail", ALWAYS_TRUE)
+                .body(Step.step("step", context -> {
                     throw new RuntimeException("intentional failure");
                 }))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isFailed()).isTrue();
+        assertThat(root.children().get(0).status().isFailed()).isTrue();
     }
 
     @Test
     @DisplayName("condition true — body skips, node skips")
     void conditionTrueBodySkips() {
-        var action = Conditional.builder("true-skip", ALWAYS_TRUE)
-                .body(Step.of("step", context -> {
-                    SkipException.skip("skip reason");
+        var action = Conditional.conditional("true-skip", ALWAYS_TRUE)
+                .body(Step.step("step", context -> {
+                    throw SkipException.skip("skip reason");
                 }))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isSkipped()).isTrue();
+        assertThat(root.status().isSkipped()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.children().get(0).status().isSkipped()).isTrue();
     }
 
     @Test
     @DisplayName("condition false — node passes, body skipped")
     void conditionFalseBodySkipped() {
-        var action = Conditional.builder("OS is not Linux", ctx -> false)
-                .body(Step.of("step", context -> {}))
+        var action = Conditional.conditional("OS is not Linux", ctx -> false)
+                .body(Step.step("step", context -> {}))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.children().get(0).status().isSkipped()).isTrue();
     }
 
     @Test
     @DisplayName("condition false — body is skipped")
     void conditionFalseBodyIsSkipped() {
-        var action = Conditional.builder("skip-gate", ctx -> false)
-                .body(Step.of("step", context -> {}))
+        var action = Conditional.conditional("skip-gate", ctx -> false)
+                .body(Step.step("step", context -> {}))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.children().get(0).status().isSkipped()).isTrue();
     }
 
     @Test
     @DisplayName("condition false — node passes, grandchildren all skipped")
     void conditionFalseCascadesToGrandchildren() {
-        var action = Conditional.builder("gate closed", ctx -> false)
-                .body(Sequence.builder("seq")
-                        .child(Step.of("child-1", context -> {}))
-                        .child(Step.of("child-2", context -> {}))
-                        .child(Step.of("child-3", context -> {}))
+        var action = Conditional.conditional("gate closed", ctx -> false)
+                .body(Sequential.sequential("seq")
+                        .child(Step.step("child-1", context -> {}))
+                        .child(Step.step("child-2", context -> {}))
+                        .child(Step.step("child-3", context -> {}))
                         .build())
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(root.children()).hasSize(1);
         var body = root.children().get(0);
-        assertThat(body.isSkipped()).isTrue();
+        assertThat(body.status().isSkipped()).isTrue();
         assertThat(body.children()).hasSize(3);
         for (var grandchild : body.children()) {
-            assertThat(grandchild.isSkipped()).isTrue();
+            assertThat(grandchild.status().isSkipped()).isTrue();
         }
     }
 
     @Test
     @DisplayName("predicate throws — node failed with descriptive message, body skipped")
     void predicateThrowsFailsConditional() {
-        var action = Conditional.builder("throw-fail", ctx -> {
+        var action = Conditional.conditional("throw-fail", ctx -> {
                     throw new RuntimeException("boom");
                 })
-                .body(Step.of("step", context -> {}))
+                .body(Step.step("step", context -> {}))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.message()).isPresent();
-        assertThat(root.message().get()).contains("condition evaluation failed");
-        assertThat(root.message().get()).contains("boom");
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.status().message()).isPresent();
+        assertThat(root.status().message().get()).contains("condition evaluation failed");
+        assertThat(root.status().message().get()).contains("boom");
         assertThat(root.children()).hasSize(1);
-        assertThat(root.children().get(0).isSkipped()).isTrue();
+        assertThat(root.children().get(0).status().isSkipped()).isTrue();
     }
 
     @Test
     @DisplayName("predicate wraps checked exception — failed with nested cause")
     void predicateWrapsCheckedException() throws Exception {
         var checked = new Exception("checked exception");
-        var action = Conditional.builder("throw-checked", ctx -> {
+        var action = Conditional.conditional("throw-checked", ctx -> {
                     throw new RuntimeException(checked);
                 })
-                .body(Step.of("step", context -> {}))
+                .body(Step.step("step", context -> {}))
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isFailed()).isTrue();
-        assertThat(root.message()).isPresent();
-        assertThat(root.message().get()).contains("condition evaluation failed");
-        assertThat(root.message().get()).contains("checked exception");
-    }
-
-    @Test
-    @DisplayName("conditional inside Sequence.dependent — false condition does not skip siblings")
-    void conditionalInsideSequenceDependentDoesNotSkipSiblings() {
-        var hitSibling = new boolean[] {false};
-        var hitGatedStep = new boolean[] {false};
-        var action = Sequence.builder("seq")
-                .dependent()
-                .child(Conditional.builder("gated", ctx -> false)
-                        .body(Step.of("gated-step", context -> {
-                            hitGatedStep[0] = true;
-                        }))
-                        .build())
-                .child(Step.of("sibling", context -> {
-                    hitSibling[0] = true;
-                }))
-                .build();
-        var result = Runner.builder().build().run(action);
-        var root = result.descriptor().orElseThrow();
-
-        assertThat(hitSibling[0])
-                .as("A Conditional that did not meet its condition should not prevent "
-                        + "remaining dependent siblings from executing")
-                .isTrue();
-        assertThat(hitGatedStep[0])
-                .as("A Conditional that did not meet its condition should not execute its body")
-                .isFalse();
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
+        assertThat(root.status().message()).isPresent();
+        assertThat(root.status().message().get()).contains("condition evaluation failed");
+        assertThat(root.status().message().get()).contains("checked exception");
     }
 
     @Test
@@ -201,14 +172,14 @@ class ConditionalTest {
     void conditionalInsideSequentialDependentDoesNotSkipSiblings() {
         var hitSibling = new boolean[] {false};
         var hitGatedStep = new boolean[] {false};
-        var action = Sequential.builder("seq")
+        var action = Sequential.sequential("seq")
                 .dependent()
-                .child(Conditional.builder("gated", ctx -> false)
-                        .body(Step.of("gated-step", context -> {
+                .child(Conditional.conditional("gated", ctx -> false)
+                        .body(Step.step("gated-step", context -> {
                             hitGatedStep[0] = true;
                         }))
                         .build())
-                .child(Step.of("sibling", context -> {
+                .child(Step.step("sibling", context -> {
                     hitSibling[0] = true;
                 }))
                 .build();
@@ -222,7 +193,7 @@ class ConditionalTest {
         assertThat(hitGatedStep[0])
                 .as("A Conditional that did not meet its condition should not execute its body")
                 .isFalse();
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
     }
 
     @Test
@@ -230,14 +201,14 @@ class ConditionalTest {
     void conditionalInsideSequentialIndependentDoesNotSkipSiblings() {
         var hitGatedStep = new boolean[] {false};
         var hitSibling = new boolean[] {false};
-        var action = Sequential.builder("seq")
+        var action = Sequential.sequential("seq")
                 .independent()
-                .child(Conditional.builder("gated-independent", ctx -> false)
-                        .body(Step.of("gated-step", context -> {
+                .child(Conditional.conditional("gated-independent", ctx -> false)
+                        .body(Step.step("gated-step", context -> {
                             hitGatedStep[0] = true;
                         }))
                         .build())
-                .child(Step.of("sibling", context -> {
+                .child(Step.step("sibling", context -> {
                     hitSibling[0] = true;
                 }))
                 .build();
@@ -248,33 +219,7 @@ class ConditionalTest {
                 .as("A Conditional that did not meet its condition should not execute its body")
                 .isFalse();
         assertThat(hitSibling[0]).isTrue();
-        assertThat(root.isPassed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("conditional inside Sequence.independent — false condition does not skip siblings")
-    void conditionalInsideSequenceIndependentDoesNotSkipSiblings() {
-        var hitGatedStep = new boolean[] {false};
-        var hitSibling = new boolean[] {false};
-        var action = Sequence.builder("seq")
-                .independent()
-                .child(Conditional.builder("gated-independent", ctx -> false)
-                        .body(Step.of("gated-step", context -> {
-                            hitGatedStep[0] = true;
-                        }))
-                        .build())
-                .child(Step.of("sibling", context -> {
-                    hitSibling[0] = true;
-                }))
-                .build();
-        var result = Runner.builder().build().run(action);
-        var root = result.descriptor().orElseThrow();
-
-        assertThat(hitGatedStep[0])
-                .as("A Conditional that did not meet its condition should not execute its body")
-                .isFalse();
-        assertThat(hitSibling[0]).isTrue();
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
     }
 
     @Test
@@ -282,14 +227,14 @@ class ConditionalTest {
     void twoConditionalsInParallelEvalIndependently() {
         var hitTrue = new boolean[] {false};
         var hitFalse = new boolean[] {false};
-        var action = Parallel.builder("parallel")
-                .child(Conditional.builder("true-branch", ctx -> true)
-                        .body(Step.of("true-step", context -> {
+        var action = Parallel.parallel("parallel", "t0")
+                .child(Conditional.conditional("true-branch", ctx -> true)
+                        .body(Step.step("true-step", context -> {
                             hitTrue[0] = true;
                         }))
                         .build())
-                .child(Conditional.builder("false-branch", ctx -> false)
-                        .body(Step.of("false-step", context -> {
+                .child(Conditional.conditional("false-branch", ctx -> false)
+                        .body(Step.step("false-step", context -> {
                             hitFalse[0] = true;
                         }))
                         .build())
@@ -299,38 +244,39 @@ class ConditionalTest {
 
         assertThat(hitTrue[0]).isTrue();
         assertThat(hitFalse[0]).isFalse();
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         var children = root.children();
         assertThat(children).hasSize(2);
         var trueBranch = children.get(0);
         var falseBranch = children.get(1);
-        assertThat(trueBranch.isPassed()).isTrue();
-        assertThat(falseBranch.isPassed()).isTrue();
+        assertThat(trueBranch.status().isPassed()).isTrue();
+        assertThat(falseBranch.status().isPassed()).isTrue();
     }
 
     @Test
     @DisplayName("conditional wraps a Scope — condition true runs full lifecycle")
     void conditionalWrapsScopeRunsFullLifecycle() {
         var messages = new java.util.ArrayList<String>();
-        var action = Conditional.builder("wrap-scope", ctx -> true)
-                .body(Scope.builder("scope")
-                        .before(Step.of("before", context -> messages.add("before")))
-                        .body(Step.of("body", context -> messages.add("body")))
-                        .after(Step.of("after", context -> messages.add("after")))
+        var action = Conditional.conditional("wrap-scope", ctx -> true)
+                .body(Scope.scope("scope")
+                        .before(Step.step("before", context -> messages.add("before")))
+                        .body(Step.step("body", context -> messages.add("body")))
+                        .after(Step.step("after", context -> messages.add("after")))
                         .build())
                 .build();
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
 
-        assertThat(root.isPassed()).isTrue();
+        assertThat(root.status().isPassed()).isTrue();
         assertThat(messages).containsExactly("before", "body", "after");
     }
 
     @Test
     @DisplayName("descriptor tree contains body child")
     void descriptorTreeContainsBodyChild() {
-        var child = Step.of("leaf", context -> {});
-        var action = Conditional.builder("tree-test", ALWAYS_TRUE).body(child).build();
+        var child = Step.step("leaf", context -> {});
+        var action =
+                Conditional.conditional("tree-test", ALWAYS_TRUE).body(child).build();
 
         var result = Runner.builder().build().run(action);
         var root = result.descriptor().orElseThrow();
@@ -347,8 +293,8 @@ class ConditionalTest {
         @Test
         @DisplayName("build throws when body not configured")
         void buildThrowsWhenBodyNotConfigured() {
-            assertThatThrownBy(
-                            () -> Conditional.builder("bad-cond", ctx -> true).build())
+            assertThatThrownBy(() ->
+                            Conditional.conditional("bad-cond", ctx -> true).build())
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("body action must be configured");
         }
@@ -356,9 +302,9 @@ class ConditionalTest {
         @Test
         @DisplayName("body accepts another Builder")
         void bodyAcceptsAnotherBuilder() {
-            var child = Step.of("inner-step", context -> {});
-            var conditional = Conditional.builder("from-builder", ALWAYS_TRUE)
-                    .body(Instance.builder("inner", Object::new).body(child))
+            var child = Step.step("inner-step", context -> {});
+            var conditional = Conditional.conditional("from-builder", ALWAYS_TRUE)
+                    .body(Instance.of("inner", Object.class, Object::new).body(child))
                     .build();
 
             assertThat(conditional.displayName()).isEqualTo("from-builder");
@@ -368,7 +314,7 @@ class ConditionalTest {
         @Test
         @DisplayName("null displayName throws")
         void nullDisplayNameThrows() {
-            assertThatThrownBy(() -> Conditional.builder(null, ALWAYS_TRUE))
+            assertThatThrownBy(() -> Conditional.conditional(null, ALWAYS_TRUE))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("displayName is null");
         }
@@ -376,7 +322,7 @@ class ConditionalTest {
         @Test
         @DisplayName("blank displayName throws")
         void blankDisplayNameThrows() {
-            assertThatThrownBy(() -> Conditional.builder("", ALWAYS_TRUE))
+            assertThatThrownBy(() -> Conditional.conditional("", ALWAYS_TRUE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("displayName is blank");
         }
@@ -384,7 +330,7 @@ class ConditionalTest {
         @Test
         @DisplayName("null condition throws")
         void nullConditionThrows() {
-            assertThatThrownBy(() -> Conditional.builder("name", null))
+            assertThatThrownBy(() -> Conditional.conditional("name", null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("condition is null");
         }
@@ -392,32 +338,39 @@ class ConditionalTest {
         @Test
         @DisplayName("null body throws")
         void nullBodyThrows() {
-            assertThatThrownBy(() -> Conditional.builder("name", ALWAYS_TRUE).body((Action) null))
+            assertThatThrownBy(
+                            () -> Conditional.conditional("name", ALWAYS_TRUE).body((Action) null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("action is null");
         }
 
         @Test
-        @DisplayName("null builder body throws")
-        void nullBuilderBodyThrows() {
-            assertThatThrownBy(() ->
-                            Conditional.builder("name", ALWAYS_TRUE).body((org.paramixel.api.action.Builder) null))
-                    .isInstanceOf(NullPointerException.class)
-                    .hasMessage("builder is null");
-        }
-
-        @Test
         @DisplayName("accessors return configured values")
         void accessorsReturnConfiguredValues() {
-            var child = Step.of("child", context -> {});
+            var child = Step.step("child", context -> {});
             var predicate = ALWAYS_TRUE;
 
-            var action =
-                    Conditional.builder("accessor-test", predicate).body(child).build();
+            var action = Conditional.conditional("accessor-test", predicate)
+                    .body(child)
+                    .build();
 
             assertThat(action.displayName()).isEqualTo("accessor-test");
             assertThat(action.condition()).isSameAs(predicate);
             assertThat(action.body()).isSameAs(child);
         }
+    }
+
+    @Test
+    @DisplayName("condition false — node passes and the skipped body states the reason")
+    void conditionFalseReportsReason() {
+        var action = Conditional.conditional("nightly only", ctx -> false)
+                .body(Step.step("expensive", context -> {}))
+                .build();
+        var root = Runner.builder().build().run(action).descriptor().orElseThrow();
+
+        assertThat(root.status().kind()).isEqualTo(Status.Kind.PASSED);
+        var body = root.children().get(0);
+        assertThat(body.status().kind()).isEqualTo(Status.Kind.SKIPPED);
+        assertThat(body.status().message()).hasValue("condition not met: nightly only");
     }
 }

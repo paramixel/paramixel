@@ -19,6 +19,7 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.action.Action;
@@ -32,10 +33,10 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("finds single factory via run with classOf selector")
     void findsSingleFactory() {
-        var selector = Selector.classOf(ActionResolverSmokeFixture.class);
+        var selector =
+                Selector.builder().classOf(ActionResolverSmokeFixture.class).build();
         var result = Runner.builder().build().run(selector);
-        assertThat(result).isPresent();
-        var children = result.orElseThrow().descriptor().orElseThrow().children();
+        var children = result.descriptor().orElseThrow().children();
         assertThat(children).hasSize(1);
         assertThat(children.get(0).action().displayName()).isEqualTo("smoke-action");
     }
@@ -43,13 +44,16 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("applies selector tag filter via matchesTag")
     void appliesTagFiltersWithAndSemantics() {
-        var selector =
-                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke-fast"));
+        var selector = Selector.builder()
+                .classOf(ActionResolverMultiTagFixture.class)
+                .build()
+                .and(Selector.builder()
+                        .tagPattern(Pattern.compile("smoke-fast"))
+                        .build());
 
         var result = Runner.builder().build().run(selector);
 
-        assertThat(result).isPresent();
-        var children = result.orElseThrow().descriptor().orElseThrow().children();
+        var children = result.descriptor().orElseThrow().children();
         assertThat(children).hasSize(1);
         assertThat(children.get(0).action().displayName()).isEqualTo("multi-tag-action");
     }
@@ -57,21 +61,22 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("returns empty when tag filter does not match")
     void returnsEmptyWhenTagFiltersDoNotBothMatch() {
-        var selector =
-                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("missing"));
+        var selector = Selector.builder()
+                .classOf(ActionResolverMultiTagFixture.class)
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("missing")).build());
 
-        assertThat(Runner.builder().build().run(selector)).isEmpty();
+        assertThat(Runner.builder().build().run(selector).descriptor()).isEmpty();
     }
 
     @Test
     @DisplayName("blank tag values produce discovery validation failure action")
     void rejectsBlankTagValues() {
-        var selector = Selector.classOf(BlankTagFactory.class);
+        var selector = Selector.builder().classOf(BlankTagFactory.class).build();
 
         var result = Runner.builder().build().run(selector);
 
-        assertThat(result).isPresent();
-        var children = result.orElseThrow().descriptor().orElseThrow().children();
+        var children = result.descriptor().orElseThrow().children();
         assertThat(children).hasSize(1);
         assertThat(children.get(0).action().displayName()).startsWith("Discovery validation failure:");
     }
@@ -79,15 +84,16 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("child override without factory shadows parent factory")
     void childOverrideWithoutFactoryShadowsParentFactory() {
-        var selector = Selector.classOf(ChildOverridesWithoutFactory.class);
+        var selector =
+                Selector.builder().classOf(ChildOverridesWithoutFactory.class).build();
 
-        assertThat(Runner.builder().build().run(selector)).isEmpty();
+        assertThat(Runner.builder().build().run(selector).descriptor()).isEmpty();
     }
 
     @Test
     @DisplayName("throws when more than one factory exists in a hierarchy")
     void throwsWhenMoreThanOneFactoryExistsInHierarchy() {
-        var selector = Selector.classOf(ChildDeclaresOwnFactory.class);
+        var selector = Selector.builder().classOf(ChildDeclaresOwnFactory.class).build();
 
         assertThatThrownBy(() -> Runner.builder().build().run(selector))
                 .isInstanceOf(ResolverException.class)
@@ -97,7 +103,7 @@ class RunnerClassDiscoveryTest {
     @Test
     @DisplayName("error from factory method is re-thrown directly, not wrapped")
     void errorFromFactoryMethodIsReThrownDirectlyNotWrapped() {
-        var selector = Selector.classOf(ErrorThrowingFactory.class);
+        var selector = Selector.builder().classOf(ErrorThrowingFactory.class).build();
 
         assertThatThrownBy(() -> Runner.builder().build().run(selector))
                 .isInstanceOf(TestError.class)
@@ -107,27 +113,27 @@ class RunnerClassDiscoveryTest {
     static class ParentFactory {
         @Paramixel.Factory
         public static Action factory() {
-            return Step.of("parent-action", context -> {});
+            return Step.step("parent-action", context -> {});
         }
     }
 
     static class ChildOverridesWithoutFactory extends ParentFactory {
         public static Action factory() {
-            return Step.of("child-action", context -> {});
+            return Step.step("child-action", context -> {});
         }
     }
 
     static class ParentFactoryTwo {
         @Paramixel.Factory
         public static Action parentAction() {
-            return Step.of("parent-action", context -> {});
+            return Step.step("parent-action", context -> {});
         }
     }
 
     static class ChildDeclaresOwnFactory extends ParentFactoryTwo {
         @Paramixel.Factory
         public static Action childAction() {
-            return Step.of("child-action", context -> {});
+            return Step.step("child-action", context -> {});
         }
     }
 
@@ -135,7 +141,7 @@ class RunnerClassDiscoveryTest {
         @Paramixel.Factory
         @Paramixel.Tag(" ")
         public static Action factory() {
-            return Step.of("blank-tag-action", context -> {});
+            return Step.step("blank-tag-action", context -> {});
         }
     }
 

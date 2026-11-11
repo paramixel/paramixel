@@ -18,6 +18,7 @@ package nonapi.org.paramixel.listener;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import nonapi.org.paramixel.support.Arguments;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
@@ -81,19 +82,14 @@ public class CompositeListener implements Listener {
     }
 
     @Override
-    public void initialize(final Configuration configuration) {
-        Objects.requireNonNull(configuration, "configuration is null");
-        invokeEach("initialize", listener -> listener.initialize(configuration));
-    }
-
-    @Override
     public void onDiscoveryStarted() {
         invokeEach("onDiscoveryStarted", Listener::onDiscoveryStarted);
     }
 
     @Override
-    public void onRunStarted() {
-        invokeEach("onRunStarted", Listener::onRunStarted);
+    public void onRunStarted(final Configuration configuration) {
+        Objects.requireNonNull(configuration, "configuration is null");
+        invokeEach("onRunStarted", listener -> listener.onRunStarted(configuration));
     }
 
     @Override
@@ -103,7 +99,7 @@ public class CompositeListener implements Listener {
     }
 
     @Override
-    public void onDiscoveryCompleted(final Descriptor root) {
+    public void onDiscoveryCompleted(final Optional<Descriptor> root) {
         invokeEach("onDiscoveryCompleted", listener -> listener.onDiscoveryCompleted(root));
     }
 

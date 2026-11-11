@@ -33,6 +33,7 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
+import org.paramixel.api.Status;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.action.Step;
 
@@ -45,7 +46,7 @@ class SafeListenerTest {
         var delegate = new ThrowingListener("onRunStarted", new RuntimeException("boom"));
         var safe = new SafeListener(delegate, false);
 
-        var captured = captureStdErr(() -> safe.onRunStarted());
+        var captured = captureStdErr(() -> safe.onRunStarted(stubConfiguration()));
 
         assertThat(captured).contains("Listener.onRunStarted threw exception: boom");
     }
@@ -56,7 +57,7 @@ class SafeListenerTest {
         var delegate = new ThrowingListener("onDiscoveryCompleted", new RuntimeException("discovery-err"));
         var safe = new SafeListener(delegate, false);
 
-        var captured = captureStdErr(() -> safe.onDiscoveryCompleted(stubDescriptor()));
+        var captured = captureStdErr(() -> safe.onDiscoveryCompleted(Optional.of(stubDescriptor())));
 
         assertThat(captured).contains("Listener.onDiscoveryCompleted threw exception: discovery-err");
     }
@@ -100,7 +101,7 @@ class SafeListenerTest {
         var delegate = new ThrowingListener("onRunStarted", new RuntimeException("ansi-test"));
         var safe = new SafeListener(delegate, true);
 
-        var captured = captureStdErr(() -> safe.onRunStarted());
+        var captured = captureStdErr(() -> safe.onRunStarted(stubConfiguration()));
 
         assertThat(captured).contains("PARAMIXEL");
         assertThat(captured).containsSequence("\033[", "1;34m");
@@ -112,7 +113,7 @@ class SafeListenerTest {
         var delegate = new ThrowingListener("onRunStarted", new RuntimeException("plain-test"));
         var safe = new SafeListener(delegate, false);
 
-        var captured = captureStdErr(() -> safe.onRunStarted());
+        var captured = captureStdErr(() -> safe.onRunStarted(stubConfiguration()));
 
         assertThat(captured).contains("[PARAMIXEL] Listener.onRunStarted");
     }
@@ -123,7 +124,7 @@ class SafeListenerTest {
         var delegate = new ThrowingListener("onRunStarted", new InternalError("vm-failure"));
         var safe = new SafeListener(delegate, false);
 
-        assertThatThrownBy(safe::onRunStarted).isInstanceOf(InternalError.class);
+        assertThatThrownBy(() -> safe.onRunStarted(stubConfiguration())).isInstanceOf(InternalError.class);
     }
 
     @Test
@@ -132,20 +133,9 @@ class SafeListenerTest {
         var delegate = new ThrowingListener("onRunStarted", new StackOverflowError("stack"));
         var safe = new SafeListener(delegate, false);
 
-        var captured = captureStdErr(() -> safe.onRunStarted());
+        var captured = captureStdErr(() -> safe.onRunStarted(stubConfiguration()));
 
         assertThat(captured).contains("Listener.onRunStarted threw exception: stack");
-    }
-
-    @Test
-    @DisplayName("catches recoverable exception from initialize and reports to stderr")
-    void catchesRecoverableExceptionFromInitialize() {
-        var delegate = new ThrowingListener("initialize", new RuntimeException("init-err"));
-        var safe = new SafeListener(delegate, false);
-
-        var captured = captureStdErr(() -> safe.initialize(stubConfiguration()));
-
-        assertThat(captured).contains("Listener.initialize threw exception: init-err");
     }
 
     @Test
@@ -160,32 +150,12 @@ class SafeListenerTest {
     }
 
     @Test
-    @DisplayName("rethrows VirtualMachineError from initialize as unrecoverable")
-    void rethrowsVirtualMachineErrorFromInitialize() {
-        var delegate = new ThrowingListener("initialize", new InternalError("vm-failure"));
-        var safe = new SafeListener(delegate, false);
-
-        assertThatThrownBy(() -> safe.initialize(stubConfiguration())).isInstanceOf(InternalError.class);
-    }
-
-    @Test
     @DisplayName("rethrows VirtualMachineError from onDiscoveryStarted as unrecoverable")
     void rethrowsVirtualMachineErrorFromOnDiscoveryStarted() {
         var delegate = new ThrowingListener("onDiscoveryStarted", new InternalError("vm-failure"));
         var safe = new SafeListener(delegate, false);
 
         assertThatThrownBy(safe::onDiscoveryStarted).isInstanceOf(InternalError.class);
-    }
-
-    @Test
-    @DisplayName("does not rethrow StackOverflowError from initialize")
-    void doesNotRethrowStackOverflowErrorFromInitialize() {
-        var delegate = new ThrowingListener("initialize", new StackOverflowError("stack"));
-        var safe = new SafeListener(delegate, false);
-
-        var captured = captureStdErr(() -> safe.initialize(stubConfiguration()));
-
-        assertThat(captured).contains("Listener.initialize threw exception: stack");
     }
 
     @Test
@@ -229,7 +199,12 @@ class SafeListenerTest {
 
     private static Descriptor stubDescriptor() {
         return new Descriptor() {
-            private final Action action = Step.of("stub", ignored -> {});
+            @Override
+            public Status status() {
+                return Status.PASSED;
+            }
+
+            private final Action action = Step.step("stub", ignored -> {});
 
             @Override
             public Optional<Descriptor> parent() {
@@ -247,23 +222,8 @@ class SafeListenerTest {
             }
 
             @Override
-            public boolean isPassed() {
-                return true;
-            }
-
-            @Override
-            public boolean isFailed() {
-                return false;
-            }
-
-            @Override
-            public boolean isSkipped() {
-                return false;
-            }
-
-            @Override
-            public boolean isAborted() {
-                return false;
+            public String path() {
+                return "stub";
             }
 
             @Override
@@ -277,21 +237,6 @@ class SafeListenerTest {
             }
 
             @Override
-            public Optional<String> message() {
-                return Optional.empty();
-            }
-
-            @Override
-            public Optional<Throwable> throwable() {
-                return Optional.empty();
-            }
-
-            @Override
-            public boolean isCompleted() {
-                return true;
-            }
-
-            @Override
             public List<Descriptor> children() {
                 return List.of();
             }
@@ -301,23 +246,13 @@ class SafeListenerTest {
     private static Result stubResult() {
         return new Result() {
             @Override
-            public boolean isPassed() {
-                return true;
+            public Status status() {
+                return Status.PASSED;
             }
 
             @Override
-            public boolean isFailed() {
-                return false;
-            }
-
-            @Override
-            public boolean isSkipped() {
-                return false;
-            }
-
-            @Override
-            public boolean isAborted() {
-                return false;
+            public int exitCode() {
+                return 0;
             }
 
             @Override
@@ -352,13 +287,6 @@ class SafeListenerTest {
         }
 
         @Override
-        public void initialize(Configuration configuration) {
-            if ("initialize".equals(methodName)) {
-                throwIfPossible();
-            }
-        }
-
-        @Override
         public void onDiscoveryStarted() {
             if ("onDiscoveryStarted".equals(methodName)) {
                 throwIfPossible();
@@ -366,14 +294,14 @@ class SafeListenerTest {
         }
 
         @Override
-        public void onRunStarted() {
+        public void onRunStarted(final Configuration configuration) {
             if ("onRunStarted".equals(methodName)) {
                 throwIfPossible();
             }
         }
 
         @Override
-        public void onDiscoveryCompleted(Descriptor root) {
+        public void onDiscoveryCompleted(final Optional<Descriptor> root) {
             if ("onDiscoveryCompleted".equals(methodName)) {
                 throwIfPossible();
             }

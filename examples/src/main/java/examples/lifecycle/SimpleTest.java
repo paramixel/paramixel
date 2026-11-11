@@ -17,8 +17,7 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,15 +32,15 @@ public class SimpleTest implements AutoCloseable {
     private static final AtomicInteger testCount = new AtomicInteger();
 
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     @Paramixel.Factory
     public static Action factory() {
         resetCounts();
 
-        return instance("FullLifecycleTest", SimpleTest::new)
-                .body(step("testOne()", withInstance(SimpleTest.class, SimpleTest::testOne)))
+        return of("FullLifecycleTest", SimpleTest.class, SimpleTest::new)
+                .body(step("testOne()", SimpleTest.class, SimpleTest::testOne))
                 .build();
     }
 

@@ -33,7 +33,6 @@ public final class CheckoutTest {
 - `@Paramixel.Disabled` excludes a factory or hook from discovery.
 - `@Paramixel.Tag` is repeatable and supports tag filtering.
 - `@Paramixel.Priority` orders discovered classes before the root action is built.
-- `@Paramixel.Id` is used by `AnnotationResolver`, not factory discovery.
 
 ## BeforeAll and AfterAll hooks
 

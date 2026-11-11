@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import nonapi.org.paramixel.action.ConcreteDescriptor;
 import nonapi.org.paramixel.action.StatusAccumulator;
+import nonapi.org.paramixel.action.Statuses;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -179,7 +180,7 @@ class StatusAccumulatorTest {
 
         private void assertAggregateMatches(final List<Status> statuses) {
             var descriptors = descriptorsWithStatuses(statuses);
-            var expected = Status.aggregate(descriptors);
+            var expected = Statuses.aggregate(descriptors);
             var accumulator = new StatusAccumulator();
             for (Status s : statuses) {
                 accumulator.include(s);
@@ -190,7 +191,7 @@ class StatusAccumulatorTest {
 
     private static void assertMatchesStatusAggregate(final List<Status> statuses) {
         var descriptors = descriptorsWithStatuses(statuses);
-        var expected = Status.aggregate(descriptors);
+        var expected = Statuses.aggregate(descriptors);
         var accumulator = new StatusAccumulator();
 
         for (Descriptor descriptor : descriptors) {
@@ -203,7 +204,7 @@ class StatusAccumulatorTest {
     private static List<Descriptor> descriptorsWithStatuses(final List<Status> statuses) {
         var descriptors = new ArrayList<Descriptor>(statuses.size());
         for (int i = 0; i < statuses.size(); i++) {
-            var descriptor = new ConcreteDescriptor(Step.of("step-" + i, value -> {}));
+            var descriptor = new ConcreteDescriptor(Step.step("step-" + i, value -> {}));
             setStatus(descriptor, statuses.get(i));
             descriptors.add(descriptor);
         }

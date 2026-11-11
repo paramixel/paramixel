@@ -16,8 +16,7 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Step.step;
 
 import org.paramixel.api.Paramixel;
@@ -38,8 +37,8 @@ public class CriticalTaggedTest {
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
     public static Action factory() {
-        return instance("CriticalTaggedTest", CriticalTaggedTest::new)
-                .body(step("test()", withInstance(CriticalTaggedTest.class, CriticalTaggedTest::test)))
+        return of("CriticalTaggedTest", CriticalTaggedTest.class, CriticalTaggedTest::new)
+                .body(step("test()", CriticalTaggedTest.class, CriticalTaggedTest::test))
                 .build();
     }
 

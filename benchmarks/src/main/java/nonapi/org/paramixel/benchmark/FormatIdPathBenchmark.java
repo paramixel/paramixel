@@ -19,7 +19,7 @@ package nonapi.org.paramixel.benchmark;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.CompiledPlans;
 import nonapi.org.paramixel.listener.Listeners;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -36,6 +36,8 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Descriptor;
+import org.paramixel.api.action.Action;
+import org.paramixel.api.action.Sequential;
 import org.paramixel.api.action.Step;
 
 /**
@@ -87,38 +89,38 @@ public class FormatIdPathBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             leaves = new ArrayList<>();
-            var root = new ConcreteDescriptor(Step.of("root", context -> {}));
-            buildTree(root, 1, leafCount, depth);
-            root.freeze();
+            var root = buildTree(depth, leafCount);
+            collectLeaves(CompiledPlans.compile(root), leaves);
         }
 
-        private void buildTree(
-                final ConcreteDescriptor parent, final int currentDepth, final int totalLeaves, final int maxDepth) {
-            if (currentDepth >= maxDepth) {
-                // This level becomes leaves
+        private static Action buildTree(final int depth, final int totalLeaves) {
+            if (depth <= 1) {
+                var builder = Sequential.sequential("leaves");
                 for (var i = 0; i < totalLeaves; i++) {
-                    var leaf = new ConcreteDescriptor(parent, Step.of("leaf-" + i, context -> {}));
-                    parent.addChild(leaf);
-                    leaves.add(leaf);
+                    builder.child(Step.step("leaf-" + i, context -> {}));
                 }
+                return builder.build();
+            }
+            var builder = Sequential.sequential("level-" + depth);
+            var perChild = Math.max(1, totalLeaves / depth);
+            for (var i = 0; i < depth; i++) {
+                builder.child(buildTree(depth - 1, perChild));
+            }
+            return builder.build();
+        }
+
+        private static void collectLeaves(final Descriptor descriptor, final List<Descriptor> leaves) {
+            if (descriptor.children().isEmpty()
+                    && descriptor.before().isEmpty()
+                    && descriptor.after().isEmpty()) {
+                leaves.add(descriptor);
                 return;
             }
-
-            // Distribute leaves across children at this level
-            // Use branching factor that creates a balanced tree
-            var branchingFactor = Math.max(2, (int) Math.ceil(Math.pow(totalLeaves, 1.0 / (maxDepth - currentDepth))));
-            var leavesPerChild = totalLeaves / branchingFactor;
-            var remainder = totalLeaves % branchingFactor;
-
-            for (var i = 0; i < branchingFactor; i++) {
-                var childLeaves = leavesPerChild + (i < remainder ? 1 : 0);
-                if (childLeaves <= 0) {
-                    continue;
-                }
-                var child = new ConcreteDescriptor(parent, Step.of("node-" + currentDepth + "-" + i, context -> {}));
-                parent.addChild(child);
-                buildTree(child, currentDepth + 1, childLeaves, maxDepth);
+            descriptor.before().ifPresent(before -> collectLeaves(before, leaves));
+            for (var child : descriptor.children()) {
+                collectLeaves(child, leaves);
             }
+            descriptor.after().ifPresent(after -> collectLeaves(after, leaves));
         }
     }
 }

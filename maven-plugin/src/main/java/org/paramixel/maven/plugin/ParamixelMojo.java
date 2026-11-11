@@ -27,8 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import nonapi.org.paramixel.support.AnsiColor;
-import nonapi.org.paramixel.support.Arguments;
+import java.util.regex.Pattern;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -51,10 +50,10 @@ import org.paramixel.api.selector.Selector;
  * during the {@link LifecyclePhase#TEST} phase with {@link ResolutionScope#TEST} dependency resolution.
  *
  * <p>The mojo resolves action factories from the test classpath using the runner's internal classpath scanner,
- * executes them with a {@link Runner}, and fails the build when {@link Result#isFailed()}
- * is {@code true}. Configuration-based promotion rules ({@code failureOnSkip},
- * {@code failureOnAbort}) are applied by the runner result, so skipped and aborted
- * outcomes are promoted to failed when the corresponding flags are enabled.
+ * executes them with a {@link Runner}, and fails the build when {@link Result#exitCode()} is non-zero.
+ * Configuration-based promotion rules ({@code failureOnSkip}, {@code failureOnAbort}) are already
+ * applied by the result's effective status, so skipped and aborted outcomes are promoted to failed when
+ * the corresponding flags are enabled.
  *
  * <p>The action tree is executed exactly once. The result is returned directly from the runner,
  * avoiding redundant re-execution.
@@ -190,7 +189,7 @@ public class ParamixelMojo extends AbstractMojo {
      * non-daemon threads that retain a reference to the test classloader and warns or fails depending
      * on {@code strictThreadLifecycle}.
      *
-     * <p>Fails the build when {@link Result#isFailed()} is {@code true}. Configuration-based
+     * <p>Fails the build when the run's exit code is non-zero. Configuration-based
      * promotion rules ({@code failureOnSkip}, {@code failureOnAbort}) are applied by the runner result.
      *
      * @throws MojoExecutionException when configuration is invalid, action resolution fails,
@@ -199,7 +198,7 @@ public class ParamixelMojo extends AbstractMojo {
      *     in flight (for example a {@code MojoFailureException} from failed tests), a
      *     strict-thread-lifecycle error is attached to it as a suppressed exception instead of
      *     replacing it.
-     * @throws MojoFailureException when {@link Result#isFailed()} is {@code true}
+     * @throws MojoFailureException when the run's exit code is non-zero
      */
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
@@ -225,8 +224,8 @@ public class ParamixelMojo extends AbstractMojo {
                         .listener(Listener.defaultListener(configuration))
                         .build();
 
-                var optionalResult = runner.run(selector);
-                if (optionalResult.isEmpty()) {
+                var result = runner.run(selector);
+                if (result.descriptor().isEmpty()) {
                     if (failIfNoTests) {
                         throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
                     }
@@ -235,9 +234,8 @@ public class ParamixelMojo extends AbstractMojo {
                     return;
                 }
 
-                var result = optionalResult.orElseThrow();
-                if (result.isFailed()) {
-                    throw new MojoFailureException(AnsiColor.BOLD_RED_TEXT.format("TESTS FAILED"));
+                if (result.exitCode() != 0) {
+                    throw new MojoFailureException(PluginText.boldRed("TESTS FAILED"));
                 }
             } catch (Throwable t) {
                 primary = t;
@@ -270,26 +268,23 @@ public class ParamixelMojo extends AbstractMojo {
     /**
      * Builds a {@link Selector} from POM parameters for action discovery filtering.
      *
-     * <p>When no match parameters are configured, returns {@link Selector#all()}.
+     * <p>All match parameters that are set are combined, so a run can filter by package, class and tag at once.
+     * When no match parameter is configured, the returned selector selects everything.
      *
      * @return the selector for action discovery
      */
     Selector buildSelector() {
-        var selectors = new ArrayList<Selector>();
+        var builder = Selector.builder();
         if (matchPackage != null && !matchPackage.isBlank()) {
-            selectors.add(Selector.packageRegex(matchPackage));
+            builder.packagePattern(Pattern.compile(matchPackage));
         }
         if (matchClass != null && !matchClass.isBlank()) {
-            selectors.add(Selector.classRegex(matchClass));
+            builder.classPattern(Pattern.compile(matchClass));
         }
         if (matchTag != null && !matchTag.isBlank()) {
-            selectors.add(Selector.tagRegex(matchTag));
+            builder.tagPattern(Pattern.compile(matchTag));
         }
-        return switch (selectors.size()) {
-            case 0 -> Selector.all();
-            case 1 -> selectors.get(0);
-            default -> Selector.and(selectors);
-        };
+        return builder.build();
     }
 
     /**
@@ -526,7 +521,7 @@ public class ParamixelMojo extends AbstractMojo {
         public void setKey(final String key) {
             Objects.requireNonNull(key, "key is null");
 
-            Arguments.requireNonBlank(key, "key is blank");
+            PluginText.requireNonBlank(key, "key is blank");
 
             this.key = key;
         }
@@ -550,7 +545,7 @@ public class ParamixelMojo extends AbstractMojo {
         public void setValue(final String value) {
             Objects.requireNonNull(value, "value is null");
 
-            Arguments.requireNonBlank(value, "value is blank");
+            PluginText.requireNonBlank(value, "value is blank");
 
             this.value = value;
         }

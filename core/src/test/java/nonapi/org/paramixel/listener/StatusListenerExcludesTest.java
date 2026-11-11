@@ -50,7 +50,7 @@ class StatusListenerExcludesTest {
     @DisplayName("prints normal output when excludes is empty")
     void normalOutputWhenNoExcludes() {
         var listener = new StatusListener();
-        var noop = Step.of("normal-action", context -> {});
+        var noop = Step.step("normal-action", context -> {});
         var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of()))
                 .listener(listener)
@@ -73,7 +73,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses onBeforeExecution and onAfterExecution when STATUS excluded")
     void suppressesStatusLinesWhenStatusExcluded() {
         var listener = new StatusListener();
-        var noop = Step.of("silent-action", context -> {});
+        var noop = Step.step("silent-action", context -> {});
         var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status")))
                 .listener(listener)
@@ -96,7 +96,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses status lines but prints exception when STATUS excluded")
     void suppressesStatusLinesButPrintsExceptionWhenStatusExcluded() {
         var listener = new StatusListener();
-        var action = Step.of("test-action", context -> {
+        var action = Step.step("test-action", context -> {
             throw new RuntimeException("test error");
         });
         var runner = Runner.builder()
@@ -124,7 +124,7 @@ class StatusListenerExcludesTest {
     @DisplayName("prints stack trace to stdout when STATUS_FOOTER excluded")
     void printsStackTraceToStdoutWhenStatusFooterExcluded() {
         var listener = new StatusListener();
-        var action = Step.of("error-action", context -> {
+        var action = Step.step("error-action", context -> {
             throw new RuntimeException("expected error");
         });
         var runner = Runner.builder()
@@ -150,8 +150,8 @@ class StatusListenerExcludesTest {
     @DisplayName("prints FailException message when STATUS_FOOTER excluded")
     void printsFailExceptionMessageWhenStatusFooterExcluded() {
         var listener = new StatusListener();
-        var action = Step.of("fail-action", context -> {
-            FailException.fail("custom failure");
+        var action = Step.step("fail-action", context -> {
+            throw FailException.fail("custom failure");
         });
         var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.footer")))
@@ -177,7 +177,7 @@ class StatusListenerExcludesTest {
     @DisplayName("quiet shorthand suppresses status lines")
     void quietShorthandSuppressesStatus() {
         var listener = new StatusListener();
-        var noop = Step.of("quiet-action", context -> {});
+        var noop = Step.step("quiet-action", context -> {});
         var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "quiet")))
                 .listener(listener)
@@ -200,7 +200,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses onBeforeExecution but keeps onAfterExecution when STATUS_HEADER excluded")
     void suppressesBeforeButNotAfterWhenStatusHeaderExcluded() {
         var listener = new StatusListener();
-        var noop = Step.of("header-split", context -> {});
+        var noop = Step.step("header-split", context -> {});
         var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.header")))
                 .listener(listener)
@@ -224,7 +224,7 @@ class StatusListenerExcludesTest {
     @DisplayName("suppresses onAfterExecution but keeps onBeforeExecution when STATUS_FOOTER excluded")
     void suppressesAfterButNotBeforeWhenStatusFooterExcluded() {
         var listener = new StatusListener();
-        var noop = Step.of("footer-split", context -> {});
+        var noop = Step.step("footer-split", context -> {});
         var runner = Runner.builder()
                 .configuration(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, "status.footer")))
                 .listener(listener)
@@ -257,8 +257,9 @@ class StatusListenerExcludesTest {
         }
 
         var listener = new StatusListener();
-        listener.initialize(new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, configValue.toString())));
-        var descriptor = new ConcreteDescriptor(Step.of("combo-action", v -> {}));
+        listener.onRunStarted(
+                new ConcreteConfiguration(Map.of(Configuration.LISTENER_EXCLUDE, configValue.toString())));
+        var descriptor = new ConcreteDescriptor(Step.step("combo-action", v -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
 

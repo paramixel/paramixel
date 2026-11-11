@@ -23,7 +23,7 @@ import org.paramixel.api.Status;
 /**
  * Incrementally computes an aggregate descriptor status.
  *
- * <p>Aggregation precedence matches {@link Status#aggregate(java.util.List)}:
+ * <p>Aggregation precedence matches {@link Statuses#aggregate(java.util.List)}:
  * FAILED &gt; ABORTED &gt; RUNNING/PENDING &gt; SKIPPED &gt; PASSED.
  *
  * <p>This class is not thread-safe.
@@ -50,19 +50,7 @@ public final class StatusAccumulator {
      * @param descriptor descriptor to include; must not be {@code null}
      */
     public void include(final Descriptor descriptor) {
-        var nonNullDescriptor = Objects.requireNonNull(descriptor, "descriptor is null");
-        if (nonNullDescriptor.isFailed()) {
-            hasFailed = true;
-        }
-        if (nonNullDescriptor.isAborted()) {
-            hasAborted = true;
-        }
-        if (!nonNullDescriptor.isCompleted()) {
-            hasNonTerminal = true;
-        }
-        if (nonNullDescriptor.isSkipped()) {
-            hasSkipped = true;
-        }
+        include(Objects.requireNonNull(descriptor, "descriptor is null").status());
     }
 
     /**
@@ -71,18 +59,14 @@ public final class StatusAccumulator {
      * @param status status to include; must not be {@code null}
      */
     public void include(final Status status) {
-        var current = Objects.requireNonNull(status, "status is null");
-        if (current.isFailed()) {
-            hasFailed = true;
-        }
-        if (current.isAborted()) {
-            hasAborted = true;
-        }
-        if (current.isPending() || current.isRunning()) {
-            hasNonTerminal = true;
-        }
-        if (current.isSkipped()) {
-            hasSkipped = true;
+        switch (Objects.requireNonNull(status, "status is null").kind()) {
+            case FAILED -> hasFailed = true;
+            case ABORTED -> hasAborted = true;
+            case PENDING, RUNNING -> hasNonTerminal = true;
+            case SKIPPED -> hasSkipped = true;
+            case PASSED -> {
+                // A passed child does not change the aggregate.
+            }
         }
     }
 

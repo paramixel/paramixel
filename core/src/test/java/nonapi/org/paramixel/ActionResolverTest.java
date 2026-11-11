@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.ActionResolverMultiTagFixture;
@@ -40,7 +41,8 @@ class ActionResolverTest {
     @Test
     @DisplayName("finds single factory")
     void findsSingleFactory() {
-        var selector = Selector.classOf(ActionResolverSmokeFixture.class);
+        var selector =
+                Selector.builder().classOf(ActionResolverSmokeFixture.class).build();
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
 
@@ -53,8 +55,12 @@ class ActionResolverTest {
     @Test
     @DisplayName("applies selector tag filter with AND semantics")
     void appliesTagFiltersWithAndSemantics() {
-        var selector =
-                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("smoke-fast"));
+        var selector = Selector.builder()
+                .classOf(ActionResolverMultiTagFixture.class)
+                .build()
+                .and(Selector.builder()
+                        .tagPattern(Pattern.compile("smoke-fast"))
+                        .build());
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -68,8 +74,10 @@ class ActionResolverTest {
     @Test
     @DisplayName("returns empty when tag filter does not match")
     void returnsEmptyWhenTagFiltersDoNotBothMatch() {
-        var selector =
-                Selector.and(Selector.classOf(ActionResolverMultiTagFixture.class), Selector.tagRegex("missing"));
+        var selector = Selector.builder()
+                .classOf(ActionResolverMultiTagFixture.class)
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("missing")).build());
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -80,7 +88,8 @@ class ActionResolverTest {
     @Test
     @DisplayName("child override without factory shadows parent factory")
     void childOverrideWithoutFactoryShadowsParentFactory() {
-        var selector = Selector.classOf(ChildOverridesWithoutFactory.class);
+        var selector =
+                Selector.builder().classOf(ChildOverridesWithoutFactory.class).build();
 
         var configuration = Configuration.defaultConfiguration();
         assertThat(new ActionResolver(configuration, selector).resolveRootAction())
@@ -90,7 +99,7 @@ class ActionResolverTest {
     @Test
     @DisplayName("throws when more than one factory exists in a hierarchy")
     void throwsWhenMoreThanOneFactoryExistsInHierarchy() {
-        var selector = Selector.classOf(ChildDeclaresOwnFactory.class);
+        var selector = Selector.builder().classOf(ChildDeclaresOwnFactory.class).build();
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
@@ -101,7 +110,7 @@ class ActionResolverTest {
     @Test
     @DisplayName("error from factory method is re-thrown directly, not wrapped")
     void errorFromFactoryMethodIsReThrownDirectlyNotWrapped() {
-        var selector = Selector.classOf(ErrorThrowingFactory.class);
+        var selector = Selector.builder().classOf(ErrorThrowingFactory.class).build();
         var configuration = Configuration.defaultConfiguration();
 
         assertThatThrownBy(() -> new ActionResolver(configuration, selector).resolveRootAction())
@@ -112,7 +121,7 @@ class ActionResolverTest {
     @Test
     @DisplayName("skips @Paramixel.Disabled factory")
     void skipsDisabledFactory() {
-        var selector = Selector.classOf(DisabledFactory.class);
+        var selector = Selector.builder().classOf(DisabledFactory.class).build();
         var configuration = Configuration.defaultConfiguration();
 
         assertThat(new ActionResolver(configuration, selector).resolveRootAction())
@@ -122,7 +131,8 @@ class ActionResolverTest {
     @Test
     @DisplayName("skips @Paramixel.Disabled with reason factory")
     void skipsDisabledWithReasonFactory() {
-        var selector = Selector.classOf(DisabledWithReasonFactory.class);
+        var selector =
+                Selector.builder().classOf(DisabledWithReasonFactory.class).build();
         var configuration = Configuration.defaultConfiguration();
 
         assertThat(new ActionResolver(configuration, selector).resolveRootAction())
@@ -132,7 +142,7 @@ class ActionResolverTest {
     @Test
     @DisplayName("null-returning factory is skipped")
     void nullReturningFactoryIsSkipped() {
-        var selector = Selector.classOf(NullReturningFactory.class);
+        var selector = Selector.builder().classOf(NullReturningFactory.class).build();
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
 
@@ -142,7 +152,7 @@ class ActionResolverTest {
     @Test
     @DisplayName("resolves Action-returning factory")
     void resolvesBuilderReturningFactory() {
-        var selector = Selector.classOf(BuilderReturningFactory.class);
+        var selector = Selector.builder().classOf(BuilderReturningFactory.class).build();
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
 
@@ -155,8 +165,10 @@ class ActionResolverTest {
     @Test
     @DisplayName("resolves actions using selector")
     void resolvesActionsUsingSelector() {
-        var selector =
-                Selector.and(Selector.classRegex(".*ActionResolverSmokeFixture.*"), Selector.tagRegex("^smoke$"));
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*ActionResolverSmokeFixture.*"))
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("^smoke$")).build());
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -168,8 +180,10 @@ class ActionResolverTest {
     @Test
     @DisplayName("returns empty when selector tag filter excludes all matches")
     void returnsEmptyWhenSelectorTagFilterExcludesAllMatches() {
-        var selector =
-                Selector.and(Selector.classRegex(".*ActionResolverSmokeFixture.*"), Selector.tagRegex("nomatch"));
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(".*ActionResolverSmokeFixture.*"))
+                .build()
+                .and(Selector.builder().tagPattern(Pattern.compile("nomatch")).build());
 
         var configuration = Configuration.defaultConfiguration();
         assertThat(new ActionResolver(configuration, selector).resolveRootAction())
@@ -179,8 +193,11 @@ class ActionResolverTest {
     @Test
     @DisplayName("continues after blank tag value during classpath discovery")
     void continuesAfterBlankTagValueDuringClasspathDiscovery() {
-        var selector = Selector.classRegex(
-                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*");
+        var selector = Selector.builder()
+                .classPattern(
+                        Pattern.compile(
+                                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*"))
+                .build();
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -197,8 +214,11 @@ class ActionResolverTest {
     @Test
     @DisplayName("discovery validation failure action fails when run")
     void discoveryValidationFailureActionFailsWhenRun() {
-        var selector = Selector.classRegex(
-                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*");
+        var selector = Selector.builder()
+                .classPattern(
+                        Pattern.compile(
+                                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*"))
+                .build();
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -208,14 +228,14 @@ class ActionResolverTest {
                 .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "1")))
                 .build();
         var rootResult = runner.run(result.orElseThrow()).descriptor().orElseThrow();
-        assertThat(rootResult.isFailed()).isTrue();
+        assertThat(rootResult.status().isFailed()).isTrue();
         assertThat(rootResult.children()).anySatisfy(child -> {
-            assertThat(child.isPassed()).isTrue();
+            assertThat(child.status().isPassed()).isTrue();
         });
         assertThat(rootResult.children()).anySatisfy(child -> {
-            assertThat(child.isFailed()).isTrue();
+            assertThat(child.status().isFailed()).isTrue();
             assertThat(child.action().displayName()).startsWith("Discovery validation failure:");
-            Throwable throwable = child.throwable().orElseThrow();
+            Throwable throwable = child.status().throwable().orElseThrow();
             assertThat(throwable).isInstanceOf(ResolverException.class);
             assertThat(throwable.getMessage()).contains("Invalid @Paramixel.Tag on");
             assertThat(throwable.getMessage()).contains("tag value is blank");
@@ -226,9 +246,11 @@ class ActionResolverTest {
     @Test
     @DisplayName("aggregates multiple blank tag values")
     void aggregatesMultipleBlankTagValues() {
-        var selector = Selector.classRegex(
-                ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*"
-                        + "|.*ActionResolverAnotherInvalidBlankTagDiscoveryFixture.*");
+        var selector = Selector.builder()
+                .classPattern(Pattern.compile(
+                        ".*ActionResolverValidTaggedDiscoveryFixture.*|.*ActionResolverInvalidBlankTagDiscoveryFixture.*"
+                                + "|.*ActionResolverAnotherInvalidBlankTagDiscoveryFixture.*"))
+                .build();
 
         var configuration = Configuration.defaultConfiguration();
         var result = new ActionResolver(configuration, selector).resolveRootAction();
@@ -246,27 +268,27 @@ class ActionResolverTest {
     static class ParentFactory {
         @Paramixel.Factory
         public static Action factory() {
-            return Step.of("parent-action", context -> {});
+            return Step.step("parent-action", context -> {});
         }
     }
 
     static class ChildOverridesWithoutFactory extends ParentFactory {
         public static Action factory() {
-            return Step.of("child-action", context -> {});
+            return Step.step("child-action", context -> {});
         }
     }
 
     static class ParentFactoryTwo {
         @Paramixel.Factory
         public static Action parentAction() {
-            return Step.of("parent-action", context -> {});
+            return Step.step("parent-action", context -> {});
         }
     }
 
     static class ChildDeclaresOwnFactory extends ParentFactoryTwo {
         @Paramixel.Factory
         public static Action childAction() {
-            return Step.of("child-action", context -> {});
+            return Step.step("child-action", context -> {});
         }
     }
 
@@ -274,7 +296,7 @@ class ActionResolverTest {
         @Paramixel.Factory
         @Paramixel.Tag(" ")
         public static Action factory() {
-            return Step.of("blank-tag-action", context -> {});
+            return Step.step("blank-tag-action", context -> {});
         }
     }
 
@@ -289,7 +311,7 @@ class ActionResolverTest {
         @Paramixel.Factory
         @Paramixel.Disabled
         public static Action factory() {
-            return Step.of("disabled-action", context -> {});
+            return Step.step("disabled-action", context -> {});
         }
     }
 
@@ -297,28 +319,28 @@ class ActionResolverTest {
         @Paramixel.Factory
         @Paramixel.Disabled("pending fix for BUG-123")
         public static Action factory() {
-            return Step.of("disabled-with-reason", context -> {});
+            return Step.step("disabled-with-reason", context -> {});
         }
     }
 
     static class NonPublicFactory {
         @Paramixel.Factory
         static Action factory() {
-            return Step.of("non-public", context -> {});
+            return Step.step("non-public", context -> {});
         }
     }
 
     static class NonStaticFactory {
         @Paramixel.Factory
         public Action factory() {
-            return Step.of("non-static", context -> {});
+            return Step.step("non-static", context -> {});
         }
     }
 
     static class ParameterizedFactory {
         @Paramixel.Factory
         public static Action factory(final String arg) {
-            return Step.of("parameterized", context -> {});
+            return Step.step("parameterized", context -> {});
         }
     }
 
@@ -346,7 +368,7 @@ class ActionResolverTest {
     static class BuilderReturningFactory {
         @Paramixel.Factory
         public static Action factory() {
-            return Scope.builder("scope").body(Step.of("step", context -> {})).build();
+            return Scope.scope("scope").body(Step.step("step", context -> {})).build();
         }
     }
 

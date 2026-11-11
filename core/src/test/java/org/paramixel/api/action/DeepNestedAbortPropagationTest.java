@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import nonapi.org.paramixel.TestPools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -62,7 +63,8 @@ class DeepNestedAbortPropagationTest {
 
     private static Runner runner(final int parallelism) {
         return Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism))))
+                .configuration(
+                        TestPools.configuration(Map.of(Configuration.RUNNER_PARALLELISM, String.valueOf(parallelism))))
                 .build();
     }
 
@@ -74,8 +76,8 @@ class DeepNestedAbortPropagationTest {
 
         // Build 5 levels of nested Sequential, each containing one child.
         // The innermost child is a blocking Step.
-        var innermost = Sequential.builder("level-5")
-                .child(Step.of("blocking-leaf", context -> {
+        var innermost = Sequential.sequential("level-5")
+                .child(Step.step("blocking-leaf", context -> {
                     blockingStarted.countDown();
                     try {
                         Thread.sleep(60_000);
@@ -86,12 +88,12 @@ class DeepNestedAbortPropagationTest {
                 }))
                 .build();
 
-        var level4 = Sequential.builder("level-4").child(innermost).build();
-        var level3 = Sequential.builder("level-3").child(level4).build();
-        var level2 = Sequential.builder("level-2").child(level3).build();
-        var level1 = Sequential.builder("level-1").child(level2).build();
+        var level4 = Sequential.sequential("level-4").child(innermost).build();
+        var level3 = Sequential.sequential("level-3").child(level4).build();
+        var level2 = Sequential.sequential("level-2").child(level3).build();
+        var level1 = Sequential.sequential("level-1").child(level2).build();
 
-        var timeout = Timeout.builder("outer-timeout")
+        var timeout = Timeout.timeout("outer-timeout")
                 .body(level1)
                 .timeout(Duration.ofMillis(500))
                 .build();
@@ -110,7 +112,7 @@ class DeepNestedAbortPropagationTest {
                 .isTrue();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
 
         // Verify all levels are terminal
         Descriptor current = root;
@@ -133,10 +135,10 @@ class DeepNestedAbortPropagationTest {
 
         // Build 5 levels of nested Parallel.
         // The innermost Parallel has blocking Step leaves.
-        var innermost = Parallel.builder("level-5").parallelism(PARALLELISM);
+        var innermost = Parallel.parallel("level-5", "t1");
         for (var i = 0; i < PARALLELISM; i++) {
             final var index = i;
-            innermost.child(Step.of("leaf-" + index, context -> {
+            innermost.child(Step.step("leaf-" + index, context -> {
                 leavesStarted.countDown();
                 try {
                     Thread.sleep(60_000);
@@ -147,15 +149,12 @@ class DeepNestedAbortPropagationTest {
             }));
         }
 
-        var level4 = Parallel.builder("level-4")
-                .parallelism(1)
-                .child(innermost.build())
-                .build();
-        var level3 = Parallel.builder("level-3").parallelism(1).child(level4).build();
-        var level2 = Parallel.builder("level-2").parallelism(1).child(level3).build();
-        var level1 = Parallel.builder("level-1").parallelism(1).child(level2).build();
+        var level4 = Parallel.parallel("level-4", "t2").child(innermost.build()).build();
+        var level3 = Parallel.parallel("level-3", "t3").child(level4).build();
+        var level2 = Parallel.parallel("level-2", "t4").child(level3).build();
+        var level1 = Parallel.parallel("level-1", "t5").child(level2).build();
 
-        var timeout = Timeout.builder("outer-timeout")
+        var timeout = Timeout.timeout("outer-timeout")
                 .body(level1)
                 .timeout(Duration.ofMillis(500))
                 .build();
@@ -174,7 +173,7 @@ class DeepNestedAbortPropagationTest {
                 .isTrue();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     @Test
@@ -185,10 +184,10 @@ class DeepNestedAbortPropagationTest {
 
         // Build a complex nested structure:
         // Sequential -> Parallel -> Sequential -> Parallel -> Step (blocking leaves)
-        var innerParallel = Parallel.builder("inner-parallel").parallelism(PARALLELISM);
+        var innerParallel = Parallel.parallel("inner-parallel", "t6");
         for (var i = 0; i < PARALLELISM; i++) {
             final var index = i;
-            innerParallel.child(Step.of("leaf-" + index, context -> {
+            innerParallel.child(Step.step("leaf-" + index, context -> {
                 leavesStarted.countDown();
                 try {
                     Thread.sleep(60_000);
@@ -199,19 +198,17 @@ class DeepNestedAbortPropagationTest {
             }));
         }
 
-        var innerSequential = Sequential.builder("inner-sequential")
+        var innerSequential = Sequential.sequential("inner-sequential")
                 .child(innerParallel.build())
                 .build();
 
-        var outerParallel = Parallel.builder("outer-parallel")
-                .parallelism(1)
-                .child(innerSequential)
-                .build();
+        var outerParallel =
+                Parallel.parallel("outer-parallel", "t7").child(innerSequential).build();
 
         var outerSequential =
-                Sequential.builder("outer-sequential").child(outerParallel).build();
+                Sequential.sequential("outer-sequential").child(outerParallel).build();
 
-        var timeout = Timeout.builder("outer-timeout")
+        var timeout = Timeout.timeout("outer-timeout")
                 .body(outerSequential)
                 .timeout(Duration.ofMillis(500))
                 .build();
@@ -230,7 +227,7 @@ class DeepNestedAbortPropagationTest {
                 .isTrue();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     @Test
@@ -242,8 +239,8 @@ class DeepNestedAbortPropagationTest {
         var thirdRan = new AtomicBoolean(false);
 
         // Sequential with 3 children. First blocks, second and third should be aborted.
-        var sequential = Sequential.builder("sequential").dependent();
-        sequential.child(Step.of("blocking", context -> {
+        var sequential = Sequential.sequential("sequential").dependent();
+        sequential.child(Step.step("blocking", context -> {
             blockingStarted.countDown();
             try {
                 Thread.sleep(60_000);
@@ -252,10 +249,10 @@ class DeepNestedAbortPropagationTest {
                 Thread.currentThread().interrupt();
             }
         }));
-        sequential.child(Step.of("second", context -> secondRan.set(true)));
-        sequential.child(Step.of("third", context -> thirdRan.set(true)));
+        sequential.child(Step.step("second", context -> secondRan.set(true)));
+        sequential.child(Step.step("third", context -> thirdRan.set(true)));
 
-        var timeout = Timeout.builder("outer-timeout")
+        var timeout = Timeout.timeout("outer-timeout")
                 .body(sequential.build())
                 .timeout(Duration.ofMillis(200))
                 .build();
@@ -276,7 +273,7 @@ class DeepNestedAbortPropagationTest {
         assertThat(thirdRan.get()).as("third child did not run").isFalse();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     @Test
@@ -288,10 +285,10 @@ class DeepNestedAbortPropagationTest {
 
         // Build a deeply nested Parallel structure that forces work-stealing
         // through managedJoin at multiple levels.
-        var innerParallel = Parallel.builder("inner-parallel").parallelism(PARALLELISM);
+        var innerParallel = Parallel.parallel("inner-parallel", "t8");
         for (var i = 0; i < PARALLELISM; i++) {
             final var index = i;
-            innerParallel.child(Step.of("leaf-" + index, context -> {
+            innerParallel.child(Step.step("leaf-" + index, context -> {
                 leavesStarted.countDown();
                 try {
                     Thread.sleep(60_000);
@@ -303,22 +300,20 @@ class DeepNestedAbortPropagationTest {
         }
 
         // Wrap in multiple levels to force nested managedJoin calls
-        var level4 = Parallel.builder("level-4")
-                .parallelism(1)
-                .child(innerParallel.build())
-                .build();
-        var level3 = Parallel.builder("level-3").parallelism(1).child(level4).build();
-        var level2 = Parallel.builder("level-2").parallelism(1).child(level3).build();
+        var level4 =
+                Parallel.parallel("level-4", "t9").child(innerParallel.build()).build();
+        var level3 = Parallel.parallel("level-3", "t10").child(level4).build();
+        var level2 = Parallel.parallel("level-2", "t11").child(level3).build();
 
-        var timeout = Timeout.builder("outer-timeout")
+        var timeout = Timeout.timeout("outer-timeout")
                 .body(level2)
                 .timeout(Duration.ofMillis(500))
                 .build();
 
         // Permit tester to verify permits are reclaimed after abort
-        var permitTester = Step.of("permit-ok", context -> permitTesterRan.set(true));
+        var permitTester = Step.step("permit-ok", context -> permitTesterRan.set(true));
 
-        var sequence = Sequential.builder("final-sequence")
+        var sequence = Sequential.sequential("final-sequence")
                 .independent()
                 .child(timeout)
                 .child(permitTester)
@@ -341,7 +336,7 @@ class DeepNestedAbortPropagationTest {
                 .isTrue();
 
         var root = result.descriptor().orElseThrow();
-        assertThat(root.isFailed()).isTrue();
+        assertThat(root.status().isFailed()).isTrue();
     }
 
     @Test
@@ -355,8 +350,8 @@ class DeepNestedAbortPropagationTest {
             var leavesInterrupted = new CountDownLatch(1);
 
             // Build N levels of nested Sequential
-            var innermost = (Object) Sequential.builder("level-" + depth)
-                    .child(Step.of("blocking-leaf-" + depth, context -> {
+            var innermost = (Object) Sequential.sequential("level-" + depth)
+                    .child(Step.step("blocking-leaf-" + depth, context -> {
                         leavesStarted.countDown();
                         try {
                             Thread.sleep(60_000);
@@ -368,12 +363,12 @@ class DeepNestedAbortPropagationTest {
                     .build();
 
             for (var i = 0; i < depth - 1; i++) {
-                innermost = Sequential.builder("level-" + (depth - i - 1))
+                innermost = Sequential.sequential("level-" + (depth - i - 1))
                         .child((org.paramixel.api.action.Action) innermost)
                         .build();
             }
 
-            var timeout = Timeout.builder("timeout-depth-" + depth)
+            var timeout = Timeout.timeout("timeout-depth-" + depth)
                     .body((org.paramixel.api.action.Action) innermost)
                     .timeout(Duration.ofMillis(timeoutMs))
                     .build();
@@ -401,7 +396,9 @@ class DeepNestedAbortPropagationTest {
                     .isLessThan(boundedTime);
 
             var root = result.descriptor().orElseThrow();
-            assertThat(root.isFailed()).as("depth %d: root is failed", depth).isTrue();
+            assertThat(root.status().isFailed())
+                    .as("depth %d: root is failed", depth)
+                    .isTrue();
         }
     }
 
@@ -423,8 +420,8 @@ class DeepNestedAbortPropagationTest {
         var secondRan = new AtomicInteger(0);
 
         // Build deeply nested structure with uncooperative leaf
-        var innermost = Sequential.builder("level-5")
-                .child(Step.of("cpu-bound-loop", context -> {
+        var innermost = Sequential.sequential("level-5")
+                .child(Step.step("cpu-bound-loop", context -> {
                     // Ignores interruption entirely — the JVM cannot safely stop this.
                     while (true) {
                         // busy spin
@@ -432,19 +429,19 @@ class DeepNestedAbortPropagationTest {
                 }))
                 .build();
 
-        var level4 = Sequential.builder("level-4").child(innermost).build();
-        var level3 = Sequential.builder("level-3").child(level4).build();
-        var level2 = Sequential.builder("level-2").child(level3).build();
-        var level1 = Sequential.builder("level-1").child(level2).build();
+        var level4 = Sequential.sequential("level-4").child(innermost).build();
+        var level3 = Sequential.sequential("level-3").child(level4).build();
+        var level2 = Sequential.sequential("level-2").child(level3).build();
+        var level1 = Sequential.sequential("level-1").child(level2).build();
 
-        var timeout = Timeout.builder("outer-timeout")
+        var timeout = Timeout.timeout("outer-timeout")
                 .body(level1)
                 .timeout(Duration.ofMillis(100))
                 .build();
 
-        var permitTester = Step.of("needs-permit", context -> secondRan.incrementAndGet());
+        var permitTester = Step.step("needs-permit", context -> secondRan.incrementAndGet());
 
-        var sequence = Sequential.builder("ceiling-test")
+        var sequence = Sequential.sequential("ceiling-test")
                 .independent()
                 .child(timeout)
                 .child(permitTester)

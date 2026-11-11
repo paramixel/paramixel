@@ -16,6 +16,7 @@
 
 package org.paramixel.api;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -24,14 +25,17 @@ import org.paramixel.api.action.Action;
 /**
  * Describes one bound occurrence of an action in a run descriptor tree.
  *
- * <p>Descriptors are read-only through this public interface. The framework creates and
- * mutates concrete descriptors during discovery and execution. Reusing the same {@link Action}
- * instance in multiple locations creates distinct descriptors with independent execution state.
+ * <p>Descriptors are read-only through this public interface, and are not for implementation by
+ * users: the framework creates and mutates concrete descriptors during discovery and execution.
+ * Reusing the same {@link Action} instance in multiple locations creates distinct descriptors with
+ * independent execution state.
  *
  * <p>Structurally mirrors {@link Action}: {@link #before()} and {@link #after()} are
  * separate structural slots, not included in {@link #children()}. The descriptor provides
  * access to the bound {@link #action()}, tree navigation ({@link #parent()}, {@link #before()},
  * {@link #children()}, {@link #after()}), and live execution-occurrence state.
+ *
+ * <p>The current outcome, including its message and throwable, is {@link #status()}.
  */
 public interface Descriptor {
 
@@ -57,32 +61,36 @@ public interface Descriptor {
     Action action();
 
     /**
-     * Returns whether this descriptor execution completed successfully.
+     * Returns the display name of the bound action.
      *
-     * @return {@code true} when this descriptor passed
+     * <p>Shorthand for {@code action().displayName()}.
+     *
+     * @return the display name; never {@code null}
      */
-    boolean isPassed();
+    default String displayName() {
+        return action().displayName();
+    }
 
     /**
-     * Returns whether this descriptor execution completed with a failure.
+     * Returns the human-readable path from the run root to this descriptor.
      *
-     * @return {@code true} when this descriptor failed
+     * <p>Components are the display names of the descriptor and its ancestors, excluding the run
+     * root, joined with {@code " / "}. Listener and report authors use this instead of rebuilding
+     * the path themselves.
+     *
+     * @return the display-name path; empty for the run root
      */
-    boolean isFailed();
+    String path();
 
     /**
-     * Returns whether this descriptor execution was skipped.
+     * Returns this descriptor's current status.
      *
-     * @return {@code true} when this descriptor was skipped
-     */
-    boolean isSkipped();
-
-    /**
-     * Returns whether this descriptor execution was aborted.
+     * <p>The status carries the outcome kind, message and throwable; compare it with
+     * {@link Status#kind()}.
      *
-     * @return {@code true} when this descriptor was aborted
+     * @return the status; never {@code null}
      */
-    boolean isAborted();
+    Status status();
 
     /**
      * Returns the instant when this descriptor started running.
@@ -99,32 +107,34 @@ public interface Descriptor {
     Optional<Instant> completedAt();
 
     /**
-     * Returns the optional outcome message associated with this descriptor's current status.
+     * Returns how long this descriptor executed.
      *
-     * @return the current status message, or empty when the current status has no message
+     * @return the duration between {@link #startedAt()} and {@link #completedAt()}, or empty when this
+     *     descriptor has not both started and completed
      */
-    Optional<String> message();
-
-    /**
-     * Returns the optional throwable associated with this descriptor's current status.
-     *
-     * @return the current status throwable, or empty when the current status has no throwable
-     */
-    Optional<Throwable> throwable();
+    default Optional<Duration> duration() {
+        var start = startedAt();
+        var end = completedAt();
+        if (start.isEmpty() || end.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(Duration.between(start.orElseThrow(), end.orElseThrow()));
+    }
 
     /**
      * Returns whether this descriptor has reached a terminal outcome.
      *
      * @return {@code true} when the descriptor outcome is terminal
      */
-    boolean isCompleted();
+    default boolean isCompleted() {
+        return status().kind().isTerminal();
+    }
 
     /**
      * Returns the before-child descriptor, if this descriptor's action declares one.
      *
      * <p>The before-child is a separate structural slot and is not included in
-     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Scope},
-     * {@link org.paramixel.api.action.Static}, and {@link org.paramixel.api.action.Instance}
+     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Scope}
      * override this method to return their before-child. Terminal and decorator descriptors
      * inherit the default, which returns an empty optional.
      *
@@ -148,8 +158,7 @@ public interface Descriptor {
      * Returns the after-child descriptor, if this descriptor's action declares one.
      *
      * <p>The after-child is a separate structural slot and is not included in
-     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Scope},
-     * {@link org.paramixel.api.action.Static}, and {@link org.paramixel.api.action.Instance}
+     * {@link #children()}. Composite actions such as {@link org.paramixel.api.action.Scope}
      * override this method to return their after-child. Terminal and decorator descriptors
      * inherit the default, which returns an empty optional.
      *

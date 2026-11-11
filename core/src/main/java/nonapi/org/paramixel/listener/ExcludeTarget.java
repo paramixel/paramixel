@@ -35,7 +35,7 @@ public enum ExcludeTarget {
     STATUS_FOOTER,
 
     /**
-     * Exclude the starting header from {@link SummaryListener#onRunStarted()}.
+     * Exclude the starting header from {@link SummaryListener#onRunStarted(org.paramixel.api.Configuration)}.
      */
     SUMMARY_HEADER,
 

@@ -28,7 +28,7 @@ public final class ActionResolverOrderingBetaFixture {
 
     @Paramixel.Factory
     public static Action factory() {
-        return Step.of("beta", context -> {
+        return Step.step("beta", context -> {
             throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
         });
     }

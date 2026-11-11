@@ -39,16 +39,18 @@ import org.paramixel.api.action.Step;
 @DisplayName("SummaryListener excludes")
 class SummaryListenerExcludesTest {
 
+    private static final Configuration CONFIGURATION = Configuration.of(Map.of());
+
     private static SummaryListener createListener(String excludeValue) {
         var listener = new SummaryListener();
         var configuration = new ConcreteConfiguration(
                 excludeValue != null ? Map.of(Configuration.LISTENER_EXCLUDE, excludeValue) : Map.of());
-        listener.initialize(configuration);
+        listener.onRunStarted(configuration);
         return listener;
     }
 
     private static ConcreteDescriptor createPassedDescriptor(String name) {
-        var descriptor = new ConcreteDescriptor(Step.of(name, v -> {}));
+        var descriptor = new ConcreteDescriptor(Step.step(name, v -> {}));
         descriptor.setStatus(Status.RUNNING);
         descriptor.setStatus(Status.PASSED);
         return descriptor;
@@ -84,7 +86,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 
@@ -102,7 +104,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 
@@ -119,7 +121,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 
@@ -137,7 +139,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 
@@ -155,7 +157,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 
@@ -173,7 +175,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 
@@ -191,7 +193,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 
@@ -229,7 +231,7 @@ class SummaryListenerExcludesTest {
         var result = createResult(root);
 
         var output = captureStdout(() -> {
-            listener.onRunStarted();
+            listener.onRunStarted(Configuration.of(Map.of()));
             listener.onRunCompleted(result);
         });
 

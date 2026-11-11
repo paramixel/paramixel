@@ -27,8 +27,8 @@ public final class ActionResolverValidTaggedDiscoveryFixture {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Action factory() {
-        return Instance.builder("valid-tagged-discovery", Object::new)
-                .body(Step.of("test", context -> {}))
+        return Instance.of("valid-tagged-discovery", Object.class, Object::new)
+                .body(Step.step("test", context -> {}))
                 .build();
     }
 }

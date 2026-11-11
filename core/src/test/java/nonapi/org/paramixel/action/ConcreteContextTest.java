@@ -20,34 +20,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Optional;
-import nonapi.org.paramixel.InstanceHolder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Context;
+import org.paramixel.api.Descriptor;
 import org.paramixel.api.Listener;
 import org.paramixel.api.action.Step;
 
 @DisplayName("ConcreteContext")
 class ConcreteContextTest {
 
-    private InstanceHolder instanceHolder;
+    private ScopeFrame frame;
     private MutableDescriptor root;
     private Configuration configuration;
     private Listener listener;
 
     @BeforeEach
     void setUp() {
-        instanceHolder = new InstanceHolder();
-        root = new ConcreteDescriptor(Step.of("root", context -> {}));
+        frame = ScopeFrame.root();
+        root = new ConcreteDescriptor(Step.step("root", context -> {}));
         configuration = Configuration.defaultConfiguration();
-        listener = Listener.defaultListener();
+        listener = Listener.defaultListener(configuration);
     }
 
     private ConcreteContext context() {
-        return new ConcreteContext(configuration, listener, root, instanceHolder);
+        return new ConcreteContext(configuration, listener, root, frame);
     }
 
     @Nested
@@ -57,18 +57,18 @@ class ConcreteContextTest {
         @Test
         @DisplayName("rejects null arguments")
         void rejectsNullArguments() {
-            assertThatThrownBy(() -> new ConcreteContext(null, listener, root, instanceHolder))
+            assertThatThrownBy(() -> new ConcreteContext(null, listener, root, frame))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("configuration is null");
-            assertThatThrownBy(() -> new ConcreteContext(configuration, null, root, instanceHolder))
+            assertThatThrownBy(() -> new ConcreteContext(configuration, null, root, frame))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("listener is null");
-            assertThatThrownBy(() -> new ConcreteContext(configuration, listener, null, instanceHolder))
+            assertThatThrownBy(() -> new ConcreteContext(configuration, listener, null, frame))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("descriptor is null");
             assertThatThrownBy(() -> new ConcreteContext(configuration, listener, root, null))
                     .isInstanceOf(NullPointerException.class)
-                    .hasMessage("instanceHolder is null");
+                    .hasMessage("frame is null");
         }
     }
 
@@ -83,27 +83,27 @@ class ConcreteContextTest {
     }
 
     @Test
-    @DisplayName("instance lookup reads the scoped holder")
-    void instanceLookupReadsHolder() {
+    @DisplayName("instance lookup reads the scope frame")
+    void instanceLookupReadsFrame() {
         var context = context();
         assertThat(context.instance(String.class)).isEmpty();
 
-        instanceHolder.set("value");
+        frame.bind(String.class, "value");
 
         assertThat(context.instance(String.class)).contains("value");
         assertThat(context.instance(Integer.class)).isEmpty();
     }
 
     @Test
-    @DisplayName("withInstanceHolder keeps the descriptor and swaps the holder")
-    void withInstanceHolderSwapsHolder() {
-        var replacement = new InstanceHolder();
-        replacement.set("replacement");
+    @DisplayName("withFrame keeps the descriptor and swaps the frame")
+    void withFrameSwapsFrame() {
+        var replacement = ScopeFrame.root();
+        replacement.bind(String.class, "replacement");
 
-        var scoped = context().withInstanceHolder(replacement);
+        var scoped = context().withFrame(replacement);
 
         assertThat(scoped.descriptor()).isSameAs(root);
-        assertThat(scoped.instanceHolder()).isSameAs(replacement);
+        assertThat(scoped.frame()).isSameAs(replacement);
         assertThat(scoped.instance(String.class)).contains("replacement");
     }
 
@@ -117,6 +117,11 @@ class ConcreteContextTest {
             @Override
             public Configuration configuration() {
                 return configuration;
+            }
+
+            @Override
+            public Descriptor descriptor() {
+                throw new UnsupportedOperationException("not used");
             }
 
             @Override

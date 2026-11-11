@@ -26,7 +26,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.MockDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,13 +39,15 @@ import org.paramixel.api.exception.ConfigurationException;
 @DisplayName("HtmlReportListener")
 class HtmlReportListenerTest {
 
+    private static final Configuration CONFIGURATION = Configuration.of(Map.of());
+
     @TempDir
     Path tempDir;
 
     private HtmlReportListener createListener(String reportFilePath) {
         var listener = new HtmlReportListener();
         var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
-        listener.initialize(configuration);
+        listener.onRunStarted(configuration);
         return listener;
     }
 
@@ -54,7 +56,7 @@ class HtmlReportListenerTest {
     void onRunCompletedThrowsConfigurationExceptionWhenNotInitialized() {
         var listener = new HtmlReportListener();
         // No report file configured: initialize fails and the listener stays uninitialized.
-        assertThatThrownBy(() -> listener.initialize(new ConcreteConfiguration(Map.of())))
+        assertThatThrownBy(() -> listener.onRunStarted(new ConcreteConfiguration(Map.of())))
                 .isInstanceOf(ConfigurationException.class);
 
         var result = new ConcreteResult(Configuration.defaultConfiguration());
@@ -86,7 +88,7 @@ class HtmlReportListenerTest {
     void writesRootDescriptor() throws Exception {
         var reportFile = tempDir.resolve("report.html");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("root-action", v -> {}));
+        var root = new MockDescriptor(Step.step("root-action", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -107,17 +109,17 @@ class HtmlReportListenerTest {
     void writesDescriptorTreeWithChildren() throws Exception {
         var reportFile = tempDir.resolve("report.html");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("parent", v -> {}));
+        var root = new MockDescriptor(Step.step("parent", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        var child1 = new ConcreteDescriptor(Step.of("child-a", v -> {}));
+        var child1 = new MockDescriptor(Step.step("child-a", v -> {}));
         child1.setStatus(Status.RUNNING);
         child1.setStatus(Status.PASSED);
-        var child2 = new ConcreteDescriptor(Step.of("child-b", v -> {}));
+        var child2 = new MockDescriptor(Step.step("child-b", v -> {}));
         child2.setStatus(Status.RUNNING);
         child2.setStatus(Status.ABORTED);
-        root.addChild(child1);
-        root.addChild(child2);
+        root.child(child1);
+        root.child(child2);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
@@ -136,17 +138,17 @@ class HtmlReportListenerTest {
     void rendersHierarchicalIndentationConsistently() throws Exception {
         var reportFile = tempDir.resolve("report.html");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+        var root = new MockDescriptor(Step.step("root", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
-        var child = new ConcreteDescriptor(Step.of("child", v -> {}));
+        var child = new MockDescriptor(Step.step("child", v -> {}));
         child.setStatus(Status.RUNNING);
         child.setStatus(Status.PASSED);
-        var grandchild = new ConcreteDescriptor(Step.of("grandchild", v -> {}));
+        var grandchild = new MockDescriptor(Step.step("grandchild", v -> {}));
         grandchild.setStatus(Status.RUNNING);
         grandchild.setStatus(Status.FAILED);
-        child.addChild(grandchild);
-        root.addChild(child);
+        child.child(grandchild);
+        root.child(child);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
         listener.onRunCompleted(result);
@@ -164,7 +166,7 @@ class HtmlReportListenerTest {
     void escapesHtmlSpecialCharacters() throws Exception {
         var reportFile = tempDir.resolve("report.html");
         var listener = createListener(reportFile.toString());
-        var root = new ConcreteDescriptor(Step.of("a&b<c>d", v -> {}));
+        var root = new MockDescriptor(Step.step("a&b<c>d", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
@@ -201,7 +203,7 @@ class HtmlReportListenerTest {
                 .hasMessageContaining("html report file");
     }
 
-    private String render(ConcreteDescriptor root) throws Exception {
+    private String render(MockDescriptor root) throws Exception {
         var reportFile = tempDir.resolve("report.html");
         var listener = createListener(reportFile.toString());
         root.setStatus(Status.RUNNING);
@@ -218,16 +220,16 @@ class HtmlReportListenerTest {
         @Test
         @DisplayName("renders skipped, running, and pending row classes")
         void rendersSkippedRunningAndPendingRowClasses() throws Exception {
-            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
-            var skipped = new ConcreteDescriptor(Step.of("skipped", v -> {}));
+            var root = new MockDescriptor(Step.step("root", v -> {}));
+            var skipped = new MockDescriptor(Step.step("skipped", v -> {}));
             skipped.setStatus(Status.RUNNING);
             skipped.setStatus(Status.SKIPPED);
-            var running = new ConcreteDescriptor(Step.of("running", v -> {}));
+            var running = new MockDescriptor(Step.step("running", v -> {}));
             running.setStatus(Status.RUNNING);
-            var pending = new ConcreteDescriptor(Step.of("pending", v -> {}));
-            root.addChild(skipped);
-            root.addChild(running);
-            root.addChild(pending);
+            var pending = new MockDescriptor(Step.step("pending", v -> {}));
+            root.child(skipped);
+            root.child(running);
+            root.child(pending);
 
             var content = render(root);
 
@@ -248,10 +250,10 @@ class HtmlReportListenerTest {
         @Test
         @DisplayName("writes before and after slots as nested rows")
         void writesBeforeAndAfterSlots() throws Exception {
-            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
-            root.setBefore(new ConcreteDescriptor(Step.of("before", v -> {})));
-            root.addChild(new ConcreteDescriptor(Step.of("child", v -> {})));
-            root.setAfter(new ConcreteDescriptor(Step.of("after", v -> {})));
+            var root = new MockDescriptor(Step.step("root", v -> {}));
+            root.before(new MockDescriptor(Step.step("before", v -> {})));
+            root.child(new MockDescriptor(Step.step("child", v -> {})));
+            root.after(new MockDescriptor(Step.step("after", v -> {})));
 
             var content = render(root);
 
@@ -270,7 +272,7 @@ class HtmlReportListenerTest {
         @Test
         @DisplayName("detects less-than as first escaped character")
         void detectsLessThanAsFirstEscapedCharacter() throws Exception {
-            var root = new ConcreteDescriptor(Step.of("<less", v -> {}));
+            var root = new MockDescriptor(Step.step("<less", v -> {}));
 
             var content = render(root);
 
@@ -281,7 +283,7 @@ class HtmlReportListenerTest {
         @Test
         @DisplayName("detects greater-than as first escaped character")
         void detectsGreaterThanAsFirstEscapedCharacter() throws Exception {
-            var root = new ConcreteDescriptor(Step.of(">greater", v -> {}));
+            var root = new MockDescriptor(Step.step(">greater", v -> {}));
 
             var content = render(root);
 

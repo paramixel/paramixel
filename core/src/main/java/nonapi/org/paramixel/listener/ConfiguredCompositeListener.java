@@ -22,7 +22,10 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 
 /**
- * Composite listener that initializes delegates with the configuration captured at construction time.
+ * Composite listener that starts its delegates with the configuration captured at construction time.
+ *
+ * <p>The standard chain is built for one configuration, so it always configures its delegates with that
+ * configuration even if the runner that uses it is constructed with a different one.
  */
 public final class ConfiguredCompositeListener extends CompositeListener {
 
@@ -42,7 +45,7 @@ public final class ConfiguredCompositeListener extends CompositeListener {
     }
 
     @Override
-    public void initialize(final Configuration ignored) {
-        super.initialize(configuration);
+    public void onRunStarted(final Configuration ignored) {
+        super.onRunStarted(configuration);
     }
 }

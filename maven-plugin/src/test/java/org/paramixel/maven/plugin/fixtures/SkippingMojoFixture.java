@@ -37,8 +37,8 @@ public final class SkippingMojoFixture {
      */
     @Paramixel.Factory
     public static Action action() {
-        return Instance.builder("mojo-skip", Object::new)
-                .body(Step.of("skip", context -> {
+        return Instance.of("mojo-skip", Object.class, Object::new)
+                .body(Step.step("skip", context -> {
                     throw new SkipException("skip requested");
                 }))
                 .build();

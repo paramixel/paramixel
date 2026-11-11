@@ -19,10 +19,8 @@ package org.paramixel.api.action;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import nonapi.org.paramixel.TestPools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -37,11 +35,11 @@ class ParallelDeadlockPreventionTest {
         int childCount = 2_000;
         var executionCount = new AtomicInteger(0);
 
-        var parallel = Parallel.builder("many-children").parallelism(50);
+        var parallel = Parallel.parallel("many-children", "p50x0");
 
         for (int i = 0; i < childCount; i++) {
             int index = i;
-            parallel.child(Step.of("child-" + index, context -> {
+            parallel.child(Step.step("child-" + index, context -> {
                 executionCount.incrementAndGet();
                 try {
                     Thread.sleep(1);
@@ -51,9 +49,12 @@ class ParallelDeadlockPreventionTest {
             }));
         }
 
-        var result = Runner.defaultRunner().run(parallel.build());
+        var result = Runner.builder().build().run(parallel.build());
 
-        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
+        assertThat(result.status().isPassed()
+                        || result.status().isFailed()
+                        || result.status().isSkipped()
+                        || result.status().isAborted())
                 .isTrue();
         assertThat(executionCount.get()).isEqualTo(childCount);
     }
@@ -67,15 +68,15 @@ class ParallelDeadlockPreventionTest {
         int outerChildren = 50;
         int innerChildren = 50;
 
-        var outer = Parallel.builder("nested-parallel").parallelism(outerParallelism);
+        var outer = Parallel.parallel("nested-parallel", "pouterparallelism");
 
         for (int i = 0; i < outerChildren; i++) {
             int outerIndex = i;
-            var inner = Parallel.builder("outer-" + outerIndex).parallelism(innerParallelism);
+            var inner = Parallel.parallel("outer-" + outerIndex, "pinnerparallelism");
 
             for (int j = 0; j < innerChildren; j++) {
                 int innerIndex = j;
-                inner.child(Step.of("inner-" + innerIndex, context -> {
+                inner.child(Step.step("inner-" + innerIndex, context -> {
                     executionCount.incrementAndGet();
                     try {
                         Thread.sleep(1);
@@ -88,9 +89,12 @@ class ParallelDeadlockPreventionTest {
             outer.child(inner.build());
         }
 
-        var result = Runner.defaultRunner().run(outer.build());
+        var result = Runner.builder().build().run(outer.build());
 
-        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
+        assertThat(result.status().isPassed()
+                        || result.status().isFailed()
+                        || result.status().isSkipped()
+                        || result.status().isAborted())
                 .isTrue();
         assertThat(executionCount.get()).isEqualTo(outerChildren * innerChildren);
     }
@@ -101,11 +105,11 @@ class ParallelDeadlockPreventionTest {
         int childCount = 500;
         var executionCount = new AtomicInteger(0);
 
-        var parallel = Parallel.builder("constrained-scheduler").parallelism(20);
+        var parallel = Parallel.parallel("constrained-scheduler", "p20x1");
 
         for (int i = 0; i < childCount; i++) {
             int index = i;
-            parallel.child(Step.of("child-" + index, context -> {
+            parallel.child(Step.step("child-" + index, context -> {
                 executionCount.incrementAndGet();
                 try {
                     Thread.sleep(1);
@@ -116,61 +120,14 @@ class ParallelDeadlockPreventionTest {
         }
 
         var result = Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "10")))
+                .configuration(TestPools.configuration(Map.of(Configuration.RUNNER_PARALLELISM, "10")))
                 .build()
                 .run(parallel.build());
 
-        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
-                .isTrue();
-        assertThat(executionCount.get()).isEqualTo(childCount);
-    }
-
-    @Test
-    @DisplayName("Parallel fully utilizes global parallelism")
-    void parallelFullyUtilizesGlobalParallelism() throws Exception {
-        int childCount = 50;
-        var executionCount = new AtomicInteger(0);
-        var active = new AtomicInteger(0);
-        var maxActive = new AtomicInteger(0);
-        var allStarted = new CountDownLatch(8);
-        var mayProceed = new CountDownLatch(1);
-
-        var parallel = Parallel.builder("parallelism-test").parallelism(50);
-
-        for (int i = 0; i < childCount; i++) {
-            int index = i;
-            parallel.child(Step.of("child-" + index, context -> {
-                executionCount.incrementAndGet();
-                int current = active.incrementAndGet();
-                maxActive.accumulateAndGet(current, Math::max);
-                allStarted.countDown();
-                try {
-                    mayProceed.await();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                try {
-                    Thread.sleep(5);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } finally {
-                    active.decrementAndGet();
-                }
-            }));
-        }
-
-        var runnerFuture = CompletableFuture.supplyAsync(() -> Runner.builder()
-                .configuration(Configuration.of(Map.of(Configuration.RUNNER_PARALLELISM, "8")))
-                .build()
-                .run(parallel.build()));
-
-        assertThat(allStarted.await(10, TimeUnit.SECONDS)).isTrue();
-        assertThat(maxActive.get()).isEqualTo(8);
-        mayProceed.countDown();
-
-        var result = runnerFuture.get(10, TimeUnit.SECONDS);
-
-        assertThat(result.isPassed() || result.isFailed() || result.isSkipped() || result.isAborted())
+        assertThat(result.status().isPassed()
+                        || result.status().isFailed()
+                        || result.status().isSkipped()
+                        || result.status().isAborted())
                 .isTrue();
         assertThat(executionCount.get()).isEqualTo(childCount);
     }

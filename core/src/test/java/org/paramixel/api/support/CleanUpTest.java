@@ -46,7 +46,7 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isEmpty()).isTrue();
+        assertThat(cleanup.throwable()).isEmpty();
     }
 
     @Test
@@ -59,8 +59,8 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isNotEmpty()).isTrue();
-        assertThat(cleanup.throwable()).isSameAs(exception);
+        assertThat(cleanup.throwable()).isPresent();
+        assertThat(cleanup.throwable()).containsSame(exception);
     }
 
     @Test
@@ -75,8 +75,8 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isNotEmpty()).isTrue();
-        assertThat(cleanup.throwable()).isSameAs(exception);
+        assertThat(cleanup.throwable()).isPresent();
+        assertThat(cleanup.throwable()).containsSame(exception);
     }
 
     @Test
@@ -112,8 +112,8 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isNotEmpty()).isTrue();
-        assertThat(cleanup.throwable()).isInstanceOf(StackOverflowError.class);
+        assertThat(cleanup.throwable()).isPresent();
+        assertThat(cleanup.throwable()).hasValueSatisfying(t -> assertThat(t).isInstanceOf(StackOverflowError.class));
     }
 
     @Test
@@ -125,8 +125,8 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isNotEmpty()).isTrue();
-        assertThat(cleanup.throwable()).isInstanceOf(AssertionError.class);
+        assertThat(cleanup.throwable()).isPresent();
+        assertThat(cleanup.throwable()).hasValueSatisfying(t -> assertThat(t).isInstanceOf(AssertionError.class));
     }
 
     @Test
@@ -156,7 +156,7 @@ class CleanUpTest {
         cleanup.run();
 
         assertThat(executionOrder).containsExactly("closed");
-        assertThat(cleanup.isEmpty()).isTrue();
+        assertThat(cleanup.throwable()).isEmpty();
     }
 
     @Test
@@ -172,8 +172,8 @@ class CleanUpTest {
         var cleanup = CleanUp.of(new ThrowingCloseable());
         cleanup.run();
 
-        assertThat(cleanup.isNotEmpty()).isTrue();
-        assertThat(cleanup.throwable()).hasMessage("close failed");
+        assertThat(cleanup.throwable()).isPresent();
+        assertThat(cleanup.throwable()).hasValueSatisfying(t -> assertThat(t).hasMessage("close failed"));
     }
 
     @Test
@@ -224,7 +224,7 @@ class CleanUpTest {
     void getThrowableReturnsNullBeforeRun() {
         var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
-        assertThat(cleanup.throwable()).isNull();
+        assertThat(cleanup.throwable()).isEmpty();
     }
 
     @Test
@@ -234,7 +234,7 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.throwable()).isNull();
+        assertThat(cleanup.throwable()).isEmpty();
     }
 
     @Test
@@ -247,7 +247,7 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.throwable()).isSameAs(exception);
+        assertThat(cleanup.throwable()).containsSame(exception);
     }
 
     @Test
@@ -255,7 +255,7 @@ class CleanUpTest {
     void isEmptyReturnsTrueBeforeRun() {
         var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
 
-        assertThat(cleanup.isEmpty()).isTrue();
+        assertThat(cleanup.throwable()).isEmpty();
     }
 
     @Test
@@ -265,7 +265,7 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isEmpty()).isTrue();
+        assertThat(cleanup.throwable()).isEmpty();
     }
 
     @Test
@@ -277,25 +277,7 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isEmpty()).isFalse();
-    }
-
-    @Test
-    @DisplayName("isNotEmpty returns false before run")
-    void isNotEmptyReturnsFalseBeforeRun() {
-        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
-
-        assertThat(cleanup.isNotEmpty()).isFalse();
-    }
-
-    @Test
-    @DisplayName("isNotEmpty returns false after successful run")
-    void isNotEmptyReturnsFalseAfterSuccessfulRun() {
-        var cleanup = CleanUp.of((ThrowingRunnable) () -> {});
-
-        cleanup.run();
-
-        assertThat(cleanup.isNotEmpty()).isFalse();
+        assertThat(cleanup.throwable()).isPresent();
     }
 
     @Test
@@ -307,7 +289,7 @@ class CleanUpTest {
 
         cleanup.run();
 
-        assertThat(cleanup.isNotEmpty()).isTrue();
+        assertThat(cleanup.throwable()).isPresent();
     }
 
     @Test

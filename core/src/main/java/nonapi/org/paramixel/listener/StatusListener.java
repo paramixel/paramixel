@@ -45,7 +45,7 @@ public class StatusListener implements Listener {
     public StatusListener() {}
 
     @Override
-    public void initialize(final Configuration configuration) {
+    public void onRunStarted(final Configuration configuration) {
         var value = configuration.getString(Configuration.ANSI).orElse(null);
         if (value == null || value.isBlank()) {
             this.ansiEnabled = AnsiDetector.isAnsiAvailable();
@@ -96,7 +96,7 @@ public class StatusListener implements Listener {
                     .append(displayName(descriptor))
                     .append(' ')
                     .append(formatTiming(Listeners.elapsedMillis(descriptor)));
-            var throwable = descriptor.throwable().orElse(null);
+            var throwable = descriptor.status().throwable().orElse(null);
             if (throwable != null) {
                 var msg = Listeners.sanitizeMessage(throwable.getMessage());
                 stringBuilder.append(" | ").append(throwable.getClass().getName());
@@ -119,6 +119,7 @@ public class StatusListener implements Listener {
                 }
             } else {
                 descriptor
+                        .status()
                         .message()
                         .ifPresent(message -> stringBuilder.append(" | ").append(Listeners.sanitizeMessage(message)));
                 stringBuilder.append(LINE_SEPARATOR);
@@ -127,6 +128,7 @@ public class StatusListener implements Listener {
             System.out.flush();
         } else {
             descriptor
+                    .status()
                     .throwable()
                     .ifPresentOrElse(
                             throwable -> {
@@ -147,7 +149,7 @@ public class StatusListener implements Listener {
                                 System.out.print(stringBuilder);
                                 System.out.flush();
                             },
-                            () -> descriptor.message().ifPresent(message -> {
+                            () -> descriptor.status().message().ifPresent(message -> {
                                 var stringBuilder = new StringBuilder();
                                 stringBuilder
                                         .append(prefix())

@@ -28,7 +28,7 @@ public final class ActionResolverOrderingNegativeFixture {
 
     @Paramixel.Factory
     public static Action factory() {
-        return Step.of("negative", context -> {
+        return Step.step("negative", context -> {
             throw new UnsupportedOperationException("ordering fixture is resolved but not executed");
         });
     }

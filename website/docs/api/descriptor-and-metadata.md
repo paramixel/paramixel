@@ -14,11 +14,11 @@ A descriptor exposes:
 - `parent()`
 - `id()`
 - `action()`
-- status predicates: `isPassed()`, `isFailed()`, `isSkipped()`, `isAborted()`, `isCompleted()`
-- timestamps: `startedAt()`, `completedAt()`
-- detail: `message()`, `throwable()`
-- tree navigation: `before()`, `children()`, `after()`
+- names: `displayName()`, `path()` (the display-name path from the run root)
+- state: `status()` (a `Status` with `kind()`, `message()` and `throwable()`), `isCompleted()`
+- timing: `startedAt()`, `completedAt()`, `duration()`
+- tree navigation: `parent()`, `before()`, `children()`, `after()`
 
 ## Execution state and identity
 
-Use `Descriptor` for execution identity, tree navigation, timestamps, status predicates, messages, and throwables. Reusing the same `Action` instance in multiple locations creates distinct descriptors with independent execution state.
+Use `Descriptor` for execution identity, tree navigation, timing, and outcome detail. Reusing the same `Action` instance in multiple locations creates distinct descriptors with independent execution state.

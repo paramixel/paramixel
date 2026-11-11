@@ -19,8 +19,11 @@ package nonapi.org.paramixel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.Configuration;
@@ -32,140 +35,79 @@ import org.paramixel.api.selector.Selector;
 @DisplayName("ConcreteRunner no-tests listener lifecycle")
 class ConcreteRunnerNoTestsListenerTest {
 
-    @Test
-    @DisplayName("run() no-tests path fires full listener lifecycle")
-    void initializeCalledInNoTestsPath() {
-        var initializeCalls = new AtomicInteger(0);
-        var callOrder = new ArrayList<String>();
+    private static final String NON_EXISTENT = "NonExistentClassXyz123";
 
-        var listener = new Listener() {
-            @Override
-            public void initialize(final Configuration configuration) {
-                initializeCalls.incrementAndGet();
-                callOrder.add("initialize");
-            }
+    private static final class RecordingListener implements Listener {
 
-            @Override
-            public void onRunStarted() {
-                callOrder.add("onRunStarted");
-            }
+        private final AtomicInteger runStarted = new AtomicInteger();
+        private final List<String> callOrder = new ArrayList<>();
 
-            @Override
-            public void onDiscoveryStarted() {
-                callOrder.add("onDiscoveryStarted");
-            }
+        @Override
+        public void onRunStarted(final Configuration configuration) {
+            runStarted.incrementAndGet();
+            callOrder.add("onRunStarted");
+        }
 
-            @Override
-            public void onDiscoveryCompleted(final Descriptor root) {
-                callOrder.add("onDiscoveryCompleted");
-            }
+        @Override
+        public void onDiscoveryStarted() {
+            callOrder.add("onDiscoveryStarted");
+        }
 
-            @Override
-            public void onRunCompleted(final Result result) {
-                callOrder.add("onRunCompleted");
-            }
-        };
+        @Override
+        public void onDiscoveryCompleted(final Optional<Descriptor> root) {
+            callOrder.add(root.isEmpty() ? "onDiscoveryCompleted(empty)" : "onDiscoveryCompleted");
+        }
 
-        var config = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, "NonExistentClassXyz123"));
-        var runner = new ConcreteRunner(config, listener);
+        @Override
+        public void onRunCompleted(final Result result) {
+            callOrder.add("onRunCompleted");
+        }
+    }
 
-        runner.run();
-
-        assertThat(initializeCalls.get()).isEqualTo(1);
-        assertThat(callOrder)
-                .containsExactly(
-                        "initialize", "onRunStarted", "onDiscoveryStarted", "onDiscoveryCompleted", "onRunCompleted");
+    private static void assertNoTestsLifecycle(final RecordingListener listener) {
+        assertThat(listener.runStarted.get()).isEqualTo(1);
+        assertThat(listener.callOrder)
+                .containsExactly("onRunStarted", "onDiscoveryStarted", "onDiscoveryCompleted(empty)", "onRunCompleted");
     }
 
     @Test
-    @DisplayName("run(Selector) no-tests path fires full listener lifecycle")
-    void runSelectorNoTestsCallsAllCallbacks() {
-        var initializeCalls = new AtomicInteger(0);
-        var callOrder = new ArrayList<String>();
+    @DisplayName("run() no-tests path fires the full listener lifecycle and returns a skipped result")
+    void runNoTestsFiresLifecycle() {
+        var listener = new RecordingListener();
+        var config = Configuration.of(Map.of(Configuration.MATCH_CLASS_REGEX, NON_EXISTENT));
 
-        var listener = new Listener() {
-            @Override
-            public void initialize(final Configuration configuration) {
-                initializeCalls.incrementAndGet();
-                callOrder.add("initialize");
-            }
+        var result = new ConcreteRunner(config, listener).run();
 
-            @Override
-            public void onRunStarted() {
-                callOrder.add("onRunStarted");
-            }
-
-            @Override
-            public void onDiscoveryStarted() {
-                callOrder.add("onDiscoveryStarted");
-            }
-
-            @Override
-            public void onDiscoveryCompleted(final Descriptor root) {
-                callOrder.add("onDiscoveryCompleted");
-            }
-
-            @Override
-            public void onRunCompleted(final Result result) {
-                callOrder.add("onRunCompleted");
-            }
-        };
-
-        var selector = Selector.classRegex("NonExistentClassXyz123");
-        var runner = new ConcreteRunner(Configuration.defaultConfiguration(), listener);
-
-        var result = runner.run(selector);
-
-        assertThat(initializeCalls.get()).isEqualTo(1);
-        assertThat(callOrder)
-                .containsExactly(
-                        "initialize", "onRunStarted", "onDiscoveryStarted", "onDiscoveryCompleted", "onRunCompleted");
-        assertThat(result).isEmpty();
+        assertNoTestsLifecycle(listener);
+        assertThat(result.descriptor()).isEmpty();
+        assertThat(result.exitCode()).isZero();
     }
 
     @Test
-    @DisplayName("runAndReturnExitCode(Selector) no-tests path fires full listener lifecycle")
-    void runAndReturnExitCodeSelectorNoTestsCallsAllCallbacks() {
-        var initializeCalls = new AtomicInteger(0);
-        var callOrder = new ArrayList<String>();
+    @DisplayName("run(Selector) no-tests path fires the full listener lifecycle")
+    void runSelectorNoTestsFiresLifecycle() {
+        var listener = new RecordingListener();
+        var selector =
+                Selector.builder().classPattern(Pattern.compile(NON_EXISTENT)).build();
 
-        var listener = new Listener() {
-            @Override
-            public void initialize(final Configuration configuration) {
-                initializeCalls.incrementAndGet();
-                callOrder.add("initialize");
-            }
+        var result = new ConcreteRunner(Configuration.of(Map.of()), listener).run(selector);
 
-            @Override
-            public void onRunStarted() {
-                callOrder.add("onRunStarted");
-            }
+        assertNoTestsLifecycle(listener);
+        assertThat(result.descriptor()).isEmpty();
+    }
 
-            @Override
-            public void onDiscoveryStarted() {
-                callOrder.add("onDiscoveryStarted");
-            }
+    @Test
+    @DisplayName("failIfNoTests makes the no-tests result fail")
+    void noTestsFailsWhenFailIfNoTestsIsSet() {
+        var listener = new RecordingListener();
+        var config = Configuration.of(Map.of(Configuration.FAIL_IF_NO_TESTS, "true"));
+        var selector =
+                Selector.builder().classPattern(Pattern.compile(NON_EXISTENT)).build();
 
-            @Override
-            public void onDiscoveryCompleted(final Descriptor root) {
-                callOrder.add("onDiscoveryCompleted");
-            }
+        var result = new ConcreteRunner(config, listener).run(selector);
 
-            @Override
-            public void onRunCompleted(final Result result) {
-                callOrder.add("onRunCompleted");
-            }
-        };
-
-        var selector = Selector.classRegex("NonExistentClassXyz123");
-        var runner = new ConcreteRunner(Configuration.defaultConfiguration(), listener);
-
-        int exitCode = runner.runAndReturnExitCode(selector);
-
-        assertThat(initializeCalls.get()).isEqualTo(1);
-        assertThat(callOrder)
-                .containsExactly(
-                        "initialize", "onRunStarted", "onDiscoveryStarted", "onDiscoveryCompleted", "onRunCompleted");
-        assertThat(exitCode).isZero();
+        assertNoTestsLifecycle(listener);
+        assertThat(result.status().isFailed()).isTrue();
+        assertThat(result.exitCode()).isOne();
     }
 }

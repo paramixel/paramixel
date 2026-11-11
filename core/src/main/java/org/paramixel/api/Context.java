@@ -20,10 +20,16 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Provides runtime services for an active action execution.
+ * Read-only runtime services for an active action execution.
  *
- * <p>Actions use this context to access configuration and fixture instances. Descriptor traversal,
- * scheduling, status transitions, and listener notifications are owned by the runner and scheduler.
+ * <p>Actions use this context to read the configuration, the current {@link Descriptor}, and the
+ * fixture instances provided by enclosing {@link org.paramixel.api.action.Instance} actions.
+ * Descriptor traversal, scheduling, status transitions, and listener notifications are owned by the
+ * runner and execution engine.
+ *
+ * <p>This interface is <strong>not for implementation by users</strong>: the framework supplies the
+ * only implementation. Fixtures are provided by an {@code Instance} in the tree and are never bound
+ * dynamically, so the compile step can validate every typed step before any user code runs.
  */
 public interface Context {
 
@@ -33,6 +39,13 @@ public interface Context {
      * @return the run configuration; never {@code null}
      */
     Configuration configuration();
+
+    /**
+     * Returns the descriptor of the action currently executing.
+     *
+     * @return the current descriptor; never {@code null}
+     */
+    Descriptor descriptor();
 
     /**
      * Returns the current fixture instance for the requested type.
@@ -57,22 +70,5 @@ public interface Context {
 
         return instance(type)
                 .orElseThrow(() -> new IllegalStateException("No instance is available for " + type.getName()));
-    }
-
-    /**
-     * Returns a context consumer that retrieves an instance of the specified type from the context
-     * and passes it to the provided consumer.
-     *
-     * @param <T> the type of the instance to retrieve and consume
-     * @param type the class of the instance to retrieve; must not be {@code null}
-     * @param consumer the consumer to accept the instance; must not be {@code null}
-     * @return the context consumer that performs the instance retrieval and consumption
-     * @throws NullPointerException if {@code type} or {@code consumer} is {@code null}
-     */
-    static <T> ContextConsumer withInstance(final Class<T> type, final InstanceConsumer<? super T> consumer) {
-        Objects.requireNonNull(type, "type is null");
-        Objects.requireNonNull(consumer, "consumer is null");
-
-        return context -> consumer.accept(context.requireInstance(type));
     }
 }

@@ -53,7 +53,7 @@ public final class Listeners {
      */
     public static String formatStatus(final Status status) {
         Objects.requireNonNull(status, "status is null");
-        return status.name();
+        return status.kind().name();
     }
 
     /**
@@ -64,7 +64,7 @@ public final class Listeners {
      */
     public static String formatAnsiStatus(final Status status) {
         Objects.requireNonNull(status, "status is null");
-        return formatAnsiStatusName(status.name());
+        return formatAnsiStatusName(status.kind().name());
     }
 
     /**
@@ -116,15 +116,7 @@ public final class Listeners {
      * @return the display path
      */
     public static String formatNamePath(final Descriptor descriptor) {
-        Objects.requireNonNull(descriptor, "descriptor is null");
-        var names = new ArrayDeque<String>();
-        for (var d = descriptor; d != null; d = d.parent().orElse(null)) {
-            var name = sanitizeMessage(d.action().displayName());
-            if (!Constants.ROOT_NAME.equals(name)) {
-                names.addFirst(name);
-            }
-        }
-        return String.join(" / ", names);
+        return Objects.requireNonNull(descriptor, "descriptor is null").path();
     }
 
     /**
@@ -157,48 +149,30 @@ public final class Listeners {
      */
     public static String formatException(final Descriptor descriptor) {
         Objects.requireNonNull(descriptor, "descriptor is null");
-        if (!descriptor.isFailed()) {
+        var status = descriptor.status();
+        if (!status.isFailed()) {
             return null;
         }
-        return descriptor
-                .throwable()
+        return status.throwable()
                 .map(throwable -> {
                     var message = sanitizeMessage(throwable.getMessage());
                     return message == null || message.isBlank()
                             ? throwable.getClass().getName()
                             : throwable.getClass().getName() + ": " + message;
                 })
-                .or(() -> descriptor.message().map(Listeners::sanitizeMessage))
+                .or(() -> status.message().map(Listeners::sanitizeMessage))
                 .orElse(null);
     }
 
     private static String statusName(final Descriptor descriptor) {
-        if (descriptor.isFailed()) {
-            return "FAILED";
-        }
-        if (descriptor.isAborted()) {
-            return "ABORTED";
-        }
-        if (!descriptor.isCompleted()) {
-            return "RUNNING";
-        }
-        if (descriptor.isSkipped()) {
-            return "SKIPPED";
-        }
-        return "PASSED";
+        return Objects.requireNonNull(descriptor, "descriptor is null")
+                .status()
+                .kind()
+                .name();
     }
 
     private static String statusName(final Result result) {
-        if (result.isFailed()) {
-            return "FAILED";
-        }
-        if (result.isAborted()) {
-            return "ABORTED";
-        }
-        if (result.isSkipped()) {
-            return "SKIPPED";
-        }
-        return "PASSED";
+        return Objects.requireNonNull(result, "result is null").status().kind().name();
     }
 
     private static String formatAnsiStatusName(final String statusName) {

@@ -16,8 +16,10 @@
 
 package org.paramixel.api.support;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.ThrowingRunnable;
 
@@ -133,11 +135,11 @@ public final class CleanUp {
     /**
      * Returns the throwable captured during {@link #run()}, if any.
      *
-     * @return the captured throwable, or {@code null} if the runnable succeeded
-     *     or the instance was created with a {@code null} closeable
+     * @return the captured throwable, or empty when the runnable succeeded or the instance was created
+     *     with a {@code null} closeable
      */
-    public Throwable throwable() {
-        return throwable;
+    public Optional<Throwable> throwable() {
+        return Optional.ofNullable(throwable);
     }
 
     /**
@@ -147,24 +149,6 @@ public final class CleanUp {
      */
     public boolean hasRun() {
         return hasRun;
-    }
-
-    /**
-     * Returns whether no throwable was captured during execution.
-     *
-     * @return {@code true} if the runnable completed without a captured throwable
-     */
-    public boolean isEmpty() {
-        return throwable == null;
-    }
-
-    /**
-     * Returns whether a throwable was captured during execution.
-     *
-     * @return {@code true} if the runnable threw a captured throwable
-     */
-    public boolean isNotEmpty() {
-        return throwable != null;
     }
 
     /**
@@ -185,24 +169,7 @@ public final class CleanUp {
      */
     public static void runAndThrow(final CleanUp... cleanUps) throws Throwable {
         Objects.requireNonNull(cleanUps, "cleanUps is null");
-        Throwable firstException = null;
-        for (CleanUp cleanUp : cleanUps) {
-            Objects.requireNonNull(cleanUp, "cleanUp is null");
-            if (!cleanUp.hasRun()) {
-                cleanUp.run();
-            }
-            Throwable t = cleanUp.throwable();
-            if (t != null) {
-                if (firstException == null) {
-                    firstException = t;
-                } else {
-                    firstException.addSuppressed(t);
-                }
-            }
-        }
-        if (firstException != null) {
-            throw firstException;
-        }
+        runAndThrow(Arrays.asList(cleanUps));
     }
 
     /**
@@ -233,8 +200,9 @@ public final class CleanUp {
             if (!cleanUp.hasRun()) {
                 cleanUp.run();
             }
-            Throwable t = cleanUp.throwable();
-            if (t != null) {
+            var captured = cleanUp.throwable();
+            if (captured.isPresent()) {
+                var t = captured.orElseThrow();
                 if (firstException == null) {
                     firstException = t;
                 } else {

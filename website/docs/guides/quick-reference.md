@@ -52,7 +52,6 @@ See [Named Builders](../api/named-builders) for the full method reference.
 | `@Paramixel.Disabled` | method | Excludes a factory or hook from discovery. |
 | `@Paramixel.Tag` | method | Repeatable tag used by selectors and regex filters. |
 | `@Paramixel.Priority` | class | Orders discovered classes before root action construction. |
-| `@Paramixel.Id` | method | Identifies methods for `AnnotationResolver`. |
 
 Use `@Paramixel.BeforeAll` and `@Paramixel.AfterAll` for runner-wide lifecycle around all discovered factory actions. Use `Scope` for setup and teardown that belongs to one test or action tree.
 

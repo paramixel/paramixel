@@ -4,8 +4,35 @@ dependencies {
     testRuntimeOnly libs.junit.platform.launcher
 }
 
+// The pool sizes the unit tests use. core/pom.xml gives surefire the same values; tests that run with the default
+// configuration resolve their pools from these properties, so both build systems must supply them.
+def testPoolSizes = {
+    def sizes = [
+        'test': 8,
+        'punbounded': 1000,
+        'pparallelism': 4,
+        'pbranching_factor': 2,
+        'pouterparallelism': 20,
+        'pinnerparallelism': 10,
+        'pscopes': 3,
+        'pcap': 2
+    ]
+    (0..11).each { sizes["t${it}".toString()] = 8 }
+    (1..16).each { n ->
+        sizes["p${n}".toString()] = n
+        (0..2).each { m -> sizes["p${n}x${m}".toString()] = n }
+    }
+    (0..2).each { m ->
+        sizes["p20x${m}".toString()] = 20
+        sizes["p50x${m}".toString()] = 50
+    }
+    sizes
+}
+
 tasks.named('test') {
     useJUnitPlatform()
+    testPoolSizes().each { name, size -> systemProperty "paramixel.parallelism.${name}", "${size}" }
+    systemProperty 'paramixel.ansi', 'false'
 }
 
 def projectVersion = project.version

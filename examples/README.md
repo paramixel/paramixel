@@ -10,17 +10,16 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 
 | Package | Purpose | Has Runner |
 |---|---|---|
-| `examples` | Parallel/sequential argument tests | Yes |
+| `examples` | Parallel/sequential argument tests, iteration examples, assertion and sleep steps | Yes |
 | `examples.annotation` | `@Disabled` annotation behavior | Yes |
 | `examples.annotation.tags` | Tag-based test selection | Yes |
 | `examples.argument` | Argument type variants (primitives, collections, custom types, etc.) | Yes |
-| `examples.context` | Context inheritance and sharing | Yes |
 | `examples.lifecycle` | Custom listeners and full lifecycle | Yes |
 | `examples.retry` | Retry support class demonstration | Yes |
-| `examples.store` | Store context and operations | Yes |
 | `examples.support` | Shared utilities (Logger, Resource, NetworkFactory, Debug) | N/A |
 | `examples.isolated` | Named-lock serialized execution with Instance isolation | Yes |
-| `examples.until` | `Until` action with retry and polling patterns | No |
+| `examples.loop` | `Loop` with `until`, `untilPassed` and `Backoff` delays | Yes |
+| `examples.fixtures` | The fixture-per-environment shape: typed `Instance`, `each`, and a bounded pool | No |
 | `examples.testcontainers.kafka` | Kafka integration test + environment + wait strategy | N/A |
 | `examples.testcontainers.mongodb` | MongoDB integration test + environment | N/A |
 | `examples.testcontainers.nginx` | Nginx integration test + environment | N/A |
@@ -33,8 +32,12 @@ Most top-level runnable example packages contain a `__ParamixelRunner__` class t
 ```java
 public class __ParamixelRunner__ {
     public static void main(String[] args) {
-        Runner.defaultRunner()
-                .runAndExit(Selector.packageTreeOf(__ParamixelRunner__.class));
+        System.exit(Runner.builder()
+                .build()
+                .run(Selector.builder()
+                        .packageTreeOf(__ParamixelRunner__.class)
+                        .build())
+                .exitCode());
     }
 }
 ```

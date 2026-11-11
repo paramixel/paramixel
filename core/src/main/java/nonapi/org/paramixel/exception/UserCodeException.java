@@ -22,7 +22,7 @@ import java.util.Objects;
  * Internal exception wrapper used to mark user-code failures crossing framework boundaries.
  *
  * <p>Framework execution paths wrap thrown user exceptions in this type so
- * {@code Status.fromThrowable(...)} can reliably unwrap one boundary layer and classify
+ * {@code Statuses.fromThrowable(...)} can reliably unwrap one boundary layer and classify
  * status semantics from the underlying user-code cause.
  */
 public final class UserCodeException extends Exception {

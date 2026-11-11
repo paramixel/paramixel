@@ -42,8 +42,7 @@ public final class Scope implements Action {
     private final Action after;
 
     private Scope(final String displayName, final Action before, final Action body, final Action after) {
-        Objects.requireNonNull(displayName, "displayName is null");
-        this.displayName = Arguments.requireNonBlank(displayName, "displayName is blank");
+        this.displayName = Objects.requireNonNull(displayName, "displayName is null");
         this.before = before;
         this.body = Objects.requireNonNull(body, "body is null");
         this.after = after;
@@ -55,21 +54,8 @@ public final class Scope implements Action {
      * @param displayName the action display name; must not be {@code null} or blank
      * @return a new builder
      */
-    public static Builder builder(final String displayName) {
-        return new Builder(displayName);
-    }
-
-    /**
-     * Creates a new builder for a {@code Scope} with the given display name.
-     *
-     * @param displayName the action display name; must not be {@code null} or blank
-     * @return a new builder
-     * @throws NullPointerException if {@code displayName} is {@code null}
-     * @throws IllegalArgumentException if {@code displayName} is blank
-     * @see Builder
-     */
     public static Builder scope(final String displayName) {
-        return builder(displayName);
+        return new Builder(displayName);
     }
 
     @Override
@@ -107,7 +93,7 @@ public final class Scope implements Action {
     /**
      * Fluent builder for {@link Scope} actions.
      */
-    public static final class Builder implements org.paramixel.api.action.Builder {
+    public static final class Builder implements ActionBuilder {
 
         private final String displayName;
         private Action before;
@@ -121,83 +107,44 @@ public final class Scope implements Action {
         }
 
         /**
-         * Sets the before action. Calling this method
-         * again overwrites the previous before action.
+         * Sets the before action. A builder argument is built immediately and the resulting
+         * action snapshot is stored; an action argument is used as is.
          *
-         * @param action the before action; must not be {@code null}
+         * @param action the before action action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder before(final Action action) {
-            this.before = Objects.requireNonNull(action, "action is null");
+        public Builder before(final ActionBuilder action) {
+            Objects.requireNonNull(action, "action is null");
+            this.before = Objects.requireNonNull(action.build(), "action.build() returned null");
             return this;
         }
 
         /**
-         * Sets the before action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
+         * Sets the body action. A builder argument is built immediately and the resulting
+         * action snapshot is stored; an action argument is used as is.
          *
-         * @param builder the before action builder; must not be {@code null}
-         * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
-         */
-        public Builder before(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.before = Objects.requireNonNull(builder.build(), "builder.build() returned null");
-            return this;
-        }
-
-        /**
-         * Sets the body action. Calling this method
-         * again overwrites the previous body action.
-         *
-         * @param action the body action; must not be {@code null}
+         * @param action the body action action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder body(final Action action) {
-            this.body = Objects.requireNonNull(action, "action is null");
+        public Builder body(final ActionBuilder action) {
+            Objects.requireNonNull(action, "action is null");
+            this.body = Objects.requireNonNull(action.build(), "action.build() returned null");
             return this;
         }
 
         /**
-         * Sets the body action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
+         * Sets the after action. A builder argument is built immediately and the resulting
+         * action snapshot is stored; an action argument is used as is.
          *
-         * @param builder the body action builder; must not be {@code null}
-         * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
-         */
-        public Builder body(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.body = Objects.requireNonNull(builder.build(), "builder.build() returned null");
-            return this;
-        }
-
-        /**
-         * Sets the after action. Calling this method
-         * again overwrites the previous after action.
-         *
-         * @param action the after action; must not be {@code null}
+         * @param action the after action action or builder; must not be {@code null}
          * @return this builder
          * @throws NullPointerException if {@code action} is {@code null}
          */
-        public Builder after(final Action action) {
-            this.after = Objects.requireNonNull(action, "action is null");
-            return this;
-        }
-
-        /**
-         * Sets the after action from a builder. The builder is built immediately
-         * and the resulting action snapshot is stored.
-         *
-         * @param builder the after action builder; must not be {@code null}
-         * @return this builder
-         * @throws NullPointerException if {@code builder} is {@code null}
-         */
-        public Builder after(final org.paramixel.api.action.Builder builder) {
-            Objects.requireNonNull(builder, "builder is null");
-            this.after = Objects.requireNonNull(builder.build(), "builder.build() returned null");
+        public Builder after(final ActionBuilder action) {
+            Objects.requireNonNull(action, "action is null");
+            this.after = Objects.requireNonNull(action.build(), "action.build() returned null");
             return this;
         }
 
@@ -206,6 +153,7 @@ public final class Scope implements Action {
          *
          * @return a new scope action
          */
+        @Override
         public Scope build() {
             if (body == null) {
                 throw new IllegalStateException("body action must be configured");

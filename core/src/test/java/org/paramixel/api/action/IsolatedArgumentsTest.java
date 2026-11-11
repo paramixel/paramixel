@@ -23,17 +23,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("Isolated arguments")
-@SuppressWarnings("removal")
 class IsolatedArgumentsTest {
 
     @Test
     @DisplayName("builder validates required inputs")
     void builderValidatesRequiredInputs() {
-        assertThatThrownBy(() -> Isolated.builder(null, "lock")).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Isolated.builder(" ", "lock")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Isolated.builder("isolated", null)).isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> Isolated.builder("isolated", " ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Isolated.builder("isolated", "lock").build())
+        assertThatThrownBy(() -> Isolated.isolated(null, "lock")).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Isolated.isolated(" ", "lock")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Isolated.isolated("isolated", null)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> Isolated.isolated("isolated", " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Isolated.isolated("isolated", "lock").build())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("body action must be configured");
     }
@@ -41,15 +40,15 @@ class IsolatedArgumentsTest {
     @Test
     @DisplayName("body(Action) rejects null action")
     void bodyActionRejectsNull() {
-        var builder = Isolated.builder("isolated", "lock");
+        var builder = Isolated.isolated("isolated", "lock");
         assertThatThrownBy(() -> builder.body((Action) null)).isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("body(Builder) builds and sets body action")
     void bodyBuilderBuildsAndSetsBodyAction() {
-        var isolated = Isolated.builder("isolated", "lock")
-                .body(Sequence.builder("body-seq").child(Step.of("step", context -> {})))
+        var isolated = Isolated.isolated("isolated", "lock")
+                .body(Sequential.sequential("body-seq").child(Step.step("step", context -> {})))
                 .build();
         assertThat(isolated.body()).isNotNull();
         assertThat(isolated.body().displayName()).isEqualTo("body-seq");
@@ -58,18 +57,18 @@ class IsolatedArgumentsTest {
     @Test
     @DisplayName("body(Builder) rejects null builder")
     void bodyBuilderOverloadRejectsNull() {
-        var builder = Isolated.builder("isolated", "lock");
-        assertThatThrownBy(() -> builder.body((org.paramixel.api.action.Builder) null))
+        var builder = Isolated.isolated("isolated", "lock");
+        assertThatThrownBy(() -> builder.body((org.paramixel.api.action.ActionBuilder) null))
                 .isInstanceOf(NullPointerException.class);
     }
 
     @Test
     @DisplayName("builder can build multiple immutable snapshots")
     void builderCanBuildMultipleImmutableSnapshots() {
-        var builder = Isolated.builder("isolated", "lock");
-        builder.body(Step.of("test", s -> {}));
+        var builder = Isolated.isolated("isolated", "lock");
+        builder.body(Step.step("test", s -> {}));
         var first = builder.build();
-        builder.body(Step.of("other", s -> {}));
+        builder.body(Step.step("other", s -> {}));
         var second = builder.build();
 
         assertThat(first.body().displayName()).isEqualTo("test");

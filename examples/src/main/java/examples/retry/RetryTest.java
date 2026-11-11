@@ -17,8 +17,7 @@
 package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Step.step;
 
 import java.time.Duration;
@@ -27,8 +26,8 @@ import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.action.Action;
 import org.paramixel.api.exception.FailException;
+import org.paramixel.api.support.Backoff;
 import org.paramixel.api.support.Retry;
-import org.paramixel.api.support.Retry.Policy;
 
 /**
  * Demonstrates the {@link Retry} support with a fixed-delay policy. The test step
@@ -45,7 +44,7 @@ public class RetryTest {
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -56,8 +55,8 @@ public class RetryTest {
      */
     @Paramixel.Factory
     public static Action factory() {
-        return instance("retry-example", RetryTest::new)
-                .body(step("retry()", withInstance(RetryTest.class, RetryTest::retry)))
+        return of("retry-example", RetryTest.class, RetryTest::new)
+                .body(step("retry()", RetryTest.class, RetryTest::retry))
                 .build();
     }
 
@@ -66,17 +65,17 @@ public class RetryTest {
     }
 
     public void retry() {
-        Retry.Result result = Retry.of(Policy.fixed(Duration.ofMillis(100), Duration.ofSeconds(1)))
+        Retry.Result result = Retry.of(Backoff.linear(Duration.ofMillis(100)), Duration.ofSeconds(1))
                 .onRetry((attempt, cause) ->
                         System.out.println("Retry attempt " + attempt + " after: " + cause.getMessage()))
                 .run(() -> {
                     int attempt = counter.incrementAndGet();
                     if (attempt < 3) {
-                        FailException.fail("flaky failure on attempt " + attempt);
+                        throw FailException.fail("flaky failure on attempt " + attempt);
                     }
                 });
 
-        assertThat(result.isSuccessful()).isTrue();
+        assertThat(result.successful()).isTrue();
         assertThat(result.attemptCount()).isEqualTo(3);
     }
 }

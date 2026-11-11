@@ -25,6 +25,6 @@ public final class ActionResolverMetadataAlphaFixture {
 
     @Paramixel.Factory
     public static Action factory() {
-        return Step.of("z-action", context -> {});
+        return Step.step("z-action", context -> {});
     }
 }

@@ -26,7 +26,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import nonapi.org.paramixel.ConcreteConfiguration;
 import nonapi.org.paramixel.ConcreteResult;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
+import nonapi.org.paramixel.action.MockDescriptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class ReportListenerTest {
     private ReportListener createListener(String reportFilePath) {
         var listener = new ReportListener();
         var configuration = new ConcreteConfiguration(Map.of(Configuration.REPORT_FILE, reportFilePath));
-        listener.initialize(configuration);
+        listener.onRunStarted(configuration);
         return listener;
     }
 
@@ -68,15 +68,15 @@ class ReportListenerTest {
         var reportFile = tempDir.resolve("report.txt");
         var listener = createListener(reportFile.toString());
 
-        var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+        var root = new MockDescriptor(Step.step("root", v -> {}));
         root.setStatus(Status.RUNNING);
         root.setStatus(Status.PASSED);
 
-        var child = new ConcreteDescriptor(Step.of("child", v -> {}));
+        var child = new MockDescriptor(Step.step("child", v -> {}));
         child.setStatus(Status.RUNNING);
         child.setStatus(Status.failed("first\n  second\tthird"));
 
-        root.addChild(child);
+        root.child(child);
 
         var result = new ConcreteResult(root, Configuration.defaultConfiguration());
 
@@ -111,21 +111,21 @@ class ReportListenerTest {
             var reportFile = tempDir.resolve("report.txt");
             var listener = createListener(reportFile.toString());
 
-            var root = new ConcreteDescriptor(Step.of("root", v -> {}));
+            var root = new MockDescriptor(Step.step("root", v -> {}));
             root.setStatus(Status.RUNNING);
             root.setStatus(Status.PASSED);
-            var before = new ConcreteDescriptor(Step.of("before", v -> {}));
+            var before = new MockDescriptor(Step.step("before", v -> {}));
             before.setStatus(Status.RUNNING);
             before.setStatus(Status.PASSED);
-            root.setBefore(before);
-            var child = new ConcreteDescriptor(Step.of("child", v -> {}));
+            root.before(before);
+            var child = new MockDescriptor(Step.step("child", v -> {}));
             child.setStatus(Status.RUNNING);
             child.setStatus(Status.PASSED);
-            root.addChild(child);
-            var after = new ConcreteDescriptor(Step.of("after", v -> {}));
+            root.child(child);
+            var after = new MockDescriptor(Step.step("after", v -> {}));
             after.setStatus(Status.RUNNING);
             after.setStatus(Status.PASSED);
-            root.setAfter(after);
+            root.after(after);
 
             var result = new ConcreteResult(root, Configuration.defaultConfiguration());
             listener.onRunCompleted(result);

@@ -17,9 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Each.parallel;
-import static org.paramixel.api.action.Instance.instance;
+import static org.paramixel.api.action.Instance.of;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Scope.scope;
 import static org.paramixel.api.action.Sequential.sequential;
@@ -53,7 +51,7 @@ public class ParallelArgumentTest {
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
@@ -70,39 +68,33 @@ public class ParallelArgumentTest {
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
         return scope(testName)
-                .body(parallel(
-                                "arguments",
+                .body(parallel("arguments", "methods")
+                        .each(
                                 arguments,
-                                value -> instance(value, ParallelArgumentTest::new)
+                                value -> of(value, ParallelArgumentTest.class, ParallelArgumentTest::new)
                                         .body(scope("scope")
                                                 .before(step(
                                                         "before()",
-                                                        withInstance(
-                                                                ParallelArgumentTest.class,
-                                                                ParallelArgumentTest::before)))
+                                                        ParallelArgumentTest.class,
+                                                        ParallelArgumentTest::before))
                                                 .body(sequential(value)
                                                         .independent()
                                                         .child(step(
                                                                 "test()",
-                                                                withInstance(
-                                                                        ParallelArgumentTest.class,
-                                                                        ParallelArgumentTest::test)))
+                                                                ParallelArgumentTest.class,
+                                                                ParallelArgumentTest::test))
                                                         .child(step(
                                                                 "test()",
-                                                                withInstance(
-                                                                        ParallelArgumentTest.class,
-                                                                        ParallelArgumentTest::test)))
+                                                                ParallelArgumentTest.class,
+                                                                ParallelArgumentTest::test))
                                                         .child(step(
                                                                 "test()",
-                                                                withInstance(
-                                                                        ParallelArgumentTest.class,
-                                                                        ParallelArgumentTest::test))))
+                                                                ParallelArgumentTest.class,
+                                                                ParallelArgumentTest::test)))
                                                 .after(step(
                                                         "after()",
-                                                        withInstance(
-                                                                ParallelArgumentTest.class,
-                                                                ParallelArgumentTest::after)))))
-                        .parallelism(PARALLELISM))
+                                                        ParallelArgumentTest.class,
+                                                        ParallelArgumentTest::after)))))
                 .after(step("validate", ignored -> validate()))
                 .build();
     }
