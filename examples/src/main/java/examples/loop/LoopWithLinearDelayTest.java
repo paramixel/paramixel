@@ -17,28 +17,27 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 import org.paramixel.api.support.Backoff;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Loop} action with a
- * constant inter-iteration delay ({@link org.paramixel.api.support.Backoff#fixed}).
- * Verifies that the loop execution accounts for the configured delay between iterations.
+ * Demonstrates a fixed delay between iterations.
+ *
+ * <p>Delays are scheduled on a timer, not by blocking a worker thread, and they are cancellable: a run cancellation
+ * stops a pending delay instead of waiting it out.
  */
 public class LoopWithLinearDelayTest {
 
     private static final AtomicInteger iterationCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -48,21 +47,20 @@ public class LoopWithLinearDelayTest {
     }
 
     /**
-     * Builds an action tree that exercises loop with constant inter-iteration delay.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
-        return sequential("loop-linear-delay-example")
-                .child(loop("poll")
-                        .body(step("check", context -> iterationCount.incrementAndGet()))
-                        .maxIterations(3)
-                        .delay(Backoff.fixed(Duration.ofMillis(100))))
-                .child(step("validate", context -> {
-                    assertThat(iterationCount.get()).isEqualTo(3);
-                }))
+        return sequential("loop-fixed-delay-example")
+                .repeat(
+                        "poll",
+                        repeat -> repeat.maxIterations(3)
+                                .delay(Backoff.fixed(Duration.ofMillis(50)))
+                                .step("check", iterationCount::incrementAndGet))
+                .step("validate", () -> assertThat(iterationCount.get()).isEqualTo(3))
                 .build();
     }
 

@@ -17,27 +17,23 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.exception.FailException.fail;
 
-import nonapi.org.paramixel.action.ConcreteContext;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Status;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates the one way to express an assertion: a {@link org.paramixel.api.action.Step} that throws {@link
- * org.paramixel.api.exception.FailException} when the check does not hold.
+ * Demonstrates assertion-style steps that fail through the framework failure signal.
  *
- * <p>Every check below holds, so the run passes. A failing check reports the step as {@code FAILED}
- * with the message from {@code fail(...)}.
+ * <p>A failing step records a {@code FAILED} status with its cause. The result tree is the source of truth, so a
+ * reporter never has to inspect exception messages to decide what happened.
  */
 public class AssertionStepTest {
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -46,34 +42,25 @@ public class AssertionStepTest {
     }
 
     /**
-     * Builds a tree of assertion steps.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         return sequential("assertion-steps")
-                .child(step("one-equals-one", context -> {
+                .step("one-equals-one", () -> {
                     if (1 != 1) {
                         throw fail("one is not equal to one");
                     }
-                }))
-                .child(step("two-is-even", context -> {
-                    var value = 2;
+                })
+                .step("two-is-even", () -> {
+                    final var value = 2;
                     if (value % 2 != 0) {
                         throw fail("expected an even value but was " + value);
                     }
-                }))
-                .child(step("report statuses", context -> {
-                    var children = ConcreteContext.require(context)
-                            .descriptor()
-                            .parent()
-                            .orElseThrow()
-                            .children();
-                    assertThat(children).isNotEmpty();
-                    assertThat(children.get(0).status()).isSameAs(Status.PASSED);
-                    assertThat(children.get(1).status().isPassed()).isTrue();
-                }))
+                })
+                .step("assertj-style", () -> assertThat("paramixel").startsWith("param"))
                 .build();
     }
 }

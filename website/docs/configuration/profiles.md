@@ -1,44 +1,33 @@
 ---
-title: Profiles
-description: Model local, CI, smoke, and full runs with properties and selectors.
+title: Profiles and Environments
+description: Adapting pool sizes and policies per environment.
 ---
 
-# Profiles
+# Profiles and Environments
 
-Model local, CI, smoke, and full profiles with Maven or Gradle build profiles, JVM system properties, multiple resource sets, or Paramixel tag selectors.
+Paramixel reads the same keys from any environment, so environment-specific tuning is a matter of where the properties
+come from.
 
-## Local run
+## CI versus local
+
+```properties
+# src/main/resources/paramixel.properties (local default)
+paramixel.parallelism.environments=4
+paramixel.shutdown.graceMillis=10000
+```
 
 ```bash
-mvn test -Dparamixel.parallelism=2 -Dparamixel.listener.exclude=quiet
+# CI: fewer containers, tighter deadlines
+./mvnw test -pl examples -Dparamixel.parallelism.environments=1 -Dparamixel.shutdown.graceMillis=5000
 ```
 
-## CI run
+## Maven profiles
 
-```bash
-mvn test \
-  -Dparamixel.parallelism=8 \
-  -Dparamixel.failFast=true \
-  -Dparamixel.failureOnSkip=true \
-  -Dparamixel.report.file=target/paramixel-report.json
-```
+The Maven plugin accepts `<properties>` plus explicit parameters (`failIfNoTests`, `failureOnSkip`, `failureOnAbort`,
+`failFast`, `reportFile`, `match*`). A profile can set either.
 
-## Smoke run
+## Guidelines
 
-```bash
-mvn test -Dparamixel.match.tag.regex=smoke
-```
-
-## Programmatic profile
-
-```java
-import java.util.Map;
-import org.paramixel.api.Configuration;
-import org.paramixel.api.Runner;
-
-var configuration = Configuration.of(Map.of(
-        "paramixel.parallelism", "4",
-        "paramixel.match.tag.regex", "critical"));
-
-var runner = Runner.builder().configuration(configuration).build();
-```
+- Size pools for the protected resource (containers, ports, licenses), not for CPU count.
+- Keep `paramixel.workers` at or above the largest pool you expect to saturate.
+- Do not hide `failureOnSkip`/`failureOnAbort` differences between environments; local and CI should agree on what fails.

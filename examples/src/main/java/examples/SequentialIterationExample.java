@@ -17,20 +17,17 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates {@code Sequential.Builder.each(...)} for parameterized runs: one child per item, mapped at define
- * time. Produces the same action tree as the hand-rolled for-loop in {@link DependentArgumentTest}.
+ * Demonstrates a sequential matrix of fixtures, where every fixture runs its steps before the next fixture starts.
  */
 public class SequentialIterationExample {
 
@@ -47,7 +44,7 @@ public class SequentialIterationExample {
     private final int argumentIndex;
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -57,46 +54,29 @@ public class SequentialIterationExample {
     }
 
     /**
-     * Builds a dependent sequential argument tree with {@code each(...)} instead
-     * of a for-loop.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
-        var testName = SequentialIterationExample.class.getName();
-        var arguments =
+        final var arguments =
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
-        return scope(testName)
-                .body(sequential("arguments").each(arguments, value -> {
-                    int index = Integer.parseInt(value.substring("string-".length()));
-                    return of(value, SequentialIterationExample.class, () -> new SequentialIterationExample(index))
-                            .body(scope("scope")
-                                    .before(step(
-                                            "before()",
-                                            SequentialIterationExample.class,
-                                            SequentialIterationExample::before))
-                                    .body(sequential("tests")
-                                            .child(step(
-                                                    "test()",
-                                                    SequentialIterationExample.class,
-                                                    SequentialIterationExample::test))
-                                            .child(step(
-                                                    "test()",
-                                                    SequentialIterationExample.class,
-                                                    SequentialIterationExample::test))
-                                            .child(step(
-                                                    "test()",
-                                                    SequentialIterationExample.class,
-                                                    SequentialIterationExample::test)))
-                                    .after(step(
-                                            "after()",
-                                            SequentialIterationExample.class,
-                                            SequentialIterationExample::after)));
-                }))
-                .after(step("validate", ignored -> validate()))
+        return sequential("SequentialIterationExample")
+                .each(
+                        arguments,
+                        value -> forInstance(
+                                        value,
+                                        () -> new SequentialIterationExample(
+                                                Integer.parseInt(value.substring("string-".length()))))
+                                .before(SequentialIterationExample::before)
+                                .step("test", SequentialIterationExample::test)
+                                .step("test", SequentialIterationExample::test)
+                                .step("test", SequentialIterationExample::test)
+                                .after(SequentialIterationExample::after))
+                .after(SequentialIterationExample::validate)
                 .build();
     }
 
@@ -104,30 +84,41 @@ public class SequentialIterationExample {
         this.argumentIndex = argumentIndex;
     }
 
+    /**
+     * Records fixture entry and verifies serialization.
+     */
     public void before() {
-        int current = concurrentCount.incrementAndGet();
+        final var current = concurrentCount.incrementAndGet();
         maxConcurrentCount.accumulateAndGet(current, Math::max);
         beforeCount.incrementAndGet();
         assertThat(nextExpectedArgument.get()).isEqualTo(argumentIndex);
     }
 
+    /**
+     * Test body.
+     */
     public void test() {
         assertThat(concurrentCount.get()).isEqualTo(1);
         testCount.incrementAndGet();
     }
 
+    /**
+     * Records fixture exit.
+     */
     public void after() {
-        assertThat(nextExpectedArgument.get()).isEqualTo(argumentIndex);
         afterCount.incrementAndGet();
         nextExpectedArgument.incrementAndGet();
         concurrentCount.decrementAndGet();
     }
 
+    /**
+     * Verifies the aggregate expectations.
+     */
     public static void validate() {
         assertThat(beforeCount.get()).isEqualTo(ARGUMENT_COUNT);
         assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
         assertThat(afterCount.get()).isEqualTo(ARGUMENT_COUNT);
-        assertThat(concurrentCount.get()).isEqualTo(0);
+        assertThat(concurrentCount.get()).isZero();
         assertThat(maxConcurrentCount.get()).isEqualTo(1);
         assertThat(nextExpectedArgument.get()).isEqualTo(ARGUMENT_COUNT);
     }

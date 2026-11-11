@@ -1,75 +1,61 @@
 ---
 title: Runner
-description: Entry points for executing action trees and discovered factories.
+description: Compile a definition, execute it with bounded concurrency, and report the result.
 ---
 
 # Runner
 
-`Runner` executes one run and returns a `Result`. There is one entry point per intent.
-
-## Create a runner
-
 ```java
-var runner = Runner.builder().build();
-
-var custom = Runner.builder()
-        .configuration(configuration)
+Runner runner = Runner.builder()
+        .configuration(Configuration.defaultConfiguration())
+        .pool(Pool.named("environments"), 3)
         .listener(listener)
         .build();
+
+Result result = runner.run(definition);       // no discovery, no hooks
+Result discovered = runner.run(selector);     // discover exactly this selection
+Result configured = runner.run();             // use the configured selection
+int exitCode = result.exitCode();
 ```
 
-Builders are reusable; calling `build()` produces a new runner from the builder's current state.
+`Runner` is `AutoCloseable`. `close()` requests cooperative cancellation of an active run and is idempotent; a closed
+runner rejects further runs.
 
 ## Entry points
 
-| Method | What it does |
-| ------ | ------------ |
-| `run(Action)` | Executes exactly the supplied tree. No discovery, no classpath scan, no `@BeforeAll`/`@AfterAll` hooks. |
-| `run(Selector)` | Discovers factories with exactly the supplied selector and executes them. |
-| `run()` | Discovers factories with `Selector.configured()` (the `paramixel.match.*` keys). |
+| Method | Behavior |
+| --- | --- |
+| `run(Task)` | Executes the supplied definition. No classpath scan and no `@BeforeAll`/`@AfterAll`. |
+| `run(Selector)` | Discovers factories with exactly that selector. A configured `paramixel.match.*` key the selector does not use is reported as a warning instead of being merged silently. |
+| `run()` | Discovers with the configured selection. |
 
-Every entry point returns a `Result`; `Result.exitCode()` is the single exit-code authority:
+## Contract
 
-```java
-System.exit(Runner.builder().build().run().exitCode());
-```
+- **One run at a time per instance.** A concurrent call throws `IllegalStateException`; independent runners may run
+  concurrently and share no mutable framework state.
+- **Validation first.** Invalid configuration throws `ConfigurationException`; an invalid definition or plan throws
+  `CompilationException`; discovery problems throw `ResolverException`. In every case no factory, lifecycle callback, or
+  body has run.
+- **Synchronous completion.** A normal run returns after every occurrence settled and every finalizer ran.
+- **Non-quiescent runs.** A run whose callback ignored cancellation past the grace period returns with
+  `result.isQuiescent() == false`, withheld cleanup, and a non-zero exit code.
+- **Pool capacity precedence.** `Runner.Builder.pool(Pool, int)` → `paramixel.parallelism.<name>` → error for a user
+  pool. `paramixel.workers` separately bounds execution threads.
 
-`Launcher.main(String[])` does exactly that for command-line use.
-
-## Direct trees
-
-A direct tree is the complete definition, so nothing is scanned and no hook runs. Setup and teardown around a tree
-is a `Scope`:
-
-```java
-var tree = Scope.scope("suite")
-        .before(step("setup", context -> start()))
-        .body(sequential("tests").child(step("test", context -> verify())))
-        .after(step("teardown", context -> stop()))
-        .build();
-
-runner.run(tree);
-```
-
-`paramixel.failFast` applies to the direct children of the root, which for a direct tree is the tree's own first
-level.
-
-## Discovery runs and hooks
-
-`run()` and `run(Selector)` discover `@Paramixel.Factory` methods across the classpath. `@BeforeAll` and
-`@AfterAll` hooks are global in those runs: they are found across the whole classpath, not just in the selected
-packages, because they wrap the entire run rather than individual factories.
-
-The selector is used as given. When a `paramixel.match.*` key is set but the selector passed to `run(Selector)`
-does not use `Selector.configured()`, the runner reports it through `Listener.onWarning` instead of merging the key
-silently. Use `Selector.configured().and(mine)` to combine the configured filter with your own.
-
-## Shuffled discovery ordering
+## Builder
 
 ```java
-var runner = Runner.builder().shuffle().build();       // random seed
-var reproducible = Runner.builder().shuffle(42L).build();
+Runner.Builder builder = Runner.builder()
+        .configuration(configuration)
+        .pool(Pool.named("environments"), 3)
+        .listener(listener)
+        .shuffle(seed);          // or shuffle() for a seed chosen at build time
 ```
 
-Shuffle applies only to discovery-based execution (`run(Selector)` and `run()`). For a direct tree, use
-`Parallel.parallel(...).shuffle()` or `Sequential.sequential(...).shuffle()` on the builder.
+`shuffle` affects discovery ordering only; a direct definition controls its own shuffle. The effective seed is reported
+in `Result.shuffleSeed()`.
+
+## Next
+
+- [Result](../api/result) — the outcome tree.
+- [Listener](../api/listener) — event delivery.

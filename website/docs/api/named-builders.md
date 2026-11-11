@@ -1,71 +1,48 @@
 ---
-title: Named Builders
-description: Static factory methods for concise action tree definitions.
+title: Builder Variants
+description: Sequential, parallel, and repetition builder views.
 ---
 
-# Named Builders
+# Builder Variants
 
-Each composite action class provides a public static method named after the action
-that returns its `Builder`. Terminal action classes provide named static factory
-methods that return the action directly. Import statically for concise action
-tree definitions.
+`Tasks` returns one of three builder views. The view determines which policies compile.
 
-```java
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
-```
+| Builder | Created by | Extra methods |
+| --- | --- | --- |
+| `SequentialBuilder<T>` | `Tasks.task`, `Tasks.sequential`, `Tasks.forInstance`, `sequential(...)`, `step(..., children -> ...)` | `dependent()`, `independent()` |
+| `ParallelBuilder<T>` | `Tasks.parallel`, `parallel(...)` | none — parallel groups have no continuation policy |
+| `RepeatBuilder<T>` | `Tasks.repeat`, `repeat(...)` | `maxIterations`, `untilPassed`, `until`, `delay` |
 
-## Terminal actions (named factory methods)
-
-Terminal actions return the action directly rather than a builder:
-
-| Action | Factory | Description |
-|--------|---------|-------------|
-| `Step` | `step(name, consumer)` | Terminal action wrapping user logic. |
-| `Step` | `step(name, type, consumer)` | Terminal action that receives the enclosing fixture. |
-
-## Composite actions (named builder methods)
-
-| Action | Factory | Builder methods |
-|--------|---------|----------------|
-| `Scope` | `scope(name)` | `before`, `body`, `after` |
-| `Sequential` | `sequential(name)` | `child`, `children`, `each`, `dependent`/`independent`, `shuffle` |
-| `Parallel` | `parallel(name, pool)` | `child`, `children`, `each`, `shuffle` |
-| `Conditional` | `conditional(name, condition)` | `body` |
-| `Instance` | `of(name, type, factory)` / `of(type)` / `of(name, type)` | `before`, `body`, `after` |
-| `Isolated` | `isolated(name, lockName)` | `body` |
-| `Loop` | `loop(name)` | `body`, `maxIterations`, `until`, `untilPassed`, `delay(Backoff)` |
-| `Timeout` | `timeout(name)` | `body`, `timeout` |
-
-## Usage example
+## Sequential
 
 ```java
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.exception.FailException.fail;
-
-Action tree = scope("root")
-    .body(sequential("suite")
-        .child(step("login", ctx -> doLogin()))
-        .child(parallel("verify", "examples")
-            .child(step("ui", ctx -> checkUi()))
-            .child(step("api", ctx -> checkApi()))
-            .build())
-        .child(step("verified", ctx -> {
-            if (!isVerified()) {
-                throw fail("not verified");
-            }
-        }))
-        .child(step("think-time", ctx -> Thread.sleep(200)))
-        .build())
-    .build();
+sequential("Validation", tests -> tests
+    .independent()
+    .step("Check A", Test::checkA)
+    .step("Check B", Test::checkB));
 ```
 
-## See also
+If `Check A` fails and `Check B` passes, both run and the group is `FAILED`.
 
-- [Action](action) — the sealed interface and its subtypes
-- [Builder](builder) — mutable builders that produce immutable action snapshots
+## Parallel
+
+```java
+parallel("Environments", Pool.named("environments"), matrix -> matrix
+    .each(environments, env -> forInstance(env.name(), () -> new Probe(env))
+            .step("Verify", Probe::verify)));
+```
+
+Every direct child holds one permit of the named pool for its entire lifetime.
+
+## Repetition
+
+```java
+repeat("Poll readiness", poll -> poll
+    .maxIterations(5)
+    .untilPassed()
+    .delay(Backoff.fixed(Duration.ofMillis(250)))
+    .step("Probe", Probe::assertReady));
+```
+
+`maxIterations` is mandatory. Each iteration is a distinct attempt in the result tree, and an owned `forInstance` inside
+the repeated subtree is re-instantiated per iteration.

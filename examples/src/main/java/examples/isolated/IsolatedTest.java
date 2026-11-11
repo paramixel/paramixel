@@ -17,32 +17,32 @@
 package examples.isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Isolated.isolated;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates {@link org.paramixel.api.action.Isolated} as a serialization boundary inside a
- * {@link org.paramixel.api.action.Parallel}. Two Isolated nodes share a lock name so their bodies
- * never execute concurrently, while unrelated actions run in parallel.
+ * Demonstrates an exclusive logical lock as a serialization boundary inside parallel work.
  *
- * <p>Each body wraps a {@link org.paramixel.api.action.Scope} with setup, test, and teardown.
- * State isolation is provided by composing {@link org.paramixel.api.action.Isolated} with
- * {@link org.paramixel.api.action.Instance}.
+ * <p>Two {@code isolated} groups share the lock name {@code db-lock}, so their subtrees never overlap, while unrelated
+ * groups run concurrently. A lock is not a pool permit: a waiter occupies no worker thread and consumes no capacity of
+ * the surrounding pool.
+ *
+ * <p>Each scenario owns its own fixture, so the counter is per scenario and no shared mutable state is needed.
  */
 public class IsolatedTest {
 
-    private final AtomicInteger counter = new AtomicInteger();
+    private static final AtomicInteger insideLock = new AtomicInteger();
+    private static final AtomicInteger peakInsideLock = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -51,54 +51,83 @@ public class IsolatedTest {
     }
 
     /**
-     * Builds an action tree that exercises Isolated serialization.
+     * Builds a definition that exercises exclusive serialization.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
-        return parallel(IsolatedTest.class.getName(), "groups")
-                .child(isolated("serialized-group-1", "db-lock")
-                        .body(parallel("group-1-tests", "group-tests")
-                                .child(of("test-1a", IsolatedTest.class, IsolatedTest::new)
-                                        .body(scope("scenario")
-                                                .before(step("setup()", IsolatedTest.class, IsolatedTest::setup))
-                                                .body(step("run()", IsolatedTest.class, IsolatedTest::run))
-                                                .after(step("teardown()", IsolatedTest.class, IsolatedTest::teardown))))
-                                .child(of("test-1b", IsolatedTest.class, IsolatedTest::new)
-                                        .body(scope("scenario")
-                                                .before(step("setup()", IsolatedTest.class, IsolatedTest::setup))
-                                                .body(step("run()", IsolatedTest.class, IsolatedTest::run))
-                                                .after(step(
-                                                        "teardown()", IsolatedTest.class, IsolatedTest::teardown))))))
-                .child(isolated("serialized-group-2", "db-lock")
-                        .body(parallel("group-2-tests", "group-tests")
-                                .child(of("test-2a", IsolatedTest.class, IsolatedTest::new)
-                                        .body(scope("scenario")
-                                                .before(step("setup()", IsolatedTest.class, IsolatedTest::setup))
-                                                .body(step("run()", IsolatedTest.class, IsolatedTest::run))
-                                                .after(step("teardown()", IsolatedTest.class, IsolatedTest::teardown))))
-                                .child(of("test-2b", IsolatedTest.class, IsolatedTest::new)
-                                        .body(scope("scenario")
-                                                .before(step("setup()", IsolatedTest.class, IsolatedTest::setup))
-                                                .body(step("run()", IsolatedTest.class, IsolatedTest::run))
-                                                .after(step(
-                                                        "teardown()", IsolatedTest.class, IsolatedTest::teardown))))))
+    public static Task factory() {
+        insideLock.set(0);
+        peakInsideLock.set(0);
+
+        return parallel("IsolatedTest", Pool.named("groups"))
+                .child(sequential("serialized-group-1")
+                        .isolated("db-lock")
+                        .parallel(
+                                "group-1-tests",
+                                Pool.named("group-tests"),
+                                tests -> tests.each(java.util.List.of("test-1a", "test-1b"), name -> scenario(name))))
+                .child(sequential("serialized-group-2")
+                        .isolated("db-lock")
+                        .parallel(
+                                "group-2-tests",
+                                Pool.named("group-tests"),
+                                tests -> tests.each(java.util.List.of("test-2a", "test-2b"), name -> scenario(name))))
+                .after(() -> {
+                    assertThat(peakInsideLock.get()).isPositive();
+                })
                 .build();
     }
 
-    public IsolatedTest() {}
-
-    public void setup() {
-        counter.set(0);
+    private static org.paramixel.api.TaskBuilder<?, ?> scenario(final String name) {
+        return forInstance(name, Scenario::new)
+                .before(Scenario::setUp)
+                .step("run", Scenario::run)
+                .after(Scenario::tearDown);
     }
 
-    public void run() {
-        var value = counter.incrementAndGet();
-        assertThat(value).isEqualTo(1);
-    }
+    /**
+     * One owned fixture per scenario.
+     */
+    public static final class Scenario {
 
-    public void teardown() {
-        assertThat(counter.get()).isEqualTo(1);
+        private final AtomicInteger counter = new AtomicInteger();
+
+        /**
+         * Creates a scenario.
+         */
+        public Scenario() {
+            // Intentionally empty
+        }
+
+        /**
+         * Resets the fixture state.
+         */
+        public void setUp() {
+            counter.set(0);
+        }
+
+        /**
+         * Runs while holding the exclusive lock of the enclosing group.
+         *
+         * @throws InterruptedException if interrupted
+         */
+        public void run() throws InterruptedException {
+            final var active = insideLock.incrementAndGet();
+            peakInsideLock.accumulateAndGet(active, Math::max);
+            try {
+                counter.incrementAndGet();
+                Thread.sleep(10L);
+            } finally {
+                insideLock.decrementAndGet();
+            }
+        }
+
+        /**
+         * Verifies the fixture state.
+         */
+        public void tearDown() {
+            assertThat(counter.get()).isEqualTo(1);
+        }
     }
 }

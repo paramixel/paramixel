@@ -19,24 +19,67 @@ package org.paramixel.api;
 /**
  * Command-line entry point for a discovered Paramixel run.
  *
- * <p>Discovers and executes every {@code @Paramixel.Factory} on the classpath, then exits the JVM with
- * {@link Result#exitCode()}. Use it as a {@code main} class, for example from a Gradle {@code JavaExec} task or a
- * Maven plugin configuration.
+ * <p>The launcher owns {@link System#exit(int)}; {@link Runner} never terminates the JVM. Exit codes:
  *
- * @see Runner#run()
+ * <ul>
+ *   <li>{@code 0} — the run passed under the configured exit policy, or help was requested.</li>
+ *   <li>{@code 1} — the run failed, was canceled, or was mapped to failure by configuration.</li>
+ *   <li>{@code 2} — a usage error or an invalid configuration, definition, or discovery result.</li>
+ * </ul>
+ *
+ * <p>Supported arguments: {@code --help} prints usage; any other argument is a usage error. Use
+ * {@link Runner#run(org.paramixel.api.selector.Selector)} or {@code paramixel.match.*} configuration to select a
+ * subset of discovered factories.
  */
 public final class Launcher {
+
+    private static final int EXIT_USAGE = 2;
 
     private Launcher() {
         // Intentionally empty
     }
 
     /**
-     * Runs discovery and exits the JVM with the run's exit code.
+     * Runs discovery and exits the JVM with the resulting exit code.
      *
-     * @param args command-line arguments; ignored
+     * @param args command-line arguments
      */
     public static void main(final String[] args) {
-        System.exit(Runner.builder().build().run().exitCode());
+        System.exit(execute(args));
+    }
+
+    /**
+     * Executes the launcher without terminating the JVM.
+     *
+     * @param args command-line arguments
+     * @return the process exit code
+     */
+    public static int execute(final String[] args) {
+        if (args != null) {
+            for (String arg : args) {
+                if ("--help".equals(arg) || "-h".equals(arg)) {
+                    printUsage();
+                    return 0;
+                }
+                if (arg != null && !arg.isBlank()) {
+                    System.err.println("Unknown argument: " + arg);
+                    printUsage();
+                    return EXIT_USAGE;
+                }
+            }
+        }
+        try (var runner = Runner.builder().build()) {
+            return runner.run().exitCode();
+        } catch (RuntimeException e) {
+            System.err.println("Paramixel run failed to start: " + e.getMessage());
+            return EXIT_USAGE;
+        }
+    }
+
+    private static void printUsage() {
+        System.out.println("Usage: paramixel [--help]");
+        System.out.println();
+        System.out.println("Discovers and executes every @Paramixel.Factory on the classpath.");
+        System.out.println("Configuration keys are read from paramixel.properties and JVM system properties.");
     }
 }

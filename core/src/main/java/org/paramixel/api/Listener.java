@@ -17,106 +17,94 @@
 package org.paramixel.api;
 
 import java.util.Optional;
-import nonapi.org.paramixel.listener.DefaultListeners;
-import nonapi.org.paramixel.listener.SafeListener;
 
 /**
- * Receives run, discovery, and descriptor execution callbacks.
+ * Receives run-level notifications and execution events.
  *
- * <p>Actions own descriptor execution callbacks and invoke {@link #onBeforeExecution(Descriptor)}
- * and {@link #onAfterExecution(Descriptor)} around their own execution boundary. The runner invokes
- * run-level and discovery callbacks.
+ * <p>Delivery model:
+ *
+ * <ul>
+ *   <li>Events are produced by the scheduler and delivered by a dedicated dispatcher thread, so listener code never
+ *       runs while the scheduler holds a permit, plan, or lock.</li>
+ *   <li>The dispatcher queue is bounded. When it is full, the producer applies backpressure rather than dropping an
+ *       event, which slows admission instead of corrupting the event stream.</li>
+ *   <li>An exception thrown by a listener is isolated and recorded as a run diagnostic. It never changes a task's
+ *       semantic pass/fail status.</li>
+ *   <li>{@link #onRunCompleted(Result)} is delivered after all task events were drained, so reporting cannot race with
+ *       finalization.</li>
+ *   <li>A listener must not re-enter the running {@link Runner}; doing so is rejected.</li>
+ * </ul>
+ *
+ * <p>Implementations must be thread-safe: the dispatcher delivers events on one thread, but a listener may be shared
+ * with another run only when the implementation permits it.
  */
 public interface Listener {
 
+    /** A listener that ignores every callback. */
+    Listener NOOP = new Listener() {};
+
     /**
-     * Returns the standard listener chain using the supplied configuration.
-     *
-     * <p>The chain contains the status and summary listeners, plus a report listener when
-     * {@link Configuration#REPORT_FILE} is set. Prefer {@code Runner.builder().build()}, which wires this chain
-     * for you.
+     * Returns the default listener chain: status and summary console output, plus a report file writer when
+     * {@link Configuration#REPORT_FILE} is set.
      *
      * @param configuration the effective configuration; must not be {@code null}
-     * @return the default listener chain; never {@code null}
+     * @return the listener chain; never {@code null}
      * @throws NullPointerException if {@code configuration} is {@code null}
      */
     static Listener defaultListener(final Configuration configuration) {
-        return DefaultListeners.create(configuration);
+        return nonapi.org.paramixel.reporting.DefaultListeners.create(configuration);
     }
 
     /**
-     * Invoked exactly once when a run starts, before any warning, discovery or execution callback.
+     * Invoked once when a run starts, before discovery and execution.
      *
-     * <p>This is the first callback of a run: it replaces the former separate {@code initialize} callback, so a
-     * listener configures itself here.
-     *
-     * @param configuration the effective configuration of the run; never {@code null}
+     * @param configuration the effective configuration; never {@code null}
      */
     default void onRunStarted(final Configuration configuration) {
         // Intentionally empty
     }
 
     /**
-     * Invoked once before discovery begins, after {@link #onRunStarted(Configuration)}.
-     *
-     * <p>Implementations are responsible for thread-safety if they maintain mutable state.
+     * Invoked once before factory discovery begins.
      */
     default void onDiscoveryStarted() {
         // Intentionally empty
     }
 
     /**
-     * Invoked after discovery creates the descriptor tree, or when discovery finds nothing.
+     * Invoked after factory discovery produced the definition that will run.
      *
-     * @param root the discovered root descriptor, or empty when no descriptor was discovered
+     * @param root the discovered root definition, or an empty optional when nothing matched
      */
-    default void onDiscoveryCompleted(final Optional<Descriptor> root) {
+    default void onDiscoveryCompleted(final Optional<Task> root) {
         // Intentionally empty
     }
 
     /**
-     * Invoked when the runner detects a condition that does not fail the run but affects behavior.
+     * Invoked once for a condition that does not fail the run but changes behavior, such as an unknown configuration
+     * key or an ignored selector setting.
      *
-     * <p>Warnings report conditions that would otherwise be silently ignored: a {@code paramixel.match.*} key that
-     * the selector passed to {@code Runner.run(Selector)} does not use, and an unknown {@code paramixel.*} key.
-     * Warnings are delivered once per condition, after {@link #onRunStarted(Configuration)} and before execution.
-     *
-     * <p>Implementations must not throw; {@link SafeListener} isolates recoverable failures.
-     *
-     * @param message the human-readable warning; never {@code null}
+     * @param message the warning; never {@code null}
      */
     default void onWarning(final String message) {
         // Intentionally empty
     }
 
     /**
-     * Invoked immediately before a descriptor's execution logic runs.
+     * Invoked for each lifecycle event of each occurrence.
      *
-     * <p>This callback and {@link #onAfterExecution(Descriptor)} are invoked <strong>concurrently</strong> from
-     * pool worker threads, because a {@link org.paramixel.api.action.Parallel} runs its children at the same time.
-     * Implementations must be thread-safe; {@link SafeListener} isolates recoverable failures.
+     * <p>Exactly one {@link TaskPhase#TERMINAL} event is delivered per occurrence.
      *
-     * @param descriptor the descriptor about to execute; never {@code null}
+     * @param event the event; never {@code null}
      */
-    default void onBeforeExecution(final Descriptor descriptor) {
+    default void onTaskEvent(final TaskEvent event) {
         // Intentionally empty
     }
 
     /**
-     * Invoked after a descriptor reaches a terminal status.
+     * Invoked once after the run completed and all task events were delivered.
      *
-     * <p>Invoked concurrently, exactly as {@link #onBeforeExecution(Descriptor)}.
-     *
-     * @param descriptor the completed descriptor; never {@code null}
-     */
-    default void onAfterExecution(final Descriptor descriptor) {
-        // Intentionally empty
-    }
-
-    /**
-     * Invoked once after the run completes.
-     *
-     * @param result the run result containing the root descriptor and effective aggregate status; never {@code null}
+     * @param result the immutable result; never {@code null}
      */
     default void onRunCompleted(final Result result) {
         // Intentionally empty

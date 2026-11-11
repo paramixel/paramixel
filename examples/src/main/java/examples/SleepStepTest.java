@@ -16,24 +16,23 @@
 
 package examples;
 
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.ThreadLocalRandom;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates pausing a branch with a {@link org.paramixel.api.action.Step}.
+ * Demonstrates pausing a branch with a step.
  *
- * <p>A delay is ordinary user code: the step sleeps on the thread that owns the branch, so it holds
- * whatever pool permit and lock that branch holds, exactly like any other step.
+ * <p>A delay is ordinary user code: the step sleeps on the worker that owns the branch, so it holds whatever permit and
+ * lock the branch holds, exactly like any other callback.
  */
 public class SleepStepTest {
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -42,18 +41,18 @@ public class SleepStepTest {
     }
 
     /**
-     * Builds a tree of fixed and random pauses.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         return sequential("sleep-steps")
-                .child(step("fixed pause", context -> Thread.sleep(100L)))
-                .child(step(
+                .step("fixed pause", () -> Thread.sleep(50L))
+                .step(
                         "random pause",
-                        context -> Thread.sleep(ThreadLocalRandom.current().nextLong(50L, 150L))))
-                .child(step("no pause", context -> Thread.sleep(0L)))
+                        () -> Thread.sleep(ThreadLocalRandom.current().nextLong(10L, 50L)))
+                .step("no pause", () -> Thread.sleep(0L))
                 .build();
     }
 }

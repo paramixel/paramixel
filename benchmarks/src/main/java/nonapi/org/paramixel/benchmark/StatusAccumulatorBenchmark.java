@@ -16,9 +16,9 @@
 
 package nonapi.org.paramixel.benchmark;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
-import nonapi.org.paramixel.action.StatusAccumulator;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -34,56 +34,41 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Status;
-import org.paramixel.api.action.Step;
 
 /**
- * Micro-benchmark measuring throughput of {@link StatusAccumulator#include} with
- * varying numbers of descriptors.
- *
- * <p>Isolates the cost of 4 virtual-dispatch + synchronized calls per descriptor
- * vs. a single status() call with switch dispatch.
+ * Measures the cost of aggregating a result set with the fixed severity ordering.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 3, time = 3)
-@Measurement(iterations = 5, time = 3)
-@Fork(2)
+@Warmup(iterations = 3, time = 2)
+@Measurement(iterations = 5, time = 2)
+@Fork(1)
 @Threads(1)
 public class StatusAccumulatorBenchmark {
 
     @Benchmark
-    public void includeDescriptors(AccumulatorState state, Blackhole blackhole) {
-        for (var descriptor : state.descriptors) {
-            var acc = new StatusAccumulator();
-            acc.include(descriptor);
-            blackhole.consume(acc.status());
-        }
+    public void aggregate(final AccumulatorState state, final Blackhole blackhole) {
+        blackhole.consume(Status.mostSevere(state.statuses));
     }
 
     @State(Scope.Benchmark)
     public static class AccumulatorState {
 
         @Param({"10", "100", "1000"})
-        private int descriptorCount;
+        private int size;
 
-        private ConcreteDescriptor[] descriptors;
+        private List<Status> statuses;
 
         @Setup(Level.Trial)
         public void setup() {
-            descriptors = new ConcreteDescriptor[descriptorCount];
-            for (var i = 0; i < descriptorCount; i++) {
-                var action = Step.step("bench-" + i, ctx -> {});
-                var d = new ConcreteDescriptor(action);
-                d.setStatus(Status.RUNNING);
-                // Alternate between terminal statuses
-                switch (i % 4) {
-                    case 0 -> d.setStatus(Status.PASSED);
-                    case 1 -> d.setStatus(Status.failed("fail-" + i));
-                    case 2 -> d.setStatus(Status.skipped("skip-" + i));
-                    case 3 -> d.setStatus(Status.aborted("abort-" + i));
-                    default -> {}
-                }
-                descriptors[i] = d;
+            statuses = new ArrayList<>(size);
+            for (var i = 0; i < size; i++) {
+                statuses.add(
+                        switch (i % 3) {
+                            case 0 -> Status.PASSED;
+                            case 1 -> Status.skipped("skipped");
+                            default -> Status.failed("failed");
+                        });
             }
         }
     }

@@ -16,13 +16,13 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.Task;
 
 /**
  * Fails the run while leaving a non-daemon thread behind that retains the test classloader, so
@@ -48,11 +48,16 @@ public final class LingeringFailingMojoFixture {
         return LINGERING_THREAD.get();
     }
 
+    /**
+     * Builds a definition that spawns a lingering thread and then fails.
+     *
+     * @return the definition
+     */
     @Paramixel.Factory
-    public static Action action() {
-        return Sequential.sequential("lingering-fail")
-                .child(Step.step("spawn-lingering-thread", context -> {
-                    var thread = new Thread(
+    public static Task action() {
+        return sequential("lingering-fail")
+                .step("spawn-lingering-thread", () -> {
+                    final var thread = new Thread(
                             () -> {
                                 try {
                                     THREAD_RELEASE.await(60, TimeUnit.SECONDS);
@@ -65,10 +70,10 @@ public final class LingeringFailingMojoFixture {
                     thread.setContextClassLoader(Thread.currentThread().getContextClassLoader());
                     LINGERING_THREAD.set(thread);
                     thread.start();
-                }))
-                .child(Step.step("fail", context -> {
+                })
+                .step("fail", () -> {
                     throw new RuntimeException("boom");
-                }))
+                })
                 .build();
     }
 }

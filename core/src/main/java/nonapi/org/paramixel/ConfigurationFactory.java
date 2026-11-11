@@ -127,10 +127,16 @@ public final class ConfigurationFactory {
     }
 
     private static void configureDefaults(final TreeMap<String, String> map) {
-        map.putIfAbsent(
-                Configuration.RUNNER_PARALLELISM,
-                String.valueOf(Runtime.getRuntime().availableProcessors()));
+        final var cores = Runtime.getRuntime().availableProcessors();
+        map.putIfAbsent(Configuration.RUNNER_PARALLELISM, String.valueOf(cores));
+        map.putIfAbsent(Configuration.WORKERS, String.valueOf(cores));
+        map.putIfAbsent(Configuration.SHUTDOWN_GRACE_MILLIS, "10000");
+        map.putIfAbsent(Configuration.LISTENER_QUEUE_CAPACITY, "8192");
         map.putIfAbsent(Configuration.FAILURE_ON_ABORT, "true");
+        map.putIfAbsent(Configuration.FAILURE_ON_SKIP, "true");
+        map.putIfAbsent(Configuration.FAIL_IF_NO_TESTS, "true");
+        map.putIfAbsent(Configuration.FAIL_FAST, "false");
+        map.putIfAbsent(Configuration.ANSI, "auto");
     }
 
     /**

@@ -46,16 +46,16 @@ import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Maven mojo bound to the {@code test} goal that discovers and executes Paramixel action trees
+ * Maven mojo bound to the {@code test} goal that discovers and executes Paramixel task definitions
  * during the {@link LifecyclePhase#TEST} phase with {@link ResolutionScope#TEST} dependency resolution.
  *
- * <p>The mojo resolves action factories from the test classpath using the runner's internal classpath scanner,
+ * <p>The mojo resolves task factories from the test classpath using the runner's internal classpath scanner,
  * executes them with a {@link Runner}, and fails the build when {@link Result#exitCode()} is non-zero.
  * Configuration-based promotion rules ({@code failureOnSkip}, {@code failureOnAbort}) are already
  * applied by the result's effective status, so skipped and aborted outcomes are promoted to failed when
  * the corresponding flags are enabled.
  *
- * <p>The action tree is executed exactly once. The result is returned directly from the runner,
+ * <p>The task definition is executed exactly once. The result is returned directly from the runner,
  * avoiding redundant re-execution.
  *
  * <p>During execution the thread context classloader is replaced with a test classloader derived
@@ -84,7 +84,7 @@ public class ParamixelMojo extends AbstractMojo {
     }
 
     /**
-     * The Maven project being built; used to resolve test classpath elements for action discovery.
+     * The Maven project being built; used to resolve test classpath elements for factory discovery.
      */
     @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
@@ -96,15 +96,15 @@ public class ParamixelMojo extends AbstractMojo {
     private boolean skipTests;
 
     /**
-     * When {@code true}, fail the build when no action factories are discovered.
+     * When {@code true}, fail the build when no task factories are discovered.
      */
-    @Parameter(property = "paramixel.failIfNoTests", defaultValue = "false")
+    @Parameter(property = "paramixel.failIfNoTests", defaultValue = "true")
     private boolean failIfNoTests;
 
     /**
      * When {@code true}, SKIP results are treated as failures and cause the build to fail.
      */
-    @Parameter(property = "paramixel.failureOnSkip", defaultValue = "false")
+    @Parameter(property = "paramixel.failureOnSkip", defaultValue = "true")
     private boolean failureOnSkip;
 
     /**
@@ -115,7 +115,7 @@ public class ParamixelMojo extends AbstractMojo {
 
     /**
      * When {@code true}, the scheduler skips remaining unscheduled root children after the first
-     * failed or aborted action.
+     * failed or aborted root task.
      */
     @Parameter(property = "paramixel.failFast", defaultValue = "false")
     private boolean failFast;
@@ -127,7 +127,7 @@ public class ParamixelMojo extends AbstractMojo {
     private String reportFile;
 
     /**
-     * Package-name regular expression for filtering discovered action factories.
+     * Package-name regular expression for filtering discovered task factories.
      *
      * <p>When set, only classes whose package name matches the pattern are considered for discovery.
      */
@@ -135,7 +135,7 @@ public class ParamixelMojo extends AbstractMojo {
     private String matchPackage;
 
     /**
-     * Fully qualified class-name regular expression for filtering discovered action factories.
+     * Fully qualified class-name regular expression for filtering discovered task factories.
      *
      * <p>When set, only classes whose fully qualified name matches the pattern are considered for discovery.
      */
@@ -143,7 +143,7 @@ public class ParamixelMojo extends AbstractMojo {
     private String matchClass;
 
     /**
-     * Tag regular expression for filtering discovered action factories.
+     * Tag regular expression for filtering discovered task factories.
      *
      * <p>When set, only methods tagged with a matching {@code @Paramixel.Tag} value are considered for discovery.
      */
@@ -182,7 +182,7 @@ public class ParamixelMojo extends AbstractMojo {
             "process-reaper");
 
     /**
-     * Discovers and executes Paramixel action trees from the test classpath.
+     * Discovers and executes Paramixel task definitions from the test classpath.
      *
      * <p>Replaces the thread context classloader with a test classloader for the duration of execution,
      * restoring the original classloader in a {@code finally} block. After execution, checks for
@@ -192,7 +192,7 @@ public class ParamixelMojo extends AbstractMojo {
      * <p>Fails the build when the run's exit code is non-zero. Configuration-based
      * promotion rules ({@code failureOnSkip}, {@code failureOnAbort}) are applied by the runner result.
      *
-     * @throws MojoExecutionException when configuration is invalid, action resolution fails,
+     * @throws MojoExecutionException when configuration is invalid, factory resolution fails,
      *     lingering threads are detected with {@code strictThreadLifecycle} enabled,
      *     or an unexpected error occurs during execution. When a primary exception is already
      *     in flight (for example a {@code MojoFailureException} from failed tests), a
@@ -225,7 +225,7 @@ public class ParamixelMojo extends AbstractMojo {
                         .build();
 
                 var result = runner.run(selector);
-                if (result.descriptor().isEmpty()) {
+                if (result.root().isEmpty()) {
                     if (failIfNoTests) {
                         throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
                     }
@@ -257,7 +257,7 @@ public class ParamixelMojo extends AbstractMojo {
         } catch (ConfigurationException e) {
             throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);
         } catch (ResolverException e) {
-            throw new MojoExecutionException("Failed to resolve Paramixel actions: " + e.getMessage(), e);
+            throw new MojoExecutionException("Failed to resolve Paramixel factories: " + e.getMessage(), e);
         } catch (MojoFailureException | MojoExecutionException e) {
             throw e;
         } catch (Exception e) {
@@ -266,12 +266,12 @@ public class ParamixelMojo extends AbstractMojo {
     }
 
     /**
-     * Builds a {@link Selector} from POM parameters for action discovery filtering.
+     * Builds a {@link Selector} from POM parameters for factory discovery filtering.
      *
      * <p>All match parameters that are set are combined, so a run can filter by package, class and tag at once.
      * When no match parameter is configured, the returned selector selects everything.
      *
-     * @return the selector for action discovery
+     * @return the selector for factory discovery
      */
     Selector buildSelector() {
         var builder = Selector.builder();
@@ -325,7 +325,7 @@ public class ParamixelMojo extends AbstractMojo {
      * Compares the current set of non-daemon threads against a pre-execution baseline
      * and warns or fails when new threads are detected that hold a reference to the test classloader.
      *
-     * @param baseline the mutable set of non-daemon threads captured before action execution
+     * @param baseline the mutable set of non-daemon threads captured before task execution
      * @throws MojoExecutionException when {@code strictThreadLifecycle} is {@code true}
      *     and lingering threads are detected
      */
@@ -399,22 +399,16 @@ public class ParamixelMojo extends AbstractMojo {
         putIfNotBlank(configMap, Configuration.REPORT_FILE, reportFile);
 
         // <configuration><failureOnSkip> overrides POM properties
-        if (failureOnSkip) {
-            configMap.put(Configuration.FAILURE_ON_SKIP, "true");
-        }
+        configMap.put(Configuration.FAILURE_ON_SKIP, String.valueOf(failureOnSkip));
 
         // <configuration><failureOnAbort> overrides POM properties
         configMap.put(Configuration.FAILURE_ON_ABORT, String.valueOf(failureOnAbort));
 
         // <configuration><failIfNoTests> overrides POM properties
-        if (failIfNoTests) {
-            configMap.put(Configuration.FAIL_IF_NO_TESTS, "true");
-        }
+        configMap.put(Configuration.FAIL_IF_NO_TESTS, String.valueOf(failIfNoTests));
 
         // <configuration><failFast> overrides POM properties
-        if (failFast) {
-            configMap.put(Configuration.FAIL_FAST, "true");
-        }
+        configMap.put(Configuration.FAIL_FAST, String.valueOf(failFast));
 
         // System properties always win (matches JUnit Platform precedence).
         // Note: defaultConfiguration(classLoader) above already includes system

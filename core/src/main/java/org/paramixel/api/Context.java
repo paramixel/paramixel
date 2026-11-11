@@ -16,59 +16,133 @@
 
 package org.paramixel.api;
 
-import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * Read-only runtime services for an active action execution.
+ * Read-only execution metadata and explicitly keyed resources for one occurrence.
  *
- * <p>Actions use this context to read the configuration, the current {@link Descriptor}, and the
- * fixture instances provided by enclosing {@link org.paramixel.api.action.Instance} actions.
- * Descriptor traversal, scheduling, status transitions, and listener notifications are owned by the
- * runner and execution engine.
+ * <p>A context belongs to one execution occurrence of one run. It exposes stable identity, the effective
+ * configuration, the declared primary instance of the nearest lexical {@code forInstance} binding, and any secondary
+ * resources declared by the occurrence or its ancestors.
  *
- * <p>This interface is <strong>not for implementation by users</strong>: the framework supplies the
- * only implementation. Fixtures are provided by an {@code Instance} in the tree and are never bound
- * dynamically, so the compile step can validate every typed step before any user code runs.
+ * <p>Primary fixtures are <strong>not</strong> looked up by {@link Class}; typed callbacks receive them directly, and
+ * additional objects are reached through an explicit {@link Key}. A context never exposes mutable execution state and
+ * must not be retained after its callback returns.
+ *
+ * <p>This interface is not for implementation by users: the framework supplies the only implementations.
  */
 public interface Context {
 
     /**
-     * Returns the configuration for the current run.
+     * Returns the effective configuration of the run.
      *
-     * @return the run configuration; never {@code null}
+     * @return the configuration; never {@code null}
      */
     Configuration configuration();
 
     /**
-     * Returns the descriptor of the action currently executing.
+     * Returns the stable identifier of the run.
      *
-     * @return the current descriptor; never {@code null}
+     * @return the run identifier; never {@code null}
      */
-    Descriptor descriptor();
+    String runId();
 
     /**
-     * Returns the current fixture instance for the requested type.
+     * Returns the stable identifier of this occurrence within the run.
      *
-     * @param <T> the requested instance type
-     * @param type the requested instance class; must not be {@code null}
-     * @return the instance, or empty when no compatible instance is available
+     * <p>The identifier is derived from the compiled structure, not from completion order, thread identity, or object
+     * identity.
+     *
+     * @return the occurrence identifier; never {@code null}
      */
-    <T> Optional<T> instance(Class<T> type);
+    String occurrenceId();
 
     /**
-     * Returns the current fixture instance for the requested type, throwing if none is available.
+     * Returns the identifier of the parent occurrence.
      *
-     * @param <T> the requested instance type
-     * @param type the requested instance class; must not be {@code null}
-     * @return the instance
-     * @throws NullPointerException if {@code type} is {@code null}
-     * @throws IllegalStateException if no compatible instance is available
+     * @return the parent identifier, or an empty optional for the root occurrence
      */
-    default <T> T requireInstance(final Class<T> type) {
-        Objects.requireNonNull(type, "type is null");
+    Optional<String> parentOccurrenceId();
 
-        return instance(type)
-                .orElseThrow(() -> new IllegalStateException("No instance is available for " + type.getName()));
-    }
+    /**
+     * Returns the display name of this occurrence.
+     *
+     * @return the name; never {@code null}
+     */
+    String name();
+
+    /**
+     * Returns the display-name path from the run root to this occurrence.
+     *
+     * <p>Framework scaffolding added by factory discovery is excluded, so a discovered factory's path starts at the
+     * factory name. Use {@link #occurrenceId()} for stable identity.
+     *
+     * @return the path; never {@code null}
+     */
+    String path();
+
+    /**
+     * Returns the 1-based attempt index of the current execution attempt.
+     *
+     * @return the attempt index; at least one
+     */
+    int attempt();
+
+    /**
+     * Returns the tags declared by this occurrence.
+     *
+     * @return the immutable tags; never {@code null}
+     */
+    List<String> tags();
+
+    /**
+     * Returns whether cooperative cancellation has been requested for this occurrence or an ancestor.
+     *
+     * <p>Cancellation is cooperative. Paramixel can request interruption and stop admitting new work, but it cannot
+     * forcibly stop a callback that ignores interruption.
+     *
+     * @return {@code true} when cancellation was requested
+     */
+    boolean isCanceled();
+
+    /**
+     * Returns the cancellation reason, when cancellation was requested.
+     *
+     * @return the reason, or an empty optional
+     */
+    Optional<String> cancellationReason();
+
+    /**
+     * Returns the primary instance of the nearest lexical {@code forInstance} binding.
+     *
+     * <p>Typed callbacks receive this instance as their argument; the method exists for framework adapters and for
+     * advanced code that needs the raw value. A nested {@code forInstance} task establishes its own binding and does
+     * not make an outer instance implicitly available through this method.
+     *
+     * @return the bound primary instance; never {@code null}
+     * @throws IllegalStateException if no primary instance is bound in this occurrence's lexical scope
+     */
+    Object primaryInstance();
+
+    /**
+     * Returns the resource bound to the supplied key in this scope or an enclosing scope.
+     *
+     * @param <T> the resource type
+     * @param key the resource key; must not be {@code null}
+     * @return the resource
+     * @throws NullPointerException if {@code key} is {@code null}
+     * @throws org.paramixel.api.exception.ResourceException if the resource is not available
+     */
+    <T> T require(Key<T> key);
+
+    /**
+     * Returns the resource bound to the supplied key, when available.
+     *
+     * @param <T> the resource type
+     * @param key the resource key; must not be {@code null}
+     * @return the resource, or an empty optional
+     * @throws NullPointerException if {@code key} is {@code null}
+     */
+    <T> Optional<T> find(Key<T> key);
 }

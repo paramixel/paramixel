@@ -17,47 +17,64 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates that the framework does not implicitly close an owned instance.
+ *
+ * <p>{@code SimpleTest} implements {@link AutoCloseable}, yet {@code close()} runs only because an explicit
+ * {@code after} callback calls it. Implicit closing was deliberately removed in 7.0: it makes ownership ambiguous when
+ * a fixture is shared with an enclosing scope.
+ */
 public class SimpleTest implements AutoCloseable {
-
-    private static final int EXPECTED_TEST_COUNT = 1;
 
     private static final AtomicInteger testCount = new AtomicInteger();
 
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
         System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
+    /**
+     * Builds the definition.
+     *
+     * @return the definition for this test
+     */
     @Paramixel.Factory
-    public static Action factory() {
-        resetCounts();
+    public static Task factory() {
+        testCount.set(0);
 
-        return of("FullLifecycleTest", SimpleTest.class, SimpleTest::new)
-                .body(step("testOne()", SimpleTest.class, SimpleTest::testOne))
+        return forInstance("SimpleTest", SimpleTest::new)
+                .step("testOne", SimpleTest::testOne)
+                .after(SimpleTest::close)
                 .build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public SimpleTest() {
         // Intentionally empty
     }
 
+    /**
+     * Test body.
+     */
     public void testOne() {
         testCount.incrementAndGet();
     }
 
-    private static void resetCounts() {
-        testCount.set(0);
-    }
-
     @Override
     public void close() {
-        assertThat(testCount.get()).isEqualTo(EXPECTED_TEST_COUNT);
+        assertThat(testCount.get()).isEqualTo(1);
     }
 }

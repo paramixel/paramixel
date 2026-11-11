@@ -17,26 +17,23 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates parallel method execution on a single instance to verify thread safety.
- * Verifies that all methods execute exactly once, that concurrent method count drops
- * to zero on completion, and that peak concurrency exceeds 1 (proving true parallelism
- * on the same instance). Also verifies that all parallel methods received the same
- * instance object by collecting identity hash codes.
+ * Demonstrates that parallel siblings sharing one owned instance are concurrent calls on the same object.
+ *
+ * <p>Paramixel does not synchronize typed callbacks: the fixture decides what is safe. Here each parallel method records
+ * the instance identity and meets at a barrier sized to the pool capacity, proving both that the methods overlap and
+ * that they all target the same instance.
  */
 public class ParallelInstanceTest {
 
@@ -46,113 +43,88 @@ public class ParallelInstanceTest {
     private static final AtomicInteger testCount = new AtomicInteger();
     private static final AtomicInteger concurrentCount = new AtomicInteger();
     private static final AtomicInteger maxConcurrentCount = new AtomicInteger();
-    private static final AtomicInteger expectedConcurrency = new AtomicInteger();
-    private static volatile CountDownLatch latch = new CountDownLatch(1);
     private static final Set<Integer> instanceIds = ConcurrentHashMap.newKeySet();
+    private static volatile CountDownLatch latch = new CountDownLatch(1);
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         resetCounts();
-        System.exit(Runner.builder().build().run(factory()).exitCode());
+        System.exit(Runner.builder()
+                .pool(Pool.named("methods"), PARALLELISM)
+                .build()
+                .run(factory())
+                .exitCode());
     }
 
     /**
-     * Builds an instance tree with a parallel body that runs multiple methods
-     * concurrently on a single instance.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
 
-        var testName = ParallelInstanceTest.class.getName();
-
-        return scope(testName)
-                .body(of(testName, ParallelInstanceTest.class, ParallelInstanceTest::new)
-                        .before("before()", ParallelInstanceTest::before)
-                        .body(parallel("parallel-methods", "methods")
-                                .child(step("method1()", ParallelInstanceTest.class, ParallelInstanceTest::method1))
-                                .child(step("method2()", ParallelInstanceTest.class, ParallelInstanceTest::method2))
-                                .child(step("method3()", ParallelInstanceTest.class, ParallelInstanceTest::method3)))
-                        .after("after()", ParallelInstanceTest::after))
-                .after(step("validate", ignored -> validate()))
+        return forInstance("ParallelInstanceTest", ParallelInstanceTest::new)
+                .before(ParallelInstanceTest::noop)
+                .parallel(
+                        "parallel-methods",
+                        Pool.named("methods"),
+                        methods -> methods.step("method1", ParallelInstanceTest::method)
+                                .step("method2", ParallelInstanceTest::method)
+                                .step("method3", ParallelInstanceTest::method))
+                .after(ParallelInstanceTest::noop)
+                .after(ParallelInstanceTest::validate)
                 .build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public ParallelInstanceTest() {
         // Intentionally empty
     }
 
-    public void before() {
-        // Intentionally empty — concurrency is measured in parallel methods, not lifecycle hooks
+    /**
+     * A lifecycle hook that deliberately does nothing; concurrency is measured in the parallel methods.
+     */
+    public void noop() {
+        // Intentionally empty
     }
 
-    public void method1() throws InterruptedException {
-        var currentLatch = latch;
+    /**
+     * Records overlap and waits until every parallel sibling arrived.
+     *
+     * @throws InterruptedException if interrupted while waiting
+     */
+    public void method() throws InterruptedException {
+        final var currentLatch = latch;
         instanceIds.add(System.identityHashCode(this));
-        enter();
-        testCount.incrementAndGet();
-        currentLatch.countDown();
-        currentLatch.await();
-        exit();
-    }
-
-    public void method2() throws InterruptedException {
-        var currentLatch = latch;
-        instanceIds.add(System.identityHashCode(this));
-        enter();
-        testCount.incrementAndGet();
-        currentLatch.countDown();
-        currentLatch.await();
-        exit();
-    }
-
-    public void method3() throws InterruptedException {
-        var currentLatch = latch;
-        instanceIds.add(System.identityHashCode(this));
-        enter();
-        testCount.incrementAndGet();
-        currentLatch.countDown();
-        currentLatch.await();
-        exit();
-    }
-
-    public void after() {
-        // Intentionally empty — concurrency is measured in parallel methods, not lifecycle hooks
-    }
-
-    private void enter() {
-        int current = concurrentCount.incrementAndGet();
+        final var current = concurrentCount.incrementAndGet();
         maxConcurrentCount.accumulateAndGet(current, Math::max);
-    }
-
-    private void exit() {
+        testCount.incrementAndGet();
+        currentLatch.countDown();
+        currentLatch.await();
         concurrentCount.decrementAndGet();
     }
 
+    /**
+     * Verifies that all methods shared one instance and overlapped.
+     */
     public static void validate() {
-        var expected = expectedConcurrency.get();
         assertThat(testCount.get()).isEqualTo(METHOD_COUNT);
-        assertThat(concurrentCount.get()).isEqualTo(0);
-        if (expected > 1) {
-            assertThat(maxConcurrentCount.get()).isGreaterThan(1);
-        } else {
-            assertThat(maxConcurrentCount.get()).isEqualTo(1);
-        }
-        assertThat(maxConcurrentCount.get()).isLessThanOrEqualTo(expected);
+        assertThat(concurrentCount.get()).isZero();
+        assertThat(maxConcurrentCount.get()).isGreaterThan(1);
+        assertThat(maxConcurrentCount.get()).isLessThanOrEqualTo(PARALLELISM);
         assertThat(instanceIds).hasSize(1);
     }
 
     private static void resetCounts() {
-        var configuredParallelism = Integer.getInteger(Configuration.RUNNER_PARALLELISM, PARALLELISM);
-        var effectiveParallelism = Math.max(1, Math.min(PARALLELISM, configuredParallelism));
-        expectedConcurrency.set(effectiveParallelism);
-        latch = new CountDownLatch(effectiveParallelism);
+        latch = new CountDownLatch(PARALLELISM);
         testCount.set(0);
         concurrentCount.set(0);
         maxConcurrentCount.set(0);

@@ -17,31 +17,19 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Conditional.conditional;
-import static org.paramixel.api.action.Isolated.isolated;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Timeout.timeout;
-import static org.paramixel.api.exception.FailException.fail;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
+import org.paramixel.api.exception.FailException;
 
 /**
- * Demonstrates the named builder static factories for constructing action trees.
- *
- * <p>Each composite action provides a public static method named after the action
- * (e.g., {@code scope("name")}, {@code sequential("name")}) that returns the
- * corresponding {@code Builder}.
- *
- * <p>Contrast with {@link CustomActionTest} and {@link SequentialIterationExample}
- * to see the same patterns expressed with typed builders.
+ * Exercises the builder vocabulary in one definition: named steps, a parallel group, repetition, a timeout, a
+ * condition, an exclusive lock, lifecycle callbacks, and assertion steps.
  */
 public class NamedBuilderExample {
 
@@ -50,7 +38,7 @@ public class NamedBuilderExample {
     private static final AtomicInteger repeatCounter = new AtomicInteger();
 
     /**
-     * Entry point.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -60,55 +48,55 @@ public class NamedBuilderExample {
     }
 
     /**
-     * Builds an action tree using the named builder factories.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         reset();
-        var testName = NamedBuilderExample.class.getName();
 
-        return scope(testName)
-                .body(sequential("tests")
-                        .child(sequential("suite")
-                                .child(step("step-demo", context -> stepCounter.incrementAndGet()))
-                                .child(parallel("parallel-demo", "examples")
-                                        .child(step("branch-1", context -> parallelCounter.incrementAndGet()))
-                                        .child(step("branch-2", context -> parallelCounter.incrementAndGet()))
-                                        .child(step("branch-3", context -> parallelCounter.incrementAndGet())))
-                                .child(loop("repeat-demo")
-                                        .body(step("repeated", context -> repeatCounter.incrementAndGet()))
-                                        .maxIterations(3))
-                                .child(step("sleep-demo", context -> Thread.sleep(10)))
-                                .child(timeout("timeout-demo")
-                                        .timeout(Duration.ofSeconds(1))
-                                        .body(step("within-timeout", context -> {})))
-                                .child(conditional("conditional-demo", context -> true)
-                                        .body(step("runs-when-true", context -> {})))
-                                .child(isolated("isolated-demo", "test-lock").body(step("serialized", context -> {})))
-                                .child(scope("lifecycle-demo")
-                                        .before(step("init", context -> {}))
-                                        .body(step("body", context -> {}))
-                                        .after(step("cleanup", context -> {})))
-                                .child(sequential("assert-demo")
-                                        .child(step("true-is-true", context -> {
-                                            boolean actual = 1 == 1;
-                                            if (!actual) {
-                                                throw fail("expected true");
-                                            }
-                                        }))
-                                        .child(step("false-is-false", context -> {
-                                            boolean actual = 1 == 2;
-                                            if (actual) {
-                                                throw fail("expected false");
-                                            }
-                                        }))))
-                        .child(step("validate", context -> {
-                            assertThat(stepCounter.get()).isGreaterThanOrEqualTo(1);
-                            assertThat(parallelCounter.get()).isEqualTo(3);
-                            assertThat(repeatCounter.get()).isEqualTo(3);
-                        })))
+        return sequential("NamedBuilderExample")
+                .child(sequential("suite")
+                        .step("step-demo", stepCounter::incrementAndGet)
+                        .parallel(
+                                "parallel-demo",
+                                Pool.named("examples"),
+                                group -> group.step("branch-1", parallelCounter::incrementAndGet)
+                                        .step("branch-2", parallelCounter::incrementAndGet)
+                                        .step("branch-3", parallelCounter::incrementAndGet))
+                        .repeat(
+                                "repeat-demo",
+                                repeat -> repeat.maxIterations(3).step("repeated", repeatCounter::incrementAndGet))
+                        .step("sleep-demo", () -> Thread.sleep(10L))
+                        .timeout(Duration.ofSeconds(5))
+                        .when(
+                                "conditional-demo",
+                                context -> true,
+                                group -> group.step("runs-when-true", () -> {
+                                    // Intentionally empty
+                                }))
+                        .isolated("test-lock")
+                        .step("serialized", () -> {
+                            // Intentionally empty
+                        })
+                        .before(() -> {
+                            // Intentionally empty
+                        })
+                        .after(() -> {
+                            // Intentionally empty
+                        })
+                        .step("true-is-true", () -> {
+                            final boolean actual = 1 == 1;
+                            if (!actual) {
+                                throw FailException.fail("expected true");
+                            }
+                        }))
+                .step("validate", () -> {
+                    assertThat(stepCounter.get()).isGreaterThanOrEqualTo(1);
+                    assertThat(parallelCounter.get()).isEqualTo(3);
+                    assertThat(repeatCounter.get()).isEqualTo(3);
+                })
                 .build();
     }
 

@@ -10,16 +10,16 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 
 | Package | Purpose | Has Runner |
 |---|---|---|
-| `examples` | Parallel/sequential argument tests, iteration examples, assertion and sleep steps | Yes |
+| `examples` | Parallel/sequential matrices, assertion and sleep steps, nested pools, lifecycle and retry examples | Yes |
 | `examples.annotation` | `@Disabled` annotation behavior | Yes |
 | `examples.annotation.tags` | Tag-based test selection | Yes |
 | `examples.argument` | Argument type variants (primitives, collections, custom types, etc.) | Yes |
 | `examples.lifecycle` | Custom listeners and full lifecycle | Yes |
-| `examples.retry` | Retry support class demonstration | Yes |
+| `examples.retry` | Bounded retry policies, fresh instance per attempt, attempt history | Yes |
 | `examples.support` | Shared utilities (Logger, Resource, NetworkFactory, Debug) | N/A |
-| `examples.isolated` | Named-lock serialized execution with Instance isolation | Yes |
-| `examples.loop` | `Loop` with `until`, `untilPassed` and `Backoff` delays | Yes |
-| `examples.fixtures` | The fixture-per-environment shape: typed `Instance`, `each`, and a bounded pool | No |
+| `examples.isolated` | Exclusive lock serialization inside parallel work | Yes |
+| `examples.loop` | Bounded `repeat` with `until`, `untilPassed`, and `Backoff` delays | Yes |
+| `examples.fixtures` | The fixture-per-environment shape: `forInstance`, `each`, and a bounded pool | No |
 | `examples.testcontainers.kafka` | Kafka integration test + environment + wait strategy | N/A |
 | `examples.testcontainers.mongodb` | MongoDB integration test + environment | N/A |
 | `examples.testcontainers.nginx` | Nginx integration test + environment | N/A |

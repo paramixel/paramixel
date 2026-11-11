@@ -17,21 +17,18 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates dependent argument execution where arguments run one at a time.
- * Verifies that each argument waits for the previous argument to complete, that all
- * tests execute exactly once, and that max concurrency never exceeds 1.
+ * Demonstrates a dependent sequence of fixtures: each fixture runs its three tests in order, and the next fixture starts
+ * only after the previous one finished, so at most one fixture is active at a time.
  */
 public class DependentArgumentTest {
 
@@ -48,7 +45,7 @@ public class DependentArgumentTest {
     private final int argumentIndex;
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -58,37 +55,29 @@ public class DependentArgumentTest {
     }
 
     /**
-     * Builds a sequential argument tree with per-argument before/after callbacks.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
-
-        var testName = DependentArgumentTest.class.getName();
-        var arguments =
+        final var arguments =
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
-        return scope(testName)
-                .body(sequential(testName).each(arguments, value -> {
-                    int argumentIndex = Integer.parseInt(value.substring("string-".length()));
-                    return of(value, DependentArgumentTest.class, () -> new DependentArgumentTest(argumentIndex))
-                            .body(scope("scope")
-                                    .before(step(
-                                            "before()", DependentArgumentTest.class, DependentArgumentTest::before))
-                                    .body(sequential(value)
-                                            .child(step(
-                                                    "test()", DependentArgumentTest.class, DependentArgumentTest::test))
-                                            .child(step(
-                                                    "test()", DependentArgumentTest.class, DependentArgumentTest::test))
-                                            .child(step(
-                                                    "test()",
-                                                    DependentArgumentTest.class,
-                                                    DependentArgumentTest::test)))
-                                    .after(step("after()", DependentArgumentTest.class, DependentArgumentTest::after)));
-                }))
-                .after(step("validate", ignored -> validate()))
+        return sequential("DependentArgumentTest")
+                .each(
+                        arguments,
+                        value -> forInstance(
+                                        value,
+                                        () -> new DependentArgumentTest(
+                                                Integer.parseInt(value.substring("string-".length()))))
+                                .before(DependentArgumentTest::before)
+                                .step("test", DependentArgumentTest::test)
+                                .step("test", DependentArgumentTest::test)
+                                .step("test", DependentArgumentTest::test)
+                                .after(DependentArgumentTest::after))
+                .after(DependentArgumentTest::validate)
                 .build();
     }
 
@@ -96,18 +85,27 @@ public class DependentArgumentTest {
         this.argumentIndex = argumentIndex;
     }
 
+    /**
+     * Records fixture entry and verifies serialization.
+     */
     public void before() {
-        int current = concurrentCount.incrementAndGet();
+        final var current = concurrentCount.incrementAndGet();
         maxConcurrentCount.accumulateAndGet(current, Math::max);
         beforeCount.incrementAndGet();
         assertThat(nextExpectedArgument.get()).isEqualTo(argumentIndex);
     }
 
+    /**
+     * Test body.
+     */
     public void test() {
         assertThat(concurrentCount.get()).isEqualTo(1);
         testCount.incrementAndGet();
     }
 
+    /**
+     * Records fixture exit.
+     */
     public void after() {
         assertThat(nextExpectedArgument.get()).isEqualTo(argumentIndex);
         afterCount.incrementAndGet();
@@ -115,11 +113,14 @@ public class DependentArgumentTest {
         concurrentCount.decrementAndGet();
     }
 
+    /**
+     * Verifies the aggregate expectations.
+     */
     public static void validate() {
         assertThat(beforeCount.get()).isEqualTo(ARGUMENT_COUNT);
         assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
         assertThat(afterCount.get()).isEqualTo(ARGUMENT_COUNT);
-        assertThat(concurrentCount.get()).isEqualTo(0);
+        assertThat(concurrentCount.get()).isZero();
         assertThat(maxConcurrentCount.get()).isEqualTo(1);
         assertThat(nextExpectedArgument.get()).isEqualTo(ARGUMENT_COUNT);
     }

@@ -15,7 +15,7 @@
  */
 
 /**
- * Paramixel: define an action tree, let the framework validate and compile it, then execute it.
+ * Paramixel: define an immutable task tree, let the framework validate and compile it, then execute it.
  *
  * <p>Only the {@code org.paramixel.api} packages are exported. Everything under {@code nonapi} is framework
  * internal: on the module path it is unreachable, and on the classpath it is internal by convention only.
@@ -25,7 +25,6 @@ module org.paramixel.api {
     requires java.xml;
 
     exports org.paramixel.api;
-    exports org.paramixel.api.action;
     exports org.paramixel.api.exception;
     exports org.paramixel.api.selector;
     exports org.paramixel.api.support;

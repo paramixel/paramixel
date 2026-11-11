@@ -20,24 +20,20 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Signals that an action should be marked as {@link org.paramixel.api.Status#SKIPPED skipped}
- * rather than executed or failed.
+ * Signals that a task deliberately does not run, so it should be marked
+ * {@link org.paramixel.api.Status.Kind#SKIPPED} with a reason.
  *
- * <p>This is a deliberate, author-initiated skip. The runtime catches {@code SkipException}
- * and records the descriptor as {@link org.paramixel.api.Status#SKIPPED}. Effect on
- * surrounding actions depends on the container: in a dependent
- * {@link org.paramixel.api.action.Sequential} a
- * skipped child short-circuits the sequence (remaining children are skipped); in an
- * independent {@link org.paramixel.api.action.Sequential} or
- * a {@link org.paramixel.api.action.Parallel},
- * remaining children still run; and in a {@link org.paramixel.api.action.Loop}
- * a skipped iteration does not stop the loop. This
- * exception can be instantiated directly through {@link #SkipException(String)},
- * {@link #SkipException(String, Throwable)}, or the factory methods {@link #skip()} and
- * {@link #skip(String)}, which return the exception so that it can be thrown at the call site
- * ({@code throw skip("x")}).
+ * <p>A skip is an author decision, not a failure and not an assumption abort. The runtime records the occurrence as
+ * {@code SKIPPED}; whether that fails a build is a run-level policy
+ * ({@link org.paramixel.api.Configuration#FAILURE_ON_SKIP}), not a task decision. A skipped child does not count as a
+ * passing child when a parent aggregates its children.
+ *
+ * <p>Use the factory methods {@link #skip()} and {@link #skip(String)} at the call site:
+ * {@code throw skip("no credentials configured")}.
  */
-public final class SkipException extends RuntimeException {
+public final class SkipException extends ParamixelException {
+
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates a skip exception with the supplied message.

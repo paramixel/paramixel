@@ -22,16 +22,15 @@ import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.ActionBuilder;
 import org.paramixel.api.selector.Selector;
 
 /**
  * Namespace class holding core annotations consumed by Paramixel discovery and execution; not
  * instantiable.
  *
- * <p>This class groups the annotations used by the framework for action discovery, tagging,
- * ordering, and disabling.
+ * <p>This class groups the annotations used by the framework for factory discovery, tagging, ordering, and disabling.
+ * The discovered definition model is the immutable {@link Task}; every discovered method returns a {@link Task} or a
+ * {@link TaskBuilder}.
  */
 public final class Paramixel {
 
@@ -42,14 +41,16 @@ public final class Paramixel {
     /**
      * Marks a method as a factory discovered by classpath scanning.
      *
-     * <p>Factory methods must produce {@link Action} or {@link ActionBuilder} instances, or
-     * {@code null} to indicate that the factory should be skipped. When a {@link ActionBuilder}
-     * is returned, it is built immediately to produce an {@link Action}. The framework
-     * invokes these methods during discovery to build the root action tree.
+     * <p>Factory methods must be {@code public static}, take no parameters, and return a {@link Task} or a
+     * {@link TaskBuilder}. A returned builder is built immediately. Returning {@code null} is an explicit skip with a
+     * recorded reason: the factory contributes no definition and discovery continues.
+     *
+     * <p>Discovery validates every matched factory before any test work runs, so an invalid shape fails the run with
+     * {@link org.paramixel.api.exception.ResolverException} rather than executing a partial suite.
      *
      * @see Runner
-     * @see Action
-     * @see ActionBuilder
+     * @see Task
+     * @see TaskBuilder
      */
     @Documented
     @Retention(RetentionPolicy.RUNTIME)
@@ -60,14 +61,12 @@ public final class Paramixel {
      * Marks a method that executes once before any discovered test actions
      * within a runner invocation.
      *
-     * <p>The method must be {@code public static}, take zero parameters, and
-     * return {@link Action} or {@link ActionBuilder}. Multiple {@code @BeforeAll}
-     * methods are ordered by {@link Priority @Priority} on the declaring
-     * class, then by package, class, and method name.
+     * <p>The method must be {@code public static}, take zero parameters, and return a {@link Task} or
+     * {@link TaskBuilder}. Multiple {@code @BeforeAll} methods are ordered by {@link Priority @Priority} on the
+     * declaring class, then by package, class, and method name.
      *
-     * <p>A failing or skipped {@code @BeforeAll} method causes the body of
-     * the run (all discovered factory actions) to be skipped. Any
-     * {@code @AfterAll} methods still execute.
+     * <p>A failing or skipped {@code @BeforeAll} method causes the discovered factory group to be skipped. Any
+     * {@code @AfterAll} method still executes.
      *
      * @see AfterAll
      */
@@ -80,11 +79,10 @@ public final class Paramixel {
      * Marks a method that executes once after all discovered test actions
      * within a runner invocation.
      *
-     * <p>The method must be {@code public static}, take zero parameters, and
-     * return {@link Action} or {@link ActionBuilder}. Multiple {@code @AfterAll}
-     * methods are ordered in reverse of {@code @BeforeAll} ordering. Every
-     * {@code @AfterAll} method executes regardless of whether preceding
-     * hooks or test actions failed.
+     * <p>The method must be {@code public static}, take zero parameters, and return a {@link Task} or
+     * {@link TaskBuilder}. Multiple {@code @AfterAll} methods are ordered in reverse of {@code @BeforeAll} ordering.
+     * Every {@code @AfterAll} method executes regardless of whether preceding hooks or discovered factories failed,
+     * subject to cooperative quiescence.
      *
      * @see BeforeAll
      */
@@ -94,7 +92,7 @@ public final class Paramixel {
     public @interface AfterAll {}
 
     /**
-     * Declares discovery ordering priority for a discovered action factory class.
+     * Declares discovery ordering priority for a discovered factory class.
      *
      * <p>Higher priority classes are ordered earlier when the framework builds the discovered
      * root action. Priority affects scheduling admission order only; concurrent execution does not

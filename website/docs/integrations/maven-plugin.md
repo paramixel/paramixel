@@ -5,15 +5,17 @@ description: Run Paramixel factories during the Maven test phase.
 
 # Maven Plugin
 
-The Maven plugin artifact is `org.paramixel:maven-plugin`. Its goal prefix is `paramixel`, and the main goal is `paramixel:test`.
+The Maven plugin artifact is `org.paramixel:maven-plugin`; the goal prefix is `paramixel` and the main goal is
+`paramixel:test`, bound to the `test` phase with test-scope dependency resolution.
 
 ```xml
 <plugin>
   <groupId>org.paramixel</groupId>
   <artifactId>maven-plugin</artifactId>
-  <version>6.1.0</version>
+  <version>7.0.0</version>
   <executions>
     <execution>
+      <phase>test</phase>
       <goals>
         <goal>test</goal>
       </goals>
@@ -24,27 +26,18 @@ The Maven plugin artifact is `org.paramixel:maven-plugin`. Its goal prefix is `p
 
 ## Parameters
 
-| Parameter | System property | Default | Description |
-| --- | --- | --- | --- |
-| `skipTests` | `paramixel.skipTests` | `false` | Skip Paramixel execution. |
-| `failIfNoTests` | `paramixel.failIfNoTests` | `false` | Fail if no factories are discovered. |
-| `failureOnSkip` | `paramixel.failureOnSkip` | `false` | Promote skipped aggregate results to build failure. |
-| `failureOnAbort` | `paramixel.failureOnAbort` | `true` | Promote aborted aggregate results to build failure. |
-| `failFast` | `paramixel.failFast` | `false` | Skip scheduling remaining root children after the first failure. |
-| `reportFile` | `paramixel.report.file` | unset | Write a report file. |
-| `matchPackage` | `paramixel.match.package.regex` | unset | Filter by package regex. |
-| `matchClass` | `paramixel.match.class.regex` | unset | Filter by fully qualified class regex. |
-| `matchTag` | `paramixel.match.tag.regex` | unset | Filter by tag regex. |
-| `strictThreadLifecycle` | `paramixel.strictThreadLifecycle` | `false` | Enable strict thread lifecycle checks in plugin execution. |
+| Parameter | Property | Default |
+| --- | --- | --- |
+| `skipTests` | `paramixel.skipTests` | `false` |
+| `failIfNoTests` | `paramixel.failIfNoTests` | `true` |
+| `failureOnSkip` | `paramixel.failureOnSkip` | `true` |
+| `failureOnAbort` | `paramixel.failureOnAbort` | `true` |
+| `failFast` | `paramixel.failFast` | `false` |
+| `reportFile` | `paramixel.report.file` | none |
+| `matchPackage` / `matchClass` / `matchTag` | `paramixel.match.*` | none |
+| `properties` | — | additional configuration keys |
+| `strictThreadLifecycle` | `paramixel.strictThreadLifecycle` | `false` |
 
-## POM properties
-
-The plugin also accepts a `<properties>` list of key/value pairs. Property precedence in the mojo is: Paramixel defaults, POM property declarations, the `reportFile` parameter, then system properties.
-
-## Run examples
-
-```bash
-mvn paramixel:test
-mvn test -Dparamixel.match.tag.regex=smoke
-mvn test -Dparamixel.skipTests=true
-```
+The mojo never calls `System.exit`: a non-zero result exit code becomes a `MojoFailureException`, and configuration,
+discovery, or plan errors become a `MojoExecutionException`. With `strictThreadLifecycle`, non-daemon threads that retain
+the test classloader are reported as an error rather than a warning.

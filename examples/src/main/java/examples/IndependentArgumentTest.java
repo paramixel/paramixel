@@ -17,20 +17,18 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates independent sequential argument execution where arguments run one at a time.
- * Verifies that all tests execute exactly once and that max concurrency never exceeds 1.
+ * Demonstrates an independent sequence of fixtures: every fixture is attempted in declaration order, even if an earlier
+ * fixture reported a non-passing outcome. Independence changes failure continuation, not concurrency.
  */
 public class IndependentArgumentTest {
 
@@ -42,7 +40,7 @@ public class IndependentArgumentTest {
     private static final AtomicInteger maxConcurrentCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -52,70 +50,65 @@ public class IndependentArgumentTest {
     }
 
     /**
-     * Builds a sequential argument tree with per-argument before/after callbacks.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
-
-        var testName = IndependentArgumentTest.class.getName();
-        var arguments =
+        final var arguments =
                 IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
 
-        return scope(testName)
-                .body(sequential(testName)
-                        .each(
-                                arguments,
-                                value -> of(value, IndependentArgumentTest.class, IndependentArgumentTest::new)
-                                        .body(scope("scope")
-                                                .before(step(
-                                                        "before()",
-                                                        IndependentArgumentTest.class,
-                                                        IndependentArgumentTest::before))
-                                                .body(sequential(value)
-                                                        .child(step(
-                                                                "test()",
-                                                                IndependentArgumentTest.class,
-                                                                IndependentArgumentTest::test))
-                                                        .child(step(
-                                                                "test()",
-                                                                IndependentArgumentTest.class,
-                                                                IndependentArgumentTest::test))
-                                                        .child(step(
-                                                                "test()",
-                                                                IndependentArgumentTest.class,
-                                                                IndependentArgumentTest::test)))
-                                                .after(step(
-                                                        "after()",
-                                                        IndependentArgumentTest.class,
-                                                        IndependentArgumentTest::after))))
-                        .independent())
-                .after(step("validate", ignored -> validate()))
+        return sequential("IndependentArgumentTest")
+                .independent()
+                .each(
+                        arguments,
+                        value -> forInstance(value, IndependentArgumentTest::new)
+                                .before(IndependentArgumentTest::before)
+                                .step("test", IndependentArgumentTest::test)
+                                .step("test", IndependentArgumentTest::test)
+                                .step("test", IndependentArgumentTest::test)
+                                .after(IndependentArgumentTest::after))
+                .after(IndependentArgumentTest::validate)
                 .build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public IndependentArgumentTest() {
         // Intentionally empty
     }
 
+    /**
+     * Records fixture entry.
+     */
     public void before() {
-        int current = concurrentCount.incrementAndGet();
+        final var current = concurrentCount.incrementAndGet();
         maxConcurrentCount.accumulateAndGet(current, Math::max);
     }
 
+    /**
+     * Test body.
+     */
     public void test() {
         testCount.incrementAndGet();
     }
 
+    /**
+     * Records fixture exit.
+     */
     public void after() {
         concurrentCount.decrementAndGet();
     }
 
+    /**
+     * Verifies the aggregate expectations.
+     */
     public static void validate() {
         assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
-        assertThat(concurrentCount.get()).isEqualTo(0);
+        assertThat(concurrentCount.get()).isZero();
         assertThat(maxConcurrentCount.get()).isEqualTo(1);
     }
 

@@ -20,33 +20,23 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Signals that an action should be marked as {@link org.paramixel.api.Status#ABORTED aborted}
- * rather than executed or failed.
+ * Signals that a task's assumption or precondition did not hold, so it should be marked
+ * {@link org.paramixel.api.Status.Kind#ABORTED} instead of executed or failed.
  *
- * <p>This indicates a <em>precondition or assumption failure</em> — the action could not run
- * due to an unmet condition. This is distinct from a deliberate
- * {@link org.paramixel.api.exception.SkipException skip} (the action chose not to run) and an
- * unexpected {@link org.paramixel.api.exception.FailException failure} (the action ran but an
- * assertion did not hold).
+ * <p>An abort is distinct from a deliberate {@link SkipException} (the task chose not to run) and from a
+ * {@link FailException} (the task ran and its assertion did not hold). The runtime records the occurrence as
+ * {@code ABORTED} and never reclassifies it as a passing skip.
  *
- * <p>The runtime catches {@code AbortException} and records the descriptor as
- * {@link org.paramixel.api.Status#ABORTED}. An abort does not, by itself, cancel sibling or
- * subsequent work: in a {@link org.paramixel.api.action.Sequential} or a
- * {@link org.paramixel.api.action.Parallel} an aborted child does not short-circuit the
- * surrounding action — remaining children still run, and the aggregate surfaces
- * {@link org.paramixel.api.Status#ABORTED}. (To stop the remaining children of a dependent
- * {@link org.paramixel.api.action.Sequential},
- * throw {@link org.paramixel.api.exception.FailException} instead.) The one exception is a
- * {@link org.paramixel.api.action.Loop}: there an
- * aborted iteration is treated as a request to stop iterating, so remaining iterations are
- * skipped and the action reports {@link org.paramixel.api.Status#ABORTED}.
+ * <p>An abort does not cancel the run and is never retried automatically. In a dependent sequential group an aborted
+ * child stops later siblings, exactly like a failure; in an independent sequential group or a parallel group the
+ * remaining eligible children still run.
  *
- * <p>This exception can be instantiated directly through {@link #AbortException(String)},
- * {@link #AbortException(String, Throwable)}, or the factory methods {@link #abort()} and
- * {@link #abort(String)}, which return the exception so that it can be thrown at the call site
- * ({@code throw abort("x")}).
+ * <p>Use the factory methods {@link #abort()} and {@link #abort(String)} at the call site:
+ * {@code throw abort("service not available")}.
  */
-public final class AbortException extends RuntimeException {
+public final class AbortException extends ParamixelException {
+
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates an aborted exception with the supplied message.

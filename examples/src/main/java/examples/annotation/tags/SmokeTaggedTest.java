@@ -16,35 +16,40 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
 
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Example test class annotated with {@code @Paramixel.Tag("smoke")} to demonstrate
- * tag-based test selection.
+ * Example factory tagged as {@code "smoke"} for tag-based selection.
  */
 public class SmokeTaggedTest {
 
     /**
-     * Returns a no-op action tagged as {@code "smoke"}.
+     * Returns a definition tagged as {@code "smoke"}.
      *
-     * @return a no-op action
+     * @return the definition
      */
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
-    public static Action factory() {
-        return of("SmokeTaggedTest", SmokeTaggedTest.class, SmokeTaggedTest::new)
-                .body(step("test()", SmokeTaggedTest.class, SmokeTaggedTest::test))
+    public static Task factory() {
+        return forInstance("SmokeTaggedTest", SmokeTaggedTest::new)
+                .tags("smoke")
+                .step("test", SmokeTaggedTest::test)
                 .build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public SmokeTaggedTest() {
         // Intentionally empty
     }
 
+    /**
+     * Trivial body so the example stays focused on selection.
+     */
     public void test() {
         // Intentionally empty
     }

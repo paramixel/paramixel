@@ -17,26 +17,25 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Loop} action with a
- * termination predicate (polling mode). Verifies that the loop stops
- * when the predicate is satisfied before maxIterations is exhausted.
+ * Demonstrates repetition with an explicit stop predicate.
+ *
+ * <p>The predicate is evaluated after each iteration with the iteration status, and the iteration bound still applies,
+ * so a predicate that never becomes true cannot create unbounded work.
  */
 public class LoopWithPredicateTest {
 
     private static final AtomicInteger pollCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -46,21 +45,20 @@ public class LoopWithPredicateTest {
     }
 
     /**
-     * Builds an action tree that exercises polling with a termination predicate.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
         return sequential("loop-predicate-example")
-                .child(loop("poll")
-                        .body(step("check", context -> pollCount.incrementAndGet()))
-                        .until(context -> pollCount.get() >= 4)
-                        .maxIterations(10))
-                .child(step("validate", context -> {
-                    assertThat(pollCount.get()).isEqualTo(4);
-                }))
+                .repeat(
+                        "poll",
+                        repeat -> repeat.maxIterations(10)
+                                .until((context, status) -> pollCount.get() >= 4)
+                                .step("check", pollCount::incrementAndGet))
+                .step("validate", () -> assertThat(pollCount.get()).isEqualTo(4))
                 .build();
     }
 

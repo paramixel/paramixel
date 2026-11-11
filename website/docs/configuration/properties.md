@@ -1,58 +1,53 @@
 ---
-title: Configuration Properties
-description: Paramixel properties, defaults, and precedence.
+title: Properties
+description: paramixel.properties keys, defaults, and precedence.
 ---
 
-# Configuration Properties
+# Properties
 
-Paramixel configuration is properties-based. The classpath resource name is `paramixel.properties`.
+Configuration is layered: classpath `paramixel.properties`, then JVM system properties, then built-in defaults. A runner
+may add a final layer for pool capacities via `Runner.Builder.pool(Pool, int)`.
 
-## Precedence
+| Key | Purpose | Default |
+| --- | --- | --- |
+| `paramixel.parallelism` | Admission budget for discovered root tasks; default capacity of the `discovery` pool | processors |
+| `paramixel.parallelism.<name>` | Capacity of the named pool `<name>` | none (required) |
+| `paramixel.workers` | Maximum execution worker threads | processors |
+| `paramixel.shutdown.graceMillis` | Bounded wait for a canceled callback to quiesce | `10000` |
+| `paramixel.listener.queue.capacity` | Bounded listener event queue | `8192` |
+| `paramixel.ansi` | Console color: `true`, `false`, `auto` | `auto` |
+| `paramixel.failureOnSkip` | Map a skipped run to a failing exit code | `true` |
+| `paramixel.failureOnAbort` | Map an aborted run to a failing exit code | `true` |
+| `paramixel.failIfNoTests` | Fail when discovery finds nothing | `true` |
+| `paramixel.failFast` | Stop admitting new root tasks after a root failure | `false` |
+| `paramixel.report.file` | Report file; format follows the extension | none |
+| `paramixel.match.package.regex` | Discovery package filter | none |
+| `paramixel.match.class.regex` | Discovery class filter | none |
+| `paramixel.match.tag.regex` | Discovery tag filter | none |
+| `paramixel.listener.exclude` | Console sections to suppress | none |
 
-For `Configuration.defaultConfiguration()`, values are layered in this order:
+## Pool expressions
 
-1. `paramixel.properties` from the classpath
-2. JVM system properties
-3. built-in defaults for unset framework keys
+A capacity is a positive integer, or `@cores`, `@cores*N`, `@cores/N`, resolved once against
+`Runtime.availableProcessors()` and never below one.
 
-Later layers override earlier layers.
+```properties
+paramixel.parallelism.environments=3
+paramixel.parallelism.checks=@cores*2
+```
+
+## Validation
+
+An unknown `paramixel.*` key is reported as a warning. Invalid values fail before any test code runs:
+`ConfigurationException` for configuration, `CompilationException` for a plan (including an undefined pool).
 
 ## Example
 
 ```properties
+paramixel.workers=8
 paramixel.parallelism=4
-paramixel.failureOnAbort=true
-paramixel.report.file=target/paramixel-report.html
-paramixel.listener.exclude=quiet
+paramixel.parallelism.environments=@cores
+paramixel.parallelism.checks=16
+paramixel.failureOnSkip=true
+paramixel.report.file=target/paramixel-report.json
 ```
-
-## Programmatic configuration
-
-```java
-import java.util.Map;
-import org.paramixel.api.Configuration;
-import org.paramixel.api.Runner;
-
-var configuration = Configuration.of(Map.of(
-        "paramixel.parallelism", "4",
-        "paramixel.match.tag.regex", "critical"));
-
-var runner = Runner.builder().configuration(configuration).build();
-```
-
-Use `paramixel.properties` for classpath defaults, JVM `-D` system properties for environment-specific overrides, or programmatic `Configuration` objects when constructing a `Runner`.
-
-See [Configuration API](../api/configuration) for the complete list of supported keys and typed getter methods.
-
-## Caching
-
-`Configuration.defaultConfiguration()` is computed once per classloader and cached
-indefinitely. If you set a JVM system property after the first call — for example,
-`System.setProperty("paramixel.parallelism", "8")` at runtime — subsequent
-`defaultConfiguration()` calls will continue to return the **original** snapshot.
-
-Use `Configuration.systemConfiguration()` to get a snapshot reflecting all current
-system properties, or construct a `Configuration` directly with `Configuration.of(...)`
-for programmatic overrides.
-
-See [Configuration API](../api/configuration#caching) for more details.

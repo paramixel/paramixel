@@ -16,8 +16,9 @@
 
 package nonapi.org.paramixel.benchmark;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import nonapi.org.paramixel.CompiledPlans;
+import nonapi.org.paramixel.compiler.PlanCompiler;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -32,59 +33,52 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.Configuration;
+import org.paramixel.api.Pool;
+import org.paramixel.api.Task;
+import org.paramixel.api.Tasks;
 
 /**
- * Benchmark measuring compile-pass cost (descriptor tree plus execution plan) with varying depths and widths.
+ * Measures definition build and plan compilation throughput for a fixed tree shape.
  *
- * <p>Isolates the cost of {@link nonapi.org.paramixel.CompiledPlans#compile(org.paramixel.api.action.Action)}, which
- * builds the descriptor tree and the execution plan in one pass.
+ * <p>Compilation is pure and must stay side-effect free, so this benchmark can compile the same definition repeatedly
+ * without invoking user code. A near-linear cost in the number of occurrences is the documented target.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 3, time = 3)
-@Measurement(iterations = 5, time = 3)
-@Fork(2)
+@Warmup(iterations = 3, time = 2)
+@Measurement(iterations = 5, time = 2)
+@Fork(1)
 @Threads(1)
 public class CompilePlanBenchmark {
 
     @Benchmark
-    public void buildTree(BuilderState state, Blackhole blackhole) {
-        for (var i = 0; i < state.iterations; i++) {
-            blackhole.consume(CompiledPlans.compile(state.rootAction));
-        }
+    public void buildTree(final BuilderState state, final Blackhole blackhole) {
+        blackhole.consume(state.definition);
+    }
+
+    @Benchmark
+    public void compilePlan(final BuilderState state, final Blackhole blackhole) {
+        blackhole.consume(state.compiler.compile(state.definition));
     }
 
     @State(Scope.Benchmark)
     public static class BuilderState {
 
-        @Param({"5", "10", "20"})
-        private int treeDepth;
+        @Param({"10", "100", "1000"})
+        private int size;
 
-        @Param({"10", "50"})
-        private int childrenPerNode;
-
-        @Param({"10", "100"})
-        private int iterations;
-
-        private Action rootAction;
+        private Task definition;
+        private PlanCompiler compiler;
 
         @Setup(Level.Trial)
         public void setup() {
-            rootAction = buildTree(treeDepth, childrenPerNode);
-        }
-
-        private Action buildTree(final int depth, final int width) {
-            if (depth == 0) {
-                return Step.step("leaf", ctx -> {});
+            var builder = Tasks.parallel("root", Pool.named("p"));
+            for (var i = 0; i < size; i++) {
+                builder.step("step-" + i, () -> {});
             }
-            var parallel = Parallel.parallel("node-" + depth, "bench");
-            for (var i = 0; i < width; i++) {
-                parallel.child(buildTree(depth - 1, width));
-            }
-            return parallel.build();
+            definition = builder.build();
+            compiler = new PlanCompiler(Configuration.of(Map.of("paramixel.parallelism.p", "8")), Map.of());
         }
     }
 }

@@ -17,114 +17,88 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates that nested Parallel actions complete without deadlock.
+ * Demonstrates that nested parallel groups with distinct pools complete without deadlock and without leaking permits.
  *
- * <p>This test verifies that the execution engine handles deeply nested Parallel structures. Each
- * {@code Parallel} names its own pool, and admission blocks only for a pool permit, so a nested
- * {@code Parallel} never waits for an ancestor that is itself waiting for a permit.
- *
- * <p>Test structure:
- * <ul>
- *   <li>Root Parallel</li>
- *   <li>Two mid-level Parallels</li>
- *   <li>Four leaf Parallels with 2 children each</li>
- * </ul>
- * This creates three levels of nesting, each bounded by its own named pool.
+ * <p>Each nested group names a different pool, so the acquisition order is acyclic. Nesting the same pool is rejected at
+ * compile time regardless of configured capacity, because a configuration change could otherwise turn a passing plan
+ * into a deadlock.
  */
 public class NestedParallelDeadlockTest {
 
-    private static final AtomicInteger executedCount = new AtomicInteger();
     private static final int EXPECTED_EXECUTIONS = 8;
 
+    private static final AtomicInteger executedCount = new AtomicInteger();
+
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         executedCount.set(0);
-        System.exit(Runner.builder().build().run(factory()).exitCode());
+        System.exit(Runner.builder()
+                .pool(Pool.named("outer"), 2)
+                .pool(Pool.named("middle"), 2)
+                .pool(Pool.named("inner"), 2)
+                .build()
+                .run(factory())
+                .exitCode());
     }
 
     /**
-     * Builds a deeply nested Parallel action tree to verify deadlock-free execution.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         executedCount.set(0);
 
-        var testName = NestedParallelDeadlockTest.class.getName();
-
-        return scope(testName)
-                .body(parallel("root", "outer")
-                        .child(parallel("mid1", "middle")
-                                .child(parallel("leaf1", "inner")
-                                        .child(step("l1-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l1-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        })))
-                                .child(parallel("leaf2", "inner")
-                                        .child(step("l2-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l2-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))))
-                        .child(parallel("mid2", "middle")
-                                .child(parallel("leaf3", "inner")
-                                        .child(step("l3-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l3-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        })))
-                                .child(parallel("leaf4", "inner")
-                                        .child(step("l4-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l4-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        })))))
-                .after(step("validate", ignored -> validate()))
+        return sequential("NestedParallelDeadlockTest")
+                .parallel(
+                        "root",
+                        Pool.named("outer"),
+                        outer -> outer.parallel(
+                                        "mid1",
+                                        Pool.named("middle"),
+                                        middle -> middle.parallel(
+                                                        "leaf1",
+                                                        Pool.named("inner"),
+                                                        inner -> inner.step("l1-1", NestedParallelDeadlockTest::work)
+                                                                .step("l1-2", NestedParallelDeadlockTest::work))
+                                                .parallel(
+                                                        "leaf2",
+                                                        Pool.named("inner"),
+                                                        inner -> inner.step("l2-1", NestedParallelDeadlockTest::work)
+                                                                .step("l2-2", NestedParallelDeadlockTest::work)))
+                                .parallel(
+                                        "mid2",
+                                        Pool.named("middle"),
+                                        middle -> middle.parallel(
+                                                        "leaf3",
+                                                        Pool.named("inner"),
+                                                        inner -> inner.step("l3-1", NestedParallelDeadlockTest::work)
+                                                                .step("l3-2", NestedParallelDeadlockTest::work))
+                                                .parallel(
+                                                        "leaf4",
+                                                        Pool.named("inner"),
+                                                        inner -> inner.step("l4-1", NestedParallelDeadlockTest::work)
+                                                                .step("l4-2", NestedParallelDeadlockTest::work))))
+                .step("validate", () -> assertThat(executedCount.get()).isEqualTo(EXPECTED_EXECUTIONS))
                 .build();
     }
 
-    /**
-     * Validates that all leaf tasks executed exactly once.
-     */
-    public static void validate() {
-        assertThat(executedCount.get())
-                .as("All leaf tasks should execute exactly once")
-                .isEqualTo(EXPECTED_EXECUTIONS);
-    }
-
-    private static void sleep(final long millisseconds) {
-        try {
-            Thread.sleep(millisseconds);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+    private static void work() throws InterruptedException {
+        executedCount.incrementAndGet();
+        Thread.sleep(5L);
     }
 }

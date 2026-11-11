@@ -17,19 +17,18 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Loop} action without a predicate
- * (run-all mode). Verifies that the child action executes exactly the
- * configured number of times.
+ * Demonstrates bounded repetition: the subtree runs exactly the configured number of iterations.
+ *
+ * <p>Repeat is not retry. Replay is intentional, the bound is mandatory, and every iteration is a distinct attempt in
+ * the result tree.
  */
 public class LoopWithoutPredicateTest {
 
@@ -37,7 +36,7 @@ public class LoopWithoutPredicateTest {
     private static final AtomicInteger independentCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -47,25 +46,24 @@ public class LoopWithoutPredicateTest {
     }
 
     /**
-     * Builds an action tree that exercises dependent and independent loop iterations
-     * without a termination predicate.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
         return sequential("loop-example")
-                .child(loop("dependent-loop")
-                        .body(step("step", context -> dependentCount.incrementAndGet()))
-                        .maxIterations(3))
-                .child(loop("independent-loop")
-                        .body(step("step", context -> independentCount.incrementAndGet()))
-                        .maxIterations(3))
-                .child(step("validate", context -> {
+                .repeat(
+                        "dependent-loop",
+                        repeat -> repeat.maxIterations(3).step("step", dependentCount::incrementAndGet))
+                .repeat(
+                        "independent-loop",
+                        repeat -> repeat.maxIterations(3).step("step", independentCount::incrementAndGet))
+                .step("validate", () -> {
                     assertThat(dependentCount.get()).isEqualTo(3);
                     assertThat(independentCount.get()).isEqualTo(3);
-                }))
+                })
                 .build();
     }
 

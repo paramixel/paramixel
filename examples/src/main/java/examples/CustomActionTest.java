@@ -16,28 +16,22 @@
 
 package examples;
 
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
 
 import java.util.Objects;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates using provided {@link org.paramixel.api.action.Step} actions with a fixture instance managed by
- * {@link org.paramixel.api.action.Instance}.
+ * Demonstrates a stateful fixture whose steps exchange state through the instance.
  */
 public class CustomActionTest {
 
-    /**
-     * The value set by the step and validated by the sibling step.
-     */
-    String value;
+    private String value;
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -46,34 +40,38 @@ public class CustomActionTest {
     }
 
     /**
-     * Builds an action tree where one step sets a value on the fixture instance and a sibling step validates it.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
-        var testName = CustomActionTest.class.getName();
-
-        return of(testName, CustomActionTest.class, CustomActionTest::new)
-                .body(sequential("body")
-                        .child(step("test", CustomActionTest.class, CustomActionTest::setValue))
-                        .child(step("validate", CustomActionTest.class, CustomActionTest::validate)))
+    public static Task factory() {
+        return forInstance(CustomActionTest.class.getName(), CustomActionTest::new)
+                .step("setValue", CustomActionTest::setValue)
+                .step("validate", CustomActionTest::validate)
                 .build();
     }
 
     /**
-     * Sets the expected value on this fixture instance.
+     * No-argument constructor used by the framework.
      */
-    public void setValue() {
-        value = "set by Step";
+    public CustomActionTest() {
+        // Intentionally empty
     }
 
     /**
-     * Asserts that the step set the expected value on this fixture instance.
+     * Sets the shared state.
+     */
+    public void setValue() {
+        value = "set by a step";
+    }
+
+    /**
+     * Verifies the shared state.
      */
     public void validate() {
-        if (!Objects.equals(value, "set by Step")) {
-            throw new AssertionError("Expected <set by Step> but was <" + value + ">");
+        if (!Objects.equals(value, "set by a step")) {
+            throw new AssertionError("Expected <set by a step> but was <" + value + ">");
         }
     }
 }

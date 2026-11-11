@@ -17,27 +17,46 @@
 package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates a heterogeneous matrix: each item maps to a fixture whose type differs, without a cast and without
+ * repeating a class token on any step.
+ */
 public class MixedArgumentTest {
 
-    sealed interface TestArgument permits StringArgument, IntegerArgument, PointArgument {
+    /**
+     * A test argument that knows its own name and how to validate itself.
+     */
+    public sealed interface TestArgument permits StringArgument, IntegerArgument, PointArgument {
 
+        /**
+         * Returns the display name used for the fixture occurrence.
+         *
+         * @return the name; never {@code null}
+         */
         String name();
 
+        /**
+         * Runs the argument-specific assertion.
+         */
         void test();
     }
 
-    record StringArgument(String value) implements TestArgument {
+    /**
+     * A string argument.
+     *
+     * @param value the value
+     */
+    public record StringArgument(String value) implements TestArgument {
+
         @Override
         public String name() {
             return "string:" + value;
@@ -49,7 +68,13 @@ public class MixedArgumentTest {
         }
     }
 
-    record IntegerArgument(int value) implements TestArgument {
+    /**
+     * An integer argument.
+     *
+     * @param value the value
+     */
+    public record IntegerArgument(int value) implements TestArgument {
+
         @Override
         public String name() {
             return "integer:" + value;
@@ -61,11 +86,22 @@ public class MixedArgumentTest {
         }
     }
 
-    record Point(int x, int y) {
+    /**
+     * A point value.
+     *
+     * @param x the x coordinate
+     * @param y the y coordinate
+     */
+    public record Point(int x, int y) {
         // Intentionally empty
     }
 
-    record PointArgument(Point point) implements TestArgument {
+    /**
+     * A point argument.
+     *
+     * @param point the point
+     */
+    public record PointArgument(Point point) implements TestArgument {
 
         @Override
         public String name() {
@@ -80,119 +116,84 @@ public class MixedArgumentTest {
     }
 
     private static final int EXPECTED_ARGUMENT_COUNT = 3;
-    private static final int EXPECTED_TEST_COUNT_PER_ARGUMENT = 1;
 
     private static final AtomicInteger setUpCount = new AtomicInteger();
-    private static final AtomicInteger beforeEachCount = new AtomicInteger();
     private static final AtomicInteger testCount = new AtomicInteger();
-    private static final AtomicInteger afterEachCount = new AtomicInteger();
     private static final AtomicInteger tearDownCount = new AtomicInteger();
 
     private final TestArgument testArgument;
 
-    private boolean suiteSetUp;
-    private boolean setUp;
-
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
+        resetCounts();
         System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
+    /**
+     * Builds the definition.
+     *
+     * @return the definition for this test
+     */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
 
-        return of("MixedArgumentTest", MixedArgumentTest.class, MixedArgumentTest::new)
-                .body(sequential("body")
-                        .child(sequential("MixedArgumentTest")
-                                .each(
-                                        List.of(
-                                                new StringArgument("paramixel"),
-                                                new IntegerArgument(42),
-                                                new PointArgument(new Point(3, 7))),
-                                        testArgument -> of(
-                                                        testArgument.name(),
-                                                        MixedArgumentTest.class,
-                                                        () -> new MixedArgumentTest(testArgument))
-                                                .body(scope("scope")
-                                                        .before(step(
-                                                                "setUp()",
-                                                                MixedArgumentTest.class,
-                                                                MixedArgumentTest::setUp))
-                                                        .body(scope("testOne")
-                                                                .before(step(
-                                                                        "beforeEach()",
-                                                                        MixedArgumentTest.class,
-                                                                        MixedArgumentTest::beforeEach))
-                                                                .body(step(
-                                                                        "testOne()",
-                                                                        MixedArgumentTest.class,
-                                                                        MixedArgumentTest::testOne))
-                                                                .after(step(
-                                                                        "afterEach()",
-                                                                        MixedArgumentTest.class,
-                                                                        MixedArgumentTest::afterEach)))
-                                                        .after(step(
-                                                                "tearDown()",
-                                                                MixedArgumentTest.class,
-                                                                MixedArgumentTest::tearDown))))
-                                .independent())
-                        .child(scope("scope")
-                                .body(step("[validate-ready]", context -> {}))
-                                .after(step("validate()", MixedArgumentTest.class, MixedArgumentTest::validate))))
+        return sequential("MixedArgumentTest")
+                .each(
+                        List.of(
+                                new StringArgument("paramixel"),
+                                new IntegerArgument(42),
+                                new PointArgument(new Point(3, 7))),
+                        testArgument -> forInstance(testArgument.name(), () -> new MixedArgumentTest(testArgument))
+                                .before(MixedArgumentTest::setUp)
+                                .step("testOne", MixedArgumentTest::testOne)
+                                .after(MixedArgumentTest::tearDown))
+                .after(MixedArgumentTest::validate)
                 .build();
-    }
-
-    public MixedArgumentTest() {
-        this.testArgument = null;
     }
 
     private MixedArgumentTest(final TestArgument testArgument) {
         this.testArgument = testArgument;
     }
 
+    /**
+     * Records setup.
+     */
     public void setUp() {
         setUpCount.incrementAndGet();
-        suiteSetUp = true;
     }
 
-    public void beforeEach() {
-        beforeEachCount.incrementAndGet();
-        assertThat(suiteSetUp).isTrue();
-        setUp = true;
-    }
-
+    /**
+     * Runs the argument-specific test.
+     */
     public void testOne() {
         testCount.incrementAndGet();
-        assertThat(setUp).isTrue();
         testArgument.test();
     }
 
-    public void afterEach() {
-        afterEachCount.incrementAndGet();
-        assertThat(suiteSetUp).isTrue();
-        setUp = false;
-    }
-
+    /**
+     * Records teardown.
+     */
     public void tearDown() {
         tearDownCount.incrementAndGet();
-
-        assertThat(suiteSetUp).isTrue();
-        assertThat(setUp).isFalse();
     }
 
-    public void validate() {
+    /**
+     * Verifies the aggregate expectations.
+     */
+    public static void validate() {
         assertThat(setUpCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT);
-        assertThat(beforeEachCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT * EXPECTED_TEST_COUNT_PER_ARGUMENT);
-        assertThat(testCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT * EXPECTED_TEST_COUNT_PER_ARGUMENT);
-        assertThat(afterEachCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT * EXPECTED_TEST_COUNT_PER_ARGUMENT);
+        assertThat(testCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT);
         assertThat(tearDownCount.get()).isEqualTo(EXPECTED_ARGUMENT_COUNT);
     }
 
     private static void resetCounts() {
         setUpCount.set(0);
-        beforeEachCount.set(0);
         testCount.set(0);
-        afterEachCount.set(0);
         tearDownCount.set(0);
     }
 }

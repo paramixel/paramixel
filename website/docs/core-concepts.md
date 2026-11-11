@@ -1,62 +1,47 @@
 ---
 title: Core Concepts
-description: Vocabulary for Paramixel execution trees.
+description: Definitions, occurrences, attempts, and results.
 ---
 
 # Core Concepts
 
-Read this page before the API reference. It gives names to the pieces of a Paramixel test plan.
+Paramixel separates four things that are easy to conflate:
 
-## Action
+| Concept | What it is |
+| --- | --- |
+| **Definition** | An immutable `Task` tree you author once and may reuse |
+| **Occurrence** | One placement of a definition in a compiled plan, with its own identity and scope |
+| **Attempt** | One execution attempt of an occurrence; retry and repeat create more than one |
+| **Result** | An immutable snapshot of what happened |
 
-An action is a node in a Paramixel execution tree. Every action has a display name and execution behavior.
+## The tree
 
-## Action tree
+Definitions form an ordered containment tree. The compiler lowers it into scheduling edges and resource requirements: an
+ordered child group, success gates for bodies and children, and finalizers attached to their owning task. The scheduler
+never lets a parent finish while its children or finalizers are live.
 
-An action tree is the complete executable test plan. Java code builds the tree, Paramixel executes the tree, and the result tree mirrors the action tree.
+## Building and compiling are free
 
-```text
-OrderWorkflow
-├── start services
-├── run checks
-│   ├── create order
-│   ├── read order
-│   └── cancel order
-└── stop services
-```
+Authoring, building, and compiling never invoke a factory, lifecycle callback, body, or runtime predicate. Consequences:
 
-## Leaf action
+- A definition can be validated without side effects.
+- A definition can be reused across runs and runner instances.
+- A validation failure means no user code ran at all.
 
-A leaf action performs work directly and has no child actions. Examples include a step, an assertion, or a delay.
+## Execution
 
-## Composite action
+Occurrences are admitted in deterministic depth-first order subject to resource eligibility. Named `Pool`s bound how
+many children of a parallel group are alive at once; exclusive locks serialize groups; waiting never occupies a worker.
 
-A composite action contains child actions and controls how those children run. Some composites run children in order, some run independent branches concurrently, and some wrap a subtree with lifecycle behavior.
+## Outcomes
 
-## Lifecycle
+`Result.status()` is the semantic aggregate. `Result.exitCode()` applies the configured mapping. `Result.isQuiescent()`
+is `false` only when a callback ignored cooperative cancellation, in which case cleanup was withheld and the run is not
+reported as cleanly finalized.
 
-Lifecycle makes setup and teardown explicit in the tree. A lifecycle subtree shows which setup belongs to which checks and which teardown runs afterward.
+Continue with:
 
-```text
-DatabaseWorkflow
-├── before: start database
-├── body
-│   ├── migrate schema
-│   └── verify query
-└── after: stop database
-```
-
-## Context
-
-Context carries runtime state during execution. Actions can use it to read configuration, access fixture instances, and interact with framework-provided execution services.
-
-## Result tree
-
-After execution, Paramixel returns a result tree with the same shape as the action tree. Each result node records the status and metadata for the corresponding action occurrence.
-
-## Learn the APIs next
-
-- [Building Action Trees](core-concepts/elements)
-- [Built-in Actions and When to Use Them](core-concepts/actions)
-- [Result API](api/result)
-- [Descriptor and Metadata](api/descriptor-and-metadata)
+- [Tasks](core-concepts/actions)
+- [Lifecycle and scope](core-concepts/elements)
+- [Discovery](core-concepts/discovery)
+- [Data-driven testing](core-concepts/data-driven-testing)

@@ -17,188 +17,199 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.parallel;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Scope;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates the same lifecycle nested inside two independent branches of one parallel group.
+ *
+ * <p>Each branch owns its own fixture and its own call-order list, so parallel execution cannot corrupt either one.
+ */
 public class NestedTest {
 
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
         System.exit(Runner.builder()
+                .pool(Pool.named("examples"), 2)
                 .build()
-                .run(parallel(NestedTest.class.getName(), "examples")
-                        .child(Nested1.factory())
-                        .child(Nested2.factory())
-                        .build())
+                .run(factory())
                 .exitCode());
     }
 
-    public static class Nested1 {
+    /**
+     * Builds the definition.
+     *
+     * @return the definition for this test
+     */
+    @Paramixel.Factory
+    public static Task factory() {
+        return parallel("NestedTest", Pool.named("examples"))
+                .child(Nested1.factory())
+                .child(Nested2.factory())
+                .build();
+    }
 
-        private static final List<String> callOrder = new ArrayList<>();
+    /**
+     * The shared lifecycle shape used by both nested branches.
+     */
+    public abstract static class Lifecycle {
 
-        public static void main(final String[] args) {
-            System.exit(Runner.builder().build().run(factory()).exitCode());
+        private final List<String> callOrder = new ArrayList<>();
+
+        /**
+         * Clears the call order.
+         */
+        public void staticSetUp() {
+            callOrder.clear();
+            callOrder.add("staticSetUp");
         }
 
-        @Paramixel.Factory
-        public static Action factory() {
-            return Scope.scope(Nested1.class.getName())
-                    .before(step("staticSetUp()", context -> Nested1.staticSetUp()))
-                    .body(of("Nested1", Nested1.class, Nested1::new)
-                            .body(scope("scope")
-                                    .before(step("setUp()", Nested1.class, Nested1::setUp))
-                                    .body(sequential("tests")
-                                            .child(scope("testOne")
-                                                    .before(step("beforeEach()", Nested1.class, Nested1::beforeEach))
-                                                    .body(step("testOne()", Nested1.class, Nested1::testOne))
-                                                    .after(step("afterEach()", Nested1.class, Nested1::afterEach)))
-                                            .child(scope("testTwo")
-                                                    .before(step("beforeEach()", Nested1.class, Nested1::beforeEach))
-                                                    .body(step("testTwo()", Nested1.class, Nested1::testTwo))
-                                                    .after(step("afterEach()", Nested1.class, Nested1::afterEach))))
-                                    .after(step("tearDown()", Nested1.class, Nested1::tearDown))))
-                    .after(step("staticTearDown()", context -> Nested1.staticTearDown()))
+        /**
+         * Records instance setup.
+         */
+        public void setUp() {
+            callOrder.add("setUp");
+        }
+
+        /**
+         * Records per-test setup.
+         */
+        public void beforeEach() {
+            callOrder.add("beforeEach");
+        }
+
+        /**
+         * First test body.
+         */
+        public void testOne() {
+            callOrder.add("testOne");
+        }
+
+        /**
+         * Second test body.
+         */
+        public void testTwo() {
+            callOrder.add("testTwo");
+        }
+
+        /**
+         * Records per-test cleanup.
+         */
+        public void afterEach() {
+            callOrder.add("afterEach");
+        }
+
+        /**
+         * Records instance cleanup.
+         */
+        public void tearDown() {
+            callOrder.add("tearDown");
+        }
+
+        /**
+         * Verifies the recorded order.
+         */
+        public void staticTearDown() {
+            callOrder.add("staticTearDown");
+            assertThat(callOrder)
+                    .containsExactly(
+                            "staticSetUp",
+                            "setUp",
+                            "beforeEach",
+                            "testOne",
+                            "afterEach",
+                            "beforeEach",
+                            "testTwo",
+                            "afterEach",
+                            "tearDown",
+                            "staticTearDown");
+        }
+
+        /**
+         * Builds the lifecycle definition for a concrete subclass.
+         *
+         * @param <S> the concrete lifecycle type
+         * @param name the task name
+         * @param factory the instance factory
+         * @return the definition
+         */
+        protected static <S extends Lifecycle> Task definition(
+                final String name, final org.paramixel.api.ThrowingSupplier<S> factory) {
+            return org.paramixel.api.Tasks.sequential(name)
+                    .child(forInstance(name, factory)
+                            .before(Lifecycle::setUp)
+                            .step(
+                                    "testOne",
+                                    Lifecycle::testOne,
+                                    children -> children.before(Lifecycle::beforeEach)
+                                            .after(Lifecycle::afterEach))
+                            .step(
+                                    "testTwo",
+                                    Lifecycle::testTwo,
+                                    children -> children.before(Lifecycle::beforeEach)
+                                            .after(Lifecycle::afterEach))
+                            .after(Lifecycle::tearDown))
                     .build();
         }
+    }
 
+    /**
+     * First nested branch.
+     */
+    public static final class Nested1 extends Lifecycle {
+
+        /**
+         * No-argument constructor used by the framework.
+         */
         public Nested1() {
             // Intentionally empty
         }
 
-        public static void staticSetUp() {
-            callOrder.clear();
-            callOrder.add("staticSetUp");
-        }
-
-        public void setUp() {
-            callOrder.add("setUp");
-        }
-
-        public void beforeEach() {
-            callOrder.add("beforeEach");
-        }
-
-        public void testOne() {
-            callOrder.add("testOne");
-        }
-
-        public void testTwo() {
-            callOrder.add("testTwo");
-        }
-
-        public void afterEach() {
-            callOrder.add("afterEach");
-        }
-
-        public void tearDown() {
-            callOrder.add("tearDown");
-        }
-
-        public static void staticTearDown() {
-            callOrder.add("staticTearDown");
-
-            assertThat(callOrder)
-                    .containsExactly(
-                            "staticSetUp",
-                            "setUp",
-                            "beforeEach",
-                            "testOne",
-                            "afterEach",
-                            "beforeEach",
-                            "testTwo",
-                            "afterEach",
-                            "tearDown",
-                            "staticTearDown");
+        /**
+         * Builds the branch definition.
+         *
+         * @return the definition
+         */
+        public static Task factory() {
+            return sequentialBranch("Nested1", Nested1::new);
         }
     }
 
-    public static class Nested2 {
+    /**
+     * Second nested branch.
+     */
+    public static final class Nested2 extends Lifecycle {
 
-        private static final List<String> callOrder = new ArrayList<>();
-
-        public static void main(final String[] args) {
-            System.exit(Runner.builder().build().run(factory()).exitCode());
-        }
-
-        @Paramixel.Factory
-        public static Action factory() {
-            return Scope.scope(Nested2.class.getName())
-                    .before(step("staticSetUp()", context -> Nested2.staticSetUp()))
-                    .body(of("Nested2", Nested2.class, Nested2::new)
-                            .body(scope("scope")
-                                    .before(step("setUp()", Nested2.class, Nested2::setUp))
-                                    .body(sequential("tests")
-                                            .child(scope("testOne")
-                                                    .before(step("beforeEach()", Nested2.class, Nested2::beforeEach))
-                                                    .body(step("testOne()", Nested2.class, Nested2::testOne))
-                                                    .after(step("afterEach()", Nested2.class, Nested2::afterEach)))
-                                            .child(scope("testTwo")
-                                                    .before(step("beforeEach()", Nested2.class, Nested2::beforeEach))
-                                                    .body(step("testTwo()", Nested2.class, Nested2::testTwo))
-                                                    .after(step("afterEach()", Nested2.class, Nested2::afterEach))))
-                                    .after(step("tearDown()", Nested2.class, Nested2::tearDown))))
-                    .after(step("staticTearDown()", context -> Nested2.staticTearDown()))
-                    .build();
-        }
-
+        /**
+         * No-argument constructor used by the framework.
+         */
         public Nested2() {
             // Intentionally empty
         }
 
-        public static void staticSetUp() {
-            callOrder.clear();
-            callOrder.add("staticSetUp");
+        /**
+         * Builds the branch definition.
+         *
+         * @return the definition
+         */
+        public static Task factory() {
+            return sequentialBranch("Nested2", Nested2::new);
         }
+    }
 
-        public void setUp() {
-            callOrder.add("setUp");
-        }
-
-        public void beforeEach() {
-            callOrder.add("beforeEach");
-        }
-
-        public void testOne() {
-            callOrder.add("testOne");
-        }
-
-        public void testTwo() {
-            callOrder.add("testTwo");
-        }
-
-        public void afterEach() {
-            callOrder.add("afterEach");
-        }
-
-        public void tearDown() {
-            callOrder.add("tearDown");
-        }
-
-        public static void staticTearDown() {
-            callOrder.add("staticTearDown");
-
-            assertThat(callOrder)
-                    .containsExactly(
-                            "staticSetUp",
-                            "setUp",
-                            "beforeEach",
-                            "testOne",
-                            "afterEach",
-                            "beforeEach",
-                            "testTwo",
-                            "afterEach",
-                            "tearDown",
-                            "staticTearDown");
-        }
+    private static <S extends Lifecycle> Task sequentialBranch(
+            final String name, final org.paramixel.api.ThrowingSupplier<S> factory) {
+        return Lifecycle.definition(name, factory);
     }
 }

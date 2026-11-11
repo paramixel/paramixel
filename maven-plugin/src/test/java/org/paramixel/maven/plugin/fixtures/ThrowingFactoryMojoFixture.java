@@ -17,25 +17,24 @@
 package org.paramixel.maven.plugin.fixtures;
 
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
- * Fixture whose {@code @Paramixel.Factory} method always throws an {@link
- * IllegalStateException}, used to verify that the Maven mojo wraps factory exceptions as {@link
- * org.apache.maven.plugin.MojoExecutionException}.
+ * Fixture whose {@code @Paramixel.Factory} method always throws, used to verify that the Maven mojo wraps factory
+ * exceptions as {@link org.apache.maven.plugin.MojoExecutionException}.
  */
 public final class ThrowingFactoryMojoFixture {
 
     private ThrowingFactoryMojoFixture() {}
 
     /**
-     * Always throws to simulate a failing action factory.
+     * Always throws to simulate a failing factory.
      *
      * @return never returns normally
      * @throws IllegalStateException always, with message {@code "factory exploded"}
      */
     @Paramixel.Factory
-    public static Action action() {
+    public static Task action() {
         throw new IllegalStateException("factory exploded");
     }
 }

@@ -17,16 +17,16 @@
 package examples.testcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.parallel;
 
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
 import org.bson.Document;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
  * Parameterized integration test that starts MongoDB containers for each Docker image
@@ -50,21 +50,21 @@ public class MongoDBTest {
     }
 
     /**
-     * Builds a parallel action tree with one instance branch per MongoDB Docker image,
+     * Builds a parallel task tree with one instance branch per MongoDB Docker image,
      * each managing a {@code MongoDBTest} instance with setUp, test, and tearDown lifecycle.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      * @throws Throwable if environment creation fails
      */
     @Paramixel.Factory
-    public static Action factory() throws Throwable {
-        return parallel(MongoDBTest.class.getName(), "environments")
+    public static Task factory() throws Throwable {
+        return parallel(MongoDBTest.class.getName(), Pool.named("environments"))
                 .each(
                         MongoDBTestEnvironment.createTestEnvironments(),
-                        environment -> of(environment.name(), MongoDBTest.class, () -> new MongoDBTest(environment))
-                                .before("setUp()", MongoDBTest::setUp)
-                                .body(step("testInsertAndQuery()", MongoDBTest.class, MongoDBTest::testInsertAndQuery))
-                                .after("tearDown()", MongoDBTest::tearDown))
+                        environment -> forInstance(environment.name(), () -> new MongoDBTest(environment))
+                                .before(MongoDBTest::setUp)
+                                .step("testInsertAndQuery()", MongoDBTest::testInsertAndQuery)
+                                .after(MongoDBTest::tearDown))
                 .build();
     }
 

@@ -1,48 +1,34 @@
 ---
 title: When to Use Paramixel
-description: Decide when an execution tree is the right shape for a Java test.
+description: The problems Paramixel is designed for, and the ones it is not.
 ---
 
 # When to Use Paramixel
 
-Paramixel is useful when the structure of the test matters as much as the assertions.
+Paramixel is a structured test-orchestration framework for Java integration, compatibility, and lifecycle-heavy testing.
 
-## Good fits
+## Good fit
 
-Use Paramixel when your test is naturally a workflow:
+- **Per-environment matrices.** One fixture per container, browser, database version, or protocol variant, bounded by a
+  named pool.
+- **Expensive fixtures with strict cleanup.** Setup, several checks, teardown, and a guaranteed finalizer even when a
+  check fails.
+- **Ordered flows with an explicit stop policy.** Dependent sequences for steps that build on each other, independent
+  sequences for checks that should all run.
+- **Bounded polling.** `repeat` with an iteration bound and an optional stop predicate instead of hand-written loops.
+- **Cooperative deadlines.** `timeout` with interruption and honest reporting of callbacks that do not stop.
 
-- setup and teardown exist at multiple levels
-- sequential phases and parallel branches belong in the same test plan
-- scenarios are generated from plain Java code
-- each branch needs its own lifecycle
-- failures should produce an inspectable result tree
-- the result tree should mirror the action tree that was executed
+## Poor fit
 
-Common examples include integration test workflows, compatibility matrices, service lifecycle checks, generated configuration scenarios, and tests that coordinate multiple external systems.
+- **Unit tests of pure functions.** A conventional unit-test framework is simpler.
+- **A distributed workflow engine.** Paramixel schedules in-process tasks; it is not a cluster scheduler.
+- **A container manager.** It orchestrates test fixtures; container lifecycle belongs to Testcontainers or similar.
+- **Crash-safe exactly-once execution.** A JVM crash cannot be recovered by the framework.
+- **Sandboxing untrusted code.** Discovered factories and callbacks are trusted executable code.
 
-## Usually not needed
+## What it deliberately does not do
 
-Paramixel is probably unnecessary when:
-
-- a simple JUnit test method clearly expresses the behavior
-- JUnit parameterized tests are sufficient
-- the test only needs assertions or mocks
-- no explicit lifecycle or execution structure is needed
-
-This is intentional. Paramixel complements JUnit; it does not try to replace ordinary unit tests.
-
-## Quick decision guide
-
-| Question | Prefer JUnit-style tests | Prefer Paramixel |
-| --- | --- | --- |
-| Is the test one clear behavior? | Yes | Usually no |
-| Does setup wrap a subtree of checks? | Usually indirect | Yes |
-| Are branches generated in Java? | Sometimes | Yes |
-| Do some branches run concurrently? | Usually externalized | Yes |
-| Should reports mirror nested structure? | Limited | Yes |
-
-## Next steps
-
-- [Quick Start: Your First Execution Tree](first-test)
-- [Core Concepts](../core-concepts)
-- [Test Shapes](../test-shapes)
+- Preempt a running callback or forcibly stop Java threads.
+- Make a shared fixture thread-safe.
+- Close an `AutoCloseable` implicitly.
+- Guarantee fairness or starvation freedom for unrelated branches.

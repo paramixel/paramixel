@@ -17,24 +17,23 @@
 package examples.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.parallel;
 
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Pool;
+import org.paramixel.api.Task;
 
 /**
- * The fixture-per-environment shape a real suite uses, built on the 7.0 API.
+ * The fixture-per-environment shape a real suite uses.
  *
- * <p>One {@code Parallel} names the pool that bounds the live fixtures, {@code each} maps every environment to one
- * typed fixture, and each step names only the method it calls: the fixture type appears once, in
- * {@code Instance.of}, instead of on every step.
+ * <p>One parallel task names the pool that bounds the live fixtures, {@code each} maps every enabled environment to one
+ * typed fixture, and each step names only the method it calls: the fixture type appears once, in {@code forInstance},
+ * instead of on every step.
  *
- * <p>{@code paramixel.parallelism.docker=2} bounds how many fixtures are alive at once. An environment that is not
- * supported is filtered out before the tree is built, and a failing step does not stop the other environments
- * because each fixture is its own branch of the {@code Parallel}.
+ * <p>{@code Runner.builder().pool(Pool.named("docker"), 2)} bounds how many fixtures are alive at once. An environment
+ * that is not supported is filtered out before the tree is built, and a failing step does not stop the other
+ * environments because each fixture is its own branch of the parallel task.
  */
 public final class MetricsTest {
 
@@ -43,44 +42,29 @@ public final class MetricsTest {
     }
 
     /**
-     * Builds the action tree.
+     * Builds the definition.
      *
-     * @return the action tree
+     * @return the definition
      */
     @Paramixel.Factory
-    public static Action factory() {
-        return parallel("MetricsTest", "docker")
+    public static Task factory() {
+        return parallel("MetricsTest", Pool.named("docker"))
                 .each(
                         Environment.supported(),
-                        environment -> of(
-                                        environment.name(), MetricsFixture.class, () -> new MetricsFixture(environment))
-                                .before("setUp()", MetricsFixture::setUp)
-                                .body(sequential("tests")
-                                        .child(step(
-                                                "testHealthy()",
-                                                MetricsFixture.class,
-                                                fixture -> fixture.check("healthy")))
-                                        .child(step(
-                                                "testDefaultTextMetrics()",
-                                                MetricsFixture.class,
-                                                fixture -> fixture.check("text-metrics")))
-                                        .child(step(
-                                                "testNamedMetrics()",
-                                                MetricsFixture.class,
-                                                fixture -> fixture.check("named")))
-                                        .child(step(
-                                                "verifyLifecycle()",
-                                                MetricsFixture.class,
-                                                MetricsTest::verifyLifecycle)))
-                                .after("tearDown()", MetricsFixture::tearDown))
+                        environment -> forInstance(environment.name(), () -> new MetricsFixture(environment))
+                                .before(MetricsFixture::setUp)
+                                .sequential(
+                                        "tests",
+                                        tests -> tests.step("testHealthy", fixture -> fixture.check("healthy"))
+                                                .step(
+                                                        "testDefaultTextMetrics",
+                                                        fixture -> fixture.check("text-metrics"))
+                                                .step("testNamedMetrics", fixture -> fixture.check("named"))
+                                                .step("verifyLifecycle", MetricsTest::verifyLifecycle))
+                                .after(MetricsFixture::tearDown))
                 .build();
     }
 
-    /**
-     * Verifies the fixture recorded the expected call order.
-     *
-     * @param fixture the fixture to verify
-     */
     private static void verifyLifecycle(final MetricsFixture fixture) {
         assertThat(fixture.calls()).containsExactly("setUp", "healthy", "text-metrics", "named");
         assertThat(fixture.environment().enabled()).isTrue();

@@ -1,32 +1,34 @@
 ---
-title: "Quick Start: Your First Execution Tree"
-description: Write and run a minimal Paramixel execution tree.
+title: "Quick Start: Your First Definition"
+description: Write and run a minimal Paramixel task definition.
 ---
 
-# Quick Start: Your First Execution Tree
+# Quick Start: Your First Definition
 
-Create a class with a public static factory method annotated with `@Paramixel.Factory`. The method returns an `Action`, a `Builder`, or `null`. Returning `null` means the factory is represented as a skipped action outcome.
+Create a class with a public static factory method annotated with `@Paramixel.Factory`. The method returns a `Task`, a
+builder, or `null`. Returning `null` is an explicit skip with a recorded reason.
 
 ```java
 package com.example;
 
-import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.exception.FailException.fail;
 
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Task;
+
 public final class LoginSmokeTest {
+
     @Paramixel.Factory
-    public static Action test() {
+    public static Task factory() {
         return sequential("login smoke")
-                .child(step("open login page", ctx -> openLoginPage()))
-                .child(step("submit credentials", ctx -> submitCredentials()))
-                .child(step("user is signed in", ctx -> {
+                .step("open login page", LoginSmokeTest::openLoginPage)
+                .step("submit credentials", LoginSmokeTest::submitCredentials)
+                .step("user is signed in", () -> {
                     if (!isSignedIn()) {
                         throw fail("user is not signed in");
                     }
-                }))
+                })
                 .build();
     }
 
@@ -40,71 +42,45 @@ public final class LoginSmokeTest {
 }
 ```
 
-This factory builds this execution tree:
-
-```text
-LoginSmokeTest
-└── login smoke
-    ├── open login page
-    ├── submit credentials
-    └── user is signed in
-```
-
-Paramixel executes the tree and returns a result tree with the same shape.
-
-Run with Maven:
+## Run it
 
 ```bash
-mvn test
+./mvnw test
 ```
 
-Or invoke the plugin goal directly:
+The Maven plugin discovers the factory, compiles and validates the definition, then executes it. The run fails the build
+if the result's exit code is non-zero.
 
-```bash
-mvn paramixel:test
-```
-
-## Programmatic run
+## Run it programmatically
 
 ```java
-import org.paramixel.api.Runner;
-
-var result = Runner.builder().build().run(LoginSmokeTest.test());
-if (result.exitCode() != 0) {
-    throw new AssertionError("Paramixel run failed: " + result.status().message().orElse(""));
+try (Runner runner = Runner.builder().build()) {
+    Result result = runner.run(LoginSmokeTest.factory());
+    System.out.println(result.status() + " exit=" + result.exitCode());
 }
 ```
 
-The returned `Result` exposes the root `Descriptor`, the effective status (`status().kind()`) and the exit code.
+`Runner.run(Task)` performs no discovery and runs no `@BeforeAll`/`@AfterAll` hooks: the supplied definition is the whole
+run.
 
-## Using named builders
-
-The same test can be written with static imports from each action class:
+## Add an owned fixture
 
 ```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.exception.FailException.fail;
-
 @Paramixel.Factory
-public static Action test() {
-    return sequential("login smoke")
-        .child(step("open login page", ctx -> openLoginPage()))
-        .child(step("submit credentials", ctx -> submitCredentials()))
-        .child(step("user is signed in", ctx -> {
-            if (!isSignedIn()) {
-                throw fail("user is not signed in");
-            }
-        }))
-        .build();
+public static Task factory() {
+    return forInstance("browser", Browser::launch)
+            .before(Browser::start)
+            .step("open login page", Browser::openLoginPage)
+            .step("submit credentials", Browser::submitCredentials)
+            .after(Browser::close)
+            .build();
 }
 ```
 
-For the full method reference, see [Named Builders](../api/named-builders).
+The class token appears once, in the supplier. Every step receives the instance directly.
 
+## Next
 
-## Next steps
-
-- [When to Use Paramixel](when-to-use)
-- [Core Concepts](../core-concepts)
-- [Test Shapes](../test-shapes)
+- [Tasks](../core-concepts/actions) — the definition model.
+- [Lifecycle and scope](../core-concepts/elements) — phases and finalization.
+- [Quick reference](../guides/quick-reference) — the full authoring surface.

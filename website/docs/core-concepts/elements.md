@@ -1,62 +1,60 @@
 ---
-title: Building Action Trees
-description: How to compose actions and access fixtures through Context.
+title: Lifecycle and Scope
+description: Instance ownership, phases, finalization order, and failure precedence.
 ---
 
-# Building Action Trees
+# Lifecycle and Scope
 
-Paramixel composes tests from action classes under `org.paramixel.api.action`. Each configurable action type is built through a `Builder`; terminal action types use static factory methods. The result is an immutable `Action` that can be nested into a larger execution tree.
+## Instance ownership
 
-See [Built-in Actions and When to Use Them](actions) for the complete list of 13 built-in action subtypes.
-
-## Fixture access
-
-A typed step receives its fixture directly; the type appears once, in `Instance.of`:
+`forInstance(name, supplier)` makes a task the owner of exactly one primary instance per execution attempt. The supplier
+runs once per attempt, on an execution worker, only after admission and permit acquisition.
 
 ```java
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Step.step;
-
-var fixture = of("my fixture", MyFixture.class, MyFixture::new)
-        .before("start", MyFixture::start)
-        .body(step("verify fixture", MyFixture.class, MyFixture::verify))
-        .after("stop", MyFixture::stop);
+forInstance("scenario", () -> new Scenario(environment))
+    .before(Scenario::start)
+    .step("verify", Scenario::verify)
+    .after(Scenario::stop);
 ```
 
-Inside an untyped step, use `context.instance(Type.class)` for an `Optional` or `context.requireInstance(Type.class)`
-when the fixture is required.
+- A nested group inherits the nearest binding; a nested `forInstance` establishes its own.
+- The factory never runs at definition, build, or compile time.
+- A factory that returns `null` fails the occurrence; no lifecycle callback runs.
+- A factory that throws must clean up its own partially acquired objects, because Paramixel cannot reach an object that
+  was never returned.
 
-## Data-driven subtrees
+## Phases
 
-`each(items, mapper)` on a container builder adds one child per item, in iteration order; it mixes with fixed
-`child(...)` calls:
-
-```java
-import java.util.List;
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-var users = List.of("ada", "grace", "linus");
-
-Action spec = sequential("user checks")
-        .each(users, user -> sequential("check " + user)
-                .child(step("load " + user, ctx -> loadUser(user)))
-                .child(step("verify " + user, ctx -> verifyUser(user))))
-        .build();
+```
+admission → resources → instance → [condition] → before → [body] → child group → after → release → terminal
 ```
 
-```text
-user checks
-├── check ada
-│   ├── load
-│   └── verify
-├── check grace
-│   ├── load
-│   └── verify
-└── check linus
-    ├── load
-    └── verify
-```
+| Situation | Instance | Normal work | After | Terminal |
+| --- | --- | --- | --- | --- |
+| Never admitted | absent | never | never | `SKIPPED`/`CANCELED` with reason |
+| Factory throws / null | absent | never | never | `FAILED` |
+| `before` fails | present | body/children skipped | all attempted | failure preserved |
+| Body fails | present | children skipped | all attempted | failure preserved |
+| Child fails | present | dependent siblings skipped | all attempted | aggregate |
+| `after` fails | present | already settled | remaining attempted | cleanup failure retained |
+| Success | present | normal | all | `PASSED` |
 
-See [Data-Driven Testing](data-driven-testing) for the `each` semantics and the fixture-per-item shape.
+Multiple `before` callbacks run in declaration order until one fails; remaining ones are recorded `SKIPPED`. Multiple
+`after` callbacks run in reverse declaration order, and every one is attempted.
+
+## Scope and sharing
+
+- A primary instance belongs to its occurrence. Reused definitions produce independent instances per environment.
+- A parallel group's children share the inherited instance and are concurrent calls on it. The fixture decides what is
+  thread-safe; Paramixel does not synchronize typed callbacks.
+- Resources that are not thread-safe belong in separate child scopes or behind `isolated(lockName)`.
+
+## Failure precedence
+
+The operation's failure is primary. Later finalization failures are appended in attempt order, and the original stack
+trace is never replaced. A parent aggregates `FAILED > CANCELED > ABORTED > SKIPPED > PASSED`.
+
+## No implicit closing
+
+Paramixel does not close a fixture merely because it implements `AutoCloseable`. Use an `after` callback so ownership and
+the exact release point stay explicit and cannot double-close.

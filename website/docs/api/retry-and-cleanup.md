@@ -1,53 +1,48 @@
 ---
-title: Retry and CleanUp
-description: Support utilities for transient failures and cleanup.
+title: Retry, Repeat, Timeout, and Cleanup
+description: Bounded advanced policies with distinct semantics.
 ---
 
-# Retry and CleanUp
+# Retry, Repeat, Timeout, and Cleanup
 
-The `org.paramixel.api.support` package contains support utilities that can be used inside steps.
+## Retry is not repeat
 
-## Retry
-
-`Retry` runs a `ThrowingRunnable` under a `Backoff` schedule and a wall-clock budget, and returns a `Result`.
-
-```java
-import java.time.Duration;
-import org.paramixel.api.support.Backoff;
-import org.paramixel.api.support.Retry;
-
-var retry = Retry.of(Backoff.exponential(Duration.ofMillis(50), Duration.ofSeconds(1)), Duration.ofSeconds(10))
-        .retryOn(throwable -> !(throwable instanceof Error))
-        .onRetry((attempt, throwable) -> logRetry(attempt, throwable));
-
-retry.runAndThrow(() -> callRemoteService());
-```
-
-`Retry` is an immutable configuration: `retryOn` and `onRetry` return a new instance, and `run` may be called any
-number of times, so one `Retry` can be reused. `Backoff` is the same type `Loop.Builder.delay` takes:
+| Policy | Purpose | Stop condition |
+| --- | --- | --- |
+| `retry(RetryPolicy)` | Re-attempt a non-success outcome | Attempt limit, non-triggering status |
+| `repeat(name, …)` | Intentional replay of a subtree | `maxIterations`, `untilPassed`, predicate |
 
 ```java
-Backoff.fixed(Duration.ofMillis(100));                       // the same wait every time
-Backoff.linear(Duration.ofMillis(100));                      // 100ms, 200ms, 300ms, …
-Backoff.exponential(Duration.ofMillis(50), Duration.ofSeconds(5)); // doubles, saturating at 5s
+step -> step
+    .retry(RetryPolicy.builder()
+            .maxAttempts(3)
+            .backoff(Backoff.linear(Duration.ofMillis(100)))
+            .build());
 ```
 
-`Backoff` arithmetic saturates: a delay never exceeds its maximum and never throws, so a long loop or a high retry
-count is safe.
+- Retry triggers default to `FAILED`. `CANCELED` and `ABORTED` are rejected as triggers: cancellation and assumption
+  failures are not retried automatically.
+- Attempts never overlap.
+- Retrying an owned `forInstance` task creates a fresh instance per attempt and runs its `after` callbacks between
+  attempts; retrying a nested step reuses the inherited instance.
+- A successful later attempt passes the task while all attempts remain visible in the result.
 
-## CleanUp
-
-`CleanUp` captures cleanup failures and can run multiple cleanup operations while preserving thrown failures.
+## Timeout
 
 ```java
-import org.paramixel.api.ThrowingRunnable;
-import org.paramixel.api.support.CleanUp;
-
-CleanUp.runAndThrow(
-        CleanUp.of((ThrowingRunnable) () -> closeBrowser()),
-        CleanUp.of((ThrowingRunnable) () -> stopServer()));
+task("bounded").timeout(Duration.ofSeconds(2)).step("work", Test::work);
 ```
 
-After a run, `cleanUp.throwable()` returns an `Optional<Throwable>`.
+The timeout uses a monotonic clock. On expiry the running callback is interrupted, no new work is admitted in the
+subtree, and finalizers run only after quiescence. If a callback ignores interruption past
+`paramixel.shutdown.graceMillis`, the result is `quiescent=false`: cleanup is withheld, permits stay held, and the exit
+code is non-zero. Paramixel does not claim it can stop arbitrary Java code.
 
-Use these utilities from action code; they are not discovery annotations or runner configuration mechanisms.
+## Cleanup
+
+`after` callbacks are the cleanup mechanism:
+
+- They run in reverse declaration order and are all attempted.
+- They are not implicit destructors: a fixture implementing `AutoCloseable` is not closed unless a callback closes it.
+- A failure in one `after` callback does not prevent the others, and the original operational failure stays primary.
+- Keyed resources are released after `after`, in reverse acquisition order.

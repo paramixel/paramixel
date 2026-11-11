@@ -36,8 +36,8 @@ import nonapi.org.paramixel.support.Arguments;
  * <p>Arithmetic saturates: a delay never exceeds its maximum (or {@link Duration#ofSeconds(long) Duration.ofSeconds(Long.MAX_VALUE)} when no
  * maximum is configured) and never throws, so a long loop or a high retry count cannot overflow.
  *
- * @see org.paramixel.api.action.Loop.Builder#delay(Backoff)
- * @see Retry#of(Backoff, Duration)
+ * @see RetryPolicy.Builder#backoff(Backoff)
+ * @see RepeatPolicy.Builder#delay(Backoff)
  */
 public final class Backoff {
 

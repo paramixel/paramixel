@@ -39,7 +39,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 import org.paramixel.maven.plugin.fixtures.LingeringFailingMojoFixture;
 import org.paramixel.maven.plugin.fixtures.PassingMojoFixture;
 
@@ -211,8 +211,8 @@ class ParamixelMojoExecuteTest {
     }
 
     @Nested
-    @DisplayName("no discovered actions")
-    class NoDiscoveredActions {
+    @DisplayName("no discovered tests")
+    class NoDiscoveredTests {
 
         @Test
         @DisplayName("execute succeeds when failIfNoTests is false")
@@ -604,7 +604,7 @@ class ParamixelMojoExecuteTest {
                 .getLocation()
                 .toURI());
         var coreClasses = Paths.get(
-                Action.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+                Task.class.getProtectionDomain().getCodeSource().getLocation().toURI());
 
         var build = new Build();
         build.setDirectory(targetDir.toString());

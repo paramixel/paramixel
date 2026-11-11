@@ -17,28 +17,26 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 import org.paramixel.api.support.Backoff;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Loop} action with an
- * exponential inter-iteration delay ({@link org.paramixel.api.support.Backoff#exponential}).
- * Verifies that the loop runs all iterations with the delay policy applied.
+ * Demonstrates an exponential, capped delay schedule between iterations.
+ *
+ * <p>Delay arithmetic saturates at the configured maximum, so a large iteration bound cannot overflow a duration.
  */
 public class LoopWithExponentialDelayTest {
 
     private static final AtomicInteger iterationCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
@@ -48,21 +46,20 @@ public class LoopWithExponentialDelayTest {
     }
 
     /**
-     * Builds an action tree that exercises loop with exponential inter-iteration delay.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
         return sequential("loop-exponential-delay-example")
-                .child(loop("poll")
-                        .body(step("check", context -> iterationCount.incrementAndGet()))
-                        .maxIterations(4)
-                        .delay(Backoff.exponential(Duration.ofMillis(50), Duration.ofSeconds(1))))
-                .child(step("validate", context -> {
-                    assertThat(iterationCount.get()).isEqualTo(4);
-                }))
+                .repeat(
+                        "poll",
+                        repeat -> repeat.maxIterations(4)
+                                .delay(Backoff.exponential(Duration.ofMillis(10), Duration.ofMillis(40)))
+                                .step("check", iterationCount::incrementAndGet))
+                .step("validate", () -> assertThat(iterationCount.get()).isEqualTo(4))
                 .build();
     }
 

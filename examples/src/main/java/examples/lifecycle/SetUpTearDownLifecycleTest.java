@@ -17,15 +17,16 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates one owned instance shared by several steps, with setup before and teardown after.
+ */
 public class SetUpTearDownLifecycleTest {
 
     private static final int EXPECTED_TEST_COUNT = 2;
@@ -34,40 +35,63 @@ public class SetUpTearDownLifecycleTest {
     private static final AtomicInteger testCount = new AtomicInteger();
     private static final AtomicInteger tearDownCount = new AtomicInteger();
 
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
         System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
+    /**
+     * Builds the definition.
+     *
+     * @return the definition for this test
+     */
     @Paramixel.Factory
-    public static Action factory() {
+    public static Task factory() {
         resetCounts();
 
-        return of("FullLifecycleTest", SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::new)
-                .before("setUp()", SetUpTearDownLifecycleTest::setUp)
-                .body(sequential("tests")
-                        .child(step("testOne()", SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::testOne))
-                        .child(step(
-                                "testTwo()", SetUpTearDownLifecycleTest.class, SetUpTearDownLifecycleTest::testTwo)))
-                .after("tearDown()", SetUpTearDownLifecycleTest::tearDown)
+        return forInstance("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
+                .before(SetUpTearDownLifecycleTest::setUp)
+                .step("testOne", SetUpTearDownLifecycleTest::testOne)
+                .step("testTwo", SetUpTearDownLifecycleTest::testTwo)
+                .after(SetUpTearDownLifecycleTest::tearDown)
                 .build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public SetUpTearDownLifecycleTest() {
         // Intentionally empty
     }
 
+    /**
+     * Records setup.
+     */
     public void setUp() {
         setUpCount.incrementAndGet();
     }
 
+    /**
+     * First test body.
+     */
     public void testOne() {
         testCount.incrementAndGet();
     }
 
+    /**
+     * Second test body.
+     */
     public void testTwo() {
         testCount.incrementAndGet();
     }
 
+    /**
+     * Verifies the lifecycle counts.
+     */
     public void tearDown() {
         tearDownCount.incrementAndGet();
 

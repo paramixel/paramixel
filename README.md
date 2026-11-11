@@ -1,223 +1,123 @@
-[![Build Status](https://github.com/paramixel/paramixel/actions/workflows/build.yaml/badge.svg)](https://github.com/paramixel/paramixel/actions)
-[![Java Version](https://img.shields.io/badge/Java-17%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/17/)
-[![Maven Central](https://img.shields.io/maven-central/v/org.paramixel/core)](https://central.sonatype.com/search?namespace=org.paramixel)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-
 # Paramixel
 
-Paramixel turns complex Java tests into readable, composable execution trees.
+**Structured test orchestration for Java integration, compatibility, and lifecycle-heavy testing.**
 
-It is a Java 17+ test orchestration framework for integration tests, compatibility scenarios, lifecycle-heavy workflows, and test plans that are awkward to express as flat annotation-driven test methods.
-
-## Why Paramixel?
-
-Most Java testing frameworks are method-based. That is a great fit for ordinary unit tests.
-
-Some tests, however, are naturally structured:
-
-- setup must wrap a group of related checks
-- teardown must run even when setup or body steps fail
-- some branches must run sequentially
-- some branches may run in parallel
-- scenarios are generated from plain Java code
-- the final result should show the same structure that was executed
-
-Paramixel models those tests as executable action trees. The tree you build is the tree Paramixel runs, and the result tree mirrors that same structure.
-
-**Key benefits:**
-
-- **Composable execution trees built with plain Java** — setup/teardown, sequential children, and parallel branches compose to arbitrary depth, making execution structure explicit
-- **Dynamic test definition** — build test plans with Java loops, conditionals, and generated data while using annotations only where they add value
-- **Explicit teardown** — configured `after` actions run even when setup or body actions fail or skip; `CleanUp.runAndThrow()` can aggregate teardown failures with suppressed exceptions
-- **Parallel execution at any depth** — embed parallel children anywhere in the tree with per-node parallelism control
-- **Fail-fast or run-all semantics** — choose per-node whether children stop on first failure or run all regardless
-- **Write custom actions** — implement your own execution semantics; custom actions compose alongside built-in primitives with zero framework changes
-- **Single factory method produces the entire test plan** — one static method returns the full action tree; no per-method reflection at test time
-- **Optional managed instances** — use `Instance` actions when tests need fixture objects; otherwise actions run without test-class instantiation
-- **Inspectable results** — walk the result tree for aggregated or granular reporting at any level
-
-## When to use Paramixel
-
-Use Paramixel when the structure of the test matters as much as the assertions.
-
-Good fits include:
-
-- integration test workflows
-- compatibility testing across versions, configurations, or environments
-- dynamically generated test plans
-- lifecycle-heavy tests with nested setup and teardown
-- tests that mix sequential and parallel execution
-- test suites where the result should be inspectable as a tree
-
-Paramixel is probably unnecessary when:
-
-- the test is a simple unit test
-- one test method clearly expresses the behavior
-- JUnit parameterized tests are sufficient
-- no explicit lifecycle or execution structure is needed
-
-## How Paramixel complements JUnit
-
-JUnit is excellent for ordinary method-based tests. Paramixel can run alongside JUnit in the same project and build, and is designed for cases where a test is better represented as a tree: global setup/teardown, nested sequential and parallel branches, per-branch lifecycle, generated environments, retries, timeouts, isolation, and reports that mirror the structure being executed.
-
-| Need | JUnit-style method tests | Paramixel |
-| --- | --- | --- |
-| Simple unit test | Excellent fit | Usually unnecessary |
-| Annotation-driven discovery | Excellent fit | Optional factory discovery |
-| Complex workflow | Possible, but can become awkward | Natural fit |
-| Nested setup/teardown | Usually indirect | Explicit in the tree |
-| Dynamic test generation | Supported, but framework-shaped | Plain Java code |
-| Sequential + parallel sections | Usually externalized | Built into the action tree |
-| Result mirrors execution structure | Limited | Core model |
-
-A Kafka compatibility test is a good example. A single Paramixel factory can build a matrix of Kafka versions, run version-specific environments in parallel, wrap each environment with its own setup and teardown, run nested producer/consumer checks inside each environment, and wrap the whole run with global hooks. JUnit can approximate parts of this with extensions or custom engines, but Paramixel exposes the execution tree directly as the core model.
-
-## Documentation
-
-For the full documentation, visit: **https://www.paramixel.org**
-
-## Quick Start
-
-This quick start creates a small Paramixel execution tree with setup, two test steps, and teardown.
-
-The important idea is that the Java code builds the same structure that Paramixel executes and reports.
-
-### Add Dependency
-
-```xml
-<properties>
-    <paramixel.version>6.1.0</paramixel.version>
-</properties>
-
-<dependency>
-    <groupId>org.paramixel</groupId>
-    <artifactId>core</artifactId>
-    <version>${paramixel.version}</version>
-</dependency>
-```
-
-See [Maven Central](https://central.sonatype.com/search?namespace=org.paramixel) for the latest published version.
-
-### Configure the Maven Plugin
-
-```xml
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.paramixel</groupId>
-            <artifactId>maven-plugin</artifactId>
-            <version>${paramixel.version}</version>
-            <executions>
-                <execution>
-                    <phase>test</phase>
-                    <goals>
-                        <goal>test</goal>
-                    </goals>
-                </execution>
-            </executions>
-        </plugin>
-    </plugins>
-</build>
-```
-
-### Write Your First Test
+Paramixel's primary unit is an immutable **task definition**. Tasks form an ordered containment tree, optionally with
+bodies and subtrees. The compiler derives execution dependencies, resource scopes, ordering constraints, and immutable
+execution metadata; the scheduler executes occurrences with bounded concurrency and deterministic admission priorities.
 
 ```java
-import org.paramixel.api.Paramixel;
-import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Scope;
-import org.paramixel.api.action.Sequential;
-import org.paramixel.api.action.Step;
+import static org.paramixel.api.Tasks.*;
 
-public final class MyTest {
+Task definition = parallel("Environments", Pool.named("environments"))
+        .each(environments, environment -> forInstance(environment.name(), () -> new Scenario(environment))
+                .before(Scenario::start)
+                .sequential("checks", checks -> checks
+                        .step("health", Scenario::checkHealth)
+                        .step("metrics", Scenario::checkMetrics))
+                .after(Scenario::stop))
+        .build();
 
-    public static void main(String[] args) {
-        System.exit(Runner.builder().build().run(factory()).exitCode());
-    }
-
-    @Paramixel.Factory
-    public static Action factory() {
-        return Scope.scope(MyTest.class.getName())
-                .before(Step.step("setUp()", ctx -> { /* setup */ }))
-                .body(Sequential.sequential("tests")
-                        .child(Step.step("test1()", ctx -> { /* test something */ }))
-                        .child(Step.step("test2()", ctx -> { /* test something else */ }))
-                        .build())
-                .after(Step.step("tearDown()", ctx -> { /* teardown */ }))
-                .build();
-    }
+try (Runner runner = Runner.builder()
+        .pool(Pool.named("environments"), 3)
+        .build()) {
+    Result result = runner.run(definition);
+    System.exit(result.exitCode());
 }
 ```
 
-This creates the following execution tree:
+No class tokens on steps, no reflective fixture lookup, no unchecked casts. `T` is inferred from the supplier and carried
+through nested groups.
 
-```text
-MyTest
-├── before: setUp()
-├── body: tests
-│   ├── test1()
-│   └── test2()
-└── after: tearDown()
-```
+## Requirements
 
-Paramixel executes the tree and returns a result tree with the same shape.
+- Java 17 or newer
+- Maven 3.9+ (the build enforces it)
 
-> **Note:** Keep factory methods public and static for discovery. Use small private helper methods when that makes each action easy to find from the IDE outline or structure view.
+## Modules
 
-### Other Examples
+| Module | Purpose |
+| --- | --- |
+| `core` | The library: definitions, compiler, scheduler, discovery, reporting |
+| `maven-plugin` | Maven `test`-phase integration; goal prefix `paramixel` |
+| `examples` | Example and Testcontainers-based integration tests |
+| `benchmarks` | JMH benchmarks for compilation and scheduling |
 
-See the [examples/](examples/src/main/java/examples/) module for more examples, including [Testcontainers](https://github.com/testcontainers/testcontainers-java), lifecycle, parallel execution, argument testing, store operations, and tag-based selection.
+## The model
 
-### Run with Maven
+One immutable definition type, `Task`:
+
+- **`sequential` / `parallel`** describe how a task's direct children run. `parallel` always names a `Pool`.
+- **`dependent()` / `independent()`** describe only *failure continuation* of ordered children, so they exist on
+  sequential builders only. `dependent` is the default.
+- **`forInstance(name, supplier)`** owns one lazily created instance per execution attempt. Lifecycle is `before` /
+  `after`; there is no separate instantiate/destroy ceremony and no implicit `AutoCloseable` closing.
+- **`step(name, operation, children -> ...)`** attaches a subtree explicitly. There is no hidden "current step" cursor.
+- **`each(items, mapper)`** expands eagerly at definition time and may produce builders bound to different instance
+  types.
+- **`when`, `repeat`, `retry`, `timeout`, `isolated`, `tags`, `shuffle`, `resource`** are typed declarations on the
+  definition, validated before anything runs.
+
+Building a definition, compiling a plan, and discovering factories are all side-effect free: no instance factory,
+lifecycle callback, body, or runtime predicate runs until the scheduler admits an occurrence.
+
+## Pools, workers, and cancellation
+
+A `Pool` is a logical concurrency budget, never a thread pool. Capacity comes from `Runner.Builder.pool(Pool, int)` or
+`paramixel.parallelism.<name>`, with the builder winning.
+
+- Each direct child of a parallel task holds one permit from admission through instance creation, body, children,
+  `after`, and resource release.
+- Waiting for a permit or a lock never occupies a worker thread.
+- Nested use of the same pool on one ancestry path, undefined pools, and provable acquisition-order cycles are rejected
+  before execution.
+- A timeout is cooperative: the running callback is interrupted, no new work is admitted in that subtree, and finalizers
+  run only after quiescence. A callback that ignores interruption produces an explicitly **non-quiescent** result with
+  withheld cleanup — Java cannot forcibly stop arbitrary code, and Paramixel does not claim otherwise.
+
+## Statuses and exit codes
+
+`PASSED`, `FAILED`, `SKIPPED`, `ABORTED` (assumption), and `CANCELED` are distinct. Aggregation is
+`FAILED > CANCELED > ABORTED > SKIPPED > PASSED`, so a partially executed group stays visible instead of looking like a
+pass. `Result.status()` is the semantic outcome; `Result.exitCode()` applies `paramixel.failureOnSkip`,
+`paramixel.failureOnAbort`, and `paramixel.failIfNoTests` (all defaulting to fail).
+
+## Discovery
+
+`@Paramixel.Factory` methods must be `public static`, take no parameters, and return a `Task` or a builder. Returning
+`null` is an explicit skip. `@BeforeAll` / `@AfterAll` wrap the discovered run, `@Disabled` excludes a factory, `@Tag`
+and `Selector` select, and `@Priority` orders.
+
+`Runner.run(Task)` executes exactly the definition you supply: no classpath scan and no hooks. `Runner.run()`
+discovers. `Launcher` owns `System.exit`.
+
+## Configuration
+
+Classpath `paramixel.properties`, then JVM system properties, then built-in defaults; a runner may override pool
+capacities explicitly. The main keys:
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `paramixel.parallelism` | admission budget for discovered root tasks | processors |
+| `paramixel.parallelism.<pool>` | capacity of a named pool | none (must be set) |
+| `paramixel.workers` | execution worker threads | processors |
+| `paramixel.shutdown.graceMillis` | bounded wait before reporting non-quiescence | `10000` |
+| `paramixel.failureOnSkip` / `paramixel.failureOnAbort` | exit-code mapping | `true` / `true` |
+| `paramixel.failIfNoTests` | fail when discovery finds nothing | `true` |
+| `paramixel.failFast` | stop admitting new root tasks after a root failure | `false` |
+| `paramixel.report.file` | report file; format follows the extension | none |
+
+An unknown `paramixel.*` key is reported as a warning rather than silently ignored.
+
+## Build and test
 
 ```bash
-# Run all tests
-./mvnw test
-
-# Skip Paramixel tests
-./mvnw test -Dparamixel.skipTests
+./mvnw spotless:apply          # format before any validation
+./mvnw clean verify            # full validation: tests, Javadoc, Spotless, PMD
+./mvnw test -Dparamixel.skipTests   # core unit tests only
+./mvnw test -pl examples       # example integration tests (requires Docker)
 ```
-
-### Run from the Console
-
-Most test classes have a `main` method and can be run directly from an IDE or console.
-
-You can create a `__ParamixelRunner__` in a package to run all tests in that package and its subpackages from a single entry point. See [__ParamixelRunner__.java](examples/src/main/java/examples/__ParamixelRunner__.java) for an example.
-
-## Build from Source
-
-### Prerequisites
-
-- **Java 17+**
-- **Maven 3.9+**
-
-### Build
-
-```bash
-git clone https://github.com/paramixel/paramixel.git
-cd paramixel
-./mvnw clean install
-```
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
-
-# Support
-
-![YourKit logo](https://www.yourkit.com/images/yklogo.png)
-
-[YourKit](https://www.yourkit.com/) supports open source projects with innovative and intelligent tools for monitoring and profiling Java and .NET applications.
-
-YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a>,
-<a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a>,
-and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.
-
----
-
-Copyright (c) 2026-present Douglas Hoard
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICES](NOTICES).

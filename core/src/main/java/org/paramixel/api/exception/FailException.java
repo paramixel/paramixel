@@ -20,15 +20,17 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Signals that an action should be marked as failed rather than allowed to propagate an unexpected error.
+ * Signals a deliberate, author-initiated failure.
  *
- * <p>This is a deliberate, author-initiated failure — distinct from an uncaught runtime exception.
- * The Paramixel runtime catches {@code FailException} and records the action as failed with the
- * provided message. This exception can be instantiated directly through {@link #FailException(String)},
- * {@link #FailException(String, Throwable)}, or the factory methods {@link #fail()} and {@link #fail(String)},
- * which return the exception so that it can be thrown at the call site ({@code throw fail("x")}).
+ * <p>Distinct from an uncaught exception only in intent: the runtime records either as
+ * {@link org.paramixel.api.Status.Kind#FAILED} with the original cause, and cleanup still runs.
+ *
+ * <p>Use the factory methods {@link #fail()} and {@link #fail(String)} at the call site:
+ * {@code throw fail("unexpected payload")}.
  */
-public final class FailException extends RuntimeException {
+public final class FailException extends ParamixelException {
+
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates a failure exception with the supplied message.

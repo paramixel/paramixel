@@ -1,51 +1,42 @@
 ---
 title: Status
-description: Outcome values in Paramixel.
+description: Terminal and in-flight kinds, severity ordering, and reasons.
 ---
 
 # Status
 
-`Status` is an immutable value: a `Kind` plus an optional message and throwable.
-
-## Kinds
-
-`Status.Kind` has six values, and `kind()` supports `switch`:
-
-- `PENDING`
-- `RUNNING`
-- `PASSED`
-- `FAILED`
-- `SKIPPED`
-- `ABORTED`
-
-`Kind.isTerminal()` is `true` for the last four.
-
-## Factories and constants
-
 ```java
-Status.PASSED;                       // canonical, no detail
-Status.failed("message");
-Status.failed("message", throwable);
-Status.skipped("message", throwable);
-Status.aborted("message");
+Status status = Status.failed("assertion failed", cause);
+status.kind();        // FAILED
+status.message();     // Optional[assertion failed]
+status.throwable();   // Optional[cause]
 ```
 
-## Comparing
+| Kind | Terminal | Meaning |
+| --- | --- | --- |
+| `PENDING` | no | Compiled but not admitted |
+| `RUNNING` | no | Execution started |
+| `PASSED` | yes | Every required phase succeeded |
+| `FAILED` | yes | Operation, runtime validation, timeout, or finalizer failed |
+| `SKIPPED` | yes | Condition false, dependency unsatisfied, selection, or stop policy |
+| `ABORTED` | yes | Assumption or precondition abort |
+| `CANCELED` | yes | Run cancellation, shutdown, or timeout-driven abortion |
 
-Compare with `kind()`, not with the canonical constants:
+`ABORTED` and `CANCELED` are intentionally distinct: an assumption failure is a test verdict, while cancellation means
+the task never produced one.
 
-```java
-if (result.status().kind() == Status.Kind.FAILED) { ... }
-```
+## Severity
 
-`Status.failed("x").equals(Status.FAILED)` is `false`, because the message differs. Equality compares `kind()` and
-`message()` only; the throwable is ignored.
+`Status.mostSevere(collection)` implements `FAILED > CANCELED > ABORTED > SKIPPED > PASSED`. An empty collection
+aggregates to `PASSED`.
 
-`isPending()`, `isRunning()`, `isPassed()`, `isFailed()`, `isSkipped()` and `isAborted()` are conveniences over
-`kind()`.
+## Exceptions and statuses
 
-## Aggregation
-
-A container combines its children as `FAILED` &gt; `ABORTED` &gt; still-running &gt; `SKIPPED` &gt; `PASSED`. The run's
-effective status is the root descriptor's status after promotion (`paramixel.failureOnSkip`,
-`paramixel.failureOnAbort`, `paramixel.failIfNoTests`), which keeps the original message and throwable.
+| Thrown | Recorded as |
+| --- | --- |
+| Any checked exception, `RuntimeException`, assertion failure | `FAILED` |
+| `AbortException.abort(…)` | `ABORTED` |
+| `SkipException.skip(…)` | `SKIPPED` |
+| `FailException.fail(…)` | `FAILED` |
+| Cancellation-driven interruption | `CANCELED` |
+| Timeout expiry | `FAILED` with an explicit timeout reason |

@@ -1,50 +1,45 @@
 ---
 title: Troubleshooting
-description: Common discovery, configuration, and execution issues.
+description: Common failures and the invariant behind them.
 ---
 
 # Troubleshooting
 
-## No factories discovered
+## "Parallel pool 'x' is not defined"
 
-Check that factory methods are public static, annotated with `@Paramixel.Factory`, and return `Action`, `Builder`, or `null`. If you expect discovery to fail the build when empty, set:
+A parallel task names a pool with no capacity. Set `paramixel.parallelism.x` or call
+`Runner.builder().pool(Pool.named("x"), n)`. Discovery itself uses a pool named `discovery`, which defaults to
+`paramixel.parallelism`.
 
-```properties
-paramixel.failIfNoTests=true
-```
+## "Task uses typed instance callbacks but no enclosing forInstance owns an instance"
 
-## Factory is not selected
+A callback referenced an instance type without a lexical binding, for example `sequential("root").step("x", Test::m)`.
+Wrap the task in `forInstance(name, factory)` or use a no-argument callback.
 
-Check filters:
+## "Pool 'x' is already active on this ancestry path"
 
-```bash
--Dparamixel.match.package.regex=...
--Dparamixel.match.class.regex=...
--Dparamixel.match.tag.regex=...
-```
+Nested groups named the same pool. Use a different pool name for nested groups; the restriction is intentional so a
+capacity change cannot turn a passing plan into a deadlock.
 
-Regex filters use `matches()` semantics. The regex must match the entire string. To match substrings, use wildcards such as `.*pattern.*`.
+## Everything is `SKIPPED`
 
-## Factory is skipped
+- A dependent sequence stops after the first non-passing child, including `ABORTED` and `SKIPPED`.
+- A `when(...)` condition evaluated to false.
+- A body failed, so its children were skipped.
 
-A factory returning `null` creates a skipped action outcome. A method annotated with `@Paramixel.Disabled` is excluded from discovery entirely.
+Inspect the child `reason()` and the parent `phases()`; a skipped child always carries an explicit reason.
 
-## Report file missing
+## `result.isQuiescent()` is false
 
-Set `paramixel.report.file` and ensure the process can write the parent directory.
+A callback ignored interruption after a timeout or cancellation. Cleanup was withheld on purpose to avoid touching
+resources that are still being mutated, permits remain held, and the exit code is non-zero. Fix the callback to honor
+interruption (for example, let `InterruptedException` propagate).
 
-## Unexpected exit code
+## A listener exception broke reporting but not the test
 
-`paramixel.failureOnAbort` defaults to `true`; aborted results produce failing exit codes by default. Set `paramixel.failureOnSkip=true` if skipped results should also fail CI. Use `paramixel.failFast=true` to stop scheduling remaining tests after the first failed or aborted action.
+Listener failures are isolated and recorded as diagnostics. Check `result.diagnostics()` for `listener` entries.
 
-## Runtime property changes are ignored
+## Nothing was discovered
 
-`Configuration.defaultConfiguration()` caches its result indefinitely after the first
-call per classloader. If you call `System.setProperty()` mid-run expecting it to take
-effect, the cached configuration will be returned instead.
-
-**Workaround:** Use `Configuration.systemConfiguration()` to get a fresh snapshot
-of current system properties, or construct a `Configuration.of(...)` map with your
-desired overrides and pass it to the `Runner.Builder`.
-
-See [Configuration Caching](../api/configuration#caching) for details.
+`Runner.run()` with no matching `@Paramixel.Factory` reports `SKIPPED` and fails by default
+(`paramixel.failIfNoTests=true`). Check the selector, `@Disabled`, and tag filters.

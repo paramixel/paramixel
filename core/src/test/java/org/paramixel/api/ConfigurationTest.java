@@ -18,207 +18,115 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.task;
 
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
+import nonapi.org.paramixel.compiler.PlanCompiler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.paramixel.api.exception.CompilationException;
+import org.paramixel.api.exception.ConfigurationException;
 
+/**
+ * Configuration defaults, precedence, pool resolution, and unknown-key reporting.
+ */
 class ConfigurationTest {
 
-    @TempDir
-    Path tempDir;
-
     @Test
-    void shouldLoadClasspathConfiguration() {
-        var configuration = Configuration.classpathConfiguration();
-        assertThat(configuration).isNotNull();
+    @DisplayName("defaults match the documented contract")
+    void defaults() {
+        final var configuration = Configuration.defaultConfiguration();
+
+        assertThat(configuration.getBoolean(Configuration.FAILURE_ON_SKIP)).hasValue(true);
+        assertThat(configuration.getBoolean(Configuration.FAILURE_ON_ABORT)).hasValue(true);
+        assertThat(configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS)).hasValue(true);
+        assertThat(configuration.getBoolean(Configuration.FAIL_FAST)).hasValue(false);
+        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM)).isPresent();
+        assertThat(configuration.getInteger(Configuration.WORKERS)).isPresent();
+        assertThat(configuration.getLong(Configuration.SHUTDOWN_GRACE_MILLIS)).hasValue(10_000L);
+        assertThat(configuration.getInteger(Configuration.LISTENER_QUEUE_CAPACITY))
+                .hasValue(8192);
+        assertThat(configuration.getString(Configuration.ANSI)).hasValue("auto");
     }
 
     @Test
-    void shouldReturnEmptyWhenPropertiesFileAbsent() {
-        var configuration = Configuration.classpathConfiguration();
-        assertThat(configuration).isNotNull();
-        assertThat(configuration.keySet()).isEmpty();
+    @DisplayName("typed accessors parse and reject values deterministically")
+    void typedAccessors() {
+        final var configuration = Configuration.of(Map.of(
+                "paramixel.workers", "4",
+                "paramixel.failFast", " TRUE ",
+                "paramixel.shutdown.graceMillis", "500"));
+
+        assertThat(configuration.getInteger("paramixel.workers")).hasValue(4);
+        assertThat(configuration.getBoolean("paramixel.failFast")).hasValue(true);
+        assertThat(configuration.getLong("paramixel.shutdown.graceMillis")).hasValue(500L);
+        assertThat(configuration.getString("paramixel.missing")).isEmpty();
+        assertThatThrownBy(() -> configuration.getInteger("paramixel.failFast"))
+                .isInstanceOf(ConfigurationException.class);
+        assertThatThrownBy(() -> Configuration.of(Map.of("k", "v")).getString(null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    void shouldIncludeParamixelSystemProperties() {
-        var configuration = Configuration.systemConfiguration();
-        assertThat(configuration).isNotNull();
-        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
+    @DisplayName("pool keys follow the documented naming rule")
+    void poolKeys() {
+        assertThat(Configuration.poolKey("environments")).isEqualTo("paramixel.parallelism.environments");
+        assertThat(Configuration.poolKey(Pool.named("p").name())).isEqualTo("paramixel.parallelism.p");
     }
 
     @Test
-    void shouldIncludeNonParamixelSystemProperties() {
-        var configuration = Configuration.systemConfiguration();
-        assertThat(configuration.getString("java.version")).isPresent();
-        assertThat(configuration.getString("user.name")).isPresent();
-        assertThat(configuration.getString("user.dir")).isPresent();
+    @DisplayName("runner pool overrides take precedence over configuration")
+    void poolPrecedence() {
+        final var definition =
+                parallel("root", Pool.named("p")).step("work", () -> {}).build();
+        final var configuration = Configuration.of(Map.of("paramixel.parallelism.p", "1"));
+
+        final var fromConfiguration = new PlanCompiler(configuration, Map.of()).compile(definition);
+        final var fromOverride = new PlanCompiler(configuration, Map.of(Pool.named("p"), 7)).compile(definition);
+
+        assertThat(fromConfiguration.poolCapacities()).containsEntry("p", 1);
+        assertThat(fromOverride.poolCapacities()).containsEntry("p", 7);
     }
 
     @Test
-    void shouldApplyParallelismDefaultInSystemConfiguration() {
-        var configuration = Configuration.systemConfiguration();
-        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
-        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
-                .isEqualTo(Runtime.getRuntime().availableProcessors());
-    }
-
-    @Test
-    void shouldMergeDefaultsCorrectly() {
-        var configuration = Configuration.defaultConfiguration();
-        assertThat(configuration).isNotNull();
-        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
-        assertThat(configuration.getInteger(Configuration.RUNNER_PARALLELISM).orElseThrow())
-                .isEqualTo(Runtime.getRuntime().availableProcessors());
-    }
-
-    @Test
-    void shouldLoadClasspathConfigurationWithNullContextClassLoader() {
-        var original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(null);
-            var configuration = Configuration.classpathConfiguration();
-            assertThat(configuration).isNotNull();
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
+    @DisplayName("processor-relative pool expressions resolve to at least one")
+    void coresExpressions() {
+        final var definition =
+                parallel("root", Pool.named("p")).step("work", () -> {}).build();
+        for (String expression : new String[] {"@cores", "@cores*2", "@cores/2", "@cores*1000"}) {
+            final var plan = new PlanCompiler(Configuration.of(Map.of("paramixel.parallelism.p", expression)), Map.of())
+                    .compile(definition);
+            assertThat(plan.poolCapacities().get("p")).isPositive();
         }
     }
 
     @Test
-    void shouldLoadClasspathConfigurationFromExplicitClassLoaderWithoutUsingContextClassLoader() throws Exception {
-        var explicitClasspath = tempDir.resolve("explicit");
-        Files.createDirectories(explicitClasspath);
-        Files.writeString(
-                explicitClasspath.resolve(Configuration.CONFIGURATION_FILE_NAME), "paramixel.match.tag.regex=explicit");
+    @DisplayName("an invalid pool capacity fails compilation with a repair hint")
+    void invalidPoolCapacity() {
+        final var definition =
+                parallel("root", Pool.named("p")).step("work", () -> {}).build();
 
-        var original = Thread.currentThread().getContextClassLoader();
-        var emptyContextClassLoader = new ClassLoader(null) {};
-        try (URLClassLoader explicitClassLoader =
-                new URLClassLoader(new URL[] {explicitClasspath.toUri().toURL()}, null)) {
-            Thread.currentThread().setContextClassLoader(emptyContextClassLoader);
-
-            var configuration = Configuration.classpathConfiguration(explicitClassLoader);
-
-            assertThat(configuration.getString("paramixel.match.tag.regex")).contains("explicit");
-            assertThat(Thread.currentThread().getContextClassLoader()).isSameAs(emptyContextClassLoader);
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
-        }
+        assertThatThrownBy(() -> new PlanCompiler(Configuration.of(Map.of("paramixel.parallelism.p", "zero")), Map.of())
+                        .compile(definition))
+                .isInstanceOf(CompilationException.class)
+                .hasMessageContaining("POOL_INVALID")
+                .hasMessageContaining("@cores");
     }
 
     @Test
-    void shouldLoadDefaultConfigurationWithNullContextClassLoader() {
-        var original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(null);
-            var configuration = Configuration.defaultConfiguration();
-            assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM))
-                    .isPresent();
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
-        }
-    }
+    @DisplayName("an unknown Paramixel key is reported as a warning, not ignored silently")
+    void unknownKeyWarns() {
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of("paramixel.unexpectedSetting", "2")))
+                .build()
+                .run(task("root").step("work", () -> {}).build());
 
-    @Test
-    void shouldContainFailureOnSkipKeyInDefaultConfigurationWhenPresentInSystemProperties() {
-        var configuration = Configuration.defaultConfiguration();
-        if (System.getProperty(Configuration.FAILURE_ON_SKIP) != null) {
-            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).isPresent();
-        }
-    }
-
-    @Test
-    void shouldContainFailureOnAbortKeyInDefaultConfigurationWhenPresentInSystemProperties() {
-        var configuration = Configuration.defaultConfiguration();
-        if (System.getProperty(Configuration.FAILURE_ON_ABORT) != null) {
-            assertThat(configuration.getString(Configuration.FAILURE_ON_ABORT)).isPresent();
-        }
-    }
-
-    @Test
-    void shouldReturnNewCopyOnEachDefaultConfigurationCall() {
-        var first = Configuration.defaultConfiguration();
-        var second = Configuration.defaultConfiguration();
-        assertThat(first.getString(Configuration.RUNNER_PARALLELISM))
-                .isEqualTo(second.getString(Configuration.RUNNER_PARALLELISM));
-    }
-
-    @Test
-    @DisplayName("CONFIGURATION_FILE_NAME constant value")
-    void configFileName() {
-        assertThat(Configuration.CONFIGURATION_FILE_NAME).isEqualTo("paramixel.properties");
-    }
-
-    @Test
-    @DisplayName("RUNNER_PARALLELISM constant value")
-    void runnerParallelism() {
-        assertThat(Configuration.RUNNER_PARALLELISM).isEqualTo("paramixel.parallelism");
-    }
-
-    @Test
-    @DisplayName("FAILURE_ON_SKIP constant value")
-    void failureOnSkip() {
-        assertThat(Configuration.FAILURE_ON_SKIP).isEqualTo("paramixel.failureOnSkip");
-    }
-
-    @Test
-    @DisplayName("FAILURE_ON_ABORT constant value")
-    void failureOnAbort() {
-        assertThat(Configuration.FAILURE_ON_ABORT).isEqualTo("paramixel.failureOnAbort");
-    }
-
-    @Test
-    @DisplayName("ANSI constant value")
-    void ansi() {
-        assertThat(Configuration.ANSI).isEqualTo("paramixel.ansi");
-    }
-
-    @Test
-    @DisplayName("REPORT_FILE constant value")
-    void reportFile() {
-        assertThat(Configuration.REPORT_FILE).isEqualTo("paramixel.report.file");
-    }
-
-    @Test
-    @DisplayName("FAIL_IF_NO_TESTS constant value")
-    void failIfNoTests() {
-        assertThat(Configuration.FAIL_IF_NO_TESTS).isEqualTo("paramixel.failIfNoTests");
-    }
-
-    @Test
-    @DisplayName("Configuration.of(Map) creates configuration from map")
-    void ofMapCreatesConfiguration() {
-        var configuration = Configuration.of(Map.of("key", "value"));
-        assertThat(configuration.getString("key")).contains("value");
-    }
-
-    @Test
-    @DisplayName("defaultConfiguration(ClassLoader) throws NullPointerException with null classloader")
-    void defaultConfigurationWithNullClassloader() {
-        assertThatThrownBy(() -> Configuration.defaultConfiguration(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("classLoader is null");
-    }
-
-    @Test
-    @DisplayName("defaultConfiguration(ClassLoader) loads with explicit classloader")
-    void defaultConfigurationWithExplicitClassloader() {
-        var configuration = Configuration.defaultConfiguration(getClass().getClassLoader());
-        assertThat(configuration).isNotNull();
-        assertThat(configuration.getString(Configuration.RUNNER_PARALLELISM)).isPresent();
-    }
-
-    @Test
-    @DisplayName("ConcreteConfiguration.toMap() returns backing properties")
-    void concreteConfigurationToMapReturnsProperties() {
-        Map<String, String> props = Map.of("key", "value");
-        var configuration = new nonapi.org.paramixel.ConcreteConfiguration(props);
-        assertThat(configuration.toMap()).containsEntry("key", "value");
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(result.diagnostics())
+                .anySatisfy(diagnostic -> assertThat(diagnostic)
+                        .contains("Unknown Paramixel configuration key")
+                        .contains("paramixel.unexpectedSetting"));
     }
 }

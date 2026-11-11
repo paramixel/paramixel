@@ -10,7 +10,7 @@ Run Paramixel from Gradle with a `JavaExec` task that invokes `org.paramixel.api
 ```groovy
 tasks.register('paramixelTest', JavaExec) {
     group = 'verification'
-    description = 'Discovers and executes Paramixel action trees'
+    description = 'Discovers and executes Paramixel task definitions'
     mainClass = 'org.paramixel.api.Runner'
     classpath = sourceSets.test.runtimeClasspath
 }

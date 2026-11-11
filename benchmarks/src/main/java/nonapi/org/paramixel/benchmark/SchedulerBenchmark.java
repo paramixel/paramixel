@@ -33,65 +33,73 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Listener;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Parallel;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.Task;
+import org.paramixel.api.Tasks;
 
 /**
  * JMH benchmarks for the Paramixel scheduler.
  *
- * <p>Run with:
+ * <p>Each benchmark runs a complete plan through the public runner with a no-op listener, so the measured cost is
+ * compilation, scheduling, synchronization, and result assembly rather than console output.
  *
  * <pre>{@code
- * java -jar benchmarks/target/benchmarks.jar
+ * java -jar benchmarks/target/benchmarks.jar SchedulerBenchmark
  * }</pre>
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 3, time = 3)
-@Measurement(iterations = 5, time = 3)
-@Fork(2)
+@Warmup(iterations = 3, time = 2)
+@Measurement(iterations = 5, time = 2)
+@Fork(1)
 @Threads(1)
 public class SchedulerBenchmark {
 
     /**
-     * Benchmark parallel throughput with heterogeneous child durations.
+     * Measures parallel throughput with heterogeneous child durations.
      *
-     * <p>Measures how efficiently the scheduler utilizes parallelism when children have varying
-     * execution times. This is the key scenario where the rolling window optimization provides
-     * improvement over batch processing.
+     * @param state the benchmark state
+     * @param blackhole the JMH sink
      */
     @Benchmark
-    public void runParallelHeterogeneousDurations(ParallelHeterogeneousState state, Blackhole blackhole) {
-        var result = state.runner().run(state.root());
-        blackhole.consume(result);
+    public void runParallelHeterogeneousDurations(final ParallelHeterogeneousState state, final Blackhole blackhole) {
+        blackhole.consume(state.runner.run(state.root));
     }
 
     /**
-     * Benchmark scheduling admission throughput with many small tasks.
+     * Measures parallel throughput with uniform child durations.
      *
-     * <p>Measures the overhead of the scheduling path itself (lock acquisition, permit handling,
-     * task submission) when actions are trivial.
+     * @param state the benchmark state
+     * @param blackhole the JMH sink
      */
     @Benchmark
-    public void scheduleManySmallTasks(ManySmallTasksState state, Blackhole blackhole) {
-        var result = state.runner().run(state.root());
-        blackhole.consume(result);
+    public void runParallelUniformDurations(final ParallelUniformState state, final Blackhole blackhole) {
+        blackhole.consume(state.runner.run(state.root));
     }
 
     /**
-     * Benchmark parallel throughput with uniform child durations.
+     * Measures scheduling overhead for many trivial steps.
      *
-     * <p>Baseline scenario — no benefit from rolling window, should show no regression.
+     * @param state the benchmark state
+     * @param blackhole the JMH sink
      */
     @Benchmark
-    public void runParallelUniformDurations(ParallelUniformState state, Blackhole blackhole) {
-        var result = state.runner().run(state.root());
-        blackhole.consume(result);
+    public void scheduleManySmallTasks(final ManySmallTasksState state, final Blackhole blackhole) {
+        blackhole.consume(state.runner.run(state.root));
+    }
+
+    private static Runner runner(final int capacity) {
+        return Runner.builder()
+                .configuration(Configuration.of(Map.of("paramixel.ansi", "false")))
+                .listener(Listener.NOOP)
+                .pool(Pool.named("bench"), capacity)
+                .build();
     }
 
     /**
-     * State for heterogeneous duration benchmark.
+     * State for the heterogeneous-duration benchmark.
      */
     @State(Scope.Benchmark)
     public static class ParallelHeterogeneousState {
@@ -103,73 +111,29 @@ public class SchedulerBenchmark {
         private int childCount;
 
         private Runner runner;
-        private Parallel root;
+        private Task root;
 
         @Setup(Level.Trial)
         public void setup() {
-            runner = createRunner(parallelism);
-            var parallel = Parallel.parallel("root", "bench");
+            runner = SchedulerBenchmark.runner(parallelism);
+            final var builder = Tasks.parallel("root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
-                final int index = i;
-                // Mix of fast (1ms) and slow (20ms) children
-                long sleepMs = (index % 4 == 0) ? 20 : 1;
-                parallel.child(Step.step("child-" + index, context -> {
+                final long sleepMillis = i % 4 == 0 ? 5L : 1L;
+                builder.step("child-" + i, () -> {
                     Blackhole.consumeCPU(1);
                     try {
-                        Thread.sleep(sleepMs);
+                        Thread.sleep(sleepMillis);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
-                }));
+                });
             }
-            root = parallel.build();
-        }
-
-        Runner runner() {
-            return runner;
-        }
-
-        Parallel root() {
-            return root;
+            root = builder.build();
         }
     }
 
     /**
-     * State for many small tasks benchmark.
-     */
-    @State(Scope.Benchmark)
-    public static class ManySmallTasksState {
-
-        @Param({"4", "8"})
-        private int parallelism;
-
-        @Param({"256", "1024"})
-        private int taskCount;
-
-        private Runner runner;
-        private Parallel root;
-
-        @Setup(Level.Trial)
-        public void setup() {
-            runner = createRunner(parallelism);
-            var parallel = Parallel.parallel("root", "bench");
-            for (var i = 0; i < taskCount; i++) {
-                parallel.child(Step.step("task-" + i, context -> Blackhole.consumeCPU(1)));
-            }
-            root = parallel.build();
-        }
-
-        Runner runner() {
-            return runner;
-        }
-
-        Parallel root() {
-            return root;
-        }
-    }
-
-    /**
-     * State for uniform duration benchmark.
+     * State for the uniform-duration benchmark.
      */
     @State(Scope.Benchmark)
     public static class ParallelUniformState {
@@ -177,41 +141,43 @@ public class SchedulerBenchmark {
         @Param({"4", "8", "16"})
         private int parallelism;
 
-        @Param({"32", "64", "128"})
+        @Param({"8", "32", "128"})
         private int childCount;
 
         private Runner runner;
-        private Parallel root;
+        private Task root;
 
         @Setup(Level.Trial)
         public void setup() {
-            runner = createRunner(parallelism);
-            var parallel = Parallel.parallel("root", "bench");
+            runner = SchedulerBenchmark.runner(parallelism);
+            final var builder = Tasks.parallel("root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
-                parallel.child(Step.step("child-" + i, context -> {
-                    Blackhole.consumeCPU(1);
-                    try {
-                        Thread.sleep(5);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                }));
+                builder.step("child-" + i, () -> Thread.sleep(1L));
             }
-            root = parallel.build();
-        }
-
-        Runner runner() {
-            return runner;
-        }
-
-        Parallel root() {
-            return root;
+            root = builder.build();
         }
     }
 
-    private static Runner createRunner(final int parallelism) {
-        var configuration = Configuration.of(
-                Map.of("paramixel.parallelism.bench", String.valueOf(parallelism), Configuration.ANSI, "false"));
-        return Runner.builder().configuration(configuration).build();
+    /**
+     * State for the many-small-tasks benchmark.
+     */
+    @State(Scope.Benchmark)
+    public static class ManySmallTasksState {
+
+        @Param({"100", "1000", "10000"})
+        private int childCount;
+
+        private Runner runner;
+        private Task root;
+
+        @Setup(Level.Trial)
+        public void setup() {
+            runner = SchedulerBenchmark.runner(8);
+            final var builder = Tasks.parallel("root", Pool.named("bench"));
+            for (var i = 0; i < childCount; i++) {
+                builder.step("step-" + i, () -> {});
+            }
+            root = builder.build();
+        }
     }
 }

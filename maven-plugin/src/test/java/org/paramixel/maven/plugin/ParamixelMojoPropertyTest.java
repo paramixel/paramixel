@@ -472,8 +472,8 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
-        @DisplayName("failureOnSkip is written to configuration only when true")
-        void failureOnSkipIsWrittenOnlyWhenTrue() throws Exception {
+        @DisplayName("failureOnSkip is written explicitly")
+        void failureOnSkipIsWrittenExplicitly() throws Exception {
             var mojo = new ParamixelMojo();
             setField(mojo, "failureOnSkip", true);
             var configuration =
@@ -483,12 +483,12 @@ class ParamixelMojoPropertyTest {
             setField(mojo, "failureOnSkip", false);
             configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
-            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).isEmpty();
+            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).contains("false");
         }
 
         @Test
-        @DisplayName("failIfNoTests is written to configuration only when true")
-        void failIfNoTestsIsWrittenOnlyWhenTrue() throws Exception {
+        @DisplayName("failIfNoTests is written to configuration explicitly")
+        void failIfNoTestsIsWrittenExplicitly() throws Exception {
             var mojo = new ParamixelMojo();
             setField(mojo, "failIfNoTests", true);
             var configuration =
@@ -498,7 +498,7 @@ class ParamixelMojoPropertyTest {
             setField(mojo, "failIfNoTests", false);
             configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
-            assertThat(configuration.getString(Configuration.FAIL_IF_NO_TESTS)).isEmpty();
+            assertThat(configuration.getString(Configuration.FAIL_IF_NO_TESTS)).contains("false");
         }
     }
 

@@ -17,98 +17,123 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Scope;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates static setup, per-instance setup, per-test before/after, instance teardown, and static teardown.
+ *
+ * <p>The nesting shows the 7.0 lifecycle model: {@code before} and {@code after} belong to the task that declares
+ * them, run in declaration order and reverse declaration order respectively, and inner tasks inherit the outer
+ * instance without repeating a class token.
+ */
 public class FullLifecycleTest {
 
     private static final List<String> callOrder = new ArrayList<>();
 
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
         System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
+    /**
+     * Builds the lifecycle definition.
+     *
+     * @return the definition for this test
+     */
     @Paramixel.Factory
-    public static Action factory() {
-        return Scope.scope(FullLifecycleTest.class.getName())
-                .before(step("staticSetUp()", context -> staticSetUp()))
-                .body(of("FullLifecycleTest", FullLifecycleTest.class, FullLifecycleTest::new)
-                        .body(scope("scope")
-                                .before(step("setUp()", FullLifecycleTest.class, FullLifecycleTest::setUp))
-                                .body(sequential("tests")
-                                        .child(scope("testOne")
-                                                .before(step(
-                                                        "beforeEach()",
-                                                        FullLifecycleTest.class,
-                                                        FullLifecycleTest::beforeEach))
-                                                .body(step(
-                                                        "testOne()",
-                                                        FullLifecycleTest.class,
-                                                        FullLifecycleTest::testOne))
-                                                .after(step(
-                                                        "afterEach()",
-                                                        FullLifecycleTest.class,
-                                                        FullLifecycleTest::afterEach)))
-                                        .child(scope("testTwo")
-                                                .before(step(
-                                                        "beforeEach()",
-                                                        FullLifecycleTest.class,
-                                                        FullLifecycleTest::beforeEach))
-                                                .body(step(
-                                                        "testTwo()",
-                                                        FullLifecycleTest.class,
-                                                        FullLifecycleTest::testTwo))
-                                                .after(step(
-                                                        "afterEach()",
-                                                        FullLifecycleTest.class,
-                                                        FullLifecycleTest::afterEach))))
-                                .after(step("tearDown()", FullLifecycleTest.class, FullLifecycleTest::tearDown))))
-                .after(step("staticTearDown()", context -> staticTearDown()))
+    public static Task factory() {
+        return sequential("FullLifecycleTest")
+                .before(FullLifecycleTest::staticSetUp)
+                .child(forInstance("instance", FullLifecycleTest::new)
+                        .before(FullLifecycleTest::setUp)
+                        .sequential(
+                                "tests",
+                                tests -> tests.step(
+                                                "testOne",
+                                                FullLifecycleTest::testOne,
+                                                children -> children.before(FullLifecycleTest::beforeEach)
+                                                        .after(FullLifecycleTest::afterEach))
+                                        .step(
+                                                "testTwo",
+                                                FullLifecycleTest::testTwo,
+                                                children -> children.before(FullLifecycleTest::beforeEach)
+                                                        .after(FullLifecycleTest::afterEach)))
+                        .after(FullLifecycleTest::tearDown))
+                .after(FullLifecycleTest::staticTearDown)
                 .build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public FullLifecycleTest() {
         // Intentionally empty
     }
 
+    /**
+     * Clears the recorded call order.
+     */
     public static void staticSetUp() {
         callOrder.clear();
         callOrder.add("staticSetUp");
     }
 
+    /**
+     * Records per-instance setup.
+     */
     public void setUp() {
         callOrder.add("setUp");
     }
 
+    /**
+     * Records per-test setup.
+     */
     public void beforeEach() {
         callOrder.add("beforeEach");
     }
 
+    /**
+     * First test body.
+     */
     public void testOne() {
         callOrder.add("testOne");
     }
 
+    /**
+     * Second test body.
+     */
     public void testTwo() {
         callOrder.add("testTwo");
     }
 
+    /**
+     * Records per-test cleanup.
+     */
     public void afterEach() {
         callOrder.add("afterEach");
     }
 
+    /**
+     * Records per-instance cleanup.
+     */
     public void tearDown() {
         callOrder.add("tearDown");
     }
 
+    /**
+     * Verifies the recorded order.
+     */
     public static void staticTearDown() {
         callOrder.add("staticTearDown");
 

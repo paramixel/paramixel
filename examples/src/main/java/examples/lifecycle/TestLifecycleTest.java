@@ -17,50 +17,66 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates a single owned instance shared by two test steps.
+ */
 public class TestLifecycleTest implements AutoCloseable {
 
     private static final int EXPECTED_TEST_COUNT = 2;
 
     private static final AtomicInteger testCount = new AtomicInteger();
 
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
         System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
+    /**
+     * Builds the definition.
+     *
+     * @return the definition for this test
+     */
     @Paramixel.Factory
-    public static Action factory() {
-        resetCounts();
+    public static Task factory() {
+        testCount.set(0);
 
-        return of("FullLifecycleTest", TestLifecycleTest.class, TestLifecycleTest::new)
-                .body(sequential("tests")
-                        .child(step("testOne()", TestLifecycleTest.class, TestLifecycleTest::testOne))
-                        .child(step("testTwo()", TestLifecycleTest.class, TestLifecycleTest::testTwo)))
+        return forInstance("TestLifecycleTest", TestLifecycleTest::new)
+                .step("testOne", TestLifecycleTest::testOne)
+                .step("testTwo", TestLifecycleTest::testTwo)
+                .after(TestLifecycleTest::close)
                 .build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public TestLifecycleTest() {
         // Intentionally empty
     }
 
+    /**
+     * First test body.
+     */
     public void testOne() {
         testCount.incrementAndGet();
     }
 
+    /**
+     * Second test body.
+     */
     public void testTwo() {
         testCount.incrementAndGet();
-    }
-
-    private static void resetCounts() {
-        testCount.set(0);
     }
 
     @Override

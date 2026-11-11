@@ -17,7 +17,7 @@ Paramixel requires Java 17 or newer.
 </dependency>
 ```
 
-Use the core dependency when running action trees programmatically or when compiling factory classes consumed by the Maven plugin.
+Use the core dependency when running task definitions programmatically or when compiling factory classes consumed by the Maven plugin.
 
 ## Maven plugin
 

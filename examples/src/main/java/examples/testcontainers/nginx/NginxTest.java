@@ -17,9 +17,8 @@
 package examples.testcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Instance.of;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
+import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.parallel;
 
 import examples.support.Logger;
 import java.io.BufferedReader;
@@ -27,8 +26,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Task;
 
 /**
  * Parameterized integration test that starts Nginx containers for each Docker image
@@ -52,23 +52,23 @@ public class NginxTest {
     }
 
     /**
-     * Builds a parallel action tree with one typed fixture per Nginx Docker image.
+     * Builds a parallel task tree with one typed fixture per Nginx Docker image.
      *
      * <p>Each fixture declares its type once; every step names only its method, and the pool named
      * {@code environments} bounds how many fixtures are alive at once.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      * @throws Throwable if environment creation fails
      */
     @Paramixel.Factory
-    public static Action factory() throws Throwable {
-        return parallel(NginxTest.class.getName(), "environments")
+    public static Task factory() throws Throwable {
+        return parallel(NginxTest.class.getName(), Pool.named("environments"))
                 .each(
                         NginxTestEnvironment.createTestEnvironments(),
-                        environment -> of(environment.name(), NginxTest.class, () -> new NginxTest(environment))
-                                .before("setUp()", NginxTest::setUp)
-                                .body(step("testGet()", NginxTest.class, NginxTest::testGet))
-                                .after("tearDown()", NginxTest::tearDown))
+                        environment -> forInstance(environment.name(), () -> new NginxTest(environment))
+                                .before(NginxTest::setUp)
+                                .step("testGet()", NginxTest::testGet)
+                                .after(NginxTest::tearDown))
                 .build();
     }
 

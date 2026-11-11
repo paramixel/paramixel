@@ -16,31 +16,30 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
+import static org.paramixel.api.Tasks.forInstance;
+
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Step;
-import org.paramixel.api.exception.FailException;
+import org.paramixel.api.Task;
 
 /**
- * Fixture whose action throws a {@link FailException} on execution, used to verify that the
- * Maven mojo translates action failures into {@link org.apache.maven.plugin.MojoFailureException}.
+ * Fixture whose step always fails, used to verify that the Maven mojo translates test failures into
+ * {@link org.apache.maven.plugin.MojoFailureException}.
  */
 public final class FailingMojoFixture {
 
     private FailingMojoFixture() {}
 
     /**
-     * Creates an instance action that always throws {@code "boom"} on execution.
+     * Creates a definition that always fails.
      *
-     * @return an {@link Instance} action that fails with a runtime exception
+     * @return a definition that fails with a runtime exception
      */
     @Paramixel.Factory
-    public static Action action() {
-        return Instance.of("mojo-fail", Object.class, Object::new)
-                .body(Step.step("fail", context -> {
+    public static Task action() {
+        return forInstance("mojo-fail", Object::new)
+                .step("fail", () -> {
                     throw new RuntimeException("boom");
-                }))
+                })
                 .build();
     }
 }

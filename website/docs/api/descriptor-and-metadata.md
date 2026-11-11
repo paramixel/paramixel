@@ -1,24 +1,31 @@
 ---
-title: Descriptor
-description: Execution-occurrence state for action trees.
+title: Result Tree and Metadata
+description: Stable identities, paths, tags, timings, and attempts.
 ---
 
-# Descriptor
+# Result Tree and Metadata
 
-`Descriptor` represents one execution occurrence of an action in a run. It is not the reusable action definition; it is the runtime node that records state.
+The public read model is `Result` → `TaskResult` → `PhaseResult` / `Failure`. The old mutable `Descriptor` tree is gone;
+there is one immutable post-run snapshot.
 
-## API
+## Identity
 
-A descriptor exposes:
+| Identifier | Derived from | Stable across |
+| --- | --- | --- |
+| `runId` | Generated per run | — |
+| `occurrenceId` | Structural ordinal path (`0`, `0.1`, `0.1.2`) | Identical plan structure |
+| `definitionId` | Structural fingerprint of the definition node | Every placement of the same definition |
+| `path` | Display names from the root | Identical definition |
 
-- `parent()`
-- `id()`
-- `action()`
-- names: `displayName()`, `path()` (the display-name path from the run root)
-- state: `status()` (a `Status` with `kind()`, `message()` and `throwable()`), `isCompleted()`
-- timing: `startedAt()`, `completedAt()`, `duration()`
-- tree navigation: `parent()`, `before()`, `children()`, `after()`
+Identifiers never incorporate thread identity, object identity hashes, wall-clock time, or completion order.
 
-## Execution state and identity
+## Metadata
 
-Use `Descriptor` for execution identity, tree navigation, timing, and outcome detail. Reusing the same `Action` instance in multiple locations creates distinct descriptors with independent execution state.
+`TaskResult` exposes mode, pool name, exclusive lock, shuffle seed, resolved child order, tags, per-phase results, attempt
+nodes, timings (queue, admission, start, completion), wait/execution/finalization durations, failures with the primary
+failure first, and explicit reasons for skips, cancellations, and timeouts.
+
+## Aggregation
+
+`status()` is the aggregate over phases, body, children, and the terminal attempt. `bodyStatus()` is separate, so a
+passed body never hides a failed child.
