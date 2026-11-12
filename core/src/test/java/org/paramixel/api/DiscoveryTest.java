@@ -22,6 +22,7 @@ import static org.paramixel.api.Tasks.task;
 
 import java.util.Map;
 import java.util.regex.Pattern;
+import nonapi.org.paramixel.discovery.FactoryScanner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,8 +61,30 @@ class DiscoveryTest {
         final var result = runner().run(fixtures());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
-        assertThat(DiscoveryFixtures.RECORDED).containsExactly("beforeAll", "beta", "alpha", "afterAll");
+        // Discovered factories share a parallel pool, so only the hook boundaries and the participant set are defined.
+        assertThat(DiscoveryFixtures.RECORDED).hasSize(4);
+        assertThat(DiscoveryFixtures.RECORDED.get(0)).isEqualTo("beforeAll");
+        assertThat(DiscoveryFixtures.RECORDED.get(3)).isEqualTo("afterAll");
+        assertThat(DiscoveryFixtures.RECORDED.subList(1, 3)).containsExactlyInAnyOrder("alpha", "beta");
         assertThat(result.root().orElseThrow().name()).isEqualTo("Paramixel");
+    }
+
+    @Test
+    @DisplayName("factory priority orders the discovery group")
+    void factoryPriorityOrdersAdmission() {
+        // A single-permit discovery pool serializes the group, so admission order becomes execution order.
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.ANSI, "false")))
+                .pool(Pool.named(FactoryScanner.DISCOVERY_POOL), 1)
+                .build()
+                .run(fixtures());
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        final var actions =
+                result.root().orElseThrow().children().get(0).children().get(1);
+        assertThat(actions.children().stream().map(TaskResult::name).toList()).containsExactly("beta", "alpha");
+        assertThat(DiscoveryFixtures.RECORDED).containsExactly("beforeAll", "beta", "alpha", "afterAll");
     }
 
     @Test
