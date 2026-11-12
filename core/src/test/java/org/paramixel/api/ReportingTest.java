@@ -68,7 +68,7 @@ class ReportingTest {
         assertThat(content).contains("\"schemaVersion\": 1");
         assertThat(content).contains("\"status\": \"FAILED\"");
         assertThat(content).contains("\"occurrenceId\": \"0\"");
-        assertThat(content).contains("\"path\": \"root / fail\"");
+        assertThat(content).contains("\"path\": \"root > fail\"");
         assertThat(content).contains("boom");
         assertThat(content).contains("\"quiescent\": true");
     }
@@ -117,7 +117,7 @@ class ReportingTest {
         final var text = out.toString(StandardCharsets.UTF_8);
 
         assertThat(text).contains("Paramixel");
-        assertThat(text).contains("[PARAMIXEL] FAIL root / fail");
+        assertThat(text).contains("[PARAMIXEL] FAIL root > fail");
         assertThat(text).contains("occurrences:");
         assertThat(text).contains("exitCode: " + result.exitCode());
     }

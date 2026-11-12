@@ -50,7 +50,19 @@ class ResultModelTest {
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> first.diagnostics().add("x")).isInstanceOf(UnsupportedOperationException.class);
         assertThat(first.root().orElseThrow().path()).isEqualTo("root");
-        assertThat(first.root().orElseThrow().children().get(0).path()).isEqualTo("root / one");
+        assertThat(first.root().orElseThrow().children().get(0).path()).isEqualTo("root > one");
+    }
+
+    @Test
+    @DisplayName("display paths separate levels with ' > ' so slashes inside names stay within one level")
+    void displayPathSeparatesLevelsWithGreaterThan() {
+        final var definition = task("root")
+                .sequential("apache/kafka:3.7.2", image -> image.step("produce()", () -> {}))
+                .build();
+        final var image = run(definition).root().orElseThrow().children().get(0);
+
+        assertThat(image.path()).isEqualTo("root > apache/kafka:3.7.2");
+        assertThat(image.children().get(0).path()).isEqualTo("root > apache/kafka:3.7.2 > produce()");
     }
 
     @Test

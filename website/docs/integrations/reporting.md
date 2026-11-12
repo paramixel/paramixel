@@ -17,14 +17,15 @@ Every console line begins with `[PARAMIXEL] `; the word `PARAMIXEL` is blue when
 an unpadded short label followed by one space, and they end with the occurrence's elapsed time:
 
 ```text
-[PARAMIXEL] PASS KafkaTest / Standalone(amazoncorretto:24) / tests / testHealthy() (42 ms)
-[PARAMIXEL] FAIL Probe / verify (3 ms) — java.lang.AssertionError: boom
+[PARAMIXEL] PASS KafkaTest > apache/kafka:3.7.2 > tests > produce() (42 ms)
+[PARAMIXEL] FAIL Probe > verify (3 ms) — java.lang.AssertionError: boom
 [PARAMIXEL] PASS run 5c0f… in 1 s 240 ms
 ```
 
 Framework scaffolding added by discovery (the synthetic root, the hook-gating group, and the factory group) is excluded
 from display paths, so a factory's path starts at the factory name instead of repeating a constant framework prefix.
-Stable identity is `occurrenceId`, never the path.
+Levels of a display path are separated by ` > `, so a slash inside a task name (a Docker image, URL, or file path) never
+looks like a level boundary. Stable identity is `occurrenceId`, never the path.
 
 Labels are `PASS`, `FAIL`, `SKIP`, `ABORT`, and `CANCEL`; `PEND`/`RUN` are used for in-flight kinds. Because labels are
 not padded, paths are not column-aligned across different statuses.

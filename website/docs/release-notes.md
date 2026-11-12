@@ -34,6 +34,8 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
 - The `org.paramixel.api.action` package and the mutable `Descriptor` tree are removed.
 - `Context.instance(Class)` is removed; typed callbacks and `Key<T>` resources replace it.
 - Implicit closing of `AutoCloseable` fixtures is removed.
+- Display paths (console lines, `TaskResult.path()`, `Context.path()`, `TaskEvent.path()`, report `path` fields) separate
+  levels with ` > ` instead of ` / `.
 
 See [Migrating from 6.x](guides/migration-6-to-7).
 

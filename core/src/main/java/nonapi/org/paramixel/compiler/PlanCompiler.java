@@ -60,9 +60,17 @@ public final class PlanCompiler {
     /**
      * Tag that marks framework scaffolding: nodes the discovery composition adds for gating, scheduling, and hook
      * wrapping. Such a node keeps its own name as its display path, and its children start a fresh display path, so
-     * user-facing paths never repeat a constant {@code Paramixel / run / actions} segment.
+     * user-facing paths never repeat a constant {@code Paramixel > run > actions} segment.
      */
     public static final String STRUCTURAL_TAG = "paramixel.structural";
+
+    /**
+     * Separator between levels of a display path, for example {@code KafkaTest > apache/kafka:3.7.2 > tests}.
+     *
+     * <p>{@code >} is used instead of {@code /} because task names often contain slashes (Docker images, URLs, file
+     * paths), which made levels hard to tell apart. Display paths are for humans; identity is the occurrence id.
+     */
+    public static final String PATH_SEPARATOR = " > ";
 
     private final Configuration configuration;
     private final Map<Pool, Integer> poolOverrides;
@@ -135,8 +143,9 @@ public final class PlanCompiler {
         final var mode = task.mode();
         final var poolName = task.pool().map(Pool::name).orElse(null);
         final var structural = task.tags().contains(STRUCTURAL_TAG);
-        final var path =
-                structural || parentDisplayPath == null ? task.name() : parentDisplayPath + " / " + task.name();
+        final var path = structural || parentDisplayPath == null
+                ? task.name()
+                : parentDisplayPath + PATH_SEPARATOR + task.name();
         final var budget = mode == ExecutionMode.PARALLEL ? capacityOf(poolName, path) : 1;
         final var failFastScope = task.tags().contains(FAIL_FAST_SCOPE_TAG);
         final var childDisplayPath = structural ? null : path;

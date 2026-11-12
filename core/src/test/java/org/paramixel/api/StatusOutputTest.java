@@ -96,10 +96,10 @@ class StatusOutputTest {
         final var lines = run(definition);
 
         final var terminal = lines.stream()
-                .filter(line -> line.startsWith(PREFIX + "PASS") && line.contains("root / slow"))
+                .filter(line -> line.startsWith(PREFIX + "PASS") && line.contains("root > slow"))
                 .toList();
         assertThat(terminal).hasSize(1);
-        assertThat(terminal.get(0)).matches("^\\[PARAMIXEL\\] PASS root / slow \\(\\d+ ms\\)$");
+        assertThat(terminal.get(0)).matches("^\\[PARAMIXEL\\] PASS root > slow \\(\\d+ ms\\)$");
     }
 
     @Test
@@ -114,11 +114,11 @@ class StatusOutputTest {
         final var lines = run(definition);
 
         final var failure = lines.stream()
-                .filter(line -> line.startsWith(PREFIX + "FAIL") && line.contains("root / failing"))
+                .filter(line -> line.startsWith(PREFIX + "FAIL") && line.contains("root > failing"))
                 .toList();
         assertThat(failure).hasSize(1);
         assertThat(failure.get(0))
-                .matches("^\\[PARAMIXEL\\] FAIL root / failing \\(\\d+ ms\\) — IllegalStateException: boom$");
+                .matches("^\\[PARAMIXEL\\] FAIL root > failing \\(\\d+ ms\\) — IllegalStateException: boom$");
     }
 
     @Test
@@ -159,7 +159,7 @@ class StatusOutputTest {
         assertThat(lines).anySatisfy(line -> assertThat(line).contains("3 attempts, 2 failed"));
         assertThat(lines).anySatisfy(line -> assertThat(line).contains("result: PASS exitCode: 0"));
         assertThat(lines)
-                .anySatisfy(line -> assertThat(line).matches("^\\[PARAMIXEL\\] FAIL root / retried / probe .*"));
+                .anySatisfy(line -> assertThat(line).matches("^\\[PARAMIXEL\\] FAIL root > retried > probe .*"));
     }
 
     @Test

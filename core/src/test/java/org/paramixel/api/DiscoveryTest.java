@@ -84,8 +84,8 @@ class DiscoveryTest {
                 .orElseThrow()
                 .children()
                 .get(0);
-        assertThat(alphaStep.path()).isEqualTo("alpha / run");
-        assertThat(factoryPaths).noneMatch(path -> path.startsWith("Paramixel / run / actions"));
+        assertThat(alphaStep.path()).isEqualTo("alpha > run");
+        assertThat(factoryPaths).noneMatch(path -> path.startsWith("Paramixel > run > actions"));
     }
 
     @Test
