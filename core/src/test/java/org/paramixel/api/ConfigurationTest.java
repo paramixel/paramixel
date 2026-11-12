@@ -22,6 +22,7 @@ import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.task;
 
 import java.util.Map;
+import nonapi.org.paramixel.ConfigurationFactory;
 import nonapi.org.paramixel.compiler.PlanCompiler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class ConfigurationTest {
     @Test
     @DisplayName("defaults match the documented contract")
     void defaults() {
-        final var configuration = Configuration.defaultConfiguration();
+        final var configuration = ConfigurationFactory.defaults();
 
         assertThat(configuration.getBoolean(Configuration.FAILURE_ON_SKIP)).hasValue(true);
         assertThat(configuration.getBoolean(Configuration.FAILURE_ON_ABORT)).hasValue(true);
@@ -48,6 +49,26 @@ class ConfigurationTest {
         assertThat(configuration.getInteger(Configuration.LISTENER_QUEUE_CAPACITY))
                 .hasValue(8192);
         assertThat(configuration.getString(Configuration.ANSI)).hasValue("auto");
+    }
+
+    @Test
+    @DisplayName("system properties override the built-in defaults")
+    void systemPropertiesOverrideDefaults() {
+        final var key = Configuration.FAIL_FAST;
+        final var previous = System.getProperty(key);
+        try {
+            assertThat(ConfigurationFactory.defaults().getBoolean(key)).hasValue(false);
+
+            System.setProperty(key, "true");
+
+            assertThat(Configuration.defaultConfiguration().getBoolean(key)).hasValue(true);
+        } finally {
+            if (previous == null) {
+                System.clearProperty(key);
+            } else {
+                System.setProperty(key, previous);
+            }
+        }
     }
 
     @Test

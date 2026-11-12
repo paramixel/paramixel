@@ -157,6 +157,9 @@ class TimeoutTest {
     void cancelWhileWaitingForPermit() {
         final AtomicInteger created = new AtomicInteger();
         final CountDownLatch started = new CountDownLatch(1);
+        // The blocker blocks until released instead of sleeping for the grace period, so cancellation settles well
+        // inside the shutdown grace regardless of host core count or load.
+        final CountDownLatch release = new CountDownLatch(1);
         final Task definition = parallel("root", Pool.named("p"))
                 .child(forInstance("blocker", () -> {
                             created.incrementAndGet();
@@ -164,7 +167,7 @@ class TimeoutTest {
                         })
                         .step("hold", () -> {
                             started.countDown();
-                            Thread.sleep(5000L);
+                            release.await(60, TimeUnit.SECONDS);
                         }))
                 .child(forInstance("waiter", () -> {
                             created.incrementAndGet();
@@ -181,9 +184,10 @@ class TimeoutTest {
         final var holder = new Thread(() -> runner.run(definition));
         holder.start();
         try {
-            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(started.await(30, TimeUnit.SECONDS)).isTrue();
             runner.close();
-            holder.join(5000L);
+            release.countDown();
+            holder.join(10_000L);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {

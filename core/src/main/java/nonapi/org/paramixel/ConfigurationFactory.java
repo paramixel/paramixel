@@ -82,6 +82,20 @@ public final class ConfigurationFactory {
     }
 
     /**
+     * Creates a configuration containing only the built-in defaults.
+     *
+     * <p>Neither classpath properties nor JVM system properties are consulted, so the result is the documented
+     * default for every key regardless of the ambient process environment.
+     *
+     * @return a configuration containing only framework defaults
+     */
+    public static Configuration defaults() {
+        var map = new TreeMap<String, String>();
+        configureDefaults(map);
+        return new ConcreteConfiguration(map);
+    }
+
+    /**
      * Creates a configuration from JVM system properties supplemented with built-in defaults.
      *
      * @return a configuration containing system properties and framework defaults

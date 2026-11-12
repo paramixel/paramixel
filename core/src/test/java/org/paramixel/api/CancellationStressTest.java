@@ -49,13 +49,17 @@ class CancellationStressTest {
     @Test
     @DisplayName("SCHED-16: closing the runner cancels parallel work and yields a canceled result")
     void shutdownCancelsRun() throws InterruptedException {
+        // In-flight steps block until released instead of sleeping for a fixed duration: a step admitted while the
+        // cancellation interrupt sweep is in flight must still finish well inside the shutdown grace, so the result
+        // is quiescent regardless of host core count or load.
         final var started = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
         final Task definition = parallel("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 4).boxed().toList(),
                         index -> task("child-" + index).step("wait", () -> {
                             started.countDown();
-                            Thread.sleep(5000L);
+                            release.await(60, TimeUnit.SECONDS);
                         }))
                 .build();
         final var runner = Runner.builder()
@@ -67,8 +71,9 @@ class CancellationStressTest {
         final var thread = new Thread(() -> results.add(runner.run(definition)));
         thread.start();
 
-        assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(started.await(30, TimeUnit.SECONDS)).isTrue();
         runner.close();
+        release.countDown();
         thread.join(10_000L);
         runner.close();
 
