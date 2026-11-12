@@ -20,6 +20,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.paramixel.api.Tasks.task;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import nonapi.org.paramixel.discovery.FactoryScanner;
@@ -35,6 +38,9 @@ import org.paramixel.api.selector.Selector;
  */
 class DiscoveryTest {
 
+    /** Number of distinct shuffle seeds exercised by the reproducibility sweep. */
+    private static final int SHUFFLE_SEED_SWEEP = 8;
+
     private static Selector fixtures() {
         return Selector.builder()
                 .packageTreeOf(DiscoveryFixtures.class)
@@ -43,11 +49,47 @@ class DiscoveryTest {
                 .build();
     }
 
+    private static Selector shuffleFixtures() {
+        return Selector.builder()
+                .packageTreeOf(DiscoveryFixtures.class)
+                .classPattern(Pattern.compile(".*(AlphaFixture|BetaFixture|GammaFixture)"))
+                .build();
+    }
+
     private static Runner runner() {
         return Runner.builder()
                 .listener(Listener.NOOP)
                 .configuration(Configuration.of(Map.of(Configuration.ANSI, "false")))
                 .build();
+    }
+
+    private static Runner shuffled(final long seed) {
+        return Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.ANSI, "false")))
+                .shuffle(seed)
+                .build();
+    }
+
+    /**
+     * Returns the discovered factory group: {@code Paramixel > run > actions}.
+     *
+     * @param result a discovery run result
+     * @return the actions group
+     */
+    private static TaskResult discoveryActions(final Result result) {
+        return result.root().orElseThrow().children().get(0).children().get(1);
+    }
+
+    /**
+     * Returns the discovered factory names in plan order. Plan order carries the shuffle order and does not depend on
+     * which factory finishes first.
+     *
+     * @param result a discovery run result
+     * @return the factory names in plan order
+     */
+    private static List<String> discoveredOrder(final Result result) {
+        return discoveryActions(result).executionOrder();
     }
 
     @BeforeEach
@@ -81,9 +123,7 @@ class DiscoveryTest {
                 .run(fixtures());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
-        final var actions =
-                result.root().orElseThrow().children().get(0).children().get(1);
-        assertThat(actions.children().stream().map(TaskResult::name).toList()).containsExactly("beta", "alpha");
+        assertThat(discoveredOrder(result)).containsExactly("beta", "alpha");
         assertThat(DiscoveryFixtures.RECORDED).containsExactly("beforeAll", "beta", "alpha", "afterAll");
     }
 
@@ -200,19 +240,54 @@ class DiscoveryTest {
     }
 
     @Test
-    @DisplayName("discovery shuffling is reproducible and reports the seed")
+    @DisplayName("discovery shuffling reorders factories, reproducibly, and reports the seed")
     void discoveryShuffleIsReproducible() {
-        final var selector = fixtures();
-        final var first =
-                Runner.builder().listener(Listener.NOOP).shuffle(7L).build().run(selector);
-        DiscoveryFixtures.RECORDED.clear();
-        final var second =
-                Runner.builder().listener(Listener.NOOP).shuffle(7L).build().run(selector);
+        final var selector = shuffleFixtures();
+        final var unshuffled = runner().run(selector);
 
-        assertThat(first.shuffleSeed()).hasValue(7L);
-        assertThat(second.shuffleSeed()).hasValue(7L);
-        assertThat(first.status().kind()).isEqualTo(Status.Kind.PASSED);
-        assertThat(second.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(unshuffled.shuffleSeed()).isEmpty();
+        final var baseline = discoveredOrder(unshuffled);
+        assertThat(baseline).containsExactly("beta", "alpha", "gamma");
+
+        final var orders = new LinkedHashMap<Long, List<String>>();
+        for (long seed = 0; seed < SHUFFLE_SEED_SWEEP; seed++) {
+            final var result = shuffled(seed).run(selector);
+
+            assertThat(result.shuffleSeed()).hasValue(seed);
+            assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+            final var order = discoveredOrder(result);
+            assertThat(order).containsExactlyInAnyOrderElementsOf(baseline);
+            orders.put(seed, order);
+        }
+
+        // Reporting a seed while keeping priority order would make shuffling a no-op.
+        final var reordered = orders.entrySet().stream()
+                .filter(entry -> !entry.getValue().equals(baseline))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no seed reordered the discovered factories: " + orders));
+
+        // The same seed must reproduce the same order, so a reported seed can replay a run.
+        assertThat(discoveredOrder(shuffled(reordered.getKey()).run(selector))).isEqualTo(reordered.getValue());
+    }
+
+    @Test
+    @DisplayName("a small seed still reorders a two-factory group")
+    void smallSeedReordersTwoFactories() {
+        final var selector = fixtures();
+        final var baseline = discoveredOrder(runner().run(selector));
+        assertThat(baseline).containsExactly("beta", "alpha");
+
+        final var orders = new ArrayList<List<String>>();
+        for (long seed = 0; seed < SHUFFLE_SEED_SWEEP; seed++) {
+            final var order = discoveredOrder(shuffled(seed).run(selector));
+            assertThat(order).containsExactlyInAnyOrderElementsOf(baseline);
+            orders.add(order);
+        }
+
+        // Two children reduce a shuffle to a single bounded draw. java.util.Random answers that draw from the high
+        // bits of its first value, which are constant across small seeds, so every seed below 4096 kept priority
+        // order; the sweep must reach both orders.
+        assertThat(orders).anyMatch(order -> !order.equals(baseline));
     }
 
     @Test

@@ -26,8 +26,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
+import java.util.SplittableRandom;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.ExecutionMode;
 import org.paramixel.api.Pool;
@@ -185,7 +185,10 @@ public final class PlanCompiler {
         if (seed == null || children.size() < 2) {
             return children;
         }
-        final var random = new Random(seed);
+        // SplittableRandom, not Random: Random.nextInt for a power-of-two bound selects from the high bits of its
+        // first draw, which are constant across small seeds. A two-child shuffle therefore never reordered, and a
+        // four-child shuffle pinned its last child, for every seed a user is likely to pick.
+        final var random = new SplittableRandom(seed);
         for (var i = children.size() - 1; i > 0; i--) {
             final var j = random.nextInt(i + 1);
             Collections.swap(children, i, j);
