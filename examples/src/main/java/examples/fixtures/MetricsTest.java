@@ -17,7 +17,7 @@
 package examples.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 
 import org.paramixel.api.Paramixel;
@@ -28,7 +28,7 @@ import org.paramixel.api.Task;
  * The fixture-per-environment shape a real suite uses.
  *
  * <p>One parallel task names the pool that bounds the live fixtures, {@code each} maps every enabled environment to one
- * typed fixture, and each step names only the method it calls: the fixture type appears once, in {@code forInstance},
+ * typed fixture, and each step names only the method it calls: the fixture type appears once, in {@code instance},
  * instead of on every step.
  *
  * <p>{@code Runner.builder().pool(Pool.named("docker"), 2)} bounds how many fixtures are alive at once. An environment
@@ -51,7 +51,7 @@ public final class MetricsTest {
         return parallel("MetricsTest", Pool.named("docker"))
                 .each(
                         Environment.supported(),
-                        environment -> forInstance(environment.name(), () -> new MetricsFixture(environment))
+                        environment -> instance(environment.name(), () -> new MetricsFixture(environment))
                                 .before(MetricsFixture::setUp)
                                 .sequential(
                                         "tests",

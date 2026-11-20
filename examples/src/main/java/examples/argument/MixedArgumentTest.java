@@ -17,7 +17,7 @@
 package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.List;
@@ -148,7 +148,7 @@ public class MixedArgumentTest {
                                 new StringArgument("paramixel"),
                                 new IntegerArgument(42),
                                 new PointArgument(new Point(3, 7))),
-                        testArgument -> forInstance(testArgument.name(), () -> new MixedArgumentTest(testArgument))
+                        testArgument -> instance(testArgument.name(), () -> new MixedArgumentTest(testArgument))
                                 .before(MixedArgumentTest::setUp)
                                 .step("testOne", MixedArgumentTest::testOne)
                                 .after(MixedArgumentTest::tearDown))

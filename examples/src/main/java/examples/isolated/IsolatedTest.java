@@ -17,15 +17,17 @@
 package examples.isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
+import org.paramixel.api.TaskBuilder;
 
 /**
  * Demonstrates an exclusive logical lock as a serialization boundary inside parallel work.
@@ -66,21 +68,21 @@ public class IsolatedTest {
                         .parallel(
                                 "group-1-tests",
                                 Pool.named("group-tests"),
-                                tests -> tests.each(java.util.List.of("test-1a", "test-1b"), name -> scenario(name))))
+                                tests -> tests.each(List.of("test-1a", "test-1b"), name -> scenario(name))))
                 .child(sequential("serialized-group-2")
                         .isolated("db-lock")
                         .parallel(
                                 "group-2-tests",
                                 Pool.named("group-tests"),
-                                tests -> tests.each(java.util.List.of("test-2a", "test-2b"), name -> scenario(name))))
+                                tests -> tests.each(List.of("test-2a", "test-2b"), name -> scenario(name))))
                 .after(() -> {
                     assertThat(peakInsideLock.get()).isPositive();
                 })
                 .build();
     }
 
-    private static org.paramixel.api.TaskBuilder<?, ?> scenario(final String name) {
-        return forInstance(name, Scenario::new)
+    private static TaskBuilder<?, ?> scenario(final String name) {
+        return instance(name, Scenario::new)
                 .before(Scenario::setUp)
                 .step("run", Scenario::run)
                 .after(Scenario::tearDown);

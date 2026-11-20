@@ -17,6 +17,7 @@
 package org.paramixel.api;
 
 import java.util.Optional;
+import nonapi.org.paramixel.reporting.DefaultListeners;
 
 /**
  * Receives run-level notifications and execution events.
@@ -31,7 +32,11 @@ import java.util.Optional;
  *   <li>An exception thrown by a listener is isolated and recorded as a run diagnostic. It never changes a task's
  *       semantic pass/fail status.</li>
  *   <li>{@link #onRunCompleted(Result)} is delivered after all task events were drained, so reporting cannot race with
- *       finalization.</li>
+ *       finalization. The drain is bounded by {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}: when a listener does
+ *       not drain in time, the remaining events are discarded and a {@code LISTENER_DRAIN_TIMEOUT} run diagnostic is
+ *       recorded rather than hidden.</li>
+ *   <li>The {@link Result} passed to {@link #onRunCompleted(Result)} already carries the run's diagnostics, including
+ *       infrastructure diagnostics such as {@code NON_QUIESCENT} and listener failures recorded during delivery.</li>
  *   <li>A listener must not re-enter the running {@link Runner}; doing so is rejected.</li>
  * </ul>
  *
@@ -52,7 +57,7 @@ public interface Listener {
      * @throws NullPointerException if {@code configuration} is {@code null}
      */
     static Listener defaultListener(final Configuration configuration) {
-        return nonapi.org.paramixel.reporting.DefaultListeners.create(configuration);
+        return DefaultListeners.create(configuration);
     }
 
     /**
@@ -102,9 +107,9 @@ public interface Listener {
     }
 
     /**
-     * Invoked once after the run completed and all task events were delivered.
+     * Invoked once after the run completed and all task events were delivered, or after the bounded drain gave up.
      *
-     * @param result the immutable result; never {@code null}
+     * @param result the immutable result, including the run's diagnostics; never {@code null}
      */
     default void onRunCompleted(final Result result) {
         // Intentionally empty

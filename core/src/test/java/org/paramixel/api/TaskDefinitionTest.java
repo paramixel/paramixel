@@ -18,11 +18,12 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -87,8 +88,7 @@ class TaskDefinitionTest {
         assertThatThrownBy(() -> task(null)).isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> Pool.named("bad name")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Pool.named("4pool")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> task("x").timeout(java.time.Duration.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> task("x").timeout(Duration.ZERO)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> task("x").isolated("bad name")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> task("x").tags(" ")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> task("x").each(List.of(1, 2), item -> null))
@@ -143,7 +143,7 @@ class TaskDefinitionTest {
     void constructionIsSideEffectFree() {
         final AtomicInteger factoryCalls = new AtomicInteger();
         final AtomicInteger callbackCalls = new AtomicInteger();
-        final Task definition = forInstance("instance", () -> {
+        final Task definition = instance("instance", () -> {
                     factoryCalls.incrementAndGet();
                     return new Object();
                 })
@@ -167,5 +167,51 @@ class TaskDefinitionTest {
         assertThat(withBoth.children().get(0).body()).isPresent();
         assertThat(withBoth.children().get(0).children()).hasSize(1);
         assertThat(task("empty").build().isEmpty()).isTrue();
+    }
+
+    @Test
+    @DisplayName("an unseeded shuffle chooses its seed on the first build and later builds reuse it")
+    void unseededShuffleSeedIsChosenOnce() {
+        final var builder = task("root").step("a", () -> {}).step("b", () -> {}).shuffle();
+
+        final var first = builder.build();
+        final var second = builder.build();
+
+        assertThat(first.shuffleSeed()).isPresent();
+        assertThat(second.shuffleSeed()).isEqualTo(first.shuffleSeed());
+    }
+
+    @Test
+    @DisplayName("the most recent shuffle call wins: shuffle() discards an earlier explicit seed")
+    void unseededShuffleDiscardsEarlierSeed() {
+        final long explicit = 42L;
+
+        final var reseeded = task("root")
+                .step("a", () -> {})
+                .step("b", () -> {})
+                .shuffle(explicit)
+                .shuffle()
+                .build();
+        final var seeded = task("root")
+                .step("a", () -> {})
+                .step("b", () -> {})
+                .shuffle()
+                .shuffle(explicit)
+                .build();
+
+        assertThat(reseeded.shuffleSeed())
+                .isPresent()
+                .hasValueSatisfying(seed -> assertThat(seed).isNotEqualTo(explicit));
+        assertThat(seeded.shuffleSeed()).hasValue(explicit);
+    }
+
+    @Test
+    @DisplayName("execution metadata alone does not make a task non-empty")
+    void executionMetadataIsNotWork() {
+        assertThat(task("lock-only").isolated("db").build().isEmpty()).isTrue();
+        assertThat(task("timeout-only").timeout(Duration.ofSeconds(1)).build().isEmpty())
+                .isTrue();
+        assertThat(task("tags-only").tags("smoke").build().isEmpty()).isTrue();
+        assertThat(task("with-body").step("work", () -> {}).build().isEmpty()).isFalse();
     }
 }

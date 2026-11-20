@@ -68,7 +68,7 @@ run.
 ```java
 @Paramixel.Factory
 public static Task factory() {
-    return forInstance("browser", Browser::launch)
+    return instance("browser", Browser::launch)
             .before(Browser::start)
             .step("open login page", Browser::openLoginPage)
             .step("submit credentials", Browser::submitCredentials)

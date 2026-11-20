@@ -17,7 +17,7 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -25,6 +25,7 @@ import static org.paramixel.api.Tasks.task;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -142,7 +143,7 @@ class ParallelSchedulingTest {
 
         final var result = Runner.builder()
                 .listener(Listener.NOOP)
-                .configuration(Configuration.of(java.util.Map.of(
+                .configuration(Configuration.of(Map.of(
                         Configuration.WORKERS, "1",
                         Configuration.SHUTDOWN_GRACE_MILLIS, "2000")))
                 .build()
@@ -169,7 +170,7 @@ class ParallelSchedulingTest {
 
         final var result = Runner.builder()
                 .listener(Listener.NOOP)
-                .configuration(Configuration.of(java.util.Map.of(Configuration.WORKERS, "1")))
+                .configuration(Configuration.of(Map.of(Configuration.WORKERS, "1")))
                 .pool(Pool.named("p"), 2)
                 .build()
                 .run(definition);
@@ -205,7 +206,7 @@ class ParallelSchedulingTest {
         final Task definition = parallel("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 4).boxed().toList(),
-                        index -> forInstance("item-" + index, () -> {
+                        index -> instance("item-" + index, () -> {
                                     final var current = active.incrementAndGet();
                                     peak.accumulateAndGet(current, Math::max);
                                     return new Object();
@@ -231,12 +232,12 @@ class ParallelSchedulingTest {
         final AtomicInteger created = new AtomicInteger();
         final CountDownLatch release = new CountDownLatch(1);
         final Task definition = parallel("root", Pool.named("p"))
-                .child(forInstance("blocker", () -> {
+                .child(instance("blocker", () -> {
                             created.incrementAndGet();
                             return new Object();
                         })
                         .step("hold", () -> release.await(5, TimeUnit.SECONDS)))
-                .child(forInstance("waiter", () -> {
+                .child(instance("waiter", () -> {
                             created.incrementAndGet();
                             return new Object();
                         })

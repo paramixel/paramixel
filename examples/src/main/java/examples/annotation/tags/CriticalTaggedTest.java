@@ -16,7 +16,7 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
@@ -35,7 +35,7 @@ public class CriticalTaggedTest {
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
     public static Task factory() {
-        return forInstance("CriticalTaggedTest", CriticalTaggedTest::new)
+        return instance("CriticalTaggedTest", CriticalTaggedTest::new)
                 .tags("smoke-fast", "critical")
                 .step("test", CriticalTaggedTest::test)
                 .build();

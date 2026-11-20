@@ -87,7 +87,7 @@ public class NamedBuilderExample {
                             // Intentionally empty
                         })
                         .step("true-is-true", () -> {
-                            final boolean actual = 1 == 1;
+                            final var actual = 1 == 1;
                             if (!actual) {
                                 throw FailException.fail("expected true");
                             }

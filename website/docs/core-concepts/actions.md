@@ -38,7 +38,7 @@ The body runs before and independently of the children group; body success gates
 depends on success: `after` callbacks run in reverse declaration order and are all attempted.
 
 ```java
-forInstance(environment.name(), () -> new KafkaTest(environment))
+instance(environment.name(), () -> new KafkaTest(environment))
     .before(KafkaTest::setUp)
     .sequential("Messaging", messaging -> messaging
         .step("Produce", KafkaTest::produce, children -> children
@@ -56,7 +56,7 @@ string pool identifier does not compile.
 
 ```java
 Task definition = parallel("Compatibility matrix", Pool.named("environments"))
-        .each(environments, env -> forInstance(env.name(), () -> new Probe(env))
+        .each(environments, env -> instance(env.name(), () -> new Probe(env))
                 .step("Verify", Probe::verify))
         .build();
 ```

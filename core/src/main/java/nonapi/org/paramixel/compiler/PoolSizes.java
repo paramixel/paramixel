@@ -49,12 +49,7 @@ final class PoolSizes {
             if (operator == null) {
                 return resolveCores(1, true);
             }
-            final long operand;
-            try {
-                operand = Long.parseLong(matcher.group(2));
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("not a number: " + matcher.group(2), e);
-            }
+            final var operand = parseOperand(matcher.group(2));
             if (operand <= 0) {
                 throw new IllegalArgumentException("operand must be positive: " + operand);
             }
@@ -63,21 +58,33 @@ final class PoolSizes {
         if (value.startsWith("@cores")) {
             throw new IllegalArgumentException("unsupported core expression: " + value);
         }
-        final int capacity;
-        try {
-            capacity = Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("not an integer: " + value, e);
-        }
+        final var capacity = parseCapacity(value);
         if (capacity <= 0) {
             throw new IllegalArgumentException("must be positive: " + capacity);
         }
         return capacity;
     }
 
+    private static long parseOperand(final String text) {
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("not a number: " + text, e);
+        }
+    }
+
+    private static int parseCapacity(final String text) {
+        try {
+            return Integer.parseInt(text);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("not an integer: " + text, e);
+        }
+    }
+
     private static int resolveCores(final long operand, final boolean multiply) {
-        final long cores = Runtime.getRuntime().availableProcessors();
-        final long resolved = multiply ? cores * operand : cores / operand;
+        // int * long and int / long promote to long, so the core count needs no cast.
+        final var cores = Runtime.getRuntime().availableProcessors();
+        final var resolved = multiply ? cores * operand : cores / operand;
         return (int) Math.max(1L, Math.min(Integer.MAX_VALUE, resolved));
     }
 }

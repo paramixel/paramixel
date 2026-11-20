@@ -20,10 +20,11 @@ step -> step
             .build());
 ```
 
-- Retry triggers default to `FAILED`. `CANCELED` and `ABORTED` are rejected as triggers: cancellation and assumption
-  failures are not retried automatically.
+- Retry triggers default to `FAILED`, and only `FAILED` and `SKIPPED` are accepted (`RetryPolicy.RETRYABLE_KINDS`).
+  `PASSED` is rejected so a passing task is never re-run, and `CANCELED` and `ABORTED` are rejected so cancellation and
+  assumption failures are not retried automatically.
 - Attempts never overlap.
-- Retrying an owned `forInstance` task creates a fresh instance per attempt and runs its `after` callbacks between
+- Retrying an owned `instance` task creates a fresh instance per attempt and runs its `after` callbacks between
   attempts; retrying a nested step reuses the inherited instance.
 - A successful later attempt passes the task while all attempts remain visible in the result.
 

@@ -26,6 +26,10 @@ public class Debug {
      */
     public static boolean ENABLED = true;
 
+    private Debug() {
+        // Intentionally empty
+    }
+
     /**
      * Prints a debug message to stdout prefixed with the calling thread name.
      *

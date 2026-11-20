@@ -150,4 +150,39 @@ class ConfigurationTest {
                         .contains("Unknown Paramixel configuration key")
                         .contains("paramixel.unexpectedSetting"));
     }
+
+    @Test
+    @DisplayName("the listener drain timeout is a known key and must be positive")
+    void listenerDrainTimeoutIsValidated() {
+        final var invalid = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS, "0")))
+                .build();
+
+        assertThatThrownBy(() -> invalid.run(task("root").step("work", () -> {}).build()))
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS);
+
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS, "1000")))
+                .build()
+                .run(task("root").step("work", () -> {}).build());
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(result.diagnostics())
+                .noneMatch(diagnostic -> diagnostic.contains("Unknown Paramixel configuration key"));
+    }
+
+    @Test
+    @DisplayName("the shutdown grace period is read as a long and accepts values beyond the int range")
+    void shutdownGraceAcceptsLongValues() {
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "3000000000")))
+                .build()
+                .run(task("root").step("work", () -> {}).build());
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+    }
 }

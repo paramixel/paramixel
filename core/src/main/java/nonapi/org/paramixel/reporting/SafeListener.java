@@ -19,6 +19,7 @@ package nonapi.org.paramixel.reporting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
@@ -46,12 +47,15 @@ final class SafeListener implements Listener {
     }
 
     /**
-     * Returns the recorded listener diagnostics.
+     * Returns the listener diagnostics recorded since the previous call and forgets them, so each diagnostic is
+     * reported exactly once.
      *
      * @return the immutable diagnostics; never {@code null}
      */
-    synchronized List<String> diagnostics() {
-        return List.copyOf(diagnostics);
+    synchronized List<String> drainDiagnostics() {
+        final var drained = List.copyOf(diagnostics);
+        diagnostics.clear();
+        return drained;
     }
 
     @Override
@@ -65,7 +69,7 @@ final class SafeListener implements Listener {
     }
 
     @Override
-    public void onDiscoveryCompleted(final java.util.Optional<Task> root) {
+    public void onDiscoveryCompleted(final Optional<Task> root) {
         guard("onDiscoveryCompleted", () -> delegate.onDiscoveryCompleted(root));
     }
 

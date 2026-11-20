@@ -17,7 +17,8 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.support.Backoff;
+import org.paramixel.api.support.RepeatPolicy;
 import org.paramixel.api.support.RetryPolicy;
 
 /**
@@ -96,7 +98,7 @@ class RetryRepeatTest {
         final List<Integer> finalized = Collections.synchronizedList(new ArrayList<>());
         final AtomicInteger attempts = new AtomicInteger();
 
-        final Task definition = forInstance("instance", () -> {
+        final Task definition = instance("instance", () -> {
                     final var id = instances.incrementAndGet();
                     return new Fixture(id);
                 })
@@ -208,6 +210,65 @@ class RetryRepeatTest {
         assertThat(iterations).hasValue(3);
         assertThat(result.status().kind()).isEqualTo(Status.Kind.FAILED);
         assertThat(result.root().orElseThrow().children().get(0).children()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("retry triggers are limited to FAILED and SKIPPED; a passing outcome is never retried")
+    void retryTriggersAreLimitedToNonSuccessOutcomes() {
+        assertThat(RetryPolicy.RETRYABLE_KINDS).containsExactlyInAnyOrder(Status.Kind.FAILED, Status.Kind.SKIPPED);
+        assertThatThrownBy(() -> RetryPolicy.builder().retryOn(Status.Kind.PASSED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("PASSED");
+        assertThatThrownBy(() -> RetryPolicy.builder().retryOn(Status.Kind.FAILED, Status.Kind.PASSED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("PASSED");
+        assertThatThrownBy(() -> RetryPolicy.builder().retryOn(Status.Kind.RUNNING))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("RUNNING");
+        assertThatThrownBy(() -> RetryPolicy.builder().retryOn(Status.Kind.ABORTED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ABORTED");
+
+        final var policy = RetryPolicy.builder()
+                .maxAttempts(2)
+                .retryOn(Status.Kind.FAILED, Status.Kind.SKIPPED)
+                .build();
+
+        assertThat(policy.retryOn()).containsExactlyInAnyOrder(Status.Kind.FAILED, Status.Kind.SKIPPED);
+        assertThat(policy.retries(Status.Kind.PASSED)).isFalse();
+    }
+
+    @Test
+    @DisplayName("delay helpers reject attempt and iteration numbers below two")
+    void delayHelpersRejectInvalidInput() {
+        final var retry = RetryPolicy.builder()
+                .maxAttempts(3)
+                .backoff(Backoff.fixed(Duration.ofMillis(7)))
+                .build();
+        final var repeat = RepeatPolicy.builder()
+                .maxIterations(3)
+                .delay(Backoff.fixed(Duration.ofMillis(9)))
+                .build();
+
+        assertThatThrownBy(() -> retry.delayBefore(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> retry.delayBefore(1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> repeat.delayBefore(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> repeat.delayBefore(1)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(retry.delayBefore(2)).isEqualTo(Duration.ofMillis(7));
+        assertThat(repeat.delayBefore(2)).isEqualTo(Duration.ofMillis(9));
+    }
+
+    @Test
+    @DisplayName("an absent repeat stop predicate is an empty Optional, never null")
+    void repeatUntilIsOptional() {
+        final var withoutPredicate = RepeatPolicy.builder().maxIterations(2).build();
+        final var withPredicate = RepeatPolicy.builder()
+                .maxIterations(2)
+                .until((context, status) -> status.isPassed())
+                .build();
+
+        assertThat(withoutPredicate.until()).isEmpty();
+        assertThat(withPredicate.until()).isPresent();
     }
 
     /**

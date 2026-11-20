@@ -244,7 +244,7 @@ public final class Status {
      */
     public static Status mostSevere(final Collection<Status> statuses) {
         Objects.requireNonNull(statuses, "statuses is null");
-        Status result = PASSED;
+        var result = PASSED;
         for (Status status : statuses) {
             Objects.requireNonNull(status, "status is null");
             if (status.kind.severity > result.kind.severity) {

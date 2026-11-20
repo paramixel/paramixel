@@ -13,7 +13,7 @@ runs, executed with bounded concurrency, and reported from a single immutable re
 import static org.paramixel.api.Tasks.*;
 
 Task definition = parallel("Environments", Pool.named("environments"))
-        .each(environments, environment -> forInstance(environment.name(), () -> new Scenario(environment))
+        .each(environments, environment -> instance(environment.name(), () -> new Scenario(environment))
                 .before(Scenario::start)
                 .sequential("checks", checks -> checks
                         .step("health", Scenario::checkHealth)

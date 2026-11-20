@@ -120,7 +120,7 @@ final class TreeRenderer {
         }
         final var children = result.children();
         for (TaskResult child : children) {
-            final AttemptInfo childInfo = child.kind() == TaskResult.Kind.ATTEMPT
+            final var childInfo = child.kind() == TaskResult.Kind.ATTEMPT
                     ? new AttemptInfo(child.attemptIndex(), attempts.size(), child.attemptIndex() < attempts.size())
                     : null;
             append(lines, child, depth + 1, console, mode, childInfo);

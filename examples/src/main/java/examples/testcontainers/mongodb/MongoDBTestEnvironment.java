@@ -136,9 +136,10 @@ public class MongoDBTestEnvironment implements AutoCloseable {
      *                               within the retry window
      */
     private void verifyWritablePrimary() {
-        int maxAttempts = 5;
-        long sleepMs = 1000;
-        Exception lastException = null;
+        Exception lastException;
+        final var maxAttempts = 5;
+        final var sleepMs = 1000L;
+        lastException = null;
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try (var mongoClient = MongoClients.create(mongoDBContainer.getConnectionString())) {
@@ -201,10 +202,10 @@ public class MongoDBTestEnvironment implements AutoCloseable {
                 System.err.println("Container id: " + mongoDBContainer.getContainerId());
                 if (mongoDBContainer.isRunning()) {
                     System.err.println("Container logs (last 30 lines):");
-                    String logs = mongoDBContainer.getLogs();
+                    final var logs = mongoDBContainer.getLogs();
                     if (logs != null && !logs.isEmpty()) {
-                        String[] lines = logs.split("\n");
-                        int start = Math.max(0, lines.length - 30);
+                        final var lines = logs.split("\n");
+                        final var start = Math.max(0, lines.length - 30);
                         for (int i = start; i < lines.length; i++) {
                             System.err.println("  [log] " + lines[i]);
                         }
@@ -248,7 +249,7 @@ public class MongoDBTestEnvironment implements AutoCloseable {
         var sw = new StringWriter();
         cause.printStackTrace(new PrintWriter(sw));
         System.err.println("Setup exception stack trace (first 20 lines):");
-        String[] traceLines = sw.toString().split("\n");
+        final var traceLines = sw.toString().split("\n");
         for (int i = 0; i < Math.min(20, traceLines.length); i++) {
             System.err.println("  " + traceLines[i]);
         }

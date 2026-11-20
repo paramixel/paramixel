@@ -37,6 +37,6 @@ class LauncherTest {
     @DisplayName("an unknown argument is a usage error")
     void unknownArgumentIsUsageError() {
         assertThat(Launcher.execute(new String[] {"--nope"})).isEqualTo(2);
-        assertThat(Launcher.execute(null)).isNotNegative();
+        assertThat(Launcher.execute((String[]) null)).isNotNegative();
     }
 }

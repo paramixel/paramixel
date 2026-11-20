@@ -27,7 +27,7 @@ public class RandomUtil {
     private static final char[] CHARS = new char[62];
 
     static {
-        int idx = 0;
+        var idx = 0;
         // Digits 0-9
         for (char c = '0'; c <= '9'; c++) {
             CHARS[idx++] = c;

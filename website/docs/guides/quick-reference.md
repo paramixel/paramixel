@@ -17,7 +17,7 @@ import org.paramixel.api.support.*;
 
 ```java
 Task definition = parallel("Matrix", Pool.named("environments"))
-        .each(environments, env -> forInstance(env.name(), () -> new Probe(env))
+        .each(environments, env -> instance(env.name(), () -> new Probe(env))
                 .before(Probe::start)
                 .sequential("checks", checks -> checks
                         .independent()
@@ -31,7 +31,7 @@ Task definition = parallel("Matrix", Pool.named("environments"))
 | --- | --- |
 | `task(name)` / `sequential(name)` | Sequential container |
 | `parallel(name, Pool.named("p"))` | Parallel container; direct children hold one permit each |
-| `forInstance(name, supplier)` | Owns one instance per attempt |
+| `instance(name, supplier)` | Owns one instance per attempt |
 | `.before(cb)` / `.after(cb)` | Lifecycle on the owning task; `after` runs in reverse order |
 | `.step(name, op)` | Child step; returns the enclosing builder |
 | `.step(name, op, children -> …)` | Child step with its own sequential subtree |

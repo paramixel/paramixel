@@ -17,7 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,7 +67,7 @@ public class SequentialIterationExample {
         return sequential("SequentialIterationExample")
                 .each(
                         arguments,
-                        value -> forInstance(
+                        value -> instance(
                                         value,
                                         () -> new SequentialIterationExample(
                                                 Integer.parseInt(value.substring("string-".length()))))

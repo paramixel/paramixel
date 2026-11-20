@@ -17,7 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -69,7 +69,7 @@ public class ParallelInstanceTest {
     public static Task factory() {
         resetCounts();
 
-        return forInstance("ParallelInstanceTest", ParallelInstanceTest::new)
+        return instance("ParallelInstanceTest", ParallelInstanceTest::new)
                 .before(ParallelInstanceTest::noop)
                 .parallel(
                         "parallel-methods",

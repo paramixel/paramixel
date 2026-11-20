@@ -17,7 +17,7 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
@@ -53,7 +53,7 @@ public class SimpleTest implements AutoCloseable {
     public static Task factory() {
         testCount.set(0);
 
-        return forInstance("SimpleTest", SimpleTest::new)
+        return instance("SimpleTest", SimpleTest::new)
                 .step("testOne", SimpleTest::testOne)
                 .after(SimpleTest::close)
                 .build();

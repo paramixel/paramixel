@@ -10,7 +10,7 @@ item can produce a different fixture type.
 
 ```java
 Task definition = parallel("Environments", Pool.named("environments"))
-        .each(environments, environment -> forInstance(environment.name(), () -> new Scenario(environment))
+        .each(environments, environment -> instance(environment.name(), () -> new Scenario(environment))
                 .before(Scenario::start)
                 .step("verify", Scenario::verify)
                 .after(Scenario::stop))
@@ -32,7 +32,7 @@ Task definition = parallel("Environments", Pool.named("environments"))
 ```java
 parallel("Matrix", Pool.named("environments"))
         .shuffle(42L)
-        .each(environments, env -> forInstance(env.name(), () -> new Probe(env))
+        .each(environments, env -> instance(env.name(), () -> new Probe(env))
                 .step("verify", Probe::verify))
         .build();
 ```

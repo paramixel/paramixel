@@ -54,8 +54,8 @@ public class FastUUID {
      */
     public static String generateUuid() {
         var rng = ThreadLocalRandom.current();
-        long msb = rng.nextLong();
-        long lsb = rng.nextLong();
+        var msb = rng.nextLong();
+        var lsb = rng.nextLong();
         msb = (msb & ~0x0000_0000_0000_F000L) | 0x0000_0000_0000_4000L;
         lsb = (lsb & ~0xC000_0000_0000_0000L) | 0x8000_0000_0000_0000L;
         return new UUID(msb, lsb).toString();

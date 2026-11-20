@@ -47,9 +47,9 @@ import org.paramixel.api.support.RetryPolicy;
  * definition is authored, built, or compiled.
  *
  * @param <T> the inherited primary instance type; {@link Void} when the task has no instance binding
- * @param <SELF> the concrete builder type, used to preserve fluent return types
+ * @param <S> the concrete builder type, used to preserve fluent return types
  */
-public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
+public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
 
     private static final Pattern VALID_RESOURCE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_.-]*");
     private static final int MAX_NAME_LENGTH = 512;
@@ -102,7 +102,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      *
      * @return this builder; never {@code null}
      */
-    protected abstract SELF self();
+    protected abstract S self();
 
     /**
      * Adds a {@code before} callback that receives the primary instance.
@@ -111,7 +111,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF before(final ThrowingConsumer<? super T> callback) {
+    public S before(final ThrowingConsumer<? super T> callback) {
         Objects.requireNonNull(callback, "callback is null");
         before.add(CallbackAdapters.instanceConsumer(callback));
         requiresPrimaryInstance = true;
@@ -125,7 +125,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF before(final ThrowingRunnable callback) {
+    public S before(final ThrowingRunnable callback) {
         Objects.requireNonNull(callback, "callback is null");
         before.add(CallbackAdapters.runnable(callback));
         return self();
@@ -138,7 +138,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF beforeWithContext(final ThrowingBiConsumer<? super T, Context> callback) {
+    public S beforeWithContext(final ThrowingBiConsumer<? super T, Context> callback) {
         Objects.requireNonNull(callback, "callback is null");
         before.add(CallbackAdapters.instanceAndContextConsumer(callback));
         requiresPrimaryInstance = true;
@@ -152,7 +152,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF beforeWithContext(final ThrowingConsumer<Context> callback) {
+    public S beforeWithContext(final ThrowingConsumer<Context> callback) {
         Objects.requireNonNull(callback, "callback is null");
         before.add(CallbackAdapters.contextConsumer(callback));
         return self();
@@ -169,7 +169,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF after(final ThrowingConsumer<? super T> callback) {
+    public S after(final ThrowingConsumer<? super T> callback) {
         Objects.requireNonNull(callback, "callback is null");
         after.add(CallbackAdapters.instanceConsumer(callback));
         requiresPrimaryInstance = true;
@@ -183,7 +183,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF after(final ThrowingRunnable callback) {
+    public S after(final ThrowingRunnable callback) {
         Objects.requireNonNull(callback, "callback is null");
         after.add(CallbackAdapters.runnable(callback));
         return self();
@@ -196,7 +196,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF afterWithContext(final ThrowingBiConsumer<? super T, Context> callback) {
+    public S afterWithContext(final ThrowingBiConsumer<? super T, Context> callback) {
         Objects.requireNonNull(callback, "callback is null");
         after.add(CallbackAdapters.instanceAndContextConsumer(callback));
         requiresPrimaryInstance = true;
@@ -210,7 +210,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public SELF afterWithContext(final ThrowingConsumer<Context> callback) {
+    public S afterWithContext(final ThrowingConsumer<Context> callback) {
         Objects.requireNonNull(callback, "callback is null");
         after.add(CallbackAdapters.contextConsumer(callback));
         return self();
@@ -229,7 +229,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code operation} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF step(final String name, final ThrowingConsumer<? super T> operation) {
+    public S step(final String name, final ThrowingConsumer<? super T> operation) {
         Objects.requireNonNull(operation, "operation is null");
         children.add(stepTask(name, CallbackAdapters.instanceConsumer(operation), true));
         return self();
@@ -244,7 +244,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code operation} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF step(final String name, final ThrowingRunnable operation) {
+    public S step(final String name, final ThrowingRunnable operation) {
         Objects.requireNonNull(operation, "operation is null");
         children.add(stepTask(name, CallbackAdapters.runnable(operation), false));
         return self();
@@ -259,7 +259,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code operation} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF stepWithContext(final String name, final ThrowingBiConsumer<? super T, Context> operation) {
+    public S stepWithContext(final String name, final ThrowingBiConsumer<? super T, Context> operation) {
         Objects.requireNonNull(operation, "operation is null");
         children.add(stepTask(name, CallbackAdapters.instanceAndContextConsumer(operation), true));
         return self();
@@ -274,7 +274,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code operation} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF stepWithContext(final String name, final ThrowingConsumer<Context> operation) {
+    public S stepWithContext(final String name, final ThrowingConsumer<Context> operation) {
         Objects.requireNonNull(operation, "operation is null");
         children.add(stepTask(name, CallbackAdapters.contextConsumer(operation), false));
         return self();
@@ -293,7 +293,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF step(
+    public S step(
             final String name,
             final ThrowingConsumer<? super T> operation,
             final Consumer<SequentialBuilder<T>> configureChildren) {
@@ -313,7 +313,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF step(
+    public S step(
             final String name,
             final ThrowingRunnable operation,
             final Consumer<SequentialBuilder<T>> configureChildren) {
@@ -334,7 +334,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code configure} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF sequential(final String name, final Consumer<SequentialBuilder<T>> configure) {
+    public S sequential(final String name, final Consumer<SequentialBuilder<T>> configure) {
         Objects.requireNonNull(configure, "configure is null");
         var group = new SequentialBuilder<T>(name);
         configure.accept(group);
@@ -355,7 +355,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF parallel(final String name, final Pool pool, final Consumer<ParallelBuilder<T>> configure) {
+    public S parallel(final String name, final Pool pool, final Consumer<ParallelBuilder<T>> configure) {
         Objects.requireNonNull(pool, "pool is null");
         Objects.requireNonNull(configure, "configure is null");
         var group = new ParallelBuilder<T>(name, pool);
@@ -376,7 +376,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code configure} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF repeat(final String name, final Consumer<RepeatBuilder<T>> configure) {
+    public S repeat(final String name, final Consumer<RepeatBuilder<T>> configure) {
         Objects.requireNonNull(configure, "configure is null");
         var repeatBuilder = new RepeatBuilder<T>(name);
         configure.accept(repeatBuilder);
@@ -398,7 +398,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public SELF when(
+    public S when(
             final String name, final Predicate<Context> condition, final Consumer<SequentialBuilder<T>> configure) {
         Objects.requireNonNull(condition, "condition is null");
         Objects.requireNonNull(configure, "configure is null");
@@ -416,7 +416,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code condition} is {@code null}
      */
-    public SELF onlyIf(final Predicate<Context> condition) {
+    public S onlyIf(final Predicate<Context> condition) {
         this.condition = Objects.requireNonNull(condition, "condition is null");
         return self();
     }
@@ -431,7 +431,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code child} is {@code null}
      */
-    public SELF child(final Task child) {
+    public S child(final Task child) {
         children.add(Objects.requireNonNull(child, "child is null"));
         return self();
     }
@@ -445,7 +445,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @return this builder
      * @throws NullPointerException if {@code child} is {@code null}
      */
-    public SELF child(final TaskBuilder<?, ?> child) {
+    public S child(final TaskBuilder<?, ?> child) {
         Objects.requireNonNull(child, "child is null");
         children.add(child.build());
         return self();
@@ -465,7 +465,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
      * @throws IllegalArgumentException if the mapper returns {@code null}
      */
-    public <E> SELF each(
+    public <E> S each(
             final Iterable<? extends E> items, final Function<? super E, ? extends TaskBuilder<?, ?>> mapper) {
         Objects.requireNonNull(items, "items is null");
         Objects.requireNonNull(mapper, "mapper is null");
@@ -487,7 +487,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @param seed the deterministic seed; the same seed yields the same order for the same definition
      * @return this builder
      */
-    public SELF shuffle(final long seed) {
+    public S shuffle(final long seed) {
         this.shuffleRequested = true;
         this.shuffleSeed = seed;
         return self();
@@ -496,12 +496,14 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
     /**
      * Requests a shuffle of this task's direct children with a seed chosen once, when the definition is first built.
      *
-     * <p>The chosen seed is reported in the result metadata so the order can be reproduced.
+     * <p>The chosen seed is reported in the result metadata so the order can be reproduced, and later builds from this
+     * builder reuse it. Calling this method discards any seed supplied earlier through {@link #shuffle(long)}.
      *
      * @return this builder
      */
-    public SELF shuffle() {
+    public S shuffle() {
         this.shuffleRequested = true;
+        this.shuffleSeed = null;
         return self();
     }
 
@@ -513,7 +515,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code values} or an element is {@code null}
      * @throws IllegalArgumentException if a tag is blank
      */
-    public SELF tags(final String... values) {
+    public S tags(final String... values) {
         Objects.requireNonNull(values, "values is null");
         for (String value : values) {
             Objects.requireNonNull(value, "tag is null");
@@ -538,7 +540,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code timeout} is {@code null}
      * @throws IllegalArgumentException if {@code timeout} is zero or negative
      */
-    public SELF timeout(final Duration timeout) {
+    public S timeout(final Duration timeout) {
         Objects.requireNonNull(timeout, "timeout is null");
         if (timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive: " + timeout);
@@ -551,14 +553,14 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * Sets a bounded retry policy for this task.
      *
      * <p>Retry re-attempts a non-success outcome named by the policy, never concurrently, and never for run
-     * cancellation or assumption abort. A retried {@code forInstance} task creates a fresh instance per attempt.
+     * cancellation or assumption abort. A retried {@code instance} task creates a fresh instance per attempt.
      * A task may not be both retried and repeated.
      *
      * @param policy the policy; must not be {@code null}
      * @return this builder
      * @throws NullPointerException if {@code policy} is {@code null}
      */
-    public SELF retry(final RetryPolicy policy) {
+    public S retry(final RetryPolicy policy) {
         this.retry = Objects.requireNonNull(policy, "policy is null");
         return self();
     }
@@ -574,7 +576,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code lockName} is {@code null}
      * @throws IllegalArgumentException if the name is invalid
      */
-    public SELF isolated(final String lockName) {
+    public S isolated(final String lockName) {
         Objects.requireNonNull(lockName, "lockName is null");
         if (!VALID_RESOURCE_NAME.matcher(lockName).matches()) {
             throw new IllegalArgumentException(
@@ -594,7 +596,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if the key is already declared on this task
      */
-    public <R> SELF resource(final Key<R> key, final ThrowingSupplier<? extends R> factory) {
+    public <R> S resource(final Key<R> key, final ThrowingSupplier<? extends R> factory) {
         Objects.requireNonNull(factory, "factory is null");
         return resource(key, (ResourceFactory) context -> factory.get(), null);
     }
@@ -610,16 +612,19 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if the key is already declared on this task
      */
-    public <R> SELF resource(
+    public <R> S resource(
             final Key<R> key, final ThrowingSupplier<? extends R> factory, final ThrowingConsumer<? super R> release) {
         Objects.requireNonNull(factory, "factory is null");
         Objects.requireNonNull(release, "release is null");
-        final ResourceReleaser releaser = (resource, context) -> {
+        return resource(key, (ResourceFactory) context -> factory.get(), TaskBuilder.<R>typedReleaser(release));
+    }
+
+    private static <R> ResourceReleaser typedReleaser(final ThrowingConsumer<? super R> release) {
+        return (resource, context) -> {
             @SuppressWarnings("unchecked")
-            final R typed = (R) resource;
+            final var typed = (R) resource;
             release.accept(typed);
         };
-        return resource(key, (ResourceFactory) context -> factory.get(), releaser);
     }
 
     /**
@@ -632,7 +637,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if the key is already declared on this task
      */
-    public <R> SELF resource(final Key<R> key, final ResourceFactory factory) {
+    public <R> S resource(final Key<R> key, final ResourceFactory factory) {
         return resource(key, factory, null);
     }
 
@@ -647,7 +652,7 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
      * @throws NullPointerException if {@code key} or {@code factory} is {@code null}
      * @throws IllegalArgumentException if the key is already declared on this task
      */
-    public <R> SELF resource(final Key<R> key, final ResourceFactory factory, final ResourceReleaser release) {
+    public <R> S resource(final Key<R> key, final ResourceFactory factory, final ResourceReleaser release) {
         Objects.requireNonNull(key, "key is null");
         Objects.requireNonNull(factory, "factory is null");
         for (ResourceDeclaration declaration : resources) {
@@ -662,8 +667,10 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
     /**
      * Builds an immutable, deeply frozen snapshot of this definition.
      *
-     * <p>Building is side-effect free. The builder may be built repeatedly; each build returns an independent
-     * definition, and later mutation of the builder does not alter an earlier snapshot.
+     * <p>The builder may be built repeatedly; each build returns a separate immutable definition, and later mutation of
+     * the builder does not alter an earlier snapshot. Building has one deliberate effect on the builder: when
+     * {@link #shuffle()} was requested without a seed, the first build chooses the seed and keeps it, so every later
+     * build from this builder reproduces the same order.
      *
      * @return the immutable task; never {@code null}
      */
@@ -678,24 +685,9 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
             effectiveSeed = null;
         }
         return new Task(
-                name,
-                mode,
-                pool,
-                dependent,
-                children,
-                before,
-                after,
-                body,
-                instanceFactory,
-                requiresPrimaryInstance,
-                tags,
-                effectiveSeed,
-                condition,
-                timeout,
-                retry,
-                repeat,
-                exclusiveLock,
-                resources);
+                new Task.Structure(name, mode, pool, dependent, children),
+                new Task.Lifecycle(before, after, body, instanceFactory, requiresPrimaryInstance, resources),
+                new Task.Policies(tags, effectiveSeed, condition, timeout, retry, repeat, exclusiveLock));
     }
 
     final String builderName() {

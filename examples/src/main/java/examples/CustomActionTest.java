@@ -16,7 +16,7 @@
 
 package examples;
 
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import java.util.Objects;
 import org.paramixel.api.Paramixel;
@@ -46,7 +46,7 @@ public class CustomActionTest {
      */
     @Paramixel.Factory
     public static Task factory() {
-        return forInstance(CustomActionTest.class.getName(), CustomActionTest::new)
+        return instance(CustomActionTest.class.getName(), CustomActionTest::new)
                 .step("setValue", CustomActionTest::setValue)
                 .step("validate", CustomActionTest::validate)
                 .build();

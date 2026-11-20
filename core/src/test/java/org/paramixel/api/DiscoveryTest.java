@@ -24,12 +24,15 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import nonapi.org.paramixel.discovery.FactoryScanner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.discoveryfixtures.DiscoveryFixtures;
+import org.paramixel.api.discoveryfixtures.InvalidFactoryFixture;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
@@ -189,9 +192,8 @@ class DiscoveryTest {
     @Test
     @DisplayName("an invalid factory is rejected before any discovered work runs")
     void invalidFactoryIsRejected() {
-        final var selector = Selector.builder()
-                .classOf(org.paramixel.api.discoveryfixtures.InvalidFactoryFixture.class)
-                .build();
+        final var selector =
+                Selector.builder().classOf(InvalidFactoryFixture.class).build();
 
         assertThatThrownBy(() -> runner().run(selector))
                 .isInstanceOf(ResolverException.class)
@@ -294,19 +296,19 @@ class DiscoveryTest {
     @DisplayName("concurrent runs on one runner are rejected")
     void concurrentRunsAreRejected() {
         final var runner = runner();
-        final var started = new java.util.concurrent.CountDownLatch(1);
-        final var release = new java.util.concurrent.CountDownLatch(1);
+        final var started = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
         final var definition = task("slow")
                 .step("work", () -> {
                     started.countDown();
-                    release.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                    release.await(5, TimeUnit.SECONDS);
                 })
                 .build();
 
         final var thread = new Thread(() -> runner.run(definition));
         thread.start();
         try {
-            assertThat(started.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
             assertThatThrownBy(() -> runner.run(definition))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("already in progress");

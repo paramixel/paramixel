@@ -17,7 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -64,7 +64,7 @@ public class IndependentArgumentTest {
                 .independent()
                 .each(
                         arguments,
-                        value -> forInstance(value, IndependentArgumentTest::new)
+                        value -> instance(value, IndependentArgumentTest::new)
                                 .before(IndependentArgumentTest::before)
                                 .step("test", IndependentArgumentTest::test)
                                 .step("test", IndependentArgumentTest::test)

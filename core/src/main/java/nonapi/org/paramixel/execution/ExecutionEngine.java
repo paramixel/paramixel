@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.concurrent.BlockingQueue;
@@ -44,13 +43,11 @@ import org.paramixel.api.PhaseResult;
 import org.paramixel.api.ResourceDeclaration;
 import org.paramixel.api.Result;
 import org.paramixel.api.Status;
-import org.paramixel.api.TaskCallback;
+import org.paramixel.api.TaskEvent;
 import org.paramixel.api.TaskPhase;
-import org.paramixel.api.TaskResult;
 import org.paramixel.api.exception.AbortException;
+import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.SkipException;
-import org.paramixel.api.support.RepeatPolicy;
-import org.paramixel.api.support.RetryPolicy;
 
 /**
  * Executes a compiled plan.
@@ -93,9 +90,7 @@ public final class ExecutionEngine {
     private final int workerLimit;
     private final Duration grace;
     private final boolean failFast;
-    private final boolean failureOnSkip;
-    private final boolean failureOnAbort;
-    private final Long discoveryShuffleSeed;
+    private final ResultProjector projector;
 
     private final BlockingQueue<Object> events = new LinkedBlockingQueue<>();
     private final PriorityQueue<Job> ready = new PriorityQueue<>(
@@ -119,7 +114,6 @@ public final class ExecutionEngine {
     private boolean rootFailureSeen;
     private Throwable fatal;
     private volatile boolean cancellationRequested;
-    private volatile String cancellationRequestReason;
 
     /**
      * Creates an engine.
@@ -155,20 +149,16 @@ public final class ExecutionEngine {
             final Configuration configuration,
             final EventPublisher publisher,
             final Long discoveryShuffleSeed) {
-        this.discoveryShuffleSeed = discoveryShuffleSeed;
         this.runId = Objects.requireNonNull(runId, "runId is null");
         this.plan = Objects.requireNonNull(plan, "plan is null");
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
         this.publisher = Objects.requireNonNull(publisher, "publisher is null");
         this.workerLimit =
                 positiveSetting(Configuration.WORKERS, Runtime.getRuntime().availableProcessors());
-        final long graceMillis = positiveSetting(Configuration.SHUTDOWN_GRACE_MILLIS, 10_000);
+        final var graceMillis = positiveSetting(Configuration.SHUTDOWN_GRACE_MILLIS, 10_000L);
         this.grace = Duration.ofMillis(graceMillis);
         this.failFast = configuration.getBoolean(Configuration.FAIL_FAST).orElse(false);
-        this.failureOnSkip =
-                configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(true);
-        this.failureOnAbort =
-                configuration.getBoolean(Configuration.FAILURE_ON_ABORT).orElse(true);
+        this.projector = new ResultProjector(runId, configuration, plan.poolCapacities(), discoveryShuffleSeed);
         final var poolCapacities = new LinkedHashMap<String, Integer>();
         poolCapacities.putAll(plan.poolCapacities());
         this.pools =
@@ -184,7 +174,7 @@ public final class ExecutionEngine {
     private int positiveSetting(final String key, final int fallback) {
         final var value = configuration.getInteger(key).orElse(fallback);
         if (value <= 0) {
-            throw new org.paramixel.api.exception.ConfigurationException(
+            throw new ConfigurationException(
                     "Invalid configuration for '" + key + "': must be positive but was " + value);
         }
         return value;
@@ -193,7 +183,7 @@ public final class ExecutionEngine {
     private long positiveSetting(final String key, final long fallback) {
         final var value = configuration.getLong(key).orElse(fallback);
         if (value <= 0) {
-            throw new org.paramixel.api.exception.ConfigurationException(
+            throw new ConfigurationException(
                     "Invalid configuration for '" + key + "': must be positive but was " + value);
         }
         return value;
@@ -226,13 +216,16 @@ public final class ExecutionEngine {
         if (cancellationRequested) {
             return;
         }
-        cancellationRequestReason = Objects.requireNonNull(reason, "reason is null");
+        final var requestReason = Objects.requireNonNull(reason, "reason is null");
         cancellationRequested = true;
-        events.add(new CancelRun(cancellationRequestReason));
+        events.add(new CancelRun(requestReason));
     }
 
     /**
      * Executes the plan and returns its immutable result.
+     *
+     * <p>The result carries every run-level failure and diagnostic the engine recorded, such as
+     * {@code NON_QUIESCENT}; callers do not need to collect them from the event publisher.
      *
      * @return the result; never {@code null}
      * @throws org.paramixel.api.exception.ParamixelException if the run aborted because of an unrecoverable VM error
@@ -253,7 +246,8 @@ public final class ExecutionEngine {
             workers.shutdownNow();
             timers.shutdownNow();
         }
-        final var result = buildResult(startedAt);
+        final var result =
+                projector.project(root, !incomplete, startedAt, List.copyOf(runFailures), List.copyOf(diagnostics));
         if (fatal instanceof Error error) {
             throw error;
         }
@@ -306,7 +300,6 @@ public final class ExecutionEngine {
         if (incomplete) {
             markRemainingTerminal();
         }
-        finishListeners();
     }
 
     private void dispatchReady() {
@@ -432,30 +425,32 @@ public final class ExecutionEngine {
             markTerminal(state, Status.skipped("failFast: a root task already failed"), "failFast");
             return;
         }
-        if (state.parent != null && state.parent.compiled.mode() == ExecutionMode.PARALLEL && !state.permitHeld) {
+        if (state.parent != null
+                && state.parent.compiled.mode() == ExecutionMode.PARALLEL
+                && !state.admission.permitHeld) {
             final var pool = state.parent.compiled.poolName();
             if (!pools.tryAcquire(pool)) {
-                state.waiting = true;
-                state.waitingFor = pool;
+                state.admission.waiting = true;
+                state.admission.waitingFor = pool;
                 pools.await(pool, state);
                 return;
             }
-            state.permitHeld = true;
-            state.permitName = pool;
+            state.admission.permitHeld = true;
+            state.admission.permitName = pool;
         }
         final var lockName = state.compiled.task().exclusiveLock().orElse(null);
-        if (lockName != null && !state.lockHeld) {
+        if (lockName != null && !state.admission.lockHeld) {
             if (!locks.tryAcquire(lockName)) {
-                state.waiting = true;
-                state.waitingFor = lockName;
+                state.admission.waiting = true;
+                state.admission.waitingFor = lockName;
                 locks.await(lockName, state);
                 return;
             }
-            state.lockHeld = true;
-            state.lockName = lockName;
+            state.admission.lockHeld = true;
+            state.admission.lockName = lockName;
         }
-        state.waiting = false;
-        state.waitingFor = null;
+        state.admission.waiting = false;
+        state.admission.waitingFor = null;
         state.stage = OccurrenceState.Stage.ADMITTED;
         state.status = Status.RUNNING;
         state.admittedAt = Instant.now();
@@ -467,15 +462,15 @@ public final class ExecutionEngine {
     }
 
     private void releaseAdmission(final OccurrenceState state) {
-        if (state.lockHeld) {
-            state.lockHeld = false;
-            final var name = state.lockName;
+        if (state.admission.lockHeld) {
+            state.admission.lockHeld = false;
+            final var name = state.admission.lockName;
             locks.release(name);
             drainLock(name);
         }
-        if (state.permitHeld) {
-            state.permitHeld = false;
-            final var name = state.permitName;
+        if (state.admission.permitHeld) {
+            state.admission.permitHeld = false;
+            final var name = state.admission.permitName;
             pools.release(name);
             drainPool(name);
         }
@@ -491,9 +486,9 @@ public final class ExecutionEngine {
                 pools.release(name);
                 return;
             }
-            waiter.permitHeld = true;
-            waiter.permitName = name;
-            waiter.waiting = false;
+            waiter.admission.permitHeld = true;
+            waiter.admission.permitName = name;
+            waiter.admission.waiting = false;
             events.add(new ResourceAvailable(waiter));
         }
     }
@@ -508,9 +503,9 @@ public final class ExecutionEngine {
                 locks.release(name);
                 return;
             }
-            waiter.lockHeld = true;
-            waiter.lockName = name;
-            waiter.waiting = false;
+            waiter.admission.lockHeld = true;
+            waiter.admission.lockName = name;
+            waiter.admission.waiting = false;
             events.add(new ResourceAvailable(waiter));
         }
     }
@@ -618,7 +613,7 @@ public final class ExecutionEngine {
             return;
         }
         final var index = attempt.beforeIndex++;
-        final TaskCallback callback = callbacks.get(index);
+        final var callback = callbacks.get(index);
         submit(state, JobKind.BEFORE, index, () -> {
             callback.execute(new ExecutionContextImpl(this, state, attempt.index));
             return JobOutcome.ok();
@@ -815,7 +810,7 @@ public final class ExecutionEngine {
             return;
         }
         final var index = attempt.afterIndex--;
-        final TaskCallback callback = callbacks.get(index);
+        final var callback = callbacks.get(index);
         submit(state, JobKind.AFTER, index, () -> {
             callback.execute(new ExecutionContextImpl(this, state, attempt.index));
             return JobOutcome.ok();
@@ -900,7 +895,7 @@ public final class ExecutionEngine {
         final var hasPolicy = state.compiled.task().retry().isPresent()
                 || state.compiled.task().repeat().isPresent();
         if (hasPolicy) {
-            final var node = attemptNode(state, attempt, attempt.attemptStatus);
+            final var node = projector.attemptNode(state, attempt, attempt.attemptStatus);
             state.attemptNodes.add(node);
             state.attemptStatuses.add(attempt.attemptStatus);
         }
@@ -908,12 +903,12 @@ public final class ExecutionEngine {
             return;
         }
         if (!state.isCanceled() && !state.timedOut) {
-            final RepeatPolicy repeat = state.compiled.task().repeat().orElse(null);
+            final var repeat = state.compiled.task().repeat().orElse(null);
             if (repeat != null && !repeat.stopsAfter(attempt.index, attempt.attemptStatus, contextOf(state))) {
                 scheduleNextAttempt(state, repeat.delayBefore(attempt.index + 1));
                 return;
             }
-            final RetryPolicy retry = state.compiled.task().retry().orElse(null);
+            final var retry = state.compiled.task().retry().orElse(null);
             if (retry != null
                     && retry.retries(attempt.attemptStatus.kind())
                     && retry.permitsAnotherAttempt(attempt.index)) {
@@ -968,7 +963,7 @@ public final class ExecutionEngine {
                 final var passed = state.attemptStatuses.stream().anyMatch(Status::isPassed);
                 return passed ? Status.PASSED : Status.mostSevere(state.attemptStatuses);
             }
-            if (repeat.until() == null) {
+            if (repeat.until().isEmpty()) {
                 return Status.mostSevere(state.attemptStatuses);
             }
             return state.attemptStatuses.get(state.attemptStatuses.size() - 1);
@@ -1029,12 +1024,12 @@ public final class ExecutionEngine {
         if (state.isTerminal()) {
             return;
         }
-        if (state.waiting) {
-            if (state.waitingFor != null) {
-                pools.cancelWait(state.waitingFor, state);
-                locks.cancelWait(state.waitingFor, state);
+        if (state.admission.waiting) {
+            if (state.admission.waitingFor != null) {
+                pools.cancelWait(state.admission.waitingFor, state);
+                locks.cancelWait(state.admission.waitingFor, state);
             }
-            state.waiting = false;
+            state.admission.waiting = false;
         }
         state.reason = reason;
         state.status = status;
@@ -1135,20 +1130,20 @@ public final class ExecutionEngine {
         if (state.isTerminal()) {
             return;
         }
-        state.canceled = true;
-        if (state.cancellationReason == null) {
-            state.cancellationReason = reason;
+        state.cancellation.requested = true;
+        if (state.cancellation.reason == null) {
+            state.cancellation.reason = reason;
         }
         final var thread = state.activeThread;
         if (thread != null) {
             thread.interrupt();
         }
-        if (state.waiting) {
-            if (state.waitingFor != null) {
-                pools.cancelWait(state.waitingFor, state);
-                locks.cancelWait(state.waitingFor, state);
+        if (state.admission.waiting) {
+            if (state.admission.waitingFor != null) {
+                pools.cancelWait(state.admission.waitingFor, state);
+                locks.cancelWait(state.admission.waitingFor, state);
             }
-            state.waiting = false;
+            state.admission.waiting = false;
             markTerminal(state, Status.canceled(reason), reason);
             return;
         }
@@ -1202,7 +1197,6 @@ public final class ExecutionEngine {
 
     private void abandon() {
         finished = true;
-        publishDiagnostics();
     }
 
     private void markRemainingTerminal() {
@@ -1294,247 +1288,33 @@ public final class ExecutionEngine {
     private void emit(final OccurrenceState state, final TaskPhase phase, final Status status, final int attempt) {
         eventSequence++;
         final var now = Instant.now();
-        final Duration elapsed;
-        if (phase == TaskPhase.TERMINAL && state.admittedAt != null) {
-            elapsed = Duration.between(state.admittedAt, state.completedAt == null ? now : state.completedAt);
-        } else if (phase == TaskPhase.TIMEOUT && state.admittedAt != null) {
-            elapsed = Duration.between(state.admittedAt, now);
-        } else {
-            elapsed = null;
+        final var elapsed = elapsedAt(state, phase, now);
+        publisher.publish(TaskEvent.builder()
+                .sequence(eventSequence)
+                .runId(runId)
+                .identity(state.id, state.parent == null ? null : state.parent.id, state.name, state.path)
+                .phase(phase, attempt)
+                .status(status)
+                .timing(now, elapsed)
+                .build());
+    }
+
+    private static Duration elapsedAt(final OccurrenceState state, final TaskPhase phase, final Instant now) {
+        if (state.admittedAt == null) {
+            return null;
         }
-        publisher.publish(new org.paramixel.api.TaskEvent(
-                eventSequence,
-                runId,
-                state.id,
-                state.parent == null ? null : state.parent.id,
-                state.name,
-                state.path,
-                phase,
-                attempt,
-                status,
-                now,
-                elapsed));
+        if (phase == TaskPhase.TERMINAL) {
+            return Duration.between(state.admittedAt, state.completedAt == null ? now : state.completedAt);
+        }
+        if (phase == TaskPhase.TIMEOUT) {
+            return Duration.between(state.admittedAt, now);
+        }
+        return null;
     }
 
     private void recordRunFailure(final String phase, final String message, final Throwable throwable) {
         runFailures.add(Failure.of(phase, message, throwable, runFailures.isEmpty()));
         diagnostics.add(phase + ": " + message);
-    }
-
-    private void publishDiagnostics() {
-        for (String diagnostic : List.copyOf(diagnostics)) {
-            publisher.diagnostic(diagnostic);
-        }
-        diagnostics.clear();
-    }
-
-    private void finishListeners() {
-        publishDiagnostics();
-    }
-
-    private Result buildResult(final Instant startedAt) {
-        final var rootResult = root == null ? null : toResult(root);
-        final var status = rootResult == null ? Status.skipped("nothing executed") : rootResult.status();
-        final var quiescent = !incomplete;
-        final int exitCode = exitCodeFor(status, quiescent);
-        final var counters = new int[8];
-        if (rootResult != null) {
-            countStates(root, counters);
-        }
-        final var builder = Result.builder()
-                .runId(runId)
-                .status(status, exitCode, quiescent)
-                .timings(startedAt, Instant.now())
-                .root(rootResult)
-                .failures(List.copyOf(runFailures))
-                .diagnostics(List.copyOf(diagnostics))
-                .configurationSummary(configurationSummary())
-                .shuffleSeed(discoveryShuffleSeed)
-                .counters(
-                        counters[0],
-                        counters[1],
-                        counters[2],
-                        counters[3],
-                        counters[4],
-                        counters[5],
-                        counters[6],
-                        counters[7]);
-        return builder.build();
-    }
-
-    private int exitCodeFor(final Status status, final boolean quiescent) {
-        if (!quiescent) {
-            return 1;
-        }
-        return switch (status.kind()) {
-            case PASSED -> 0;
-            case SKIPPED -> failureOnSkip ? 1 : 0;
-            case ABORTED -> failureOnAbort ? 1 : 0;
-            case FAILED, CANCELED -> 1;
-            case PENDING, RUNNING -> 1;
-        };
-    }
-
-    private Map<String, String> configurationSummary() {
-        final var summary = new LinkedHashMap<String, String>();
-        for (String key : configuration.keySet()) {
-            if (!key.startsWith("paramixel.")) {
-                continue;
-            }
-            configuration.getString(key).ifPresent(value -> summary.put(key, redact(key, value)));
-        }
-        final var poolSummary = new LinkedHashMap<String, String>();
-        for (Map.Entry<String, Integer> entry : plan.poolCapacities().entrySet()) {
-            poolSummary.put(entry.getKey(), Integer.toString(entry.getValue()));
-        }
-        if (!poolSummary.isEmpty()) {
-            summary.put("pools", poolSummary.toString());
-        }
-        return summary;
-    }
-
-    private static String redact(final String key, final String value) {
-        final var lower = key.toLowerCase(java.util.Locale.ROOT);
-        if (lower.contains("secret")
-                || lower.contains("token")
-                || lower.contains("password")
-                || lower.contains("credential")
-                || lower.contains("apikey")
-                || lower.contains("api-key")) {
-            return "***";
-        }
-        return value;
-    }
-
-    /**
-     * Counts logical occurrences once each.
-     *
-     * <p>Counters are computed from the runtime occurrence tree rather than the result tree, because the result tree
-     * intentionally retains every historical attempt. A retried occurrence therefore contributes one occurrence and
-     * one status (its final aggregate), plus one attempt per attempt node; the failed inner steps of an earlier attempt
-     * stay visible as {@code ATTEMPT} nodes but are not counted as separate failed occurrences. Counting this way keeps
-     * the status counters summing to the occurrence count and prevents a successful retry from inflating failure
-     * metrics.
-     */
-    private void countStates(final OccurrenceState state, final int[] counters) {
-        counters[0]++;
-        switch (state.status.kind()) {
-            case PASSED -> counters[2]++;
-            case FAILED -> counters[3]++;
-            case SKIPPED -> counters[4]++;
-            case ABORTED -> counters[5]++;
-            case CANCELED -> counters[6]++;
-            default -> {
-                // in-flight kinds do not occur in a finished result
-            }
-        }
-        if (state.timedOut) {
-            counters[7]++;
-        }
-        counters[1] += state.attemptNodes.size();
-        final var attempt = state.attempt;
-        if (attempt != null) {
-            for (OccurrenceState child : attempt.children) {
-                countStates(child, counters);
-            }
-        }
-    }
-
-    private TaskResult toResult(final OccurrenceState state) {
-        final var attempt = state.attempt;
-        final var builder = TaskResult.builder()
-                .identity(
-                        state.id,
-                        state.compiled.definitionId(),
-                        state.parent == null ? null : state.parent.id,
-                        state.name,
-                        state.path)
-                .tags(state.compiled.task().tags())
-                .attributes(
-                        state.compiled.mode(),
-                        state.compiled.poolName(),
-                        state.compiled.task().exclusiveLock().orElse(null),
-                        state.compiled.shuffleSeed(),
-                        state.compiled.executionOrder())
-                .status(state.status, attempt == null ? null : attempt.bodyStatus)
-                .reason(state.reason)
-                .timedOut(state.timedOut)
-                .timings(
-                        state.queuedAt,
-                        state.admittedAt,
-                        state.startedAt,
-                        state.completedAt,
-                        durationBetween(state.queuedAt, state.admittedAt),
-                        state.admittedNanos == 0
-                                ? null
-                                : durationNanos(state.admittedNanos, state.finalizationStartNanos),
-                        state.finalizationStartNanos == 0 ? null : durationNanos(state.finalizationStartNanos, 0));
-        if (!state.attemptNodes.isEmpty()) {
-            builder.children(state.attemptNodes);
-        } else if (attempt != null) {
-            builder.children(resultsOf(attempt.children));
-        }
-        if (attempt != null) {
-            builder.phases(attempt.phases).failures(attempt.failures);
-        }
-        return builder.build();
-    }
-
-    private TaskResult attemptNode(
-            final OccurrenceState state, final OccurrenceState.Attempt attempt, final Status status) {
-        return TaskResult.builder()
-                .kind(TaskResult.Kind.ATTEMPT)
-                .attemptIndex(attempt.index)
-                .identity(
-                        state.id + "#" + attempt.index,
-                        state.compiled.definitionId(),
-                        state.parent == null ? null : state.parent.id,
-                        state.name,
-                        state.path)
-                .tags(state.compiled.task().tags())
-                .attributes(
-                        state.compiled.mode(),
-                        state.compiled.poolName(),
-                        state.compiled.task().exclusiveLock().orElse(null),
-                        state.compiled.shuffleSeed(),
-                        state.compiled.executionOrder())
-                .status(status, attempt.bodyStatus)
-                .reason(state.attemptCount > attempt.index ? null : state.reason)
-                .timedOut(state.timedOut)
-                .phases(attempt.phases)
-                .children(resultsOf(attempt.children))
-                .failures(attempt.failures)
-                .timings(
-                        state.queuedAt,
-                        state.admittedAt,
-                        attempt.startedAt,
-                        attempt.completedAt,
-                        null,
-                        attempt.startNanos == 0
-                                ? null
-                                : durationNanos(attempt.startNanos, attempt.finalizationStartNanos),
-                        attempt.finalizationStartNanos == 0 ? null : durationNanos(attempt.finalizationStartNanos, 0))
-                .build();
-    }
-
-    private List<TaskResult> resultsOf(final List<OccurrenceState> children) {
-        final var results = new ArrayList<TaskResult>(children.size());
-        for (OccurrenceState child : children) {
-            results.add(toResult(child));
-        }
-        return results;
-    }
-
-    private static Duration durationBetween(final Instant from, final Instant to) {
-        if (from == null || to == null) {
-            return null;
-        }
-        return Duration.between(from, to);
-    }
-
-    private static Duration durationNanos(final long fromNanos, final long toNanosOrZero) {
-        final var end = toNanosOrZero == 0 ? System.nanoTime() : toNanosOrZero;
-        return Duration.ofNanos(Math.max(0, end - fromNanos));
     }
 
     private static long nanosSafely(final Duration duration) {

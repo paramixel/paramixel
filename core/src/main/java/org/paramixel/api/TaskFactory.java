@@ -17,7 +17,7 @@
 package org.paramixel.api;
 
 /**
- * Creates the primary instance owned by a {@code forInstance} task.
+ * Creates the primary instance owned by an {@code instance} task.
  *
  * <p>The factory runs once per execution attempt of the owning occurrence, on an execution worker, only after the
  * occurrence was admitted and its concurrency budgets were acquired. It never runs while a definition is built or

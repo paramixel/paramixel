@@ -28,7 +28,7 @@ import java.util.function.Predicate;
  *
  * <pre>{@code
  * Task definition = parallel("Environments", Pool.named("environments"))
- *         .each(environments, environment -> forInstance(environment.name(), () -> new Scenario(environment))
+ *         .each(environments, environment -> instance(environment.name(), () -> new Scenario(environment))
  *                 .before(Scenario::start)
  *                 .step("Verify", Scenario::verify)
  *                 .after(Scenario::stop))
@@ -43,6 +43,10 @@ public final class Tasks {
 
     /**
      * Starts the default sequential container.
+     *
+     * <p>This is a deliberate alias of {@link #sequential(String)} with identical behavior. Use {@code task} for a
+     * root or a plain named node, and {@code sequential} where the contrast with {@link #parallel(String, Pool)} should
+     * be explicit.
      *
      * @param name the task name; must not be blank
      * @return a sequential builder with no instance binding; never {@code null}
@@ -82,7 +86,7 @@ public final class Tasks {
      * Starts a task that owns one lazily created primary instance per execution attempt.
      *
      * <p>{@code T} is inferred from the supplier, so lifecycle callbacks and steps bind to the instance without a class
-     * token: {@code forInstance("scenario", () -> new Scenario(environment)).before(Scenario::start)}. The supplier
+     * token: {@code instance("scenario", () -> new Scenario(environment)).before(Scenario::start)}. The supplier
      * runs once per attempt of this occurrence, on an execution worker, after admission.
      *
      * @param <T> the instance type
@@ -92,7 +96,7 @@ public final class Tasks {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public static <T> SequentialBuilder<T> forInstance(final String name, final ThrowingSupplier<? extends T> factory) {
+    public static <T> SequentialBuilder<T> instance(final String name, final ThrowingSupplier<? extends T> factory) {
         Objects.requireNonNull(factory, "factory is null");
         final var builder = new SequentialBuilder<T>(name);
         builder.setInstanceFactory(factory::get);

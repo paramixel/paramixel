@@ -17,6 +17,7 @@
 package org.paramixel.api.exception;
 
 import java.util.Objects;
+import org.paramixel.api.Key;
 
 /**
  * Thrown when a keyed resource is not available to the requesting occurrence.
@@ -29,7 +30,7 @@ public final class ResourceException extends ParamixelException {
     private static final long serialVersionUID = 1L;
 
     /** The key that was requested. */
-    private final transient org.paramixel.api.Key<?> key;
+    private final transient Key<?> key;
 
     /** The occurrence path that requested the resource. */
     private final String path;
@@ -41,7 +42,7 @@ public final class ResourceException extends ParamixelException {
      * @param path the occurrence path that requested the resource; must not be {@code null}
      * @param message the description; must not be {@code null}
      */
-    public ResourceException(final org.paramixel.api.Key<?> key, final String path, final String message) {
+    public ResourceException(final Key<?> key, final String path, final String message) {
         super(message);
         this.key = Objects.requireNonNull(key, "key is null");
         this.path = Objects.requireNonNull(path, "path is null");
@@ -52,7 +53,7 @@ public final class ResourceException extends ParamixelException {
      *
      * @return the key; never {@code null}
      */
-    public org.paramixel.api.Key<?> key() {
+    public Key<?> key() {
         return key;
     }
 

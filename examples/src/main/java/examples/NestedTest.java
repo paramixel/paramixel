@@ -17,7 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 
 import java.util.ArrayList;
@@ -26,6 +26,8 @@ import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
+import org.paramixel.api.Tasks;
+import org.paramixel.api.ThrowingSupplier;
 
 /**
  * Demonstrates the same lifecycle nested inside two independent branches of one parallel group.
@@ -63,9 +65,16 @@ public class NestedTest {
     /**
      * The shared lifecycle shape used by both nested branches.
      */
-    public abstract static class Lifecycle {
+    public static class Lifecycle {
 
         private final List<String> callOrder = new ArrayList<>();
+
+        /**
+         * Creates the lifecycle base; only the nested branches extend it.
+         */
+        protected Lifecycle() {
+            // Intentionally empty
+        }
 
         /**
          * Clears the call order.
@@ -144,10 +153,9 @@ public class NestedTest {
          * @param factory the instance factory
          * @return the definition
          */
-        protected static <S extends Lifecycle> Task definition(
-                final String name, final org.paramixel.api.ThrowingSupplier<S> factory) {
-            return org.paramixel.api.Tasks.sequential(name)
-                    .child(forInstance(name, factory)
+        protected static <S extends Lifecycle> Task definition(final String name, final ThrowingSupplier<S> factory) {
+            return Tasks.sequential(name)
+                    .child(instance(name, factory)
                             .before(Lifecycle::setUp)
                             .step(
                                     "testOne",
@@ -208,8 +216,7 @@ public class NestedTest {
         }
     }
 
-    private static <S extends Lifecycle> Task sequentialBranch(
-            final String name, final org.paramixel.api.ThrowingSupplier<S> factory) {
+    private static <S extends Lifecycle> Task sequentialBranch(final String name, final ThrowingSupplier<S> factory) {
         return Lifecycle.definition(name, factory);
     }
 }

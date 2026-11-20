@@ -12,7 +12,7 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
 **Highlights**
 
 - `Task` / `TaskBuilder` / `Tasks` replace `Action`, `ActionBuilder`, and the per-shape classes.
-- `forInstance(name, supplier)` owns a lazily created instance per attempt with `before` / `after` lifecycle.
+- `instance(name, supplier)` owns a lazily created instance per attempt with `before` / `after` lifecycle.
 - `parallel(name, Pool.named("..."))` replaces raw string pool identifiers; `Pool` is a value object.
 - `sequential` / `parallel` describe concurrency; `dependent()` / `independent()` describe only failure continuation and
   exist on sequential builders only.

@@ -20,7 +20,7 @@ Each step is a child task. A failing step skips the rest with an explicit reason
 ## Fixture with setup and teardown
 
 ```java
-Task definition = forInstance("database workflow", () -> new DatabaseWorkflow(dsn))
+Task definition = instance("database workflow", () -> new DatabaseWorkflow(dsn))
         .before(DatabaseWorkflow::migrate)
         .step("insert", DatabaseWorkflow::insert)
         .step("query", DatabaseWorkflow::query)
@@ -34,7 +34,7 @@ The fixture is created lazily per attempt, `after` runs even when a step fails, 
 
 ```java
 Task definition = parallel("compatibility matrix", Pool.named("environments"))
-        .each(environments, env -> forInstance(env.name(), () -> new Probe(env))
+        .each(environments, env -> instance(env.name(), () -> new Probe(env))
                 .before(Probe::start)
                 .step("verify", Probe::verify)
                 .after(Probe::stop))

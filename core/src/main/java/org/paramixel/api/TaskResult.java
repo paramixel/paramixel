@@ -16,6 +16,13 @@
 
 package org.paramixel.api;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
 /**
  * An immutable snapshot of one executed occurrence in a run's result tree.
  *
@@ -49,55 +56,55 @@ public final class TaskResult {
     private final String parentOccurrenceId;
     private final String name;
     private final String path;
-    private final java.util.List<String> tags;
+    private final List<String> tags;
     private final ExecutionMode mode;
     private final String poolName;
     private final String exclusiveLock;
     private final Long shuffleSeed;
-    private final java.util.List<String> executionOrder;
+    private final List<String> executionOrder;
     private final Status status;
     private final Status bodyStatus;
-    private final java.util.List<PhaseResult> phases;
-    private final java.util.List<TaskResult> children;
-    private final java.util.List<Failure> failures;
+    private final List<PhaseResult> phases;
+    private final List<TaskResult> children;
+    private final List<Failure> failures;
     private final String reason;
     private final int attemptIndex;
-    private final java.time.Instant queuedAt;
-    private final java.time.Instant admittedAt;
-    private final java.time.Instant startedAt;
-    private final java.time.Instant completedAt;
-    private final java.time.Duration waitDuration;
-    private final java.time.Duration executionDuration;
-    private final java.time.Duration finalizationDuration;
+    private final Instant queuedAt;
+    private final Instant admittedAt;
+    private final Instant startedAt;
+    private final Instant completedAt;
+    private final Duration waitDuration;
+    private final Duration executionDuration;
+    private final Duration finalizationDuration;
     private final boolean timedOut;
 
     private TaskResult(final Builder builder) {
         this.kind = builder.kind;
-        this.occurrenceId = builder.occurrenceId;
-        this.definitionId = builder.definitionId;
-        this.parentOccurrenceId = builder.parentOccurrenceId;
-        this.name = builder.name;
-        this.path = builder.path;
-        this.tags = java.util.List.copyOf(builder.tags);
-        this.mode = builder.mode;
-        this.poolName = builder.poolName;
-        this.exclusiveLock = builder.exclusiveLock;
-        this.shuffleSeed = builder.shuffleSeed;
-        this.executionOrder = java.util.List.copyOf(builder.executionOrder);
+        this.occurrenceId = builder.identity.occurrenceId();
+        this.definitionId = builder.identity.definitionId();
+        this.parentOccurrenceId = builder.identity.parentOccurrenceId();
+        this.name = builder.identity.name();
+        this.path = builder.identity.path();
+        this.tags = List.copyOf(builder.tags);
+        this.mode = builder.attributes.mode();
+        this.poolName = builder.attributes.poolName();
+        this.exclusiveLock = builder.attributes.exclusiveLock();
+        this.shuffleSeed = builder.attributes.shuffleSeed();
+        this.executionOrder = List.copyOf(builder.attributes.executionOrder());
         this.status = builder.status;
         this.bodyStatus = builder.bodyStatus;
-        this.phases = java.util.List.copyOf(builder.phases);
-        this.children = java.util.List.copyOf(builder.children);
-        this.failures = java.util.List.copyOf(builder.failures);
+        this.phases = List.copyOf(builder.phases);
+        this.children = List.copyOf(builder.children);
+        this.failures = List.copyOf(builder.failures);
         this.reason = builder.reason;
         this.attemptIndex = builder.attemptIndex;
-        this.queuedAt = builder.queuedAt;
-        this.admittedAt = builder.admittedAt;
-        this.startedAt = builder.startedAt;
-        this.completedAt = builder.completedAt;
-        this.waitDuration = builder.waitDuration;
-        this.executionDuration = builder.executionDuration;
-        this.finalizationDuration = builder.finalizationDuration;
+        this.queuedAt = builder.timings.queuedAt();
+        this.admittedAt = builder.timings.admittedAt();
+        this.startedAt = builder.timings.startedAt();
+        this.completedAt = builder.timings.completedAt();
+        this.waitDuration = builder.timings.waitDuration();
+        this.executionDuration = builder.timings.executionDuration();
+        this.finalizationDuration = builder.timings.finalizationDuration();
         this.timedOut = builder.timedOut;
     }
 
@@ -142,8 +149,8 @@ public final class TaskResult {
      *
      * @return the parent identifier, or an empty optional for the root
      */
-    public java.util.Optional<String> parentOccurrenceId() {
-        return java.util.Optional.ofNullable(parentOccurrenceId);
+    public Optional<String> parentOccurrenceId() {
+        return Optional.ofNullable(parentOccurrenceId);
     }
 
     /**
@@ -173,7 +180,7 @@ public final class TaskResult {
      *
      * @return the immutable tags; never {@code null}
      */
-    public java.util.List<String> tags() {
+    public List<String> tags() {
         return tags;
     }
 
@@ -191,8 +198,8 @@ public final class TaskResult {
      *
      * @return the pool name, or an empty optional
      */
-    public java.util.Optional<String> poolName() {
-        return java.util.Optional.ofNullable(poolName);
+    public Optional<String> poolName() {
+        return Optional.ofNullable(poolName);
     }
 
     /**
@@ -200,8 +207,8 @@ public final class TaskResult {
      *
      * @return the lock name, or an empty optional
      */
-    public java.util.Optional<String> exclusiveLock() {
-        return java.util.Optional.ofNullable(exclusiveLock);
+    public Optional<String> exclusiveLock() {
+        return Optional.ofNullable(exclusiveLock);
     }
 
     /**
@@ -209,8 +216,8 @@ public final class TaskResult {
      *
      * @return the seed, or an empty optional when the children were not shuffled
      */
-    public java.util.Optional<Long> shuffleSeed() {
-        return java.util.Optional.ofNullable(shuffleSeed);
+    public Optional<Long> shuffleSeed() {
+        return Optional.ofNullable(shuffleSeed);
     }
 
     /**
@@ -218,7 +225,7 @@ public final class TaskResult {
      *
      * @return the immutable ordered names; never {@code null}
      */
-    public java.util.List<String> executionOrder() {
+    public List<String> executionOrder() {
         return executionOrder;
     }
 
@@ -236,8 +243,8 @@ public final class TaskResult {
      *
      * @return the body status, or an empty optional when the task has no body or never ran it
      */
-    public java.util.Optional<Status> bodyStatus() {
-        return java.util.Optional.ofNullable(bodyStatus);
+    public Optional<Status> bodyStatus() {
+        return Optional.ofNullable(bodyStatus);
     }
 
     /**
@@ -245,7 +252,7 @@ public final class TaskResult {
      *
      * @return the immutable phase results; never {@code null}
      */
-    public java.util.List<PhaseResult> phases() {
+    public List<PhaseResult> phases() {
         return phases;
     }
 
@@ -256,7 +263,7 @@ public final class TaskResult {
      *
      * @return the immutable children; never {@code null}
      */
-    public java.util.List<TaskResult> children() {
+    public List<TaskResult> children() {
         return children;
     }
 
@@ -265,7 +272,7 @@ public final class TaskResult {
      *
      * @return the immutable failures; never {@code null}
      */
-    public java.util.List<Failure> failures() {
+    public List<Failure> failures() {
         return failures;
     }
 
@@ -274,8 +281,8 @@ public final class TaskResult {
      *
      * @return the reason, or an empty optional
      */
-    public java.util.Optional<String> reason() {
-        return java.util.Optional.ofNullable(reason);
+    public Optional<String> reason() {
+        return Optional.ofNullable(reason);
     }
 
     /**
@@ -292,8 +299,8 @@ public final class TaskResult {
      *
      * @return the instant, or an empty optional
      */
-    public java.util.Optional<java.time.Instant> queuedAt() {
-        return java.util.Optional.ofNullable(queuedAt);
+    public Optional<Instant> queuedAt() {
+        return Optional.ofNullable(queuedAt);
     }
 
     /**
@@ -301,8 +308,8 @@ public final class TaskResult {
      *
      * @return the instant, or an empty optional
      */
-    public java.util.Optional<java.time.Instant> admittedAt() {
-        return java.util.Optional.ofNullable(admittedAt);
+    public Optional<Instant> admittedAt() {
+        return Optional.ofNullable(admittedAt);
     }
 
     /**
@@ -310,8 +317,8 @@ public final class TaskResult {
      *
      * @return the instant, or an empty optional
      */
-    public java.util.Optional<java.time.Instant> startedAt() {
-        return java.util.Optional.ofNullable(startedAt);
+    public Optional<Instant> startedAt() {
+        return Optional.ofNullable(startedAt);
     }
 
     /**
@@ -319,8 +326,8 @@ public final class TaskResult {
      *
      * @return the instant, or an empty optional
      */
-    public java.util.Optional<java.time.Instant> completedAt() {
-        return java.util.Optional.ofNullable(completedAt);
+    public Optional<Instant> completedAt() {
+        return Optional.ofNullable(completedAt);
     }
 
     /**
@@ -328,8 +335,8 @@ public final class TaskResult {
      *
      * @return the wait, or an empty optional
      */
-    public java.util.Optional<java.time.Duration> waitDuration() {
-        return java.util.Optional.ofNullable(waitDuration);
+    public Optional<Duration> waitDuration() {
+        return Optional.ofNullable(waitDuration);
     }
 
     /**
@@ -337,8 +344,8 @@ public final class TaskResult {
      *
      * @return the duration, or an empty optional
      */
-    public java.util.Optional<java.time.Duration> executionDuration() {
-        return java.util.Optional.ofNullable(executionDuration);
+    public Optional<Duration> executionDuration() {
+        return Optional.ofNullable(executionDuration);
     }
 
     /**
@@ -346,8 +353,8 @@ public final class TaskResult {
      *
      * @return the duration, or an empty optional
      */
-    public java.util.Optional<java.time.Duration> finalizationDuration() {
-        return java.util.Optional.ofNullable(finalizationDuration);
+    public Optional<Duration> finalizationDuration() {
+        return Optional.ofNullable(finalizationDuration);
     }
 
     /**
@@ -373,6 +380,24 @@ public final class TaskResult {
         return kind + "[" + occurrenceId + " " + path + " " + status + "]";
     }
 
+    /** The identity values a {@link Builder} collects through {@link Builder#identity}. */
+    private record Identity(
+            String occurrenceId, String definitionId, String parentOccurrenceId, String name, String path) {}
+
+    /** The scheduling attributes a {@link Builder} collects through {@link Builder#attributes}. */
+    private record Attributes(
+            ExecutionMode mode, String poolName, String exclusiveLock, Long shuffleSeed, List<String> executionOrder) {}
+
+    /** The timing values a {@link Builder} collects through {@link Builder#timings}. */
+    private record Timings(
+            Instant queuedAt,
+            Instant admittedAt,
+            Instant startedAt,
+            Instant completedAt,
+            Duration waitDuration,
+            Duration executionDuration,
+            Duration finalizationDuration) {}
+
     /**
      * Builds immutable {@link TaskResult} instances.
      *
@@ -382,31 +407,17 @@ public final class TaskResult {
     public static final class Builder {
 
         private Kind kind = Kind.TASK;
-        private String occurrenceId;
-        private String definitionId;
-        private String parentOccurrenceId;
-        private String name;
-        private String path;
-        private java.util.List<String> tags = new java.util.ArrayList<>();
-        private ExecutionMode mode = ExecutionMode.SEQUENTIAL;
-        private String poolName;
-        private String exclusiveLock;
-        private Long shuffleSeed;
-        private java.util.List<String> executionOrder = new java.util.ArrayList<>();
+        private Identity identity = new Identity(null, null, null, null, null);
+        private List<String> tags = new ArrayList<>();
+        private Attributes attributes = new Attributes(ExecutionMode.SEQUENTIAL, null, null, null, List.of());
         private Status status = Status.PENDING;
         private Status bodyStatus;
-        private java.util.List<PhaseResult> phases = new java.util.ArrayList<>();
-        private java.util.List<TaskResult> children = new java.util.ArrayList<>();
-        private java.util.List<Failure> failures = new java.util.ArrayList<>();
+        private List<PhaseResult> phases = new ArrayList<>();
+        private List<TaskResult> children = new ArrayList<>();
+        private List<Failure> failures = new ArrayList<>();
         private String reason;
         private int attemptIndex;
-        private java.time.Instant queuedAt;
-        private java.time.Instant admittedAt;
-        private java.time.Instant startedAt;
-        private java.time.Instant completedAt;
-        private java.time.Duration waitDuration;
-        private java.time.Duration executionDuration;
-        private java.time.Duration finalizationDuration;
+        private Timings timings = new Timings(null, null, null, null, null, null, null);
         private boolean timedOut;
 
         private Builder() {
@@ -420,7 +431,7 @@ public final class TaskResult {
          * @return this builder
          */
         public Builder kind(final Kind kind) {
-            this.kind = java.util.Objects.requireNonNull(kind, "kind is null");
+            this.kind = Objects.requireNonNull(kind, "kind is null");
             return this;
         }
 
@@ -440,11 +451,7 @@ public final class TaskResult {
                 final String parentOccurrenceId,
                 final String name,
                 final String path) {
-            this.occurrenceId = occurrenceId;
-            this.definitionId = definitionId;
-            this.parentOccurrenceId = parentOccurrenceId;
-            this.name = name;
-            this.path = path;
+            this.identity = new Identity(occurrenceId, definitionId, parentOccurrenceId, name, path);
             return this;
         }
 
@@ -454,8 +461,8 @@ public final class TaskResult {
          * @param values the tags; must not be {@code null}
          * @return this builder
          */
-        public Builder tags(final java.util.List<String> values) {
-            this.tags = new java.util.ArrayList<>(values);
+        public Builder tags(final List<String> values) {
+            this.tags = new ArrayList<>(values);
             return this;
         }
 
@@ -474,12 +481,9 @@ public final class TaskResult {
                 final String poolName,
                 final String exclusiveLock,
                 final Long shuffleSeed,
-                final java.util.List<String> executionOrder) {
-            this.mode = mode;
-            this.poolName = poolName;
-            this.exclusiveLock = exclusiveLock;
-            this.shuffleSeed = shuffleSeed;
-            this.executionOrder = new java.util.ArrayList<>(executionOrder);
+                final List<String> executionOrder) {
+            this.attributes =
+                    new Attributes(mode, poolName, exclusiveLock, shuffleSeed, new ArrayList<>(executionOrder));
             return this;
         }
 
@@ -502,8 +506,8 @@ public final class TaskResult {
          * @param values the phase results; must not be {@code null}
          * @return this builder
          */
-        public Builder phases(final java.util.List<PhaseResult> values) {
-            this.phases = new java.util.ArrayList<>(values);
+        public Builder phases(final List<PhaseResult> values) {
+            this.phases = new ArrayList<>(values);
             return this;
         }
 
@@ -513,8 +517,8 @@ public final class TaskResult {
          * @param values the child results; must not be {@code null}
          * @return this builder
          */
-        public Builder children(final java.util.List<TaskResult> values) {
-            this.children = new java.util.ArrayList<>(values);
+        public Builder children(final List<TaskResult> values) {
+            this.children = new ArrayList<>(values);
             return this;
         }
 
@@ -524,8 +528,8 @@ public final class TaskResult {
          * @param values the failures; must not be {@code null}
          * @return this builder
          */
-        public Builder failures(final java.util.List<Failure> values) {
-            this.failures = new java.util.ArrayList<>(values);
+        public Builder failures(final List<Failure> values) {
+            this.failures = new ArrayList<>(values);
             return this;
         }
 
@@ -564,20 +568,21 @@ public final class TaskResult {
          * @return this builder
          */
         public Builder timings(
-                final java.time.Instant queuedAt,
-                final java.time.Instant admittedAt,
-                final java.time.Instant startedAt,
-                final java.time.Instant completedAt,
-                final java.time.Duration waitDuration,
-                final java.time.Duration executionDuration,
-                final java.time.Duration finalizationDuration) {
-            this.queuedAt = queuedAt;
-            this.admittedAt = admittedAt;
-            this.startedAt = startedAt;
-            this.completedAt = completedAt;
-            this.waitDuration = waitDuration;
-            this.executionDuration = executionDuration;
-            this.finalizationDuration = finalizationDuration;
+                final Instant queuedAt,
+                final Instant admittedAt,
+                final Instant startedAt,
+                final Instant completedAt,
+                final Duration waitDuration,
+                final Duration executionDuration,
+                final Duration finalizationDuration) {
+            this.timings = new Timings(
+                    queuedAt,
+                    admittedAt,
+                    startedAt,
+                    completedAt,
+                    waitDuration,
+                    executionDuration,
+                    finalizationDuration);
             return this;
         }
 
@@ -599,12 +604,12 @@ public final class TaskResult {
          * @throws NullPointerException if a required field is missing
          */
         public TaskResult build() {
-            java.util.Objects.requireNonNull(occurrenceId, "occurrenceId is null");
-            java.util.Objects.requireNonNull(definitionId, "definitionId is null");
-            java.util.Objects.requireNonNull(name, "name is null");
-            java.util.Objects.requireNonNull(path, "path is null");
-            java.util.Objects.requireNonNull(status, "status is null");
-            java.util.Objects.requireNonNull(mode, "mode is null");
+            Objects.requireNonNull(identity.occurrenceId(), "occurrenceId is null");
+            Objects.requireNonNull(identity.definitionId(), "definitionId is null");
+            Objects.requireNonNull(identity.name(), "name is null");
+            Objects.requireNonNull(identity.path(), "path is null");
+            Objects.requireNonNull(status, "status is null");
+            Objects.requireNonNull(attributes.mode(), "mode is null");
             return new TaskResult(this);
         }
     }

@@ -64,16 +64,16 @@ public final class ElapsedTimeFormatter {
         Arguments.requireFalse(milliseconds < 0, "milliseconds is negative");
 
         var result = new StringBuilder();
-        boolean hasPrevious = false;
+        var hasPrevious = false;
 
-        long hours = milliseconds / 3_600_000;
+        final var hours = milliseconds / 3_600_000;
         if (hours > 0) {
             result.append(hours).append(" h");
             hasPrevious = true;
         }
         milliseconds %= 3_600_000;
 
-        long minutes = milliseconds / 60_000;
+        final var minutes = milliseconds / 60_000;
         if (minutes > 0 || hours > 0) {
             if (hasPrevious) {
                 result.append(' ');
@@ -83,7 +83,7 @@ public final class ElapsedTimeFormatter {
         }
         milliseconds %= 60_000;
 
-        long seconds = milliseconds / 1_000;
+        final var seconds = milliseconds / 1_000;
         if (seconds > 0 || minutes > 0 || hours > 0) {
             if (hasPrevious) {
                 result.append(' ');

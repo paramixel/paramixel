@@ -18,6 +18,7 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -49,7 +50,7 @@ class CompileProofTest {
         Files.createDirectories(output);
         final var apiLocation =
                 Task.class.getProtectionDomain().getCodeSource().getLocation().getPath();
-        final var classpath = apiLocation + java.io.File.pathSeparator + System.getProperty("java.class.path");
+        final var classpath = apiLocation + File.pathSeparator + System.getProperty("java.class.path");
         final var windows =
                 System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
         final var javac = Path.of(System.getProperty("java.home"), "bin", windows ? "javac.exe" : "javac");
@@ -120,7 +121,7 @@ class CompileProofTest {
                         return parallel("BasicStyleTest", Pool.named("environments"))
                                 .each(
                                         List.of(new Environment("plain"), new Environment("tls")),
-                                        environment -> forInstance(environment.name(), () -> new BasicStyleTest(environment))
+                                        environment -> instance(environment.name(), () -> new BasicStyleTest(environment))
                                                 .before(BasicStyleTest::setUp)
                                                 .sequential("tests", tests -> tests
                                                         .step("testHealthy()", BasicStyleTest::testHealthy)
@@ -177,7 +178,7 @@ class CompileProofTest {
                         return parallel("Kafka compatibility", Pool.named("environments"))
                                 .each(
                                         List.of(new Environment("kafka-1"), new Environment("kafka-2")),
-                                        env -> forInstance(env.name(), () -> new KafkaStyleTest(env))
+                                        env -> instance(env.name(), () -> new KafkaStyleTest(env))
                                                 .before(KafkaStyleTest::setUp)
                                                 .sequential("tests", tests -> tests
                                                         .step("produce()", KafkaStyleTest::produce)
@@ -220,13 +221,13 @@ class CompileProofTest {
                                 .step("Validate configuration", () -> {})
                                 .each(
                                         List.of(new One(), new Two()),
-                                        fixture -> forInstance(fixture.getClass().getSimpleName(), () -> fixture)
+                                        fixture -> instance(fixture.getClass().getSimpleName(), () -> fixture)
                                                 .before(Fixture::verify)
                                                 .step("Verify", Fixture::verify)
                                                 .after(Fixture::verify))
                                 .child(task("Group").step("Ping", () -> {}))
                                 .parallel("Matrix", Pool.named("environments"), matrix -> matrix
-                                        .each(List.of("a", "b"), name -> forInstance(name, () -> new One())
+                                        .each(List.of("a", "b"), name -> instance(name, () -> new One())
                                                 .step("Consume", One::verify, children -> children
                                                         .parallel("Record checks", Pool.named("checks"), checks -> checks
                                                                 .step("Verify payload", One::verify)
@@ -270,7 +271,7 @@ class CompileProofTest {
     @DisplayName("API-08: an incompatible method reference is rejected")
     void incompatibleMethodReferenceDoesNotCompile() throws IOException {
         assertDoesNotCompile("IncompatibleReference", """
-                import static org.paramixel.api.Tasks.forInstance;
+                import static org.paramixel.api.Tasks.instance;
 
                 public final class IncompatibleReference {
 
@@ -279,7 +280,7 @@ class CompileProofTest {
                     static final class Other { void run() {} }
 
                     public static void definition() {
-                        forInstance("x", Fixture::new).step("run", Other::run);
+                        instance("x", Fixture::new).step("run", Other::run);
                     }
                 }
                 """);

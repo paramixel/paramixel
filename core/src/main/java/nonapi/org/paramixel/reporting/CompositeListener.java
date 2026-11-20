@@ -19,8 +19,11 @@ package nonapi.org.paramixel.reporting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
+import org.paramixel.api.Result;
+import org.paramixel.api.Task;
 import org.paramixel.api.TaskEvent;
 
 /**
@@ -52,7 +55,7 @@ final class CompositeListener implements Listener {
     }
 
     @Override
-    public void onDiscoveryCompleted(final java.util.Optional<org.paramixel.api.Task> root) {
+    public void onDiscoveryCompleted(final Optional<Task> root) {
         for (Listener listener : listeners) {
             listener.onDiscoveryCompleted(root);
         }
@@ -73,7 +76,7 @@ final class CompositeListener implements Listener {
     }
 
     @Override
-    public void onRunCompleted(final org.paramixel.api.Result result) {
+    public void onRunCompleted(final Result result) {
         final var failures = new ArrayList<Throwable>();
         for (Listener listener : listeners) {
             try {

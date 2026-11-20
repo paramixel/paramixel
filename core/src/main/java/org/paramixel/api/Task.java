@@ -61,44 +61,75 @@ public final class Task {
     private final String exclusiveLock;
     private final List<ResourceDeclaration> resources;
 
-    Task(
-            final String name,
-            final ExecutionMode mode,
-            final Pool pool,
-            final boolean dependent,
-            final List<Task> children,
-            final List<TaskCallback> before,
-            final List<TaskCallback> after,
-            final TaskCallback body,
-            final TaskFactory instanceFactory,
-            final boolean requiresPrimaryInstance,
-            final List<String> tags,
-            final Long shuffleSeed,
-            final Predicate<Context> condition,
-            final Duration timeout,
-            final RetryPolicy retry,
-            final RepeatPolicy repeat,
-            final String exclusiveLock,
-            final List<ResourceDeclaration> resources) {
-        this.name = name;
-        this.mode = mode;
-        this.pool = pool;
-        this.dependent = dependent;
-        this.children = List.copyOf(children);
-        this.before = List.copyOf(before);
-        this.after = List.copyOf(after);
-        this.body = body;
-        this.instanceFactory = instanceFactory;
-        this.requiresPrimaryInstance = requiresPrimaryInstance;
-        this.tags = List.copyOf(tags);
-        this.shuffleSeed = shuffleSeed;
-        this.condition = condition;
-        this.timeout = timeout;
-        this.retry = retry;
-        this.repeat = repeat;
-        this.exclusiveLock = exclusiveLock;
-        this.resources = List.copyOf(resources);
+    Task(final Structure structure, final Lifecycle lifecycle, final Policies policies) {
+        this.name = structure.name();
+        this.mode = structure.mode();
+        this.pool = structure.pool();
+        this.dependent = structure.dependent();
+        this.children = List.copyOf(structure.children());
+        this.before = List.copyOf(lifecycle.before());
+        this.after = List.copyOf(lifecycle.after());
+        this.body = lifecycle.body();
+        this.instanceFactory = lifecycle.instanceFactory();
+        this.requiresPrimaryInstance = lifecycle.requiresPrimaryInstance();
+        this.resources = List.copyOf(lifecycle.resources());
+        this.tags = List.copyOf(policies.tags());
+        this.shuffleSeed = policies.shuffleSeed();
+        this.condition = policies.condition();
+        this.timeout = policies.timeout();
+        this.retry = policies.retry();
+        this.repeat = policies.repeat();
+        this.exclusiveLock = policies.exclusiveLock();
     }
+
+    /**
+     * The structural part of a definition, handed from {@link TaskBuilder#build()} to the constructor.
+     *
+     * @param name the display name
+     * @param mode the child execution mode
+     * @param pool the pool of a parallel task, or {@code null}
+     * @param dependent whether a non-passing child stops later siblings
+     * @param children the ordered children; copied by the constructor
+     */
+    record Structure(String name, ExecutionMode mode, Pool pool, boolean dependent, List<Task> children) {}
+
+    /**
+     * The lifecycle part of a definition, handed from {@link TaskBuilder#build()} to the constructor.
+     *
+     * @param before the before callbacks; copied by the constructor
+     * @param after the after callbacks; copied by the constructor
+     * @param body the body, or {@code null}
+     * @param instanceFactory the primary instance factory, or {@code null}
+     * @param requiresPrimaryInstance whether typed callbacks need an inherited instance
+     * @param resources the resource declarations; copied by the constructor
+     */
+    record Lifecycle(
+            List<TaskCallback> before,
+            List<TaskCallback> after,
+            TaskCallback body,
+            TaskFactory instanceFactory,
+            boolean requiresPrimaryInstance,
+            List<ResourceDeclaration> resources) {}
+
+    /**
+     * The execution policies of a definition, handed from {@link TaskBuilder#build()} to the constructor.
+     *
+     * @param tags the tags; copied by the constructor
+     * @param shuffleSeed the effective shuffle seed, or {@code null}
+     * @param condition the condition, or {@code null}
+     * @param timeout the timeout, or {@code null}
+     * @param retry the retry policy, or {@code null}
+     * @param repeat the repeat policy, or {@code null}
+     * @param exclusiveLock the exclusive lock name, or {@code null}
+     */
+    record Policies(
+            List<String> tags,
+            Long shuffleSeed,
+            Predicate<Context> condition,
+            Duration timeout,
+            RetryPolicy retry,
+            RepeatPolicy repeat,
+            String exclusiveLock) {}
 
     /**
      * Returns the display name.
@@ -275,7 +306,11 @@ public final class Task {
     }
 
     /**
-     * Returns whether this task is a pure no-op: no body, no children, no lifecycle, and no execution metadata.
+     * Returns whether this task is a pure no-op that runs no user code: no body, no children, no {@code before} or
+     * {@code after} callbacks, no instance or resource factory, no condition, and no repeat policy.
+     *
+     * <p>Execution metadata such as a timeout, retry policy, exclusive lock, pool, tags, or shuffle seed does not count
+     * as work: it only governs how work runs, so a task that declares nothing else is still empty.
      *
      * <p>An empty named task is allowed and passes when admitted; optional strict diagnostics may warn about it.
      *

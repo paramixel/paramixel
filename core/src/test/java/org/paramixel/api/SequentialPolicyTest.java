@@ -22,6 +22,7 @@ import static org.paramixel.api.Tasks.task;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -200,7 +201,7 @@ class SequentialPolicyTest {
 
         final var permissive = Runner.builder()
                 .listener(Listener.NOOP)
-                .configuration(Configuration.of(java.util.Map.of(
+                .configuration(Configuration.of(Map.of(
                         Configuration.FAILURE_ON_SKIP, "false",
                         Configuration.FAILURE_ON_ABORT, "false")))
                 .build()

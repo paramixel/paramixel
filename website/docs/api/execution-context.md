@@ -29,7 +29,11 @@ lexical primary instance, and keyed resources; it never exposes mutable executio
 ## Primary instances
 
 Typed callbacks receive the instance directly. `primaryInstance()` exists for framework adapters and advanced code; a
-nested `forInstance` establishes its own binding and does not make the outer instance appear here.
+nested `instance` establishes its own binding and does not make the outer instance appear here.
+
+An `instance` task creates its instance after its own resources. A resource factory declared on that same task therefore
+cannot read the instance: `primaryInstance()` throws `IllegalStateException` there instead of returning an outer
+instance.
 
 ## Keyed resources
 

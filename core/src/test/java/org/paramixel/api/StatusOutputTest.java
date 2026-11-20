@@ -25,11 +25,14 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import nonapi.org.paramixel.reporting.DefaultListeners;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.exception.AbortException;
 import org.paramixel.api.exception.SkipException;
+import org.paramixel.api.support.RetryPolicy;
 
 /**
  * Console status-line format: short padded labels, no indentation, and elapsed time.
@@ -43,8 +46,8 @@ class StatusOutputTest {
 
     private List<String> run(final Task definition) {
         final var buffer = new ByteArrayOutputStream();
-        final var listener = nonapi.org.paramixel.reporting.DefaultListeners.create(
-                Configuration.of(Map.of(Configuration.ANSI, "false")), new PrintStream(buffer));
+        final var listener =
+                DefaultListeners.create(Configuration.of(Map.of(Configuration.ANSI, "false")), new PrintStream(buffer));
         Runner.builder().listener(listener).pool(Pool.named("p"), 4).build().run(definition);
         return buffer.toString(StandardCharsets.UTF_8).lines().toList();
     }
@@ -141,10 +144,10 @@ class StatusOutputTest {
     @Test
     @DisplayName("console summary shows final outcomes only and notes attempt history")
     void consoleSummaryHidesSupersededAttempts() {
-        final var attempts = new java.util.concurrent.atomic.AtomicInteger();
+        final var attempts = new AtomicInteger();
         final var definition = task("root")
-                .child(org.paramixel.api.Tasks.sequential("retried")
-                        .retry(org.paramixel.api.support.RetryPolicy.attempts(3))
+                .child(Tasks.sequential("retried")
+                        .retry(RetryPolicy.attempts(3))
                         .step("probe", () -> {
                             if (attempts.incrementAndGet() < 3) {
                                 throw new IllegalStateException("not yet");

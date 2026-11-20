@@ -26,7 +26,11 @@ report-file writer when `paramixel.report.file` is set.
 - The queue is bounded (`paramixel.listener.queue.capacity`, default 8192). A full queue applies backpressure instead of
   dropping events.
 - An exception thrown by a listener is isolated and recorded as a run diagnostic; it never changes a task's status.
-- `onRunCompleted` runs after all task events are drained, so reporting cannot race finalization.
+- `onRunCompleted` runs after all task events are drained, so reporting cannot race finalization. The drain is bounded
+  (`paramixel.listener.drainTimeoutMillis`, default 30000): if a listener does not drain in time, the remaining events
+  are discarded and a `LISTENER_DRAIN_TIMEOUT` run diagnostic is recorded.
+- The `Result` passed to `onRunCompleted` already carries the run's diagnostics, including infrastructure diagnostics
+  such as `NON_QUIESCENT`, so console summaries and report files show them.
 - A listener must not re-enter the running `Runner`.
 
 ## TaskEvent

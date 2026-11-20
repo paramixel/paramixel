@@ -94,10 +94,17 @@ final class ExecutionContextImpl implements Context {
 
     @Override
     public Object primaryInstance() {
-        final var instance = state.nearestInstance();
-        if (instance == null) {
+        final var owner = state.bindingOwner();
+        if (owner == null) {
             throw new IllegalStateException("No primary instance is bound for occurrence " + state.path
-                    + "; wrap the task in forInstance(name, factory)");
+                    + "; wrap the task in instance(name, factory)");
+        }
+        final var attempt = owner.attempt;
+        final var instance = attempt == null ? null : attempt.instance;
+        if (instance == null) {
+            throw new IllegalStateException("The primary instance of " + owner.path
+                    + " is not available yet: it is created after that task's resources, so a resource factory"
+                    + " declared on that task cannot read it");
         }
         return instance;
     }

@@ -7,17 +7,17 @@ description: Instance ownership, phases, finalization order, and failure precede
 
 ## Instance ownership
 
-`forInstance(name, supplier)` makes a task the owner of exactly one primary instance per execution attempt. The supplier
+`instance(name, supplier)` makes a task the owner of exactly one primary instance per execution attempt. The supplier
 runs once per attempt, on an execution worker, only after admission and permit acquisition.
 
 ```java
-forInstance("scenario", () -> new Scenario(environment))
+instance("scenario", () -> new Scenario(environment))
     .before(Scenario::start)
     .step("verify", Scenario::verify)
     .after(Scenario::stop);
 ```
 
-- A nested group inherits the nearest binding; a nested `forInstance` establishes its own.
+- A nested group inherits the nearest binding; a nested `instance` establishes its own.
 - The factory never runs at definition, build, or compile time.
 - A factory that returns `null` fails the occurrence; no lifecycle callback runs.
 - A factory that throws must clean up its own partially acquired objects, because Paramixel cannot reach an object that

@@ -19,6 +19,7 @@ package nonapi.org.paramixel.compiler;
 import java.util.List;
 import java.util.Objects;
 import org.paramixel.api.ExecutionMode;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Task;
 
 /**
@@ -50,39 +51,51 @@ public final class CompiledOccurrence {
     private final List<CompiledOccurrence> children;
 
     CompiledOccurrence(
-            final String id,
-            final String definitionId,
-            final String parentId,
-            final String name,
-            final String path,
             final Task task,
-            final ExecutionMode mode,
-            final String poolName,
-            final int budget,
-            final String bindingSlot,
-            final int preOrderIndex,
-            final int depth,
-            final boolean failFastScope,
-            final Long shuffleSeed,
+            final Identity identity,
+            final Scheduling scheduling,
             final List<String> executionOrder,
             final List<CompiledOccurrence> children) {
-        this.id = Objects.requireNonNull(id, "id is null");
-        this.definitionId = Objects.requireNonNull(definitionId, "definitionId is null");
-        this.parentId = parentId;
-        this.name = Objects.requireNonNull(name, "name is null");
-        this.path = Objects.requireNonNull(path, "path is null");
         this.task = Objects.requireNonNull(task, "task is null");
-        this.mode = Objects.requireNonNull(mode, "mode is null");
-        this.poolName = poolName;
-        this.budget = budget;
-        this.bindingSlot = bindingSlot;
-        this.preOrderIndex = preOrderIndex;
-        this.depth = depth;
-        this.failFastScope = failFastScope;
-        this.shuffleSeed = shuffleSeed;
+        Objects.requireNonNull(identity, "identity is null");
+        Objects.requireNonNull(scheduling, "scheduling is null");
+        this.id = Objects.requireNonNull(identity.id(), "id is null");
+        this.definitionId = Objects.requireNonNull(identity.definitionId(), "definitionId is null");
+        this.parentId = identity.parentId();
+        this.name = task.name();
+        this.path = Objects.requireNonNull(identity.path(), "path is null");
+        this.mode = task.mode();
+        this.poolName = task.pool().map(Pool::name).orElse(null);
+        this.budget = scheduling.budget();
+        this.bindingSlot = scheduling.bindingSlot();
+        this.preOrderIndex = scheduling.preOrderIndex();
+        this.depth = scheduling.depth();
+        this.failFastScope = scheduling.failFastScope();
+        this.shuffleSeed = task.shuffleSeed().orElse(null);
         this.executionOrder = List.copyOf(executionOrder);
         this.children = List.copyOf(children);
     }
+
+    /**
+     * The compiler-assigned identity of an occurrence.
+     *
+     * @param id the structural occurrence identifier
+     * @param definitionId the stable definition identifier
+     * @param parentId the parent occurrence identifier, or {@code null} for the root
+     * @param path the display path
+     */
+    record Identity(String id, String definitionId, String parentId, String path) {}
+
+    /**
+     * The scheduling facts the compiler resolved for an occurrence.
+     *
+     * @param budget the child admission budget
+     * @param bindingSlot the lexical instance binding slot, or {@code null}
+     * @param preOrderIndex the depth-first pre-order index
+     * @param depth the nesting depth
+     * @param failFastScope whether the occurrence honors the run-level fail-fast policy
+     */
+    record Scheduling(int budget, String bindingSlot, int preOrderIndex, int depth, boolean failFastScope) {}
 
     /**
      * Returns the occurrence identifier, derived from the structural ordinal path.

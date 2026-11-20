@@ -23,7 +23,7 @@ import java.util.Optional;
  * Read-only execution metadata and explicitly keyed resources for one occurrence.
  *
  * <p>A context belongs to one execution occurrence of one run. It exposes stable identity, the effective
- * configuration, the declared primary instance of the nearest lexical {@code forInstance} binding, and any secondary
+ * configuration, the declared primary instance of the nearest lexical {@code instance} binding, and any secondary
  * resources declared by the occurrence or its ancestors.
  *
  * <p>Primary fixtures are <strong>not</strong> looked up by {@link Class}; typed callbacks receive them directly, and
@@ -114,14 +114,19 @@ public interface Context {
     Optional<String> cancellationReason();
 
     /**
-     * Returns the primary instance of the nearest lexical {@code forInstance} binding.
+     * Returns the primary instance of the nearest lexical {@code instance} binding.
      *
      * <p>Typed callbacks receive this instance as their argument; the method exists for framework adapters and for
-     * advanced code that needs the raw value. A nested {@code forInstance} task establishes its own binding and does
+     * advanced code that needs the raw value. A nested {@code instance} task establishes its own binding and does
      * not make an outer instance implicitly available through this method.
      *
+     * <p>The binding is lexical and does not depend on when the method is called. An {@code instance} task creates its
+     * instance after its own resources, so a {@code ResourceFactory} declared on that same task cannot read the
+     * instance: the call fails rather than returning an outer instance.
+     *
      * @return the bound primary instance; never {@code null}
-     * @throws IllegalStateException if no primary instance is bound in this occurrence's lexical scope
+     * @throws IllegalStateException if no primary instance is bound in this occurrence's lexical scope, or if the bound
+     *     instance has not been created yet
      */
     Object primaryInstance();
 

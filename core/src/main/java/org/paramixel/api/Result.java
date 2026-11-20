@@ -16,6 +16,7 @@
 
 package org.paramixel.api;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -43,8 +44,8 @@ public final class Result {
     private final Status status;
     private final int exitCode;
     private final boolean quiescent;
-    private final java.time.Instant startedAt;
-    private final java.time.Instant completedAt;
+    private final Instant startedAt;
+    private final Instant completedAt;
     private final TaskResult root;
     private final List<Failure> failures;
     private final List<String> diagnostics;
@@ -71,14 +72,14 @@ public final class Result {
         this.diagnostics = List.copyOf(builder.diagnostics);
         this.configurationSummary = Collections.unmodifiableMap(new TreeMap<>(builder.configurationSummary));
         this.shuffleSeed = builder.shuffleSeed;
-        this.occurrenceCount = builder.occurrenceCount;
-        this.attemptCount = builder.attemptCount;
-        this.passedCount = builder.passedCount;
-        this.failedCount = builder.failedCount;
-        this.skippedCount = builder.skippedCount;
-        this.abortedCount = builder.abortedCount;
-        this.canceledCount = builder.canceledCount;
-        this.timedOutCount = builder.timedOutCount;
+        this.occurrenceCount = builder.counters.occurrenceCount;
+        this.attemptCount = builder.counters.attemptCount;
+        this.passedCount = builder.counters.passedCount;
+        this.failedCount = builder.counters.failedCount;
+        this.skippedCount = builder.counters.skippedCount;
+        this.abortedCount = builder.counters.abortedCount;
+        this.canceledCount = builder.counters.canceledCount;
+        this.timedOutCount = builder.counters.timedOutCount;
     }
 
     /**
@@ -131,7 +132,7 @@ public final class Result {
      *
      * @return the start instant, or an empty optional
      */
-    public Optional<java.time.Instant> startedAt() {
+    public Optional<Instant> startedAt() {
         return Optional.ofNullable(startedAt);
     }
 
@@ -140,7 +141,7 @@ public final class Result {
      *
      * @return the completion instant, or an empty optional
      */
-    public Optional<java.time.Instant> completedAt() {
+    public Optional<Instant> completedAt() {
         return Optional.ofNullable(completedAt);
     }
 
@@ -292,21 +293,35 @@ public final class Result {
                 .diagnostics(merged)
                 .configurationSummary(configurationSummary)
                 .shuffleSeed(shuffleSeed)
-                .counters(
-                        occurrenceCount,
-                        attemptCount,
-                        passedCount,
-                        failedCount,
-                        skippedCount,
-                        abortedCount,
-                        canceledCount,
-                        timedOutCount);
+                .occurrenceCount(occurrenceCount)
+                .attemptCount(attemptCount)
+                .passedCount(passedCount)
+                .failedCount(failedCount)
+                .skippedCount(skippedCount)
+                .abortedCount(abortedCount)
+                .canceledCount(canceledCount)
+                .timedOutCount(timedOutCount);
         return builder.build();
     }
 
     @Override
     public String toString() {
         return "Result[" + runId + " " + status + " exit=" + exitCode + " quiescent=" + quiescent + "]";
+    }
+
+    /**
+     * The mutable occurrence and attempt counters a {@link Builder} collects before building.
+     */
+    private static final class Counters {
+
+        private int occurrenceCount;
+        private int attemptCount;
+        private int passedCount;
+        private int failedCount;
+        private int skippedCount;
+        private int abortedCount;
+        private int canceledCount;
+        private int timedOutCount;
     }
 
     /**
@@ -321,21 +336,14 @@ public final class Result {
         private Status status = Status.PENDING;
         private int exitCode;
         private boolean quiescent = true;
-        private java.time.Instant startedAt;
-        private java.time.Instant completedAt;
+        private Instant startedAt;
+        private Instant completedAt;
         private TaskResult root;
         private List<Failure> failures = new ArrayList<>();
         private List<String> diagnostics = new ArrayList<>();
         private Map<String, String> configurationSummary = new TreeMap<>();
         private Long shuffleSeed;
-        private int occurrenceCount;
-        private int attemptCount;
-        private int passedCount;
-        private int failedCount;
-        private int skippedCount;
-        private int abortedCount;
-        private int canceledCount;
-        private int timedOutCount;
+        private final Counters counters = new Counters();
 
         private Builder() {
             // Intentionally empty
@@ -374,7 +382,7 @@ public final class Result {
          * @param completedAt the completion instant, or {@code null}
          * @return this builder
          */
-        public Builder timings(final java.time.Instant startedAt, final java.time.Instant completedAt) {
+        public Builder timings(final Instant startedAt, final Instant completedAt) {
             this.startedAt = startedAt;
             this.completedAt = completedAt;
             return this;
@@ -436,47 +444,135 @@ public final class Result {
         }
 
         /**
-         * Sets the occurrence and attempt counters.
+         * Sets the number of task occurrences, excluding attempt nodes.
          *
-         * @param occurrences the task occurrence count
-         * @param attempts the attempt node count
-         * @param passed the passed count
-         * @param failed the failed count
-         * @param skipped the skipped count
-         * @param aborted the aborted count
-         * @param canceled the canceled count
-         * @param timedOut the timeout count
+         * @param value the occurrence count; must not be negative
          * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
          */
-        public Builder counters(
-                final int occurrences,
-                final int attempts,
-                final int passed,
-                final int failed,
-                final int skipped,
-                final int aborted,
-                final int canceled,
-                final int timedOut) {
-            this.occurrenceCount = occurrences;
-            this.attemptCount = attempts;
-            this.passedCount = passed;
-            this.failedCount = failed;
-            this.skippedCount = skipped;
-            this.abortedCount = aborted;
-            this.canceledCount = canceled;
-            this.timedOutCount = timedOut;
+        public Builder occurrenceCount(final int value) {
+            counters.occurrenceCount = requireCount("occurrenceCount", value);
+            return this;
+        }
+
+        /**
+         * Sets the number of attempt or iteration nodes.
+         *
+         * @param value the attempt count; must not be negative
+         * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
+         */
+        public Builder attemptCount(final int value) {
+            counters.attemptCount = requireCount("attemptCount", value);
+            return this;
+        }
+
+        /**
+         * Sets the number of passed task occurrences.
+         *
+         * @param value the passed count; must not be negative
+         * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
+         */
+        public Builder passedCount(final int value) {
+            counters.passedCount = requireCount("passedCount", value);
+            return this;
+        }
+
+        /**
+         * Sets the number of failed task occurrences.
+         *
+         * @param value the failed count; must not be negative
+         * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
+         */
+        public Builder failedCount(final int value) {
+            counters.failedCount = requireCount("failedCount", value);
+            return this;
+        }
+
+        /**
+         * Sets the number of skipped task occurrences.
+         *
+         * @param value the skipped count; must not be negative
+         * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
+         */
+        public Builder skippedCount(final int value) {
+            counters.skippedCount = requireCount("skippedCount", value);
+            return this;
+        }
+
+        /**
+         * Sets the number of aborted task occurrences.
+         *
+         * @param value the aborted count; must not be negative
+         * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
+         */
+        public Builder abortedCount(final int value) {
+            counters.abortedCount = requireCount("abortedCount", value);
+            return this;
+        }
+
+        /**
+         * Sets the number of canceled task occurrences.
+         *
+         * @param value the canceled count; must not be negative
+         * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
+         */
+        public Builder canceledCount(final int value) {
+            counters.canceledCount = requireCount("canceledCount", value);
+            return this;
+        }
+
+        /**
+         * Sets the number of task occurrences whose timeout expired.
+         *
+         * @param value the timeout count; must not be negative
+         * @return this builder
+         * @throws IllegalArgumentException if {@code value} is negative
+         */
+        public Builder timedOutCount(final int value) {
+            counters.timedOutCount = requireCount("timedOutCount", value);
             return this;
         }
 
         /**
          * Builds the immutable result.
          *
+         * <p>The counters must be mutually consistent: the status counts (passed, failed, skipped, aborted, canceled)
+         * together, and the timeout count on its own, cannot exceed {@link Result#occurrenceCount()}. The status counts
+         * may sum to less than the occurrence count only when some occurrence never reached a terminal status.
+         *
          * @return the result; never {@code null}
          * @throws NullPointerException if the run identifier is missing
+         * @throws IllegalArgumentException if the counters are inconsistent
          */
         public Result build() {
             Objects.requireNonNull(runId, "runId is null");
+            final var statusTotal = (long) counters.passedCount
+                    + counters.failedCount
+                    + counters.skippedCount
+                    + counters.abortedCount
+                    + counters.canceledCount;
+            if (statusTotal > counters.occurrenceCount) {
+                throw new IllegalArgumentException("Status counts sum to " + statusTotal
+                        + ", which exceeds occurrenceCount " + counters.occurrenceCount);
+            }
+            if (counters.timedOutCount > counters.occurrenceCount) {
+                throw new IllegalArgumentException("timedOutCount " + counters.timedOutCount
+                        + " exceeds occurrenceCount " + counters.occurrenceCount);
+            }
             return new Result(this);
+        }
+
+        private static int requireCount(final String name, final int value) {
+            if (value < 0) {
+                throw new IllegalArgumentException(name + " must not be negative: " + value);
+            }
+            return value;
         }
     }
 }

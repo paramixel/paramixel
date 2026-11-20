@@ -16,14 +16,15 @@
 
 package nonapi.org.paramixel;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import nonapi.org.paramixel.compiler.CompiledPlan;
+import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.compiler.PlanCompiler;
 import nonapi.org.paramixel.discovery.FactoryScanner;
 import nonapi.org.paramixel.execution.ExecutionEngine;
@@ -54,7 +55,7 @@ public final class RunnerImpl implements Runner {
     private final long shuffleSeed;
     private final Map<Pool, Integer> poolOverrides;
     private final AtomicBoolean running = new AtomicBoolean();
-    private volatile ExecutionEngine activeEngine;
+    private final AtomicReference<ExecutionEngine> activeEngine = new AtomicReference<>();
     private volatile boolean closed;
 
     /**
@@ -120,7 +121,7 @@ public final class RunnerImpl implements Runner {
     @Override
     public void close() {
         closed = true;
-        final var engine = activeEngine;
+        final var engine = activeEngine.get();
         if (engine != null) {
             engine.requestCancellation("runner closed");
         }
@@ -136,11 +137,12 @@ public final class RunnerImpl implements Runner {
         }
     }
 
-    private static final java.util.Set<String> KNOWN_KEYS = java.util.Set.of(
+    private static final Set<String> KNOWN_KEYS = Set.of(
             Configuration.RUNNER_PARALLELISM,
             Configuration.WORKERS,
             Configuration.SHUTDOWN_GRACE_MILLIS,
             Configuration.LISTENER_QUEUE_CAPACITY,
+            Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS,
             Configuration.ANSI,
             Configuration.FAILURE_ON_SKIP,
             Configuration.FAILURE_ON_ABORT,
@@ -168,21 +170,14 @@ public final class RunnerImpl implements Runner {
 
     private Result discoverAndExecute(final ConcreteSelector selector) {
         final var runId = FastUUID.generateUuid();
-        final var dispatcher = new ReportingDispatcher(listener, configuration);
-        try {
+        try (var dispatcher = new ReportingDispatcher(listener, configuration)) {
             dispatcher.runStarted(configuration);
             warnAboutUnknownKeys(dispatcher);
             warnAboutIgnoredSelection(selector, dispatcher);
             dispatcher.discoveryStarted();
             final var effectiveSelector = selector.resolve(configuration);
             final var scanner = new FactoryScanner(configuration, effectiveSelector, shuffled, shuffleSeed);
-            final Optional<Task> discovered;
-            try {
-                discovered = scanner.discover();
-            } catch (RuntimeException e) {
-                dispatcher.diagnostic("Discovery failed: " + e.getMessage());
-                throw e;
-            }
+            final var discovered = scanner.discover();
             dispatcher.discoveryCompleted(discovered);
             if (discovered.isEmpty()) {
                 return finishNoTests(runId, dispatcher);
@@ -191,8 +186,6 @@ public final class RunnerImpl implements Runner {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while delivering listener events", e);
-        } finally {
-            dispatcher.close();
         }
     }
 
@@ -201,13 +194,10 @@ public final class RunnerImpl implements Runner {
         if (existing != null) {
             return executeDiscovered(runId, definition, discoveryRun, existing);
         }
-        final var dispatcher = new ReportingDispatcher(listener, configuration);
-        try {
+        try (var dispatcher = new ReportingDispatcher(listener, configuration)) {
             dispatcher.runStarted(configuration);
             warnAboutUnknownKeys(dispatcher);
             return executeDiscovered(runId, definition, discoveryRun, dispatcher);
-        } finally {
-            dispatcher.close();
         }
     }
 
@@ -220,25 +210,21 @@ public final class RunnerImpl implements Runner {
         if (discoveryRun) {
             seedDiscoveryPool(overrides);
         }
-        final CompiledPlan plan = new PlanCompiler(configuration, overrides).compile(definition);
+        final var plan = new PlanCompiler(configuration, overrides).compile(definition);
         plan.warnings().forEach(warning -> dispatcher.warning(warning.toString()));
         final var engine = new ExecutionEngine(
                 runId, plan, configuration, dispatcher, discoveryRun && shuffled ? shuffleSeed : null);
-        activeEngine = engine;
+        activeEngine.set(engine);
         try {
-            var result = engine.run();
+            final var result = engine.run();
             try {
-                final var listenerDiagnostics = dispatcher.finish(result);
-                if (!listenerDiagnostics.isEmpty()) {
-                    result = result.withAdditionalDiagnostics(listenerDiagnostics);
-                }
+                return dispatcher.finish(result);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted while draining listener events", e);
             }
-            return result;
         } finally {
-            activeEngine = null;
+            activeEngine.set(null);
         }
     }
 
@@ -265,18 +251,14 @@ public final class RunnerImpl implements Runner {
         final var exitCode = failIfNoTests || failureOnSkip ? 1 : 0;
         final var warnings = new ArrayList<String>();
         warnings.add("No @Paramixel.Factory method matched the requested selection");
-        var result = Result.builder()
+        final var result = Result.builder()
                 .runId(runId)
                 .status(status, exitCode, true)
-                .timings(java.time.Instant.now(), java.time.Instant.now())
+                .timings(Instant.now(), Instant.now())
                 .diagnostics(warnings)
                 .shuffleSeed(shuffled ? shuffleSeed : null)
                 .build();
-        final var listenerDiagnostics = dispatcher.finish(result);
-        if (!listenerDiagnostics.isEmpty()) {
-            result = result.withAdditionalDiagnostics(listenerDiagnostics);
-        }
-        return result;
+        return dispatcher.finish(result);
     }
 
     private void warnAboutIgnoredSelection(final ConcreteSelector selector, final ReportingDispatcher dispatcher) {

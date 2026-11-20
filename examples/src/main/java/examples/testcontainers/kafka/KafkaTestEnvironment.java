@@ -124,8 +124,8 @@ public class KafkaTestEnvironment implements AutoCloseable {
     private void initialize(final Network network, final boolean ownsNetwork) {
         this.network = Objects.requireNonNull(network, "network is null");
         this.ownsNetwork = ownsNetwork;
-        boolean success = false;
-        boolean interrupted = false;
+        var success = false;
+        var interrupted = false;
 
         try {
             final var image = DockerImageName.parse(dockerImageName).asCompatibleSubstituteFor("apache/kafka");
@@ -248,7 +248,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
         }
     }
 
-    private void waitForBrokerReadiness() {
+    private Properties adminClientProperties() {
         var properties = new Properties();
         properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, getBootstrapServers());
         properties.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, String.valueOf(PROBE_TIMEOUT.toMillis()));
@@ -256,7 +256,12 @@ public class KafkaTestEnvironment implements AutoCloseable {
         properties.put("reconnect.backoff.ms", "1000");
         properties.put("reconnect.backoff.max.ms", "2000");
         properties.put("retries", "5");
+        return properties;
+    }
 
+    private void waitForBrokerReadiness() {
+        Exception lastException;
+        final var properties = adminClientProperties();
         var listTopicsOptions = new ListTopicsOptions()
                 .timeoutMs((int) PROBE_TIMEOUT.toMillis())
                 .listInternal(true);
@@ -264,7 +269,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
         var deadlineNanos = System.nanoTime() + BROKER_READINESS_TIMEOUT.toNanos();
         var attempt = 0;
         var maxBackoffMs = 2_000L;
-        Exception lastException = null;
+        lastException = null;
 
         while (System.nanoTime() < deadlineNanos) {
             try (var adminClient = AdminClient.create(properties)) {
@@ -276,7 +281,7 @@ public class KafkaTestEnvironment implements AutoCloseable {
                 throw new ContainerLaunchException("Interrupted while waiting for Kafka broker readiness", e);
             } catch (Exception e) {
                 lastException = e;
-                long delay = Math.min(100L * (1L << Math.min(attempt, 4)), maxBackoffMs);
+                final var delay = Math.min(100L * (1L << Math.min(attempt, 4)), maxBackoffMs);
                 try {
                     Thread.sleep(delay);
                 } catch (InterruptedException ee) {

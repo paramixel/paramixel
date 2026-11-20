@@ -17,7 +17,7 @@
 package examples.testcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 
 import com.mongodb.client.MongoClients;
@@ -61,7 +61,7 @@ public class MongoDBTest {
         return parallel(MongoDBTest.class.getName(), Pool.named("environments"))
                 .each(
                         MongoDBTestEnvironment.createTestEnvironments(),
-                        environment -> forInstance(environment.name(), () -> new MongoDBTest(environment))
+                        environment -> instance(environment.name(), () -> new MongoDBTest(environment))
                                 .before(MongoDBTest::setUp)
                                 .step("testInsertAndQuery()", MongoDBTest::testInsertAndQuery)
                                 .after(MongoDBTest::tearDown))

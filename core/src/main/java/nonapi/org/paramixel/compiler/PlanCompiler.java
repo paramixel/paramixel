@@ -26,8 +26,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SplittableRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.ExecutionMode;
 import org.paramixel.api.Pool;
@@ -53,6 +55,12 @@ import org.paramixel.api.support.RetryPolicy;
  * one definition identity and several occurrence identities.
  */
 public final class PlanCompiler {
+
+    /** FNV-1a 64-bit offset basis used by {@link #definitionId(Task)}. */
+    private static final long FNV_OFFSET_BASIS = 0xcbf29ce484222325L;
+
+    /** FNV-1a 64-bit prime used by {@link #definitionId(Task)}. */
+    private static final long FNV_PRIME = 0x100000001b3L;
 
     /** Tag that marks the discovery factory group, whose children honor the run-level fail-fast policy. */
     public static final String FAIL_FAST_SCOPE_TAG = "paramixel.discovery.actions";
@@ -103,7 +111,7 @@ public final class PlanCompiler {
         diagnostics.clear();
         capacities.clear();
         reportedUndefinedPools.clear();
-        final var counter = new int[] {0};
+        final var counter = new AtomicInteger();
         final var compiledRoot = expand(root, "0", null, null, null, 0, counter);
         final var occurrences = new ArrayList<CompiledOccurrence>();
         collectPreOrder(compiledRoot, occurrences);
@@ -139,7 +147,7 @@ public final class PlanCompiler {
             final String parentDisplayPath,
             final String bindingSlot,
             final int depth,
-            final int[] counter) {
+            final AtomicInteger counter) {
         final var mode = task.mode();
         final var poolName = task.pool().map(Pool::name).orElse(null);
         final var structural = task.tags().contains(STRUCTURAL_TAG);
@@ -149,7 +157,7 @@ public final class PlanCompiler {
         final var budget = mode == ExecutionMode.PARALLEL ? capacityOf(poolName, path) : 1;
         final var failFastScope = task.tags().contains(FAIL_FAST_SCOPE_TAG);
         final var childDisplayPath = structural ? null : path;
-        final var index = counter[0]++;
+        final var index = counter.getAndIncrement();
         final var childBinding = task.instanceFactory().isPresent() ? id : bindingSlot;
         final var ordered = orderedChildren(task);
         final var childOccurrences = new ArrayList<CompiledOccurrence>(ordered.size());
@@ -161,20 +169,9 @@ public final class PlanCompiler {
         }
         final var executionOrder = ordered.stream().map(Task::name).toList();
         return new CompiledOccurrence(
-                id,
-                definitionId(task),
-                parentId,
-                task.name(),
-                path,
                 task,
-                mode,
-                poolName,
-                budget,
-                childBinding,
-                index,
-                depth,
-                failFastScope,
-                task.shuffleSeed().orElse(null),
+                new CompiledOccurrence.Identity(id, definitionId(task), parentId, path),
+                new CompiledOccurrence.Scheduling(budget, childBinding, index, depth, failFastScope),
                 executionOrder,
                 childOccurrences);
     }
@@ -223,20 +220,22 @@ public final class PlanCompiler {
             capacities.put(poolName, 1);
             return 1;
         }
-        final int capacity;
+        final var capacity = parseCapacityOrReport(raw, poolName, path);
+        capacities.put(poolName, capacity);
+        return capacity;
+    }
+
+    private int parseCapacityOrReport(final String raw, final String poolName, final String path) {
         try {
-            capacity = PoolSizes.parse(raw);
+            return PoolSizes.parse(raw);
         } catch (IllegalArgumentException e) {
             diagnostics.add(Diagnostic.error(
                     "POOL_INVALID",
                     path,
                     "Invalid capacity '" + raw + "' for pool '" + poolName + "': " + e.getMessage(),
                     "Use a positive integer, @cores, @cores*N or @cores/N"));
-            capacities.put(poolName, 1);
             return 1;
         }
-        capacities.put(poolName, capacity);
-        return capacity;
     }
 
     private void collectPreOrder(final CompiledOccurrence occurrence, final List<CompiledOccurrence> target) {
@@ -270,8 +269,8 @@ public final class PlanCompiler {
             diagnostics.add(Diagnostic.error(
                     "INSTANCE_BINDING_MISSING",
                     path,
-                    "Task uses typed instance callbacks but no enclosing forInstance task owns an instance",
-                    "Wrap the task in forInstance(name, factory) or use the no-argument callbacks"));
+                    "Task uses typed instance callbacks but no enclosing task owns a primary instance",
+                    "Wrap the task in instance(name, factory) or use the no-argument callbacks"));
         }
         task.timeout().ifPresent(timeout -> checkTimeout(timeout, path));
         if (task.retry().isPresent() && task.repeat().isPresent()) {
@@ -349,12 +348,11 @@ public final class PlanCompiler {
         if (policy.retryOn().isEmpty()) {
             diagnostics.add(Diagnostic.error("RETRY_NO_TRIGGER", path, "Retry policy has no trigger status", null));
         }
-        if (policy.retryOn().contains(org.paramixel.api.Status.Kind.CANCELED)
-                || policy.retryOn().contains(org.paramixel.api.Status.Kind.ABORTED)) {
+        if (!RetryPolicy.RETRYABLE_KINDS.containsAll(policy.retryOn())) {
             diagnostics.add(Diagnostic.error(
                     "RETRY_ILLEGAL_TRIGGER",
                     path,
-                    "Retry policy must not retry cancellation or assumption abort",
+                    "Retry policy may only retry " + RetryPolicy.RETRYABLE_KINDS + " but names " + policy.retryOn(),
                     "Retry only FAILED (optionally SKIPPED)"));
         }
     }
@@ -406,7 +404,7 @@ public final class PlanCompiler {
         }
     }
 
-    private static java.util.Optional<List<String>> findCycle(final Map<String, Set<String>> edges) {
+    private static Optional<List<String>> findCycle(final Map<String, Set<String>> edges) {
         final var colors = new HashMap<String, Integer>();
         final var stack = new ArrayList<String>();
         for (String node : edges.keySet()) {
@@ -415,23 +413,23 @@ public final class PlanCompiler {
                 return cycle;
             }
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
-    private static java.util.Optional<List<String>> visit(
+    private static Optional<List<String>> visit(
             final String node,
             final Map<String, Set<String>> edges,
             final Map<String, Integer> colors,
             final List<String> stack) {
         final var color = colors.getOrDefault(node, 0);
         if (color == 2) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
         if (color == 1) {
             final var start = stack.indexOf(node);
             final var cycle = new ArrayList<>(stack.subList(start < 0 ? 0 : start, stack.size()));
             cycle.add(node);
-            return java.util.Optional.of(cycle);
+            return Optional.of(cycle);
         }
         colors.put(node, 1);
         stack.add(node);
@@ -443,7 +441,7 @@ public final class PlanCompiler {
         }
         stack.remove(stack.size() - 1);
         colors.put(node, 2);
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
     /**
@@ -457,33 +455,34 @@ public final class PlanCompiler {
      */
     public static String definitionId(final Task task) {
         Objects.requireNonNull(task, "task is null");
-        final var hash = new long[] {0xcbf29ce484222325L};
-        hashTask(task, hash);
-        return "d" + Long.toHexString(hash[0]);
+        return "d" + Long.toHexString(hashTask(task, FNV_OFFSET_BASIS));
     }
 
-    private static void hashTask(final Task task, final long[] hash) {
-        hashText(task.name(), hash);
-        hashText(task.mode().name(), hash);
-        hashText(task.pool().map(Pool::name).orElse(""), hash);
-        hashText(task.instanceFactory().isPresent() ? "i" : "-", hash);
-        hashText(task.body().isPresent() ? "b" : "-", hash);
-        hashText(Integer.toString(task.before().size()), hash);
-        hashText(Integer.toString(task.after().size()), hash);
-        hashText(task.condition().isPresent() ? "c" : "-", hash);
+    private static long hashTask(final Task task, final long seed) {
+        var hash = hashText(task.name(), seed);
+        hash = hashText(task.mode().name(), hash);
+        hash = hashText(task.pool().map(Pool::name).orElse(""), hash);
+        hash = hashText(task.instanceFactory().isPresent() ? "i" : "-", hash);
+        hash = hashText(task.body().isPresent() ? "b" : "-", hash);
+        hash = hashText(Integer.toString(task.before().size()), hash);
+        hash = hashText(Integer.toString(task.after().size()), hash);
+        hash = hashText(task.condition().isPresent() ? "c" : "-", hash);
         for (Task child : task.children()) {
-            hashText("[", hash);
-            hashTask(child, hash);
-            hashText("]", hash);
+            hash = hashText("[", hash);
+            hash = hashTask(child, hash);
+            hash = hashText("]", hash);
         }
+        return hash;
     }
 
-    private static void hashText(final String text, final long[] hash) {
+    private static long hashText(final String text, final long seed) {
+        var hash = seed;
         for (var i = 0; i < text.length(); i++) {
-            hash[0] ^= text.charAt(i);
-            hash[0] *= 0x100000001b3L;
+            hash ^= text.charAt(i);
+            hash *= FNV_PRIME;
         }
-        hash[0] ^= '|';
-        hash[0] *= 0x100000001b3L;
+        hash ^= '|';
+        hash *= FNV_PRIME;
+        return hash;
     }
 }

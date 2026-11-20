@@ -17,15 +17,19 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.task;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import nonapi.org.paramixel.compiler.PlanCompiler;
+import nonapi.org.paramixel.execution.EventPublisher;
+import nonapi.org.paramixel.execution.ExecutionEngine;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +39,7 @@ import org.junit.jupiter.api.Test;
 class TimeoutTest {
 
     private static Runner runner(final Map<String, String> settings) {
-        final var configuration = new java.util.LinkedHashMap<String, String>();
+        final var configuration = new LinkedHashMap<String, String>();
         configuration.put(Configuration.ANSI, "false");
         configuration.putAll(settings);
         return Runner.builder()
@@ -70,7 +74,7 @@ class TimeoutTest {
     void uncooperativeTimeout() {
         final CountDownLatch stuckStarted = new CountDownLatch(1);
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = forInstance("instance", Object::new)
+        final Task definition = instance("instance", Object::new)
                 .timeout(Duration.ofMillis(100))
                 .step("stuck", () -> {
                     stuckStarted.countDown();
@@ -107,12 +111,12 @@ class TimeoutTest {
                 .parallel(
                         "children",
                         Pool.named("p"),
-                        children -> children.child(forInstance("first", () -> {
+                        children -> children.child(instance("first", () -> {
                                             created.incrementAndGet();
                                             return new Object();
                                         })
                                         .step("hold", () -> block.await(5, TimeUnit.SECONDS)))
-                                .child(forInstance("second", () -> {
+                                .child(instance("second", () -> {
                                             created.incrementAndGet();
                                             return new Object();
                                         })
@@ -137,7 +141,7 @@ class TimeoutTest {
     void timeoutDuringBefore() {
         final AtomicInteger bodyCalls = new AtomicInteger();
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = forInstance("instance", Object::new)
+        final Task definition = instance("instance", Object::new)
                 .timeout(Duration.ofMillis(100))
                 .before(() -> Thread.sleep(5000L))
                 .step("body", bodyCalls::incrementAndGet)
@@ -153,6 +157,46 @@ class TimeoutTest {
     }
 
     @Test
+    @DisplayName("TIME-05: the engine's own result carries its infrastructure diagnostics, independent of the runner")
+    void engineResultCarriesInfrastructureDiagnostics() {
+        final Task definition = task("root")
+                .timeout(Duration.ofMillis(80))
+                .step("stuck", () -> {
+                    final var deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(400);
+                    while (System.nanoTime() < deadline) {
+                        try {
+                            Thread.sleep(10L);
+                        } catch (InterruptedException e) {
+                            // Deliberately ignore interruption: this callback is uncooperative.
+                        }
+                    }
+                })
+                .build();
+        final var configuration =
+                Configuration.of(Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "80", Configuration.ANSI, "false"));
+        final EventPublisher publisher = new EventPublisher() {
+            @Override
+            public void publish(final TaskEvent event) {
+                // Events are irrelevant here.
+            }
+
+            @Override
+            public void warning(final String message) {
+                // Warnings are irrelevant here.
+            }
+        };
+        final var plan = new PlanCompiler(configuration, Map.of()).compile(definition);
+
+        final var result = new ExecutionEngine("engine-diagnostics", plan, configuration, publisher).run();
+
+        assertThat(result.isQuiescent()).isFalse();
+        assertThat(result.diagnostics())
+                .anySatisfy(diagnostic -> assertThat(diagnostic).contains("NON_QUIESCENT"));
+        assertThat(result.failures())
+                .anySatisfy(failure -> assertThat(failure.phase()).isEqualTo("NON_QUIESCENT"));
+    }
+
+    @Test
     @DisplayName("TIME-06: canceling a run while a task waits for a permit acquires no resources")
     void cancelWhileWaitingForPermit() {
         final AtomicInteger created = new AtomicInteger();
@@ -161,7 +205,7 @@ class TimeoutTest {
         // inside the shutdown grace regardless of host core count or load.
         final CountDownLatch release = new CountDownLatch(1);
         final Task definition = parallel("root", Pool.named("p"))
-                .child(forInstance("blocker", () -> {
+                .child(instance("blocker", () -> {
                             created.incrementAndGet();
                             return new Object();
                         })
@@ -169,7 +213,7 @@ class TimeoutTest {
                             started.countDown();
                             release.await(60, TimeUnit.SECONDS);
                         }))
-                .child(forInstance("waiter", () -> {
+                .child(instance("waiter", () -> {
                             created.incrementAndGet();
                             return new Object();
                         })

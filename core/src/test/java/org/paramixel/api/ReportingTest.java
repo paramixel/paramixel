@@ -20,14 +20,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Tasks.task;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import javax.xml.parsers.DocumentBuilderFactory;
+import nonapi.org.paramixel.reporting.DefaultListeners;
+import nonapi.org.paramixel.reporting.ReportFileListener;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.paramixel.api.support.RetryPolicy;
 
 /**
  * Report files are generated from the same immutable result as console output.
@@ -109,9 +118,9 @@ class ReportingTest {
     @Test
     @DisplayName("console listener writes status and summary from the same result")
     void consoleListener() {
-        final var out = new java.io.ByteArrayOutputStream();
-        final var listener = nonapi.org.paramixel.reporting.DefaultListeners.create(
-                Configuration.of(Map.of(Configuration.ANSI, "false")), new java.io.PrintStream(out));
+        final var out = new ByteArrayOutputStream();
+        final var listener =
+                DefaultListeners.create(Configuration.of(Map.of(Configuration.ANSI, "false")), new PrintStream(out));
 
         final var result = Runner.builder().listener(listener).build().run(definition());
         final var text = out.toString(StandardCharsets.UTF_8);
@@ -125,10 +134,10 @@ class ReportingTest {
     @Test
     @DisplayName("detailed reports keep superseded attempts with explicit markers")
     void detailedReportsKeepSupersededAttempts() throws Exception {
-        final var attempts = new java.util.concurrent.atomic.AtomicInteger();
-        final java.util.function.Supplier<Task> definition = () -> task("root")
+        final var attempts = new AtomicInteger();
+        final Supplier<Task> definition = () -> task("root")
                 .child(Tasks.sequential("retried")
-                        .retry(org.paramixel.api.support.RetryPolicy.attempts(3))
+                        .retry(RetryPolicy.attempts(3))
                         .step("probe", () -> {
                             if (attempts.incrementAndGet() < 3) {
                                 throw new IllegalStateException("not yet");
@@ -137,10 +146,7 @@ class ReportingTest {
                 .build();
 
         final var textFile = tempDir.resolve("retry.log");
-        Runner.builder()
-                .listener(new nonapi.org.paramixel.reporting.ReportFileListener(textFile))
-                .build()
-                .run(definition.get());
+        Runner.builder().listener(new ReportFileListener(textFile)).build().run(definition.get());
 
         final var text = Files.readString(textFile);
         assertThat(text).contains("3 attempts, 2 failed");
@@ -150,15 +156,56 @@ class ReportingTest {
 
         attempts.set(0);
         final var jsonFile = tempDir.resolve("retry.json");
-        Runner.builder()
-                .listener(new nonapi.org.paramixel.reporting.ReportFileListener(jsonFile))
-                .build()
-                .run(definition.get());
+        Runner.builder().listener(new ReportFileListener(jsonFile)).build().run(definition.get());
 
         final var json = Files.readString(jsonFile);
         assertThat(json).contains("\"superseded\": true");
         assertThat(json).contains("\"superseded\": false");
         assertThat(json).contains("\"attemptTotal\": 3");
+    }
+
+    @Test
+    @DisplayName("console summary and report file include infrastructure diagnostics such as NON_QUIESCENT")
+    void reportsIncludeInfrastructureDiagnostics() throws Exception {
+        final var configuration =
+                Configuration.of(Map.of(Configuration.ANSI, "false", Configuration.SHUTDOWN_GRACE_MILLIS, "80"));
+
+        final var out = new ByteArrayOutputStream();
+        final var console = DefaultListeners.create(configuration, new PrintStream(out, true, StandardCharsets.UTF_8));
+        final var consoleResult = Runner.builder()
+                .listener(console)
+                .configuration(configuration)
+                .build()
+                .run(nonQuiescentDefinition());
+
+        assertThat(consoleResult.isQuiescent()).isFalse();
+        assertThat(out.toString(StandardCharsets.UTF_8)).contains("diagnostic NON_QUIESCENT");
+
+        final var file = tempDir.resolve("non-quiescent.log");
+        final var fileResult = Runner.builder()
+                .listener(ReportFileListenerFactory.listener(file))
+                .configuration(configuration)
+                .build()
+                .run(nonQuiescentDefinition());
+
+        assertThat(fileResult.isQuiescent()).isFalse();
+        assertThat(Files.readString(file)).contains("NON_QUIESCENT");
+    }
+
+    private static Task nonQuiescentDefinition() {
+        return task("root")
+                .timeout(Duration.ofMillis(80))
+                .step("stuck", () -> {
+                    final var deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(400);
+                    while (System.nanoTime() < deadline) {
+                        try {
+                            Thread.sleep(10L);
+                        } catch (InterruptedException e) {
+                            // Deliberately ignore interruption: this callback is uncooperative.
+                        }
+                    }
+                })
+                .build();
     }
 
     /**
@@ -171,7 +218,7 @@ class ReportingTest {
         }
 
         static Listener listener(final Path file) {
-            return new nonapi.org.paramixel.reporting.ReportFileListener(file);
+            return new ReportFileListener(file);
         }
     }
 }

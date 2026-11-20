@@ -21,9 +21,12 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Failure;
@@ -41,6 +44,13 @@ import org.paramixel.api.TaskResult;
  * only.
  */
 public final class ReportFileListener implements Listener {
+
+    private static final String HTML_TITLE_END_AND_STYLE = "</title>\n"
+            + "<style>body{font-family:sans-serif}table{border-collapse:collapse}"
+            + "td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}"
+            + ".FAILED{background:#fdd}.PASSED{background:#dfd}.SKIPPED{background:#ffe}"
+            + ".ABORTED{background:#fec}.CANCELED{background:#eee}</style>\n"
+            + "</head>\n<body>\n<h1>Paramixel run ";
 
     private final Path file;
 
@@ -62,7 +72,7 @@ public final class ReportFileListener implements Listener {
      * @param file the target file; must not be {@code null}
      */
     public ReportFileListener(final Path file) {
-        this.file = java.util.Objects.requireNonNull(file, "file is null");
+        this.file = Objects.requireNonNull(file, "file is null");
     }
 
     @Override
@@ -95,26 +105,22 @@ public final class ReportFileListener implements Listener {
     // ------------------------------------------------------------------------------------------
 
     private static String json(final Result result) {
-        final var out = new StringBuilder();
-        out.append("{\n");
-        out.append("  \"schemaVersion\": 1,\n");
-        out.append("  \"run\": {\n");
-        out.append("    \"id\": ").append(quote(result.runId())).append(",\n");
-        out.append("    \"status\": ")
+        final var out = new StringBuilder(1024);
+        out.append("{\n  \"schemaVersion\": 1,\n  \"run\": {\n    \"id\": ")
+                .append(quote(result.runId()))
+                .append(",\n    \"status\": ")
                 .append(quote(result.status().kind().name()))
-                .append(",\n");
-        out.append("    \"exitCode\": ").append(result.exitCode()).append(",\n");
-        out.append("    \"quiescent\": ").append(result.isQuiescent()).append(",\n");
-        out.append("    \"startedAt\": ")
+                .append(",\n    \"exitCode\": ")
+                .append(result.exitCode())
+                .append(",\n    \"quiescent\": ")
+                .append(result.isQuiescent())
+                .append(",\n    \"startedAt\": ")
                 .append(optionalInstant(result.startedAt()))
-                .append(",\n");
-        out.append("    \"completedAt\": ")
+                .append(",\n    \"completedAt\": ")
                 .append(optionalInstant(result.completedAt()))
-                .append(",\n");
-        out.append("    \"shuffleSeed\": ")
+                .append(",\n    \"shuffleSeed\": ")
                 .append(result.shuffleSeed().map(String::valueOf).orElse("null"))
-                .append(",\n");
-        out.append("    \"counts\": {\"occurrences\": ")
+                .append(",\n    \"counts\": {\"occurrences\": ")
                 .append(result.occurrenceCount())
                 .append(", \"attempts\": ")
                 .append(result.attemptCount())
@@ -130,8 +136,7 @@ public final class ReportFileListener implements Listener {
                 .append(result.canceledCount())
                 .append(", \"timedOut\": ")
                 .append(result.timedOutCount())
-                .append("},\n");
-        out.append("    \"configuration\": {");
+                .append("},\n    \"configuration\": {");
         var first = true;
         for (var entry : result.configurationSummary().entrySet()) {
             if (!first) {
@@ -140,58 +145,57 @@ public final class ReportFileListener implements Listener {
             first = false;
             out.append(quote(entry.getKey())).append(": ").append(quote(entry.getValue()));
         }
-        out.append("},\n");
-        out.append("    \"diagnostics\": ")
+        out.append("},\n    \"diagnostics\": ")
                 .append(quoteList(result.diagnostics()))
-                .append(",\n");
-        out.append("    \"failures\": ").append(jsonFailures(result.failures())).append("\n");
-        out.append("  },\n");
-        out.append("  \"root\": ");
-        out.append(result.root().map(root -> jsonNode(root, false, 0)).orElse("null"));
-        out.append("\n}\n");
+                .append(",\n    \"failures\": ")
+                .append(jsonFailures(result.failures()))
+                .append("\n  },\n  \"root\": ")
+                .append(result.root().map(root -> jsonNode(root, false, 0)).orElse("null"))
+                .append("\n}\n");
         return out.toString();
     }
 
     private static String jsonNode(final TaskResult node, final boolean superseded, final int attemptTotal) {
-        final var out = new StringBuilder();
-        out.append("{\n");
-        out.append("    \"kind\": ").append(quote(node.kind().name())).append(",\n");
-        out.append("    \"occurrenceId\": ").append(quote(node.occurrenceId())).append(",\n");
-        out.append("    \"definitionId\": ").append(quote(node.definitionId())).append(",\n");
-        out.append("    \"parentOccurrenceId\": ")
+        final var out = new StringBuilder(1024);
+        out.append("{\n    \"kind\": ")
+                .append(quote(node.kind().name()))
+                .append(",\n    \"occurrenceId\": ")
+                .append(quote(node.occurrenceId()))
+                .append(",\n    \"definitionId\": ")
+                .append(quote(node.definitionId()))
+                .append(",\n    \"parentOccurrenceId\": ")
                 .append(node.parentOccurrenceId().map(ReportFileListener::quote).orElse("null"))
-                .append(",\n");
-        out.append("    \"name\": ").append(quote(node.name())).append(",\n");
-        out.append("    \"path\": ").append(quote(node.path())).append(",\n");
-        out.append("    \"mode\": ").append(quote(node.mode().name())).append(",\n");
-        out.append("    \"pool\": ")
+                .append(",\n    \"name\": ")
+                .append(quote(node.name()))
+                .append(",\n    \"path\": ")
+                .append(quote(node.path()))
+                .append(",\n    \"mode\": ")
+                .append(quote(node.mode().name()))
+                .append(",\n    \"pool\": ")
                 .append(node.poolName().map(ReportFileListener::quote).orElse("null"))
-                .append(",\n");
-        out.append("    \"lock\": ")
+                .append(",\n    \"lock\": ")
                 .append(node.exclusiveLock().map(ReportFileListener::quote).orElse("null"))
-                .append(",\n");
-        out.append("    \"shuffleSeed\": ")
+                .append(",\n    \"shuffleSeed\": ")
                 .append(node.shuffleSeed().map(String::valueOf).orElse("null"))
-                .append(",\n");
-        out.append("    \"executionOrder\": ")
+                .append(",\n    \"executionOrder\": ")
                 .append(quoteList(node.executionOrder()))
-                .append(",\n");
-        out.append("    \"status\": ")
+                .append(",\n    \"status\": ")
                 .append(quote(node.status().kind().name()))
-                .append(",\n");
-        out.append("    \"bodyStatus\": ")
+                .append(",\n    \"bodyStatus\": ")
                 .append(node.bodyStatus()
                         .map(status -> quote(status.kind().name()))
                         .orElse("null"))
-                .append(",\n");
-        out.append("    \"attemptIndex\": ").append(node.attemptIndex()).append(",\n");
-        out.append("    \"attemptTotal\": ").append(attemptTotal).append(",\n");
-        out.append("    \"superseded\": ").append(superseded).append(",\n");
-        out.append("    \"timedOut\": ").append(node.timedOut()).append(",\n");
-        out.append("    \"reason\": ")
+                .append(",\n    \"attemptIndex\": ")
+                .append(node.attemptIndex())
+                .append(",\n    \"attemptTotal\": ")
+                .append(attemptTotal)
+                .append(",\n    \"superseded\": ")
+                .append(superseded)
+                .append(",\n    \"timedOut\": ")
+                .append(node.timedOut())
+                .append(",\n    \"reason\": ")
                 .append(node.reason().map(ReportFileListener::quote).orElse("null"))
-                .append(",\n");
-        out.append("    \"phases\": [");
+                .append(",\n    \"phases\": [");
         var first = true;
         for (PhaseResult phase : node.phases()) {
             if (!first) {
@@ -204,11 +208,11 @@ public final class ReportFileListener implements Listener {
                     .append(quote(phase.name()))
                     .append(", \"status\": ")
                     .append(quote(phase.status().kind().name()))
-                    .append("}");
+                    .append('}');
         }
-        out.append("],\n");
-        out.append("    \"failures\": ").append(jsonFailures(node.failures())).append(",\n");
-        out.append("    \"children\": [");
+        out.append("],\n    \"failures\": ")
+                .append(jsonFailures(node.failures()))
+                .append(",\n    \"children\": [");
         var childFirst = true;
         for (TaskResult child : node.children()) {
             if (!childFirst) {
@@ -230,7 +234,7 @@ public final class ReportFileListener implements Listener {
     }
 
     private static String jsonFailures(final List<Failure> failures) {
-        final var out = new StringBuilder("[");
+        final var out = new StringBuilder(128).append('[');
         var first = true;
         for (Failure failure : failures) {
             if (!first) {
@@ -245,12 +249,12 @@ public final class ReportFileListener implements Listener {
                     .append(failure.isPrimary())
                     .append(", \"throwable\": ")
                     .append(failure.throwable().map(t -> quote(t.toString())).orElse("null"))
-                    .append("}");
+                    .append('}');
         }
-        return out.append("]").toString();
+        return out.append(']').toString();
     }
 
-    private static String optionalInstant(final Optional<java.time.Instant> instant) {
+    private static String optionalInstant(final Optional<Instant> instant) {
         return instant.map(value -> quote(value.toString())).orElse("null");
     }
 
@@ -264,7 +268,7 @@ public final class ReportFileListener implements Listener {
             first = false;
             out.append(quote(value));
         }
-        return out.append("]").toString();
+        return out.append(']').toString();
     }
 
     private static String quote(final String value) {
@@ -294,10 +298,8 @@ public final class ReportFileListener implements Listener {
     // ------------------------------------------------------------------------------------------
 
     private static String xml(final Result result) {
-        final var out = new StringBuilder();
-        out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        out.append("<paramixel schemaVersion=\"1\">\n");
-        out.append("  <run id=\"")
+        final var out = new StringBuilder(256);
+        out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<paramixel schemaVersion=\"1\">\n  <run id=\"")
                 .append(escape(result.runId()))
                 .append("\" status=\"")
                 .append(result.status().kind().name())
@@ -335,8 +337,11 @@ public final class ReportFileListener implements Listener {
             out.append(" timedOut=\"true\"");
         }
         if (node.kind() == TaskResult.Kind.ATTEMPT) {
-            out.append(" attemptIndex=\"").append(node.attemptIndex()).append('"');
-            out.append(" superseded=\"").append(superseded).append('"');
+            out.append(" attemptIndex=\"")
+                    .append(node.attemptIndex())
+                    .append("\" superseded=\"")
+                    .append(superseded)
+                    .append('"');
         }
         out.append(">\n");
         for (Failure failure : node.failures()) {
@@ -370,23 +375,18 @@ public final class ReportFileListener implements Listener {
     // ------------------------------------------------------------------------------------------
 
     private static String html(final Result result) {
-        final var out = new StringBuilder();
-        out.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n");
-        out.append("<title>Paramixel report ").append(escape(result.runId())).append("</title>\n");
-        out.append("<style>body{font-family:sans-serif}table{border-collapse:collapse}")
-                .append("td,th{border:1px solid #ccc;padding:4px 8px;text-align:left}")
-                .append(".FAILED{background:#fdd}.PASSED{background:#dfd}.SKIPPED{background:#ffe}")
-                .append(".ABORTED{background:#fec}.CANCELED{background:#eee}</style>\n");
-        out.append("</head>\n<body>\n");
-        out.append("<h1>Paramixel run ").append(escape(result.runId())).append("</h1>\n");
-        out.append("<p>Status: <strong>")
+        final var out = new StringBuilder(1024);
+        out.append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Paramixel report ")
+                .append(escape(result.runId()))
+                .append(HTML_TITLE_END_AND_STYLE)
+                .append(escape(result.runId()))
+                .append("</h1>\n<p>Status: <strong>")
                 .append(result.status().kind())
                 .append("</strong>, exit code ")
                 .append(result.exitCode())
                 .append(", quiescent: ")
                 .append(result.isQuiescent())
-                .append("</p>\n");
-        out.append("<p>Occurrences: ")
+                .append("</p>\n<p>Occurrences: ")
                 .append(result.occurrenceCount())
                 .append(" (passed ")
                 .append(result.passedCount())
@@ -443,7 +443,7 @@ public final class ReportFileListener implements Listener {
                 + result.isQuiescent());
         result.root()
                 .ifPresent(root -> lines.addAll(TreeRenderer.renderDetailed(
-                        root, new ConsoleSupport(Configuration.of(java.util.Map.of("paramixel.ansi", "false"))))));
+                        root, new ConsoleSupport(Configuration.of(Map.of("paramixel.ansi", "false"))))));
         for (String diagnostic : result.diagnostics()) {
             lines.add("diagnostic: " + diagnostic);
         }

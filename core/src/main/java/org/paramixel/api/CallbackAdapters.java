@@ -31,7 +31,7 @@ final class CallbackAdapters {
 
     @SuppressWarnings("unchecked")
     static <T> TaskCallback instanceConsumer(final ThrowingConsumer<? super T> consumer) {
-        final ThrowingConsumer<Object> erased = (ThrowingConsumer<Object>) consumer;
+        final var erased = (ThrowingConsumer<Object>) consumer;
         return context -> erased.accept(context.primaryInstance());
     }
 
@@ -41,7 +41,7 @@ final class CallbackAdapters {
 
     @SuppressWarnings("unchecked")
     static <T> TaskCallback instanceAndContextConsumer(final ThrowingBiConsumer<? super T, Context> consumer) {
-        final ThrowingBiConsumer<Object, Context> erased = (ThrowingBiConsumer<Object, Context>) consumer;
+        final var erased = (ThrowingBiConsumer<Object, Context>) consumer;
         return context -> erased.accept(context.primaryInstance(), context);
     }
 

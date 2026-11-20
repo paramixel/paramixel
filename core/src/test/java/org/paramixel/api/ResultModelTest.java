@@ -23,10 +23,12 @@ import static org.paramixel.api.Tasks.task;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.exception.AbortException;
 import org.paramixel.api.exception.SkipException;
+import org.paramixel.api.support.RetryPolicy;
 
 /**
  * The immutable result model: identity, counters, aggregation, and exit policy.
@@ -124,8 +126,8 @@ class ResultModelTest {
     void retriedRunPasses() {
         final var definition = task("root")
                 .child(task("retried")
-                        .retry(org.paramixel.api.support.RetryPolicy.attempts(2))
-                        .step("probe", new java.util.concurrent.atomic.AtomicInteger()::incrementAndGet))
+                        .retry(RetryPolicy.attempts(2))
+                        .step("probe", new AtomicInteger()::incrementAndGet))
                 .build();
 
         final var result = run(definition);
@@ -138,10 +140,10 @@ class ResultModelTest {
     @Test
     @DisplayName("a successful retry does not count historical attempt failures as occurrences")
     void retriedAttemptsAreNotCountedAsFailures() {
-        final var attempts = new java.util.concurrent.atomic.AtomicInteger();
+        final var attempts = new AtomicInteger();
         final var definition = task("root")
-                .child(org.paramixel.api.Tasks.sequential("retried")
-                        .retry(org.paramixel.api.support.RetryPolicy.attempts(3))
+                .child(Tasks.sequential("retried")
+                        .retry(RetryPolicy.attempts(3))
                         .step("probe", () -> {
                             if (attempts.incrementAndGet() < 3) {
                                 throw new IllegalStateException("not yet");
@@ -230,5 +232,91 @@ class ResultModelTest {
         assertThat(child.failures().get(0).message()).contains("operation failed");
         assertThat(child.failures().get(0).isPrimary()).isTrue();
         assertThat(result.root().orElseThrow().failures().get(0).message()).contains("cleanup failed");
+    }
+
+    @Test
+    @DisplayName("counters are set by name and round-trip through accessors and diagnostic merges")
+    void namedCountersRoundTrip() {
+        final var result = Result.builder()
+                .runId("named-counters")
+                .occurrenceCount(10)
+                .attemptCount(4)
+                .passedCount(5)
+                .failedCount(2)
+                .skippedCount(1)
+                .abortedCount(1)
+                .canceledCount(1)
+                .timedOutCount(2)
+                .build();
+        final var merged = result.withAdditionalDiagnostics(List.of("late diagnostic"));
+
+        for (Result value : List.of(result, merged)) {
+            assertThat(value.occurrenceCount()).isEqualTo(10);
+            assertThat(value.attemptCount()).isEqualTo(4);
+            assertThat(value.passedCount()).isEqualTo(5);
+            assertThat(value.failedCount()).isEqualTo(2);
+            assertThat(value.skippedCount()).isEqualTo(1);
+            assertThat(value.abortedCount()).isEqualTo(1);
+            assertThat(value.canceledCount()).isEqualTo(1);
+            assertThat(value.timedOutCount()).isEqualTo(2);
+        }
+        assertThat(merged.diagnostics()).containsExactly("late diagnostic");
+    }
+
+    @Test
+    @DisplayName("inconsistent or negative counters are rejected")
+    void inconsistentCountersAreRejected() {
+        assertThatThrownBy(() -> Result.builder()
+                        .runId("too-many-passed")
+                        .occurrenceCount(10)
+                        .passedCount(99)
+                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("occurrenceCount");
+        assertThatThrownBy(() -> Result.builder()
+                        .runId("status-sum")
+                        .occurrenceCount(3)
+                        .passedCount(2)
+                        .failedCount(2)
+                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("occurrenceCount");
+        assertThatThrownBy(() -> Result.builder()
+                        .runId("timeouts")
+                        .occurrenceCount(1)
+                        .timedOutCount(2)
+                        .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("timedOutCount");
+        assertThatThrownBy(() -> Result.builder().failedCount(-1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("failedCount");
+    }
+
+    @Test
+    @DisplayName("engine counters satisfy the builder's consistency rules for a mixed run")
+    void engineCountersAreConsistent() {
+        final var definition = task("root")
+                .independent()
+                .step("passes", () -> {})
+                .step("fails", () -> {
+                    throw new IllegalStateException("boom");
+                })
+                .step("skips", () -> {
+                    throw new SkipException("not applicable");
+                })
+                .build();
+
+        final var result = run(definition);
+
+        assertThat(result.passedCount()
+                        + result.failedCount()
+                        + result.skippedCount()
+                        + result.abortedCount()
+                        + result.canceledCount())
+                .isEqualTo(result.occurrenceCount());
+        assertThat(result.passedCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(2);
+        assertThat(result.skippedCount()).isEqualTo(1);
     }
 }

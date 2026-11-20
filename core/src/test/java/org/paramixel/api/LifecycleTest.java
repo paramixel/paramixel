@@ -17,7 +17,7 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +48,7 @@ class LifecycleTest {
         final Task definition = parallel("matrix", Pool.named("p"))
                 .each(
                         List.of("a", "b", "c"),
-                        name -> forInstance(name, () -> {
+                        name -> instance(name, () -> {
                                     factories.incrementAndGet();
                                     return name;
                                 })
@@ -70,7 +71,7 @@ class LifecycleTest {
     @DisplayName("LIFE-02: definition and compilation do not create instances or run callbacks")
     void definitionIsLazy() {
         final AtomicInteger calls = new AtomicInteger();
-        final Task definition = forInstance("instance", () -> {
+        final Task definition = instance("instance", () -> {
                     calls.incrementAndGet();
                     return new Object();
                 })
@@ -91,7 +92,7 @@ class LifecycleTest {
                 .step("failing", () -> {
                     throw new IllegalStateException("boom");
                 })
-                .child(forInstance("skipped", () -> {
+                .child(instance("skipped", () -> {
                             factoryCalls.incrementAndGet();
                             return new Object();
                         })
@@ -113,7 +114,7 @@ class LifecycleTest {
     @DisplayName("LIFE-04: a throwing factory runs no before, body, or after")
     void factoryFailureSkipsLifecycle() {
         final List<String> calls = new ArrayList<>();
-        final Task definition = forInstance("instance", () -> {
+        final Task definition = instance("instance", () -> {
                     throw new IllegalStateException("factory failed");
                 })
                 .before(() -> calls.add("before"))
@@ -133,7 +134,7 @@ class LifecycleTest {
     @DisplayName("LIFE-05: a null instance is rejected without running after")
     void nullInstanceFails() {
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = forInstance("instance", () -> null)
+        final Task definition = instance("instance", () -> null)
                 .after(afterCalls::incrementAndGet)
                 .build();
 
@@ -147,7 +148,7 @@ class LifecycleTest {
     @DisplayName("LIFE-06: a failing before callback still runs every after callback")
     void beforeFailureStillFinalizes() {
         final List<String> calls = new ArrayList<>();
-        final Task definition = forInstance("instance", Object::new)
+        final Task definition = instance("instance", Object::new)
                 .before(() -> {
                     calls.add("before-1");
                     throw new IllegalStateException("before failed");
@@ -205,7 +206,7 @@ class LifecycleTest {
     @Test
     @DisplayName("LIFE-10/11: a failing after callback keeps the original failure primary")
     void afterFailurePreservesPrimaryFailure() {
-        final Task definition = forInstance("instance", Object::new)
+        final Task definition = instance("instance", Object::new)
                 .step(
                         "body",
                         () -> {
@@ -252,7 +253,7 @@ class LifecycleTest {
         final Task definition = parallel("matrix", Pool.named("p"))
                 .each(
                         List.of("a", "b", "c", "d"),
-                        name -> forInstance(name, () -> name).step("verify", (String value) -> {
+                        name -> instance(name, () -> name).step("verify", (String value) -> {
                             assertThat(value).isEqualTo(name);
                             seen.add(value);
                         }))
@@ -272,7 +273,7 @@ class LifecycleTest {
     @DisplayName("LIFE-15: re-running a definition creates fresh instances")
     void rerunCreatesFreshInstances() {
         final AtomicInteger factories = new AtomicInteger();
-        final Task definition = forInstance("instance", () -> {
+        final Task definition = instance("instance", () -> {
                     factories.incrementAndGet();
                     return new Object();
                 })
@@ -295,12 +296,78 @@ class LifecycleTest {
                 closes.incrementAndGet();
             }
         }
-        final Task definition = forInstance("instance", Closeable::new)
+        final Task definition = instance("instance", Closeable::new)
                 .step("body", instance -> assertThat(instance).isNotNull())
                 .build();
 
         run(definition);
 
         assertThat(closes).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("LIFE-19: a resource factory on an instance task cannot read that task's instance, nor an outer one")
+    void resourceFactoryCannotReadOwnInstance() {
+        final var key = Key.named("lifecycle", "ownInstance", String.class);
+        final var seen = new AtomicReference<Object>();
+        final var bodyCalls = new AtomicInteger();
+        final Task inner = instance("inner", () -> "inner-value")
+                .resource(key, context -> {
+                    seen.set(context.primaryInstance());
+                    return "resource";
+                })
+                .step("uses own instance", value -> bodyCalls.incrementAndGet())
+                .build();
+        final Task definition =
+                instance("outer", () -> "outer-value").child(inner).build();
+
+        final var result = run(definition);
+        final var innerNode = result.root().orElseThrow().children().get(0);
+
+        assertThat(seen.get()).isNull();
+        assertThat(bodyCalls).hasValue(0);
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(innerNode.failures())
+                .anySatisfy(failure ->
+                        assertThat(failure.message()).contains("outer > inner").contains("not available yet"));
+    }
+
+    @Test
+    @DisplayName("LIFE-20: without an outer instance, the error names the timing, not a missing binding")
+    void resourceFactoryOnRootInstanceGetsTimingError() {
+        final var key = Key.named("lifecycle", "rootInstance", String.class);
+        final Task definition = instance("solo", () -> "solo-value")
+                .resource(key, context -> String.valueOf(context.primaryInstance()))
+                .step("work", value -> {})
+                .build();
+
+        final var result = run(definition);
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(result.root().orElseThrow().failures())
+                .anySatisfy(failure -> assertThat(failure.message())
+                        .contains("not available yet")
+                        .doesNotContain("wrap the task in instance"));
+    }
+
+    @Test
+    @DisplayName("LIFE-21: a resource factory on a plain child task reads the enclosing instance")
+    void childResourceFactoryReadsEnclosingInstance() {
+        final var key = Key.named("lifecycle", "enclosingInstance", String.class);
+        final var seen = new AtomicReference<Object>();
+        final Task child = task("child")
+                .resource(key, context -> {
+                    seen.set(context.primaryInstance());
+                    return "resource";
+                })
+                .step("work", () -> {})
+                .build();
+        final Task definition =
+                instance("outer", () -> "outer-value").child(child).build();
+
+        final var result = run(definition);
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(seen.get()).isEqualTo("outer-value");
     }
 }

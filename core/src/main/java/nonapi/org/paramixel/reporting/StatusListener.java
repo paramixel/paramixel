@@ -17,13 +17,17 @@
 package nonapi.org.paramixel.reporting;
 
 import java.io.PrintStream;
+import java.time.Duration;
 import java.util.Optional;
 import nonapi.org.paramixel.support.AnsiColor;
+import nonapi.org.paramixel.support.ElapsedTimeFormatter;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
+import org.paramixel.api.Result;
 import org.paramixel.api.Task;
 import org.paramixel.api.TaskEvent;
 import org.paramixel.api.TaskPhase;
+import org.paramixel.api.Version;
 
 /**
  * Prints a status line for terminal and timeout events.
@@ -53,9 +57,8 @@ public final class StatusListener implements Listener {
             return;
         }
         final var runId = configuration.getString("paramixel.run.id").orElse("");
-        out.println(console.line(
-                console.color(AnsiColor.BOLD_WHITE_TEXT, "Paramixel " + org.paramixel.api.Version.version())
-                        + (runId.isEmpty() ? "" : " " + runId)));
+        out.println(console.line(console.color(AnsiColor.BOLD_WHITE_TEXT, "Paramixel " + Version.version())
+                + (runId.isEmpty() ? "" : " " + runId)));
     }
 
     @Override
@@ -87,22 +90,21 @@ public final class StatusListener implements Listener {
     }
 
     @Override
-    public void onRunCompleted(final org.paramixel.api.Result result) {
+    public void onRunCompleted(final Result result) {
         if (!console.enabled("status.footer")) {
             return;
         }
         out.println(console.line(console.label(result.status()) + " run " + result.runId() + " in "
-                + nonapi.org.paramixel.support.ElapsedTimeFormatter.formatDuration(elapsedMillis(result))
+                + ElapsedTimeFormatter.formatDuration(elapsedMillis(result))
                 + (result.isQuiescent() ? "" : " (non-quiescent)")));
     }
 
-    private static long elapsedMillis(final org.paramixel.api.Result result) {
+    private static long elapsedMillis(final Result result) {
         final var start = result.startedAt();
         final var end = result.completedAt();
         if (start.isEmpty() || end.isEmpty()) {
             return 0L;
         }
-        return java.time.Duration.between(start.orElseThrow(), end.orElseThrow())
-                .toMillis();
+        return Duration.between(start.orElseThrow(), end.orElseThrow()).toMillis();
     }
 }

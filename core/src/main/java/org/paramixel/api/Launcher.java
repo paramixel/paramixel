@@ -54,7 +54,7 @@ public final class Launcher {
      * @param args command-line arguments
      * @return the process exit code
      */
-    public static int execute(final String[] args) {
+    public static int execute(final String... args) {
         if (args != null) {
             for (String arg : args) {
                 if ("--help".equals(arg) || "-h".equals(arg)) {

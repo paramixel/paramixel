@@ -17,10 +17,11 @@
 package nonapi.org.paramixel.reporting;
 
 import java.io.PrintStream;
-import java.util.Optional;
+import java.time.Duration;
 import nonapi.org.paramixel.support.AnsiColor;
 import nonapi.org.paramixel.support.ElapsedTimeFormatter;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Failure;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 
@@ -60,7 +61,7 @@ public final class SummaryListener implements Listener {
                 out.println(console.line(line));
             }
         });
-        for (org.paramixel.api.Failure failure : result.failures()) {
+        for (Failure failure : result.failures()) {
             out.println(console.line(console.color(AnsiColor.BOLD_RED_TEXT, "infrastructure") + " [" + failure.phase()
                     + "] " + failure.message()));
             failure.throwable().ifPresent(throwable -> out.println(console.line("  " + throwable)));
@@ -90,12 +91,11 @@ public final class SummaryListener implements Listener {
     }
 
     private static long elapsedMillis(final Result result) {
-        final Optional<java.time.Instant> start = result.startedAt();
-        final Optional<java.time.Instant> end = result.completedAt();
+        final var start = result.startedAt();
+        final var end = result.completedAt();
         if (start.isEmpty() || end.isEmpty()) {
             return 0L;
         }
-        return java.time.Duration.between(start.orElseThrow(), end.orElseThrow())
-                .toMillis();
+        return Duration.between(start.orElseThrow(), end.orElseThrow()).toMillis();
     }
 }

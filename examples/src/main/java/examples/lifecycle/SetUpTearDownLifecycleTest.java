@@ -17,7 +17,7 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Paramixel;
@@ -53,7 +53,7 @@ public class SetUpTearDownLifecycleTest {
     public static Task factory() {
         resetCounts();
 
-        return forInstance("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
+        return instance("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
                 .before(SetUpTearDownLifecycleTest::setUp)
                 .step("testOne", SetUpTearDownLifecycleTest::testOne)
                 .step("testTwo", SetUpTearDownLifecycleTest::testTwo)

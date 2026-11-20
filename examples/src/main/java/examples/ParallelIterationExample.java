@@ -17,7 +17,7 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,7 +67,7 @@ public class ParallelIterationExample {
         return parallel("ParallelIterationExample", Pool.named("methods"))
                 .each(
                         arguments,
-                        value -> forInstance(value, ParallelIterationExample::new)
+                        value -> instance(value, ParallelIterationExample::new)
                                 .before(ParallelIterationExample::before)
                                 .sequential(
                                         "tests",

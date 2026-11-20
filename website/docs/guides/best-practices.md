@@ -7,7 +7,7 @@ description: Patterns that keep definitions readable and results trustworthy.
 
 ## One instance per environment
 
-Use `forInstance` once per environment and let nested groups inherit it. Avoid capturing shared mutable state in static
+Use `instance` once per environment and let nested groups inherit it. Avoid capturing shared mutable state in static
 fields when children run in parallel.
 
 ## Name every boundary

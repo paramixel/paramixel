@@ -6,37 +6,37 @@ description: Typed fluent authoring with generic instance inheritance and immuta
 # TaskBuilder
 
 ```java
-public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
-    public SELF before(ThrowingConsumer<? super T> callback);
-    public SELF before(ThrowingRunnable callback);
-    public SELF after(ThrowingConsumer<? super T> callback);
-    public SELF after(ThrowingRunnable callback);
+public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
+    public S before(ThrowingConsumer<? super T> callback);
+    public S before(ThrowingRunnable callback);
+    public S after(ThrowingConsumer<? super T> callback);
+    public S after(ThrowingRunnable callback);
 
-    public SELF step(String name, ThrowingConsumer<? super T> operation);
-    public SELF step(String name, ThrowingRunnable operation);
-    public SELF step(String name, ThrowingConsumer<? super T> operation,
+    public S step(String name, ThrowingConsumer<? super T> operation);
+    public S step(String name, ThrowingRunnable operation);
+    public S step(String name, ThrowingConsumer<? super T> operation,
                      Consumer<SequentialBuilder<T>> configureChildren);
-    public SELF step(String name, ThrowingRunnable operation,
+    public S step(String name, ThrowingRunnable operation,
                      Consumer<SequentialBuilder<T>> configureChildren);
 
-    public SELF sequential(String name, Consumer<SequentialBuilder<T>> configure);
-    public SELF parallel(String name, Pool pool, Consumer<ParallelBuilder<T>> configure);
-    public SELF repeat(String name, Consumer<RepeatBuilder<T>> configure);
-    public SELF when(String name, Predicate<Context> condition, Consumer<SequentialBuilder<T>> configure);
-    public SELF onlyIf(Predicate<Context> condition);
+    public S sequential(String name, Consumer<SequentialBuilder<T>> configure);
+    public S parallel(String name, Pool pool, Consumer<ParallelBuilder<T>> configure);
+    public S repeat(String name, Consumer<RepeatBuilder<T>> configure);
+    public S when(String name, Predicate<Context> condition, Consumer<SequentialBuilder<T>> configure);
+    public S onlyIf(Predicate<Context> condition);
 
-    public <E> SELF each(Iterable<? extends E> items,
+    public <E> S each(Iterable<? extends E> items,
                          Function<? super E, ? extends TaskBuilder<?, ?>> mapper);
-    public SELF child(Task child);
-    public SELF child(TaskBuilder<?, ?> child);
-    public SELF shuffle();
-    public SELF shuffle(long seed);
-    public SELF tags(String... values);
-    public SELF timeout(Duration timeout);
-    public SELF retry(RetryPolicy policy);
-    public SELF isolated(String lockName);
-    public <R> SELF resource(Key<R> key, ThrowingSupplier<? extends R> factory);
-    public <R> SELF resource(Key<R> key, ThrowingSupplier<? extends R> factory,
+    public S child(Task child);
+    public S child(TaskBuilder<?, ?> child);
+    public S shuffle();
+    public S shuffle(long seed);
+    public S tags(String... values);
+    public S timeout(Duration timeout);
+    public S retry(RetryPolicy policy);
+    public S isolated(String lockName);
+    public <R> S resource(Key<R> key, ThrowingSupplier<? extends R> factory);
+    public <R> S resource(Key<R> key, ThrowingSupplier<? extends R> factory,
                              ThrowingConsumer<? super R> release);
     public Task build();
 }
@@ -45,10 +45,10 @@ public abstract class TaskBuilder<T, SELF extends TaskBuilder<T, SELF>> {
 ## The type parameter
 
 `T` is the **nearest lexical primary instance**: `Void` means no instance binding. A nested group inherits the enclosing
-`T` without creating an instance, and a nested `forInstance` establishes its own binding.
+`T` without creating an instance, and a nested `instance` establishes its own binding.
 
 ```java
-forInstance("scenario", () -> new Scenario(environment))
+instance("scenario", () -> new Scenario(environment))
     .before(Scenario::start)
     .sequential("checks", checks -> checks
         .step("health", Scenario::checkHealth)

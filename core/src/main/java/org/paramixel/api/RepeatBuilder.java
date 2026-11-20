@@ -25,10 +25,11 @@ import org.paramixel.api.support.RepeatPolicy;
  * Authors a bounded repetition task.
  *
  * <p>The iteration bound is mandatory: {@link #maxIterations(int)} must be called before the definition can be built.
- * Each iteration is a distinct execution attempt with its own status and timestamps, and any {@code forInstance} task
+ * Each iteration is a distinct execution attempt with its own status and timestamps, and any {@code instance} task
  * inside the repeated subtree is re-instantiated per iteration while an inherited ancestor instance is reused.
  *
  * @param <T> the inherited primary instance type; {@link Void} when the task has no instance binding
+ * @see org.paramixel.api.support.RepeatPolicy
  * @see org.paramixel.api.support.RetryPolicy
  */
 public final class RepeatBuilder<T> extends TaskBuilder<T, RepeatBuilder<T>> {

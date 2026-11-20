@@ -19,7 +19,7 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 | `examples.support` | Shared utilities (Logger, Resource, NetworkFactory, Debug) | N/A |
 | `examples.isolated` | Exclusive lock serialization inside parallel work | Yes |
 | `examples.loop` | Bounded `repeat` with `until`, `untilPassed`, and `Backoff` delays | Yes |
-| `examples.fixtures` | The fixture-per-environment shape: `forInstance`, `each`, and a bounded pool | No |
+| `examples.fixtures` | The fixture-per-environment shape: `instance`, `each`, and a bounded pool | No |
 | `examples.testcontainers.kafka` | Kafka integration test + environment + wait strategy | N/A |
 | `examples.testcontainers.mongodb` | MongoDB integration test + environment | N/A |
 | `examples.testcontainers.nginx` | Nginx integration test + environment | N/A |

@@ -17,7 +17,7 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.ArrayList;
@@ -55,7 +55,7 @@ public class FullLifecycleTest {
     public static Task factory() {
         return sequential("FullLifecycleTest")
                 .before(FullLifecycleTest::staticSetUp)
-                .child(forInstance("instance", FullLifecycleTest::new)
+                .child(instance("instance", FullLifecycleTest::new)
                         .before(FullLifecycleTest::setUp)
                         .sequential(
                                 "tests",

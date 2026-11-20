@@ -214,46 +214,13 @@ public class ParamixelMojo extends AbstractMojo {
 
         try (var testClassLoader = buildTestClassLoader()) {
             Thread.currentThread().setContextClassLoader(testClassLoader);
-            Throwable primary = null;
             try {
-                final var configuration = buildConfiguration(testClassLoader);
-                final var selector = buildSelector();
-
-                var runner = Runner.builder()
-                        .configuration(configuration)
-                        .listener(Listener.defaultListener(configuration))
-                        .build();
-
-                var result = runner.run(selector);
-                if (result.root().isEmpty()) {
-                    if (failIfNoTests) {
-                        throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
-                    }
-
-                    getLog().info("No Paramixel tests found");
-                    return;
-                }
-
-                if (result.exitCode() != 0) {
-                    throw new MojoFailureException(PluginText.boldRed("TESTS FAILED"));
-                }
+                runTests(testClassLoader);
             } catch (Throwable t) {
-                primary = t;
+                finishExecution(originalClassLoader, preExecutionThreads, t);
                 throw t;
-            } finally {
-                Thread.currentThread().setContextClassLoader(originalClassLoader);
-                try {
-                    warnOrErrorLingeringThreads(preExecutionThreads);
-                } catch (MojoExecutionException leakError) {
-                    // A strict-thread-lifecycle error must not replace an in-flight primary
-                    // exception (e.g. a test failure); attach it as suppressed instead.
-                    if (primary != null) {
-                        primary.addSuppressed(leakError);
-                    } else {
-                        throw leakError;
-                    }
-                }
             }
+            finishExecution(originalClassLoader, preExecutionThreads, null);
         } catch (ConfigurationException e) {
             throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);
         } catch (ResolverException e) {
@@ -262,6 +229,55 @@ public class ParamixelMojo extends AbstractMojo {
             throw e;
         } catch (Exception e) {
             throw new MojoExecutionException("Failed to run Paramixel tests", e);
+        }
+    }
+
+    private void runTests(final ClassLoader testClassLoader) throws MojoExecutionException, MojoFailureException {
+        final var configuration = buildConfiguration(testClassLoader);
+        final var selector = buildSelector();
+
+        var runner = Runner.builder()
+                .configuration(configuration)
+                .listener(Listener.defaultListener(configuration))
+                .build();
+
+        var result = runner.run(selector);
+        if (result.root().isEmpty()) {
+            if (failIfNoTests) {
+                throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
+            }
+
+            getLog().info("No Paramixel tests found");
+            return;
+        }
+
+        if (result.exitCode() != 0) {
+            throw new MojoFailureException(PluginText.boldRed("TESTS FAILED"));
+        }
+    }
+
+    /**
+     * Restores the context class loader and checks for lingering threads after the test run.
+     *
+     * <p>A strict-thread-lifecycle error must not replace an in-flight primary exception (for example a test failure),
+     * so it is attached to {@code primary} as suppressed instead of being thrown.
+     *
+     * @param originalClassLoader the context class loader to restore
+     * @param preExecutionThreads the non-daemon threads alive before the run
+     * @param primary the exception the run is already failing with, or {@code null} when the run completed
+     * @throws MojoExecutionException if threads lingered under strict thread lifecycle and no primary exception exists
+     */
+    private void finishExecution(
+            final ClassLoader originalClassLoader, final Set<Thread> preExecutionThreads, final Throwable primary)
+            throws MojoExecutionException {
+        Thread.currentThread().setContextClassLoader(originalClassLoader);
+        try {
+            warnOrErrorLingeringThreads(preExecutionThreads);
+        } catch (MojoExecutionException leakError) {
+            if (primary == null) {
+                throw leakError;
+            }
+            primary.addSuppressed(leakError);
         }
     }
 
@@ -414,17 +430,19 @@ public class ParamixelMojo extends AbstractMojo {
         // Note: defaultConfiguration(classLoader) above already includes system
         // properties; this loop provides the authoritative point-in-time snapshot
         // that overrides any earlier values.
-        var systemProps = System.getProperties();
-        List<Map.Entry<Object, Object>> snapshot;
-        synchronized (systemProps) {
-            snapshot = systemProps.entrySet().stream().toList();
-        }
-        for (var entry : snapshot) {
+        for (var entry : systemPropertySnapshot()) {
             var k = String.valueOf(entry.getKey());
             configMap.put(k, String.valueOf(entry.getValue()));
         }
 
         return Configuration.of(configMap);
+    }
+
+    private static List<Map.Entry<Object, Object>> systemPropertySnapshot() {
+        final var systemProps = System.getProperties();
+        synchronized (systemProps) {
+            return systemProps.entrySet().stream().toList();
+        }
     }
 
     private static void putIfNotBlank(final Map<String, String> configuration, final String key, final String value) {
@@ -448,20 +466,22 @@ public class ParamixelMojo extends AbstractMojo {
         return new URLClassLoader(classpathUrls.toArray(new URL[0]), getClass().getClassLoader());
     }
 
-    private List<URL> buildTestClasspathUrls() throws MojoExecutionException {
-        if (project.getBuild() == null) {
-            throw new MojoExecutionException("Project build information is not available");
-        }
-
-        final List<String> classpathElements;
+    private List<String> testClasspathElements() throws MojoExecutionException {
         try {
-            classpathElements = project.getTestClasspathElements();
+            return project.getTestClasspathElements();
         } catch (DependencyResolutionRequiredException e) {
             throw new MojoExecutionException(
                     "Failed to resolve Maven test classpath; run the mojo in a phase with test dependency resolution",
                     e);
         }
+    }
 
+    private List<URL> buildTestClasspathUrls() throws MojoExecutionException {
+        if (project.getBuild() == null) {
+            throw new MojoExecutionException("Project build information is not available");
+        }
+
+        final var classpathElements = testClasspathElements();
         final var classpathUrls = new LinkedHashSet<URL>();
         try {
             for (String element : classpathElements) {

@@ -19,11 +19,14 @@ package nonapi.org.paramixel.execution;
 import org.paramixel.api.TaskEvent;
 
 /**
- * Receives execution events and diagnostics from the engine.
+ * Receives execution events and warnings from the engine.
  *
  * <p>Implementations must be non-blocking with respect to scheduler state: the engine calls these methods on its own
  * thread while it owns the scheduling decision, so an implementation that dispatches to a separate thread (with a
  * bounded queue and backpressure) is expected.
+ *
+ * <p>Run-level infrastructure diagnostics are deliberately not published here. The engine keeps them and attaches them
+ * to the {@link org.paramixel.api.Result} it returns, so they never depend on listener delivery to be recorded.
  */
 public interface EventPublisher {
 
@@ -40,11 +43,4 @@ public interface EventPublisher {
      * @param message the warning; never {@code null}
      */
     void warning(String message);
-
-    /**
-     * Publishes a run-level infrastructure diagnostic.
-     *
-     * @param message the diagnostic; never {@code null}
-     */
-    void diagnostic(String message);
 }

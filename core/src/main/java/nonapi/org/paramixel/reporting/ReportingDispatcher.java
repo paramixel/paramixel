@@ -18,6 +18,8 @@ package nonapi.org.paramixel.reporting;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +29,9 @@ import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
+import org.paramixel.api.Task;
 import org.paramixel.api.TaskEvent;
+import org.paramixel.api.exception.ConfigurationException;
 
 /**
  * Bounded, asynchronous event delivery.
@@ -39,36 +43,58 @@ import org.paramixel.api.TaskEvent;
  *
  * <p>Delivery guarantees: events are delivered in production order, exactly one terminal event per occurrence is
  * produced by the engine, and {@link #finish(Result)} drains every queued event before invoking
- * {@link Listener#onRunCompleted(Result)} on the calling thread, so reporting cannot race finalization.
+ * {@link Listener#onRunCompleted(Result)} on the calling thread, so reporting cannot race finalization. The drain is
+ * bounded by {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}: a listener that does not drain in time has its
+ * remaining events discarded, and the degradation is reported as a {@value #DRAIN_TIMEOUT_DIAGNOSTIC} diagnostic
+ * instead of being hidden.
  */
 public final class ReportingDispatcher implements EventPublisher, AutoCloseable {
 
+    /** The diagnostic code recorded when listeners did not drain within the configured timeout. */
+    public static final String DRAIN_TIMEOUT_DIAGNOSTIC = "LISTENER_DRAIN_TIMEOUT";
+
+    /** The drain timeout used when {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS} is unset. */
+    public static final long DEFAULT_DRAIN_TIMEOUT_MILLIS = 30_000L;
+
+    private static final int DEFAULT_QUEUE_CAPACITY = 8192;
+
     private static final Object END = new Object();
 
-    private final Listener listener;
     private final SafeListener safe;
     private final BlockingQueue<Object> queue;
+    private final long drainTimeoutMillis;
     private final Thread thread;
     private final AtomicBoolean finished = new AtomicBoolean();
     private final List<String> diagnostics = new ArrayList<>();
     private final Object diagnosticsLock = new Object();
+    private volatile boolean discarding;
 
     /**
      * Creates and starts a dispatcher.
      *
      * @param listener the listener; must not be {@code null}
      * @param configuration the effective configuration; must not be {@code null}
-     * @throws org.paramixel.api.exception.ConfigurationException if the queue capacity is not positive
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws ConfigurationException if the queue capacity or the drain timeout is not positive
      */
     public ReportingDispatcher(final Listener listener, final Configuration configuration) {
-        this.listener = java.util.Objects.requireNonNull(listener, "listener is null");
+        Objects.requireNonNull(listener, "listener is null");
+        Objects.requireNonNull(configuration, "configuration is null");
         this.safe = new SafeListener(listener);
         final var capacity =
-                configuration.getInteger(Configuration.LISTENER_QUEUE_CAPACITY).orElse(8192);
+                configuration.getInteger(Configuration.LISTENER_QUEUE_CAPACITY).orElse(DEFAULT_QUEUE_CAPACITY);
         if (capacity <= 0) {
-            throw new org.paramixel.api.exception.ConfigurationException(
+            throw new ConfigurationException(
                     "Invalid configuration for '" + Configuration.LISTENER_QUEUE_CAPACITY + "': must be positive");
         }
+        final var drainTimeout = configuration
+                .getLong(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS)
+                .orElse(DEFAULT_DRAIN_TIMEOUT_MILLIS);
+        if (drainTimeout <= 0) {
+            throw new ConfigurationException("Invalid configuration for '" + Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS
+                    + "': must be positive but was " + drainTimeout);
+        }
+        this.drainTimeoutMillis = drainTimeout;
         this.queue = new ArrayBlockingQueue<>(capacity);
         this.thread = new Thread(this::drainLoop, "paramixel-listener");
         this.thread.setDaemon(true);
@@ -96,7 +122,7 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
      *
      * @param root the discovered root, or empty
      */
-    public void discoveryCompleted(final java.util.Optional<org.paramixel.api.Task> root) {
+    public void discoveryCompleted(final Optional<Task> root) {
         safe.onDiscoveryCompleted(root);
     }
 
@@ -105,14 +131,21 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
         enqueue(event);
     }
 
+    /**
+     * Records a warning as a run diagnostic immediately and queues it for {@link Listener#onWarning(String)}.
+     *
+     * <p>Recording happens on the calling thread, so the diagnostic is kept even when a stuck listener never receives
+     * the queued warning.
+     *
+     * @param message the warning; must not be {@code null}
+     */
     @Override
     public void warning(final String message) {
+        if (finished.get()) {
+            return;
+        }
+        record("warning: " + message);
         enqueue(new Warning(message));
-    }
-
-    @Override
-    public void diagnostic(final String message) {
-        enqueue(new DiagnosticMessage(message));
     }
 
     private void enqueue(final Object item) {
@@ -136,7 +169,7 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
                 Thread.currentThread().interrupt();
                 return;
             }
-            if (item == END) {
+            if (item == END || discarding) {
                 return;
             }
             deliver(item);
@@ -148,10 +181,7 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
             if (item instanceof TaskEvent event) {
                 safe.onTaskEvent(event);
             } else if (item instanceof Warning warning) {
-                record("warning: " + warning.message);
                 safe.onWarning(warning.message);
-            } else if (item instanceof DiagnosticMessage diagnostic) {
-                record(diagnostic.message);
             }
         } catch (Throwable t) {
             UnrecoverableErrors.rethrowIfUnrecoverable(t);
@@ -166,24 +196,62 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
     }
 
     /**
-     * Drains all queued events, then invokes {@link Listener#onRunCompleted(Result)} on the calling thread.
+     * Ends event delivery and reports the completed run.
      *
-     * @param result the immutable result; must not be {@code null}
-     * @return listener diagnostics recorded during delivery; never {@code null}
+     * <p>Queued events are drained for at most {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}. When the listener
+     * does not drain in time, the remaining events are discarded, the dispatcher thread is interrupted, and a
+     * {@value #DRAIN_TIMEOUT_DIAGNOSTIC} diagnostic is recorded. The completed result — the supplied result plus every
+     * listener diagnostic recorded so far — is then passed to {@link Listener#onRunCompleted(Result)} on the calling
+     * thread. Diagnostics recorded while {@code onRunCompleted} itself runs are appended to the returned result only.
+     *
+     * @param result the engine's result; must not be {@code null}
+     * @return the completed result; never {@code null}
+     * @throws NullPointerException if {@code result} is {@code null}
      * @throws InterruptedException if interrupted while waiting for the queue to drain
      */
-    public List<String> finish(final Result result) throws InterruptedException {
+    public Result finish(final Result result) throws InterruptedException {
+        Objects.requireNonNull(result, "result is null");
         if (finished.compareAndSet(false, true)) {
-            queue.put(END);
-            thread.join(TimeUnit.SECONDS.toMillis(30));
+            drain();
         }
-        safe.onRunCompleted(result);
+        final var completed = result.withAdditionalDiagnostics(collectDiagnostics());
+        safe.onRunCompleted(completed);
+        return completed.withAdditionalDiagnostics(collectDiagnostics());
+    }
+
+    private void drain() throws InterruptedException {
+        final var deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(drainTimeoutMillis);
+        if (queue.offer(END, drainTimeoutMillis, TimeUnit.MILLISECONDS)) {
+            final var remainingMillis = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+            // Thread.join(0) waits forever, so the remaining wait is never allowed to reach zero.
+            thread.join(Math.max(1L, remainingMillis));
+        }
+        if (thread.isAlive()) {
+            discarding = true;
+            final var undelivered = undeliveredCount();
+            thread.interrupt();
+            record(DRAIN_TIMEOUT_DIAGNOSTIC + ": listener did not drain queued events within " + drainTimeoutMillis
+                    + "ms; " + undelivered + " queued item(s) were discarded");
+        }
+    }
+
+    private int undeliveredCount() {
+        var count = 0;
+        for (Object item : queue) {
+            if (item != END) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private List<String> collectDiagnostics() {
         final var collected = new ArrayList<String>();
         synchronized (diagnosticsLock) {
             collected.addAll(diagnostics);
             diagnostics.clear();
         }
-        collected.addAll(safe.diagnostics());
+        collected.addAll(safe.drainDiagnostics());
         return collected;
     }
 
@@ -193,16 +261,11 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
     @Override
     public void close() {
         if (finished.compareAndSet(false, true)) {
-            try {
-                queue.put(END);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            discarding = true;
+            queue.offer(END);
             thread.interrupt();
         }
     }
 
     private record Warning(String message) {}
-
-    private record DiagnosticMessage(String message) {}
 }

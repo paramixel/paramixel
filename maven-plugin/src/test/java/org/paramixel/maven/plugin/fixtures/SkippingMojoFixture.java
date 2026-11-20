@@ -16,7 +16,7 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
@@ -37,7 +37,7 @@ public final class SkippingMojoFixture {
      */
     @Paramixel.Factory
     public static Task action() {
-        return forInstance("mojo-skip", Object::new)
+        return instance("mojo-skip", Object::new)
                 .step("skip", () -> {
                     throw new SkipException("skip requested");
                 })

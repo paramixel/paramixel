@@ -17,6 +17,7 @@
 package org.paramixel.api.support;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
@@ -26,13 +27,14 @@ import org.paramixel.api.Status;
  * An immutable retry policy for a task.
  *
  * <p><strong>Retry is not repeat.</strong> A retry re-attempts the same task only after a non-success outcome that the
- * policy names, up to a finite attempt limit, and never concurrently. An owned {@code forInstance} instance is
+ * policy names, up to a finite attempt limit, and never concurrently. An instance owned by an {@code instance} task is
  * recreated for each attempt and its {@code after} callbacks run between attempts; retrying a nested step reuses the
  * inherited instance and does not reconstruct its ancestor.
  *
- * <p>The trigger set defaults to {@link Status.Kind#FAILED} only. Run cancellation and assumption aborts are never
- * retried automatically, and the builder rejects an attempt to add {@link Status.Kind#CANCELED} or
- * {@link Status.Kind#ABORTED} so a policy cannot silently mask an intentional stop.
+ * <p>The trigger set defaults to {@link Status.Kind#FAILED} only and may contain only the kinds in
+ * {@link #RETRYABLE_KINDS}: {@link Status.Kind#FAILED} and {@link Status.Kind#SKIPPED}. A passing outcome is never
+ * re-attempted, and run cancellation and assumption aborts are never retried automatically, so a policy can neither
+ * turn a pass into a later failure nor silently mask an intentional stop.
  *
  * <p>Instances are immutable and safe to share.
  */
@@ -40,6 +42,13 @@ public final class RetryPolicy {
 
     /** The largest accepted attempt limit; a larger value is rejected as unbounded work. */
     public static final int MAX_ATTEMPTS = 10_000;
+
+    /**
+     * The only status kinds a retry policy may name as triggers: the non-success outcomes {@code FAILED} and
+     * {@code SKIPPED}. This set is the single definition of a legal trigger for both the builder and plan validation.
+     */
+    public static final Set<Status.Kind> RETRYABLE_KINDS =
+            Collections.unmodifiableSet(EnumSet.of(Status.Kind.FAILED, Status.Kind.SKIPPED));
 
     private final int maxAttempts;
     private final Set<Status.Kind> retryOn;
@@ -123,11 +132,15 @@ public final class RetryPolicy {
     /**
      * Returns the delay before the supplied 1-based attempt.
      *
-     * @param nextAttempt the attempt number about to start; at least two
+     * @param nextAttempt the attempt number about to start; at least two, because the first attempt never waits
      * @return the delay; never {@code null}
+     * @throws IllegalArgumentException if {@code nextAttempt} is less than two
      */
     public Duration delayBefore(final int nextAttempt) {
-        return backoff.delayFor(Math.max(1, nextAttempt - 1));
+        if (nextAttempt < 2) {
+            throw new IllegalArgumentException("nextAttempt must be at least 2: " + nextAttempt);
+        }
+        return backoff.delayFor(nextAttempt - 1);
     }
 
     @Override
@@ -167,10 +180,11 @@ public final class RetryPolicy {
         /**
          * Replaces the trigger set.
          *
-         * @param kinds the status kinds that trigger a retry; must not be {@code null} or empty
+         * @param kinds the status kinds that trigger a retry; must not be {@code null} or empty, and each kind must be
+         *     one of {@link #RETRYABLE_KINDS}
          * @return this builder
-         * @throws NullPointerException if {@code kinds} is {@code null}
-         * @throws IllegalArgumentException if no kind is supplied or a kind cannot be retried
+         * @throws NullPointerException if {@code kinds} or an element is {@code null}
+         * @throws IllegalArgumentException if no kind is supplied or a kind is not in {@link #RETRYABLE_KINDS}
          */
         public Builder retryOn(final Status.Kind... kinds) {
             Objects.requireNonNull(kinds, "kinds is null");
@@ -210,11 +224,9 @@ public final class RetryPolicy {
 
         private static void requireRetryable(final Status.Kind kind) {
             Objects.requireNonNull(kind, "kind is null");
-            if (kind == Status.Kind.CANCELED || kind == Status.Kind.ABORTED) {
-                throw new IllegalArgumentException("A retry policy must not retry " + kind);
-            }
-            if (!kind.isTerminal()) {
-                throw new IllegalArgumentException("A retry policy trigger must be terminal: " + kind);
+            if (!RETRYABLE_KINDS.contains(kind)) {
+                throw new IllegalArgumentException(
+                        "A retry policy may only retry " + RETRYABLE_KINDS + ", not " + kind);
             }
         }
     }

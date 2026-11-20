@@ -9,7 +9,7 @@ description: Sequential, parallel, and repetition builder views.
 
 | Builder | Created by | Extra methods |
 | --- | --- | --- |
-| `SequentialBuilder<T>` | `Tasks.task`, `Tasks.sequential`, `Tasks.forInstance`, `sequential(...)`, `step(..., children -> ...)` | `dependent()`, `independent()` |
+| `SequentialBuilder<T>` | `Tasks.task`, `Tasks.sequential`, `Tasks.instance`, `sequential(...)`, `step(..., children -> ...)` | `dependent()`, `independent()` |
 | `ParallelBuilder<T>` | `Tasks.parallel`, `parallel(...)` | none — parallel groups have no continuation policy |
 | `RepeatBuilder<T>` | `Tasks.repeat`, `repeat(...)` | `maxIterations`, `untilPassed`, `until`, `delay` |
 
@@ -28,7 +28,7 @@ If `Check A` fails and `Check B` passes, both run and the group is `FAILED`.
 
 ```java
 parallel("Environments", Pool.named("environments"), matrix -> matrix
-    .each(environments, env -> forInstance(env.name(), () -> new Probe(env))
+    .each(environments, env -> instance(env.name(), () -> new Probe(env))
             .step("Verify", Probe::verify)));
 ```
 
@@ -44,5 +44,5 @@ repeat("Poll readiness", poll -> poll
     .step("Probe", Probe::assertReady));
 ```
 
-`maxIterations` is mandatory. Each iteration is a distinct attempt in the result tree, and an owned `forInstance` inside
+`maxIterations` is mandatory. Each iteration is a distinct attempt in the result tree, and an owned `instance` task inside
 the repeated subtree is re-instantiated per iteration.

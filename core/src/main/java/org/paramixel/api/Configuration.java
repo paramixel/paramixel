@@ -21,6 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import nonapi.org.paramixel.ConfigurationFactory;
 import org.paramixel.api.exception.ConfigurationException;
 
 /**
@@ -49,6 +50,8 @@ import org.paramixel.api.exception.ConfigurationException;
  *       quiesce before the run is reported non-quiescent</td><td>{@code 10000}</td></tr>
  *   <tr><td>{@code paramixel.listener.queue.capacity}</td><td>bounded listener event queue capacity</td>
  *       <td>{@code 8192}</td></tr>
+ *   <tr><td>{@code paramixel.listener.drainTimeoutMillis}</td><td>how long the end of a run waits for listeners to
+ *       drain queued events before discarding the rest and recording a diagnostic</td><td>{@code 30000}</td></tr>
  *   <tr><td>{@code paramixel.ansi}</td><td>{@code true}, {@code false} or {@code auto}</td><td>{@code auto}</td></tr>
  *   <tr><td>{@code paramixel.failureOnSkip}</td><td>map a skipped run to a failing exit code</td>
  *       <td>{@code true}</td></tr>
@@ -95,6 +98,9 @@ public interface Configuration {
 
     /** Configuration key controlling the bounded listener event queue capacity. */
     String LISTENER_QUEUE_CAPACITY = "paramixel.listener.queue.capacity";
+
+    /** Configuration key controlling the bounded wait for listeners to drain queued events, in milliseconds. */
+    String LISTENER_DRAIN_TIMEOUT_MILLIS = "paramixel.listener.drainTimeoutMillis";
 
     /** Configuration key controlling ANSI escape code output in console listeners. */
     String ANSI = "paramixel.ansi";
@@ -222,7 +228,7 @@ public interface Configuration {
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     static Configuration defaultConfiguration() {
-        return nonapi.org.paramixel.ConfigurationFactory.defaultConfiguration();
+        return ConfigurationFactory.defaultConfiguration();
     }
 
     /**
@@ -234,7 +240,7 @@ public interface Configuration {
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     static Configuration defaultConfiguration(final ClassLoader classLoader) {
-        return nonapi.org.paramixel.ConfigurationFactory.defaultConfiguration(classLoader);
+        return ConfigurationFactory.defaultConfiguration(classLoader);
     }
 
     /**
@@ -244,7 +250,7 @@ public interface Configuration {
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     static Configuration classpathConfiguration() {
-        return nonapi.org.paramixel.ConfigurationFactory.classpathConfiguration();
+        return ConfigurationFactory.classpathConfiguration();
     }
 
     /**
@@ -256,7 +262,7 @@ public interface Configuration {
      * @throws ConfigurationException if the classpath resource exists but cannot be loaded
      */
     static Configuration classpathConfiguration(final ClassLoader classLoader) {
-        return nonapi.org.paramixel.ConfigurationFactory.classpathConfiguration(classLoader);
+        return ConfigurationFactory.classpathConfiguration(classLoader);
     }
 
     /**
@@ -265,7 +271,7 @@ public interface Configuration {
      * @return the configuration; never {@code null}
      */
     static Configuration systemConfiguration() {
-        return nonapi.org.paramixel.ConfigurationFactory.systemConfiguration();
+        return ConfigurationFactory.systemConfiguration();
     }
 
     /**
@@ -278,6 +284,6 @@ public interface Configuration {
      * @throws NullPointerException if the map, a key, or a value is {@code null}
      */
     static Configuration of(final Map<String, String> properties) {
-        return nonapi.org.paramixel.ConfigurationFactory.fromMap(properties);
+        return ConfigurationFactory.fromMap(properties);
     }
 }

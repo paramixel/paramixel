@@ -18,7 +18,7 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.exception.CompilationException;
@@ -148,7 +149,7 @@ class ResourceConditionIsolationTest {
         final AtomicInteger bodyCalls = new AtomicInteger();
         final AtomicInteger afterCalls = new AtomicInteger();
         final AtomicInteger factories = new AtomicInteger();
-        final Task definition = forInstance("instance", () -> {
+        final Task definition = instance("instance", () -> {
                     factories.incrementAndGet();
                     return new Object();
                 })
@@ -241,8 +242,7 @@ class ResourceConditionIsolationTest {
                 .step("inner", () -> {}, children -> children.isolated("lock").step("work", () -> {}))
                 .build();
 
-        final var error =
-                org.assertj.core.api.Assertions.catchThrowableOfType(() -> run(definition), CompilationException.class);
+        final var error = Assertions.catchThrowableOfType(() -> run(definition), CompilationException.class);
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("LOCK_NESTED_SAME");

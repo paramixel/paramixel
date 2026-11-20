@@ -16,10 +16,12 @@
 
 package nonapi.org.paramixel.discovery;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -34,7 +36,6 @@ import nonapi.org.paramixel.selector.ConcreteSelector;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
-import org.paramixel.api.SequentialBuilder;
 import org.paramixel.api.Task;
 import org.paramixel.api.TaskBuilder;
 import org.paramixel.api.Tasks;
@@ -137,10 +138,9 @@ public final class FactoryScanner {
         afterHooks.sort(hookOrder().reversed());
         factories.sort(factoryOrder());
 
-        final SequentialBuilder<Void> root =
-                Tasks.sequential(Constants.ROOT_NAME).independent();
+        final var root = Tasks.sequential(Constants.ROOT_NAME).independent();
         root.tags(PlanCompiler.STRUCTURAL_TAG);
-        final SequentialBuilder<Void> run = Tasks.sequential("run");
+        final var run = Tasks.sequential("run");
         run.tags(PlanCompiler.STRUCTURAL_TAG);
         final var beforeGroup = buildHookGroup("BeforeAll hooks", beforeHooks);
         beforeGroup.ifPresent(run::child);
@@ -171,7 +171,7 @@ public final class FactoryScanner {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
-        final SequentialBuilder<Void> group = Tasks.sequential(name);
+        final var group = Tasks.sequential(name);
         for (HookCandidate candidate : candidates) {
             invoke(candidate.method(), name).ifPresent(group::child);
         }
@@ -179,9 +179,7 @@ public final class FactoryScanner {
     }
 
     private void collectHooks(
-            final Class<?> clazz,
-            final Class<? extends java.lang.annotation.Annotation> annotation,
-            final List<HookCandidate> target) {
+            final Class<?> clazz, final Class<? extends Annotation> annotation, final List<HookCandidate> target) {
         for (Method method : clazz.getDeclaredMethods()) {
             if (!method.isAnnotationPresent(annotation) || method.isAnnotationPresent(Paramixel.Disabled.class)) {
                 continue;
@@ -344,12 +342,12 @@ public final class FactoryScanner {
             if (!(other instanceof MethodKey key)) {
                 return false;
             }
-            return name.equals(key.name) && java.util.Arrays.equals(parameterTypes, key.parameterTypes);
+            return name.equals(key.name) && Arrays.equals(parameterTypes, key.parameterTypes);
         }
 
         @Override
         public int hashCode() {
-            return 31 * name.hashCode() + java.util.Arrays.hashCode(parameterTypes);
+            return 31 * name.hashCode() + Arrays.hashCode(parameterTypes);
         }
     }
 

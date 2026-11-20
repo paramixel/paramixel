@@ -18,6 +18,7 @@ package nonapi.org.paramixel.compiler;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 
@@ -120,6 +121,6 @@ public final class CompiledPlan {
                 return occurrence;
             }
         }
-        throw new java.util.NoSuchElementException("No occurrence with id " + id);
+        throw new NoSuchElementException("No occurrence with id " + id);
     }
 }

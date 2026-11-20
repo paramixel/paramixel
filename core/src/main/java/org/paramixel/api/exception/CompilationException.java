@@ -16,6 +16,8 @@
 
 package org.paramixel.api.exception;
 
+import java.util.List;
+
 /**
  * Thrown when a run's definition, configuration, or resource declaration fails validation before execution.
  *
@@ -29,7 +31,7 @@ public class CompilationException extends ParamixelException {
 
     private static final long serialVersionUID = 1L;
 
-    private final transient java.util.List<String> diagnostics;
+    private final transient List<String> diagnostics;
 
     /**
      * Creates an exception with one message.
@@ -37,7 +39,7 @@ public class CompilationException extends ParamixelException {
      * @param message the description; must not be {@code null}
      */
     public CompilationException(final String message) {
-        this(message, java.util.List.of(), null);
+        this(message, List.of(), null);
     }
 
     /**
@@ -47,7 +49,7 @@ public class CompilationException extends ParamixelException {
      * @param cause the cause, or {@code null}
      */
     public CompilationException(final String message, final Throwable cause) {
-        this(message, java.util.List.of(), cause);
+        this(message, List.of(), cause);
     }
 
     /**
@@ -57,9 +59,9 @@ public class CompilationException extends ParamixelException {
      * @param diagnostics the individual diagnostics; must not be {@code null}
      * @param cause the cause, or {@code null}
      */
-    public CompilationException(final String message, final java.util.List<String> diagnostics, final Throwable cause) {
+    public CompilationException(final String message, final List<String> diagnostics, final Throwable cause) {
         super(message, cause);
-        this.diagnostics = java.util.List.copyOf(diagnostics);
+        this.diagnostics = List.copyOf(diagnostics);
         for (String diagnostic : this.diagnostics) {
             addSuppressed(new ParamixelException(diagnostic));
         }
@@ -70,7 +72,7 @@ public class CompilationException extends ParamixelException {
      *
      * @return the immutable, ordered diagnostics; never {@code null}
      */
-    public java.util.List<String> diagnostics() {
+    public List<String> diagnostics() {
         return diagnostics;
     }
 }

@@ -17,7 +17,7 @@
 package examples.testcontainers.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 
 import examples.support.Logger;
@@ -76,7 +76,7 @@ public class KafkaTest {
         return parallel(KafkaTest.class.getName(), Pool.named("environments"))
                 .each(
                         KafkaTestEnvironment.createTestEnvironments(),
-                        environment -> forInstance(environment.name(), () -> new KafkaTest(environment))
+                        environment -> instance(environment.name(), () -> new KafkaTest(environment))
                                 .before(KafkaTest::setUp)
                                 .sequential(
                                         "tests",
@@ -118,9 +118,9 @@ public class KafkaTest {
     public void consume() {
         LOGGER.info("[%s] expected message [%s]", environment.name(), message);
 
-        boolean messageMatched = false;
-        int attempts = 0;
-        int maxAttempts = 5;
+        var messageMatched = false;
+        var attempts = 0;
+        final var maxAttempts = 5;
         var pollTimeout = Duration.ofSeconds(2);
 
         try (var consumer = createKafkaConsumer()) {

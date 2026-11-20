@@ -20,15 +20,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.task;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import nonapi.org.paramixel.reporting.ReportingDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Listener contract: event ordering, exactly one terminal event per occurrence, and error isolation.
@@ -155,6 +162,132 @@ class ListenerTest {
         assertThat(started).hasValue(1);
         assertThat(completed).hasValue(1);
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+    }
+
+    @Test
+    @DisplayName("onRunCompleted receives the run's infrastructure diagnostics")
+    void runCompletedReceivesInfrastructureDiagnostics() {
+        final var seen = new AtomicReference<List<String>>();
+        final var listener = new Listener() {
+            @Override
+            public void onRunCompleted(final Result result) {
+                seen.set(result.diagnostics());
+            }
+        };
+        final Task definition = task("root")
+                .timeout(Duration.ofMillis(80))
+                .step("stuck", () -> ignoreInterruptionFor(Duration.ofMillis(400)))
+                .build();
+
+        final var result = Runner.builder()
+                .listener(listener)
+                .configuration(Configuration.of(
+                        Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "80", Configuration.ANSI, "false")))
+                .build()
+                .run(definition);
+
+        assertThat(result.isQuiescent()).isFalse();
+        assertThat(seen.get()).anySatisfy(diagnostic -> assertThat(diagnostic).contains("NON_QUIESCENT"));
+        assertThat(result.diagnostics()).containsAll(seen.get());
+    }
+
+    @Test
+    @Timeout(30)
+    @DisplayName("a listener that does not drain in time is reported, and no event is delivered after onRunCompleted")
+    void blockedListenerDrainIsBoundedAndReported() throws InterruptedException {
+        final var blocked = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
+        final var dispatcher = new AtomicReference<Thread>();
+        final var completionStarted = new AtomicBoolean();
+        final var eventsAfterCompletion = new AtomicInteger();
+        final var diagnosticsAtCompletion = new AtomicReference<List<String>>();
+        final var listener = new Listener() {
+            @Override
+            public void onTaskEvent(final TaskEvent event) {
+                if (completionStarted.get()) {
+                    eventsAfterCompletion.incrementAndGet();
+                }
+                if (event.phase() == TaskPhase.BODY
+                        && "a".equals(event.name())
+                        && dispatcher.compareAndSet(null, Thread.currentThread())) {
+                    blocked.countDown();
+                    try {
+                        release.await(20, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+
+            @Override
+            public void onRunCompleted(final Result result) {
+                completionStarted.set(true);
+                diagnosticsAtCompletion.set(result.diagnostics());
+            }
+        };
+        final Task definition = task("root")
+                .step("a", () -> {})
+                .step("b", () -> {})
+                .step("c", () -> {})
+                .build();
+
+        final var startedNanos = System.nanoTime();
+        final Result result;
+        try {
+            result = Runner.builder()
+                    .listener(listener)
+                    .configuration(Configuration.of(
+                            Map.of(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS, "500", Configuration.ANSI, "false")))
+                    .build()
+                    .run(definition);
+        } finally {
+            release.countDown();
+        }
+        final var elapsed = Duration.ofNanos(System.nanoTime() - startedNanos);
+
+        assertThat(blocked.await(5, TimeUnit.SECONDS)).isTrue();
+        dispatcher.get().join(5_000L);
+        assertThat(dispatcher.get().isAlive()).isFalse();
+        assertThat(elapsed).isLessThan(Duration.ofSeconds(10));
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(result.diagnostics())
+                .anySatisfy(
+                        diagnostic -> assertThat(diagnostic).contains(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC));
+        assertThat(diagnosticsAtCompletion.get())
+                .anySatisfy(
+                        diagnostic -> assertThat(diagnostic).contains(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC));
+        assertThat(eventsAfterCompletion).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("a listener that drains normally produces no drain diagnostic")
+    void normalDrainProducesNoDiagnostic() {
+        final var listener = new RecordingListener();
+
+        final var result = Runner.builder()
+                .listener(listener)
+                .build()
+                .run(task("root").step("work", () -> {}).build());
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(result.diagnostics())
+                .noneMatch(diagnostic -> diagnostic.contains(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC));
+        assertThat(listener.events)
+                .anySatisfy(event -> assertThat(event.phase()).isEqualTo(TaskPhase.TERMINAL));
+    }
+
+    /**
+     * Busy-waits for the supplied duration while deliberately ignoring interruption, to force a non-quiescent run.
+     */
+    private static void ignoreInterruptionFor(final Duration duration) {
+        final var deadline = System.nanoTime() + duration.toNanos();
+        while (System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(10L);
+            } catch (InterruptedException ignored) {
+                // Deliberately uncooperative.
+            }
+        }
     }
 
     /**

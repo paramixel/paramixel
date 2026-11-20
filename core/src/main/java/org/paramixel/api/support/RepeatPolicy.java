@@ -18,6 +18,7 @@ package org.paramixel.api.support;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiPredicate;
 import org.paramixel.api.Context;
 import org.paramixel.api.Status;
@@ -27,7 +28,7 @@ import org.paramixel.api.Status;
  *
  * <p><strong>Repeat is not retry.</strong> Repetition runs the same subtree an intentional, bounded number of times —
  * for example to poll a service until it is ready — rather than re-attempting a failure. Each iteration has its own
- * result identity and timestamps, and an owned {@code forInstance} instance inside the repeated subtree is recreated
+ * result identity and timestamps, and an owned {@code instance} task inside the repeated subtree is recreated
  * for every iteration.
  *
  * <p>Iteration always stops at {@link #maxIterations()}. It may also stop early when {@link #untilPassed()} is set and
@@ -84,10 +85,10 @@ public final class RepeatPolicy {
     /**
      * Returns the optional stop predicate.
      *
-     * @return the predicate, or {@code null} when no predicate is configured
+     * @return the predicate, or empty when no predicate is configured; never {@code null}
      */
-    public BiPredicate<Context, Status> until() {
-        return until;
+    public Optional<BiPredicate<Context, Status>> until() {
+        return Optional.ofNullable(until);
     }
 
     /**
@@ -102,11 +103,15 @@ public final class RepeatPolicy {
     /**
      * Returns the delay before the supplied 1-based iteration.
      *
-     * @param nextIteration the iteration about to start; at least two
+     * @param nextIteration the iteration about to start; at least two, because the first iteration never waits
      * @return the delay; never {@code null}
+     * @throws IllegalArgumentException if {@code nextIteration} is less than two
      */
     public Duration delayBefore(final int nextIteration) {
-        return delay.delayFor(Math.max(1, nextIteration - 1));
+        if (nextIteration < 2) {
+            throw new IllegalArgumentException("nextIteration must be at least 2: " + nextIteration);
+        }
+        return delay.delayFor(nextIteration - 1);
     }
 
     /**

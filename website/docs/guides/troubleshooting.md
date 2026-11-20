@@ -11,10 +11,10 @@ A parallel task names a pool with no capacity. Set `paramixel.parallelism.x` or 
 `Runner.builder().pool(Pool.named("x"), n)`. Discovery itself uses a pool named `discovery`, which defaults to
 `paramixel.parallelism`.
 
-## "Task uses typed instance callbacks but no enclosing forInstance owns an instance"
+## "Task uses typed instance callbacks but no enclosing task owns a primary instance"
 
 A callback referenced an instance type without a lexical binding, for example `sequential("root").step("x", Test::m)`.
-Wrap the task in `forInstance(name, factory)` or use a no-argument callback.
+Wrap the task in `instance(name, factory)` or use a no-argument callback.
 
 ## "Pool 'x' is already active on this ancestry path"
 

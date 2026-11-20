@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import nonapi.org.paramixel.compiler.CompiledOccurrence;
 import org.paramixel.api.Failure;
@@ -68,15 +67,9 @@ final class OccurrenceState {
     Stage stage = Stage.NEW;
     Status status = Status.PENDING;
     String reason;
-    boolean canceled;
-    String cancellationReason;
+    final Cancellation cancellation = new Cancellation();
     boolean timedOut;
-    boolean permitHeld;
-    String permitName;
-    boolean lockHeld;
-    String lockName;
-    boolean waiting;
-    String waitingFor;
+    final Admission admission = new Admission();
     Attempt attempt;
     final List<TaskResult> attemptNodes = new ArrayList<>();
     final List<Status> attemptStatuses = new ArrayList<>();
@@ -88,7 +81,6 @@ final class OccurrenceState {
     Instant startedAt;
     Instant completedAt;
     int graceGeneration;
-    boolean terminalEmitted;
 
     /**
      * The worker thread currently running a callback for this occurrence, if any.
@@ -131,7 +123,7 @@ final class OccurrenceState {
      * @return {@code true} when canceled
      */
     boolean isCanceled() {
-        if (canceled) {
+        if (cancellation.requested) {
             return true;
         }
         return parent != null && parent.isCanceled();
@@ -143,8 +135,8 @@ final class OccurrenceState {
      * @return the reason, or {@code null}
      */
     String cancellationReason() {
-        if (cancellationReason != null) {
-            return cancellationReason;
+        if (cancellation.reason != null) {
+            return cancellation.reason;
         }
         return parent == null ? null : parent.cancellationReason();
     }
@@ -180,15 +172,24 @@ final class OccurrenceState {
     }
 
     /**
-     * Returns the nearest primary instance bound in this scope or an ancestor scope.
+     * Returns the occurrence that owns this occurrence's lexical instance binding.
      *
-     * @return the instance, or {@code null}
+     * <p>The owner is resolved through the compiled {@link CompiledOccurrence#bindingSlot() binding slot}, the same
+     * identity the compiler used to validate typed callbacks, so runtime resolution cannot drift from validation. The
+     * owner's instance may still be absent: it is created after the owner's resources, so a resource factory on the
+     * owning task runs before it exists.
+     *
+     * @return the owning occurrence, which may be this occurrence, or {@code null} when no instance is bound in scope
      */
-    Object nearestInstance() {
+    OccurrenceState bindingOwner() {
+        final var slot = compiled.bindingSlot();
+        if (slot == null) {
+            return null;
+        }
         var current = this;
         while (current != null) {
-            if (current.attempt != null && current.attempt.instance != null) {
-                return current.attempt.instance;
+            if (slot.equals(current.id)) {
+                return current;
             }
             current = current.parent;
         }
@@ -213,6 +214,28 @@ final class OccurrenceState {
             current = current.parent;
         }
         return null;
+    }
+
+    /**
+     * Cancellation requested for this occurrence itself; ancestors are consulted through {@link #isCanceled()}.
+     */
+    static final class Cancellation {
+
+        boolean requested;
+        String reason;
+    }
+
+    /**
+     * Admission state: the pool permit and exclusive lock this occurrence holds or is waiting for.
+     */
+    static final class Admission {
+
+        boolean permitHeld;
+        String permitName;
+        boolean lockHeld;
+        String lockName;
+        boolean waiting;
+        String waitingFor;
     }
 
     /**
@@ -255,15 +278,6 @@ final class OccurrenceState {
             final var failure = Failure.of(phase, message, throwable, failures.isEmpty());
             failures.add(failure);
             return failure;
-        }
-
-        /**
-         * Returns every resource binding visible in this attempt, for diagnostics.
-         *
-         * @return the immutable bindings; never {@code null}
-         */
-        Map<Key<?>, Object> resourceBindings() {
-            return Map.copyOf(resources);
         }
     }
 }

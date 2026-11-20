@@ -17,7 +17,7 @@ names the behavior changes that can affect an existing suite.
 | `Step` | A child task with a body |
 | `Sequential` | A sequential task |
 | `Parallel(displayName, "pool")` | `parallel(displayName, Pool.named("pool"))` |
-| `Instance.of(name, Class, factory)` | `forInstance(name, factory)` |
+| `Instance.of(name, Class, factory)` | `instance(name, factory)` |
 | `Scope` | Task lifecycle (`before` / `after`) |
 | `Conditional` | `when(name, predicate, …)` or `onlyIf(predicate)` |
 | `Loop` | `repeat(name, r -> r.maxIterations(n)…)` |
@@ -39,7 +39,7 @@ Instance.of("scenario", Scenario.class, () -> new Scenario(environment))
         .after("tearDown()", Scenario.class, Scenario::tearDown);
 
 // 7.0
-forInstance("scenario", () -> new Scenario(environment))
+instance("scenario", () -> new Scenario(environment))
         .before(Scenario::setUp)
         .step("check", Scenario::check)
         .after(Scenario::tearDown);
@@ -72,12 +72,12 @@ The class token appears once, in the supplier, and never again.
 Existing keys keep their names: `paramixel.parallelism`, `paramixel.parallelism.<pool>`, `paramixel.ansi`,
 `paramixel.failureOnSkip`, `paramixel.failureOnAbort`, `paramixel.failIfNoTests`, `paramixel.failFast`,
 `paramixel.report.file`, `paramixel.match.*`, `paramixel.listener.exclude`. New keys: `paramixel.workers`,
-`paramixel.shutdown.graceMillis`, `paramixel.listener.queue.capacity`.
+`paramixel.shutdown.graceMillis`, `paramixel.listener.queue.capacity`, `paramixel.listener.drainTimeoutMillis`.
 
 ## Migration checklist
 
 - Replace every `org.paramixel.api.action` import.
-- Convert `Instance.of(...)` to `forInstance(...)` and drop class tokens from steps.
+- Convert `Instance.of(...)` to `instance(...)` and drop class tokens from steps.
 - Convert `Parallel.parallel("x", "pool")` to `parallel("x", Pool.named("pool"))`.
 - Replace `Loop` with `repeat`, and the `Retry` helper with `RetryPolicy`.
 - Replace `Context.instance(Class)` lookups with typed callbacks or `Key<T>` resources.

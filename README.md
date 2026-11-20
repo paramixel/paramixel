@@ -10,7 +10,7 @@ execution metadata; the scheduler executes occurrences with bounded concurrency 
 import static org.paramixel.api.Tasks.*;
 
 Task definition = parallel("Environments", Pool.named("environments"))
-        .each(environments, environment -> forInstance(environment.name(), () -> new Scenario(environment))
+        .each(environments, environment -> instance(environment.name(), () -> new Scenario(environment))
                 .before(Scenario::start)
                 .sequential("checks", checks -> checks
                         .step("health", Scenario::checkHealth)
@@ -50,7 +50,7 @@ One immutable definition type, `Task`:
 - **`sequential` / `parallel`** describe how a task's direct children run. `parallel` always names a `Pool`.
 - **`dependent()` / `independent()`** describe only *failure continuation* of ordered children, so they exist on
   sequential builders only. `dependent` is the default.
-- **`forInstance(name, supplier)`** owns one lazily created instance per execution attempt. Lifecycle is `before` /
+- **`instance(name, supplier)`** owns one lazily created instance per execution attempt. Lifecycle is `before` /
   `after`; there is no separate instantiate/destroy ceremony and no implicit `AutoCloseable` closing.
 - **`step(name, operation, children -> ...)`** attaches a subtree explicitly. There is no hidden "current step" cursor.
 - **`each(items, mapper)`** expands eagerly at definition time and may produce builders bound to different instance

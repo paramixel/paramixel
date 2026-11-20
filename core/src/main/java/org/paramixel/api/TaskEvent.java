@@ -16,6 +16,7 @@
 
 package org.paramixel.api;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -42,47 +43,29 @@ public final class TaskEvent {
     private final int attempt;
     private final Status status;
     private final Instant timestamp;
-    private final java.time.Duration elapsed;
+    private final Duration elapsed;
+
+    private TaskEvent(final Builder builder) {
+        this.sequence = builder.sequence;
+        this.runId = Objects.requireNonNull(builder.runId, "runId is null");
+        this.occurrenceId = Objects.requireNonNull(builder.occurrenceId, "occurrenceId is null");
+        this.parentOccurrenceId = builder.parentOccurrenceId;
+        this.name = Objects.requireNonNull(builder.name, "name is null");
+        this.path = Objects.requireNonNull(builder.path, "path is null");
+        this.phase = Objects.requireNonNull(builder.phase, "phase is null");
+        this.attempt = builder.attempt;
+        this.status = Objects.requireNonNull(builder.status, "status is null");
+        this.timestamp = Objects.requireNonNull(builder.timestamp, "timestamp is null");
+        this.elapsed = builder.elapsed;
+    }
 
     /**
-     * Creates an event.
+     * Returns a new builder.
      *
-     * @param sequence the per-run monotonic sequence number
-     * @param runId the run identifier; must not be {@code null}
-     * @param occurrenceId the occurrence identifier; must not be {@code null}
-     * @param parentOccurrenceId the parent identifier, or {@code null}
-     * @param name the display name; must not be {@code null}
-     * @param path the display path; must not be {@code null}
-     * @param phase the phase; must not be {@code null}
-     * @param attempt the 1-based attempt index
-     * @param status the status of the phase or occurrence; must not be {@code null}
-     * @param timestamp the event instant; must not be {@code null}
-     * @param elapsed the occurrence duration for a terminal or timeout event, or {@code null}
-     * @throws NullPointerException if a required argument is {@code null}
+     * @return a builder; never {@code null}
      */
-    public TaskEvent(
-            final long sequence,
-            final String runId,
-            final String occurrenceId,
-            final String parentOccurrenceId,
-            final String name,
-            final String path,
-            final TaskPhase phase,
-            final int attempt,
-            final Status status,
-            final Instant timestamp,
-            final java.time.Duration elapsed) {
-        this.sequence = sequence;
-        this.runId = Objects.requireNonNull(runId, "runId is null");
-        this.occurrenceId = Objects.requireNonNull(occurrenceId, "occurrenceId is null");
-        this.parentOccurrenceId = parentOccurrenceId;
-        this.name = Objects.requireNonNull(name, "name is null");
-        this.path = Objects.requireNonNull(path, "path is null");
-        this.phase = Objects.requireNonNull(phase, "phase is null");
-        this.attempt = attempt;
-        this.status = Objects.requireNonNull(status, "status is null");
-        this.timestamp = Objects.requireNonNull(timestamp, "timestamp is null");
-        this.elapsed = elapsed;
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
@@ -180,12 +163,129 @@ public final class TaskEvent {
      *
      * @return the elapsed duration, or an empty optional for other phases
      */
-    public Optional<java.time.Duration> elapsed() {
+    public Optional<Duration> elapsed() {
         return Optional.ofNullable(elapsed);
     }
 
     @Override
     public String toString() {
         return "#" + sequence + " " + path + " " + phase + " " + status;
+    }
+
+    /**
+     * Builds {@link TaskEvent} instances.
+     *
+     * <p>The builder is used by the framework and by integrations that replay stored events. It is mutable and
+     * single-thread-confined.
+     */
+    public static final class Builder {
+
+        private long sequence;
+        private String runId;
+        private String occurrenceId;
+        private String parentOccurrenceId;
+        private String name;
+        private String path;
+        private TaskPhase phase;
+        private int attempt = 1;
+        private Status status;
+        private Instant timestamp;
+        private Duration elapsed;
+
+        private Builder() {
+            // Intentionally empty
+        }
+
+        /**
+         * Sets the per-run monotonic sequence number.
+         *
+         * @param sequence the sequence number
+         * @return this builder
+         */
+        public Builder sequence(final long sequence) {
+            this.sequence = sequence;
+            return this;
+        }
+
+        /**
+         * Sets the run identifier.
+         *
+         * @param runId the run identifier; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code runId} is {@code null}
+         */
+        public Builder runId(final String runId) {
+            this.runId = Objects.requireNonNull(runId, "runId is null");
+            return this;
+        }
+
+        /**
+         * Sets the occurrence identity.
+         *
+         * @param occurrenceId the occurrence identifier; must not be {@code null}
+         * @param parentOccurrenceId the parent identifier, or {@code null}
+         * @param name the display name; must not be {@code null}
+         * @param path the display path; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if a required argument is {@code null}
+         */
+        public Builder identity(
+                final String occurrenceId, final String parentOccurrenceId, final String name, final String path) {
+            this.occurrenceId = Objects.requireNonNull(occurrenceId, "occurrenceId is null");
+            this.parentOccurrenceId = parentOccurrenceId;
+            this.name = Objects.requireNonNull(name, "name is null");
+            this.path = Objects.requireNonNull(path, "path is null");
+            return this;
+        }
+
+        /**
+         * Sets the phase and its 1-based attempt index.
+         *
+         * @param phase the phase; must not be {@code null}
+         * @param attempt the 1-based attempt index
+         * @return this builder
+         * @throws NullPointerException if {@code phase} is {@code null}
+         */
+        public Builder phase(final TaskPhase phase, final int attempt) {
+            this.phase = Objects.requireNonNull(phase, "phase is null");
+            this.attempt = attempt;
+            return this;
+        }
+
+        /**
+         * Sets the status of the phase or occurrence.
+         *
+         * @param status the status; must not be {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code status} is {@code null}
+         */
+        public Builder status(final Status status) {
+            this.status = Objects.requireNonNull(status, "status is null");
+            return this;
+        }
+
+        /**
+         * Sets the event timing.
+         *
+         * @param timestamp the event instant; must not be {@code null}
+         * @param elapsed the occurrence duration for a terminal or timeout event, or {@code null}
+         * @return this builder
+         * @throws NullPointerException if {@code timestamp} is {@code null}
+         */
+        public Builder timing(final Instant timestamp, final Duration elapsed) {
+            this.timestamp = Objects.requireNonNull(timestamp, "timestamp is null");
+            this.elapsed = elapsed;
+            return this;
+        }
+
+        /**
+         * Builds the immutable event.
+         *
+         * @return the event; never {@code null}
+         * @throws NullPointerException if the run identifier, identity, phase, status, or timestamp is missing
+         */
+        public TaskEvent build() {
+            return new TaskEvent(this);
+        }
     }
 }

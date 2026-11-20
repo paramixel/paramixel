@@ -16,7 +16,7 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
@@ -36,6 +36,6 @@ public final class PassingMojoFixture {
      */
     @Paramixel.Factory
     public static Task action() {
-        return forInstance("mojo-pass", Object::new).step("test", () -> {}).build();
+        return instance("mojo-pass", Object::new).step("test", () -> {}).build();
     }
 }

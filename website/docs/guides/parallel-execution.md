@@ -11,7 +11,7 @@ description: Named pools, permit lifetimes, admission order, and honest limits.
 private static final Pool ENVIRONMENTS = Pool.named("environments");
 
 Task definition = parallel("Compatibility matrix", ENVIRONMENTS)
-        .each(environments, env -> forInstance(env.name(), () -> new Test(env))
+        .each(environments, env -> instance(env.name(), () -> new Test(env))
                 .step("check", Test::check))
         .build();
 

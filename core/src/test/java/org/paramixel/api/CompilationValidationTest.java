@@ -18,7 +18,7 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -26,9 +26,11 @@ import static org.paramixel.api.Tasks.task;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.exception.CompilationException;
+import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.support.RepeatPolicy;
 import org.paramixel.api.support.RetryPolicy;
 
@@ -42,8 +44,8 @@ class CompilationValidationTest {
                 .listener(Listener.NOOP)
                 .configuration(Configuration.of(Map.of("paramixel.ansi", "false")));
         pools.forEach(runner::pool);
-        return (CompilationException) org.assertj.core.api.Assertions.catchThrowableOfType(
-                () -> runner.build().run(definition), CompilationException.class);
+        return (CompilationException)
+                Assertions.catchThrowableOfType(() -> runner.build().run(definition), CompilationException.class);
     }
 
     @Test
@@ -54,7 +56,7 @@ class CompilationValidationTest {
                 .parallel(
                         "inner",
                         Pool.named("p"),
-                        inner -> inner.child(forInstance("instance", () -> {
+                        inner -> inner.child(instance("instance", () -> {
                             factories.incrementAndGet();
                             return new Object();
                         })))
@@ -203,7 +205,7 @@ class CompilationValidationTest {
                 .configuration(Configuration.of(Map.of(Configuration.WORKERS, "0")))
                 .build();
         assertThatThrownBy(() -> runner.run(task("root").step("work", () -> {}).build()))
-                .isInstanceOf(org.paramixel.api.exception.ConfigurationException.class)
+                .isInstanceOf(ConfigurationException.class)
                 .hasMessageContaining(Configuration.WORKERS);
     }
 }

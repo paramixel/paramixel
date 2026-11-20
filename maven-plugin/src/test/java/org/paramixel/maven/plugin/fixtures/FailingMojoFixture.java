@@ -16,7 +16,7 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
@@ -36,7 +36,7 @@ public final class FailingMojoFixture {
      */
     @Paramixel.Factory
     public static Task action() {
-        return forInstance("mojo-fail", Object::new)
+        return instance("mojo-fail", Object::new)
                 .step("fail", () -> {
                     throw new RuntimeException("boom");
                 })

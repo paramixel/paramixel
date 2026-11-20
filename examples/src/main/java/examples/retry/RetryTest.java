@@ -17,7 +17,7 @@
 package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.forInstance;
+import static org.paramixel.api.Tasks.instance;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -63,7 +63,7 @@ public class RetryTest {
         attempts.set(0);
         instancesCreated.set(0);
 
-        return forInstance("retry-example", RetryTest::new)
+        return instance("retry-example", RetryTest::new)
                 .retry(RetryPolicy.builder()
                         .maxAttempts(3)
                         .backoff(Backoff.linear(Duration.ofMillis(25)))
