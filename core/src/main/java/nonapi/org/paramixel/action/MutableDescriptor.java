@@ -16,6 +16,8 @@
 
 package nonapi.org.paramixel.action;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.paramixel.api.Descriptor;
 import org.paramixel.api.Status;
@@ -129,7 +131,7 @@ public interface MutableDescriptor extends Descriptor {
     /**
      * Interrupts the thread executing this descriptor's action, if one is recorded.
      *
-     * <p>Called by the scheduler's timeout handler after the grace period expires.
+     * <p>Called by {@link #abort(Status, Throwable)} once the cancelled subtree is fully terminal.
      * If no thread is recorded, this method is a no-op.
      */
     void interruptExecutingThread();
@@ -157,18 +159,25 @@ public interface MutableDescriptor extends Descriptor {
     /**
      * Cancels this descriptor's subtree best-effort.
      *
-     * <p>Marks this descriptor terminal with {@code rootStatus} (if not already terminal),
-     * completes its scheduled future exceptionally with {@code cause}, interrupts this
-     * descriptor's executing thread when it is a leaf action, and recurses into
-     * {@link #before()} and {@link #children()}: each descendant is marked
-     * {@link Status#ABORTED}, has its scheduled future completed exceptionally, and, when it is
-     * a leaf action, has its executing thread interrupted.
+     * <p>Cancellation runs in two phases. First the whole subtree is made terminal: this descriptor
+     * is marked with {@code rootStatus} (if not already terminal), every descendant is marked
+     * {@link Status#ABORTED}, and each scheduled future is completed exceptionally with
+     * {@code cause}. Only once that walk has returned are the executing threads of leaf actions
+     * interrupted.
+     *
+     * <p>The ordering is the contract. An interrupted leaf unwinds through its coordination frames
+     * on its own thread concurrently with this call, and those frames inspect the status of their
+     * siblings and children. Terminalizing the subtree first guarantees that a resuming frame — for
+     * example a dependent {@code Sequential}, which continues to its next child when the current one
+     * reports {@link Status#ABORTED} — observes a fully cancelled subtree, so it cannot start work
+     * inside it. Interrupting a leaf while its siblings are still {@link Status#PENDING} would make
+     * that outcome depend on thread scheduling.
      *
      * <p>Lifecycle cleanup is preserved: {@link #after()} is aborted only when its lifecycle never
      * attempted its {@link #before()} (or, without a {@code before}, never started). Otherwise the
      * {@code after} action is left untouched and not interrupted, so it still runs once the
      * cancelled work has unwound — matching the documented guarantee that {@code after} always
-     * runs once {@code before} has been attempted.
+     * runs once {@code before()} has been attempted.
      *
      * <p>This is the unblocking mechanism for coordination subtrees (e.g. a {@code Parallel})
      * whose coordinating frame is waiting on children: completing the futures publishes terminal
@@ -178,7 +187,7 @@ public interface MutableDescriptor extends Descriptor {
      * <p>For deeply nested coordination (e.g. Sequential → Parallel → Sequential → Parallel →
      * Step), propagation is bounded by the nesting depth: the interrupt reaches each executing
      * leaf, each leaf returns, and each coordinating frame observes its children's terminal state
-     * as the recursion unwinds.
+     * as they settle.
      *
      * <p>Idempotent: a descriptor already in a terminal state is skipped, so concurrent
      * completion and cancellation both converge safely. Safe to call from any thread,
@@ -192,7 +201,33 @@ public interface MutableDescriptor extends Descriptor {
      * @return {@code true} if this descriptor had already started (was running or terminal) when
      *     the abort reached it; {@code false} if the abort prevented it from ever starting
      */
-    boolean abort(Status rootStatus, Throwable cause);
+    default boolean abort(final Status rootStatus, final Throwable cause) {
+        var deferredInterrupts = new ArrayList<MutableDescriptor>(2);
+        var started = abort(rootStatus, cause, deferredInterrupts);
+        for (var leaf : deferredInterrupts) {
+            leaf.interruptExecutingThread();
+        }
+        return started;
+    }
+
+    /**
+     * Marks this descriptor's subtree cancelled, deferring leaf interrupts to the caller.
+     *
+     * <p>This is phase one of {@link #abort(Status, Throwable)}: this descriptor and every
+     * descendant are made terminal and their scheduled futures completed exceptionally, and each
+     * leaf action whose executing thread must be interrupted is appended to
+     * {@code deferredInterrupts}. The caller must invoke {@link #interruptExecutingThread()} on each
+     * collected descriptor only after the whole subtree walk has returned, so no leaf is woken
+     * while part of the cancelled subtree is still {@link Status#PENDING}.
+     *
+     * @param rootStatus the terminal status for this descriptor; must not be {@code null}
+     * @param cause the cause used to complete futures exceptionally; must not be {@code null}
+     * @param deferredInterrupts receives the leaf actions whose executing threads must be
+     *     interrupted; must not be {@code null}
+     * @return {@code true} if this descriptor had already started (was running or terminal) when
+     *     the abort reached it; {@code false} if the abort prevented it from ever starting
+     */
+    boolean abort(Status rootStatus, Throwable cause, List<MutableDescriptor> deferredInterrupts);
 
     /**
      * Returns the descriptor depth from the root.

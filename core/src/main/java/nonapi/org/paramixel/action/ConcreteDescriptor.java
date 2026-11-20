@@ -349,10 +349,12 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     @Override
-    public boolean abort(final Status rootStatus, final Throwable cause) {
+    public boolean abort(
+            final Status rootStatus, final Throwable cause, final List<MutableDescriptor> deferredInterrupts) {
         Objects.requireNonNull(rootStatus, "rootStatus is null");
         Objects.requireNonNull(cause, "cause is null");
-        var transition = beginAbort(rootStatus, cause);
+        Objects.requireNonNull(deferredInterrupts, "deferredInterrupts is null");
+        var transition = beginAbort(rootStatus, cause, deferredInterrupts);
         if (transition == AbortTransition.ALREADY_TERMINAL) {
             return true; // already terminal — idempotent; it necessarily started earlier
         }
@@ -362,14 +364,14 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         var abortedDescendant = Status.aborted("cancelled by ancestor: " + message);
         // The before slot is aborted first: its own atomic transition reports whether it had been
         // attempted, which decides whether the after slot still owes cleanup.
-        var beforeAttempted = before != null && before.abort(abortedDescendant, cause);
+        var beforeAttempted = before != null && before.abort(abortedDescendant, cause, deferredInterrupts);
         for (var child : children()) {
             Arguments.requireInstanceOf(child, MutableDescriptor.class, "child must be a MutableDescriptor")
-                    .abort(abortedDescendant, cause);
+                    .abort(abortedDescendant, cause, deferredInterrupts);
         }
         var cleanupOwed = before != null ? beforeAttempted : transition == AbortTransition.STARTED;
         if (after != null && !cleanupOwed) {
-            after.abort(abortedDescendant, cause);
+            after.abort(abortedDescendant, cause, deferredInterrupts);
         }
         return transition == AbortTransition.STARTED;
     }
@@ -387,27 +389,29 @@ public final class ConcreteDescriptor implements MutableDescriptor {
     }
 
     /**
-     * Performs this node's own terminal transition and leaf interrupt.
+     * Performs this node's own terminal transition and defers its leaf interrupt.
      *
      * <p>Returns {@link AbortTransition#ALREADY_TERMINAL} when this descriptor is already terminal,
-     * making {@link #abort} idempotent. Uses {@link #setStatus} to preserve the documented status
-     * state machine and {@code startedAt}/{@code completedAt} bookkeeping. Runs under this
-     * descriptor's monitor, so it is atomic with respect to {@link #tryStart()}.
+     * making {@link #abort(Status, Throwable, List)} idempotent. Uses {@link #setStatus} to preserve
+     * the documented status state machine and {@code startedAt}/{@code completedAt} bookkeeping. Runs
+     * under this descriptor's monitor, so it is atomic with respect to {@link #tryStart()}.
      *
      * <p>Only leaf descriptors run user code on their executing thread; coordination nodes are
-     * unblocked by their children completing, so interrupting only leaves avoids stranding an
-     * interrupt flag on a coordinating stack. For deeply nested coordination
-     * (e.g. Sequential → Parallel → Sequential → Parallel → Step), the interrupt reaches every
-     * executing leaf in the subtree, each leaf returns, and each coordinating frame observes its
-     * children's terminal state as the recursion unwinds. Propagation is therefore bounded by the
-     * nesting depth plus the time an uncooperative leaf takes to return.
+     * unblocked by their children completing, so only leaves are collected, and a coordinator never
+     * has a stray interrupt flag stranded on its parked stack. The interrupt is not delivered here:
+     * {@code deferredInterrupts} is replayed by the caller once the whole subtree is terminal, so an
+     * interrupted leaf cannot resume a coordination frame while its siblings are still
+     * {@link Status#PENDING}.
      *
      * @param rootStatus the terminal status for this descriptor; must not be {@code null}
      * @param cause the cause used to complete the scheduling future exceptionally; must not be
      *     {@code null}
+     * @param deferredInterrupts receives this descriptor when it is a leaf action; must not be
+     *     {@code null}
      * @return the transition that occurred
      */
-    private synchronized AbortTransition beginAbort(final Status rootStatus, final Throwable cause) {
+    private synchronized AbortTransition beginAbort(
+            final Status rootStatus, final Throwable cause, final List<MutableDescriptor> deferredInterrupts) {
         if (isCompleted()) {
             return AbortTransition.ALREADY_TERMINAL;
         }
@@ -418,11 +422,8 @@ public final class ConcreteDescriptor implements MutableDescriptor {
         }
         setStatus(rootStatus);
         completeFutureExceptionally(cause);
-        // Only leaf descriptors run user code on their executing thread; coordination nodes are
-        // unblocked solely by future completion, so interrupting only leaves avoids stranding an
-        // interrupt flag on a coordinator parked in the scheduler's managed join.
         if (isLeafAction()) {
-            interruptExecutingThread();
+            deferredInterrupts.add(this);
         }
         return transition;
     }
