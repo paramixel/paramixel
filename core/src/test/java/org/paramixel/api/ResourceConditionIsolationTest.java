@@ -242,7 +242,7 @@ class ResourceConditionIsolationTest {
                 .step("inner", () -> {}, children -> children.isolated("lock").step("work", () -> {}))
                 .build();
 
-        final var error = Assertions.catchThrowableOfType(() -> run(definition), CompilationException.class);
+        final var error = Assertions.catchThrowableOfType(CompilationException.class, () -> run(definition));
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("LOCK_NESTED_SAME");

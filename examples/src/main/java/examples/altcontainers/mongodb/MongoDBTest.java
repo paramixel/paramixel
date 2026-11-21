@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package examples.testcontainers.mongodb;
+package examples.altcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Tasks.instance;

@@ -22,7 +22,7 @@ Paramixel is a structured test-orchestration framework for Java integration, com
 
 - **Unit tests of pure functions.** A conventional unit-test framework is simpler.
 - **A distributed workflow engine.** Paramixel schedules in-process tasks; it is not a cluster scheduler.
-- **A container manager.** It orchestrates test fixtures; container lifecycle belongs to Testcontainers or similar.
+- **A container manager.** It orchestrates test fixtures; container lifecycle belongs to Altcontainers or similar.
 - **Crash-safe exactly-once execution.** A JVM crash cannot be recovered by the framework.
 - **Sandboxing untrusted code.** Discovered factories and callbacks are trusted executable code.
 

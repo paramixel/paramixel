@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package examples.testcontainers.kafka;
+package examples.altcontainers.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 
+import examples.altcontainers.util.RandomUtil;
 import examples.support.Logger;
-import examples.testcontainers.util.RandomUtil;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;

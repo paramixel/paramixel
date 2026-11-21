@@ -40,7 +40,7 @@ through nested groups.
 | --- | --- |
 | `core` | The library: definitions, compiler, scheduler, discovery, reporting |
 | `maven-plugin` | Maven `test`-phase integration; goal prefix `paramixel` |
-| `examples` | Example and Testcontainers-based integration tests |
+| `examples` | Example and Altcontainers-based integration tests |
 | `benchmarks` | JMH benchmarks for compilation and scheduling |
 
 ## The model

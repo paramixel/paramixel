@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package examples.testcontainers.util;
+package examples.altcontainers.util;
 
 import java.util.concurrent.ThreadLocalRandom;
 

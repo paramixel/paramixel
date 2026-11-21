@@ -44,8 +44,8 @@ class CompilationValidationTest {
                 .listener(Listener.NOOP)
                 .configuration(Configuration.of(Map.of("paramixel.ansi", "false")));
         pools.forEach(runner::pool);
-        return (CompilationException)
-                Assertions.catchThrowableOfType(() -> runner.build().run(definition), CompilationException.class);
+        return Assertions.catchThrowableOfType(
+                CompilationException.class, () -> runner.build().run(definition));
     }
 
     @Test

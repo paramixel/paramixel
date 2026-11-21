@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package examples.testcontainers.nginx;
+package examples.altcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Tasks.instance;
@@ -86,8 +86,9 @@ public class NginxTest {
     public void testGet() throws Exception {
         LOGGER.info("[%s] testing GET ...", environment.name());
 
-        final var port = environment.getNginxContainer().getMappedPort(80);
-        var content = doGet("http://localhost:" + port);
+        final var container = environment.getContainer();
+        final var port = container.hostPort(NginxContainerSpec.NGINX_PORT);
+        var content = doGet("http://" + container.host() + ":" + port);
         assertThat(content).contains("Welcome to nginx!");
     }
 

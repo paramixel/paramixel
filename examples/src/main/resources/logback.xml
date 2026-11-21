@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright (c) 2026-present Douglas Hoard
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+    Logging configuration for the examples when they run outside the Maven plugin (IDE, exec:java).
+
+    Example progress lines and container output are written to System.out directly (examples.support.Logger and
+    ContainerLogConsumer) and are not affected by this file; it configures SLF4J only. The container library logs
+    lifecycle details at DEBUG and the Kafka and MongoDB clients log their full configuration at INFO, which buries
+    the example's own output. WARN keeps real problems visible.
+
+    A Maven build is unaffected: the Paramixel Maven plugin runs the examples with its own classloader, which keeps
+    Maven's SLF4J provider as the binding, so this file is never read there.
+-->
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

@@ -77,11 +77,10 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - Website: https://www.slf4j.org/
   - License: MIT
 
-- Testcontainers
-  - Coordinates: org.testcontainers:*
-  - Website: https://testcontainers.com/
-  - License: MIT
-  - Copyright: (c) 2015-2021 Richard North and other authors
+- Altcontainers
+  - Coordinates: org.altcontainers:core
+  - Website: https://github.com/altcontainers/altcontainers
+  - License: Apache License 2.0
 
 Direct Dependency Inventory (as declared in Gradle build files)
 

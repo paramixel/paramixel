@@ -8,7 +8,7 @@ description: What the examples module demonstrates.
 The `examples` module holds definitions executed by the Paramixel Maven plugin during `test`. Run them with:
 
 ```bash
-./mvnw test -pl examples        # requires Docker for the Testcontainers examples
+./mvnw test -pl examples        # requires Docker for the Altcontainers examples
 ```
 
 | Package | Demonstrates |
@@ -21,8 +21,8 @@ The `examples` module holds definitions executed by the Paramixel Maven plugin d
 | `examples.argument` | Heterogeneous argument types in one matrix without casts |
 | `examples.annotation` | `@Disabled` and tag selection |
 | `examples.fixtures` | The fixture-per-environment shape with a bounded pool |
-| `examples.testcontainers` | Kafka, MongoDB, and Nginx environments with real containers |
+| `examples.altcontainers` | Kafka, MongoDB, and Nginx environments with real containers |
 
 Each runnable package contains a `__ParamixelRunner__` entry point that runs everything in that package with a package
-selector. The Testcontainers examples read image versions from `docker-images.txt` resources and share the
+selector. The Altcontainers examples read image versions from `docker-images.txt` resources and share the
 `environments` pool so only a bounded number of containers are alive at once.

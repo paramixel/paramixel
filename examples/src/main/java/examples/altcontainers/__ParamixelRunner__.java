@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package examples.testcontainers;
+package examples.altcontainers;
 
 import org.paramixel.api.Runner;
 import org.paramixel.api.selector.Selector;
 
 /**
  * Entry point for the Paramixel runner that discovers and executes all action factories
- * in the {@code examples.testcontainers} package and sub-packages.
+ * in the {@code examples.altcontainers} package and sub-packages.
  */
 public class __ParamixelRunner__ {
 

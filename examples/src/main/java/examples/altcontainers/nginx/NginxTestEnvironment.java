@@ -14,24 +14,20 @@
  * limitations under the License.
  */
 
-package examples.testcontainers.nginx;
+package examples.altcontainers.nginx;
 
-import examples.support.NetworkFactory;
+import examples.altcontainers.util.ContainerLogConsumer;
 import examples.support.Resource;
-import examples.testcontainers.util.ContainerLogConsumer;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-import org.testcontainers.containers.Network;
-import org.testcontainers.containers.NginxContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.DockerImageName;
+import org.altcontainers.api.Container;
+import org.altcontainers.api.Network;
 
 /**
  * Manages the lifecycle of an Nginx container for parameterized integration tests.
  * Starts an Nginx server inside a Docker container and provides access to the
- * raw container for port mapping.
+ * container for port mapping.
  *
  * <p>Supports two initialization modes:
  * <ul>
@@ -49,7 +45,7 @@ public class NginxTestEnvironment implements AutoCloseable {
 
     private final String argumentName;
 
-    private volatile NginxContainer<?> nginxContainer;
+    private volatile Container container;
 
     private volatile Network network;
 
@@ -58,7 +54,7 @@ public class NginxTestEnvironment implements AutoCloseable {
     /**
      * Creates a test environment for the given Docker image.
      *
-     * @param dockerImageName the Nginx Docker image (e.g. {@code "nginx:1.25"})
+     * @param dockerImageName the Nginx Docker image (e.g. {@code "nginx:1.29.5"})
      */
     public NginxTestEnvironment(final String dockerImageName) {
         this.dockerImageName = dockerImageName;
@@ -82,18 +78,18 @@ public class NginxTestEnvironment implements AutoCloseable {
      * @see #initialize(Network)
      */
     public void initialize() {
-        initialize(NetworkFactory.createNetwork(), true);
+        initialize(Network.create(), true);
     }
 
     /**
      * Starts the Nginx container on the given Docker network and waits for it to
-     * accept connections. The caller owns the network; {@link #close()} stops only
+     * serve HTTP requests. The caller owns the network; {@link #close()} stops only
      * the container.
      *
      * <p>If startup fails, the container is stopped silently before the exception
      * is re-thrown.
      *
-     * @param network the Testcontainers network to attach the container to
+     * @param network the Docker network to attach the container to
      * @see #initialize()
      */
     public void initialize(final Network network) {
@@ -103,18 +99,17 @@ public class NginxTestEnvironment implements AutoCloseable {
     private void initialize(final Network network, final boolean ownsNetwork) {
         this.network = Objects.requireNonNull(network, "network is null");
         this.ownsNetwork = ownsNetwork;
-        nginxContainer = new NginxContainer<>(DockerImageName.parse(dockerImageName))
-                .withNetwork(network)
-                .withStartupAttempts(3)
-                .withLogConsumer(new ContainerLogConsumer(getClass().getSimpleName(), argumentName))
-                .withStartupTimeout(Duration.ofSeconds(30))
-                .waitingFor(Wait.forListeningPort())
-                .withReuse(false);
+
+        final var spec = NginxContainerSpec.builder(dockerImageName)
+                .network(network, networkAlias())
+                .outputConsumer(new ContainerLogConsumer(getClass().getSimpleName(), argumentName))
+                .build();
 
         try {
-            nginxContainer.start();
+            container = Container.create(spec);
         } catch (Exception e) {
             stopQuietly();
+            closeNetworkIfOwned();
             throw e;
         }
     }
@@ -125,26 +120,26 @@ public class NginxTestEnvironment implements AutoCloseable {
      * @return {@code true} if the container has been started and not yet stopped
      */
     public boolean isRunning() {
-        return nginxContainer != null && nginxContainer.isRunning();
+        return container != null && container.isRunning();
     }
 
     /**
      * Returns the Docker network this container is attached to.
      *
-     * @return the Testcontainers network, or {@code null} if not yet initialized
+     * @return the network, or {@code null} if not yet initialized or already closed
      */
     public Network getNetwork() {
         return network;
     }
 
     /**
-     * Returns the underlying Nginx container instance for direct access, e.g. to
+     * Returns the underlying container instance for direct access, e.g. to
      * retrieve mapped ports.
      *
-     * @return the Testcontainers Nginx container
+     * @return the container handle, or {@code null} if not yet initialized or already closed
      */
-    public NginxContainer<?> getNginxContainer() {
-        return nginxContainer;
+    public Container getContainer() {
+        return container;
     }
 
     /**
@@ -156,6 +151,10 @@ public class NginxTestEnvironment implements AutoCloseable {
     public void close() {
         stopQuietly();
         closeNetworkIfOwned();
+    }
+
+    private String networkAlias() {
+        return argumentName.replaceAll("[^A-Za-z0-9_.-]", "-");
     }
 
     private void closeNetworkIfOwned() {
@@ -172,13 +171,13 @@ public class NginxTestEnvironment implements AutoCloseable {
     }
 
     private void stopQuietly() {
-        if (nginxContainer != null) {
+        if (container != null) {
             try {
-                nginxContainer.stop();
+                container.close();
             } catch (Exception ignored) {
                 // Intentionally suppress stop exception to preserve original cause
             } finally {
-                nginxContainer = null;
+                container = null;
             }
         }
     }

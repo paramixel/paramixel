@@ -58,6 +58,18 @@ cd paramixel
 ./mvnw clean install
 ```
 
+The build runs the examples against real containers, so Docker must be running. Expect two kinds of output that look
+worse than they are:
+
+- **`[PARAMIXEL] FAIL` lines** come from examples and plugin fixtures that deliberately exercise failure paths (a
+  retry policy's failed attempts, a factory that throws). The build result is reported by the `[PARAMIXEL] result:`
+  line and the Maven reactor summary, not by individual attempts.
+- **`WARNING:` lines from the JDK** originate in build tools, not in this code: Maven's Jansi library on JDK 24+ is
+  handled by `.mvn/jvm.config`, while Spotless' use of `sun.misc.Unsafe` and PMD's "Adding current platform … to
+  auxClasspath" notice remain. They are silenced with
+  `MAVEN_OPTS="--sun-misc-unsafe-memory-access=allow"` (JDK 24+) and `PMD_JAVA_DISABLE_AUX_CLASSPATH_WARNINGS=true`
+  respectively.
+
 ### Project Structure
 
 - `core/` - Main library (public API + implementation)

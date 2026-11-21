@@ -14,14 +14,19 @@
  * limitations under the License.
  */
 
-package examples.testcontainers.util;
+package examples.altcontainers.util;
 
+import java.util.Objects;
 import java.util.function.Consumer;
-import org.testcontainers.containers.output.OutputFrame;
+import org.altcontainers.api.OutputFrame;
 
 /**
- * Writes Testcontainers {@link OutputFrame} log lines to stdout, each prefixed with
+ * Writes Altcontainers {@link OutputFrame} log lines to stdout, each prefixed with
  * the consumer label and Docker image name for easy filtering.
+ *
+ * <p>Frames are decoded as UTF-8 with safe text conversion and stripped of trailing
+ * line endings; blank output is silently skipped. Instances are immutable and safe
+ * to share between threads.
  */
 public class ContainerLogConsumer implements Consumer<OutputFrame> {
 
@@ -36,8 +41,8 @@ public class ContainerLogConsumer implements Consumer<OutputFrame> {
      * @param dockerImageName Docker image identifier included in each log line
      */
     public ContainerLogConsumer(final String prefix, final String dockerImageName) {
-        this.prefix = prefix;
-        this.dockerImageName = dockerImageName;
+        this.prefix = Objects.requireNonNull(prefix, "prefix is null");
+        this.dockerImageName = Objects.requireNonNull(dockerImageName, "dockerImageName is null");
     }
 
     /**
@@ -47,13 +52,9 @@ public class ContainerLogConsumer implements Consumer<OutputFrame> {
      */
     @Override
     public void accept(final OutputFrame outputFrame) {
-        var message = outputFrame.getUtf8String();
-        if (message != null) {
-            message = message.trim();
-
-            if (!message.isEmpty()) {
-                System.out.printf("%s | [%s] %s%n", prefix, dockerImageName, message);
-            }
+        var message = outputFrame.safeUtf8StringWithoutLineEnding();
+        if (!message.isBlank()) {
+            System.out.printf("%s | [%s] %s%n", prefix, dockerImageName, message);
         }
     }
 }
