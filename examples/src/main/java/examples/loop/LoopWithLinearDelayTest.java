@@ -29,7 +29,7 @@ import org.paramixel.api.support.Backoff;
 /**
  * Demonstrates a fixed delay between iterations.
  *
- * <p>Delays are scheduled on a timer, not by blocking a worker thread, and they are cancellable: a run cancellation
+ * <p>Delays are scheduled on a timer, not by blocking a worker thread, and they are cancelable: a run cancellation
  * stops a pending delay instead of waiting it out.
  */
 public class LoopWithLinearDelayTest {

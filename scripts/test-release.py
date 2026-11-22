@@ -209,7 +209,7 @@ class ReleaseTests(unittest.TestCase):
         self.run_release('1.0.0', '--execute', '--retry-deploy')
         self.assertEqual(len(self.deployments()), 2)
 
-    def test_cancelled_tag_push_resumes(self):
+    def test_canceled_tag_push_resumes(self):
         self.run_release('1.0.0', '--execute', answers='y\ny\ny\nn\n', success=False)
         self.assertEqual(self.state()[0], '5')
         self.run_release('1.0.0', '--execute')
@@ -221,7 +221,7 @@ class ReleaseTests(unittest.TestCase):
         self.run_release('1.0.0', '--execute')
         self.assertEqual(len(self.deployments()), 1)
 
-    def test_cancelled_main_push_resumes(self):
+    def test_canceled_main_push_resumes(self):
         self.run_release('1.0.0', '--execute', answers='y\ny\ny\ny\nn\n', success=False)
         self.assertEqual(self.state()[0], '7')
         self.run_release('1.0.0', '--execute')

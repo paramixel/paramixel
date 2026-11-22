@@ -235,7 +235,7 @@ commit_changes() {
 push_release_branch() {
     if ! ref_exists "refs/remotes/origin/release/${VERSION}" \
         || [[ "$(commit_at "refs/remotes/origin/release/${VERSION}")" != "$(commit_at HEAD)" ]]; then
-        prompt_yes "Push release/${VERSION} to origin?" || fail 'Push cancelled; rerun to resume.'
+        prompt_yes "Push release/${VERSION} to origin?" || fail 'Push canceled; rerun to resume.'
         git push -u origin "refs/heads/release/${VERSION}:refs/heads/release/${VERSION}"
     fi
 }
@@ -298,7 +298,7 @@ tag_release() {
         git tag -a "v${VERSION}" "$RELEASE_COMMIT" -m "Release ${VERSION}"
     fi
     if [[ -z "$REMOTE_TAG_COMMIT" ]]; then
-        prompt_yes "Push tag v${VERSION} to origin?" || fail 'Tag push cancelled; rerun to resume.'
+        prompt_yes "Push tag v${VERSION} to origin?" || fail 'Tag push canceled; rerun to resume.'
         git push origin "refs/tags/v${VERSION}:refs/tags/v${VERSION}"
     fi
 }
@@ -327,7 +327,7 @@ bump_dev_version() {
     validate_build
     commit_changes 'chore: Prepare for development'
     if [[ "$(commit_at HEAD)" != "$(commit_at refs/remotes/origin/main)" ]]; then
-        prompt_yes 'Push main to origin?' || fail 'Push cancelled; rerun to resume the development bump.'
+        prompt_yes 'Push main to origin?' || fail 'Push canceled; rerun to resume the development bump.'
         git push origin refs/heads/main:refs/heads/main
     fi
 }
@@ -383,7 +383,7 @@ main() {
     if [[ "$RETRY_DEPLOY" == true ]]; then
         checkout_release
         prompt_yes 'Have you confirmed this version is NOT published and dropped ALL pending deployments for it in Central?' \
-            || fail 'Deployment retry cancelled.'
+            || fail 'Deployment retry canceled.'
         save_state 3
     fi
 
