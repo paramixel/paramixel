@@ -175,4 +175,20 @@ class StatusOutputTest {
         assertThat(lines).anySatisfy(line -> assertThat(line).startsWith(PREFIX + "PASS run "));
         assertThat(lines).anySatisfy(line -> assertThat(line).contains("result: PASS exitCode: 0"));
     }
+
+    @Test
+    @DisplayName("the summary header is separated from the run footer by a rule")
+    void summaryHeaderIsSeparatedFromFooterByRule() {
+        final var definition = task("root").step("pass", () -> {}).build();
+
+        final var lines = run(definition);
+
+        final var footer = lines.indexOf(lines.stream()
+                .filter(line -> line.startsWith(PREFIX + "PASS run "))
+                .findFirst()
+                .orElseThrow());
+        assertThat(lines).contains(PREFIX + "-------");
+        assertThat(lines.get(footer + 1)).isEqualTo(PREFIX + "-------");
+        assertThat(lines.get(footer + 2)).isEqualTo(PREFIX + "Summary");
+    }
 }

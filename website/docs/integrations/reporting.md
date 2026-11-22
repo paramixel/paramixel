@@ -30,10 +30,13 @@ looks like a level boundary. Stable identity is `occurrenceId`, never the path.
 Labels are `PASS`, `FAIL`, `SKIP`, `ABORT`, and `CANCEL`; `PEND`/`RUN` are used for in-flight kinds. Because labels are
 not padded, paths are not column-aligned across different statuses.
 
-The console summary shows each occurrence once with its final outcome and summarizes retry or repeat history on the
-occurrence line, so console output never contradicts the counters:
+The console summary is separated from the status footer by a short rule and shows each occurrence once with its final
+outcome, summarizing retry or repeat history on the occurrence line, so console output never contradicts the counters:
 
 ```text
+[PARAMIXEL] PASS run 5c0f… in 1 s 240 ms
+[PARAMIXEL] -------
+[PARAMIXEL] Summary
 [PARAMIXEL] PASS retry-example (sequential) — 3 attempts, 2 failed
 [PARAMIXEL] PASS   retry (sequential)
 ```
