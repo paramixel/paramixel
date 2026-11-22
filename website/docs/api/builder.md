@@ -12,9 +12,11 @@ public sealed interface Builder
         permits Conditional.Builder,
                 Instance.Builder,
                 Isolated.Builder,
+                Loop.Builder,
                 Parallel.Builder,
                 Repeat.Builder,
                 Scope.Builder,
+                Sequence.Builder, // Deprecated since 6.2 — use Sequential.Builder instead
                 Sequential.Builder,
                 Static.Builder, // Deprecated since 6.2 — use Scope.Builder instead
                 Timeout.Builder,
@@ -33,15 +35,17 @@ Each `Action` subtype that requires configuration exposes a corresponding `Build
 | Builder | Produces | Description |
 |---------|----------|-------------|
 | `Sequential.Builder` | `Sequential` | Sequential execution; `.child(action)` adds children, `.dependent()`/`.independent()` controls failure propagation. |
+| `Sequence.Builder` | `Sequence` | Sequential execution; same as `Sequential.Builder`. _(Deprecated since 6.2 — use `Sequential.Builder` instead.)_ |
 | `Parallel.Builder` | `Parallel` | Concurrent execution; `.parallelism(int)` controls in-flight count. |
 | `Scope.Builder` | `Scope` | Before-body-after with lifecycle guarantee. |
 | `Static.Builder` | `Static` | Before-body-after without fixture instance. _(Deprecated since 6.2 — use `Scope.Builder` instead.)_ |
 | `Instance.Builder` | `Instance` | Fixture instance lifecycle; `.body(action)` sets the body. |
 | `Isolated.Builder` | `Isolated` | Named-lock execution; `.body(action)` sets the protected child. |
-| `Repeat.Builder` | `Repeat` | Executes child action N times. |
+| `Repeat.Builder` | `Repeat` | Executes child action N times. _(Deprecated since 6.2 — use `Loop.Builder` instead.)_ |
+| `Loop.Builder` | `Loop` | Executes child action up to `maxIterations` times; `.until(Predicate)` optional, `.delay(...)` optional. `maxIterations` is required. |
 | `Timeout.Builder` | `Timeout` | Executes child action with wall-clock deadline. |
 | `Conditional.Builder` | `Conditional` | Evaluates a runtime predicate and gates body execution. |
-| `Until.Builder` | `Until` | Executes child repeatedly until predicate satisfied, body passes, or iterations exhausted; `.until(Predicate)` optional, rejects `null`. Without `.until()`, the loop stops when the body passes and reports `PASSED`. |
+| `Until.Builder` | `Until` | Executes child repeatedly until predicate satisfied, body passes, or iterations exhausted; `.until(Predicate)` optional, rejects `null`. Without `.until()`, the loop stops when the body passes and reports `PASSED`. _(Deprecated since 6.2 — use `Loop.Builder` instead.)_ |
 
 
 ## Named builder entry points

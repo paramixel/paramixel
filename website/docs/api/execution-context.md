@@ -45,4 +45,4 @@ Use `context.instance(Type.class)` when a fixture is optional. Use `context.requ
 
 ## Outcomes
 
-Actions communicate outcomes by throwing Paramixel outcome exceptions such as `FailException`, `SkipException`, or `AbortedException`. The scheduler catches these and maps them to terminal `Status` values on the descriptor.
+Actions communicate outcomes by throwing Paramixel outcome exceptions such as `FailException`, `SkipException`, or `AbortedException`. The execution engine catches these and maps them to terminal `Status` values on the descriptor.

@@ -67,7 +67,7 @@ public static Action temporarilyDisabled() {
 
 ## Named builders
 
-The `ActionsExample` in the repository demonstrates the named builder factories:
+The `NamedBuilderExample` in the repository demonstrates the named builder factories:
 
 ```java
 import static org.paramixel.api.action.Scope.scope;
@@ -75,7 +75,7 @@ import static org.paramixel.api.action.Sequential.sequential;
 import static org.paramixel.api.action.Parallel.parallel;
 import static org.paramixel.api.action.Assert.assertTrue;
 import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Repeat.repeat;
+import static org.paramixel.api.action.Loop.loop;
 import static org.paramixel.api.action.Timeout.timeout;
 
 @Paramixel.Factory
@@ -88,9 +88,9 @@ public static Action factory() {
                 .child(step("branch-2", ctx -> {}))
                 .child(step("branch-3", ctx -> {}))
                 .build())
-            .child(repeat("repeat-demo")
+            .child(loop("repeat-demo")
                 .body(step("repeated", ctx -> {}))
-                .iterations(3)
+                .maxIterations(3)
                 .build())
             .child(timeout("timeout-demo")
                 .timeout(Duration.ofSeconds(1))
