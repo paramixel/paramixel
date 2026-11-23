@@ -46,6 +46,23 @@ echo "test" | gpg --batch --clearsign >/dev/null
 
 The `WWW_PARAMIXEL_ORG` environment variable must be set to your SSH host alias for documentation publishing.
 
+Each release publishes a frozen documentation snapshot. `scripts/build-documentation.sh` validates and builds the site; it does not create the snapshot. Create the snapshot on `main` and commit it with the documentation changes **before** starting a release, then verify the whole site with `./scripts/build-documentation.sh`:
+
+```bash
+cd website
+npm run docusaurus -- docs:version <VERSION>
+```
+
+Then update `website/docusaurus.config.js`:
+
+- set `lastVersion` to `<VERSION>` so the new snapshot is served at `/`,
+- set `banner: 'none'` for the new version,
+- change the previously latest entry to `banner: 'unmaintained'` with the
+  `<version> (Unmaintained)` label and `className: 'notice-unmaintained'`.
+
+Commit the new `website/versioned_docs/version-<VERSION>` tree, its sidebar, `website/versions.json`,
+the configuration change, and the updated `website/docs` content together.
+
 ## Automated Release
 
 The `./scripts/release.sh` script automates the entire release process except for publishing from the Maven Central Portal, which requires manual verification.

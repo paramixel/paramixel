@@ -5,7 +5,7 @@ description: Common execution-tree patterns for Paramixel tests.
 
 # Test Shapes
 
-Paramixel is useful when a test has a shape that should be visible in code, execution, and reports. These patterns use existing 6.1.0 APIs only.
+Paramixel is useful when a test has a shape that should be visible in code, execution, and reports. These patterns use only the current public API.
 
 ## Simple sequence
 

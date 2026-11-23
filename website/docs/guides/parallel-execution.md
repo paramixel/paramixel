@@ -32,7 +32,7 @@ browser matrix
 `paramixel.parallelism` is the runner-wide concurrency budget, and it is the only global
 concurrency knob. Each executing branch — a `Parallel` child, a `Step` leaf, an `Isolated` body —
 holds one unit of that budget for as long as it runs, and the thread that calls the runner holds one for the whole run, so the budget bounds both the number of
-scheduler threads and the number of concurrently allocated resources such as containers.
+executing threads and the number of concurrently allocated resources such as containers.
 
 Execution is depth-first. The thread that reaches a `Parallel` runs its first child itself and
 starts additional workers for the remaining children while budget is available. Every worker simply
@@ -55,8 +55,8 @@ Because the budget counts branches rather than only leaf bodies, a suite that pr
 `N` concurrent leaves will now peak at `N` concurrent branches. Raise `paramixel.parallelism` if a
 plan needs more concurrent work.
 
-The former `paramixel.scheduler.queue.capacity` property was removed: the scheduler no longer has a
-ready queue. Setting it now logs a warning and has no effect.
+The former `paramixel.scheduler.queue.capacity` property was removed: there is no
+ready queue any more. Setting it now logs a warning through `Listener.onWarning` and has no effect.
 
 ## Best practices
 

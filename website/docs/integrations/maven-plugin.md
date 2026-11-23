@@ -11,7 +11,7 @@ The Maven plugin artifact is `org.paramixel:maven-plugin`. Its goal prefix is `p
 <plugin>
   <groupId>org.paramixel</groupId>
   <artifactId>maven-plugin</artifactId>
-  <version>6.1.0</version>
+  <version>6.2.7</version>
   <executions>
     <execution>
       <goals>
@@ -30,7 +30,7 @@ The Maven plugin artifact is `org.paramixel:maven-plugin`. Its goal prefix is `p
 | `failIfNoTests` | `paramixel.failIfNoTests` | `false` | Fail if no factories are discovered. |
 | `failureOnSkip` | `paramixel.failureOnSkip` | `false` | Promote skipped aggregate results to build failure. |
 | `failureOnAbort` | `paramixel.failureOnAbort` | `true` | Promote aborted aggregate results to build failure. |
-| `failFast` | `paramixel.failFast` | `false` | Skip scheduling remaining root children after the first failure. |
+| `failFast` | `paramixel.failFast` | `false` | Skip scheduling remaining root children after the first failed or aborted action. |
 | `reportFile` | `paramixel.report.file` | unset | Write a report file. |
 | `matchPackage` | `paramixel.match.package.regex` | unset | Filter by package regex. |
 | `matchClass` | `paramixel.match.class.regex` | unset | Filter by fully qualified class regex. |

@@ -5,11 +5,12 @@ description: Built-in action types, their roles, and composition examples.
 
 # Built-in Actions and When to Use Them
 
-`Action` is a sealed interface in `org.paramixel.api.action` with 13 permitted subtypes. Each action is an immutable, reusable definition. The runner and scheduler own all traversal, execution, status transitions, and listener callbacks.
+`Action` is a sealed interface in `org.paramixel.api.action` with 15 permitted subtypes. Each action is an immutable, reusable definition. The runner and its execution engine own all traversal, execution, status transitions, and listener callbacks.
 
 ```java
 public sealed interface Action
-        permits Assert, Conditional, Delay, Instance, Isolated, Parallel, Repeat, Scope, Sequential, Static, Step, Timeout, Until {
+        permits Assert, Conditional, Delay, Instance, Isolated, Loop, Parallel, Repeat, Scope, Sequence, Sequential,
+                Static, Step, Timeout, Until {
 
     String displayName();
 }
@@ -19,6 +20,7 @@ public sealed interface Action
 
 - `Step` wraps a `ContextConsumer` for user logic.
 - `Sequential` runs children one after another in dependent or independent mode, optionally shuffled. In dependent mode (the default), a `FAILED` or `SKIPPED` child short-circuits the sequence (remaining children are skipped); an `ABORTED` child does **not** short-circuit, so siblings still run and the sequence aggregates to `ABORTED`. In independent mode, all children run regardless of outcome. See [Exception Reference](../api/exception-reference) for how each outcome exception affects siblings.
+- `Sequence` has the same sequential semantics as `Sequential`. _(Deprecated since 6.2 — use `Sequential` instead.)_
 - `Parallel` runs children concurrently with configurable parallelism, optionally shuffled.
 - `Scope` provides before-body-after execution with lifecycle guarantee: once the before action has been attempted, the after action always runs, regardless of earlier outcomes. A scope cancelled before it starts runs neither.
 - `Static` provides before-body-after without a fixture instance. _(Deprecated since 6.2 — use `Scope` instead.)_
@@ -26,10 +28,11 @@ public sealed interface Action
 - `Assert` evaluates a boolean condition against an expected value. Passes when the actual value equals the expected value; fails with `FailException` otherwise. Created via static factories, not a builder: `assertTrue(name, actual)`, `assertFalse(name, actual)`, `assertThat(name, expected, actual)`, `assertThat(name, expected, () -> compute(), "message")`.
 - `Delay` pauses execution for a fixed or random duration. Created via static factories: `delay(name, millis)` or `delay(name, Duration)`.
 - `Isolated` executes its body under a named re-entrant lock. Same-named nodes serialize. Nested same-name nodes are re-entrant.
-- `Repeat` executes a child action a configurable number of times.
+- `Repeat` executes a child action a configurable number of times. _(Deprecated since 6.2 — use `Loop` instead.)_
+- `Loop` executes a child action up to `maxIterations` times. It accepts an optional termination predicate, evaluated after each iteration, and an optional inter-iteration delay. Without a predicate, every iteration runs and the loop reports the aggregate of its iterations; a failing or skipped iteration is treated as "try again" and does not stop the loop, while an aborted iteration stops it with `ABORTED`. With a predicate, exhaustion without satisfaction reports `FAILED`. Created via `loop(name)` with `.body(...)` and `.maxIterations(...)` required. `Loop` replaces both `Repeat` and `Until`.
 - `Timeout` executes a child action with a wall-clock deadline. On timeout the child is cancelled, but lifecycle cleanup still runs: see [Timeouts and cleanup](#timeouts-and-cleanup).
 - `Conditional` evaluates a runtime predicate and gates body execution. When the predicate is false, the node reports `PASSED` and the body subtree is skipped. Because the node passes, it does not disrupt dependent siblings in `Sequential`.
-- `Until` executes a child action repeatedly until a `Predicate<Context>` returns `true`, the body action passes, or `maxIterations` is exhausted. Individual iteration failures continue the loop. When `until()` is configured, only `ABORTED` or predicate satisfaction stops early; exhaustion reports `FAILED`. When `until()` is absent, the loop stops when the body passes and reports `PASSED`.
+- `Until` executes a child action repeatedly until a `Predicate<Context>` returns `true`, the body action passes, or `maxIterations` is exhausted. Individual iteration failures continue the loop. When `until()` is configured, only `ABORTED` or predicate satisfaction stops early; exhaustion reports `FAILED`. When `until()` is absent, the loop stops when the body passes and reports `PASSED`. _(Deprecated since 6.2 — use `Loop` instead.)_
 
 ## Choosing an action
 

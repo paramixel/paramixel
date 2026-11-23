@@ -45,12 +45,13 @@ Terminal actions return the action directly rather than a builder:
 | `Scope` | `scope(name)` | `before`, `body`, `after` |
 | `Sequential` | `sequential(name)` | `child`, `dependent`/`independent`, `shuffle` |
 | `Parallel` | `parallel(name)` | `child`, `parallelism`, `shuffle` |
-| `Repeat` | `repeat(name)` | `body`, `iterations` |
+| `Repeat` | `repeat(name)` | `body`, `iterations`. _(Deprecated since 6.2 — use `loop(name)`.)_ |
+| `Loop` | `loop(name)` | `body`, `maxIterations`, `until`, `delay` |
 | `Conditional` | `conditional(name, condition)` | `body` |
 | `Instance` | `instance(name, factory)` / `instance(type)` / `instance(name, type)` | `body` |
 | `Isolated` | `isolated(name, lockName)` | `body` |
 | `Timeout` | `timeout(name)` | `body`, `timeout`/`timeoutMillis` |
-| `Until` | `until(name)` | `body`, `maxIterations`, `until` |
+| `Until` | `until(name)` | `body`, `maxIterations`, `until`. _(Deprecated since 6.2 — use `loop(name)`.)_ |
 
 ## Usage example
 

@@ -20,7 +20,7 @@ Paramixel's public API is under `org.paramixel.api`.
 
 ## Action package
 
-`org.paramixel.api.action` contains `Action` (sealed interface with 13 subtypes), `Builder` (sealed interface with 10 subtypes), and built-in action types: `Step`, `Assert`, `Sequential`, `Parallel`, `Scope`, `Static` _(deprecated — use `Scope`)_, `Instance`, `Delay`, `Repeat`, `Timeout`, `Conditional`, `Isolated`, `Until`, and the `Each` data-driven utility.
+`org.paramixel.api.action` contains `Action` (sealed interface with 15 subtypes), `Builder` (sealed interface with 12 subtypes), and built-in action types: `Step`, `Assert`, `Sequential`, `Sequence` _(deprecated — use `Sequential`)_, `Parallel`, `Scope`, `Static` _(deprecated — use `Scope`)_, `Instance`, `Delay`, `Repeat` _(deprecated — use `Loop`)_, `Loop`, `Timeout`, `Conditional`, `Isolated`, `Until` _(deprecated — use `Loop`)_, and the `Each` data-driven utility.
 
 ## Selector package
 

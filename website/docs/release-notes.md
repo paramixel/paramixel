@@ -5,7 +5,7 @@ description: Current documentation-facing release notes.
 
 # Release Notes
 
-## Unreleased
+## 6.2.7
 
 - **Scheduler replaced by a depth-first execution engine** — Actions are compiled into a per-run
   execution plan before execution starts, and the plan is executed by recursive depth-first descent
