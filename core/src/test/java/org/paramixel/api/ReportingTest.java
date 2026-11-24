@@ -37,6 +37,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.paramixel.api.support.RetryPolicy;
+import org.w3c.dom.Element;
 
 /**
  * Report files are generated from the same immutable result as console output.
@@ -93,6 +94,48 @@ class ReportingTest {
         assertThat(document.getDocumentElement().getNodeName()).isEqualTo("paramixel");
         assertThat(document.getElementsByTagName("task").getLength()).isGreaterThanOrEqualTo(3);
         assertThat(document.getElementsByTagName("failure").getLength()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void xmlReportPreservesWhitespaceInTaskAttributes() throws Exception {
+        final var name = "task\twith\na\rname";
+        final var reason = "reason\r\nsecond\tline";
+        final var file = tempDir.resolve("attributes.xml");
+        final var definition = task(name)
+                .before(() -> {
+                    throw new IllegalStateException(reason);
+                })
+                .step("unstarted", () -> {})
+                .build();
+        final var result = Runner.builder()
+                .listener(ReportFileListenerFactory.listener(file))
+                .build()
+                .run(definition);
+        final var document = DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder()
+                .parse(new ByteArrayInputStream(Files.readAllBytes(file)));
+        final var root = (Element) document.getElementsByTagName("task").item(0);
+        final var failure = root.getElementsByTagName("failure").item(0);
+        final var rootResult = result.root().orElseThrow();
+        assertThat(root.getAttribute("name")).isEqualTo(rootResult.name()).isEqualTo(name);
+        assertThat(failure.getTextContent())
+                .isEqualTo(rootResult.failures().get(0).message())
+                .contains(reason);
+    }
+
+    @Test
+    void xmlReportPreservesSupplementaryCharactersAndMarkupAsText() throws Exception {
+        final var name = "<test> & \"name\" 🎉";
+        final var file = tempDir.resolve("characters.xml");
+        Runner.builder()
+                .listener(ReportFileListenerFactory.listener(file))
+                .build()
+                .run(task(name).step("work", () -> {}).build());
+        final var document = DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder()
+                .parse(new ByteArrayInputStream(Files.readAllBytes(file)));
+        final var root = (Element) document.getElementsByTagName("task").item(0);
+        assertThat(root.getAttribute("name")).isEqualTo(name);
     }
 
     @Test

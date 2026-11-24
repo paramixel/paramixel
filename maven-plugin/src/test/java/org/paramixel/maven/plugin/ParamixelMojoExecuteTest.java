@@ -30,7 +30,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.maven.model.Build;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -424,6 +426,39 @@ class ParamixelMojoExecuteTest {
         }
 
         @Test
+        void strictLifecycleDetectsANonDaemonTimerThatRetainsTheTestLoader() throws Exception {
+            final var timer = new AtomicReference<Timer>();
+            final var mojo = new ParamixelMojo() {
+                @Override
+                URLClassLoader buildTestClassLoader() throws MojoExecutionException {
+                    final var loader = super.buildTestClassLoader();
+                    final var thread = Thread.currentThread();
+                    final var original = thread.getContextClassLoader();
+                    try {
+                        thread.setContextClassLoader(loader);
+                        timer.set(new Timer());
+                    } finally {
+                        thread.setContextClassLoader(original);
+                    }
+                    return loader;
+                }
+            };
+            setField(mojo, "project", newProject(tempDir));
+            setField(mojo, "matchClass", PassingMojoFixture.class.getName());
+            setField(mojo, "strictThreadLifecycle", true);
+
+            try {
+                assertThatThrownBy(mojo::execute)
+                        .isInstanceOf(MojoExecutionException.class)
+                        .hasMessageContaining("Non-daemon threads");
+            } finally {
+                if (timer.get() != null) {
+                    timer.get().cancel();
+                }
+            }
+        }
+
+        @Test
         @DisplayName("no warning when no lingering threads after normal execution")
         void noWarningWhenNoLingeringThreadsAfterNormalExecution() throws Exception {
             var mojo = newMojo(tempDir, "PassingMojoFixture");
@@ -547,55 +582,37 @@ class ParamixelMojoExecuteTest {
         }
 
         @Test
-        @DisplayName("snapshotNonDaemonThreads excludes threads with system prefixes")
-        void snapshotNonDaemonThreadsExcludesThreadsWithSystemPrefixes() throws Exception {
-            var testCl = new URLClassLoader(new URL[0], getClass().getClassLoader());
-            var forkJoinThread = new Thread(
-                    () -> {
-                        try {
-                            Thread.sleep(30_000);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    },
-                    "ForkJoinPool-1");
+        void snapshotIncludesApplicationThreadsEvenWithSystemLikeNames() throws Exception {
+            final var started = new CountDownLatch(2);
+            final var release = new CountDownLatch(1);
+            final Runnable work = () -> {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            };
+            final var forkJoinThread = new Thread(work, "ForkJoinPool-1");
             forkJoinThread.setDaemon(false);
-            forkJoinThread.setContextClassLoader(testCl);
-
-            var timerThread = new Thread(
-                    () -> {
-                        try {
-                            Thread.sleep(30_000);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    },
-                    "Timer-0");
+            final var timerThread = new Thread(work, "Timer-0");
             timerThread.setDaemon(false);
-            timerThread.setContextClassLoader(testCl);
-
             try {
                 forkJoinThread.start();
                 timerThread.start();
+                assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
 
-                // Wait for threads to start
-                Thread.sleep(100);
-
-                var mojo = new ParamixelMojo();
-                var method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
+                final var method = ParamixelMojo.class.getDeclaredMethod("snapshotNonDaemonThreads");
                 method.setAccessible(true);
-
                 @SuppressWarnings("unchecked")
-                var threads = (Set<Thread>) method.invoke(mojo);
+                final var threads = (Set<Thread>) method.invoke(new ParamixelMojo());
 
-                var threadNames = threads.stream().map(Thread::getName).toList();
-                assertThat(threadNames).doesNotContain("ForkJoinPool-1", "Timer-0");
+                // These are application threads, not JVM-owned threads. Their names do not identify their owner.
+                assertThat(threads).contains(forkJoinThread, timerThread);
             } finally {
-                forkJoinThread.interrupt();
-                timerThread.interrupt();
+                release.countDown();
                 forkJoinThread.join(5_000);
                 timerThread.join(5_000);
-                testCl.close();
             }
         }
 

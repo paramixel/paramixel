@@ -29,13 +29,17 @@ public final class SkippingFactoryFixture {
     }
 
     /**
-     * Returns {@code null} to skip discovery.
+     * Runs the configured discovery hook, then returns {@code null} to skip discovery.
      *
      * @return {@code null}
      */
     @Paramixel.Factory
     @Paramixel.Tag("skipping")
     public static Task factory() {
+        final var hook = DiscoveryFixtures.factoryHook;
+        if (hook != null) {
+            hook.run();
+        }
         return null;
     }
 }

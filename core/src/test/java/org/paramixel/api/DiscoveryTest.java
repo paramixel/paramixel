@@ -364,6 +364,24 @@ class DiscoveryTest {
     }
 
     @Test
+    void closeDuringDiscoveryCancelsEvenIfNoFactoryContributedATask() {
+        final var selector =
+                Selector.builder().classOf(SkippingFactoryFixture.class).build();
+        try (var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.FAIL_IF_NO_TESTS, "false")))
+                .build()) {
+            DiscoveryFixtures.factoryHook = runner::close;
+            final var result = runner.run(selector);
+
+            assertThat(result.status().kind()).isEqualTo(Status.Kind.CANCELED);
+            assertThat(result.exitCode()).isEqualTo(1);
+            assertThat(result.root()).isEmpty();
+            assertThat(result.isQuiescent()).isTrue();
+        }
+    }
+
+    @Test
     void closeDuringDiscoveryDoesNotAdmitTheExecutionRoot() {
         final var admitted = new ArrayList<String>();
         try (var runner = Runner.builder()

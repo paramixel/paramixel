@@ -688,7 +688,7 @@ public final class ExecutionEngine {
                         List.of()));
             }
             attempt.beforeIndex = remaining.size();
-            skipChildren(state, "before did not pass");
+            finishUnstartedChildren(state, "before did not pass");
             goAfter(state);
             return;
         }
@@ -724,7 +724,7 @@ public final class ExecutionEngine {
                 TaskPhase.BODY, "body", status, outcome.error == null ? List.of() : List.of(lastFailure(attempt))));
         emit(state, TaskPhase.BODY, status, attempt.index);
         if (!status.isPassed()) {
-            skipChildren(state, "body " + status.kind());
+            finishUnstartedChildren(state, "body " + status.kind());
             goAfter(state);
             return;
         }
@@ -799,20 +799,6 @@ public final class ExecutionEngine {
         attempt.phases.add(PhaseResult.of(TaskPhase.CHILDREN, "children", aggregate, List.of()));
         emit(parent, TaskPhase.CHILDREN, aggregate, attempt.index);
         goAfter(parent);
-    }
-
-    private void skipChildren(final OccurrenceState state, final String reason) {
-        final var attempt = state.attempt;
-        if (attempt == null) {
-            return;
-        }
-        while (attempt.childCursor < attempt.children.size()) {
-            final var child = attempt.children.get(attempt.childCursor);
-            attempt.childCursor++;
-            if (!child.isTerminal()) {
-                markTerminal(child, Status.skipped(reason), reason);
-            }
-        }
     }
 
     private void finishUnstartedChildren(final OccurrenceState state, final String reason) {
@@ -981,6 +967,10 @@ public final class ExecutionEngine {
 
     private void onUntil(final OccurrenceState state, final JobOutcome outcome) {
         final var attempt = state.attempt;
+        if (state.isCanceled()) {
+            // The status passed to the predicate predates any cancellation or timeout during its evaluation.
+            attempt.attemptStatus = finalStatus(state);
+        }
         if (outcome.error != null) {
             final var status = classify(outcome.error, state);
             attempt.fail("REPEAT_UNTIL", messageFor(status, outcome.error, state), outcome.error);

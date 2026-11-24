@@ -92,6 +92,95 @@ class CancellationStressTest {
     }
 
     @Test
+    void cancellationDuringRepeatPredicateMarksTheCurrentAttemptCanceled() throws Exception {
+        final var checking = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
+        final var definition = task("root")
+                .repeat(
+                        "repeated",
+                        repeat -> repeat.maxIterations(2)
+                                .until((context, status) -> {
+                                    checking.countDown();
+                                    try {
+                                        release.await();
+                                    } catch (InterruptedException e) {
+                                        Thread.currentThread().interrupt();
+                                    }
+                                    return false;
+                                })
+                                .step("work", () -> {}))
+                .build();
+
+        try (var runner = runner(1, 5_000)) {
+            final var run = new FutureTask<>(() -> runner.run(definition));
+            final var thread = new Thread(run);
+            thread.setDaemon(true);
+            thread.start();
+            try {
+                assertThat(checking.await(5, TimeUnit.SECONDS)).isTrue();
+                runner.close();
+                final var result = run.get(10, TimeUnit.SECONDS);
+                final var repeated = result.root().orElseThrow().children().get(0);
+
+                assertThat(result.isQuiescent()).isTrue();
+                assertThat(repeated.status().kind()).isEqualTo(Status.Kind.CANCELED);
+                assertThat(repeated.reason()).hasValue("runner closed");
+                assertThat(repeated.children()).singleElement().satisfies(attempt -> {
+                    assertThat(attempt.status().kind()).isEqualTo(Status.Kind.CANCELED);
+                    assertThat(attempt.reason()).hasValue("runner closed");
+                    assertThat(attempt.children())
+                            .singleElement()
+                            .satisfies(
+                                    child -> assertThat(child.status().kind()).isEqualTo(Status.Kind.PASSED));
+                });
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    @Test
+    void cancellationInterruptingBeforeCancelsChildrenAndStillRunsAfter() throws Exception {
+        final var starting = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
+        final var childCalls = new AtomicInteger();
+        final var afterCalls = new AtomicInteger();
+        final var definition = task("root")
+                .before(() -> {
+                    starting.countDown();
+                    release.await();
+                })
+                .step("child", childCalls::incrementAndGet)
+                .after(afterCalls::incrementAndGet)
+                .build();
+
+        try (var runner = runner(1, 5_000)) {
+            final var run = new FutureTask<>(() -> runner.run(definition));
+            final var thread = new Thread(run);
+            thread.setDaemon(true);
+            thread.start();
+            try {
+                assertThat(starting.await(5, TimeUnit.SECONDS)).isTrue();
+                runner.close();
+                final var result = run.get(10, TimeUnit.SECONDS);
+
+                assertThat(result.isQuiescent()).isTrue();
+                assertThat(result.status().kind()).isEqualTo(Status.Kind.CANCELED);
+                assertThat(afterCalls).hasValue(1);
+                assertThat(childCalls).hasValue(0);
+                assertThat(result.root().orElseThrow().children())
+                        .singleElement()
+                        .satisfies(child -> {
+                            assertThat(child.status().kind()).isEqualTo(Status.Kind.CANCELED);
+                            assertThat(child.reason()).hasValue("runner closed");
+                        });
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    @Test
     void cancellationDuringAcquisitionReleasesTheAcquiredResourceAndStopsFurtherFactories() throws Exception {
         final var first = Key.named("cancel", "first", String.class);
         final var second = Key.named("cancel", "second", String.class);

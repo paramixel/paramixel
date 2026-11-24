@@ -141,7 +141,10 @@ final class ResultProjector {
                         state.compiled.shuffleSeed(),
                         state.compiled.executionOrder())
                 .status(status, attempt.bodyStatus)
-                .reason(state.reason != null && state.attemptCount == attempt.index ? state.reason : attempt.reason)
+                .reason(
+                        state.reason != null && state.attemptCount == attempt.index
+                                ? state.reason
+                                : reasonOf(status, attempt))
                 .timedOut(state.timedOut)
                 .phases(attempt.phases)
                 .children(resultsOf(attempt.children))
@@ -212,7 +215,7 @@ final class ResultProjector {
      *
      * <p>An occurrence-level reason (timeout, cancellation, never admitted) wins. Otherwise, under a retry or repeat
      * policy, the final status is one attempt's status object, so the reason comes from that attempt and not from a
-     * different one; without a policy it is the current attempt's reason.
+     * different one; if no recorded attempt has the final status, use the current attempt and final status.
      *
      * @param state the occurrence
      * @return the reason, or {@code null}
@@ -227,7 +230,17 @@ final class ResultProjector {
                 return state.attemptNodes.get(i).reason().orElse(null);
             }
         }
-        return state.attempt == null ? null : state.attempt.reason;
+        return reasonOf(state.status, state.attempt);
+    }
+
+    private static String reasonOf(final Status status, final OccurrenceState.Attempt attempt) {
+        if (status.isCanceled()) {
+            return status.message().orElse(null);
+        }
+        if (attempt != null && attempt.reason != null) {
+            return attempt.reason;
+        }
+        return status.isSkipped() ? status.message().orElse(null) : null;
     }
 
     private List<TaskResult> resultsOf(final List<OccurrenceState> children) {

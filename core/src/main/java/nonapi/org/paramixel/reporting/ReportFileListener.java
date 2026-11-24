@@ -304,7 +304,7 @@ public final class ReportFileListener implements Listener {
     private static String xml(final Result result) {
         final var out = new StringBuilder(256);
         out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<paramixel schemaVersion=\"1\">\n  <run id=\"")
-                .append(escape(result.runId()))
+                .append(escapeXml(result.runId()))
                 .append("\" status=\"")
                 .append(result.status().kind().name())
                 .append("\" exitCode=\"")
@@ -328,15 +328,15 @@ public final class ReportFileListener implements Listener {
                 .append("<task kind=\"")
                 .append(node.kind().name())
                 .append("\" id=\"")
-                .append(escape(node.occurrenceId()))
+                .append(escapeXml(node.occurrenceId()))
                 .append("\" name=\"")
-                .append(escape(node.name()))
+                .append(escapeXml(node.name()))
                 .append("\" status=\"")
                 .append(node.status().kind().name())
                 .append('"');
         node.reason()
                 .ifPresent(reason ->
-                        out.append(" reason=\"").append(escape(reason)).append('"'));
+                        out.append(" reason=\"").append(escapeXml(reason)).append('"'));
         if (node.timedOut()) {
             out.append(" timedOut=\"true\"");
         }
@@ -351,11 +351,11 @@ public final class ReportFileListener implements Listener {
         for (Failure failure : node.failures()) {
             out.append(indent)
                     .append("  <failure phase=\"")
-                    .append(escape(failure.phase()))
+                    .append(escapeXml(failure.phase()))
                     .append("\" primary=\"")
                     .append(failure.isPrimary())
                     .append("\">")
-                    .append(escape(failure.message()))
+                    .append(escapeXml(failure.message()))
                     .append("</failure>\n");
         }
         final var attemptTotal = attemptTotalOf(node);
@@ -366,7 +366,15 @@ public final class ReportFileListener implements Listener {
         out.append(indent).append("</task>\n");
     }
 
+    private static String escapeXml(final String value) {
+        return escape(value, true);
+    }
+
     private static String escape(final String value) {
+        return escape(value, false);
+    }
+
+    private static String escape(final String value, final boolean xml) {
         final var out = new StringBuilder(value.length() + 16);
         var i = 0;
         while (i < value.length()) {
@@ -378,6 +386,10 @@ public final class ReportFileListener implements Listener {
                 case '>' -> out.append("&gt;");
                 case '"' -> out.append("&quot;");
                 case '\'' -> out.append("&apos;");
+                // XML parsers normalize literal whitespace in attributes and carriage returns in text.
+                case '\t' -> out.append(xml ? "&#9;" : "\t");
+                case '\n' -> out.append(xml ? "&#10;" : "\n");
+                case '\r' -> out.append(xml ? "&#13;" : "\r");
                 default -> {
                     if (isXmlCharacter(codePoint)) {
                         out.appendCodePoint(codePoint);

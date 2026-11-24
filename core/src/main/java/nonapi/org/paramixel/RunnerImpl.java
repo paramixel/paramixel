@@ -17,7 +17,6 @@
 package nonapi.org.paramixel;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,7 +185,7 @@ public final class RunnerImpl implements Runner {
             scanner.skipped().forEach(dispatcher::warning);
             dispatcher.discoveryCompleted(discovered);
             if (discovered.isEmpty()) {
-                return finishNoTests(runId, dispatcher);
+                return finishEmptyDiscovery(runId, dispatcher);
             }
             return executeDiscovered(runId, discovered.orElseThrow(), overrides, true, dispatcher);
         } catch (InterruptedException e) {
@@ -254,14 +253,22 @@ public final class RunnerImpl implements Runner {
         overrides.put(pool, capacity);
     }
 
-    private Result finishNoTests(final String runId, final ReportingDispatcher dispatcher) throws InterruptedException {
-        // An empty discovery follows the separately configured failIfNoTests rule, not the skip mapping.
-        final var failIfNoTests =
-                configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true);
-        final var status = Status.skipped("no task factories were discovered");
-        final var exitCode = failIfNoTests ? 1 : 0;
-        final var warnings = new ArrayList<String>();
-        warnings.add("No @Paramixel.Factory method contributed a task for the requested selection");
+    private Result finishEmptyDiscovery(final String runId, final ReportingDispatcher dispatcher)
+            throws InterruptedException {
+        final Status status;
+        final int exitCode;
+        final List<String> warnings;
+        if (closed) {
+            status = Status.canceled("runner closed");
+            exitCode = 1;
+            warnings = List.of();
+            dispatcher.warning("Run cancellation requested: runner closed");
+        } else {
+            // An empty discovery follows the separately configured failIfNoTests rule, not the skip mapping.
+            status = Status.skipped("no task factories were discovered");
+            exitCode = configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true) ? 1 : 0;
+            warnings = List.of("No @Paramixel.Factory method contributed a task for the requested selection");
+        }
         final var result = Result.builder()
                 .runId(runId)
                 .status(status, exitCode, true)

@@ -36,6 +36,22 @@ import org.paramixel.api.support.RetryPolicy;
  */
 class ResultModelTest {
 
+    @Test
+    void deliberateSkipExposesItsExplicitReason() {
+        final var reason = "fixture unavailable";
+        final var definition = task("root")
+                .step("skipped", () -> {
+                    throw SkipException.skip(reason);
+                })
+                .build();
+        final var result = run(definition);
+
+        assertThat(result.root().orElseThrow().children()).singleElement().satisfies(skipped -> {
+            assertThat(skipped.status().kind()).isEqualTo(Status.Kind.SKIPPED);
+            assertThat(skipped.reason()).hasValue(reason);
+        });
+    }
+
     private static Result run(final Task definition) {
         return Runner.builder().listener(Listener.NOOP).build().run(definition);
     }

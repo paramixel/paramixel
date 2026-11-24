@@ -179,23 +179,6 @@ public class ParamixelMojo extends AbstractMojo {
     private boolean strictThreadLifecycle;
 
     /**
-     * Thread name prefixes for well-known JVM system threads that should be excluded
-     * from the lingering-thread leak detector. Prefix-matched — a thread named
-     * {@code "ForkJoinPool-1"} is excluded by the prefix {@code "ForkJoinPool"}.
-     */
-    private static final Set<String> SYSTEM_THREAD_PREFIXES = Set.of(
-            "main",
-            "Reference Handler",
-            "Finalizer",
-            "Signal Dispatcher",
-            "Attach Listener",
-            "Common-Cleaner",
-            "notification-thread",
-            "ForkJoinPool",
-            "Timer",
-            "process-reaper");
-
-    /**
      * Discovers and executes Paramixel task definitions from the test classpath.
      *
      * <p>Replaces the thread context classloader with a test classloader for the duration of execution,
@@ -321,7 +304,7 @@ public class ParamixelMojo extends AbstractMojo {
     }
 
     /**
-     * Snapshots all live non-daemon, non-system threads at the current moment.
+     * Snapshots all live non-daemon threads at the current moment.
      *
      * <p>Uses {@link Thread#getAllStackTraces()} to guarantee a complete snapshot of every
      * live thread. Unlike {@link Thread#enumerate(Thread[])}, which silently drops threads
@@ -343,10 +326,7 @@ public class ParamixelMojo extends AbstractMojo {
     private Set<Thread> snapshotNonDaemonThreads() {
         var result = new HashSet<Thread>();
         for (Thread t : Thread.getAllStackTraces().keySet()) {
-            if (t.isDaemon()
-                    || t.getThreadGroup() == null
-                    || "system".equals(t.getThreadGroup().getName())
-                    || SYSTEM_THREAD_PREFIXES.stream().anyMatch(t.getName()::startsWith)) {
+            if (t.isDaemon()) {
                 continue;
             }
             result.add(t);

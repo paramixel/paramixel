@@ -19,7 +19,8 @@ int exitCode = result.exitCode();
 ```
 
 `Runner` is `AutoCloseable`. `close()` requests cooperative cancellation of an active run, including one that is still
-discovering factories, and is idempotent; a closed runner rejects further runs.
+discovering factories, and is idempotent; a closed runner rejects further runs. If discovery is canceled and no
+factory contributes a task, the result is `CANCELED` with no root, regardless of `paramixel.failIfNoTests`.
 
 ## Entry points
 
