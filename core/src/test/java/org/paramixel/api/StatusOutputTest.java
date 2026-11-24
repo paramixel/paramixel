@@ -23,11 +23,14 @@ import static org.paramixel.api.Tasks.task;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import nonapi.org.paramixel.reporting.DefaultListeners;
+import nonapi.org.paramixel.reporting.StatusListener;
+import nonapi.org.paramixel.reporting.SummaryListener;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.exception.AbortException;
@@ -174,6 +177,27 @@ class StatusOutputTest {
 
         assertThat(lines).anySatisfy(line -> assertThat(line).startsWith(PREFIX + "PASS run "));
         assertThat(lines).anySatisfy(line -> assertThat(line).contains("result: PASS exitCode: 0"));
+    }
+
+    @Test
+    @DisplayName("footers tolerate a wall clock that stepped backwards during the run")
+    void footersTolerateBackwardClockStep() {
+        final var startedAt = Instant.parse("2026-01-01T00:00:10Z");
+        final var result = Result.builder()
+                .runId("clock-step")
+                .status(Status.PASSED, 0, true)
+                .timings(startedAt, startedAt.minusSeconds(5))
+                .build();
+        final var configuration = Configuration.of(Map.of(Configuration.ANSI, "false"));
+        final var buffer = new ByteArrayOutputStream();
+        final var out = new PrintStream(buffer, true, StandardCharsets.UTF_8);
+
+        new StatusListener(configuration, out).onRunCompleted(result);
+        new SummaryListener(configuration, out).onRunCompleted(result);
+
+        final var lines = buffer.toString(StandardCharsets.UTF_8).lines().toList();
+        assertThat(lines).anySatisfy(line -> assertThat(line).startsWith(PREFIX + "PASS run clock-step in 0 ms"));
+        assertThat(lines).anySatisfy(line -> assertThat(line).contains("result: PASS exitCode: 0 elapsed: 0 ms"));
     }
 
     @Test

@@ -159,40 +159,37 @@ public final class Backoff {
         }
         return switch (kind) {
             case FIXED -> base;
-            case LINEAR -> capped(multipliedSaturating(base, attempt), maximum);
-            case EXPONENTIAL -> capped(exponentialDelay(attempt), maximum);
+            case LINEAR -> multiplyCapped(base, attempt);
+            case EXPONENTIAL -> exponentialDelay(attempt);
         };
     }
 
     private Duration exponentialDelay(final int attempt) {
+        if (base.isZero()) {
+            // Doubling zero never reaches the maximum, so the loop below would run once per attempt for nothing.
+            return Duration.ZERO;
+        }
         var doublings = attempt - 1;
         var result = base;
         for (var i = 0; i < doublings; i++) {
             if (result.compareTo(maximum) >= 0) {
                 return maximum;
             }
-            result = multipliedSaturating(result, 2L);
+            result = multiplyCapped(result, 2L);
         }
         return result;
     }
 
     /**
-     * Multiplies with saturating arithmetic: an overflow yields the largest representable duration instead of
-     * throwing.
+     * Multiplies with saturating arithmetic: a product beyond the configured maximum yields the maximum.
      */
-    private static Duration multipliedSaturating(final Duration duration, final long multiplier) {
+    private Duration multiplyCapped(final Duration duration, final long multiplier) {
         try {
-            return duration.multipliedBy(multiplier);
+            final var product = duration.multipliedBy(multiplier);
+            return product.compareTo(maximum) >= 0 ? maximum : product;
         } catch (ArithmeticException e) {
-            return NO_MAXIMUM;
+            return maximum;
         }
-    }
-
-    /**
-     * Multiplies with saturating arithmetic: an overflow yields the maximum instead of throwing.
-     */
-    private static Duration capped(final Duration duration, final Duration maximum) {
-        return duration.compareTo(maximum) >= 0 ? maximum : duration;
     }
 
     @Override

@@ -17,25 +17,130 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.support.Backoff;
 import org.paramixel.api.support.RetryPolicy;
 
 /**
  * Cancellation, shutdown, and high-contention interleavings.
  */
 class CancellationStressTest {
+
+    @Test
+    void nonQuiescentRetryStillReportsTheActiveAttemptAndItsChild() throws Exception {
+        final var calls = new AtomicInteger();
+        final var secondAttemptRunning = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
+        final var definition = task("retried")
+                .retry(RetryPolicy.attempts(2))
+                .step("work", () -> {
+                    if (calls.incrementAndGet() == 1) {
+                        throw new IllegalStateException("first attempt failed");
+                    }
+                    secondAttemptRunning.countDown();
+                    for (; ; ) {
+                        try {
+                            release.await();
+                            return;
+                        } catch (InterruptedException ignored) {
+                            // Keep this attempt active until the test releases it.
+                        }
+                    }
+                })
+                .build();
+
+        try (var runner = runner(1, 50)) {
+            final var run = new FutureTask<>(() -> runner.run(definition));
+            final var thread = new Thread(run);
+            thread.setDaemon(true);
+            thread.start();
+            try {
+                assertThat(secondAttemptRunning.await(5, TimeUnit.SECONDS)).isTrue();
+                runner.close();
+                final var result = run.get(5, TimeUnit.SECONDS);
+                final var attempts = result.root().orElseThrow().children();
+
+                assertThat(result.isQuiescent()).isFalse();
+                assertThat(result.attemptCount()).isEqualTo(2);
+                assertThat(attempts)
+                        .extracting(attempt -> attempt.status().kind())
+                        .containsExactly(Status.Kind.FAILED, Status.Kind.CANCELED);
+                assertThat(attempts.get(1).completedAt()).isEmpty();
+                assertThat(attempts.get(1).children()).singleElement().satisfies(child -> {
+                    assertThat(child.name()).isEqualTo("work");
+                    assertThat(child.status().kind()).isEqualTo(Status.Kind.CANCELED);
+                });
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    @Test
+    void cancellationDuringAcquisitionReleasesTheAcquiredResourceAndStopsFurtherFactories() throws Exception {
+        final var first = Key.named("cancel", "first", String.class);
+        final var second = Key.named("cancel", "second", String.class);
+        final var acquiring = new CountDownLatch(1);
+        final var unblock = new CountDownLatch(1);
+        final var secondAcquisitions = new AtomicInteger();
+        final var instances = new AtomicInteger();
+        final var releases = new AtomicInteger();
+        final var definition = instance("root", () -> {
+                    instances.incrementAndGet();
+                    return "instance";
+                })
+                .resource(
+                        first,
+                        () -> {
+                            acquiring.countDown();
+                            try {
+                                unblock.await();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                            return "acquired";
+                        },
+                        value -> releases.incrementAndGet())
+                .resource(second, () -> {
+                    secondAcquisitions.incrementAndGet();
+                    return "second";
+                })
+                .build();
+        try (var runner = runner(1, 5_000)) {
+            final var run = new FutureTask<>(() -> runner.run(definition));
+            final var thread = new Thread(run);
+            thread.setDaemon(true);
+            thread.start();
+            try {
+                assertThat(acquiring.await(5, TimeUnit.SECONDS)).isTrue();
+                runner.close();
+                final var result = run.get(10, TimeUnit.SECONDS);
+
+                assertThat(result.isQuiescent()).isTrue();
+                assertThat(result.status().kind()).isEqualTo(Status.Kind.CANCELED);
+                assertThat(releases).hasValue(1);
+                assertThat(secondAcquisitions).hasValue(0);
+                assertThat(instances).hasValue(0);
+            } finally {
+                unblock.countDown();
+            }
+        }
+    }
 
     private static Runner runner(final int workers, final long graceMillis) {
         return Runner.builder()
@@ -177,6 +282,98 @@ class CancellationStressTest {
         assertThat(results).hasSize(1);
         final var result = results.get(0);
         assertThat(result.status().kind()).isIn(Status.Kind.CANCELED, Status.Kind.FAILED);
+        assertThat(result.exitCode()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("closing the runner while a parallel subtree is idle still finalizes every started fixture")
+    void closeWhileSubtreeIdleFinalizesStartedFixtures() throws InterruptedException {
+        final Key<String> handle = Key.named("cancel", "handle", String.class);
+        final var afterCalls = new AtomicInteger();
+        final var released = new AtomicInteger();
+        final var firstAttemptsFailed = new CountDownLatch(2);
+        final Task definition = parallel("root", Pool.named("p"))
+                .each(
+                        IntStream.range(0, 2).boxed().toList(),
+                        index -> sequential("fixture-" + index)
+                                .resource(handle, () -> "open", value -> released.incrementAndGet())
+                                .after(afterCalls::incrementAndGet)
+                                .child(sequential("flaky")
+                                        .retry(RetryPolicy.builder()
+                                                .maxAttempts(3)
+                                                .backoff(Backoff.fixed(Duration.ofSeconds(30)))
+                                                .build())
+                                        .step("attempt", () -> {
+                                            firstAttemptsFailed.countDown();
+                                            throw new IllegalStateException("flaky");
+                                        })))
+                .build();
+        final var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "5000")))
+                .pool(Pool.named("p"), 2)
+                .build();
+        final List<Result> results = new ArrayList<>();
+        final var thread = new Thread(() -> results.add(runner.run(definition)));
+        thread.start();
+        try {
+            assertThat(firstAttemptsFailed.await(10, TimeUnit.SECONDS)).isTrue();
+            // Let both failed attempts finish their finalizers so the whole tree is idle in its retry backoff.
+            Thread.sleep(200L);
+            runner.close();
+            thread.join(20_000L);
+        } finally {
+            runner.close();
+        }
+
+        assertThat(thread.isAlive()).isFalse();
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).isQuiescent()).isTrue();
+        assertThat(results.get(0).status().kind()).isIn(Status.Kind.CANCELED, Status.Kind.FAILED);
+        assertThat(afterCalls).as("fixture after callbacks").hasValue(2);
+        assertThat(released).as("fixture resource releases").hasValue(2);
+    }
+
+    @Test
+    @DisplayName("closing the runner during a retry backoff ends the run without waiting out the delay")
+    void closeDuringRetryBackoffEndsPromptly() throws InterruptedException {
+        final var attempts = new AtomicInteger();
+        final var firstAttemptFailed = new CountDownLatch(1);
+        final Task definition = sequential("root")
+                .child(sequential("retried")
+                        .retry(RetryPolicy.builder()
+                                .maxAttempts(3)
+                                .backoff(Backoff.fixed(Duration.ofSeconds(30)))
+                                .build())
+                        .step("probe", () -> {
+                            attempts.incrementAndGet();
+                            firstAttemptFailed.countDown();
+                            throw new IllegalStateException("always fails");
+                        }))
+                .build();
+        final var runner = runner(2, 2000);
+        final List<Result> results = new ArrayList<>();
+        final var thread = new Thread(() -> results.add(runner.run(definition)));
+        thread.start();
+        final long elapsedMillis;
+        try {
+            assertThat(firstAttemptFailed.await(10, TimeUnit.SECONDS)).isTrue();
+            final var closedAt = System.nanoTime();
+            runner.close();
+            thread.join(20_000L);
+            elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - closedAt);
+        } finally {
+            runner.close();
+        }
+
+        assertThat(thread.isAlive()).isFalse();
+        assertThat(elapsedMillis).isLessThan(10_000L);
+        assertThat(attempts).hasValue(1);
+        assertThat(results).hasSize(1);
+        final var result = results.get(0);
+        assertThat(result.isQuiescent()).isTrue();
+        assertThat(result.root().orElseThrow().children().get(0).status().kind())
+                .isIn(Status.Kind.CANCELED, Status.Kind.FAILED);
         assertThat(result.exitCode()).isEqualTo(1);
     }
 }

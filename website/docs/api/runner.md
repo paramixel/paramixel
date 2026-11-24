@@ -18,8 +18,8 @@ Result configured = runner.run();             // use the configured selection
 int exitCode = result.exitCode();
 ```
 
-`Runner` is `AutoCloseable`. `close()` requests cooperative cancellation of an active run and is idempotent; a closed
-runner rejects further runs.
+`Runner` is `AutoCloseable`. `close()` requests cooperative cancellation of an active run, including one that is still
+discovering factories, and is idempotent; a closed runner rejects further runs.
 
 ## Entry points
 

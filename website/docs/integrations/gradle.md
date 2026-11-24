@@ -5,13 +5,13 @@ description: Run Paramixel from Gradle with a JavaExec task.
 
 # Gradle
 
-Run Paramixel from Gradle with a `JavaExec` task that invokes `org.paramixel.api.Runner` on a classpath containing Paramixel core and the classes with `@Paramixel.Factory` methods.
+Run Paramixel from Gradle with a `JavaExec` task that invokes `org.paramixel.api.Launcher` on a classpath containing Paramixel core and the classes with `@Paramixel.Factory` methods.
 
 ```groovy
 tasks.register('paramixelTest', JavaExec) {
     group = 'verification'
     description = 'Discovers and executes Paramixel task definitions'
-    mainClass = 'org.paramixel.api.Runner'
+    mainClass = 'org.paramixel.api.Launcher'
     classpath = sourceSets.test.runtimeClasspath
 }
 

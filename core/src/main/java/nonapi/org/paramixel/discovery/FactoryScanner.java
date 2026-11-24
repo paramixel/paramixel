@@ -82,6 +82,7 @@ public final class FactoryScanner {
     private final ConcreteSelector selector;
     private final boolean shuffled;
     private final long shuffleSeed;
+    private final List<String> skipped = new ArrayList<>();
 
     /**
      * Creates a scanner.
@@ -110,6 +111,7 @@ public final class FactoryScanner {
      * @throws ResolverException if a discovered method is invalid or cannot be invoked
      */
     public Optional<Task> discover() {
+        skipped.clear();
         final var factories = new ArrayList<FactoryCandidate>();
         final var beforeHooks = new ArrayList<HookCandidate>();
         final var afterHooks = new ArrayList<HookCandidate>();
@@ -120,9 +122,14 @@ public final class FactoryScanner {
                 .ignoreClassVisibility()
                 .ignoreMethodVisibility()
                 .scan()) {
+            // The scan also returns subclasses that inherit an annotated method, and resolving a subclass walks up to
+            // the declaring class, so the same static factory can resolve more than once; it is invoked only once.
+            final var resolvedFactories = new HashSet<Method>();
             for (ClassInfo classInfo : scanResult.getClassesWithMethodAnnotation(FACTORY_ANNOTATION)) {
                 final var clazz = classInfo.loadClass();
-                resolveFactoryMethod(clazz).ifPresent(factories::add);
+                resolveFactoryMethod(clazz)
+                        .filter(candidate -> resolvedFactories.add(candidate.method()))
+                        .ifPresent(factories::add);
             }
             for (ClassInfo classInfo : scanResult.getClassesWithMethodAnnotation(BEFORE_ALL_ANNOTATION)) {
                 collectHooks(classInfo.loadClass(), Paramixel.BeforeAll.class, beforeHooks);
@@ -142,7 +149,7 @@ public final class FactoryScanner {
         root.tags(PlanCompiler.STRUCTURAL_TAG);
         final var run = Tasks.sequential("run");
         run.tags(PlanCompiler.STRUCTURAL_TAG);
-        final var beforeGroup = buildHookGroup("BeforeAll hooks", beforeHooks);
+        final var beforeGroup = buildHookGroup("BeforeAll hooks", beforeHooks, true);
         beforeGroup.ifPresent(run::child);
         final var actions = Tasks.parallel("actions", Pool.named(DISCOVERY_POOL));
         actions.tags(PlanCompiler.FAIL_FAST_SCOPE_TAG, PlanCompiler.STRUCTURAL_TAG);
@@ -152,10 +159,26 @@ public final class FactoryScanner {
         for (FactoryCandidate candidate : factories) {
             invoke(candidate.method(), "@Paramixel.Factory").ifPresent(actions::child);
         }
-        run.child(actions);
+        final var actionGroup = actions.build();
+        if (actionGroup.children().isEmpty()) {
+            return Optional.empty();
+        }
+        run.child(actionGroup);
         root.child(run);
-        buildHookGroup("AfterAll hooks", afterHooks).ifPresent(root::child);
+        buildHookGroup("AfterAll hooks", afterHooks, false).ifPresent(root::child);
         return Optional.of(root.build());
+    }
+
+    /**
+     * Returns why discovered methods contributed nothing during the last {@link #discover()}.
+     *
+     * <p>A method that returns {@code null} is an explicit skip; each entry names the method so the skip is recorded
+     * rather than silent.
+     *
+     * @return the skip reasons in invocation order; never {@code null}
+     */
+    public List<String> skipped() {
+        return List.copyOf(skipped);
     }
 
     /**
@@ -167,11 +190,15 @@ public final class FactoryScanner {
         return configuration;
     }
 
-    private Optional<Task> buildHookGroup(final String name, final List<HookCandidate> candidates) {
+    private Optional<Task> buildHookGroup(
+            final String name, final List<HookCandidate> candidates, final boolean dependent) {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
         final var group = Tasks.sequential(name);
+        if (!dependent) {
+            group.independent();
+        }
         for (HookCandidate candidate : candidates) {
             invoke(candidate.method(), name).ifPresent(group::child);
         }
@@ -289,7 +316,7 @@ public final class FactoryScanner {
     }
 
     @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
-    private static Optional<Task> invoke(final Method method, final String label) {
+    private Optional<Task> invoke(final Method method, final String label) {
         final var location = locationOf(method);
         try {
             Object result;
@@ -304,6 +331,7 @@ public final class FactoryScanner {
                 }
             }
             if (result == null) {
+                skipped.add(label + " method " + location + " returned null and was skipped");
                 return Optional.empty();
             }
             if (result instanceof Task task) {

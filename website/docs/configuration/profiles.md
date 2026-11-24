@@ -24,7 +24,9 @@ paramixel.shutdown.graceMillis=10000
 ## Maven profiles
 
 The Maven plugin accepts `<properties>` plus explicit parameters (`failIfNoTests`, `failureOnSkip`, `failureOnAbort`,
-`failFast`, `reportFile`, `match*`). A profile can set either.
+`failFast`, `reportFile`, `match*`). A profile can set either: an explicitly set parameter overrides the same key in
+`<properties>` and `paramixel.properties`, and an unset parameter leaves those values in effect. See
+[Maven plugin](../integrations/maven-plugin).
 
 ## Guidelines
 

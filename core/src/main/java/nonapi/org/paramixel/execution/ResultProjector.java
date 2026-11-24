@@ -141,7 +141,7 @@ final class ResultProjector {
                         state.compiled.shuffleSeed(),
                         state.compiled.executionOrder())
                 .status(status, attempt.bodyStatus)
-                .reason(state.attemptCount > attempt.index ? null : state.reason)
+                .reason(state.reason != null && state.attemptCount == attempt.index ? state.reason : attempt.reason)
                 .timedOut(state.timedOut)
                 .phases(attempt.phases)
                 .children(resultsOf(attempt.children))
@@ -154,8 +154,12 @@ final class ResultProjector {
                         null,
                         attempt.startNanos == 0
                                 ? null
-                                : durationNanos(attempt.startNanos, attempt.finalizationStartNanos),
-                        attempt.finalizationStartNanos == 0 ? null : durationNanos(attempt.finalizationStartNanos, 0))
+                                : durationNanos(
+                                        attempt.startNanos,
+                                        endOfExecution(attempt.finalizationStartNanos, attempt.completedNanos)),
+                        attempt.finalizationStartNanos == 0
+                                ? null
+                                : durationNanos(attempt.finalizationStartNanos, attempt.completedNanos))
                 .build();
     }
 
@@ -176,7 +180,7 @@ final class ResultProjector {
                         state.compiled.shuffleSeed(),
                         state.compiled.executionOrder())
                 .status(state.status, attempt == null ? null : attempt.bodyStatus)
-                .reason(state.reason)
+                .reason(finalReason(state))
                 .timedOut(state.timedOut)
                 .timings(
                         state.queuedAt,
@@ -186,8 +190,12 @@ final class ResultProjector {
                         durationBetween(state.queuedAt, state.admittedAt),
                         state.admittedNanos == 0
                                 ? null
-                                : durationNanos(state.admittedNanos, state.finalizationStartNanos),
-                        state.finalizationStartNanos == 0 ? null : durationNanos(state.finalizationStartNanos, 0));
+                                : durationNanos(
+                                        state.admittedNanos,
+                                        endOfExecution(state.finalizationStartNanos, state.completedNanos)),
+                        state.finalizationStartNanos == 0
+                                ? null
+                                : durationNanos(state.finalizationStartNanos, state.completedNanos));
         if (!state.attemptNodes.isEmpty()) {
             builder.children(state.attemptNodes);
         } else if (attempt != null) {
@@ -197,6 +205,29 @@ final class ResultProjector {
             builder.phases(attempt.phases).failures(attempt.failures);
         }
         return builder.build();
+    }
+
+    /**
+     * Returns the reason that belongs with an occurrence's final status.
+     *
+     * <p>An occurrence-level reason (timeout, cancellation, never admitted) wins. Otherwise, under a retry or repeat
+     * policy, the final status is one attempt's status object, so the reason comes from that attempt and not from a
+     * different one; without a policy it is the current attempt's reason.
+     *
+     * @param state the occurrence
+     * @return the reason, or {@code null}
+     */
+    private static String finalReason(final OccurrenceState state) {
+        if (state.reason != null) {
+            return state.reason;
+        }
+        final var attempts = Math.min(state.attemptStatuses.size(), state.attemptNodes.size());
+        for (var i = 0; i < attempts; i++) {
+            if (state.attemptStatuses.get(i) == state.status) {
+                return state.attemptNodes.get(i).reason().orElse(null);
+            }
+        }
+        return state.attempt == null ? null : state.attempt.reason;
     }
 
     private List<TaskResult> resultsOf(final List<OccurrenceState> children) {
@@ -256,6 +287,17 @@ final class ResultProjector {
             return null;
         }
         return Duration.between(from, to);
+    }
+
+    /**
+     * Returns where the execution span ends: at finalization start, or at completion when finalization never began.
+     *
+     * @param finalizationStartNanos the finalization start, or {@code 0}
+     * @param completedNanos the completion, or {@code 0}
+     * @return the end of the execution span, or {@code 0} when neither is known
+     */
+    private static long endOfExecution(final long finalizationStartNanos, final long completedNanos) {
+        return finalizationStartNanos != 0 ? finalizationStartNanos : completedNanos;
     }
 
     private static Duration durationNanos(final long fromNanos, final long toNanosOrZero) {

@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import nonapi.org.paramixel.compiler.CompiledOccurrence;
 import org.paramixel.api.Failure;
@@ -32,9 +33,9 @@ import org.paramixel.api.TaskResult;
 /**
  * Mutable per-run execution state of one compiled occurrence.
  *
- * <p>All mutable scheduling fields are owned by the engine thread. The single exception is
- * {@link #activeThread}, which a worker publishes so cooperative cancellation can interrupt the callback that is
- * actually running, and {@link #activeJobs}, which is atomic so a grace-period check stays correct.
+ * <p>All mutable scheduling fields are owned by the engine thread. The exceptions are the worker binding, which a
+ * worker publishes under {@link #workerLock} so cooperative cancellation interrupts only the callback that is actually
+ * running, and {@link #activeJobs}, which is atomic.
  *
  * <p>An occurrence owns one {@link Attempt} at a time. A retried or repeated occurrence completes several attempts;
  * each attempt has its own instance, resources, phases, failures, children, and result node.
@@ -66,6 +67,8 @@ final class OccurrenceState {
 
     Stage stage = Stage.NEW;
     Status status = Status.PENDING;
+    // The occurrence-level reason: a timeout, a cancellation, or a never-admitted skip. A reason that belongs to one
+    // attempt (a false condition) lives in Attempt.reason, so it cannot leak into a later attempt's outcome.
     String reason;
     final Cancellation cancellation = new Cancellation();
     boolean timedOut;
@@ -80,12 +83,34 @@ final class OccurrenceState {
     Instant admittedAt;
     Instant startedAt;
     Instant completedAt;
+    long completedNanos;
     int graceGeneration;
 
     /**
-     * The worker thread currently running a callback for this occurrence, if any.
+     * The pending timeout timer of the current attempt, or {@code null}.
      */
-    volatile Thread activeThread;
+    ScheduledFuture<?> timeoutTimer;
+
+    /**
+     * The pending grace timer, or {@code null}.
+     */
+    ScheduledFuture<?> graceTimer;
+
+    /**
+     * The pending retry or repeat delay timer, or {@code null}.
+     */
+    ScheduledFuture<?> retryTimer;
+
+    /**
+     * Guards {@link #activeThread} so an interrupt is delivered only while a callback of this occurrence is bound to
+     * the worker thread.
+     */
+    private final Object workerLock = new Object();
+
+    /**
+     * The worker thread currently running a callback for this occurrence, if any. Guarded by {@link #workerLock}.
+     */
+    private Thread activeThread;
 
     /**
      * The number of callbacks of this occurrence that are currently running.
@@ -113,6 +138,40 @@ final class OccurrenceState {
      *
      * @return {@code true} when terminal
      */
+    /**
+     * Binds the calling worker thread to this occurrence before a callback runs.
+     *
+     * <p>The worker's interrupt status is cleared before the thread is published, so a stale interrupt from an
+     * unrelated job cannot leak in and an interrupt requested after publication is never cleared.
+     */
+    void bindWorker() {
+        synchronized (workerLock) {
+            Thread.interrupted();
+            activeThread = Thread.currentThread();
+        }
+    }
+
+    /**
+     * Unbinds the calling worker thread after a callback completes and clears any interrupt aimed at that callback.
+     */
+    void unbindWorker() {
+        synchronized (workerLock) {
+            activeThread = null;
+            Thread.interrupted();
+        }
+    }
+
+    /**
+     * Interrupts the worker thread currently running a callback for this occurrence, if any.
+     */
+    void interruptWorker() {
+        synchronized (workerLock) {
+            if (activeThread != null) {
+                activeThread.interrupt();
+            }
+        }
+    }
+
     boolean isTerminal() {
         return stage == Stage.TERMINAL;
     }
@@ -218,11 +277,16 @@ final class OccurrenceState {
 
     /**
      * Cancellation requested for this occurrence itself; ancestors are consulted through {@link #isCanceled()}.
+     *
+     * <p>The engine thread writes these fields while user callbacks read them on worker threads through
+     * {@link org.paramixel.api.Context#isCanceled()}, so both are volatile: a callback polling for cancellation must
+     * observe the request. The engine writes {@code reason} before {@code requested}, so a reader that sees the request
+     * also sees its reason.
      */
     static final class Cancellation {
 
-        boolean requested;
-        String reason;
+        volatile boolean requested;
+        volatile String reason;
     }
 
     /**
@@ -252,6 +316,7 @@ final class OccurrenceState {
         Object instance;
         Status bodyStatus;
         Status conditionStatus;
+        String reason;
         int beforeIndex;
         int beforeFailedAtIndex = -1;
         int afterIndex;
@@ -261,6 +326,7 @@ final class OccurrenceState {
         Instant completedAt;
         long startNanos;
         long finalizationStartNanos;
+        long completedNanos;
 
         Attempt(final int index) {
             this.index = index;

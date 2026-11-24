@@ -104,7 +104,7 @@ capacities explicitly. The main keys:
 | `paramixel.shutdown.graceMillis` | bounded wait before reporting non-quiescence | `10000` |
 | `paramixel.failureOnSkip` / `paramixel.failureOnAbort` | exit-code mapping | `true` / `true` |
 | `paramixel.failIfNoTests` | fail when discovery finds nothing | `true` |
-| `paramixel.failFast` | stop admitting new root tasks after a root failure | `false` |
+| `paramixel.failFast` | stop admitting new root tasks after a root task fails (skips and aborts do not count) | `false` |
 | `paramixel.report.file` | report file; format follows the extension | none |
 
 An unknown `paramixel.*` key is reported as a warning rather than silently ignored.

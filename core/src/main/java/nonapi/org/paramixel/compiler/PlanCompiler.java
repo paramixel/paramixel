@@ -388,11 +388,13 @@ public final class PlanCompiler {
             final List<String> inherited,
             final Map<String, Set<String>> edges,
             final Map<String, String> examples) {
+        // Runtime order: the occurrence takes its exclusive lock at admission (after the parent's pool permit, which
+        // the inherited list already ends with); only its children take permits of its own pool afterwards.
         final var resources = new ArrayList<>(inherited);
+        occurrence.task().exclusiveLock().ifPresent(lock -> resources.add("lock:" + lock));
         if (occurrence.poolName() != null) {
             resources.add("pool:" + occurrence.poolName());
         }
-        occurrence.task().exclusiveLock().ifPresent(lock -> resources.add("lock:" + lock));
         for (var i = 1; i < resources.size(); i++) {
             final var from = resources.get(i - 1);
             final var to = resources.get(i);

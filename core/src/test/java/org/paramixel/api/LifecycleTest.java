@@ -370,4 +370,34 @@ class LifecycleTest {
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(seen.get()).isEqualTo("outer-value");
     }
+
+    @Test
+    @DisplayName("LIFE-22: when resource acquisition fails, never-started children finish skipped, not pending")
+    void failedAcquisitionSkipsChildren() {
+        final var key = Key.named("lifecycle", "failingResource", String.class);
+        final var stepCalls = new AtomicInteger();
+        final Task definition = task("group")
+                .resource(key, () -> {
+                    throw new IllegalStateException("cannot open");
+                })
+                .step("first", stepCalls::incrementAndGet)
+                .step("second", stepCalls::incrementAndGet)
+                .build();
+
+        final var result = run(definition);
+        final var root = result.root().orElseThrow();
+
+        assertThat(stepCalls).hasValue(0);
+        assertThat(root.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(root.children())
+                .hasSize(2)
+                .allSatisfy(child -> assertThat(child.status().kind()).isEqualTo(Status.Kind.SKIPPED));
+        assertThat(result.passedCount()
+                        + result.failedCount()
+                        + result.skippedCount()
+                        + result.abortedCount()
+                        + result.canceledCount())
+                .as("status counters sum to the occurrence count")
+                .isEqualTo(result.occurrenceCount());
+    }
 }

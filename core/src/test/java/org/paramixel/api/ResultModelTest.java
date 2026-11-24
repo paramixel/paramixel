@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.task;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,6 +38,22 @@ class ResultModelTest {
 
     private static Result run(final Task definition) {
         return Runner.builder().listener(Listener.NOOP).build().run(definition);
+    }
+
+    @Test
+    @DisplayName("execution and finalization durations end at the occurrence's completion, not at projection")
+    void durationsEndAtCompletion() {
+        final var definition = task("root")
+                .child(task("quick").step("work", () -> {}).after(() -> {}))
+                .child(task("slow").step("work", () -> Thread.sleep(600L)))
+                .build();
+
+        final var quick = run(definition).root().orElseThrow().children().get(0);
+
+        assertThat(quick.executionDuration())
+                .hasValueSatisfying(duration -> assertThat(duration).isLessThan(Duration.ofMillis(300)));
+        assertThat(quick.finalizationDuration())
+                .hasValueSatisfying(duration -> assertThat(duration).isLessThan(Duration.ofMillis(300)));
     }
 
     @Test

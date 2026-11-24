@@ -29,7 +29,8 @@ public static Task factory() {
 }
 ```
 
-A factory returning `null` is an explicit skip with a recorded reason. Any other invalid shape — not `static`, has
+A factory returning `null` is an explicit skip with a recorded reason. If every selected factory returns `null`,
+`paramixel.failIfNoTests` decides the exit code. Any other invalid shape — not `static`, has
 parameters, or returns an unrelated type — fails the run with `ResolverException` **before** any discovered test code
 runs.
 
@@ -44,8 +45,10 @@ Paramixel (independent sequential root)
 ```
 
 - A failing `BeforeAll` hook skips the factories.
-- `AfterAll` hooks still run after a started run.
-- `actions` is the fail-fast scope: with `paramixel.failFast=true`, a non-passing factory stops admitting later ones.
+- `AfterAll` hooks still run after a started run, in reverse order. A failing hook does not prevent the remaining
+  `AfterAll` hooks from running.
+- `actions` is the fail-fast scope: with `paramixel.failFast=true`, a failed factory (`FAILED`, including a timeout)
+  stops admitting later ones. A skipped or aborted factory does not.
 - Capacity of the `discovery` pool defaults to `paramixel.parallelism`; override it with
   `Runner.Builder.pool(Pool.named("discovery"), n)` or `paramixel.parallelism.discovery`.
 

@@ -10,10 +10,22 @@ dependencies {
     implementation libs.mongodb.driver.sync
 }
 
-tasks.register('paramixelTest', JavaExec) {
+def paramixelTest = tasks.register('paramixelTest', JavaExec) {
     dependsOn classes
     group = 'verification'
     description = 'Discovers and executes Paramixel action trees'
-    mainClass = 'org.paramixel.api.Runner'
+    mainClass = 'org.paramixel.api.Launcher'
     classpath = sourceSets.main.runtimeClasspath
+}
+
+def paramixelLauncherTest = tasks.register('paramixelLauncherTest', JavaExec) {
+    group = 'verification'
+    description = 'Checks the Paramixel launcher configured for the examples'
+    mainClass.set(paramixelTest.flatMap { it.mainClass })
+    classpath = sourceSets.main.runtimeClasspath
+    args '--help'
+}
+
+tasks.named('check') {
+    dependsOn paramixelLauncherTest
 }

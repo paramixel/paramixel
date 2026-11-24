@@ -42,7 +42,10 @@ waiting for its children, so a one-worker run of a nested tree still completes.
 ## Deadlock protection
 
 - Nesting the same pool on one ancestry path is rejected at compile time, regardless of configured capacity.
-- Provable pool/lock acquisition-order cycles are rejected with both resource names and the offending task path.
+- Provable pool/lock acquisition-order cycles are rejected with both resource names and the offending task path. The
+  check follows runtime order: a task takes its parent's pool permit, then its own `isolated` lock at admission, and
+  only then do its children take permits of its own pool. So `parallel(..., pool).isolated(lock)` on one path and a
+  `pool` child that is `isolated(lock)` on another path form a cycle.
 - A scheduler that cannot make progress fails the run with a diagnostic instead of hanging.
 
 ## Honest limits

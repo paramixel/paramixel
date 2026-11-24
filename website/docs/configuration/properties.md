@@ -20,7 +20,7 @@ may add a final layer for pool capacities via `Runner.Builder.pool(Pool, int)`.
 | `paramixel.failureOnSkip` | Map a skipped run to a failing exit code | `true` |
 | `paramixel.failureOnAbort` | Map an aborted run to a failing exit code | `true` |
 | `paramixel.failIfNoTests` | Fail when discovery finds nothing | `true` |
-| `paramixel.failFast` | Stop admitting new root tasks after a root failure | `false` |
+| `paramixel.failFast` | Stop admitting new root tasks after a root task fails (skips and aborts do not count) | `false` |
 | `paramixel.report.file` | Report file; format follows the extension | none |
 | `paramixel.match.package.regex` | Discovery package filter | none |
 | `paramixel.match.class.regex` | Discovery class filter | none |

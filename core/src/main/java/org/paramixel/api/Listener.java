@@ -30,7 +30,7 @@ import nonapi.org.paramixel.reporting.DefaultListeners;
  *   <li>The dispatcher queue is bounded. When it is full, the producer applies backpressure rather than dropping an
  *       event, which slows admission instead of corrupting the event stream.</li>
  *   <li>An exception thrown by a listener is isolated and recorded as a run diagnostic. It never changes a task's
- *       semantic pass/fail status.</li>
+ *       semantic pass/fail status. Unrecoverable VM errors are propagated to the runner.</li>
  *   <li>{@link #onRunCompleted(Result)} is delivered after all task events were drained, so reporting cannot race with
  *       finalization. The drain is bounded by {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}: when a listener does
  *       not drain in time, the remaining events are discarded and a {@code LISTENER_DRAIN_TIMEOUT} run diagnostic is
@@ -79,7 +79,7 @@ public interface Listener {
     /**
      * Invoked after factory discovery produced the definition that will run.
      *
-     * @param root the discovered root definition, or an empty optional when nothing matched
+     * @param root the discovered root definition, or an empty optional when no factory contributes a task
      */
     default void onDiscoveryCompleted(final Optional<Task> root) {
         // Intentionally empty

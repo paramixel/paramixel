@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -165,6 +166,54 @@ class RetryRepeatTest {
     }
 
     @Test
+    @DisplayName("FAIL-15: a throwing repeat until-predicate fails the task instead of escaping the run")
+    void throwingUntilPredicateFailsTask() {
+        final AtomicInteger iterations = new AtomicInteger();
+        final Task definition = sequential("root")
+                .repeat(
+                        "repeated",
+                        repeat -> repeat.maxIterations(3)
+                                .until((context, status) -> {
+                                    throw new IllegalStateException("predicate boom");
+                                })
+                                .step("work", iterations::incrementAndGet))
+                .build();
+
+        final var result = run(definition);
+        final var repeated = result.root().orElseThrow().children().get(0);
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(repeated.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(iterations).hasValue(1);
+        assertThat(repeated.children()).hasSize(1);
+        assertThat(repeated.children().get(0).failures())
+                .anySatisfy(failure -> assertThat(failure.message()).contains("predicate boom"));
+    }
+
+    @Test
+    @DisplayName("FAIL-16: a repeat until-predicate runs on a worker thread and stops the repetition")
+    void untilPredicateRunsOnWorkerThread() {
+        final List<String> threads = Collections.synchronizedList(new ArrayList<>());
+        final Task definition = sequential("root")
+                .repeat(
+                        "repeated",
+                        repeat -> repeat.maxIterations(5)
+                                .until((context, status) -> {
+                                    threads.add(Thread.currentThread().getName());
+                                    return context.attempt() >= 2;
+                                })
+                                .step("work", () -> {}))
+                .build();
+
+        final var result = run(definition);
+        final var repeated = result.root().orElseThrow().children().get(0);
+
+        assertThat(repeated.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(repeated.children()).hasSize(2);
+        assertThat(threads).hasSize(2).allMatch(name -> name.startsWith("paramixel-worker-"));
+    }
+
+    @Test
     @DisplayName("FAIL-14: repeat untilPassed stops on the first passing iteration")
     void repeatUntilPassed() {
         final AtomicInteger iterations = new AtomicInteger();
@@ -269,6 +318,105 @@ class RetryRepeatTest {
 
         assertThat(withoutPredicate.until()).isEmpty();
         assertThat(withPredicate.until()).isPresent();
+    }
+
+    @Test
+    @DisplayName("a false condition on one attempt does not leave its skip reason on a later passing attempt")
+    void retryDoesNotKeepStaleConditionReason() {
+        final Task definition = sequential("root")
+                .child(sequential("retried")
+                        .retry(RetryPolicy.builder()
+                                .maxAttempts(2)
+                                .retryOn(Status.Kind.SKIPPED)
+                                .build())
+                        .onlyIf(context -> context.attempt() > 1)
+                        .step("probe", () -> {}))
+                .build();
+
+        final var result = run(definition);
+        final var retried = result.root().orElseThrow().children().get(0);
+
+        assertThat(retried.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(retried.children()).hasSize(2);
+        assertThat(retried.children().get(0).status().kind()).isEqualTo(Status.Kind.SKIPPED);
+        assertThat(retried.children().get(0).reason()).hasValue("condition was false");
+        assertThat(retried.children().get(1).status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(retried.children().get(1).reason()).isEmpty();
+        assertThat(retried.reason()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a retry that fails after a false condition reports no skip reason")
+    void retryFailureAfterFalseConditionHasNoSkipReason() {
+        final Task definition = sequential("root")
+                .child(sequential("retried")
+                        .retry(RetryPolicy.builder()
+                                .maxAttempts(2)
+                                .retryOn(Status.Kind.FAILED, Status.Kind.SKIPPED)
+                                .build())
+                        .onlyIf(context -> context.attempt() > 1)
+                        .step("probe", () -> {
+                            throw new IllegalStateException("boom");
+                        }))
+                .build();
+
+        final var result = run(definition);
+        final var retried = result.root().orElseThrow().children().get(0);
+
+        assertThat(retried.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(retried.reason()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a repeat whose earlier iteration decides the outcome keeps that iteration's skip reason")
+    void repeatKeepsReasonOfDecidingIteration() {
+        final Task definition = sequential("root")
+                .repeat(
+                        "repeated",
+                        repeat -> repeat.maxIterations(2)
+                                .onlyIf(context -> context.attempt() > 1)
+                                .step("probe", () -> {}))
+                .build();
+
+        final var result = run(definition);
+        final var repeated = result.root().orElseThrow().children().get(0);
+
+        assertThat(repeated.status().kind()).isEqualTo(Status.Kind.SKIPPED);
+        assertThat(repeated.reason()).hasValue("condition was false");
+        assertThat(repeated.children().get(1).reason()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an exponential backoff with a zero base answers a high attempt number without iterating")
+    void exponentialZeroBaseIsImmediate() {
+        final var backoff = Backoff.exponential(Duration.ZERO, Duration.ofSeconds(1));
+
+        final var delay = CompletableFuture.supplyAsync(() -> backoff.delayFor(Integer.MAX_VALUE));
+
+        assertThat(delay).succeedsWithin(Duration.ofSeconds(5)).isEqualTo(Duration.ZERO);
+        assertThat(backoff.delayFor(1)).isEqualTo(Duration.ZERO);
+        assertThat(Backoff.exponential(Duration.ofMillis(1), Duration.ofSeconds(1))
+                        .delayFor(Integer.MAX_VALUE))
+                .isEqualTo(Duration.ofSeconds(1));
+    }
+
+    @Test
+    void exponentialOverflowSaturatesAtTheConfiguredMaximumIncludingNanos() {
+        final var base = Duration.ofSeconds(Long.MAX_VALUE / 2 + 1);
+        final var maximum = Duration.ofSeconds(Long.MAX_VALUE, 500);
+        final var backoff = Backoff.exponential(base, maximum);
+
+        assertThat(backoff.delayFor(1)).isEqualTo(base);
+        assertThat(backoff.delayFor(2)).isEqualTo(maximum);
+        assertThat(backoff.delayFor(Integer.MAX_VALUE)).isEqualTo(maximum);
+    }
+
+    @Test
+    void linearOverflowSaturatesAtTheDefaultMaximum() {
+        final var backoff = Backoff.linear(Duration.ofSeconds(Long.MAX_VALUE / 2 + 1));
+
+        assertThat(backoff.delayFor(2)).isEqualTo(backoff.maximum());
+        assertThat(backoff.delayFor(Integer.MAX_VALUE)).isEqualTo(backoff.maximum());
     }
 
     /**

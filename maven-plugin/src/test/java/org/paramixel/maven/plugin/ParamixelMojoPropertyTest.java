@@ -487,6 +487,43 @@ class ParamixelMojoPropertyTest {
         }
 
         @Test
+        @DisplayName("POM properties apply to boolean settings whose mojo parameter is not set")
+        void pomPropertiesApplyWhenParametersAreUnset() throws Exception {
+            var mojo = new ParamixelMojo();
+            var failFast = new Property();
+            failFast.setKey(Configuration.FAIL_FAST);
+            failFast.setValue("true");
+            var failureOnSkip = new Property();
+            failureOnSkip.setKey(Configuration.FAILURE_ON_SKIP);
+            failureOnSkip.setValue("false");
+            setField(mojo, "properties", List.of(failFast, failureOnSkip));
+
+            var configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+            assertThat(configuration.getBoolean(Configuration.FAIL_FAST)).hasValue(true);
+            assertThat(configuration.getBoolean(Configuration.FAILURE_ON_SKIP)).hasValue(false);
+            assertThat(configuration.getBoolean(Configuration.FAILURE_ON_ABORT)).hasValue(true);
+            assertThat(configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS)).hasValue(true);
+        }
+
+        @Test
+        @DisplayName("an explicitly set mojo parameter still overrides the POM property")
+        void explicitParameterOverridesPomProperty() throws Exception {
+            var mojo = new ParamixelMojo();
+            var failFast = new Property();
+            failFast.setKey(Configuration.FAIL_FAST);
+            failFast.setValue("true");
+            setField(mojo, "properties", List.of(failFast));
+            setField(mojo, "failFast", false);
+
+            var configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+            assertThat(configuration.getBoolean(Configuration.FAIL_FAST)).hasValue(false);
+        }
+
+        @Test
         @DisplayName("failIfNoTests is written to configuration explicitly")
         void failIfNoTestsIsWrittenExplicitly() throws Exception {
             var mojo = new ParamixelMojo();

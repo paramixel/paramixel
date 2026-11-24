@@ -16,6 +16,7 @@
 
 package nonapi.org.paramixel.execution;
 
+import java.lang.invoke.MethodType;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -116,13 +117,33 @@ final class ExecutionContextImpl implements Context {
         if (value == null) {
             throw new ResourceException(key, state.path, "No resource is bound for key " + key + " at " + state.path);
         }
-        return key.type().cast(value);
+        return cast(key, value);
     }
 
     @Override
     public <T> Optional<T> find(final Key<T> key) {
         Objects.requireNonNull(key, "key is null");
         final var value = state.findResource(key);
-        return value == null ? Optional.empty() : Optional.of(key.type().cast(value));
+        return value == null ? Optional.empty() : Optional.of(cast(key, value));
+    }
+
+    /**
+     * Casts a resource value to the key's type.
+     *
+     * <p>A key declared with a primitive type, such as {@code int.class}, holds the boxed value, so the cast uses the
+     * wrapper type; {@code int.class.cast(42)} would otherwise throw.
+     *
+     * @param key the key
+     * @param value the non-null resource value
+     * @param <T> the resource type
+     * @return the typed value
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> T cast(final Key<T> key, final Object value) {
+        final var type = key.type();
+        if (type.isPrimitive()) {
+            return (T) MethodType.methodType(type).wrap().returnType().cast(value);
+        }
+        return type.cast(value);
     }
 }

@@ -31,6 +31,18 @@ public final class DiscoveryFixtures {
     /** Whether the before-all hook should fail. */
     public static volatile boolean failBeforeAll;
 
+    /** Whether to add an after-all hook that fails before the normal after-all hook. */
+    public static volatile boolean failAfterAll;
+
+    /** An action the close-during-discovery factory runs while it is being invoked, or {@code null}. */
+    public static volatile Runnable factoryHook;
+
+    /**
+     * How the fail-fast trigger factory ends: {@code pass}, {@code skip}, {@code condition}, {@code abort},
+     * {@code fail} or {@code timeout}.
+     */
+    public static volatile String failFastMode = "pass";
+
     private DiscoveryFixtures() {
         // Intentionally empty
     }
@@ -41,5 +53,8 @@ public final class DiscoveryFixtures {
     public static void reset() {
         RECORDED.clear();
         failBeforeAll = false;
+        failAfterAll = false;
+        factoryHook = null;
+        failFastMode = "pass";
     }
 }

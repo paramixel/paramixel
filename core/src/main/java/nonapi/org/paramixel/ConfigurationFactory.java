@@ -177,7 +177,7 @@ public final class ConfigurationFactory {
         var properties = new Properties();
         try (inputStream) {
             properties.load(inputStream);
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             throw new ConfigurationException(
                     "failed to load default properties resource: " + Configuration.CONFIGURATION_FILE_NAME + " ("
                             + e.getMessage() + ")",

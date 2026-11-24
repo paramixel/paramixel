@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -62,8 +61,11 @@ import org.paramixel.api.selector.Selector;
  * from the Maven project's test classpath; the original classloader is restored in a {@code finally}
  * block regardless of outcome.
  *
- * <p>Configuration property precedence, from lowest to highest: Paramixel defaults,
- * POM {@code <properties>} declarations, the {@code reportFile} parameter, and system properties.
+ * <p>Configuration property precedence, from lowest to highest: Paramixel defaults, the test-classpath
+ * {@code paramixel.properties}, POM {@code <properties>} declarations, explicitly set mojo parameters
+ * ({@code reportFile}, {@code failIfNoTests}, {@code failureOnSkip}, {@code failureOnAbort}, {@code failFast}
+ * and the {@code match*} patterns), and system properties. A mojo parameter that is not set leaves the lower
+ * layers in effect; the documented defaults then come from Paramixel's own defaults.
  *
  * <p>This mojo is thread-safe and may run concurrently with other mojos in a parallel build.
  */
@@ -97,28 +99,40 @@ public class ParamixelMojo extends AbstractMojo {
 
     /**
      * When {@code true}, fail the build when no task factories are discovered.
+     *
+     * <p>When unset, the value from {@code paramixel.properties} or POM {@code <properties>} applies, and
+     * otherwise the Paramixel default ({@code true}).
      */
-    @Parameter(property = "paramixel.failIfNoTests", defaultValue = "true")
-    private boolean failIfNoTests;
+    @Parameter(property = "paramixel.failIfNoTests")
+    private Boolean failIfNoTests;
 
     /**
      * When {@code true}, SKIP results are treated as failures and cause the build to fail.
+     *
+     * <p>When unset, the value from {@code paramixel.properties} or POM {@code <properties>} applies, and
+     * otherwise the Paramixel default ({@code true}).
      */
-    @Parameter(property = "paramixel.failureOnSkip", defaultValue = "true")
-    private boolean failureOnSkip;
+    @Parameter(property = "paramixel.failureOnSkip")
+    private Boolean failureOnSkip;
 
     /**
      * When {@code true}, ABORTED results are treated as failures and cause the build to fail.
+     *
+     * <p>When unset, the value from {@code paramixel.properties} or POM {@code <properties>} applies, and
+     * otherwise the Paramixel default ({@code true}).
      */
-    @Parameter(property = "paramixel.failureOnAbort", defaultValue = "true")
-    private boolean failureOnAbort;
+    @Parameter(property = "paramixel.failureOnAbort")
+    private Boolean failureOnAbort;
 
     /**
      * When {@code true}, the scheduler skips remaining unscheduled root children after the first
-     * failed or aborted root task.
+     * failed root task. Skipped and aborted root tasks do not trigger it.
+     *
+     * <p>When unset, the value from {@code paramixel.properties} or POM {@code <properties>} applies, and
+     * otherwise the Paramixel default ({@code false}).
      */
-    @Parameter(property = "paramixel.failFast", defaultValue = "false")
-    private boolean failFast;
+    @Parameter(property = "paramixel.failFast")
+    private Boolean failFast;
 
     /**
      * Path to the per-run summary report; when unset, no report file is generated.
@@ -217,10 +231,10 @@ public class ParamixelMojo extends AbstractMojo {
             try {
                 runTests(testClassLoader);
             } catch (Throwable t) {
-                finishExecution(originalClassLoader, preExecutionThreads, t);
+                finishExecution(originalClassLoader, testClassLoader, preExecutionThreads, t);
                 throw t;
             }
-            finishExecution(originalClassLoader, preExecutionThreads, null);
+            finishExecution(originalClassLoader, testClassLoader, preExecutionThreads, null);
         } catch (ConfigurationException e) {
             throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);
         } catch (ResolverException e) {
@@ -243,7 +257,7 @@ public class ParamixelMojo extends AbstractMojo {
 
         var result = runner.run(selector);
         if (result.root().isEmpty()) {
-            if (failIfNoTests) {
+            if (configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true)) {
                 throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
             }
 
@@ -263,16 +277,20 @@ public class ParamixelMojo extends AbstractMojo {
      * so it is attached to {@code primary} as suppressed instead of being thrown.
      *
      * @param originalClassLoader the context class loader to restore
+     * @param testClassLoader the class loader created for this run
      * @param preExecutionThreads the non-daemon threads alive before the run
      * @param primary the exception the run is already failing with, or {@code null} when the run completed
      * @throws MojoExecutionException if threads lingered under strict thread lifecycle and no primary exception exists
      */
     private void finishExecution(
-            final ClassLoader originalClassLoader, final Set<Thread> preExecutionThreads, final Throwable primary)
+            final ClassLoader originalClassLoader,
+            final ClassLoader testClassLoader,
+            final Set<Thread> preExecutionThreads,
+            final Throwable primary)
             throws MojoExecutionException {
         Thread.currentThread().setContextClassLoader(originalClassLoader);
         try {
-            warnOrErrorLingeringThreads(preExecutionThreads);
+            warnOrErrorLingeringThreads(preExecutionThreads, testClassLoader);
         } catch (MojoExecutionException leakError) {
             if (primary == null) {
                 throw leakError;
@@ -289,18 +307,17 @@ public class ParamixelMojo extends AbstractMojo {
      *
      * @return the selector for factory discovery
      */
+    /**
+     * Returns the selector for the run.
+     *
+     * <p>The {@code match*} parameters are written into the configuration by {@link #buildConfiguration}, so the
+     * selector resolves {@code paramixel.match.*} from the effective configuration and every configuration layer is
+     * honored.
+     *
+     * @return the configuration-resolved selector
+     */
     Selector buildSelector() {
-        var builder = Selector.builder();
-        if (matchPackage != null && !matchPackage.isBlank()) {
-            builder.packagePattern(Pattern.compile(matchPackage));
-        }
-        if (matchClass != null && !matchClass.isBlank()) {
-            builder.classPattern(Pattern.compile(matchClass));
-        }
-        if (matchTag != null && !matchTag.isBlank()) {
-            builder.tagPattern(Pattern.compile(matchTag));
-        }
-        return builder.build();
+        return Selector.configured();
     }
 
     /**
@@ -342,15 +359,17 @@ public class ParamixelMojo extends AbstractMojo {
      * and warns or fails when new threads are detected that hold a reference to the test classloader.
      *
      * @param baseline the mutable set of non-daemon threads captured before task execution
+     * @param testClassLoader the class loader created for this run
      * @throws MojoExecutionException when {@code strictThreadLifecycle} is {@code true}
      *     and lingering threads are detected
      */
-    private void warnOrErrorLingeringThreads(final Set<Thread> baseline) throws MojoExecutionException {
+    private void warnOrErrorLingeringThreads(final Set<Thread> baseline, final ClassLoader testClassLoader)
+            throws MojoExecutionException {
         var current = snapshotNonDaemonThreads();
         current.removeAll(baseline);
 
         var lingering = current.stream()
-                .filter(t -> t.getContextClassLoader() instanceof URLClassLoader)
+                .filter(t -> usesTestClassLoader(t, testClassLoader))
                 .toList();
 
         if (!lingering.isEmpty()) {
@@ -364,6 +383,15 @@ public class ParamixelMojo extends AbstractMojo {
                 getLog().warn("  - " + t.getName() + " [id=" + t.getId() + ", state=" + t.getState() + "]");
             }
         }
+    }
+
+    private static boolean usesTestClassLoader(final Thread thread, final ClassLoader testClassLoader) {
+        for (var loader = thread.getContextClassLoader(); loader != null; loader = loader.getParent()) {
+            if (loader == testClassLoader) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -414,17 +442,14 @@ public class ParamixelMojo extends AbstractMojo {
         // <configuration><reportFile> overrides POM properties
         putIfNotBlank(configMap, Configuration.REPORT_FILE, reportFile);
 
-        // <configuration><failureOnSkip> overrides POM properties
-        configMap.put(Configuration.FAILURE_ON_SKIP, String.valueOf(failureOnSkip));
-
-        // <configuration><failureOnAbort> overrides POM properties
-        configMap.put(Configuration.FAILURE_ON_ABORT, String.valueOf(failureOnAbort));
-
-        // <configuration><failIfNoTests> overrides POM properties
-        configMap.put(Configuration.FAIL_IF_NO_TESTS, String.valueOf(failIfNoTests));
-
-        // <configuration><failFast> overrides POM properties
-        configMap.put(Configuration.FAIL_FAST, String.valueOf(failFast));
+        // Explicitly set <configuration> parameters override POM properties; unset parameters leave them in effect
+        putIfSet(configMap, Configuration.FAILURE_ON_SKIP, failureOnSkip);
+        putIfSet(configMap, Configuration.FAILURE_ON_ABORT, failureOnAbort);
+        putIfSet(configMap, Configuration.FAIL_IF_NO_TESTS, failIfNoTests);
+        putIfSet(configMap, Configuration.FAIL_FAST, failFast);
+        putIfNotBlank(configMap, Configuration.MATCH_PACKAGE_REGEX, matchPackage);
+        putIfNotBlank(configMap, Configuration.MATCH_CLASS_REGEX, matchClass);
+        putIfNotBlank(configMap, Configuration.MATCH_TAG_REGEX, matchTag);
 
         // System properties always win (matches JUnit Platform precedence).
         // Note: defaultConfiguration(classLoader) above already includes system
@@ -442,6 +467,12 @@ public class ParamixelMojo extends AbstractMojo {
         final var systemProps = System.getProperties();
         synchronized (systemProps) {
             return systemProps.entrySet().stream().toList();
+        }
+    }
+
+    private static void putIfSet(final Map<String, String> configuration, final String key, final Boolean value) {
+        if (value != null) {
+            configuration.put(key, value.toString());
         }
     }
 

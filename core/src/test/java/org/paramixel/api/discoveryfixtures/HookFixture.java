@@ -57,4 +57,22 @@ public final class HookFixture {
                 .step("run", () -> DiscoveryFixtures.RECORDED.add("afterAll"))
                 .build();
     }
+
+    /**
+     * Runs before the normal after-all hook when the failure scenario is enabled.
+     *
+     * @return the failing hook definition, or {@code null}
+     */
+    @Paramixel.AfterAll
+    public static Task failingAfterAll() {
+        if (!DiscoveryFixtures.failAfterAll) {
+            return null;
+        }
+        return Tasks.task("failingAfterAll")
+                .step("run", () -> {
+                    DiscoveryFixtures.RECORDED.add("failingAfterAll");
+                    throw new IllegalStateException("afterAll failed");
+                })
+                .build();
+    }
 }

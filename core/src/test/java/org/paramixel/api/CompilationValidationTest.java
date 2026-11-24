@@ -91,6 +91,50 @@ class CompilationValidationTest {
     }
 
     @Test
+    @DisplayName("SCHED-08: a lock held around an owned pool and the reverse order elsewhere is rejected")
+    void lockAroundOwnedPoolCycleIsRejected() {
+        final AtomicInteger calls = new AtomicInteger();
+        final Task lockThenPool = parallel("lock-then-pool", Pool.named("p"))
+                .isolated("l")
+                .step("child", calls::incrementAndGet)
+                .build();
+        final Task poolThenLock = parallel("pool-then-lock", Pool.named("p"))
+                .child(task("locked").isolated("l").step("work", calls::incrementAndGet))
+                .build();
+        final Task definition = parallel("root", Pool.named("root"))
+                .child(lockThenPool)
+                .child(poolThenLock)
+                .build();
+
+        final var error = compileError(definition, Map.of(Pool.named("root"), 2, Pool.named("p"), 1));
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("ACQUISITION_CYCLE");
+        assertThat(calls).hasValue(0);
+    }
+
+    @Test
+    @DisplayName("SCHED-09: a lock held around an owned pool compiles when no path inverts the order")
+    void lockAroundOwnedPoolWithoutInversionRuns() {
+        final AtomicInteger calls = new AtomicInteger();
+        final Task definition = parallel("lock-then-pool", Pool.named("p"))
+                .isolated("l")
+                .step("first", calls::incrementAndGet)
+                .step("second", calls::incrementAndGet)
+                .build();
+
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of("paramixel.ansi", "false")))
+                .pool(Pool.named("p"), 1)
+                .build()
+                .run(definition);
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
     @DisplayName("SCHED-07: an undefined pool is rejected before any user callback")
     void undefinedPoolIsRejected() {
         final AtomicInteger calls = new AtomicInteger();

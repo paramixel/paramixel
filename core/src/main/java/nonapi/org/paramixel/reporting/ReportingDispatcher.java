@@ -68,6 +68,7 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
     private final List<String> diagnostics = new ArrayList<>();
     private final Object diagnosticsLock = new Object();
     private volatile boolean discarding;
+    private volatile VirtualMachineError fatalListenerError;
 
     /**
      * Creates and starts a dispatcher.
@@ -153,7 +154,9 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
             return;
         }
         try {
+            UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
             queue.put(item);
+            UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             record("Event delivery was interrupted: " + e.getMessage());
@@ -172,7 +175,16 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
             if (item == END || discarding) {
                 return;
             }
-            deliver(item);
+            try {
+                deliver(item);
+            } catch (VirtualMachineError e) {
+                // Wake a producer blocked on backpressure so the runner can surface the error.
+                fatalListenerError = e;
+                queue.clear();
+                return;
+            }
+            // The dispatcher owns its interrupt policy. A callback may restore its interrupt flag before returning.
+            Thread.interrupted();
         }
     }
 
@@ -212,8 +224,14 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
     public Result finish(final Result result) throws InterruptedException {
         Objects.requireNonNull(result, "result is null");
         if (finished.compareAndSet(false, true)) {
-            drain();
+            try {
+                drain();
+            } catch (InterruptedException e) {
+                discardPending();
+                throw e;
+            }
         }
+        UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
         final var completed = result.withAdditionalDiagnostics(collectDiagnostics());
         safe.onRunCompleted(completed);
         return completed.withAdditionalDiagnostics(collectDiagnostics());
@@ -227,9 +245,8 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
             thread.join(Math.max(1L, remainingMillis));
         }
         if (thread.isAlive()) {
-            discarding = true;
             final var undelivered = undeliveredCount();
-            thread.interrupt();
+            discardPending();
             record(DRAIN_TIMEOUT_DIAGNOSTIC + ": listener did not drain queued events within " + drainTimeoutMillis
                     + "ms; " + undelivered + " queued item(s) were discarded");
         }
@@ -261,10 +278,15 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
     @Override
     public void close() {
         if (finished.compareAndSet(false, true)) {
-            discarding = true;
-            queue.offer(END);
-            thread.interrupt();
+            discardPending();
         }
+    }
+
+    private void discardPending() {
+        discarding = true;
+        queue.clear();
+        queue.offer(END);
+        thread.interrupt();
     }
 
     private record Warning(String message) {}

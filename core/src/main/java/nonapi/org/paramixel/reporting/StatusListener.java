@@ -105,6 +105,9 @@ public final class StatusListener implements Listener {
         if (start.isEmpty() || end.isEmpty()) {
             return 0L;
         }
-        return Duration.between(start.orElseThrow(), end.orElseThrow()).toMillis();
+        // Wall-clock instants can step backwards (for example an NTP correction during the run); never report a
+        // negative elapsed time, which the formatter rejects.
+        return Math.max(
+                0L, Duration.between(start.orElseThrow(), end.orElseThrow()).toMillis());
     }
 }

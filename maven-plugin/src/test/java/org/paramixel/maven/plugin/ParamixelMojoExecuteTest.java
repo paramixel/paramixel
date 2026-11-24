@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.maven.model.Build;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -248,6 +249,28 @@ class ParamixelMojoExecuteTest {
     }
 
     @Nested
+    @DisplayName("selection from configuration")
+    class ConfiguredSelection {
+
+        @Test
+        @DisplayName("paramixel.match.class.regex from POM properties selects the factories")
+        void pomPropertyClassMatchSelectsFactories() throws Exception {
+            var mojo = newMojo(tempDir, null);
+            var match = new ParamixelMojo.Property();
+            match.setKey("paramixel.match.class.regex");
+            match.setValue(".*PassingMojoFixture.*");
+            setField(mojo, "properties", List.of(match));
+
+            var original = Thread.currentThread().getContextClassLoader();
+            try {
+                assertThatCode(mojo::execute).doesNotThrowAnyException();
+            } finally {
+                Thread.currentThread().setContextClassLoader(original);
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("resolver exceptions")
     class ResolverExceptions {
 
@@ -365,6 +388,42 @@ class ParamixelMojoExecuteTest {
     class ThreadLifecycleCheck {
 
         @Test
+        void strictLifecycleIgnoresAnotherMavenModulesClassLoader() throws Exception {
+            final var release = new CountDownLatch(1);
+            try (var otherLoader = new URLClassLoader(new URL[0], getClass().getClassLoader())) {
+                final var otherThread = new Thread(
+                        () -> {
+                            try {
+                                release.await();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        },
+                        "other-maven-module-worker");
+                otherThread.setDaemon(false);
+                otherThread.setContextClassLoader(otherLoader);
+                final var mojo = new ParamixelMojo() {
+                    @Override
+                    URLClassLoader buildTestClassLoader() throws MojoExecutionException {
+                        // Start after the baseline snapshot, as another build module could do.
+                        otherThread.start();
+                        return super.buildTestClassLoader();
+                    }
+                };
+                setField(mojo, "project", newProject(tempDir));
+                setField(mojo, "matchClass", PassingMojoFixture.class.getName());
+                setField(mojo, "strictThreadLifecycle", true);
+
+                try {
+                    assertThatCode(mojo::execute).doesNotThrowAnyException();
+                } finally {
+                    release.countDown();
+                    otherThread.join(5_000L);
+                }
+            }
+        }
+
+        @Test
         @DisplayName("no warning when no lingering threads after normal execution")
         void noWarningWhenNoLingeringThreadsAfterNormalExecution() throws Exception {
             var mojo = newMojo(tempDir, "PassingMojoFixture");
@@ -419,10 +478,11 @@ class ParamixelMojoExecuteTest {
                 var baseline = (Set<Thread>) snapshotMethod.invoke(mojo);
                 baseline.remove(dummyThread);
 
-                var warnMethod = ParamixelMojo.class.getDeclaredMethod("warnOrErrorLingeringThreads", Set.class);
+                var warnMethod = ParamixelMojo.class.getDeclaredMethod(
+                        "warnOrErrorLingeringThreads", Set.class, ClassLoader.class);
                 warnMethod.setAccessible(true);
 
-                assertThatThrownBy(() -> warnMethod.invoke(mojo, baseline))
+                assertThatThrownBy(() -> warnMethod.invoke(mojo, baseline, testCl))
                         .hasCauseInstanceOf(MojoExecutionException.class);
             } finally {
                 dummyThread.interrupt();
@@ -459,10 +519,11 @@ class ParamixelMojoExecuteTest {
                 var baseline = (Set<Thread>) snapshotMethod.invoke(mojo);
                 baseline.remove(dummyThread);
 
-                var warnMethod = ParamixelMojo.class.getDeclaredMethod("warnOrErrorLingeringThreads", Set.class);
+                var warnMethod = ParamixelMojo.class.getDeclaredMethod(
+                        "warnOrErrorLingeringThreads", Set.class, ClassLoader.class);
                 warnMethod.setAccessible(true);
 
-                assertThatCode(() -> warnMethod.invoke(mojo, baseline)).doesNotThrowAnyException();
+                assertThatCode(() -> warnMethod.invoke(mojo, baseline, testCl)).doesNotThrowAnyException();
             } finally {
                 dummyThread.interrupt();
                 dummyThread.join(5_000);

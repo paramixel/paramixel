@@ -12,6 +12,9 @@ description: Bounded advanced policies with distinct semantics.
 | `retry(RetryPolicy)` | Re-attempt a non-success outcome | Attempt limit, non-triggering status |
 | `repeat(name, …)` | Intentional replay of a subtree | `maxIterations`, `untilPassed`, predicate |
 
+A repeat `until` predicate is user code: it runs on an execution worker after each iteration, like a `when` condition.
+If it throws, the failure is recorded on that iteration, the task fails, and repetition stops.
+
 ```java
 step -> step
     .retry(RetryPolicy.builder()
@@ -46,4 +49,5 @@ code is non-zero. Paramixel does not claim it can stop arbitrary Java code.
 - They run in reverse declaration order and are all attempted.
 - They are not implicit destructors: a fixture implementing `AutoCloseable` is not closed unless a callback closes it.
 - A failure in one `after` callback does not prevent the others, and the original operational failure stays primary.
-- Keyed resources are released after `after`, in reverse acquisition order.
+- Keyed resources are released after `after`, in reverse acquisition order. If cancellation interrupts acquisition,
+  the runner stops starting new factories and releases resources acquired before acquisition stopped.

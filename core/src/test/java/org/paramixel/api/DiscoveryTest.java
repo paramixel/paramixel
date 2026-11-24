@@ -31,8 +31,11 @@ import nonapi.org.paramixel.discovery.FactoryScanner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.discoveryfixtures.CloseDuringDiscoveryFixture;
 import org.paramixel.api.discoveryfixtures.DiscoveryFixtures;
 import org.paramixel.api.discoveryfixtures.InvalidFactoryFixture;
+import org.paramixel.api.discoveryfixtures.SkippingFactoryFixture;
+import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
@@ -131,6 +134,16 @@ class DiscoveryTest {
     }
 
     @Test
+    void aFailingAfterAllHookDoesNotPreventTheNextAfterAllHookFromRunning() {
+        DiscoveryFixtures.failAfterAll = true;
+
+        final var result = runner().run(fixtures());
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(DiscoveryFixtures.RECORDED).endsWith("failingAfterAll", "afterAll");
+    }
+
+    @Test
     @DisplayName("display paths exclude framework scaffolding")
     void displayPathsExcludeScaffolding() {
         final var result = runner().run(fixtures());
@@ -164,6 +177,54 @@ class DiscoveryTest {
     }
 
     @Test
+    @DisplayName("a null factory records why it contributed nothing")
+    void nullFactoryRecordsReason() {
+        final var warnings = new ArrayList<String>();
+        final var runner = Runner.builder()
+                .listener(new Listener() {
+                    @Override
+                    public void onWarning(final String message) {
+                        warnings.add(message);
+                    }
+                })
+                .configuration(Configuration.of(Map.of(Configuration.ANSI, "false")))
+                .build();
+
+        final var result = runner.run(fixtures());
+
+        final var location = SkippingFactoryFixture.class.getName() + "#factory";
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(warnings)
+                .anySatisfy(warning -> assertThat(warning).contains(location).contains("returned null"));
+        assertThat(result.diagnostics())
+                .anySatisfy(
+                        diagnostic -> assertThat(diagnostic).contains(location).contains("returned null"));
+    }
+
+    @Test
+    void onlyNullFactoriesFollowTheNoTestsPolicy() {
+        final var selector =
+                Selector.builder().classOf(SkippingFactoryFixture.class).build();
+        for (boolean failIfNoTests : new boolean[] {true, false}) {
+            final var configuration = Configuration.of(Map.of(
+                    Configuration.FAIL_IF_NO_TESTS, Boolean.toString(failIfNoTests),
+                    Configuration.FAILURE_ON_SKIP, Boolean.toString(!failIfNoTests)));
+            try (var runner = Runner.builder()
+                    .configuration(configuration)
+                    .listener(Listener.NOOP)
+                    .build()) {
+                final var result = runner.run(selector);
+
+                assertThat(result.status().kind()).isEqualTo(Status.Kind.SKIPPED);
+                assertThat(result.root()).isEmpty();
+                assertThat(result.exitCode()).isEqualTo(failIfNoTests ? 1 : 0);
+                assertThat(result.diagnostics()).anyMatch(diagnostic -> diagnostic.contains("returned null"));
+                assertThat(DiscoveryFixtures.RECORDED).isEmpty();
+            }
+        }
+    }
+
+    @Test
     @DisplayName("tag selection filters factories")
     void tagSelectionFilters() {
         final var selector = Selector.builder()
@@ -176,6 +237,21 @@ class DiscoveryTest {
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(DiscoveryFixtures.RECORDED).contains("alpha").doesNotContain("beta");
+    }
+
+    @Test
+    @DisplayName("a factory inherited by a subclass is discovered and invoked once")
+    void inheritedFactoryRunsOnce() {
+        final var selector = Selector.builder()
+                .packageTreeOf(DiscoveryFixtures.class)
+                .classPattern(Pattern.compile(".*InheritedFactory(Base|Sub)Fixture"))
+                .build();
+
+        final var result = runner().run(selector);
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(discoveredOrder(result)).containsExactly("inherited");
+        assertThat(DiscoveryFixtures.RECORDED).containsOnlyOnce("inherited");
     }
 
     @Test
@@ -239,6 +315,77 @@ class DiscoveryTest {
 
         assertThat(result.exitCode()).isZero();
         assertThat(result.root()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FAIL-11: disabling failIfNoTests alone makes an empty discovery pass")
+    void noTestsPassesWhenOnlyFailIfNoTestsIsDisabled() {
+        final var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(
+                        Configuration.ANSI, "false",
+                        Configuration.FAIL_IF_NO_TESTS, "false")))
+                .build();
+        final var selector = Selector.builder().classOf(DiscoveryTest.class).build();
+
+        final var result = runner.run(selector);
+
+        assertThat(result.exitCode()).isZero();
+        assertThat(result.root()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FAIL-11: an empty discovery fails when failIfNoTests is set even if skips do not fail")
+    void noTestsFailsWhenFailIfNoTestsIsSetAndSkipsDoNotFail() {
+        final var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(
+                        Configuration.ANSI, "false",
+                        Configuration.FAIL_IF_NO_TESTS, "true",
+                        Configuration.FAILURE_ON_SKIP, "false")))
+                .build();
+        final var selector = Selector.builder().classOf(DiscoveryTest.class).build();
+
+        assertThat(runner.run(selector).exitCode()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("closing a runner while its factories are being discovered cancels that run")
+    void closeDuringDiscoveryCancelsRun() {
+        final var runner = runner();
+        DiscoveryFixtures.factoryHook = runner::close;
+        final var selector =
+                Selector.builder().classOf(CloseDuringDiscoveryFixture.class).build();
+
+        final var result = runner.run(selector);
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.CANCELED);
+        assertThat(DiscoveryFixtures.RECORDED).doesNotContain("close-during-discovery");
+    }
+
+    @Test
+    void closeDuringDiscoveryDoesNotAdmitTheExecutionRoot() {
+        final var admitted = new ArrayList<String>();
+        try (var runner = Runner.builder()
+                .listener(new Listener() {
+                    @Override
+                    public void onTaskEvent(final TaskEvent event) {
+                        if (event.phase() == TaskPhase.ADMITTED) {
+                            admitted.add(event.name());
+                        }
+                    }
+                })
+                .build()) {
+            DiscoveryFixtures.factoryHook = runner::close;
+            final var selector = Selector.builder()
+                    .classOf(CloseDuringDiscoveryFixture.class)
+                    .build();
+
+            final var result = runner.run(selector);
+
+            assertThat(result.status().kind()).isEqualTo(Status.Kind.CANCELED);
+            assertThat(admitted).isEmpty();
+        }
     }
 
     @Test
@@ -319,6 +466,60 @@ class DiscoveryTest {
         }
 
         assertThat(thread.isAlive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a nonpositive discovery parallelism is rejected instead of being raised to one")
+    void nonpositiveDiscoveryParallelismIsRejected() {
+        for (String value : List.of("0", "-3")) {
+            final var runner = Runner.builder()
+                    .listener(Listener.NOOP)
+                    .configuration(Configuration.of(
+                            Map.of(Configuration.ANSI, "false", Configuration.RUNNER_PARALLELISM, value)))
+                    .build();
+
+            assertThatThrownBy(() -> runner.run(fixtures()))
+                    .isInstanceOf(ConfigurationException.class)
+                    .hasMessageContaining(Configuration.RUNNER_PARALLELISM);
+            assertThat(DiscoveryFixtures.RECORDED).isEmpty();
+        }
+    }
+
+    @Test
+    @DisplayName("invalid engine configuration is rejected before any factory is invoked")
+    void invalidEngineConfigurationFailsBeforeFactories() {
+        final var selector =
+                Selector.builder().classOf(CloseDuringDiscoveryFixture.class).build();
+        DiscoveryFixtures.factoryHook = () -> DiscoveryFixtures.RECORDED.add("factory invoked");
+        for (String key :
+                List.of(Configuration.WORKERS, Configuration.SHUTDOWN_GRACE_MILLIS, Configuration.RUNNER_PARALLELISM)) {
+            final var runner = Runner.builder()
+                    .listener(Listener.NOOP)
+                    .configuration(Configuration.of(Map.of(Configuration.ANSI, "false", key, "0")))
+                    .build();
+
+            assertThatThrownBy(() -> runner.run(selector))
+                    .isInstanceOf(ConfigurationException.class)
+                    .hasMessageContaining(key);
+            assertThat(DiscoveryFixtures.RECORDED).as(key).isEmpty();
+        }
+    }
+
+    @Test
+    void booleanEngineSettingsUseTheDocumentedFalseFallback() {
+        final var selector =
+                Selector.builder().classOf(CloseDuringDiscoveryFixture.class).build();
+        for (String key :
+                List.of(Configuration.FAIL_FAST, Configuration.FAILURE_ON_SKIP, Configuration.FAILURE_ON_ABORT)) {
+            final var configuration = Configuration.of(Map.of(key, "not-true"));
+            try (var runner = Runner.builder()
+                    .listener(Listener.NOOP)
+                    .configuration(configuration)
+                    .build()) {
+                assertThat(configuration.getBoolean(key)).as(key).hasValue(false);
+                assertThat(runner.run(selector).status().kind()).as(key).isEqualTo(Status.Kind.PASSED);
+            }
+        }
     }
 
     @Test

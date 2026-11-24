@@ -21,6 +21,7 @@ import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.task;
 
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -32,6 +33,8 @@ import nonapi.org.paramixel.execution.EventPublisher;
 import nonapi.org.paramixel.execution.ExecutionEngine;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.support.Backoff;
+import org.paramixel.api.support.RetryPolicy;
 
 /**
  * Cooperative timeout behavior and the honesty rules around non-quiescent work.
@@ -240,5 +243,191 @@ class TimeoutTest {
 
         assertThat(holder.isAlive()).isFalse();
         assertThat(created).hasValue(1);
+    }
+
+    @Test
+    @DisplayName("TIME-06: grace covers only the interrupted callback, not finalizers that start after it quiesced")
+    void graceDoesNotCoverFinalizersStartedAfterQuiescence() {
+        final AtomicInteger afterCompleted = new AtomicInteger();
+        final Task definition = task("group")
+                .timeout(Duration.ofMillis(100))
+                .step("body", () -> Thread.sleep(5000L))
+                .after(() -> {
+                    Thread.sleep(1500L);
+                    afterCompleted.incrementAndGet();
+                })
+                .build();
+
+        final var result =
+                runner(Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "500")).run(definition);
+        final var node = result.root().orElseThrow();
+
+        assertThat(result.isQuiescent()).isTrue();
+        assertThat(result.diagnostics()).noneMatch(diagnostic -> diagnostic.contains("NON_QUIESCENT"));
+        assertThat(node.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(node.timedOut()).isTrue();
+        assertThat(afterCompleted).hasValue(1);
+    }
+
+    @Test
+    @DisplayName("TIME-07: a callback that polls Context.isCanceled() observes the timeout and quiesces")
+    void pollingCallbackObservesTimeout() {
+        final AtomicInteger observed = new AtomicInteger();
+        final Task definition = task("group")
+                .timeout(Duration.ofMillis(100))
+                .stepWithContext("spin", (Context context) -> {
+                    // Busy-polls without blocking, so only the cancellation flag can end the loop in time; the safety
+                    // deadline keeps a broken flag from leaving a spinning daemon thread behind.
+                    final var safetyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                    var spins = 0L;
+                    while (!context.isCanceled()) {
+                        spins++;
+                        if ((spins & 0xFFFFFL) == 0 && System.nanoTime() > safetyDeadline) {
+                            return;
+                        }
+                    }
+                    observed.incrementAndGet();
+                })
+                .build();
+
+        final var result =
+                runner(Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "2000")).run(definition);
+
+        assertThat(result.isQuiescent()).isTrue();
+        assertThat(observed).hasValue(1);
+        assertThat(result.root().orElseThrow().timedOut()).isTrue();
+    }
+
+    @Test
+    @DisplayName("TIME-08: a timeout while the subtree is idle still finalizes every started descendant")
+    void timeoutWhileSubtreeIdleFinalizesStartedDescendants() {
+        final Key<String> handle = Key.named("timeout", "handle", String.class);
+        final AtomicInteger afterCalls = new AtomicInteger();
+        final AtomicInteger released = new AtomicInteger();
+        final CountDownLatch firstAttemptFailed = new CountDownLatch(1);
+        final Task definition = task("root")
+                .timeout(Duration.ofMillis(300))
+                .child(Tasks.sequential("fixture")
+                        .resource(handle, () -> "open", value -> released.incrementAndGet())
+                        .after(afterCalls::incrementAndGet)
+                        .child(Tasks.sequential("flaky")
+                                .retry(RetryPolicy.builder()
+                                        .maxAttempts(3)
+                                        .backoff(Backoff.fixed(Duration.ofSeconds(30)))
+                                        .build())
+                                .step("attempt", () -> {
+                                    firstAttemptFailed.countDown();
+                                    throw new IllegalStateException("flaky");
+                                })))
+                .build();
+
+        final var result =
+                runner(Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "5000")).run(definition);
+
+        assertThat(firstAttemptFailed.getCount()).isZero();
+        assertThat(result.isQuiescent()).isTrue();
+        assertThat(result.root().orElseThrow().timedOut()).isTrue();
+        assertThat(afterCalls).as("fixture after callbacks").hasValue(1);
+        assertThat(released).as("fixture resource releases").hasValue(1);
+    }
+
+    @Test
+    @DisplayName("TIME-09: zero-delay retries keep the engine's pending-timer count balanced")
+    void zeroDelayRetriesKeepTimerAccountingBalanced() throws Exception {
+        // A negative pending-timer count disables the stall detection, which only fires when the count is zero.
+        final Task definition = task("root")
+                .child(Tasks.sequential("retried")
+                        .retry(RetryPolicy.attempts(3))
+                        .step("probe", () -> {
+                            throw new IllegalStateException("always fails");
+                        }))
+                .build();
+        final var configuration = Configuration.of(Map.of(Configuration.ANSI, "false"));
+        final EventPublisher publisher = new EventPublisher() {
+            @Override
+            public void publish(final TaskEvent event) {
+                // Events are irrelevant here.
+            }
+
+            @Override
+            public void warning(final String message) {
+                // Warnings are irrelevant here.
+            }
+        };
+        final var plan = new PlanCompiler(configuration, Map.of()).compile(definition);
+        final var engine = new ExecutionEngine("timer-accounting", plan, configuration, publisher);
+
+        final var result = engine.run();
+
+        assertThat(result.attemptCount()).isEqualTo(3);
+        final Field field = ExecutionEngine.class.getDeclaredField("pendingTimers");
+        field.setAccessible(true);
+        assertThat(((AtomicInteger) field.get(engine)).get()).isZero();
+    }
+
+    @Test
+    @DisplayName("TIME-10: a finished attempt's timeout does not expire during the retry delay")
+    void timeoutDoesNotSpanRetryDelay() {
+        final AtomicInteger attempts = new AtomicInteger();
+        // Each attempt restarts the deadline, so the delay between attempts must not be charged to either attempt.
+        final Task definition = task("flaky")
+                .timeout(Duration.ofMillis(200))
+                .retry(RetryPolicy.builder()
+                        .maxAttempts(2)
+                        .backoff(Backoff.fixed(Duration.ofMillis(600)))
+                        .build())
+                .step("attempt", () -> {
+                    if (attempts.incrementAndGet() == 1) {
+                        throw new IllegalStateException("first attempt fails");
+                    }
+                })
+                .build();
+
+        final var result = runner(Map.of()).run(definition);
+        final var node = result.root().orElseThrow();
+
+        assertThat(attempts).hasValue(2);
+        assertThat(node.timedOut()).isFalse();
+        assertThat(node.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(result.timedOutCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("TIME-11: work still queued for a worker at timeout is not non-quiescent and never starts")
+    void queuedWorkAtTimeoutIsNotNonQuiescent() {
+        final AtomicInteger created = new AtomicInteger();
+        final AtomicInteger quickCalls = new AtomicInteger();
+        // One worker: the busy step occupies it, so the timed-out task's first job waits in the ready queue and has
+        // never started when the timeout and the shutdown grace expire.
+        final Task definition = parallel("root", Pool.named("p"))
+                .step("busy", () -> Thread.sleep(1500L))
+                .child(instance("queued", () -> {
+                            created.incrementAndGet();
+                            return new Object();
+                        })
+                        .timeout(Duration.ofMillis(100))
+                        .step("quick", quickCalls::incrementAndGet))
+                .build();
+
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(
+                        Configuration.ANSI, "false",
+                        Configuration.WORKERS, "1",
+                        Configuration.SHUTDOWN_GRACE_MILLIS, "300")))
+                .pool(Pool.named("p"), 2)
+                .build()
+                .run(definition);
+        final var root = result.root().orElseThrow();
+        final var busy = root.children().get(0);
+        final var queued = root.children().get(1);
+
+        assertThat(result.isQuiescent()).isTrue();
+        assertThat(result.diagnostics()).noneMatch(diagnostic -> diagnostic.contains("NON_QUIESCENT"));
+        assertThat(busy.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(queued.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(queued.timedOut()).isTrue();
+        assertThat(created).as("fixture factory of the timed-out task").hasValue(0);
+        assertThat(quickCalls).hasValue(0);
     }
 }

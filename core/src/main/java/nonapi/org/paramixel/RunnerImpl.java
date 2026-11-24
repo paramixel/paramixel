@@ -38,6 +38,7 @@ import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
 import org.paramixel.api.Task;
+import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.selector.Selector;
 
 /**
@@ -174,15 +175,20 @@ public final class RunnerImpl implements Runner {
             dispatcher.runStarted(configuration);
             warnAboutUnknownKeys(dispatcher);
             warnAboutIgnoredSelection(selector, dispatcher);
+            // Validation first: invalid configuration must fail before discovery invokes any factory.
+            ExecutionEngine.validateConfiguration(configuration);
+            final var overrides = new LinkedHashMap<>(poolOverrides);
+            seedDiscoveryPool(overrides);
             dispatcher.discoveryStarted();
             final var effectiveSelector = selector.resolve(configuration);
             final var scanner = new FactoryScanner(configuration, effectiveSelector, shuffled, shuffleSeed);
             final var discovered = scanner.discover();
+            scanner.skipped().forEach(dispatcher::warning);
             dispatcher.discoveryCompleted(discovered);
             if (discovered.isEmpty()) {
                 return finishNoTests(runId, dispatcher);
             }
-            return executeDiscovered(runId, discovered.orElseThrow(), true, dispatcher);
+            return executeDiscovered(runId, discovered.orElseThrow(), overrides, true, dispatcher);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while delivering listener events", e);
@@ -192,29 +198,31 @@ public final class RunnerImpl implements Runner {
     private Result execute(final Task definition, final boolean discoveryRun, final ReportingDispatcher existing) {
         final var runId = FastUUID.generateUuid();
         if (existing != null) {
-            return executeDiscovered(runId, definition, discoveryRun, existing);
+            return executeDiscovered(runId, definition, new LinkedHashMap<>(poolOverrides), discoveryRun, existing);
         }
         try (var dispatcher = new ReportingDispatcher(listener, configuration)) {
             dispatcher.runStarted(configuration);
             warnAboutUnknownKeys(dispatcher);
-            return executeDiscovered(runId, definition, discoveryRun, dispatcher);
+            return executeDiscovered(runId, definition, new LinkedHashMap<>(poolOverrides), discoveryRun, dispatcher);
         }
     }
 
     private Result executeDiscovered(
             final String runId,
             final Task definition,
+            final Map<Pool, Integer> overrides,
             final boolean discoveryRun,
             final ReportingDispatcher dispatcher) {
-        final var overrides = new LinkedHashMap<>(poolOverrides);
-        if (discoveryRun) {
-            seedDiscoveryPool(overrides);
-        }
         final var plan = new PlanCompiler(configuration, overrides).compile(definition);
         plan.warnings().forEach(warning -> dispatcher.warning(warning.toString()));
         final var engine = new ExecutionEngine(
                 runId, plan, configuration, dispatcher, discoveryRun && shuffled ? shuffleSeed : null);
         activeEngine.set(engine);
+        if (closed) {
+            // close() may have run before the engine was published (for example during discovery) and found nothing
+            // to cancel; publishing first and re-checking guarantees one of the two sides requests cancellation.
+            engine.requestCancellation("runner closed");
+        }
         try {
             final var result = engine.run();
             try {
@@ -239,18 +247,21 @@ public final class RunnerImpl implements Runner {
         final var capacity = configuration
                 .getInteger(Configuration.RUNNER_PARALLELISM)
                 .orElse(Runtime.getRuntime().availableProcessors());
-        overrides.put(pool, Math.max(1, capacity));
+        if (capacity <= 0) {
+            throw new ConfigurationException("Invalid configuration for '" + Configuration.RUNNER_PARALLELISM
+                    + "': must be positive but was " + capacity);
+        }
+        overrides.put(pool, capacity);
     }
 
     private Result finishNoTests(final String runId, final ReportingDispatcher dispatcher) throws InterruptedException {
+        // An empty discovery follows the separately configured failIfNoTests rule, not the skip mapping.
         final var failIfNoTests =
                 configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true);
-        final var failureOnSkip =
-                configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(true);
         final var status = Status.skipped("no task factories were discovered");
-        final var exitCode = failIfNoTests || failureOnSkip ? 1 : 0;
+        final var exitCode = failIfNoTests ? 1 : 0;
         final var warnings = new ArrayList<String>();
-        warnings.add("No @Paramixel.Factory method matched the requested selection");
+        warnings.add("No @Paramixel.Factory method contributed a task for the requested selection");
         final var result = Result.builder()
                 .runId(runId)
                 .status(status, exitCode, true)

@@ -82,9 +82,17 @@ final class PoolSizes {
     }
 
     private static int resolveCores(final long operand, final boolean multiply) {
-        // int * long and int / long promote to long, so the core count needs no cast.
-        final var cores = Runtime.getRuntime().availableProcessors();
-        final var resolved = multiply ? cores * operand : cores / operand;
+        final long cores = Runtime.getRuntime().availableProcessors();
+        // A huge multiplier must saturate: a wrapped long product would be negative and collapse the pool to one.
+        final var resolved = multiply ? saturatingMultiply(cores, operand) : cores / operand;
         return (int) Math.max(1L, Math.min(Integer.MAX_VALUE, resolved));
+    }
+
+    private static long saturatingMultiply(final long left, final long right) {
+        try {
+            return Math.multiplyExact(left, right);
+        } catch (ArithmeticException e) {
+            return Long.MAX_VALUE;
+        }
     }
 }

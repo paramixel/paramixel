@@ -88,7 +88,7 @@ public interface Runner extends AutoCloseable {
      * Discovers factories matching exactly the supplied selector and executes them.
      *
      * @param selector the selector; must not be {@code null}
-     * @return the result, with no root when nothing matched; never {@code null}
+     * @return the result, with no root when no factory contributes a task; never {@code null}
      * @throws NullPointerException if {@code selector} is {@code null}
      * @throws ConfigurationException if the configuration is invalid
      * @throws ResolverException if discovery or factory validation fails
@@ -100,7 +100,7 @@ public interface Runner extends AutoCloseable {
     /**
      * Discovers factories using the configured selection and executes them.
      *
-     * @return the result, with no root when nothing matched; never {@code null}
+     * @return the result, with no root when no factory contributes a task; never {@code null}
      * @throws ConfigurationException if the configuration is invalid
      * @throws ResolverException if discovery or factory validation fails
      * @throws CompilationException if the discovered definition is invalid

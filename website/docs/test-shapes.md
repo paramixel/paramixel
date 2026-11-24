@@ -79,5 +79,7 @@ Both groups run, but their bodies never overlap.
 
 ## Fail-fast at the root
 
-`paramixel.failFast=true` stops admitting new root tasks after a non-passing root outcome. Already-running work finishes;
-skipped roots carry an explicit reason.
+`paramixel.failFast=true` stops admitting new root tasks after a root task fails (`FAILED`, which includes a timeout).
+A deliberate skip (`throw skip(...)` or a false `when`/`onlyIf` condition) and an assumption abort (`throw abort(...)`)
+are not failures and do not trigger it. Already-running work finishes; roots that are not admitted are `SKIPPED` with an
+explicit `failFast` reason.

@@ -94,7 +94,9 @@ public final class ReportFileListener implements Listener {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(file, content, StandardCharsets.UTF_8);
+            // String.getBytes replaces an unpaired surrogate (for example from a truncated failure message) instead of
+            // throwing, so one malformed message cannot prevent the whole report from being written.
+            Files.write(file, content.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write report file " + file, e);
         }
@@ -150,7 +152,9 @@ public final class ReportFileListener implements Listener {
                 .append(",\n    \"failures\": ")
                 .append(jsonFailures(result.failures()))
                 .append("\n  },\n  \"root\": ")
-                .append(result.root().map(root -> jsonNode(root, false, 0)).orElse("null"))
+                .append(result.root()
+                        .map(root -> jsonNode(root, false, attemptTotalOf(root)))
+                        .orElse("null"))
                 .append("\n}\n");
         return out.toString();
     }
@@ -363,11 +367,46 @@ public final class ReportFileListener implements Listener {
     }
 
     private static String escape(final String value) {
-        return value.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&apos;");
+        final var out = new StringBuilder(value.length() + 16);
+        var i = 0;
+        while (i < value.length()) {
+            final var codePoint = value.codePointAt(i);
+            i += Character.charCount(codePoint);
+            switch (codePoint) {
+                case '&' -> out.append("&amp;");
+                case '<' -> out.append("&lt;");
+                case '>' -> out.append("&gt;");
+                case '"' -> out.append("&quot;");
+                case '\'' -> out.append("&apos;");
+                default -> {
+                    if (isXmlCharacter(codePoint)) {
+                        out.appendCodePoint(codePoint);
+                    } else {
+                        // XML 1.0 cannot represent this character at all, not even as a character reference.
+                        out.append('\uFFFD');
+                    }
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * Returns whether a code point is a legal XML 1.0 {@code Char}.
+     *
+     * <p>Control characters other than tab, line feed and carriage return, unpaired surrogates, and U+FFFE/U+FFFF are
+     * illegal; ANSI color codes in failure messages are a common source of them.
+     *
+     * @param codePoint the code point
+     * @return {@code true} if the code point may appear in an XML document
+     */
+    private static boolean isXmlCharacter(final int codePoint) {
+        return codePoint == 0x9
+                || codePoint == 0xA
+                || codePoint == 0xD
+                || (codePoint >= 0x20 && codePoint <= 0xD7FF)
+                || (codePoint >= 0xE000 && codePoint <= 0xFFFD)
+                || (codePoint >= 0x10000 && codePoint <= 0x10FFFF);
     }
 
     // ------------------------------------------------------------------------------------------

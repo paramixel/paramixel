@@ -17,6 +17,7 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.task;
 
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -274,6 +277,94 @@ class ListenerTest {
                 .noneMatch(diagnostic -> diagnostic.contains(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC));
         assertThat(listener.events)
                 .anySatisfy(event -> assertThat(event.phase()).isEqualTo(TaskPhase.TERMINAL));
+    }
+
+    @Test
+    void listenerInterruptDoesNotLoseLaterEvents() {
+        final var terminal = new AtomicInteger();
+        final var listener = new Listener() {
+            @Override
+            public void onTaskEvent(final TaskEvent event) {
+                if (event.phase() == TaskPhase.ADMITTED) {
+                    Thread.currentThread().interrupt();
+                } else if (event.phase() == TaskPhase.TERMINAL) {
+                    terminal.incrementAndGet();
+                }
+            }
+        };
+
+        final var result = Runner.builder()
+                .listener(listener)
+                .build()
+                .run(task("root").step("work", () -> {}).build());
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(terminal).hasValue(result.occurrenceCount());
+    }
+
+    @Test
+    void fatalListenerErrorReachesTheRunnerEvenWithABoundedQueue() throws Exception {
+        final var fatal = new InternalError("simulated fatal listener error");
+        final var listener = new Listener() {
+            @Override
+            public void onTaskEvent(final TaskEvent event) {
+                throw fatal;
+            }
+        };
+        final var definition = task("root").step("work", () -> {}).build();
+        try (var runner = Runner.builder()
+                .listener(listener)
+                .configuration(Configuration.of(Map.of(Configuration.LISTENER_QUEUE_CAPACITY, "1")))
+                .build()) {
+            final var run = new FutureTask<>(() -> runner.run(definition));
+            final var caller = new Thread(run);
+            caller.setDaemon(true);
+            caller.start();
+            try {
+                assertThatThrownBy(() -> run.get(5, TimeUnit.SECONDS))
+                        .isInstanceOf(ExecutionException.class)
+                        .satisfies(error -> assertThat(error.getCause()).isSameAs(fatal));
+            } finally {
+                caller.interrupt();
+                caller.join(5_000L);
+            }
+        }
+    }
+
+    @Test
+    void interruptedFinishStopsDispatchAndInterruptsTheListener() throws Exception {
+        final var listening = new CountDownLatch(1);
+        final var interrupted = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
+        final var listener = new Listener() {
+            @Override
+            public void onWarning(final String message) {
+                listening.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    interrupted.countDown();
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .build()
+                .run(task("root").build());
+        try (var dispatcher = new ReportingDispatcher(listener, Configuration.of(Map.of()))) {
+            dispatcher.warning("waiting listener");
+            assertThat(listening.await(5, TimeUnit.SECONDS)).isTrue();
+            Thread.currentThread().interrupt();
+            try {
+                assertThatThrownBy(() -> dispatcher.finish(result)).isInstanceOf(InterruptedException.class);
+            } finally {
+                Thread.interrupted();
+            }
+            assertThat(interrupted.await(2, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            release.countDown();
+        }
     }
 
     /**

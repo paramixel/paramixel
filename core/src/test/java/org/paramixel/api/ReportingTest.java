@@ -165,6 +165,25 @@ class ReportingTest {
     }
 
     @Test
+    @DisplayName("the JSON report gives a retried root task its attempt total")
+    void jsonReportsRootAttemptTotal() throws Exception {
+        final Task definition = task("root")
+                .retry(RetryPolicy.attempts(2))
+                .step("fail", () -> {
+                    throw new IllegalStateException("boom");
+                })
+                .build();
+
+        final var jsonFile = tempDir.resolve("root-retry.json");
+        Runner.builder().listener(new ReportFileListener(jsonFile)).build().run(definition);
+
+        final var json = Files.readString(jsonFile);
+        final var rootNode = json.substring(json.indexOf("\"root\": {"));
+        final var rootHeader = rootNode.substring(0, rootNode.indexOf("\"children\""));
+        assertThat(rootHeader).contains("\"attemptTotal\": 2");
+    }
+
+    @Test
     @DisplayName("console summary and report file include infrastructure diagnostics such as NON_QUIESCENT")
     void reportsIncludeInfrastructureDiagnostics() throws Exception {
         final var configuration =
@@ -190,6 +209,49 @@ class ReportingTest {
 
         assertThat(fileResult.isQuiescent()).isFalse();
         assertThat(Files.readString(file)).contains("NON_QUIESCENT");
+    }
+
+    @Test
+    @DisplayName("the XML report stays well-formed when names and messages contain control characters")
+    void xmlReportReplacesIllegalControlCharacters() throws Exception {
+        final Task definition = task("root")
+                .step("bell\u0007step", () -> {
+                    throw new IllegalStateException("bad \u0001 byte and \u001b[31mANSI\u001b[0m color");
+                })
+                .build();
+
+        final var file = tempDir.resolve("control.xml");
+        Runner.builder()
+                .listener(ReportFileListenerFactory.listener(file))
+                .build()
+                .run(definition);
+
+        final var document = DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder()
+                .parse(new ByteArrayInputStream(Files.readAllBytes(file)));
+        assertThat(document.getElementsByTagName("failure").getLength()).isGreaterThanOrEqualTo(1);
+        assertThat(document.getDocumentElement().getTextContent()).contains("ANSI");
+    }
+
+    @Test
+    @DisplayName("a report is still written when a failure message contains an unpaired surrogate")
+    void reportWrittenDespiteUnpairedSurrogate() throws Exception {
+        final Task definition = task("root")
+                .step("truncated", () -> {
+                    // A message cut in the middle of a surrogate pair, as naive truncation of an emoji produces.
+                    throw new IllegalStateException("cut \uD83D");
+                })
+                .build();
+
+        final var file = tempDir.resolve("surrogate.json");
+        final var result = Runner.builder()
+                .listener(ReportFileListenerFactory.listener(file))
+                .build()
+                .run(definition);
+
+        assertThat(result.diagnostics()).noneMatch(diagnostic -> diagnostic.contains("Failed to write report"));
+        assertThat(file).exists();
+        assertThat(Files.readString(file)).contains("\"status\": \"FAILED\"");
     }
 
     private static Task nonQuiescentDefinition() {

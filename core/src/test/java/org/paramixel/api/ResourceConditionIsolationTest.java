@@ -46,6 +46,27 @@ class ResourceConditionIsolationTest {
     }
 
     @Test
+    @DisplayName("RES-06: a key declared with a primitive type resolves its boxed resource")
+    void primitiveKeyResolvesBoxedValue() {
+        final Key<Integer> count = Key.named("test", "count", int.class);
+        final AtomicInteger required = new AtomicInteger();
+        final AtomicInteger found = new AtomicInteger();
+        final Task definition = task("root")
+                .resource(count, () -> 42)
+                .stepWithContext("verify", (Context context) -> {
+                    required.set(context.require(count));
+                    found.set(context.find(count).orElseThrow());
+                })
+                .build();
+
+        final var result = run(definition);
+
+        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
+        assertThat(required).hasValue(42);
+        assertThat(found).hasValue(42);
+    }
+
+    @Test
     @DisplayName("RES-01: two values of the same class resolve through distinct keys")
     void distinctKeysResolveDistinctValues() {
         final Task definition = task("root")
@@ -123,6 +144,48 @@ class ResourceConditionIsolationTest {
                 .anySatisfy(failure -> assertThat(failure.message()).contains("body failed"));
         assertThat(root.failures())
                 .anySatisfy(failure -> assertThat(failure.message()).contains("release failed"));
+    }
+
+    @Test
+    void releasePhaseRetainsEveryFailureInReverseAcquisitionOrder() {
+        final var first = new IllegalStateException("primary release failed");
+        final var second = new IllegalArgumentException("secondary release failed");
+        final var definition = task("root")
+                .resource(PRIMARY, () -> "primary", value -> {
+                    throw first;
+                })
+                .resource(SECONDARY, () -> "secondary", value -> {
+                    throw second;
+                })
+                .build();
+
+        final var result = run(definition);
+        final var root = result.root().orElseThrow();
+        final var release = root.phases().stream()
+                .filter(phase -> phase.phase() == TaskPhase.RESOURCES_RELEASED)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(release.status().kind()).isEqualTo(Status.Kind.FAILED);
+        assertThat(root.failures())
+                .extracting(failure -> failure.throwable().orElseThrow())
+                .containsExactly(second, first);
+        assertThat(release.failures()).containsExactlyElementsOf(root.failures());
+    }
+
+    @Test
+    void unrecoverableErrorFromResourceReleaseIsRethrown() {
+        final var fatal = new InternalError("simulated unrecoverable error");
+        final var furtherReleases = new AtomicInteger();
+        final var definition = task("root")
+                .resource(PRIMARY, () -> "primary", value -> furtherReleases.incrementAndGet())
+                .resource(SECONDARY, () -> "secondary", value -> {
+                    throw fatal;
+                })
+                .build();
+
+        assertThatThrownBy(() -> run(definition)).isSameAs(fatal);
+        assertThat(furtherReleases).hasValue(0);
     }
 
     @Test

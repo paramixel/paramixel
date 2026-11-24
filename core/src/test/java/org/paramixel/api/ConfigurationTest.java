@@ -18,9 +18,13 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.task;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import nonapi.org.paramixel.ConfigurationFactory;
 import nonapi.org.paramixel.compiler.PlanCompiler;
@@ -72,6 +76,24 @@ class ConfigurationTest {
     }
 
     @Test
+    void malformedUnicodeInClasspathPropertiesIsReportedAsAConfigurationError() {
+        final var loader = new ClassLoader(null) {
+            @Override
+            public InputStream getResourceAsStream(final String name) {
+                if (Configuration.CONFIGURATION_FILE_NAME.equals(name)) {
+                    return new ByteArrayInputStream("paramixel.workers=\\u12G4\n".getBytes(StandardCharsets.US_ASCII));
+                }
+                return null;
+            }
+        };
+
+        assertThatThrownBy(() -> Configuration.defaultConfiguration(loader))
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining(Configuration.CONFIGURATION_FILE_NAME)
+                .hasCauseInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @DisplayName("typed accessors parse and reject values deterministically")
     void typedAccessors() {
         final var configuration = Configuration.of(Map.of(
@@ -120,6 +142,23 @@ class ConfigurationTest {
                     .compile(definition);
             assertThat(plan.poolCapacities().get("p")).isPositive();
         }
+    }
+
+    @Test
+    @DisplayName("a huge processor multiplier saturates at the largest capacity instead of overflowing to one")
+    void coresMultiplierSaturates() {
+        assumeThat(Runtime.getRuntime().availableProcessors())
+                .as("overflow needs at least two processors")
+                .isGreaterThanOrEqualTo(2);
+        final var definition =
+                parallel("root", Pool.named("p")).step("work", () -> {}).build();
+        // cores * operand exceeds Long.MAX_VALUE for any core count of two or more.
+        final var expression = "@cores*" + (Long.MAX_VALUE / 2 + 1);
+
+        final var plan = new PlanCompiler(Configuration.of(Map.of("paramixel.parallelism.p", expression)), Map.of())
+                .compile(definition);
+
+        assertThat(plan.poolCapacities()).containsEntry("p", Integer.MAX_VALUE);
     }
 
     @Test

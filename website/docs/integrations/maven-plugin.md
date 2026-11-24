@@ -38,6 +38,11 @@ The Maven plugin artifact is `org.paramixel:maven-plugin`; the goal prefix is `p
 | `properties` | — | additional configuration keys |
 | `strictThreadLifecycle` | `paramixel.strictThreadLifecycle` | `false` |
 
+Configuration precedence, from lowest to highest: Paramixel defaults, the test-classpath `paramixel.properties`,
+`<properties>` entries, explicitly set mojo parameters, and system properties. A parameter you do not set leaves the
+lower layers in effect, so `paramixel.failFast` or `paramixel.match.class.regex` in `paramixel.properties` or
+`<properties>` applies unless the matching parameter is configured.
+
 The mojo never calls `System.exit`: a non-zero result exit code becomes a `MojoFailureException`, and configuration,
 discovery, or plan errors become a `MojoExecutionException`. With `strictThreadLifecycle`, non-daemon threads that retain
 the test classloader are reported as an error rather than a warning.
