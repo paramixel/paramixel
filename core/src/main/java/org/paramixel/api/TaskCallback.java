@@ -20,12 +20,12 @@ package org.paramixel.api;
  * One executable callback of a {@link Task}: a body operation or a lifecycle callback.
  *
  * <p>Callbacks are attached to their owning task and are invoked by the execution engine on a worker thread, in the
- * phase order the task defines. Typed authoring callbacks such as {@code BasicTest::setUp} are adapted to this type
- * when a builder snapshots its definition, and the adapter obtains the primary instance through the execution
- * context; no reflective class lookup is involved.
+ * phase order the task defines. A hook declared with {@code @Paramixel.Id} is resolved to this type when the
+ * definition is built; the resolved callback remembers its identifier, which is what the report labels it with.
  *
  * <p>Implementations must be safe for the concurrency the definition asks for. A callback on a direct child of a
- * {@code parallel} task may run concurrently with sibling callbacks that share the same primary instance.
+ * {@code parallel} task may run concurrently with its siblings; they share no context scope, but they can read the
+ * same bound fixture.
  */
 @FunctionalInterface
 public interface TaskCallback {

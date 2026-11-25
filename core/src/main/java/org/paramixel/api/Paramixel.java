@@ -58,6 +58,38 @@ public final class Paramixel {
     public @interface Factory {}
 
     /**
+     * Binds a stable identifier to a hook method.
+     *
+     * <p>The annotated method must be {@code public static}, take exactly one {@link org.paramixel.api.Context}
+     * parameter, and return {@code void} — or {@code boolean} when the identifier is used for a predicate
+     * ({@code .onlyIf(id)} and {@code repeat().until(id)}). It may declare checked exceptions; a hook that
+     * declares them runs exactly as an ordinary method call would.
+     *
+     * <p>The identifier resolves only against methods declared by the definition's <strong>anchor class</strong> —
+     * the class named once at the definition root, as in {@code Tasks.sequential(MyTest.class, "MyTest")}.
+     * Inheritance is not consulted, and an identifier that is declared in a class that is not the anchor of a
+     * definition is never resolved.
+     *
+     * <p>Identifiers must be unique within the anchor class, and the identifier is also the label reported for the
+     * hook ({@code before[setUp]}, {@code body[work]}). Ids are not selectable in 7.0.0: {@link Selector} filters
+     * classes, so tagging a hook has no effect and is rejected.
+     *
+     * @see org.paramixel.api.Tasks
+     */
+    @Documented
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface Id {
+
+        /**
+         * Returns the stable identifier of the hook.
+         *
+         * @return the identifier; must not be blank
+         */
+        String value();
+    }
+
+    /**
      * Marks a method that executes once before any discovered test actions
      * within a runner invocation.
      *

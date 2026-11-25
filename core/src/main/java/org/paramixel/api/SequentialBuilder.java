@@ -26,17 +26,15 @@ package org.paramixel.api;
  *
  * <p>The policy applies to this task's own direct children only. An independent inner group does not make its
  * enclosing dependent sequence independent, and a {@code parallel} builder has no such policy at all.
- *
- * @param <T> the inherited primary instance type; {@link Void} when the task has no instance binding
  */
-public final class SequentialBuilder<T> extends TaskBuilder<T, SequentialBuilder<T>> {
+public final class SequentialBuilder extends TaskBuilder<SequentialBuilder> {
 
     SequentialBuilder(final String name) {
         super(name, ExecutionMode.SEQUENTIAL, null);
     }
 
     @Override
-    protected SequentialBuilder<T> self() {
+    protected SequentialBuilder self() {
         return this;
     }
 
@@ -45,7 +43,7 @@ public final class SequentialBuilder<T> extends TaskBuilder<T, SequentialBuilder
      *
      * @return this builder
      */
-    public SequentialBuilder<T> dependent() {
+    public SequentialBuilder dependent() {
         setDependent(true);
         return this;
     }
@@ -58,7 +56,7 @@ public final class SequentialBuilder<T> extends TaskBuilder<T, SequentialBuilder
      *
      * @return this builder
      */
-    public SequentialBuilder<T> independent() {
+    public SequentialBuilder independent() {
         setDependent(false);
         return this;
     }

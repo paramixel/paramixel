@@ -14,23 +14,25 @@
  * limitations under the License.
  */
 
-package org.paramixel.api;
+package org.paramixel.api.discoveryfixtures;
 
-/**
- * Releases a secondary scoped resource.
- *
- * <p>Release callbacks run in reverse acquisition order after the owning task's {@code after} callbacks, and after all
- * descendants have settled. A failing release does not prevent the remaining releases from being attempted.
- */
-@FunctionalInterface
-public interface ResourceReleaser {
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Task;
+
+/** A disabled factory with conflicting annotations that must be ignored entirely. */
+public final class DisabledConflictingFactoryFixture {
+
+    private DisabledConflictingFactoryFixture() {}
 
     /**
-     * Releases the resource.
+     * Fails if invoked as a factory or hook.
      *
-     * @param resource the acquired resource; never {@code null}
-     * @param context the read-only execution context
-     * @throws Throwable if release fails
+     * @return never returns normally
      */
-    void release(Object resource, Context context) throws Throwable;
+    @Paramixel.Disabled
+    @Paramixel.Factory
+    @Paramixel.BeforeAll
+    public static Task factory() {
+        throw new AssertionError("disabled factory or hook was invoked");
+    }
 }

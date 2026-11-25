@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.compiler.PlanCompiler;
+import nonapi.org.paramixel.compiler.PoolSizes;
 import nonapi.org.paramixel.discovery.FactoryScanner;
 import nonapi.org.paramixel.execution.ExecutionEngine;
 import nonapi.org.paramixel.reporting.ReportingDispatcher;
@@ -240,7 +241,15 @@ public final class RunnerImpl implements Runner {
         if (overrides.containsKey(pool)) {
             return;
         }
-        if (configuration.getString(Configuration.poolKey(pool.name())).isPresent()) {
+        final var key = Configuration.poolKey(pool.name());
+        final var configured = configuration.getString(key);
+        if (configured.isPresent()) {
+            final var value = configured.orElseThrow();
+            try {
+                overrides.put(pool, PoolSizes.parse(value));
+            } catch (IllegalArgumentException e) {
+                throw new ConfigurationException("Invalid configuration for '" + key + "': " + e.getMessage(), e);
+            }
             return;
         }
         final var capacity = configuration

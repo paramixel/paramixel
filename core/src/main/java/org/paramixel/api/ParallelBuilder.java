@@ -25,21 +25,18 @@ import java.util.Objects;
  * <em>attempt-all-unless-explicitly-canceled</em>. A failed sibling does not cancel other siblings; the group
  * aggregates the most severe outcome.
  *
- * <p>Parallel children that share an inherited primary instance are concurrent calls on the same object. Paramixel
- * cannot make {@code T} thread-safe and deliberately does not synchronize typed callbacks, because that would defeat
- * the point of a parallel group. Guard shared state in the fixture, give each child its own scope, or declare an
- * exclusive lock.
- *
- * @param <T> the inherited primary instance type; {@link Void} when the task has no instance binding
+ * <p>Each direct child of a parallel group owns its own context scope, so siblings never see each other's entries. A
+ * fixture shared by several branches is published with {@code bind} on this group, and Paramixel cannot make it
+ * thread-safe: guard shared state in the fixture, give each child its own entry, or declare an exclusive lock.
  */
-public final class ParallelBuilder<T> extends TaskBuilder<T, ParallelBuilder<T>> {
+public final class ParallelBuilder extends TaskBuilder<ParallelBuilder> {
 
     ParallelBuilder(final String name, final Pool pool) {
         super(name, ExecutionMode.PARALLEL, Objects.requireNonNull(pool, "pool is null"));
     }
 
     @Override
-    protected ParallelBuilder<T> self() {
+    protected ParallelBuilder self() {
         return this;
     }
 }

@@ -17,25 +17,36 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
+import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
 
 /**
- * Demonstrates that parallel siblings sharing one owned instance are concurrent calls on the same object.
+ * Demonstrates that parallel siblings reading one shared fixture are concurrent calls on the same object.
  *
- * <p>Paramixel does not synchronize typed callbacks: the fixture decides what is safe. Here each parallel method records
- * the instance identity and meets at a barrier sized to the pool capacity, proving both that the methods overlap and
- * that they all target the same instance.
+ * <p>Paramixel does not synchronize hooks: the fixture decides what is safe. The fixture is published with
+ * {@code bind}, so it is one object captured at authoring time and readable by every descendant, while each parallel
+ * sibling keeps its own context scope. Each method records the fixture identity and meets at a barrier sized to the
+ * pool capacity, proving both that the calls overlap and that they all target the same object.
  */
 public class ParallelInstanceTest {
+
+    private static final String ID_NOOP = "noop";
+    private static final String ID_METHOD_1 = "method1";
+    private static final String ID_METHOD_2 = "method2";
+    private static final String ID_METHOD_3 = "method3";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String FIXTURE = "fixture";
 
     private static final int METHOD_COUNT = 3;
     private static final int PARALLELISM = METHOD_COUNT;
@@ -69,30 +80,75 @@ public class ParallelInstanceTest {
     public static Task factory() {
         resetCounts();
 
-        return instance("ParallelInstanceTest", ParallelInstanceTest::new)
-                .before(ParallelInstanceTest::noop)
-                .parallel(
-                        "parallel-methods",
-                        Pool.named("methods"),
-                        methods -> methods.step("method1", ParallelInstanceTest::method)
-                                .step("method2", ParallelInstanceTest::method)
-                                .step("method3", ParallelInstanceTest::method))
-                .after(ParallelInstanceTest::noop)
-                .after(ParallelInstanceTest::validate)
+        return sequential(ParallelInstanceTest.class, "ParallelInstanceTest")
+                .bind(FIXTURE, new ParallelInstanceTest())
+                .before(ID_NOOP)
+                .child(parallel("parallel-methods", Pool.named("methods"))
+                        .step(ID_METHOD_1)
+                        .step(ID_METHOD_2)
+                        .step(ID_METHOD_3))
+                .after(ID_NOOP)
+                .after(ID_VALIDATE)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
+     * A lifecycle hook that deliberately does nothing; concurrency is measured in the parallel methods.
+     *
+     * @param context the execution context
      */
-    public ParallelInstanceTest() {
+    @Paramixel.Id(ID_NOOP)
+    public static void noop(final Context context) {
         // Intentionally empty
     }
 
     /**
-     * A lifecycle hook that deliberately does nothing; concurrency is measured in the parallel methods.
+     * Runs the first parallel method.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if interrupted while waiting
      */
-    public void noop() {
+    @Paramixel.Id(ID_METHOD_1)
+    public static void methodOne(final Context context) throws InterruptedException {
+        context.require(FIXTURE, ParallelInstanceTest.class).method();
+    }
+
+    /**
+     * Runs the second parallel method.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if interrupted while waiting
+     */
+    @Paramixel.Id(ID_METHOD_2)
+    public static void methodTwo(final Context context) throws InterruptedException {
+        context.require(FIXTURE, ParallelInstanceTest.class).method();
+    }
+
+    /**
+     * Runs the third parallel method.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if interrupted while waiting
+     */
+    @Paramixel.Id(ID_METHOD_3)
+    public static void methodThree(final Context context) throws InterruptedException {
+        context.require(FIXTURE, ParallelInstanceTest.class).method();
+    }
+
+    /**
+     * Verifies that all methods shared one fixture and overlapped.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        verify();
+    }
+
+    /**
+     * A lifecycle hook body that does nothing.
+     */
+    public void noopBody() {
         // Intentionally empty
     }
 
@@ -112,10 +168,7 @@ public class ParallelInstanceTest {
         concurrentCount.decrementAndGet();
     }
 
-    /**
-     * Verifies that all methods shared one instance and overlapped.
-     */
-    public static void validate() {
+    private static void verify() {
         assertThat(testCount.get()).isEqualTo(METHOD_COUNT);
         assertThat(concurrentCount.get()).isZero();
         assertThat(maxConcurrentCount.get()).isGreaterThan(1);

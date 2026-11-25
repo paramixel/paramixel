@@ -17,8 +17,8 @@
 package examples.altcontainers.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
 import examples.altcontainers.util.RandomUtil;
 import examples.support.Logger;
@@ -33,6 +33,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
@@ -44,6 +45,14 @@ import org.paramixel.api.Task;
  * the round-trip content matches.
  */
 public class KafkaTest {
+
+    private static final String ID_SET_UP = "setUp";
+    private static final String ID_PRODUCE = "produce()";
+    private static final String ID_CONSUME = "consume()";
+    private static final String ID_TEAR_DOWN = "tearDown";
+
+    private static final String ENVIRONMENT = "environment";
+    private static final String FIXTURE = "fixture";
 
     private static final Logger LOGGER = Logger.createLogger(KafkaTest.class);
     private static final String TOPIC = "test";
@@ -73,17 +82,57 @@ public class KafkaTest {
      */
     @Paramixel.Factory
     public static Task factory() throws Throwable {
-        return parallel(KafkaTest.class.getName(), Pool.named("environments"))
-                .each(
-                        KafkaTestEnvironment.createTestEnvironments(),
-                        environment -> instance(environment.name(), () -> new KafkaTest(environment))
-                                .before(KafkaTest::setUp)
-                                .sequential(
-                                        "tests",
-                                        tests -> tests.step("produce()", KafkaTest::produce)
-                                                .step("consume()", KafkaTest::consume))
-                                .after(KafkaTest::tearDown))
-                .build();
+        final var root = parallel(KafkaTest.class, "KafkaTest", Pool.named("environments"));
+        for (final var environment : KafkaTestEnvironment.createTestEnvironments()) {
+            root.child(sequential(environment.name())
+                    .bind(ENVIRONMENT, environment)
+                    .before(ID_SET_UP)
+                    .child(sequential("tests").step(ID_PRODUCE).step(ID_CONSUME))
+                    .after(ID_TEAR_DOWN));
+        }
+        return root.build();
+    }
+
+    /**
+     * Builds this branch's fixture and runs its setup.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SET_UP)
+    public static void setUpHook(final Context context) throws Throwable {
+        final var fixture = new KafkaTest(context.require(ENVIRONMENT, KafkaTestEnvironment.class));
+        context.put(FIXTURE, fixture);
+        fixture.setUp();
+    }
+
+    /**
+     * Runs the produce body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_PRODUCE)
+    public static void produceHook(final Context context) throws Throwable {
+        context.require(FIXTURE, KafkaTest.class).produce();
+    }
+
+    /**
+     * Runs the consume body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CONSUME)
+    public static void consumeHook(final Context context) throws Throwable {
+        context.require(FIXTURE, KafkaTest.class).consume();
+    }
+
+    /**
+     * Releases the fixture, if it was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDownHook(final Context context) {
+        context.find(FIXTURE, KafkaTest.class).ifPresent(KafkaTest::tearDown);
     }
 
     private KafkaTest(final KafkaTestEnvironment environment) {

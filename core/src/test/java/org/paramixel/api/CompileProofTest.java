@@ -96,12 +96,14 @@ class CompileProofTest {
     }
 
     @Test
-    @DisplayName("API-01: the canonical per-environment fixture compiles without class tokens")
+    @DisplayName("API-01: the canonical per-environment fixture compiles without class tokens on steps")
     void basicTestExampleCompiles() throws IOException {
         assertCompiles("BasicStyleTest", """
-                import static org.paramixel.api.Tasks.*;
+                import static org.paramixel.api.Tasks.parallel;
+                import static org.paramixel.api.Tasks.sequential;
 
                 import java.util.List;
+                import org.paramixel.api.Context;
                 import org.paramixel.api.Paramixel;
                 import org.paramixel.api.Pool;
                 import org.paramixel.api.Task;
@@ -110,44 +112,42 @@ class CompileProofTest {
 
                     record Environment(String name) {}
 
-                    private final Environment environment;
-
-                    private BasicStyleTest(Environment environment) {
-                        this.environment = environment;
-                    }
+                    private static final String ENVIRONMENT = "environment";
+                    private static final String SET_UP = "setUp";
+                    private static final String TEAR_DOWN = "tearDown";
 
                     @Paramixel.Factory
                     public static Task factory() throws Throwable {
-                        return parallel("BasicStyleTest", Pool.named("environments"))
-                                .each(
-                                        List.of(new Environment("plain"), new Environment("tls")),
-                                        environment -> instance(environment.name(), () -> new BasicStyleTest(environment))
-                                                .before(BasicStyleTest::setUp)
-                                                .sequential("tests", tests -> tests
-                                                        .step("testHealthy()", BasicStyleTest::testHealthy)
-                                                        .step("testDefaultTextMetrics()", BasicStyleTest::testDefaultTextMetrics)
-                                                        .step("testOpenMetricsTextMetrics()", BasicStyleTest::testOpenMetricsTextMetrics)
-                                                        .step("testPrometheusTextMetrics()", BasicStyleTest::testPrometheusTextMetrics)
-                                                        .step("testPrometheusProtobufMetrics()", BasicStyleTest::testPrometheusProtobufMetrics))
-                                                .after(BasicStyleTest::tearDown))
-                                .build();
+                        final var root = parallel(BasicStyleTest.class, "BasicStyleTest", Pool.named("environments"));
+                        for (final var environment : List.of(new Environment("plain"), new Environment("tls"))) {
+                            root.child(sequential(environment.name())
+                                    .bind(ENVIRONMENT, environment)
+                                    .before(SET_UP)
+                                    .child(sequential("tests")
+                                            .step("testHealthy")
+                                            .step("testTextMetrics")
+                                            .step("testOpenMetrics"))
+                                    .after(TEAR_DOWN));
+                        }
+                        return root.build();
                     }
 
-                    private void setUp() throws Exception {
-                        environment.name();
+                    @Paramixel.Id(SET_UP)
+                    public static void setUp(final Context context) throws Exception {
+                        context.require(ENVIRONMENT, Environment.class).name();
                     }
 
-                    private void testHealthy() {}
+                    @Paramixel.Id("testHealthy")
+                    public static void testHealthy(final Context context) {}
 
-                    private void testDefaultTextMetrics() {}
+                    @Paramixel.Id("testTextMetrics")
+                    public static void testTextMetrics(final Context context) {}
 
-                    private void testOpenMetricsTextMetrics() {}
+                    @Paramixel.Id("testOpenMetrics")
+                    public static void testOpenMetrics(final Context context) {}
 
-                    private void testPrometheusTextMetrics() {}
-
-                    private void testPrometheusProtobufMetrics() {}
-
-                    private void tearDown() {}
+                    @Paramixel.Id(TEAR_DOWN)
+                    public static void tearDown(final Context context) {}
                 }
                 """);
     }
@@ -156,9 +156,11 @@ class CompileProofTest {
     @DisplayName("API-02: the canonical compatibility matrix compiles")
     void kafkaExampleCompiles() throws IOException {
         assertCompiles("KafkaStyleTest", """
-                import static org.paramixel.api.Tasks.*;
+                import static org.paramixel.api.Tasks.parallel;
+                import static org.paramixel.api.Tasks.sequential;
 
                 import java.util.List;
+                import org.paramixel.api.Context;
                 import org.paramixel.api.Paramixel;
                 import org.paramixel.api.Pool;
                 import org.paramixel.api.Task;
@@ -167,73 +169,114 @@ class CompileProofTest {
 
                     record Environment(String name) {}
 
-                    private final Environment environment;
-
-                    private KafkaStyleTest(Environment environment) {
-                        this.environment = environment;
-                    }
+                    private static final String ENVIRONMENT = "environment";
+                    private static final String MESSAGE = "message";
 
                     @Paramixel.Factory
                     public static Task factory() throws Throwable {
-                        return parallel("Kafka compatibility", Pool.named("environments"))
-                                .each(
-                                        List.of(new Environment("kafka-1"), new Environment("kafka-2")),
-                                        env -> instance(env.name(), () -> new KafkaStyleTest(env))
-                                                .before(KafkaStyleTest::setUp)
-                                                .sequential("tests", tests -> tests
-                                                        .step("produce()", KafkaStyleTest::produce)
-                                                        .step("consume()", KafkaStyleTest::consume))
-                                                .after(KafkaStyleTest::tearDown))
-                                .build();
+                        final var root = parallel(KafkaStyleTest.class, "Kafka compatibility", Pool.named("environments"));
+                        for (final var environment : List.of(new Environment("kafka-1"), new Environment("kafka-2"))) {
+                            root.child(sequential(environment.name())
+                                    .bind(ENVIRONMENT, environment)
+                                    .before("setUp")
+                                    .child(sequential("tests").step("produce").step("consume"))
+                                    .after("tearDown"));
+                        }
+                        return root.build();
                     }
 
-                    private void setUp() throws Throwable {}
+                    @Paramixel.Id("setUp")
+                    public static void setUp(final Context context) throws Throwable {}
 
-                    private void produce() throws Throwable {}
+                    @Paramixel.Id("produce")
+                    public static void produce(final Context context) throws Throwable {
+                        context.put(MESSAGE, "payload");
+                    }
 
-                    private void consume() {}
+                    @Paramixel.Id("consume")
+                    public static void consume(final Context context) {
+                        context.require(MESSAGE, String.class);
+                    }
 
-                    private void tearDown() {}
+                    @Paramixel.Id("tearDown")
+                    public static void tearDown(final Context context) throws Throwable {}
                 }
                 """);
     }
 
     @Test
-    @DisplayName("API-03/06/07: nested subtrees, no-instance tasks, and heterogeneous matrices compile")
+    @DisplayName("API-03/06/07: nested subtrees, bodies with children, and heterogeneous matrices compile")
     void nestedAndHeterogeneousExamplesCompile() throws IOException {
         assertCompiles("NestedStyleTest", """
-                import static org.paramixel.api.Tasks.*;
+                import static org.paramixel.api.Tasks.parallel;
+                import static org.paramixel.api.Tasks.sequential;
 
                 import java.util.List;
+                import org.paramixel.api.Context;
+                import org.paramixel.api.Paramixel;
                 import org.paramixel.api.Pool;
                 import org.paramixel.api.Task;
 
                 public final class NestedStyleTest {
 
-                    interface Fixture { void verify(); }
+                    interface Fixture {}
 
-                    static final class One implements Fixture { public void verify() {} }
+                    static final class One implements Fixture {}
 
-                    static final class Two implements Fixture { public void verify() {} }
+                    static final class Two implements Fixture {}
+
+                    private static final String FIXTURE = "fixture";
+                    private static final String INDEX = "index";
 
                     public static Task definition() {
-                        return sequential("Integration suite")
-                                .step("Validate configuration", () -> {})
-                                .each(
-                                        List.of(new One(), new Two()),
-                                        fixture -> instance(fixture.getClass().getSimpleName(), () -> fixture)
-                                                .before(Fixture::verify)
-                                                .step("Verify", Fixture::verify)
-                                                .after(Fixture::verify))
-                                .child(task("Group").step("Ping", () -> {}))
-                                .parallel("Matrix", Pool.named("environments"), matrix -> matrix
-                                        .each(List.of("a", "b"), name -> instance(name, () -> new One())
-                                                .step("Consume", One::verify, children -> children
-                                                        .parallel("Record checks", Pool.named("checks"), checks -> checks
-                                                                .step("Verify payload", One::verify)
-                                                                .step("Verify headers", One::verify)))))
-                                .build();
+                        final var root = sequential(NestedStyleTest.class, "Integration suite")
+                                .step("validateConfiguration");
+                        for (final Fixture fixture : List.of(new One(), new Two())) {
+                            root.child(sequential(fixture.getClass().getSimpleName())
+                                    .bind(FIXTURE, fixture)
+                                    .before("verifySetup")
+                                    .step("verify")
+                                    .after("verifyTeardown"));
+                        }
+                        root.child(sequential("Group").step("ping"));
+                        final var matrix = parallel("Matrix", Pool.named("environments"));
+                        for (final var name : List.of("a", "b")) {
+                            matrix.child(sequential(name)
+                                    .bind(INDEX, name)
+                                    .child(sequential("Consume")
+                                            .body("consume")
+                                            .child(parallel("Record checks", Pool.named("checks"))
+                                                    .step("verifyPayload")
+                                                    .step("verifyHeaders"))));
+                        }
+                        return root.child(matrix).build();
                     }
+
+                    @Paramixel.Id("validateConfiguration")
+                    public static void validateConfiguration(final Context context) {}
+
+                    @Paramixel.Id("verifySetup")
+                    public static void verifySetup(final Context context) {}
+
+                    @Paramixel.Id("verify")
+                    public static void verify(final Context context) {}
+
+                    @Paramixel.Id("verifyTeardown")
+                    public static void verifyTeardown(final Context context) {}
+
+                    @Paramixel.Id("ping")
+                    public static void ping(final Context context) {}
+
+                    @Paramixel.Id("consume")
+                    public static void consume(final Context context) {
+                        context.require(INDEX, String.class);
+                    }
+
+                    @Paramixel.Id("verifyPayload")
+                    public static void verifyPayload(final Context context) {}
+
+                    @Paramixel.Id("verifyHeaders")
+                    public static void verifyHeaders(final Context context) {}
                 }
                 """);
     }
@@ -268,19 +311,27 @@ class CompileProofTest {
     }
 
     @Test
-    @DisplayName("API-08: an incompatible method reference is rejected")
-    void incompatibleMethodReferenceDoesNotCompile() throws IOException {
-        assertDoesNotCompile("IncompatibleReference", """
+    @DisplayName("API-08: the typed authoring surface is not public")
+    void typedAuthoringSurfaceIsNotPublic() throws IOException {
+        assertDoesNotCompile("TypedInstance", """
                 import static org.paramixel.api.Tasks.instance;
 
-                public final class IncompatibleReference {
+                public final class TypedInstance {
 
                     static final class Fixture { void run() {} }
 
-                    static final class Other { void run() {} }
-
                     public static void definition() {
-                        instance("x", Fixture::new).step("run", Other::run);
+                        instance("x", Fixture::new).step("run", Fixture::run);
+                    }
+                }
+                """);
+
+        assertDoesNotCompile("TypedStep", """
+                import static org.paramixel.api.Tasks.sequential;
+
+                public final class TypedStep {
+                    public static void definition() {
+                        sequential("x").step("run", () -> {});
                     }
                 }
                 """);

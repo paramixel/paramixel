@@ -16,9 +16,11 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * Declares a factory that {@link InheritedFactorySubFixture} inherits, used by discovery tests.
@@ -39,8 +41,18 @@ public class InheritedFactoryBaseFixture {
      */
     @Paramixel.Factory
     public static Task factory() {
-        return Tasks.task("inherited")
-                .step("run", () -> DiscoveryFixtures.RECORDED.add("inherited"))
+        return sequential(InheritedFactoryBaseFixture.class, "inherited")
+                .step("run")
                 .build();
+    }
+
+    /**
+     * Records this fixture's execution.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        DiscoveryFixtures.RECORDED.add("inherited");
     }
 }

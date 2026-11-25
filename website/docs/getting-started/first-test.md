@@ -63,21 +63,39 @@ try (Runner runner = Runner.builder().build()) {
 `Runner.run(Task)` performs no discovery and runs no `@BeforeAll`/`@AfterAll` hooks: the supplied definition is the whole
 run.
 
-## Add an owned fixture
+## Add a fixture
 
 ```java
+private static final String FIXTURE = "browser";
+
 @Paramixel.Factory
 public static Task factory() {
-    return instance("browser", Browser::launch)
-            .before(Browser::start)
-            .step("open login page", Browser::openLoginPage)
-            .step("submit credentials", Browser::submitCredentials)
-            .after(Browser::close)
+    return sequential(FirstTest.class, "browser")
+            .before("launch")
+            .step("openLoginPage")
+            .step("submitCredentials")
+            .after("close")
             .build();
+}
+
+@Paramixel.Id("launch")
+public static void launch(final Context context) {
+    context.put(FIXTURE, Browser.launch());
+}
+
+@Paramixel.Id("openLoginPage")
+public static void openLoginPage(final Context context) {
+    context.require(FIXTURE, Browser.class).openLoginPage();
+}
+
+@Paramixel.Id("close")
+public static void close(final Context context) {
+    context.find(FIXTURE, Browser.class).ifPresent(Browser::close);
 }
 ```
 
-The class token appears once, in the supplier. Every step receives the instance directly.
+The fixture is a plain object stored in the context scope. `find` in the `after` hook means a failed launch cannot mask
+the original failure, and the framework never closes anything itself.
 
 ## Next
 

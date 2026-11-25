@@ -17,11 +17,11 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
@@ -34,6 +34,13 @@ import org.paramixel.api.Task;
  * check is exact.
  */
 public class ParallelArgumentTest {
+
+    private static final String ID_BEFORE = "before";
+    private static final String ID_TEST = "test";
+    private static final String ID_AFTER = "after";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String FIXTURE = "fixture";
 
     private static final int ARGUMENT_COUNT = 5;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
@@ -63,20 +70,17 @@ public class ParallelArgumentTest {
     @Paramixel.Factory
     public static Task factory() {
         resetCounts();
-        final var arguments =
-                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
-
-        return parallel("ParallelArgumentTest", Pool.named("methods"))
-                .each(
-                        arguments,
-                        value -> instance(value, ParallelArgumentTest::new)
-                                .before(ParallelArgumentTest::before)
-                                .step("test", ParallelArgumentTest::test)
-                                .step("test", ParallelArgumentTest::test)
-                                .step("test", ParallelArgumentTest::test)
-                                .after(ParallelArgumentTest::after))
-                .after(ParallelArgumentTest::validate)
-                .build();
+        final var root = parallel(ParallelArgumentTest.class, "ParallelArgumentTest", Pool.named("methods"));
+        for (var i = 0; i < ARGUMENT_COUNT; i++) {
+            final var value = "string-" + i;
+            root.child(sequential(value)
+                    .before(ID_BEFORE)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .after(ID_AFTER));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
     /**
@@ -84,6 +88,48 @@ public class ParallelArgumentTest {
      */
     public ParallelArgumentTest() {
         // Intentionally empty
+    }
+
+    /**
+     * Builds this branch's fixture and records fixture entry.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE)
+    public static void beforeHook(final Context context) {
+        final var fixture = new ParallelArgumentTest();
+        context.put(FIXTURE, fixture);
+        fixture.before();
+    }
+
+    /**
+     * Runs one test body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void testHook(final Context context) throws InterruptedException {
+        context.require(FIXTURE, ParallelArgumentTest.class).test();
+    }
+
+    /**
+     * Records fixture exit, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER)
+    public static void afterHook(final Context context) {
+        context.find(FIXTURE, ParallelArgumentTest.class).ifPresent(ParallelArgumentTest::after);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
     }
 
     /**

@@ -16,6 +16,7 @@
 
 package examples;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
 import org.paramixel.api.Tasks;
@@ -26,8 +27,14 @@ import org.paramixel.api.Tasks;
  * <p>Hooks are ordinary task definitions: {@code BeforeAll} runs before the discovered factories and gates them, and
  * {@code AfterAll} runs after the started run even when a discovered factory failed. Both are discovered globally, not
  * by the package selector, because they wrap the whole run.
+ *
+ * <p>Each hook builds its own anchored definition, so its {@code @Paramixel.Id} methods resolve against this class.
+ * The two hooks therefore need distinct identifiers even though both steps print the same kind of line.
  */
 public final class ParamixelHooks {
+
+    private static final String ID_RUN_BEFORE = "run-before";
+    private static final String ID_RUN_AFTER = "run-after";
 
     private ParamixelHooks() {
         // Intentionally empty
@@ -40,8 +47,8 @@ public final class ParamixelHooks {
      */
     @Paramixel.BeforeAll
     public static Task beforeAll() {
-        return Tasks.task(ParamixelHooks.class.getSimpleName() + ".beforeAll")
-                .step("run", () -> System.out.println(ParamixelHooks.class.getSimpleName() + ".beforeAll"))
+        return Tasks.sequential(ParamixelHooks.class, ParamixelHooks.class.getSimpleName() + ".beforeAll")
+                .step(ID_RUN_BEFORE)
                 .build();
     }
 
@@ -52,8 +59,28 @@ public final class ParamixelHooks {
      */
     @Paramixel.AfterAll
     public static Task afterAll() {
-        return Tasks.task(ParamixelHooks.class.getSimpleName() + ".afterAll")
-                .step("run", () -> System.out.println(ParamixelHooks.class.getSimpleName() + ".afterAll"))
+        return Tasks.sequential(ParamixelHooks.class, ParamixelHooks.class.getSimpleName() + ".afterAll")
+                .step(ID_RUN_AFTER)
                 .build();
+    }
+
+    /**
+     * Prints the before-all line.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_RUN_BEFORE)
+    public static void runBefore(final Context context) {
+        System.out.println(ParamixelHooks.class.getSimpleName() + ".beforeAll");
+    }
+
+    /**
+     * Prints the after-all line.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_RUN_AFTER)
+    public static void runAfter(final Context context) {
+        System.out.println(ParamixelHooks.class.getSimpleName() + ".afterAll");
     }
 }

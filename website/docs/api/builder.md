@@ -6,59 +6,84 @@ description: Typed fluent authoring with generic instance inheritance and immuta
 # TaskBuilder
 
 ```java
-public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
-    public S before(ThrowingConsumer<? super T> callback);
-    public S before(ThrowingRunnable callback);
-    public S after(ThrowingConsumer<? super T> callback);
-    public S after(ThrowingRunnable callback);
+public abstract class TaskBuilder<S extends TaskBuilder<S>> {
+    public S before(String id);
+    public S after(String id);
+    public S step(String id);
+    public S body(String id);
+    public S onlyIf(String id);
 
-    public S step(String name, ThrowingConsumer<? super T> operation);
-    public S step(String name, ThrowingRunnable operation);
-    public S step(String name, ThrowingConsumer<? super T> operation,
-                     Consumer<SequentialBuilder<T>> configureChildren);
-    public S step(String name, ThrowingRunnable operation,
-                     Consumer<SequentialBuilder<T>> configureChildren);
-
-    public S sequential(String name, Consumer<SequentialBuilder<T>> configure);
-    public S parallel(String name, Pool pool, Consumer<ParallelBuilder<T>> configure);
-    public S repeat(String name, Consumer<RepeatBuilder<T>> configure);
-    public S when(String name, Predicate<Context> condition, Consumer<SequentialBuilder<T>> configure);
-    public S onlyIf(Predicate<Context> condition);
-
-    public <E> S each(Iterable<? extends E> items,
-                         Function<? super E, ? extends TaskBuilder<?, ?>> mapper);
+    public S bind(String name, Object value);
     public S child(Task child);
-    public S child(TaskBuilder<?, ?> child);
+    public S child(TaskBuilder<?> child);
+    public S children(Collection<? extends TaskBuilder<?>> builders);
+
     public S shuffle();
     public S shuffle(long seed);
     public S tags(String... values);
     public S timeout(Duration timeout);
     public S retry(RetryPolicy policy);
     public S isolated(String lockName);
-    public <R> S resource(Key<R> key, ThrowingSupplier<? extends R> factory);
-    public <R> S resource(Key<R> key, ThrowingSupplier<? extends R> factory,
-                             ThrowingConsumer<? super R> release);
     public Task build();
 }
 ```
 
-## The type parameter
+Every hook is an ordinary `public static` method named by a stable identifier, and the tree refers to it by that
+identifier. There is no functional-interface overload and no generic instance type.
 
-`T` is the **nearest lexical primary instance**: `Void` means no instance binding. A nested group inherits the enclosing
-`T` without creating an instance, and a nested `instance` establishes its own binding.
+## Anchors and identifiers
 
 ```java
-instance("scenario", () -> new Scenario(environment))
-    .before(Scenario::start)
-    .sequential("checks", checks -> checks
-        .step("health", Scenario::checkHealth)
-        .step("metrics", Scenario::checkMetrics))
-    .after(Scenario::stop);
+public class ScenarioTest {
+
+    private static final String ID_START = "start";
+    private static final String ID_HEALTH = "health";
+    private static final String ID_STOP = "stop";
+    private static final String FIXTURE = "fixture";
+
+    @Paramixel.Factory
+    public static Task factory() {
+        return sequential(ScenarioTest.class, "ScenarioTest")
+                .bind(FIXTURE, new Scenario())
+                .before(ID_START)
+                .child(sequential("checks").step(ID_HEALTH))
+                .after(ID_STOP)
+                .build();
+    }
+
+    @Paramixel.Id(ID_START)
+    public static void start(final Context context) {
+        context.require(FIXTURE, Scenario.class).start();
+    }
+}
 ```
 
-No `Scenario.class` token appears at any level, and nested callbacks keep the same fluent type.
+The class literal appears **once per definition root**; everything attached below it inherits it. Identifiers resolve
+only against methods declared by that class — inheritance is not consulted — and they are also the labels reported for
+the hooks (`before[start]`, `body[health]`).
 
 ## Builder rules
+
+- Identifiers are resolved when the definition is built, before any hook runs; every problem in one definition is
+  reported together as a `CompilationException`.
+- `before` hooks run in declaration order until one fails; `after` hooks run in **reverse** declaration order and are
+  all attempted.
+- There is no hidden "current step". `.step(id)` adds a body-only child; a child that needs **both** a body and
+  children is written `child(sequential(name).body(id)…)`.
+- `.body(id)` attaches a body to the occurrence the builder already describes, which is how a body-bearing step keeps its
+  one-occurrence shape.
+- `bind` seeds the scope at the start of every attempt; a name must be unique on its own task.
+- Adding a builder snapshots it when it references no identifier; one that does is materialized when the anchor is
+  known, so treat it as immutable after attachment.
+- `build()` returns a deep snapshot, may be called repeatedly, and performs no user work.
+
+## Compile-time guidance
+
+- `.independent()` exists only on `SequentialBuilder`.
+- `parallel(name, Pool.named("x"))` requires a `Pool`; a second `String` does not compile.
+- `Tasks.instance(...)` and the callback overloads no longer exist: authoring goes through identifiers.
+- An identifier used in a definition with no anchor is rejected when the definition is built.
+
 
 - `before` callbacks run in declaration order until one fails; `after` callbacks run in **reverse** declaration order and
   are all attempted.

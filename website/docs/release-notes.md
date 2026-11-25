@@ -12,7 +12,8 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
 **Highlights**
 
 - `Task` / `TaskBuilder` / `Tasks` replace `Action`, `ActionBuilder`, and the per-shape classes.
-- `instance(name, supplier)` owns a lazily created instance per attempt with `before` / `after` lifecycle.
+- Fixtures live in the per-scope context: `bind(name, value)` seeds it, `put`/`require`/`find`/`remove` manage it,
+  and `after` hooks release it. The framework never closes a stored value and never probes for `AutoCloseable`.
 - `parallel(name, Pool.named("..."))` replaces raw string pool identifiers; `Pool` is a value object.
 - `sequential` / `parallel` describe concurrency; `dependent()` / `independent()` describe only failure continuation and
   exist on sequential builders only.
@@ -49,7 +50,8 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
 **Breaking changes**
 
 - The `org.paramixel.api.action` package and the mutable `Descriptor` tree are removed.
-- `Context.instance(Class)` is removed; typed callbacks and `Key<T>` resources replace it.
+- `Context.instance(Class)` is removed; typed callbacks replaced it, and this release removes those too in favour of
+  identifier-bound hooks that read the context by name.
 - Implicit closing of `AutoCloseable` fixtures is removed.
 - Display paths (console lines, `TaskResult.path()`, `Context.path()`, `TaskEvent.path()`, report `path` fields) separate
   levels with ` > ` instead of ` / `.

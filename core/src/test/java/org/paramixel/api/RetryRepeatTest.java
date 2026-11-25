@@ -18,7 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
@@ -90,36 +89,6 @@ class RetryRepeatTest {
         assertThat(retried.status().kind()).isEqualTo(Status.Kind.FAILED);
         assertThat(retried.children()).hasSize(3);
         assertThat(result.exitCode()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("retrying an instance task creates a fresh instance and finalizes each attempt")
-    void retryRecreatesOwnedInstance() {
-        final AtomicInteger instances = new AtomicInteger();
-        final List<Integer> finalized = Collections.synchronizedList(new ArrayList<>());
-        final AtomicInteger attempts = new AtomicInteger();
-
-        final Task definition = instance("instance", () -> {
-                    final var id = instances.incrementAndGet();
-                    return new Fixture(id);
-                })
-                .retry(RetryPolicy.builder()
-                        .maxAttempts(3)
-                        .backoff(Backoff.fixed(Duration.ZERO))
-                        .build())
-                .step("probe", (Fixture fixture) -> {
-                    if (attempts.incrementAndGet() < 2) {
-                        throw new IllegalStateException("not yet");
-                    }
-                })
-                .after((Fixture fixture) -> finalized.add(fixture.id()))
-                .build();
-
-        final var result = run(definition);
-
-        assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
-        assertThat(instances).hasValue(2);
-        assertThat(finalized).containsExactly(1, 2);
     }
 
     @Test

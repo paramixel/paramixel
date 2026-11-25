@@ -18,15 +18,14 @@ package nonapi.org.paramixel.execution;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import nonapi.org.paramixel.compiler.CompiledOccurrence;
+import org.paramixel.api.ExecutionMode;
 import org.paramixel.api.Failure;
-import org.paramixel.api.Key;
 import org.paramixel.api.PhaseResult;
-import org.paramixel.api.ResourceDeclaration;
 import org.paramixel.api.Status;
 import org.paramixel.api.TaskResult;
 
@@ -38,7 +37,7 @@ import org.paramixel.api.TaskResult;
  * running, and {@link #activeJobs}, which is atomic.
  *
  * <p>An occurrence owns one {@link Attempt} at a time. A retried or repeated occurrence completes several attempts;
- * each attempt has its own instance, resources, phases, failures, children, and result node.
+ * each attempt has its own instance, phases, failures, children, and result node.
  */
 final class OccurrenceState {
 
@@ -46,13 +45,11 @@ final class OccurrenceState {
     enum Stage {
         NEW,
         ADMITTED,
-        PREPARING,
         CONDITION,
         BEFORE,
         BODY,
         CHILDREN,
         AFTER,
-        RELEASING,
         TERMINAL
     }
 
@@ -218,6 +215,12 @@ final class OccurrenceState {
             startedAt = now;
         }
         attempt = fresh;
+        final var scope = scopeAttempt();
+        if (scope != null) {
+            for (final var binding : compiled.task().bindings().entrySet()) {
+                scope.context.put(binding.getKey(), binding.getValue());
+            }
+        }
         return fresh;
     }
 
@@ -231,41 +234,59 @@ final class OccurrenceState {
     }
 
     /**
-     * Returns the occurrence that owns this occurrence's lexical instance binding.
+     * Returns whether this occurrence owns a context scope.
      *
-     * <p>The owner is resolved through the compiled {@link CompiledOccurrence#bindingSlot() binding slot}, the same
-     * identity the compiler used to validate typed callbacks, so runtime resolution cannot drift from validation. The
-     * owner's instance may still be absent: it is created after the owner's resources, so a resource factory on the
-     * owning task runs before it exists.
+     * <p>A scope is created at the run root, at every direct child of a {@code parallel} group, and at every task that
+     * carries {@code retry} or {@code repeat}. Ownership is a static property of the tree, so the compiler and the
+     * runtime cannot disagree about it.
      *
-     * @return the owning occurrence, which may be this occurrence, or {@code null} when no instance is bound in scope
+     * @return {@code true} when this occurrence owns a scope
      */
-    OccurrenceState bindingOwner() {
-        final var slot = compiled.bindingSlot();
-        if (slot == null) {
-            return null;
+    boolean isScopeOwner() {
+        if (parent == null) {
+            return true;
         }
-        var current = this;
-        while (current != null) {
-            if (slot.equals(current.id)) {
-                return current;
-            }
-            current = current.parent;
-        }
-        return null;
+        final var task = compiled.task();
+        return parent.compiled.task().mode() == ExecutionMode.PARALLEL
+                || task.retry().isPresent()
+                || task.repeat().isPresent();
     }
 
     /**
-     * Finds a keyed resource in this scope or an ancestor scope.
+     * Returns this occurrence's nearest scope-owning self-or-ancestor.
      *
-     * @param key the key; must not be {@code null}
-     * @return the resource, or {@code null}
+     * @return the owning occurrence; never {@code null}, because the root owns a scope
      */
-    Object findResource(final Key<?> key) {
+    OccurrenceState scopeOwner() {
+        var current = this;
+        while (current != null && !current.isScopeOwner()) {
+            current = current.parent;
+        }
+        return current;
+    }
+
+    /**
+     * Returns the current attempt of this occurrence's scope owner.
+     *
+     * @return the owning attempt, or {@code null} when no attempt is materialized
+     */
+    Attempt scopeAttempt() {
+        final var owner = scopeOwner();
+        return owner == null ? null : owner.attempt;
+    }
+
+    /**
+     * Finds a context entry in this scope or an enclosing scope, nearest first.
+     *
+     * @param name the entry name; must not be {@code null}
+     * @return the value, or {@code null}
+     */
+    Object findContextEntry(final String name) {
         var current = this;
         while (current != null) {
-            if (current.attempt != null) {
-                final var value = current.attempt.resources.get(key);
+            final var candidate = current.attempt;
+            if (candidate != null) {
+                final var value = candidate.context.get(name);
                 if (value != null) {
                     return value;
                 }
@@ -309,11 +330,20 @@ final class OccurrenceState {
 
         final int index;
         final List<OccurrenceState> children = new ArrayList<>();
-        final LinkedHashMap<Key<?>, Object> resources = new LinkedHashMap<>();
-        final List<ResourceDeclaration> acquired = new ArrayList<>();
         final List<PhaseResult> phases = new ArrayList<>();
         final List<Failure> failures = new ArrayList<>();
-        Object instance;
+
+        /**
+         * The named context entries of the scope this attempt owns.
+         */
+        final ConcurrentHashMap<String, Object> context = new ConcurrentHashMap<>();
+
+        /**
+         * Set when the attempt finished and its scope was cleared; a later write from an abandoned callback is
+         * discarded instead of repopulating a map nobody will read.
+         */
+        volatile boolean contextClosed;
+
         Status bodyStatus;
         Status conditionStatus;
         String reason;

@@ -22,6 +22,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -32,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.Timer;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.maven.model.Build;
@@ -42,6 +45,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
+import org.paramixel.api.Configuration;
+import org.paramixel.api.Listener;
 import org.paramixel.api.Task;
 import org.paramixel.maven.plugin.fixtures.LingeringFailingMojoFixture;
 import org.paramixel.maven.plugin.fixtures.PassingMojoFixture;
@@ -247,6 +254,51 @@ class ParamixelMojoExecuteTest {
             } finally {
                 Thread.currentThread().setContextClassLoader(original);
             }
+        }
+    }
+
+    @Test
+    @ResourceLock(Resources.SYSTEM_OUT)
+    void reportingStallFailsTheBuildEvenWhenAnEmptyRunWouldPass() throws Exception {
+        var mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
+        setField(mojo, "failIfNoTests", false);
+        var timeout = new ParamixelMojo.Property();
+        timeout.setKey(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS);
+        timeout.setValue("500");
+        setField(mojo, "properties", List.of(timeout));
+
+        var footerStarted = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var original = System.out;
+        try (var output = new PrintStream(OutputStream.nullOutputStream()) {
+            @Override
+            public void println(final String line) {
+                if (line.contains(" run ") && footerStarted.getCount() != 0) {
+                    footerStarted.countDown();
+                    try {
+                        release.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+        }) {
+            System.setOut(output);
+            var execution = new FutureTask<>(() -> catchThrowable(mojo::execute));
+            var caller = new Thread(execution);
+            caller.setDaemon(true);
+            caller.start();
+            try {
+                assertThat(footerStarted.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(execution.get(5, TimeUnit.SECONDS))
+                        .isInstanceOf(MojoExecutionException.class)
+                        .hasMessageContaining(Listener.DRAIN_TIMEOUT_DIAGNOSTIC);
+            } finally {
+                release.countDown();
+                caller.join(5_000L);
+            }
+        } finally {
+            System.setOut(original);
         }
     }
 

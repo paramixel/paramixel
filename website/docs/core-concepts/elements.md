@@ -5,21 +5,35 @@ description: Instance ownership, phases, finalization order, and failure precede
 
 # Lifecycle and Scope
 
-## Instance ownership
+## Fixture ownership
 
-`instance(name, supplier)` makes a task the owner of exactly one primary instance per execution attempt. The supplier
-runs once per attempt, on an execution worker, only after admission and permit acquisition.
+A fixture is an ordinary object a hook creates and stores in the context. There is no instance type and no factory the
+framework owns: the `before` hook builds it, the steps read it by name, and an `after` hook releases it.
 
 ```java
-instance("scenario", () -> new Scenario(environment))
-    .before(Scenario::start)
-    .step("verify", Scenario::verify)
-    .after(Scenario::stop);
+sequential(MySuite.class, "scenario")
+    .bind(ENVIRONMENT, environment)
+    .before(ID_START)
+    .step(ID_VERIFY)
+    .after(ID_STOP);
+
+@Paramixel.Id(ID_START)
+public static void start(final Context context) {
+    final var fixture = new Scenario(context.require(ENVIRONMENT, Environment.class));
+    context.put(FIXTURE, fixture);
+    fixture.start();
+}
+
+@Paramixel.Id(ID_STOP)
+public static void stop(final Context context) {
+    context.find(FIXTURE, Scenario.class).ifPresent(Scenario::stop);
+}
 ```
 
-- A nested group inherits the nearest binding; a nested `instance` establishes its own.
-- The factory never runs at definition, build, or compile time.
-- A factory that returns `null` fails the occurrence; no lifecycle callback runs.
+- The fixture belongs to the scope of the group that created it, so every descendant resolves it and parallel siblings
+  never share one.
+- Nothing runs at definition, build, or compile time; the hook runs when the occurrence is admitted.
+- An `after` hook uses `find`, so a partially completed `before` cannot mask the original failure.
 - A factory that throws must clean up its own partially acquired objects, because Paramixel cannot reach an object that
   was never returned.
 

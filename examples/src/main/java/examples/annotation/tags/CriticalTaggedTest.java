@@ -16,8 +16,9 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.Tasks.instance;
+import static org.paramixel.api.Tasks.sequential;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
 
@@ -25,6 +26,8 @@ import org.paramixel.api.Task;
  * Example factory tagged as both {@code "smoke-fast"} and {@code "critical"} for tag-based selection.
  */
 public class CriticalTaggedTest {
+
+    private static final String ID_TEST = "test";
 
     /**
      * Returns a definition tagged as both {@code "smoke-fast"} and {@code "critical"}.
@@ -35,23 +38,19 @@ public class CriticalTaggedTest {
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
     public static Task factory() {
-        return instance("CriticalTaggedTest", CriticalTaggedTest::new)
+        return sequential(CriticalTaggedTest.class, "CriticalTaggedTest")
                 .tags("smoke-fast", "critical")
-                .step("test", CriticalTaggedTest::test)
+                .step(ID_TEST)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
-     */
-    public CriticalTaggedTest() {
-        // Intentionally empty
-    }
-
-    /**
      * Trivial body so the example stays focused on selection.
+     *
+     * @param context the execution context
      */
-    public void test() {
+    @Paramixel.Id(ID_TEST)
+    public static void test(final Context context) {
         // Intentionally empty
     }
 }

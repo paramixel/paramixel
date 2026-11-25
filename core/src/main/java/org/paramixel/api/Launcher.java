@@ -23,7 +23,7 @@ package org.paramixel.api;
  *
  * <ul>
  *   <li>{@code 0} — the run passed under the configured exit policy, or help was requested.</li>
- *   <li>{@code 1} — the run failed, was canceled, or was mapped to failure by configuration.</li>
+ *   <li>{@code 1} — the run failed, was canceled, reporting was incomplete, or configuration mapped it to failure.</li>
  *   <li>{@code 2} — a usage error or an invalid configuration, definition, or discovery result.</li>
  * </ul>
  *
@@ -69,7 +69,11 @@ public final class Launcher {
             }
         }
         try (var runner = Runner.builder().build()) {
-            return runner.run().exitCode();
+            final var result = runner.run();
+            result.failures().stream()
+                    .filter(failure -> Listener.DRAIN_TIMEOUT_DIAGNOSTIC.equals(failure.phase()))
+                    .forEach(failure -> System.err.println("Paramixel " + failure.phase() + ": " + failure.message()));
+            return result.exitCode();
         } catch (RuntimeException e) {
             System.err.println("Paramixel run failed to start: " + e.getMessage());
             return EXIT_USAGE;

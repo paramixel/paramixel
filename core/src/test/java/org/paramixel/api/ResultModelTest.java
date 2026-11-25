@@ -251,7 +251,7 @@ class ResultModelTest {
     @DisplayName("failure precedence puts the operation failure first")
     void failurePrecedence() {
         final var definition = task("root")
-                .resource(Key.named("test", "value", String.class), () -> "value", value -> {
+                .after(() -> {
                     throw new IllegalStateException("cleanup failed");
                 })
                 .step("body", () -> {

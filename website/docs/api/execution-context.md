@@ -1,6 +1,6 @@
 ---
 title: Context
-description: Read-only execution metadata and explicitly keyed resources.
+description: Read-only execution metadata plus the per-scope state store.
 ---
 
 # Context
@@ -17,41 +17,46 @@ public interface Context {
     List<String> tags();
     boolean isCanceled();
     Optional<String> cancellationReason();
-    Object primaryInstance();
-    <T> T require(Key<T> key);
-    <T> Optional<T> find(Key<T> key);
+    void put(String name, Object value);
+    void remove(String name);
+    <T> T require(String name, Class<T> type);
+    <T> Optional<T> find(String name, Class<T> type);
 }
 ```
 
-A context belongs to one occurrence of one attempt. It exposes stable identity, the effective configuration, the nearest
-lexical primary instance, and keyed resources; it never exposes mutable execution state.
+A context belongs to one occurrence of one attempt. It exposes stable identity, the effective configuration, and a state
+store shared by every occurrence in the same **scope**.
 
-## Primary instances
-
-Typed callbacks receive the instance directly. `primaryInstance()` exists for framework adapters and advanced code; a
-nested `instance` establishes its own binding and does not make the outer instance appear here.
-
-An `instance` task creates its instance after its own resources. A resource factory declared on that same task therefore
-cannot read the instance: `primaryInstance()` throws `IllegalStateException` there instead of returning an outer
-instance.
-
-## Keyed resources
+## Scope state
 
 ```java
-Key<HttpClient> CLIENT = Key.named("http", "client", HttpClient.class);
+@Paramixel.Id("allocate")
+public static void allocate(final Context context) {
+    context.put("client", new HttpClient());          // stored in this scope
+}
 
-Task definition = task("root")
-        .resource(CLIENT, HttpClient::new, HttpClient::close)
-        .stepWithContext("call", (Context context) ->
-                context.require(CLIENT).send(request));
+@Paramixel.Id("call")
+public static void call(final Context context) {
+    context.require("client", HttpClient.class).send(request);
+}
+
+@Paramixel.Id("deallocate")
+public static void deallocate(final Context context) {
+    context.find("client", HttpClient.class).ifPresent(HttpClient::close);
+}
 ```
 
-- Acquisition is lazy, at admission, in declaration order.
-- Release runs in reverse acquisition order after `after` callbacks.
-- A missing required resource throws `ResourceException` naming the key and occurrence path.
-- Duplicate keys in one scope and ambiguous shadowing across scopes are rejected at compile time.
+A scope is created at the run root, at every direct child of a `parallel` group, and at every task carrying `retry` or
+`repeat`. Sequential descendants share the nearest enclosing scope, so a value stored by one step is visible to the next
+sibling and to the group's `after` hook; parallel siblings never see each other's entries.
 
-## Context-aware callbacks
+- A missing entry throws `ContextException` naming the entry and occurrence path; a type mismatch names both types.
+- `find` returns an empty optional, which is what teardown after a partially completed `before` hook should use.
+- The framework never closes a stored value, and it never probes for `AutoCloseable`. Close resources in `after`;
+  `remove` drops the reference early. Whatever is left when the scope ends is dropped for you.
 
-Use the explicitly named methods — `beforeWithContext`, `afterWithContext`, `stepWithContext` — rather than an ambiguous
-overload of the one-argument callbacks.
+## Bindings
+
+`.bind(name, value)` seeds the scope at the start of every attempt of its owner, so a value captured while the
+definition is authored is available to the hooks without being captured in a lambda. A name must be unique on its own
+task; the same name may be bound by sibling tasks in a sequential chain, where seeding follows start order.

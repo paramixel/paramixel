@@ -30,8 +30,9 @@ looks like a level boundary. Stable identity is `occurrenceId`, never the path.
 Labels are `PASS`, `FAIL`, `SKIP`, `ABORT`, and `CANCEL`; `PEND`/`RUN` are used for in-flight kinds. Because labels are
 not padded, paths are not column-aligned across different statuses.
 
-The console summary is separated from the status footer by a short rule and shows each occurrence once with its final
-outcome, summarizing retry or repeat history on the occurrence line, so console output never contradicts the counters:
+The console summary is separated from the status footer by a horizontal rule, and the run totals are separated from the
+result tree the same way. The summary shows each occurrence once with its final outcome, summarizing retry or repeat
+history on the occurrence line, so console output never contradicts the counters:
 
 ```text
 [PARAMIXEL] PASS run 5c0f… in 1 s 240 ms
@@ -39,6 +40,9 @@ outcome, summarizing retry or repeat history on the occurrence line, so console 
 [PARAMIXEL] Summary
 [PARAMIXEL] PASS retry-example (sequential) — 3 attempts, 2 failed
 [PARAMIXEL] PASS   retry (sequential)
+[PARAMIXEL] -------
+[PARAMIXEL] occurrences: 2 passed: 2 failed: 0 skipped: 0 aborted: 0 canceled: 0 timedOut: 0 attempts: 3
+[PARAMIXEL] result: PASS exitCode: 0 elapsed: 1 s 240 ms
 ```
 
 Report files, by contrast, keep every attempt. Each attempt is labeled `attempt k of n`, and superseded attempts are
@@ -68,4 +72,6 @@ visible only as `ATTEMPT` nodes — a passing run never reports failed occurrenc
 ## Custom listeners
 
 Implement `Listener` and pass it to `Runner.builder().listener(...)`. Delivery is asynchronous on one dispatcher thread,
-bounded, and isolated: a listener exception is recorded as a diagnostic and never changes a task status.
+bounded, and isolated: a listener exception is recorded as a diagnostic and never changes a task status. A full queue
+pauses new work without dropping events while delivery is making progress. A delivery stall fails the run at the process
+boundary without rewriting completed task outcomes; an incomplete stream does not receive `onRunCompleted`.

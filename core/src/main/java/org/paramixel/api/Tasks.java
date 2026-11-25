@@ -49,24 +49,43 @@ public final class Tasks {
      * be explicit.
      *
      * @param name the task name; must not be blank
-     * @return a sequential builder with no instance binding; never {@code null}
+     * @return a sequential builder never {@code null}
      * @throws NullPointerException if {@code name} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public static SequentialBuilder<Void> task(final String name) {
-        return new SequentialBuilder<>(name);
+    static SequentialBuilder task(final String name) {
+        return new SequentialBuilder(name);
     }
 
     /**
      * Starts a sequential group.
      *
      * @param name the task name; must not be blank
-     * @return a sequential builder with no instance binding; never {@code null}
+     * @return a sequential builder never {@code null}
      * @throws NullPointerException if {@code name} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public static SequentialBuilder<Void> sequential(final String name) {
-        return new SequentialBuilder<>(name);
+    public static SequentialBuilder sequential(final String name) {
+        return new SequentialBuilder(name);
+    }
+
+    /**
+     * Starts a sequential group whose hook identifiers resolve against an anchor class.
+     *
+     * <p>One class literal per definition root; every builder attached below it inherits the anchor, so hooks are
+     * written {@code .before("setUp")} without repeating the class. Referencing an identifier in a definition with no
+     * anchor is an authoring error.
+     *
+     * @param anchor the class that declares the {@code @Paramixel.Id} methods; must not be {@code null}
+     * @param name the task name; must not be blank
+     * @return a sequential builder anchored for id resolution; never {@code null}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static SequentialBuilder sequential(final Class<?> anchor, final String name) {
+        final var builder = new SequentialBuilder(name);
+        builder.anchor(Objects.requireNonNull(anchor, "anchor is null"));
+        return builder;
     }
 
     /**
@@ -74,49 +93,59 @@ public final class Tasks {
      *
      * @param name the task name; must not be blank
      * @param pool the concurrency budget of the direct children; must not be {@code null}
-     * @return a parallel builder with no instance binding; never {@code null}
+     * @return a parallel builder never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public static ParallelBuilder<Void> parallel(final String name, final Pool pool) {
-        return new ParallelBuilder<>(name, Objects.requireNonNull(pool, "pool is null"));
+    public static ParallelBuilder parallel(final String name, final Pool pool) {
+        return new ParallelBuilder(name, Objects.requireNonNull(pool, "pool is null"));
     }
 
     /**
-     * Starts a task that owns one lazily created primary instance per execution attempt.
+     * Starts a parallel group whose hook identifiers resolve against an anchor class.
      *
-     * <p>{@code T} is inferred from the supplier, so lifecycle callbacks and steps bind to the instance without a class
-     * token: {@code instance("scenario", () -> new Scenario(environment)).before(Scenario::start)}. The supplier
-     * runs once per attempt of this occurrence, on an execution worker, after admission.
-     *
-     * @param <T> the instance type
+     * @param anchor the class that declares the {@code @Paramixel.Id} methods; must not be {@code null}
      * @param name the task name; must not be blank
-     * @param factory the instance supplier; must not be {@code null}, and must not return {@code null}
-     * @return a sequential builder bound to {@code T}; never {@code null}
+     * @param pool the concurrency budget of the direct children; must not be {@code null}
+     * @return a parallel builder anchored for id resolution; never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public static <T> SequentialBuilder<T> instance(final String name, final ThrowingSupplier<? extends T> factory) {
-        Objects.requireNonNull(factory, "factory is null");
-        final var builder = new SequentialBuilder<T>(name);
-        builder.setInstanceFactory(factory::get);
+    public static ParallelBuilder parallel(final Class<?> anchor, final String name, final Pool pool) {
+        final var builder = new ParallelBuilder(name, Objects.requireNonNull(pool, "pool is null"));
+        builder.anchor(Objects.requireNonNull(anchor, "anchor is null"));
         return builder;
     }
 
     /**
-     * Starts a bounded repetition task with no instance binding.
+     * Starts a bounded repetition task.
      *
      * @param name the task name; must not be blank
      * @return a repeat builder; configure {@code maxIterations} before building; never {@code null}
      * @throws NullPointerException if {@code name} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public static RepeatBuilder<Void> repeat(final String name) {
-        return new RepeatBuilder<>(name);
+    public static RepeatBuilder repeat(final String name) {
+        return new RepeatBuilder(name);
     }
 
     /**
-     * Starts a conditional sequential group with no instance binding.
+     * Starts a bounded repetition task whose hook identifiers resolve against an anchor class.
+     *
+     * @param anchor the class that declares the {@code @Paramixel.Id} methods; must not be {@code null}
+     * @param name the task name; must not be blank
+     * @return a repeat builder anchored for id resolution; never {@code null}
+     * @throws NullPointerException if any argument is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
+     */
+    public static RepeatBuilder repeat(final Class<?> anchor, final String name) {
+        final var builder = new RepeatBuilder(name);
+        builder.anchor(Objects.requireNonNull(anchor, "anchor is null"));
+        return builder;
+    }
+
+    /**
+     * Starts a conditional sequential group.
      *
      * @param name the task name; must not be blank
      * @param condition the runtime condition; must not be {@code null}
@@ -124,9 +153,9 @@ public final class Tasks {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public static SequentialBuilder<Void> when(final String name, final Predicate<Context> condition) {
+    static SequentialBuilder when(final String name, final Predicate<Context> condition) {
         Objects.requireNonNull(condition, "condition is null");
-        final var builder = new SequentialBuilder<Void>(name);
+        final var builder = new SequentialBuilder(name);
         builder.onlyIf(condition);
         return builder;
     }

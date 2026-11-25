@@ -17,14 +17,15 @@
 package examples.altcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
 import examples.support.Logger;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
@@ -36,6 +37,13 @@ import org.paramixel.api.Task;
  * default welcome page is served.
  */
 public class NginxTest {
+
+    private static final String ID_SET_UP = "setUp";
+    private static final String ID_TEST_GET = "testGet()";
+    private static final String ID_TEAR_DOWN = "tearDown";
+
+    private static final String ENVIRONMENT = "environment";
+    private static final String FIXTURE = "fixture";
 
     private static final Logger LOGGER = Logger.createLogger(NginxTest.class);
 
@@ -62,14 +70,47 @@ public class NginxTest {
      */
     @Paramixel.Factory
     public static Task factory() throws Throwable {
-        return parallel(NginxTest.class.getName(), Pool.named("environments"))
-                .each(
-                        NginxTestEnvironment.createTestEnvironments(),
-                        environment -> instance(environment.name(), () -> new NginxTest(environment))
-                                .before(NginxTest::setUp)
-                                .step("testGet()", NginxTest::testGet)
-                                .after(NginxTest::tearDown))
-                .build();
+        final var root = parallel(NginxTest.class, "NginxTest", Pool.named("environments"));
+        for (final var environment : NginxTestEnvironment.createTestEnvironments()) {
+            root.child(sequential(environment.name())
+                    .bind(ENVIRONMENT, environment)
+                    .before(ID_SET_UP)
+                    .step(ID_TEST_GET)
+                    .after(ID_TEAR_DOWN));
+        }
+        return root.build();
+    }
+
+    /**
+     * Builds this branch's fixture and runs its setup.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SET_UP)
+    public static void setUpHook(final Context context) throws Throwable {
+        final var fixture = new NginxTest(context.require(ENVIRONMENT, NginxTestEnvironment.class));
+        context.put(FIXTURE, fixture);
+        fixture.setUp();
+    }
+
+    /**
+     * Runs the testGet body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_GET)
+    public static void testGetHook(final Context context) throws Throwable {
+        context.require(FIXTURE, NginxTest.class).testGet();
+    }
+
+    /**
+     * Releases the fixture, if it was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDownHook(final Context context) {
+        context.find(FIXTURE, NginxTest.class).ifPresent(NginxTest::tearDown);
     }
 
     private NginxTest(final NginxTestEnvironment environment) {

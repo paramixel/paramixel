@@ -18,27 +18,32 @@ package org.paramixel.api;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import nonapi.org.paramixel.authoring.IdResolver;
+import nonapi.org.paramixel.authoring.IdRole;
+import org.paramixel.api.exception.CompilationException;
 import org.paramixel.api.support.RepeatPolicy;
 import org.paramixel.api.support.RetryPolicy;
 
 /**
- * Authors an immutable {@link Task} with typed fluent methods.
+ * Authors an immutable {@link Task} with identifier-bound hooks.
  *
  * <p>A builder is a mutable, single-thread-confined authoring surface; it is never a runtime node. {@link #build()}
  * returns a deeply immutable snapshot, so mutating a builder afterwards cannot change a task that was already built or
  * attached to a parent.
  *
- * <p>The type parameter {@code T} is the <strong>nearest lexical primary instance</strong>: {@code Void} means no
- * instance binding, and a nested group inherits the enclosing {@code T} without creating an instance of its own.
- * Method references such as {@code BasicTest::setUp} therefore need no class token, and nested callbacks at any depth
- * keep the same fluent type.
+ * <p>Hooks are {@code public static} methods annotated with {@link Paramixel.Id}; the builder refers to them by
+ * identifier and resolves them against the definition's anchor class when {@link #build()} runs. There is no instance
+ * type and no functional-interface overload: state lives in the {@link Context} scope.
  *
  * <p>Callbacks are attached to their owning task. {@code before} callbacks run in declaration order until one fails;
  * {@code after} callbacks run in reverse declaration order and all are attempted, even after failures.
@@ -46,10 +51,9 @@ import org.paramixel.api.support.RetryPolicy;
  * <p>Building performs no work: no factory, lifecycle callback, body, or runtime predicate is invoked while a
  * definition is authored, built, or compiled.
  *
- * @param <T> the inherited primary instance type; {@link Void} when the task has no instance binding
  * @param <S> the concrete builder type, used to preserve fluent return types
  */
-public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
+public abstract class TaskBuilder<S extends TaskBuilder<S>> {
 
     private static final Pattern VALID_RESOURCE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_.-]*");
     private static final int MAX_NAME_LENGTH = 512;
@@ -58,12 +62,14 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
     private final ExecutionMode mode;
     private final Pool pool;
     private boolean dependent = true;
-    private final List<Task> children = new ArrayList<>();
+    private Class<?> anchor;
+    private final Map<String, Object> bindings = new LinkedHashMap<>();
+    private final List<Object> children = new ArrayList<>();
     private final List<TaskCallback> before = new ArrayList<>();
     private final List<TaskCallback> after = new ArrayList<>();
     private TaskCallback body;
-    private TaskFactory instanceFactory;
-    private boolean requiresPrimaryInstance;
+    private String bodyId;
+    private String conditionId;
     private final List<String> tags = new ArrayList<>();
     private boolean shuffleRequested;
     private Long shuffleSeed;
@@ -72,7 +78,6 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
     private RetryPolicy retry;
     private RepeatPolicy repeat;
     private String exclusiveLock;
-    private final List<ResourceDeclaration> resources = new ArrayList<>();
 
     /**
      * Creates a builder.
@@ -105,43 +110,15 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
     protected abstract S self();
 
     /**
-     * Adds a {@code before} callback that receives the primary instance.
-     *
-     * @param callback the callback; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if {@code callback} is {@code null}
-     */
-    public S before(final ThrowingConsumer<? super T> callback) {
-        Objects.requireNonNull(callback, "callback is null");
-        before.add(CallbackAdapters.instanceConsumer(callback));
-        requiresPrimaryInstance = true;
-        return self();
-    }
-
-    /**
      * Adds a {@code before} callback that takes no arguments.
      *
      * @param callback the callback; must not be {@code null}
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public S before(final ThrowingRunnable callback) {
+    S before(final ThrowingRunnable callback) {
         Objects.requireNonNull(callback, "callback is null");
         before.add(CallbackAdapters.runnable(callback));
-        return self();
-    }
-
-    /**
-     * Adds a {@code before} callback that receives the primary instance and the execution context.
-     *
-     * @param callback the callback; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if {@code callback} is {@code null}
-     */
-    public S beforeWithContext(final ThrowingBiConsumer<? super T, Context> callback) {
-        Objects.requireNonNull(callback, "callback is null");
-        before.add(CallbackAdapters.instanceAndContextConsumer(callback));
-        requiresPrimaryInstance = true;
         return self();
     }
 
@@ -152,27 +129,9 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public S beforeWithContext(final ThrowingConsumer<Context> callback) {
+    S beforeWithContext(final ThrowingConsumer<Context> callback) {
         Objects.requireNonNull(callback, "callback is null");
         before.add(CallbackAdapters.contextConsumer(callback));
-        return self();
-    }
-
-    /**
-     * Adds an {@code after} callback that receives the primary instance.
-     *
-     * <p>{@code after} callbacks are attached to this task, not to its children, and run in reverse declaration order.
-     * Paramixel does not implicitly close an {@link AutoCloseable} instance: the callback decides whether and how to
-     * release it.
-     *
-     * @param callback the callback; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if {@code callback} is {@code null}
-     */
-    public S after(final ThrowingConsumer<? super T> callback) {
-        Objects.requireNonNull(callback, "callback is null");
-        after.add(CallbackAdapters.instanceConsumer(callback));
-        requiresPrimaryInstance = true;
         return self();
     }
 
@@ -183,23 +142,9 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public S after(final ThrowingRunnable callback) {
+    S after(final ThrowingRunnable callback) {
         Objects.requireNonNull(callback, "callback is null");
         after.add(CallbackAdapters.runnable(callback));
-        return self();
-    }
-
-    /**
-     * Adds an {@code after} callback that receives the primary instance and the execution context.
-     *
-     * @param callback the callback; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if {@code callback} is {@code null}
-     */
-    public S afterWithContext(final ThrowingBiConsumer<? super T, Context> callback) {
-        Objects.requireNonNull(callback, "callback is null");
-        after.add(CallbackAdapters.instanceAndContextConsumer(callback));
-        requiresPrimaryInstance = true;
         return self();
     }
 
@@ -210,29 +155,186 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @return this builder
      * @throws NullPointerException if {@code callback} is {@code null}
      */
-    public S afterWithContext(final ThrowingConsumer<Context> callback) {
+    S afterWithContext(final ThrowingConsumer<Context> callback) {
         Objects.requireNonNull(callback, "callback is null");
         after.add(CallbackAdapters.contextConsumer(callback));
         return self();
     }
 
+    // ------------------------------------------------------------------------------------------------------------
+    // Name-bound authoring (`API_REFACTOR.md` revision 5, phase 1). Additive: the typed forms above remain until the
+    // surface is replaced.
+    // ------------------------------------------------------------------------------------------------------------
+
     /**
-     * Adds a child step whose body receives the primary instance.
+     * Sets the anchor class that hook identifiers in this definition resolve against.
      *
-     * <p>The returned builder is this <strong>enclosing</strong> builder, so further {@code step} calls define siblings.
-     * Attach children to the new step with
-     * {@link #step(String, ThrowingConsumer, Consumer)}, which takes an explicit child configuration callback.
-     *
-     * @param name the step name; must not be blank
-     * @param operation the operation; must not be {@code null}
+     * @param anchor the anchor class; must not be {@code null}
      * @return this builder
-     * @throws NullPointerException if {@code operation} is {@code null}
-     * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S step(final String name, final ThrowingConsumer<? super T> operation) {
-        Objects.requireNonNull(operation, "operation is null");
-        children.add(stepTask(name, CallbackAdapters.instanceConsumer(operation), true));
+    final S anchor(final Class<?> anchor) {
+        this.anchor = Objects.requireNonNull(anchor, "anchor is null");
         return self();
+    }
+
+    /**
+     * Seeds a value into this task's scope at the start of every attempt.
+     *
+     * <p>The value is captured now, at authoring time, so the same object is handed to every attempt; anything that
+     * must be re-created per attempt belongs in a {@code before} hook with {@link Context#put(String, Object)}.
+     * Names must be unique within one scope.
+     *
+     * @param bindName the entry name; must not be {@code null} or blank
+     * @param value the value; must not be {@code null}
+     * @return this builder
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalArgumentException if {@code bindName} is blank
+     */
+    public S bind(final String bindName, final Object value) {
+        Objects.requireNonNull(bindName, "bindName is null");
+        Objects.requireNonNull(value, "value is null");
+        if (bindName.isBlank()) {
+            throw new IllegalArgumentException("bind name is blank");
+        }
+        if (bindings.containsKey(bindName)) {
+            throw new IllegalArgumentException("Duplicate bind name on task '" + name + "': " + bindName);
+        }
+        bindings.put(bindName, value);
+        return self();
+    }
+
+    /**
+     * Adds a {@code before} hook by identifier, in declaration order.
+     *
+     * @param id the hook identifier; must not be {@code null} or blank
+     * @return this builder
+     * @throws NullPointerException if {@code id} is {@code null}
+     * @throws IllegalArgumentException if {@code id} is blank
+     */
+    public S before(final String id) {
+        before.add(new PendingHook(requireId(id), IdRole.BEFORE));
+        return self();
+    }
+
+    /**
+     * Adds an {@code after} hook by identifier; hooks run in reverse declaration order.
+     *
+     * @param id the hook identifier; must not be {@code null} or blank
+     * @return this builder
+     * @throws NullPointerException if {@code id} is {@code null}
+     * @throws IllegalArgumentException if {@code id} is blank
+     */
+    public S after(final String id) {
+        after.add(new PendingHook(requireId(id), IdRole.AFTER));
+        return self();
+    }
+
+    /**
+     * Adds a child step whose body is the identified hook and whose name is the identifier.
+     *
+     * @param id the hook identifier; must not be {@code null} or blank
+     * @return this builder
+     * @throws NullPointerException if {@code id} is {@code null}
+     * @throws IllegalArgumentException if {@code id} is blank
+     */
+    public S step(final String id) {
+        children.add(new PendingChild(requireId(id)));
+        return self();
+    }
+
+    /**
+     * Sets this occurrence's body to the identified hook.
+     *
+     * <p>A body is an attribute of one occurrence, so a task can have both a body and children: this is the surface
+     * that keeps a body-bearing step expressible once the three-argument {@code step} overloads are removed.
+     *
+     * @param id the hook identifier; must not be {@code null} or blank
+     * @return this builder
+     * @throws NullPointerException if {@code id} is {@code null}
+     * @throws IllegalArgumentException if {@code id} is blank
+     */
+    public S body(final String id) {
+        this.bodyId = requireId(id);
+        return self();
+    }
+
+    /**
+     * Adds a runtime condition by identifier; the identified hook must return {@code boolean}.
+     *
+     * @param id the hook identifier; must not be {@code null} or blank
+     * @return this builder
+     * @throws NullPointerException if {@code id} is {@code null}
+     * @throws IllegalArgumentException if {@code id} is blank
+     */
+    public S onlyIf(final String id) {
+        this.conditionId = requireId(id);
+        return self();
+    }
+
+    /**
+     * Attaches several builders as children, in iteration order.
+     *
+     * @param builders the child builders; must not be {@code null}
+     * @return this builder
+     * @throws NullPointerException if {@code builders} or any element is {@code null}
+     */
+    public S children(final Collection<? extends TaskBuilder<?>> builders) {
+        Objects.requireNonNull(builders, "builders is null");
+        for (final var builder : builders) {
+            child(builder);
+        }
+        return self();
+    }
+
+    private static String requireId(final String id) {
+        Objects.requireNonNull(id, "id is null");
+        if (id.isBlank()) {
+            throw new IllegalArgumentException("Hook id is blank");
+        }
+        return id;
+    }
+
+    /**
+     * Returns whether this builder, or anything attached below it, references a hook identifier.
+     *
+     * <p>A definition that references no identifier needs no anchor and can be materialized immediately; one that does
+     * is held until the anchor is known.
+     *
+     * @return {@code true} when an identifier is referenced anywhere in this subtree
+     */
+    final boolean usesIds() {
+        if (bodyId != null || conditionId != null) {
+            return true;
+        }
+        for (final TaskCallback hook : before) {
+            if (hook instanceof PendingHook) {
+                return true;
+            }
+        }
+        for (final TaskCallback hook : after) {
+            if (hook instanceof PendingHook) {
+                return true;
+            }
+        }
+        for (final Object child : children) {
+            if (child instanceof PendingChild) {
+                return true;
+            }
+            if (child instanceof TaskBuilder<?> builder && builder.usesIds()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns the anchor this builder resolves against: its own, or the one inherited from the parent builder.
+     *
+     * @param inheritedAnchor the parent's anchor, or {@code null}
+     * @return the effective anchor, or {@code null} when the definition names none
+     */
+    final Class<?> effectiveAnchor(final Class<?> inheritedAnchor) {
+        return anchor != null ? anchor : inheritedAnchor;
     }
 
     /**
@@ -244,24 +346,9 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if {@code operation} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S step(final String name, final ThrowingRunnable operation) {
+    S step(final String name, final ThrowingRunnable operation) {
         Objects.requireNonNull(operation, "operation is null");
-        children.add(stepTask(name, CallbackAdapters.runnable(operation), false));
-        return self();
-    }
-
-    /**
-     * Adds a child step whose body receives the primary instance and the context.
-     *
-     * @param name the step name; must not be blank
-     * @param operation the operation; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if {@code operation} is {@code null}
-     * @throws IllegalArgumentException if {@code name} is blank
-     */
-    public S stepWithContext(final String name, final ThrowingBiConsumer<? super T, Context> operation) {
-        Objects.requireNonNull(operation, "operation is null");
-        children.add(stepTask(name, CallbackAdapters.instanceAndContextConsumer(operation), true));
+        children.add(stepTask(name, CallbackAdapters.runnable(operation)));
         return self();
     }
 
@@ -274,32 +361,9 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if {@code operation} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S stepWithContext(final String name, final ThrowingConsumer<Context> operation) {
+    S stepWithContext(final String name, final ThrowingConsumer<Context> operation) {
         Objects.requireNonNull(operation, "operation is null");
-        children.add(stepTask(name, CallbackAdapters.contextConsumer(operation), false));
-        return self();
-    }
-
-    /**
-     * Adds a child step whose body receives the primary instance and which owns an explicit sequential subtree.
-     *
-     * <p>The three-argument form is the only way to attach children to a step. There is no builder method that silently
-     * targets the most recently added step.
-     *
-     * @param name the step name; must not be blank
-     * @param operation the operation; must not be {@code null}
-     * @param configureChildren configures the step's own sequential child group; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if {@code name} is blank
-     */
-    public S step(
-            final String name,
-            final ThrowingConsumer<? super T> operation,
-            final Consumer<SequentialBuilder<T>> configureChildren) {
-        Objects.requireNonNull(operation, "operation is null");
-        Objects.requireNonNull(configureChildren, "configureChildren is null");
-        children.add(groupWithBody(name, CallbackAdapters.instanceConsumer(operation), true, configureChildren));
+        children.add(stepTask(name, CallbackAdapters.contextConsumer(operation)));
         return self();
     }
 
@@ -313,20 +377,17 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S step(
-            final String name,
-            final ThrowingRunnable operation,
-            final Consumer<SequentialBuilder<T>> configureChildren) {
+    S step(final String name, final ThrowingRunnable operation, final Consumer<SequentialBuilder> configureChildren) {
         Objects.requireNonNull(operation, "operation is null");
         Objects.requireNonNull(configureChildren, "configureChildren is null");
-        children.add(groupWithBody(name, CallbackAdapters.runnable(operation), false, configureChildren));
+        children.add(groupWithBody(name, CallbackAdapters.runnable(operation), configureChildren));
         return self();
     }
 
     /**
      * Adds a named sequential group as a child.
      *
-     * <p>The group inherits the enclosing primary instance type and does not create a new instance.
+     * <p>The group inherits the enclosing anchor and does not create a scope of its own.
      *
      * @param name the group name; must not be blank
      * @param configure configures the group; must not be {@code null}
@@ -334,9 +395,9 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if {@code configure} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S sequential(final String name, final Consumer<SequentialBuilder<T>> configure) {
+    S sequential(final String name, final Consumer<SequentialBuilder> configure) {
         Objects.requireNonNull(configure, "configure is null");
-        var group = new SequentialBuilder<T>(name);
+        var group = new SequentialBuilder(name);
         configure.accept(group);
         children.add(group.build());
         return self();
@@ -346,7 +407,7 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * Adds a named parallel group as a child.
      *
      * <p>Each direct child of the group holds one permit of {@code pool} for its whole lifetime. The group inherits the
-     * enclosing primary instance type, so parallel children share it and must handle concurrent access themselves.
+     * enclosing anchor, so its hooks resolve against the same class.
      *
      * @param name the group name; must not be blank
      * @param pool the concurrency budget; must not be {@code null}
@@ -355,10 +416,10 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S parallel(final String name, final Pool pool, final Consumer<ParallelBuilder<T>> configure) {
+    S parallel(final String name, final Pool pool, final Consumer<ParallelBuilder> configure) {
         Objects.requireNonNull(pool, "pool is null");
         Objects.requireNonNull(configure, "configure is null");
-        var group = new ParallelBuilder<T>(name, pool);
+        var group = new ParallelBuilder(name, pool);
         configure.accept(group);
         children.add(group.build());
         return self();
@@ -376,9 +437,9 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if {@code configure} is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S repeat(final String name, final Consumer<RepeatBuilder<T>> configure) {
+    S repeat(final String name, final Consumer<RepeatBuilder> configure) {
         Objects.requireNonNull(configure, "configure is null");
-        var repeatBuilder = new RepeatBuilder<T>(name);
+        var repeatBuilder = new RepeatBuilder(name);
         configure.accept(repeatBuilder);
         children.add(repeatBuilder.build());
         return self();
@@ -398,11 +459,10 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if any argument is {@code null}
      * @throws IllegalArgumentException if {@code name} is blank
      */
-    public S when(
-            final String name, final Predicate<Context> condition, final Consumer<SequentialBuilder<T>> configure) {
+    S when(final String name, final Predicate<Context> condition, final Consumer<SequentialBuilder> configure) {
         Objects.requireNonNull(condition, "condition is null");
         Objects.requireNonNull(configure, "configure is null");
-        var group = new SequentialBuilder<T>(name);
+        var group = new SequentialBuilder(name);
         group.onlyIf(condition);
         configure.accept(group);
         children.add(group.build());
@@ -416,7 +476,7 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @return this builder
      * @throws NullPointerException if {@code condition} is {@code null}
      */
-    public S onlyIf(final Predicate<Context> condition) {
+    S onlyIf(final Predicate<Context> condition) {
         this.condition = Objects.requireNonNull(condition, "condition is null");
         return self();
     }
@@ -445,9 +505,17 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @return this builder
      * @throws NullPointerException if {@code child} is {@code null}
      */
-    public S child(final TaskBuilder<?, ?> child) {
+    public S child(final TaskBuilder<?> child) {
         Objects.requireNonNull(child, "child is null");
-        children.add(child.build());
+        if (child.usesIds()) {
+            // The child references hook ids, so it cannot be resolved until the anchor is known. Materializing it here
+            // would force every intermediate group to carry a class literal, which defeats anchor inheritance for the
+            // ordinary bottom-up composition (`root.child(sequential("suite").child(...))`). Keep the builder and
+            // build it during this builder's build, when `effectiveAnchor` is known.
+            children.add(child);
+        } else {
+            children.add(child.build(anchor));
+        }
         return self();
     }
 
@@ -465,8 +533,7 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @throws NullPointerException if {@code items} or {@code mapper} is {@code null}
      * @throws IllegalArgumentException if the mapper returns {@code null}
      */
-    public <E> S each(
-            final Iterable<? extends E> items, final Function<? super E, ? extends TaskBuilder<?, ?>> mapper) {
+    <E> S each(final Iterable<? extends E> items, final Function<? super E, ? extends TaskBuilder<?>> mapper) {
         Objects.requireNonNull(items, "items is null");
         Objects.requireNonNull(mapper, "mapper is null");
         var index = 0;
@@ -475,7 +542,7 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
             if (mapped == null) {
                 throw new IllegalArgumentException("each mapper returned null for item at index " + index);
             }
-            children.add(mapped.build());
+            children.add(((TaskBuilder<?>) mapped).build(anchor));
             index++;
         }
         return self();
@@ -587,84 +654,6 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
     }
 
     /**
-     * Declares an externally owned secondary resource acquired lazily when this task is admitted.
-     *
-     * @param <R> the resource type
-     * @param key the typed key; must not be {@code null}
-     * @param factory the lazy factory; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if the key is already declared on this task
-     */
-    public <R> S resource(final Key<R> key, final ThrowingSupplier<? extends R> factory) {
-        Objects.requireNonNull(factory, "factory is null");
-        return resource(key, (ResourceFactory) context -> factory.get(), null);
-    }
-
-    /**
-     * Declares a secondary resource with a release callback acquired lazily when this task is admitted.
-     *
-     * @param <R> the resource type
-     * @param key the typed key; must not be {@code null}
-     * @param factory the lazy factory; must not be {@code null}
-     * @param release the release callback, run in reverse acquisition order; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if the key is already declared on this task
-     */
-    public <R> S resource(
-            final Key<R> key, final ThrowingSupplier<? extends R> factory, final ThrowingConsumer<? super R> release) {
-        Objects.requireNonNull(factory, "factory is null");
-        Objects.requireNonNull(release, "release is null");
-        return resource(key, (ResourceFactory) context -> factory.get(), TaskBuilder.<R>typedReleaser(release));
-    }
-
-    private static <R> ResourceReleaser typedReleaser(final ThrowingConsumer<? super R> release) {
-        return (resource, context) -> {
-            @SuppressWarnings("unchecked")
-            final var typed = (R) resource;
-            release.accept(typed);
-        };
-    }
-
-    /**
-     * Declares a secondary resource whose factory may read resources acquired earlier in the same scope.
-     *
-     * @param <R> the resource type
-     * @param key the typed key; must not be {@code null}
-     * @param factory the lazy, context-aware factory; must not be {@code null}
-     * @return this builder
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws IllegalArgumentException if the key is already declared on this task
-     */
-    public <R> S resource(final Key<R> key, final ResourceFactory factory) {
-        return resource(key, factory, null);
-    }
-
-    /**
-     * Declares a secondary resource with a context-aware factory and release callback.
-     *
-     * @param <R> the resource type
-     * @param key the typed key; must not be {@code null}
-     * @param factory the lazy, context-aware factory; must not be {@code null}
-     * @param release the release callback, or {@code null} when the resource is externally owned
-     * @return this builder
-     * @throws NullPointerException if {@code key} or {@code factory} is {@code null}
-     * @throws IllegalArgumentException if the key is already declared on this task
-     */
-    public <R> S resource(final Key<R> key, final ResourceFactory factory, final ResourceReleaser release) {
-        Objects.requireNonNull(key, "key is null");
-        Objects.requireNonNull(factory, "factory is null");
-        for (ResourceDeclaration declaration : resources) {
-            if (declaration.key().equals(key)) {
-                throw new IllegalArgumentException("Duplicate resource key on task '" + name + "': " + key);
-            }
-        }
-        resources.add(ResourceDeclaration.of(key, factory, release));
-        return self();
-    }
-
-    /**
      * Builds an immutable, deeply frozen snapshot of this definition.
      *
      * <p>The builder may be built repeatedly; each build returns a separate immutable definition, and later mutation of
@@ -675,6 +664,43 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
      * @return the immutable task; never {@code null}
      */
     public Task build() {
+        return build(null);
+    }
+
+    /**
+     * Builds this definition against the anchor inherited from the builder it is attached to.
+     *
+     * <p>Resolution runs here and never during execution: identifiers are matched to declared methods, malformed
+     * hooks are rejected, and every problem is aggregated into one {@link CompilationException} before any hook can
+     * run.
+     *
+     * @param inheritedAnchor the anchor of the parent builder, or {@code null} for a root
+     * @return the immutable task; never {@code null}
+     * @throws CompilationException if an identifier is unknown, ambiguous, malformed, or has no anchor
+     */
+    Task build(final Class<?> inheritedAnchor) {
+        final var problems = new ArrayList<String>();
+        final var task = materialize(inheritedAnchor, problems);
+        if (!problems.isEmpty()) {
+            throw new CompilationException(
+                    problems.size() + (problems.size() == 1 ? " problem in " : " problems in ") + name,
+                    List.copyOf(problems),
+                    null);
+        }
+        return task;
+    }
+
+    /**
+     * Materializes this definition against an anchor, appending every problem to the supplied list.
+     *
+     * <p>Subclasses override this rather than {@link #build(Class)} so that a deferred subtree — one held until the
+     * anchor is known — still passes through their own policy handling.
+     *
+     * @param inheritedAnchor the anchor of the parent builder, or {@code null} for a root
+     * @param problems the diagnostic list to append to
+     * @return the immutable task; never {@code null}
+     */
+    Task materialize(final Class<?> inheritedAnchor, final List<String> problems) {
         final Long effectiveSeed;
         if (shuffleRequested) {
             if (shuffleSeed == null) {
@@ -684,10 +710,87 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
         } else {
             effectiveSeed = null;
         }
-        return new Task(
-                new Task.Structure(name, mode, pool, dependent, children),
-                new Task.Lifecycle(before, after, body, instanceFactory, requiresPrimaryInstance, resources),
-                new Task.Policies(tags, effectiveSeed, condition, timeout, retry, repeat, exclusiveLock));
+        final Class<?> effectiveAnchor = effectiveAnchor(inheritedAnchor);
+
+        final var resolvedChildren = new ArrayList<Task>(children.size());
+        for (final Object child : children) {
+            if (child instanceof Task task) {
+                resolvedChildren.add(task);
+            } else if (child instanceof TaskBuilder<?> deferred) {
+                resolvedChildren.add(deferred.materialize(effectiveAnchor, problems));
+            } else {
+                final var pending = (PendingChild) child;
+                final var step = new SequentialBuilder(pending.id);
+                step.setBody(new PendingHook(pending.id, IdRole.STEP));
+                resolvedChildren.add(step.materialize(effectiveAnchor, problems));
+            }
+        }
+
+        final var resolvedBefore = resolveAll(before, effectiveAnchor, problems);
+        final var resolvedAfter = resolveAll(after, effectiveAnchor, problems);
+        final TaskCallback resolvedBody;
+        if (bodyId != null) {
+            resolvedBody = IdResolver.resolveHook(bodyId, effectiveAnchor, IdRole.BODY, problems);
+        } else if (body instanceof PendingHook pendingBody) {
+            resolvedBody = IdResolver.resolveHook(pendingBody.id, effectiveAnchor, pendingBody.role, problems);
+        } else {
+            resolvedBody = body;
+        }
+        final Predicate<Context> resolvedCondition =
+                conditionId == null ? condition : IdResolver.resolveCondition(conditionId, effectiveAnchor, problems);
+
+        final var task = new Task(
+                new Task.Structure(name, mode, pool, dependent, resolvedChildren, effectiveAnchor, bindings),
+                new Task.Lifecycle(resolvedBefore, resolvedAfter, resolvedBody),
+                new Task.Policies(tags, effectiveSeed, resolvedCondition, timeout, retry, repeat, exclusiveLock));
+        return task;
+    }
+
+    private static List<TaskCallback> resolveAll(
+            final List<TaskCallback> hooks, final Class<?> anchor, final List<String> problems) {
+        final var resolved = new ArrayList<TaskCallback>(hooks.size());
+        for (final TaskCallback hook : hooks) {
+            if (hook instanceof PendingHook pending) {
+                final var callback = IdResolver.resolveHook(pending.id, anchor, pending.role, problems);
+                if (callback != null) {
+                    resolved.add(callback);
+                }
+            } else {
+                resolved.add(hook);
+            }
+        }
+        return resolved;
+    }
+
+    /**
+     * A hook identifier captured at authoring time and resolved when the definition is built.
+     */
+    private static final class PendingHook implements TaskCallback {
+
+        private final String id;
+        private final IdRole role;
+
+        PendingHook(final String id, final IdRole role) {
+            this.id = id;
+            this.role = role;
+        }
+
+        @Override
+        public void execute(final Context context) {
+            throw new IllegalStateException("Unresolved hook id " + id + " (" + role + ")");
+        }
+    }
+
+    /**
+     * A {@code step(id)} child captured at authoring time and materialized when the definition is built.
+     */
+    private static final class PendingChild {
+
+        private final String id;
+
+        PendingChild(final String id) {
+            this.id = id;
+        }
     }
 
     final String builderName() {
@@ -698,33 +801,24 @@ public abstract class TaskBuilder<T, S extends TaskBuilder<T, S>> {
         this.dependent = dependent;
     }
 
-    final void setInstanceFactory(final TaskFactory factory) {
-        this.instanceFactory = Objects.requireNonNull(factory, "factory is null");
-        this.requiresPrimaryInstance = true;
-    }
-
-    final void setBody(final TaskCallback body, final boolean requiresInstance) {
+    final void setBody(final TaskCallback body) {
         this.body = Objects.requireNonNull(body, "body is null");
-        this.requiresPrimaryInstance = requiresPrimaryInstance || requiresInstance;
     }
 
     final void setRepeat(final RepeatPolicy repeat) {
         this.repeat = repeat;
     }
 
-    private Task stepTask(final String name, final TaskCallback operation, final boolean requiresInstance) {
-        final var step = new SequentialBuilder<T>(name);
-        step.setBody(operation, requiresInstance);
+    private Task stepTask(final String name, final TaskCallback operation) {
+        final var step = new SequentialBuilder(name);
+        step.setBody(operation);
         return step.build();
     }
 
     private Task groupWithBody(
-            final String name,
-            final TaskCallback operation,
-            final boolean requiresInstance,
-            final Consumer<SequentialBuilder<T>> configureChildren) {
-        final var group = new SequentialBuilder<T>(name);
-        group.setBody(operation, requiresInstance);
+            final String name, final TaskCallback operation, final Consumer<SequentialBuilder> configureChildren) {
+        final var group = new SequentialBuilder(name);
+        group.setBody(operation);
         configureChildren.accept(group);
         return group.build();
     }

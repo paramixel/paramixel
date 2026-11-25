@@ -16,9 +16,11 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * A factory that runs {@link DiscoveryFixtures#factoryHook} while it is being invoked during discovery.
@@ -40,8 +42,18 @@ public final class CloseDuringDiscoveryFixture {
         if (hook != null) {
             hook.run();
         }
-        return Tasks.task("close-during-discovery")
-                .step("run", () -> DiscoveryFixtures.RECORDED.add("close-during-discovery"))
+        return sequential(CloseDuringDiscoveryFixture.class, "close-during-discovery")
+                .step("run")
                 .build();
+    }
+
+    /**
+     * Records this fixture's execution.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        DiscoveryFixtures.RECORDED.add("close-during-discovery");
     }
 }

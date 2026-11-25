@@ -10,10 +10,11 @@ description: Named pools, permit lifetimes, admission order, and honest limits.
 ```java
 private static final Pool ENVIRONMENTS = Pool.named("environments");
 
-Task definition = parallel("Compatibility matrix", ENVIRONMENTS)
-        .each(environments, env -> instance(env.name(), () -> new Test(env))
-                .step("check", Test::check))
-        .build();
+final var root = parallel(MySuite.class, "Compatibility matrix", ENVIRONMENTS);
+for (final var environment : environments) {
+    root.child(sequential(environment.name()).bind(ENVIRONMENT, environment).step("check"));
+}
+Task definition = root.build();
 
 Runner runner = Runner.builder().pool(ENVIRONMENTS, 3).build();
 ```

@@ -18,7 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -141,18 +140,13 @@ class TaskDefinitionTest {
     @Test
     @DisplayName("definition construction performs no user work")
     void constructionIsSideEffectFree() {
-        final AtomicInteger factoryCalls = new AtomicInteger();
         final AtomicInteger callbackCalls = new AtomicInteger();
-        final Task definition = instance("instance", () -> {
-                    factoryCalls.incrementAndGet();
-                    return new Object();
-                })
+        final Task definition = sequential("group")
                 .before(callbackCalls::incrementAndGet)
                 .step("body", callbackCalls::incrementAndGet)
                 .after(callbackCalls::incrementAndGet)
                 .build();
 
-        assertThat(factoryCalls).hasValue(0);
         assertThat(callbackCalls).hasValue(0);
         assertThat(definition.children()).hasSize(1);
     }

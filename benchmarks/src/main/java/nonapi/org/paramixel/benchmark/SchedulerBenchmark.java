@@ -116,17 +116,10 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = SchedulerBenchmark.runner(parallelism);
-            final var builder = Tasks.parallel("root", Pool.named("bench"));
+            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
                 final long sleepMillis = i % 4 == 0 ? 5L : 1L;
-                builder.step("child-" + i, () -> {
-                    Blackhole.consumeCPU(1);
-                    try {
-                        Thread.sleep(sleepMillis);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                });
+                builder.step(BenchmarkTree.ID_SLEEP);
             }
             root = builder.build();
         }
@@ -150,9 +143,9 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = SchedulerBenchmark.runner(parallelism);
-            final var builder = Tasks.parallel("root", Pool.named("bench"));
+            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
-                builder.step("child-" + i, () -> Thread.sleep(1L));
+                builder.step(BenchmarkTree.ID_SLEEP);
             }
             root = builder.build();
         }
@@ -173,9 +166,9 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = SchedulerBenchmark.runner(8);
-            final var builder = Tasks.parallel("root", Pool.named("bench"));
+            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
-                builder.step("step-" + i, () -> {});
+                builder.step(BenchmarkTree.ID_NOOP);
             }
             root = builder.build();
         }

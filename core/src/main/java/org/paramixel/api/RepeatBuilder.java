@@ -16,8 +16,10 @@
 
 package org.paramixel.api;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import nonapi.org.paramixel.authoring.IdResolver;
 import org.paramixel.api.support.Backoff;
 import org.paramixel.api.support.RepeatPolicy;
 
@@ -25,23 +27,23 @@ import org.paramixel.api.support.RepeatPolicy;
  * Authors a bounded repetition task.
  *
  * <p>The iteration bound is mandatory: {@link #maxIterations(int)} must be called before the definition can be built.
- * Each iteration is a distinct execution attempt with its own status and timestamps, and any {@code instance} task
- * inside the repeated subtree is re-instantiated per iteration while an inherited ancestor instance is reused.
- *
- * @param <T> the inherited primary instance type; {@link Void} when the task has no instance binding
+ * Each iteration is a distinct execution attempt with its own status and timestamps. A repeated task owns its context
+ * scope, so every iteration starts with an empty scope and state written by one iteration never reaches the next.
  * @see org.paramixel.api.support.RepeatPolicy
  * @see org.paramixel.api.support.RetryPolicy
  */
-public final class RepeatBuilder<T> extends TaskBuilder<T, RepeatBuilder<T>> {
+public final class RepeatBuilder extends TaskBuilder<RepeatBuilder> {
 
     private final RepeatPolicy.Builder policy = RepeatPolicy.builder();
+
+    private String untilId;
 
     RepeatBuilder(final String name) {
         super(name, ExecutionMode.SEQUENTIAL, null);
     }
 
     @Override
-    protected RepeatBuilder<T> self() {
+    protected RepeatBuilder self() {
         return this;
     }
 
@@ -52,7 +54,7 @@ public final class RepeatBuilder<T> extends TaskBuilder<T, RepeatBuilder<T>> {
      * @return this builder
      * @throws IllegalArgumentException if the bound is outside the accepted range
      */
-    public RepeatBuilder<T> maxIterations(final int maxIterations) {
+    public RepeatBuilder maxIterations(final int maxIterations) {
         policy.maxIterations(maxIterations);
         return this;
     }
@@ -62,7 +64,7 @@ public final class RepeatBuilder<T> extends TaskBuilder<T, RepeatBuilder<T>> {
      *
      * @return this builder
      */
-    public RepeatBuilder<T> untilPassed() {
+    public RepeatBuilder untilPassed() {
         policy.untilPassed();
         return this;
     }
@@ -74,9 +76,29 @@ public final class RepeatBuilder<T> extends TaskBuilder<T, RepeatBuilder<T>> {
      * @return this builder
      * @throws NullPointerException if {@code until} is {@code null}
      */
-    public RepeatBuilder<T> until(final BiPredicate<Context, Status> until) {
+    public RepeatBuilder until(final BiPredicate<Context, Status> until) {
         Objects.requireNonNull(until, "until is null");
         policy.until(until);
+        return this;
+    }
+
+    /**
+     * Stops iterating when the identified hook returns {@code true}.
+     *
+     * <p>The hook takes two parameters — {@code boolean m(Context, Status)} — because the decision depends on the
+     * outcome of the iteration that just finished.
+     *
+     * @param id the hook identifier; must not be {@code null} or blank
+     * @return this builder
+     * @throws NullPointerException if {@code id} is {@code null}
+     * @throws IllegalArgumentException if {@code id} is blank
+     */
+    public RepeatBuilder until(final String id) {
+        Objects.requireNonNull(id, "id is null");
+        if (id.isBlank()) {
+            throw new IllegalArgumentException("Hook id is blank");
+        }
+        this.untilId = id;
         return this;
     }
 
@@ -87,15 +109,22 @@ public final class RepeatBuilder<T> extends TaskBuilder<T, RepeatBuilder<T>> {
      * @return this builder
      * @throws NullPointerException if {@code delay} is {@code null}
      */
-    public RepeatBuilder<T> delay(final Backoff delay) {
+    public RepeatBuilder delay(final Backoff delay) {
         Objects.requireNonNull(delay, "delay is null");
         policy.delay(delay);
         return this;
     }
 
     @Override
-    public Task build() {
+    Task materialize(final Class<?> inheritedAnchor, final List<String> problems) {
+        if (untilId != null) {
+            final var predicate = IdResolver.resolveUntil(untilId, effectiveAnchor(inheritedAnchor), problems);
+            if (predicate != null) {
+                policy.until(predicate);
+            }
+            untilId = null;
+        }
         setRepeat(policy.build());
-        return super.build();
+        return super.materialize(inheritedAnchor, problems);
     }
 }

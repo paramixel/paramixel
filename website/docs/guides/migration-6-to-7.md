@@ -17,14 +17,14 @@ names the behavior changes that can affect an existing suite.
 | `Step` | A child task with a body |
 | `Sequential` | A sequential task |
 | `Parallel(displayName, "pool")` | `parallel(displayName, Pool.named("pool"))` |
-| `Instance.of(name, Class, factory)` | `instance(name, factory)` |
+| `Instance.of(name, Class, factory)` | `bind`/`put` + `require` in the per-scope context |
 | `Scope` | Task lifecycle (`before` / `after`) |
-| `Conditional` | `when(name, predicate, …)` or `onlyIf(predicate)` |
-| `Loop` | `repeat(name, r -> r.maxIterations(n)…)` |
+| `Conditional` | `onlyIf(id)` on an attached child group |
+| `Loop` | `child(repeat(name).maxIterations(n).until(id))` |
 | `Timeout` | `timeout(Duration)` on any task |
 | `Isolated` | `isolated(lockName)` on any task |
 | `Retry` / `CleanUp` helpers | `RetryPolicy` / `after` callbacks |
-| `Context.instance(Class)` | Typed callbacks or `Context.require(Key)` |
+| `Context.instance(Class)` | `Context.require(name, Type)` |
 | `Runner.run(Action)` | `Runner.run(Task)` |
 | Mutable `Descriptor` | Immutable `Result` / `TaskResult` |
 
@@ -39,13 +39,20 @@ Instance.of("scenario", Scenario.class, () -> new Scenario(environment))
         .after("tearDown()", Scenario.class, Scenario::tearDown);
 
 // 7.0
-instance("scenario", () -> new Scenario(environment))
-        .before(Scenario::setUp)
-        .step("check", Scenario::check)
-        .after(Scenario::tearDown);
+sequential(MySuite.class, "scenario")
+        .bind(ENVIRONMENT, environment)
+        .before(ID_SET_UP)
+        .step(ID_CHECK)
+        .after(ID_TEAR_DOWN);
+
+@Paramixel.Id(ID_SET_UP)
+public static void setUp(final Context context) {
+    context.put(FIXTURE, new Scenario(context.require(ENVIRONMENT, Environment.class)));
+}
 ```
 
-The class token appears once, in the supplier, and never again.
+The class literal appears once per definition root; the hooks are ordinary static methods, and each one reads what it
+needs from the context by name.
 
 ## Behavior changes to review
 
@@ -56,8 +63,9 @@ The class token appears once, in the supplier, and never again.
 3. **`CANCELED` is distinct from `ABORTED`.** A canceled run or timeout-driven stop is `CANCELED`, not an assumption
    abort.
 4. **No implicit `AutoCloseable` closing.** Add an `after` callback that closes the fixture.
-5. **No reflective fixture lookup.** `Context.instance(Class)` is gone; typed callbacks receive the instance and
-   secondary objects use `Key<T>`.
+5. **No reflective fixture lookup, and no typed callbacks.** `Context.instance(Class)` is gone, and so are the callback
+   overloads that replaced it: hooks are identified by `@Paramixel.Id` and read state from the context with
+   `require(name, Type)`.
 6. **Pools are required and validated.** An undefined pool fails before execution, same-pool nesting is rejected, and
    the discovery root uses a `discovery` pool whose capacity defaults to `paramixel.parallelism`.
 7. **Timeouts are cooperative and honest.** A callback that ignores interruption yields
@@ -77,9 +85,11 @@ Existing keys keep their names: `paramixel.parallelism`, `paramixel.parallelism.
 ## Migration checklist
 
 - Replace every `org.paramixel.api.action` import.
-- Convert `Instance.of(...)` to `instance(...)` and drop class tokens from steps.
-- Convert `Parallel.parallel("x", "pool")` to `parallel("x", Pool.named("pool"))`.
-- Replace `Loop` with `repeat`, and the `Retry` helper with `RetryPolicy`.
-- Replace `Context.instance(Class)` lookups with typed callbacks or `Key<T>` resources.
+- Convert `Instance.of(...)` to a `before` hook that builds the fixture and stores it with `Context.put`.
+- Convert `Parallel.parallel("x", "pool")` to `parallel(Owner.class, "x", Pool.named("pool"))`.
+- Replace `Loop` with `child(repeat(...))`, and the `Retry` helper with `RetryPolicy`.
+- Replace `Context.instance(Class)` lookups with `Context.require(name, Type)`.
+- Convert every lifecycle callback and step body to a `public static` method annotated with `@Paramixel.Id`, and make the
+  definition root name its owning class.
 - Review dependent sequences that relied on abort continuation.
 - Run the suite and inspect `result.root()` for newly visible `SKIPPED`/`CANCELED` outcomes.

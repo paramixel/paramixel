@@ -17,17 +17,17 @@
 package examples.isolated;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
+import org.paramixel.api.SequentialBuilder;
 import org.paramixel.api.Task;
-import org.paramixel.api.TaskBuilder;
 
 /**
  * Demonstrates an exclusive logical lock as a serialization boundary inside parallel work.
@@ -36,9 +36,17 @@ import org.paramixel.api.TaskBuilder;
  * groups run concurrently. A lock is not a pool permit: a waiter occupies no worker thread and consumes no capacity of
  * the surrounding pool.
  *
- * <p>Each scenario owns its own fixture, so the counter is per scenario and no shared mutable state is needed.
+ * <p>Each scenario is a direct child of a parallel group and therefore owns a context scope, so its fixture counter is
+ * per scenario and no shared mutable state is needed.
  */
 public class IsolatedTest {
+
+    private static final String ID_SET_UP = "setUp";
+    private static final String ID_RUN = "run";
+    private static final String ID_TEAR_DOWN = "tearDown";
+    private static final String ID_PEAK = "peak";
+
+    private static final String FIXTURE = "fixture";
 
     private static final AtomicInteger insideLock = new AtomicInteger();
     private static final AtomicInteger peakInsideLock = new AtomicInteger();
@@ -62,34 +70,71 @@ public class IsolatedTest {
         insideLock.set(0);
         peakInsideLock.set(0);
 
-        return parallel("IsolatedTest", Pool.named("groups"))
-                .child(sequential("serialized-group-1")
-                        .isolated("db-lock")
-                        .parallel(
-                                "group-1-tests",
-                                Pool.named("group-tests"),
-                                tests -> tests.each(List.of("test-1a", "test-1b"), name -> scenario(name))))
-                .child(sequential("serialized-group-2")
-                        .isolated("db-lock")
-                        .parallel(
-                                "group-2-tests",
-                                Pool.named("group-tests"),
-                                tests -> tests.each(List.of("test-2a", "test-2b"), name -> scenario(name))))
-                .after(() -> {
-                    assertThat(peakInsideLock.get()).isPositive();
-                })
+        final var groupOne = parallel("group-1-tests", Pool.named("group-tests"));
+        for (final var name : List.of("test-1a", "test-1b")) {
+            groupOne.child(scenario(name));
+        }
+        final var groupTwo = parallel("group-2-tests", Pool.named("group-tests"));
+        for (final var name : List.of("test-2a", "test-2b")) {
+            groupTwo.child(scenario(name));
+        }
+
+        return parallel(IsolatedTest.class, "IsolatedTest", Pool.named("groups"))
+                .child(sequential("serialized-group-1").isolated("db-lock").child(groupOne))
+                .child(sequential("serialized-group-2").isolated("db-lock").child(groupTwo))
+                .after(ID_PEAK)
                 .build();
     }
 
-    private static TaskBuilder<?, ?> scenario(final String name) {
-        return instance(name, Scenario::new)
-                .before(Scenario::setUp)
-                .step("run", Scenario::run)
-                .after(Scenario::tearDown);
+    private static SequentialBuilder scenario(final String name) {
+        return sequential(name).before(ID_SET_UP).step(ID_RUN).after(ID_TEAR_DOWN);
     }
 
     /**
-     * One owned fixture per scenario.
+     * Creates this scenario's fixture.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SET_UP)
+    public static void setUp(final Context context) {
+        final var scenario = new Scenario();
+        context.put(FIXTURE, scenario);
+        scenario.setUp();
+    }
+
+    /**
+     * Runs the scenario body while the enclosing group's exclusive lock is held.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_RUN)
+    public static void run(final Context context) throws InterruptedException {
+        context.require(FIXTURE, Scenario.class).run();
+    }
+
+    /**
+     * Verifies the scenario's fixture state.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDown(final Context context) {
+        context.find(FIXTURE, Scenario.class).ifPresent(Scenario::tearDown);
+    }
+
+    /**
+     * Confirms the run actually serialized.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_PEAK)
+    public static void peak(final Context context) {
+        assertThat(peakInsideLock.get()).isPositive();
+    }
+
+    /**
+     * One scenario's fixture.
      */
     public static final class Scenario {
 

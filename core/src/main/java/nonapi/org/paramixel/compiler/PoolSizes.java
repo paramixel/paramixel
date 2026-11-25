@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  * {@link Runtime#availableProcessors()} and never resolve below one, so a small container cannot configure an
  * unusable pool. Division truncates toward zero.
  */
-final class PoolSizes {
+public final class PoolSizes {
 
     private static final Pattern CORES = Pattern.compile("@cores(?:([*/])(\\d+))?");
 
@@ -41,7 +41,7 @@ final class PoolSizes {
      * @return the resolved capacity; at least one
      * @throws IllegalArgumentException if the value is not a valid capacity
      */
-    static int parse(final String raw) {
+    public static int parse(final String raw) {
         final var value = raw.strip();
         final var matcher = CORES.matcher(value);
         if (matcher.matches()) {

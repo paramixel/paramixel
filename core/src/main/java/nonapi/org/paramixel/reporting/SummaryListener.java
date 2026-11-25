@@ -33,7 +33,7 @@ import org.paramixel.api.Result;
  */
 public final class SummaryListener implements Listener {
 
-    /** The horizontal rule that separates the status footer from the summary block. */
+    /** The horizontal rule that separates the console sections from the result tree and the run totals. */
     private static final String RULE = "-".repeat(7);
 
     private final ConsoleSupport console;
@@ -78,7 +78,7 @@ public final class SummaryListener implements Listener {
     }
 
     private void printTotals(final Result result) {
-        out.println();
+        out.println(console.line(console.color(AnsiColor.BOLD_GRAY_TEXT, RULE)));
         out.println(console.line("occurrences: " + result.occurrenceCount()
                 + " passed: " + result.passedCount()
                 + " failed: " + result.failedCount()

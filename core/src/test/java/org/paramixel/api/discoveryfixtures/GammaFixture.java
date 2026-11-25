@@ -16,14 +16,14 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
- * A tagged, neutral-priority factory used by discovery tests. Shuffle tests need a third factory: two children give a
- * single permutation pair that {@code java.util.Random} does not reach for small seeds, while three children exercise
- * the full permutation space.
+ * A tagged, neutral-priority factory used by discovery tests. Shuffle tests need a third factory.
  */
 public final class GammaFixture {
 
@@ -36,12 +36,19 @@ public final class GammaFixture {
      *
      * @return the definition
      */
-    @Paramixel.Factory
     @Paramixel.Tag("gamma")
+    @Paramixel.Factory
     public static Task factory() {
-        return Tasks.task("gamma")
-                .tags("gamma")
-                .step("run", () -> DiscoveryFixtures.RECORDED.add("gamma"))
-                .build();
+        return sequential(GammaFixture.class, "gamma").tags("gamma").step("run").build();
+    }
+
+    /**
+     * Records this fixture's execution.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        DiscoveryFixtures.RECORDED.add("gamma");
     }
 }

@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.ExecutionMode;
 import org.paramixel.api.Pool;
-import org.paramixel.api.ResourceDeclaration;
 import org.paramixel.api.Task;
 import org.paramixel.api.exception.CompilationException;
 import org.paramixel.api.support.RepeatPolicy;
@@ -112,7 +111,7 @@ public final class PlanCompiler {
         capacities.clear();
         reportedUndefinedPools.clear();
         final var counter = new AtomicInteger();
-        final var compiledRoot = expand(root, "0", null, null, null, 0, counter);
+        final var compiledRoot = expand(root, "0", null, null, 0, counter);
         final var occurrences = new ArrayList<CompiledOccurrence>();
         collectPreOrder(compiledRoot, occurrences);
         validate(root, compiledRoot);
@@ -145,7 +144,6 @@ public final class PlanCompiler {
             final String id,
             final String parentId,
             final String parentDisplayPath,
-            final String bindingSlot,
             final int depth,
             final AtomicInteger counter) {
         final var mode = task.mode();
@@ -158,20 +156,18 @@ public final class PlanCompiler {
         final var failFastScope = task.tags().contains(FAIL_FAST_SCOPE_TAG);
         final var childDisplayPath = structural ? null : path;
         final var index = counter.getAndIncrement();
-        final var childBinding = task.instanceFactory().isPresent() ? id : bindingSlot;
         final var ordered = orderedChildren(task);
         final var childOccurrences = new ArrayList<CompiledOccurrence>(ordered.size());
         var ordinal = 0;
         for (Task child : ordered) {
-            childOccurrences.add(
-                    expand(child, id + "." + ordinal, id, childDisplayPath, childBinding, depth + 1, counter));
+            childOccurrences.add(expand(child, id + "." + ordinal, id, childDisplayPath, depth + 1, counter));
             ordinal++;
         }
         final var executionOrder = ordered.stream().map(Task::name).toList();
         return new CompiledOccurrence(
                 task,
                 new CompiledOccurrence.Identity(id, definitionId(task), parentId, path),
-                new CompiledOccurrence.Scheduling(budget, childBinding, index, depth, failFastScope),
+                new CompiledOccurrence.Scheduling(budget, index, depth, failFastScope),
                 executionOrder,
                 childOccurrences);
     }
@@ -265,13 +261,6 @@ public final class PlanCompiler {
                     "Parallel task has no pool",
                     "Use parallel(name, Pool.named(\"...\"), ...)"));
         }
-        if (task.requiresPrimaryInstance() && occurrence.bindingSlot() == null) {
-            diagnostics.add(Diagnostic.error(
-                    "INSTANCE_BINDING_MISSING",
-                    path,
-                    "Task uses typed instance callbacks but no enclosing task owns a primary instance",
-                    "Wrap the task in instance(name, factory) or use the no-argument callbacks"));
-        }
         task.timeout().ifPresent(timeout -> checkTimeout(timeout, path));
         if (task.retry().isPresent() && task.repeat().isPresent()) {
             diagnostics.add(Diagnostic.error(
@@ -282,19 +271,6 @@ public final class PlanCompiler {
         }
         task.retry().ifPresent(policy -> checkRetry(policy, path));
         task.repeat().ifPresent(policy -> checkRepeat(policy, path));
-        for (ResourceDeclaration declaration : task.resources()) {
-            for (Task ancestor : ancestors) {
-                final var shadowed = ancestor.resources().stream()
-                        .anyMatch(parent -> parent.key().equals(declaration.key()));
-                if (shadowed) {
-                    diagnostics.add(Diagnostic.error(
-                            "RESOURCE_SHADOWING",
-                            path,
-                            "Resource key " + declaration.key() + " is declared by an ancestor and again here",
-                            "Use a distinct key; ambiguous shadowing is rejected in 7.0.0"));
-                }
-            }
-        }
         final var poolName = occurrence.poolName();
         if (poolName != null && ancestorPools.contains(poolName)) {
             diagnostics.add(Diagnostic.error(
@@ -392,7 +368,7 @@ public final class PlanCompiler {
         // the inherited list already ends with); only its children take permits of its own pool afterwards.
         final var resources = new ArrayList<>(inherited);
         occurrence.task().exclusiveLock().ifPresent(lock -> resources.add("lock:" + lock));
-        if (occurrence.poolName() != null) {
+        if (occurrence.poolName() != null && !occurrence.children().isEmpty()) {
             resources.add("pool:" + occurrence.poolName());
         }
         for (var i = 1; i < resources.size(); i++) {
@@ -464,7 +440,6 @@ public final class PlanCompiler {
         var hash = hashText(task.name(), seed);
         hash = hashText(task.mode().name(), hash);
         hash = hashText(task.pool().map(Pool::name).orElse(""), hash);
-        hash = hashText(task.instanceFactory().isPresent() ? "i" : "-", hash);
         hash = hashText(task.body().isPresent() ? "b" : "-", hash);
         hash = hashText(Integer.toString(task.before().size()), hash);
         hash = hashText(Integer.toString(task.after().size()), hash);

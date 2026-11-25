@@ -17,7 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -154,26 +153,19 @@ class ParallelSchedulingTest {
     }
 
     @Test
-    @DisplayName("SCHED-08: admitted branch descendants are admitted before an unopened sibling")
+    @DisplayName("SCHED-08: with one permit, a branch's subtree completes before its sibling is admitted")
     void depthFirstAdmissionPreference() {
+        // Deterministic form of the property. With capacity 1 the admitted branch holds the only permit until its
+        // subtree finishes, so the engine's depth-first pre-order admission is observable without racing a worker:
+        // a1, a2 must precede b1. What is *not* guaranteed — and was never deterministic — is the interleaving of
+        // bodies across branches that are admitted at the same time.
         final List<String> order = Collections.synchronizedList(new ArrayList<>());
-        final CountDownLatch firstAdmitted = new CountDownLatch(1);
         final Task definition = parallel("root", Pool.named("p"))
-                .child(sequential("a")
-                        .step("a1", () -> {
-                            order.add("a1");
-                            firstAdmitted.countDown();
-                        })
-                        .step("a2", () -> order.add("a2")))
+                .child(sequential("a").step("a1", () -> order.add("a1")).step("a2", () -> order.add("a2")))
                 .child(task("b").step("b1", () -> order.add("b1")))
                 .build();
 
-        final var result = Runner.builder()
-                .listener(Listener.NOOP)
-                .configuration(Configuration.of(Map.of(Configuration.WORKERS, "1")))
-                .pool(Pool.named("p"), 2)
-                .build()
-                .run(definition);
+        final var result = run(definition, Pool.named("p"), 1);
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(order).containsExactly("a1", "a2", "b1");
@@ -206,10 +198,10 @@ class ParallelSchedulingTest {
         final Task definition = parallel("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 4).boxed().toList(),
-                        index -> instance("item-" + index, () -> {
+                        index -> sequential("item-" + index)
+                                .before(() -> {
                                     final var current = active.incrementAndGet();
                                     peak.accumulateAndGet(current, Math::max);
-                                    return new Object();
                                 })
                                 .step("body", () -> Thread.sleep(1L))
                                 .after(() -> {
@@ -227,21 +219,15 @@ class ParallelSchedulingTest {
     }
 
     @Test
-    @DisplayName("SCHED-13: a fixture is not created while waiting for a permit")
+    @DisplayName("SCHED-13: a before hook does not run while waiting for a permit")
     void noFixtureWhileWaiting() {
         final AtomicInteger created = new AtomicInteger();
         final CountDownLatch release = new CountDownLatch(1);
         final Task definition = parallel("root", Pool.named("p"))
-                .child(instance("blocker", () -> {
-                            created.incrementAndGet();
-                            return new Object();
-                        })
+                .child(sequential("blocker")
+                        .before(created::incrementAndGet)
                         .step("hold", () -> release.await(5, TimeUnit.SECONDS)))
-                .child(instance("waiter", () -> {
-                            created.incrementAndGet();
-                            return new Object();
-                        })
-                        .step("quick", () -> {}))
+                .child(sequential("waiter").before(created::incrementAndGet).step("quick", () -> {}))
                 .build();
 
         final Thread releaser = new Thread(() -> {

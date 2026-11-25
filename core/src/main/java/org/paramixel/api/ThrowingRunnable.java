@@ -20,7 +20,7 @@ package org.paramixel.api;
  * A runnable that may throw a checked exception.
  */
 @FunctionalInterface
-public interface ThrowingRunnable {
+interface ThrowingRunnable {
 
     /**
      * Runs the operation.

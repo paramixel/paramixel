@@ -19,6 +19,7 @@ package examples;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.ThreadLocalRandom;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -26,10 +27,15 @@ import org.paramixel.api.Task;
 /**
  * Demonstrates pausing a branch with a step.
  *
- * <p>A delay is ordinary user code: the step sleeps on the worker that owns the branch, so it holds whatever permit and
- * lock the branch holds, exactly like any other callback.
+ * <p>A delay is ordinary user code: the step sleeps on the worker that owns the branch, so it holds whatever permit
+ * and lock the branch holds, exactly like any other callback. A hook may declare checked exceptions, so
+ * {@code Thread.sleep} needs no wrapping.
  */
 public class SleepStepTest {
+
+    private static final String ID_FIXED_PAUSE = "fixed pause";
+    private static final String ID_RANDOM_PAUSE = "random pause";
+    private static final String ID_NO_PAUSE = "no pause";
 
     /**
      * Runs the factory and exits the JVM.
@@ -47,12 +53,43 @@ public class SleepStepTest {
      */
     @Paramixel.Factory
     public static Task factory() {
-        return sequential("sleep-steps")
-                .step("fixed pause", () -> Thread.sleep(50L))
-                .step(
-                        "random pause",
-                        () -> Thread.sleep(ThreadLocalRandom.current().nextLong(10L, 50L)))
-                .step("no pause", () -> Thread.sleep(0L))
+        return sequential(SleepStepTest.class, "sleep-steps")
+                .step(ID_FIXED_PAUSE)
+                .step(ID_RANDOM_PAUSE)
+                .step(ID_NO_PAUSE)
                 .build();
+    }
+
+    /**
+     * Sleeps for a fixed interval.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_FIXED_PAUSE)
+    public static void fixedPause(final Context context) throws InterruptedException {
+        Thread.sleep(50L);
+    }
+
+    /**
+     * Sleeps for a random interval.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_RANDOM_PAUSE)
+    public static void randomPause(final Context context) throws InterruptedException {
+        Thread.sleep(ThreadLocalRandom.current().nextLong(10L, 50L));
+    }
+
+    /**
+     * Yields without a meaningful pause.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_NO_PAUSE)
+    public static void noPause(final Context context) throws InterruptedException {
+        Thread.sleep(0L);
     }
 }

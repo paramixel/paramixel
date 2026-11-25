@@ -32,8 +32,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.discoveryfixtures.CloseDuringDiscoveryFixture;
+import org.paramixel.api.discoveryfixtures.DisabledConflictingFactoryFixture;
 import org.paramixel.api.discoveryfixtures.DiscoveryFixtures;
 import org.paramixel.api.discoveryfixtures.InvalidFactoryFixture;
+import org.paramixel.api.discoveryfixtures.InvalidTagFixture;
 import org.paramixel.api.discoveryfixtures.SkippingFactoryFixture;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.ResolverException;
@@ -520,6 +522,72 @@ class DiscoveryTest {
                     .isInstanceOf(ConfigurationException.class)
                     .hasMessageContaining(key);
             assertThat(DiscoveryFixtures.RECORDED).as(key).isEmpty();
+        }
+    }
+
+    @Test
+    void classExcludedBySelectorCannotFailDiscoveryWithAnInvalidTag() {
+        final var selector =
+                Selector.builder().classOf(CloseDuringDiscoveryFixture.class).build();
+        DiscoveryFixtures.factoryHook = () -> DiscoveryFixtures.RECORDED.add("selected factory invoked");
+        try (var runner = runner()) {
+            assertThat(runner.run(selector).status().kind()).isEqualTo(Status.Kind.PASSED);
+            assertThat(DiscoveryFixtures.RECORDED).contains("selected factory invoked");
+        }
+    }
+
+    @Test
+    void invalidTagOnSelectedClassStillFailsDiscovery() {
+        final var selector = Selector.builder().classOf(InvalidTagFixture.class).build();
+        try (var runner = runner()) {
+            assertThatThrownBy(() -> runner.run(selector))
+                    .isInstanceOf(ResolverException.class)
+                    .hasMessageContaining(InvalidTagFixture.class.getName())
+                    .hasMessageContaining("value is blank");
+        }
+    }
+
+    @Test
+    void disabledFactoryIsExcludedBeforeCheckingConflictingAnnotations() {
+        final var selector = Selector.builder()
+                .classOf(DisabledConflictingFactoryFixture.class)
+                .build();
+        try (var runner = runner()) {
+            final var result = runner.run(selector);
+            assertThat(result.root()).isEmpty();
+            assertThat(result.status().kind()).isEqualTo(Status.Kind.SKIPPED);
+        }
+    }
+
+    @Test
+    void invalidDiscoveryPoolCapacityFailsBeforeFactories() {
+        final var selector =
+                Selector.builder().classOf(CloseDuringDiscoveryFixture.class).build();
+        final var key = Configuration.poolKey("discovery");
+        DiscoveryFixtures.factoryHook = () -> DiscoveryFixtures.RECORDED.add("factory invoked");
+        try (var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(key, "@cores/0")))
+                .build()) {
+            assertThatThrownBy(() -> runner.run(selector))
+                    .isInstanceOf(ConfigurationException.class)
+                    .hasMessageContaining(key);
+            assertThat(DiscoveryFixtures.RECORDED).isEmpty();
+        }
+    }
+
+    @Test
+    void discoveryPoolBuilderOverrideDoesNotValidateTheUnusedProperty() {
+        final var selector =
+                Selector.builder().classOf(CloseDuringDiscoveryFixture.class).build();
+        DiscoveryFixtures.factoryHook = () -> DiscoveryFixtures.RECORDED.add("factory invoked");
+        try (var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.poolKey("discovery"), "@cores/0")))
+                .pool(Pool.named("discovery"), 1)
+                .build()) {
+            assertThat(runner.run(selector).status().kind()).isEqualTo(Status.Kind.PASSED);
+            assertThat(DiscoveryFixtures.RECORDED).contains("factory invoked");
         }
     }
 

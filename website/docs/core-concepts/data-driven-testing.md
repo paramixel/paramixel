@@ -9,12 +9,15 @@ description: Typed matrices with each, without casts or repeated class tokens.
 item can produce a different fixture type.
 
 ```java
-Task definition = parallel("Environments", Pool.named("environments"))
-        .each(environments, environment -> instance(environment.name(), () -> new Scenario(environment))
-                .before(Scenario::start)
-                .step("verify", Scenario::verify)
-                .after(Scenario::stop))
-        .build();
+final var root = parallel(MySuite.class, "Environments", Pool.named("environments"));
+for (final var environment : environments) {
+    root.child(sequential(environment.name())
+            .bind(ENVIRONMENT, environment)
+            .before(ID_START)
+            .step(ID_VERIFY)
+            .after(ID_STOP));
+}
+Task definition = root.build();
 ```
 
 ## Rules
@@ -30,11 +33,11 @@ Task definition = parallel("Environments", Pool.named("environments"))
 ## Shuffling
 
 ```java
-parallel("Matrix", Pool.named("environments"))
-        .shuffle(42L)
-        .each(environments, env -> instance(env.name(), () -> new Probe(env))
-                .step("verify", Probe::verify))
-        .build();
+final var matrix = parallel(MySuite.class, "Matrix", Pool.named("environments")).shuffle(42L);
+for (final var environment : environments) {
+    matrix.child(sequential(environment.name()).bind(ENVIRONMENT, environment).step(ID_VERIFY));
+}
+Task definition = matrix.build();
 ```
 
 Shuffling reorders admission for the task's direct children. The effective seed and resolved order are recorded in the

@@ -14,24 +14,21 @@
  * limitations under the License.
  */
 
-package org.paramixel.api;
+package nonapi.org.paramixel.authoring;
 
 /**
- * Supplies a value and may throw a checked exception.
+ * A callback that carries the identifier it was resolved from.
  *
- * <p>Paramixel uses this type for instance factories and resource factories so that test code can acquire
- * fixtures and secondary resources without wrapping every call in a {@code try}/{@code catch} block.
- *
- * @param <T> the supplied value type
+ * <p>The engine prefers the identifier over the declaration position when it labels a phase or a failure, so a report
+ * shows {@code before[setUp]} rather than {@code before[0]}. A callback with no identifier — a programmatic one — keeps
+ * the positional label.
  */
-@FunctionalInterface
-public interface ThrowingSupplier<T> {
+public interface IdentifiedHook {
 
     /**
-     * Produces a value.
+     * Returns the identifier the callback was resolved from.
      *
-     * @return the value; an instance factory must not return {@code null}
-     * @throws Throwable if production fails
+     * @return the identifier; never {@code null} or blank
      */
-    T get() throws Throwable;
+    String id();
 }

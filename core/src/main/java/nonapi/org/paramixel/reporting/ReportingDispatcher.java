@@ -16,17 +16,16 @@
 
 package nonapi.org.paramixel.reporting;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import nonapi.org.paramixel.execution.EventPublisher;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Failure;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Task;
@@ -36,39 +35,39 @@ import org.paramixel.api.exception.ConfigurationException;
 /**
  * Bounded, asynchronous event delivery.
  *
- * <p>Production is synchronous with a bounded queue: when the queue is full, the scheduler waits for the dispatcher
- * instead of dropping events. That is a deliberate backpressure choice — a slow reporter slows admission rather than
- * corrupting the stream — and it cannot deadlock the scheduler because the dispatcher holds no scheduler lock and never
- * calls back into the engine.
- *
- * <p>Delivery guarantees: events are delivered in production order, exactly one terminal event per occurrence is
- * produced by the engine, and {@link #finish(Result)} drains every queued event before invoking
- * {@link Listener#onRunCompleted(Result)} on the calling thread, so reporting cannot race finalization. The drain is
- * bounded by {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}: a listener that does not drain in time has its
- * remaining events discarded, and the degradation is reported as a {@value #DRAIN_TIMEOUT_DIAGNOSTIC} diagnostic
- * instead of being hidden.
+ * <p>The normal queue limit applies backpressure to admission. A bounded execution reserve allows the scheduler to
+ * keep publishing events from work already in flight, timeouts, cancellation, and cleanup without blocking. The
+ * dispatcher delivers events in FIFO order, then invokes {@link Listener#onRunCompleted(Result)} on the same thread.
+ * A listener that stops making progress under pressure or during final delivery is interrupted and the run reports a
+ * {@value #DRAIN_TIMEOUT_DIAGNOSTIC} infrastructure failure.
  */
 public final class ReportingDispatcher implements EventPublisher, AutoCloseable {
 
     /** The diagnostic code recorded when listeners did not drain within the configured timeout. */
-    public static final String DRAIN_TIMEOUT_DIAGNOSTIC = "LISTENER_DRAIN_TIMEOUT";
+    public static final String DRAIN_TIMEOUT_DIAGNOSTIC = Listener.DRAIN_TIMEOUT_DIAGNOSTIC;
 
     /** The drain timeout used when {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS} is unset. */
     public static final long DEFAULT_DRAIN_TIMEOUT_MILLIS = 30_000L;
 
     private static final int DEFAULT_QUEUE_CAPACITY = 8192;
 
-    private static final Object END = new Object();
-
     private final SafeListener safe;
-    private final BlockingQueue<Object> queue;
-    private final long drainTimeoutMillis;
     private final Thread thread;
-    private final AtomicBoolean finished = new AtomicBoolean();
+    private final int capacity;
+    private final long stallBudgetNanos;
+
+    // Guarded by deliveryLock. No listener callback is invoked while holding it.
+    private final Object deliveryLock = new Object();
+    private ArrayDeque<Object> queue = new ArrayDeque<>();
     private final List<String> diagnostics = new ArrayList<>();
-    private final Object diagnosticsLock = new Object();
-    private volatile boolean discarding;
-    private volatile VirtualMachineError fatalListenerError;
+    private long queueLimit;
+    private long lastProgressNanos;
+    private Runnable engineWakeup;
+    private Result completion;
+    private boolean delivered;
+    private boolean stopped;
+    private Failure deliveryFailure;
+    private VirtualMachineError fatalListenerError;
 
     /**
      * Creates and starts a dispatcher.
@@ -95,8 +94,9 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
             throw new ConfigurationException("Invalid configuration for '" + Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS
                     + "': must be positive but was " + drainTimeout);
         }
-        this.drainTimeoutMillis = drainTimeout;
-        this.queue = new ArrayBlockingQueue<>(capacity);
+        this.capacity = capacity;
+        this.queueLimit = capacity;
+        this.stallBudgetNanos = TimeUnit.MILLISECONDS.toNanos(drainTimeout);
         this.thread = new Thread(this::drainLoop, "paramixel-listener");
         this.thread.setDaemon(true);
         this.thread.start();
@@ -142,151 +142,221 @@ public final class ReportingDispatcher implements EventPublisher, AutoCloseable 
      */
     @Override
     public void warning(final String message) {
-        if (finished.get()) {
-            return;
+        synchronized (deliveryLock) {
+            diagnostics.add("warning: " + message);
         }
-        record("warning: " + message);
         enqueue(new Warning(message));
     }
 
-    private void enqueue(final Object item) {
-        if (finished.get()) {
-            return;
+    @Override
+    public void beginExecution(final long reserve, final Runnable wakeup) {
+        synchronized (deliveryLock) {
+            queueLimit = capacity + reserve;
+            engineWakeup = Objects.requireNonNull(wakeup, "wakeup is null");
         }
-        try {
+    }
+
+    @Override
+    public boolean isBackpressured() {
+        synchronized (deliveryLock) {
             UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
-            queue.put(item);
+            return underPressure();
+        }
+    }
+
+    @Override
+    public long nanosUntilStall() {
+        synchronized (deliveryLock) {
+            return underPressure() ? remainingNanos() : Long.MAX_VALUE;
+        }
+    }
+
+    @Override
+    public boolean executionStalled() {
+        synchronized (deliveryLock) {
             UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            record("Event delivery was interrupted: " + e.getMessage());
+            if (underPressure() && remainingNanos() <= 0) {
+                failDelivery("listener made no progress while the event queue was full");
+            }
+            return deliveryFailure != null;
+        }
+    }
+
+    private boolean underPressure() {
+        return !stopped && queue.size() >= capacity;
+    }
+
+    private long remainingNanos() {
+        return stallBudgetNanos - (System.nanoTime() - lastProgressNanos);
+    }
+
+    private void enqueue(final Object item) {
+        synchronized (deliveryLock) {
+            try {
+                // Discovery and compilation are synchronous, before the engine owns any running callbacks.
+                while (engineWakeup == null && underPressure()) {
+                    final var remaining = remainingNanos();
+                    if (remaining <= 0) {
+                        failDelivery("listener made no progress while the event queue was full");
+                        break;
+                    }
+                    TimeUnit.NANOSECONDS.timedWait(deliveryLock, remaining);
+                }
+                UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
+                if (stopped || completion != null) {
+                    return;
+                }
+                if (queue.size() >= queueLimit) {
+                    failDelivery("the execution event reserve was exhausted");
+                    return;
+                }
+                queue.addLast(item);
+                if (queue.size() == capacity) {
+                    lastProgressNanos = System.nanoTime();
+                }
+                deliveryLock.notifyAll();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                failDelivery("event delivery was interrupted");
+            }
         }
     }
 
     private void drainLoop() {
-        while (true) {
-            final Object item;
-            try {
-                item = queue.take();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-            if (item == END || discarding) {
-                return;
-            }
-            try {
+        try {
+            while (true) {
+                final Object item;
+                synchronized (deliveryLock) {
+                    while (!stopped && queue.isEmpty() && completion == null) {
+                        deliveryLock.wait();
+                    }
+                    if (stopped) {
+                        return;
+                    }
+                    if (queue.isEmpty()) {
+                        item = completion;
+                    } else {
+                        item = queue.removeFirst();
+                        if (queue.size() == capacity - 1) {
+                            signalProgress();
+                        }
+                    }
+                }
                 deliver(item);
-            } catch (VirtualMachineError e) {
-                // Wake a producer blocked on backpressure so the runner can surface the error.
-                fatalListenerError = e;
-                queue.clear();
-                return;
+                // A callback may restore its interrupt flag before returning; it must not end delivery.
+                Thread.interrupted();
+                synchronized (deliveryLock) {
+                    lastProgressNanos = System.nanoTime();
+                    if (item instanceof Result) {
+                        delivered = true;
+                        deliveryLock.notifyAll();
+                        return;
+                    }
+                    deliveryLock.notifyAll();
+                }
             }
-            // The dispatcher owns its interrupt policy. A callback may restore its interrupt flag before returning.
-            Thread.interrupted();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (VirtualMachineError e) {
+            synchronized (deliveryLock) {
+                fatalListenerError = e;
+                stopDelivery();
+            }
         }
     }
 
     private void deliver(final Object item) {
-        try {
-            if (item instanceof TaskEvent event) {
-                safe.onTaskEvent(event);
-            } else if (item instanceof Warning warning) {
-                safe.onWarning(warning.message);
-            }
-        } catch (Throwable t) {
-            UnrecoverableErrors.rethrowIfUnrecoverable(t);
-            record("Listener delivery failed: " + t);
+        if (item instanceof TaskEvent event) {
+            safe.onTaskEvent(event);
+        } else if (item instanceof Warning warning) {
+            safe.onWarning(warning.message);
+        } else if (item instanceof Result result) {
+            safe.onRunCompleted(result.withAdditionalDiagnostics(listenerDiagnostics()));
         }
     }
 
-    private void record(final String message) {
-        synchronized (diagnosticsLock) {
-            diagnostics.add(message);
+    private void signalProgress() {
+        deliveryLock.notifyAll();
+        if (engineWakeup != null) {
+            engineWakeup.run();
         }
     }
 
     /**
-     * Ends event delivery and reports the completed run.
-     *
-     * <p>Queued events are drained for at most {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}. When the listener
-     * does not drain in time, the remaining events are discarded, the dispatcher thread is interrupted, and a
-     * {@value #DRAIN_TIMEOUT_DIAGNOSTIC} diagnostic is recorded. The completed result — the supplied result plus every
-     * listener diagnostic recorded so far — is then passed to {@link Listener#onRunCompleted(Result)} on the calling
-     * thread. Diagnostics recorded while {@code onRunCompleted} itself runs are appended to the returned result only.
+     * Drains the event stream, then delivers completion only if all queued events were processed. The no-progress
+     * timeout also bounds the completion callback itself. Reporting failures are independent of the task outcome.
      *
      * @param result the engine's result; must not be {@code null}
-     * @return the completed result; never {@code null}
+     * @return the result with listener diagnostics and any delivery failure; never {@code null}
      * @throws NullPointerException if {@code result} is {@code null}
-     * @throws InterruptedException if interrupted while waiting for the queue to drain
+     * @throws InterruptedException if interrupted while waiting for the listener
      */
     public Result finish(final Result result) throws InterruptedException {
         Objects.requireNonNull(result, "result is null");
-        if (finished.compareAndSet(false, true)) {
-            try {
-                drain();
-            } catch (InterruptedException e) {
-                discardPending();
-                throw e;
+        synchronized (deliveryLock) {
+            engineWakeup = null;
+            if (!stopped) {
+                if (!underPressure()) {
+                    lastProgressNanos = System.nanoTime();
+                }
+                completion = result;
+                deliveryLock.notifyAll();
+                try {
+                    while (!delivered && !stopped) {
+                        final var remaining = remainingNanos();
+                        if (remaining <= 0) {
+                            failDelivery("listener made no progress during final delivery");
+                            break;
+                        }
+                        TimeUnit.NANOSECONDS.timedWait(deliveryLock, remaining);
+                    }
+                } catch (InterruptedException e) {
+                    stopDelivery();
+                    throw e;
+                }
             }
-        }
-        UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
-        final var completed = result.withAdditionalDiagnostics(collectDiagnostics());
-        safe.onRunCompleted(completed);
-        return completed.withAdditionalDiagnostics(collectDiagnostics());
-    }
-
-    private void drain() throws InterruptedException {
-        final var deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(drainTimeoutMillis);
-        if (queue.offer(END, drainTimeoutMillis, TimeUnit.MILLISECONDS)) {
-            final var remainingMillis = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
-            // Thread.join(0) waits forever, so the remaining wait is never allowed to reach zero.
-            thread.join(Math.max(1L, remainingMillis));
-        }
-        if (thread.isAlive()) {
-            final var undelivered = undeliveredCount();
-            discardPending();
-            record(DRAIN_TIMEOUT_DIAGNOSTIC + ": listener did not drain queued events within " + drainTimeoutMillis
-                    + "ms; " + undelivered + " queued item(s) were discarded");
+            UnrecoverableErrors.rethrowIfUnrecoverable(fatalListenerError);
+            final var completed = result.withAdditionalDiagnostics(listenerDiagnostics());
+            return deliveryFailure == null ? completed : completed.withInfrastructureFailure(deliveryFailure);
         }
     }
 
-    private int undeliveredCount() {
-        var count = 0;
-        for (Object item : queue) {
-            if (item != END) {
-                count++;
-            }
+    private List<String> listenerDiagnostics() {
+        synchronized (deliveryLock) {
+            final var collected = new ArrayList<>(diagnostics);
+            collected.addAll(safe.diagnostics());
+            return collected;
         }
-        return count;
     }
 
-    private List<String> collectDiagnostics() {
-        final var collected = new ArrayList<String>();
-        synchronized (diagnosticsLock) {
-            collected.addAll(diagnostics);
-            diagnostics.clear();
+    private void failDelivery(final String reason) {
+        if (stopped) {
+            return;
         }
-        collected.addAll(safe.drainDiagnostics());
-        return collected;
+        final var message = "Listener reporting is incomplete: " + reason + "; " + queue.size()
+                + " queued item(s) were discarded and further delivery was stopped";
+        deliveryFailure = Failure.of(DRAIN_TIMEOUT_DIAGNOSTIC, message, null, true);
+        stopDelivery();
     }
 
-    /**
-     * Stops the dispatcher without reporting a completed run.
-     */
+    /** Stops the dispatcher without reporting a completed run. */
     @Override
     public void close() {
-        if (finished.compareAndSet(false, true)) {
-            discardPending();
+        synchronized (deliveryLock) {
+            if (!stopped && !delivered) {
+                stopDelivery();
+            }
         }
     }
 
-    private void discardPending() {
-        discarding = true;
-        queue.clear();
-        queue.offer(END);
+    private void stopDelivery() {
+        stopped = true;
+        // A callback that ignores interruption must not retain the backlog or its backing array.
+        queue = null;
+        completion = null;
         thread.interrupt();
+        signalProgress();
+        engineWakeup = null;
     }
 
     private record Warning(String message) {}

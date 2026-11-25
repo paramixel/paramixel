@@ -16,10 +16,12 @@
 
 package examples.annotation;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.selector.Selector;
 
@@ -27,9 +29,11 @@ import org.paramixel.api.selector.Selector;
  * Verifies that {@code @Paramixel.Disabled} prevents a factory from being invoked.
  *
  * <p>The disabled factory would fail if it ever ran, so a passing run proves discovery excluded it before invoking any
- * user code.
+ * user code — including before id resolution, which only happens when the factory body executes.
  */
 public class DisabledTest {
+
+    private static final String ID_SHOULD_NOT_RUN = "should-not-run";
 
     /**
      * Runs discovery in this package and exits the JVM.
@@ -51,10 +55,18 @@ public class DisabledTest {
     @Paramixel.Disabled("covered by discovery skip behavior")
     @Paramixel.Factory
     public static Task factory() {
-        return Tasks.task("[scenario]")
-                .step("should-not-run", () -> {
-                    throw FailException.fail("@Paramixel.Disabled factory was invoked");
-                })
+        return sequential(DisabledTest.class, "[scenario]")
+                .step(ID_SHOULD_NOT_RUN)
                 .build();
+    }
+
+    /**
+     * Fails if it ever runs.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SHOULD_NOT_RUN)
+    public static void shouldNotRun(final Context context) {
+        throw FailException.fail("@Paramixel.Disabled factory was invoked");
     }
 }

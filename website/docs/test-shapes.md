@@ -8,10 +8,10 @@ description: Reusable definition shapes for common integration testing problems.
 ## Linear flow
 
 ```java
-Task definition = sequential("login smoke")
-        .step("open login page", Browser::openLoginPage)
-        .step("submit credentials", Browser::submitCredentials)
-        .step("user is signed in", Browser::assertSignedIn)
+Task definition = sequential(LoginSmokeTest.class, "login smoke")
+        .step("openLoginPage")
+        .step("submitCredentials")
+        .step("assertSignedIn")
         .build();
 ```
 
@@ -20,11 +20,12 @@ Each step is a child task. A failing step skips the rest with an explicit reason
 ## Fixture with setup and teardown
 
 ```java
-Task definition = instance("database workflow", () -> new DatabaseWorkflow(dsn))
-        .before(DatabaseWorkflow::migrate)
-        .step("insert", DatabaseWorkflow::insert)
-        .step("query", DatabaseWorkflow::query)
-        .after(DatabaseWorkflow::dropSchema)
+Task definition = sequential(DatabaseWorkflowTest.class, "database workflow")
+        .bind(DSN, dsn)
+        .before("migrate")
+        .step("insert")
+        .step("query")
+        .after("dropSchema")
         .build();
 ```
 
@@ -33,12 +34,15 @@ The fixture is created lazily per attempt, `after` runs even when a step fails, 
 ## Compatibility matrix
 
 ```java
-Task definition = parallel("compatibility matrix", Pool.named("environments"))
-        .each(environments, env -> instance(env.name(), () -> new Probe(env))
-                .before(Probe::start)
-                .step("verify", Probe::verify)
-                .after(Probe::stop))
-        .build();
+final var root = parallel(MySuite.class, "compatibility matrix", Pool.named("environments"));
+for (final var environment : environments) {
+    root.child(sequential(environment.name())
+            .bind(ENVIRONMENT, environment)
+            .before("start")
+            .step("verify")
+            .after("stop"));
+}
+Task definition = root.build();
 ```
 
 A failure in one environment does not cancel the others; the group aggregates the most severe outcome.

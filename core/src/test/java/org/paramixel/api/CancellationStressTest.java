@@ -17,7 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -181,52 +180,47 @@ class CancellationStressTest {
     }
 
     @Test
-    void cancellationDuringAcquisitionReleasesTheAcquiredResourceAndStopsFurtherFactories() throws Exception {
-        final var first = Key.named("cancel", "first", String.class);
-        final var second = Key.named("cancel", "second", String.class);
-        final var acquiring = new CountDownLatch(1);
-        final var unblock = new CountDownLatch(1);
-        final var secondAcquisitions = new AtomicInteger();
-        final var instances = new AtomicInteger();
-        final var releases = new AtomicInteger();
-        final var definition = instance("root", () -> {
-                    instances.incrementAndGet();
-                    return "instance";
+    void cleanupFailuresRetainTheirSeverityAfterCancellation() throws Exception {
+        final var bodyStarted = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
+        final var afterFailure = new IllegalStateException("after failed");
+        final var definition = task("root")
+                .step("work", () -> {
+                    bodyStarted.countDown();
+                    release.await();
                 })
-                .resource(
-                        first,
-                        () -> {
-                            acquiring.countDown();
-                            try {
-                                unblock.await();
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                            }
-                            return "acquired";
-                        },
-                        value -> releases.incrementAndGet())
-                .resource(second, () -> {
-                    secondAcquisitions.incrementAndGet();
-                    return "second";
+                .after(() -> {
+                    throw afterFailure;
                 })
                 .build();
+
         try (var runner = runner(1, 5_000)) {
             final var run = new FutureTask<>(() -> runner.run(definition));
             final var thread = new Thread(run);
             thread.setDaemon(true);
             thread.start();
             try {
-                assertThat(acquiring.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(bodyStarted.await(5, TimeUnit.SECONDS)).isTrue();
                 runner.close();
                 final var result = run.get(10, TimeUnit.SECONDS);
+                final var root = result.root().orElseThrow();
 
                 assertThat(result.isQuiescent()).isTrue();
-                assertThat(result.status().kind()).isEqualTo(Status.Kind.CANCELED);
-                assertThat(releases).hasValue(1);
-                assertThat(secondAcquisitions).hasValue(0);
-                assertThat(instances).hasValue(0);
+                assertThat(root.children()).singleElement().satisfies(child -> {
+                    assertThat(child.bodyStatus())
+                            .hasValueSatisfying(
+                                    status -> assertThat(status.isCanceled()).isTrue());
+                });
+                assertThat(root.phases())
+                        .filteredOn(phase -> phase.phase() == TaskPhase.AFTER)
+                        .extracting(phase -> phase.status().kind())
+                        .containsExactly(Status.Kind.FAILED);
+                assertThat(root.failures())
+                        .extracting(failure -> failure.throwable().orElseThrow())
+                        .containsExactly(afterFailure);
+                assertThat(result.status().kind()).isEqualTo(Status.Kind.FAILED);
             } finally {
-                unblock.countDown();
+                release.countDown();
             }
         }
     }
@@ -377,7 +371,6 @@ class CancellationStressTest {
     @Test
     @DisplayName("closing the runner while a parallel subtree is idle still finalizes every started fixture")
     void closeWhileSubtreeIdleFinalizesStartedFixtures() throws InterruptedException {
-        final Key<String> handle = Key.named("cancel", "handle", String.class);
         final var afterCalls = new AtomicInteger();
         final var released = new AtomicInteger();
         final var firstAttemptsFailed = new CountDownLatch(2);
@@ -385,8 +378,8 @@ class CancellationStressTest {
                 .each(
                         IntStream.range(0, 2).boxed().toList(),
                         index -> sequential("fixture-" + index)
-                                .resource(handle, () -> "open", value -> released.incrementAndGet())
                                 .after(afterCalls::incrementAndGet)
+                                .after(() -> released.incrementAndGet())
                                 .child(sequential("flaky")
                                         .retry(RetryPolicy.builder()
                                                 .maxAttempts(3)

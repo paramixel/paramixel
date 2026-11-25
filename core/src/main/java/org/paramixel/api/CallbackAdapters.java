@@ -19,7 +19,11 @@ package org.paramixel.api;
 /**
  * Adapts typed authoring callbacks to the context-aware {@link TaskCallback} the runtime invokes.
  *
- * <p>Adaptation happens once, when a builder snapshots its definition. The adapter receives the primary instance from
+ * <p>Adaptation happens once, when a builder snapshots its definition. This class is the internal seam between the
+ * package-private programmatic callback forms the framework's own tests use and the single {@link TaskCallback} the
+ * engine consumes; nothing here is reachable from user code, and the public authoring surface is identifier-bound.
+ *
+ * <p>The adapter receives
  * the execution context, which the compiler bound lexically; no reflective lookup and no generic type token is
  * involved at execution time.
  */
@@ -30,21 +34,11 @@ final class CallbackAdapters {
     }
 
     @SuppressWarnings("unchecked")
-    static <T> TaskCallback instanceConsumer(final ThrowingConsumer<? super T> consumer) {
-        final var erased = (ThrowingConsumer<Object>) consumer;
-        return context -> erased.accept(context.primaryInstance());
-    }
-
     static TaskCallback runnable(final ThrowingRunnable runnable) {
         return context -> runnable.run();
     }
 
     @SuppressWarnings("unchecked")
-    static <T> TaskCallback instanceAndContextConsumer(final ThrowingBiConsumer<? super T, Context> consumer) {
-        final var erased = (ThrowingBiConsumer<Object, Context>) consumer;
-        return context -> erased.accept(context.primaryInstance(), context);
-    }
-
     static TaskCallback contextConsumer(final ThrowingConsumer<Context> consumer) {
         return consumer::accept;
     }

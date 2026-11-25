@@ -18,7 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
@@ -53,13 +52,7 @@ class CompilationValidationTest {
     void nestedSamePoolIsRejected() {
         final AtomicInteger factories = new AtomicInteger();
         final Task definition = parallel("outer", Pool.named("p"))
-                .parallel(
-                        "inner",
-                        Pool.named("p"),
-                        inner -> inner.child(instance("instance", () -> {
-                            factories.incrementAndGet();
-                            return new Object();
-                        })))
+                .parallel("inner", Pool.named("p"), inner -> inner.child(sequential("instance")))
                 .build();
 
         final var error = compileError(definition, Map.of(Pool.named("p"), 4));
@@ -114,6 +107,32 @@ class CompilationValidationTest {
     }
 
     @Test
+    void childlessParallelTaskDoesNotCreateAnAcquisitionCycle() {
+        final var pool = Pool.named("p");
+        final var calls = new AtomicInteger();
+        final var lockOnly = parallel("lock-only", pool)
+                .isolated("l")
+                .before(calls::incrementAndGet)
+                .build();
+        final var poolThenLock = parallel("pool-then-lock", pool)
+                .child(task("locked").isolated("l").before(calls::incrementAndGet))
+                .build();
+        final var definition = parallel("root", Pool.named("root"))
+                .child(lockOnly)
+                .child(poolThenLock)
+                .build();
+
+        try (var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .pool(Pool.named("root"), 2)
+                .pool(pool, 1)
+                .build()) {
+            assertThat(runner.run(definition).status().kind()).isEqualTo(Status.Kind.PASSED);
+            assertThat(calls).hasValue(2);
+        }
+    }
+
+    @Test
     @DisplayName("SCHED-09: a lock held around an owned pool compiles when no path inverts the order")
     void lockAroundOwnedPoolWithoutInversionRuns() {
         final AtomicInteger calls = new AtomicInteger();
@@ -150,21 +169,6 @@ class CompilationValidationTest {
     }
 
     @Test
-    @DisplayName("typed callbacks require a lexical instance binding")
-    void missingInstanceBindingIsRejected() {
-        final AtomicInteger calls = new AtomicInteger();
-        final Task definition = sequential("dangling")
-                .step("typed", (Object value) -> calls.incrementAndGet())
-                .build();
-
-        final var error = compileError(definition, Map.of());
-
-        assertThat(error).isNotNull();
-        assertThat(error.getMessage()).contains("INSTANCE_BINDING_MISSING");
-        assertThat(calls).hasValue(0);
-    }
-
-    @Test
     @DisplayName("retry and repeat cannot be combined")
     void retryAndRepeatAreRejected() {
         final Task definition = sequential("root")
@@ -179,30 +183,6 @@ class CompilationValidationTest {
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("RETRY_AND_REPEAT");
-    }
-
-    @Test
-    @DisplayName("duplicate resource keys in one task are rejected at definition time")
-    void duplicateResourceKeyIsRejected() {
-        final Key<String> key = Key.named("test", "value", String.class);
-        assertThatThrownBy(() -> task("root").resource(key, () -> "a").resource(key, () -> "b"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Duplicate resource key");
-    }
-
-    @Test
-    @DisplayName("ambiguous resource shadowing across scopes is rejected")
-    void resourceShadowingIsRejected() {
-        final Key<String> key = Key.named("test", "value", String.class);
-        final Task definition = sequential("root")
-                .resource(key, () -> "outer")
-                .step("inner", () -> {}, children -> children.resource(key, () -> "inner"))
-                .build();
-
-        final var error = compileError(definition, Map.of());
-
-        assertThat(error).isNotNull();
-        assertThat(error.getMessage()).contains("RESOURCE_SHADOWING");
     }
 
     @Test
@@ -227,15 +207,16 @@ class CompilationValidationTest {
     @DisplayName("all independent errors are aggregated into one exception")
     void diagnosticsAreAggregated() {
         final Task definition = task("root")
-                .child(sequential("dangling").step("typed", (Object value) -> {}))
+                .child(sequential("dangling"))
                 .child(parallel("undefined-pool", Pool.named("a")).step("work", () -> {}))
+                .child(parallel("undefined-pool-2", Pool.named("b")))
                 .build();
 
         final var error = compileError(definition, Map.of());
 
         assertThat(error).isNotNull();
         assertThat(error.diagnostics()).hasSizeGreaterThanOrEqualTo(2);
-        assertThat(error.getMessage()).contains("INSTANCE_BINDING_MISSING").contains("POOL_UNDEFINED");
+        assertThat(error.getMessage()).contains("POOL_UNDEFINED");
     }
 
     @Test

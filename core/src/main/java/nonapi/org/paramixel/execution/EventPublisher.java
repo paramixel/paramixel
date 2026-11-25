@@ -43,4 +43,27 @@ public interface EventPublisher {
      * @param message the warning; never {@code null}
      */
     void warning(String message);
+
+    /**
+     * Prepares for execution, when publishing must not block the scheduler.
+     *
+     * @param reserve bounded space for events produced by admitted work under pressure
+     * @param wakeup notifies the engine when capacity returns or delivery fails
+     */
+    default void beginExecution(final long reserve, final Runnable wakeup) {}
+
+    /** @return whether normal work must wait for the listener */
+    default boolean isBackpressured() {
+        return false;
+    }
+
+    /** @return the remaining stall budget under pressure, or {@link Long#MAX_VALUE} otherwise */
+    default long nanosUntilStall() {
+        return Long.MAX_VALUE;
+    }
+
+    /** @return whether delivery has failed, including if the stall budget just expired */
+    default boolean executionStalled() {
+        return false;
+    }
 }

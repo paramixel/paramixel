@@ -17,10 +17,12 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Tasks.repeat;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -32,6 +34,9 @@ import org.paramixel.api.support.Backoff;
  * <p>Delay arithmetic saturates at the configured maximum, so a large iteration bound cannot overflow a duration.
  */
 public class LoopWithExponentialDelayTest {
+
+    private static final String ID_CHECK = "check";
+    private static final String ID_VALIDATE = "validate";
 
     private static final AtomicInteger iterationCount = new AtomicInteger();
 
@@ -53,14 +58,33 @@ public class LoopWithExponentialDelayTest {
     @Paramixel.Factory
     public static Task factory() {
         resetCounts();
-        return sequential("loop-exponential-delay-example")
-                .repeat(
-                        "poll",
-                        repeat -> repeat.maxIterations(4)
-                                .delay(Backoff.exponential(Duration.ofMillis(10), Duration.ofMillis(40)))
-                                .step("check", iterationCount::incrementAndGet))
-                .step("validate", () -> assertThat(iterationCount.get()).isEqualTo(4))
+        return sequential(LoopWithExponentialDelayTest.class, "loop-exponential-delay-example")
+                .child(repeat("poll")
+                        .maxIterations(4)
+                        .delay(Backoff.exponential(Duration.ofMillis(10), Duration.ofMillis(40)))
+                        .step(ID_CHECK))
+                .step(ID_VALIDATE)
                 .build();
+    }
+
+    /**
+     * Counts one iteration.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CHECK)
+    public static void check(final Context context) {
+        iterationCount.incrementAndGet();
+    }
+
+    /**
+     * Confirms every iteration ran.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        assertThat(iterationCount.get()).isEqualTo(4);
     }
 
     private static void resetCounts() {

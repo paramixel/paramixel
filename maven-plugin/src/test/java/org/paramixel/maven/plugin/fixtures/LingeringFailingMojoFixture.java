@@ -21,12 +21,13 @@ import static org.paramixel.api.Tasks.sequential;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
 
 /**
- * Fails the run while leaving a non-daemon thread behind that retains the test classloader, so
- * {@code strictThreadLifecycle} reporting is triggered at the same time as a test failure.
+ * Fixture that spawns a non-daemon thread and then fails, used to verify that the Maven mojo does not hang on worker
+ * threads that outlive the run.
  */
 public final class LingeringFailingMojoFixture {
 
@@ -55,25 +56,41 @@ public final class LingeringFailingMojoFixture {
      */
     @Paramixel.Factory
     public static Task action() {
-        return sequential("lingering-fail")
-                .step("spawn-lingering-thread", () -> {
-                    final var thread = new Thread(
-                            () -> {
-                                try {
-                                    THREAD_RELEASE.await(60, TimeUnit.SECONDS);
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                }
-                            },
-                            "lingering-fixture-thread");
-                    thread.setDaemon(false);
-                    thread.setContextClassLoader(Thread.currentThread().getContextClassLoader());
-                    LINGERING_THREAD.set(thread);
-                    thread.start();
-                })
-                .step("fail", () -> {
-                    throw new RuntimeException("boom");
-                })
+        return sequential(LingeringFailingMojoFixture.class, "lingering-fail")
+                .step("spawn-lingering-thread")
+                .step("fail")
                 .build();
+    }
+
+    /**
+     * Spawns a non-daemon thread that waits for the test to release it.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("spawn-lingering-thread")
+    public static void spawnLingeringThread(final Context context) {
+        final var thread = new Thread(
+                () -> {
+                    try {
+                        THREAD_RELEASE.await(60, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                },
+                "lingering-fixture-thread");
+        thread.setDaemon(false);
+        thread.setContextClassLoader(Thread.currentThread().getContextClassLoader());
+        LINGERING_THREAD.set(thread);
+        thread.start();
+    }
+
+    /**
+     * Always fails.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("fail")
+    public static void fail(final Context context) {
+        throw new RuntimeException("boom");
     }
 }

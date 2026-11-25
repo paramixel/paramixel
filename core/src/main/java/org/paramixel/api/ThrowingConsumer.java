@@ -25,12 +25,12 @@ package org.paramixel.api;
  * @param <T> the consumed value type
  */
 @FunctionalInterface
-public interface ThrowingConsumer<T> {
+interface ThrowingConsumer<T> {
 
     /**
      * Consumes the supplied value.
      *
-     * @param value the value; never {@code null} for a primary instance or an acquired resource
+     * @param value the value; never {@code null}
      * @throws Throwable if consumption fails
      */
     void accept(T value) throws Throwable;

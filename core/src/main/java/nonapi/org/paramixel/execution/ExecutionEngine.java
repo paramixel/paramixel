@@ -36,8 +36,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import nonapi.org.paramixel.authoring.IdentifiedHook;
 import nonapi.org.paramixel.compiler.CompiledPlan;
 import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
@@ -45,7 +47,6 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.ExecutionMode;
 import org.paramixel.api.Failure;
 import org.paramixel.api.PhaseResult;
-import org.paramixel.api.ResourceDeclaration;
 import org.paramixel.api.Result;
 import org.paramixel.api.Status;
 import org.paramixel.api.TaskEvent;
@@ -88,6 +89,11 @@ import org.paramixel.api.support.RepeatPolicy;
 public final class ExecutionEngine {
 
     private static final long WATCHDOG_MILLIS = 30_000L;
+    private static final long WATCHDOG_NANOS = TimeUnit.MILLISECONDS.toNanos(WATCHDOG_MILLIS);
+    private static final int EVENT_RESERVE_PER_OCCURRENCE = 8;
+    private static final String LISTENER_STALLED = "listener reporting stalled";
+    private static final Comparator<Job> JOB_ORDER =
+            Comparator.comparingInt((Job job) -> job.priority).thenComparingLong(job -> job.sequence);
 
     private static final long DEFAULT_GRACE_MILLIS = 10_000L;
 
@@ -101,8 +107,11 @@ public final class ExecutionEngine {
     private final ResultProjector projector;
 
     private final BlockingQueue<Object> events = new LinkedBlockingQueue<>();
-    private final PriorityQueue<Job> ready = new PriorityQueue<>(
-            Comparator.comparingInt((Job job) -> job.priority).thenComparingLong(job -> job.sequence));
+    private final PriorityQueue<Job> ready = new PriorityQueue<>(JOB_ORDER);
+    private final PriorityQueue<Job> cleanupReady = new PriorityQueue<>(JOB_ORDER);
+    private final PriorityQueue<OccurrenceState> deferredAdmissions =
+            new PriorityQueue<>(Comparator.comparingInt(state -> state.compiled.preOrderIndex()));
+    private final AtomicBoolean listenerWakePending = new AtomicBoolean();
     private final Set<Job> inFlight = new HashSet<>();
     private final Set<Job> started = new HashSet<>();
     private final ResourceLedger<OccurrenceState> pools;
@@ -267,12 +276,15 @@ public final class ExecutionEngine {
         timers = Executors.newSingleThreadScheduledExecutor(
                 daemonFactory("paramixel-timer-" + shortId(runId) + "-", timerCounter));
         try {
+            publisher.beginExecution(reportingReserve(), this::wakeForListener);
             root = new OccurrenceState(this, plan.root(), null, Instant.now(), true);
             final var cancellationReason = cancellationRequest.get();
-            if (cancellationReason == null) {
-                admit(root);
-            } else {
+            if (cancellationReason != null) {
                 onRunCanceled(cancellationReason);
+            } else if (publisher.executionStalled()) {
+                onRunCanceled(LISTENER_STALLED);
+            } else {
+                admit(root);
             }
             loop();
         } finally {
@@ -291,17 +303,37 @@ public final class ExecutionEngine {
     // Scheduler loop
     // --------------------------------------------------------------------------------------------
 
+    private long reportingReserve() {
+        // With normal work paused, each compiled occurrence can contribute at most one attempt's events. This
+        // includes canceled, never-admitted children and the whole finalization chain, not just running workers.
+        // The fixed phases are ADMITTED, CONDITION, BODY, CHILDREN, TIMEOUT,
+        // and TERMINAL. The extra slot is the run-cancellation warning.
+        long reserve = 1;
+        for (var occurrence : plan.preOrder()) {
+            reserve += (long) EVENT_RESERVE_PER_OCCURRENCE
+                    + occurrence.task().before().size()
+                    + occurrence.task().after().size();
+        }
+        return reserve;
+    }
+
+    private void wakeForListener() {
+        if (listenerWakePending.compareAndSet(false, true)) {
+            events.add(ListenerProgress.INSTANCE);
+        }
+    }
+
     private void loop() {
         while (!finished) {
+            if (publisher.executionStalled()) {
+                onRunCanceled(LISTENER_STALLED);
+            }
+            resumeAdmissions();
             dispatchReady();
             if (finished) {
                 break;
             }
-            if (runningJobs == 0
-                    && ready.isEmpty()
-                    && pendingTimers.get() == 0
-                    && !hasPendingWaiters()
-                    && events.isEmpty()) {
+            if (noRunnableWork() && !publisher.isBackpressured() && !hasPendingWaiters() && events.isEmpty()) {
                 // Nothing can make progress and nothing will post an event: a framework invariant is broken.
                 recordRunFailure("SCHEDULER_STALLED", "Scheduler stalled with no runnable or waiting work", null);
                 incomplete = true;
@@ -309,9 +341,10 @@ public final class ExecutionEngine {
                 break;
             }
             try {
-                final var event = events.poll(WATCHDOG_MILLIS, TimeUnit.MILLISECONDS);
+                final var waitNanos = Math.min(WATCHDOG_NANOS, publisher.nanosUntilStall());
+                final var event = events.poll(waitNanos, TimeUnit.NANOSECONDS);
                 if (event == null) {
-                    if (runningJobs == 0 && ready.isEmpty() && pendingTimers.get() == 0) {
+                    if (waitNanos == WATCHDOG_NANOS && noRunnableWork() && !publisher.isBackpressured()) {
                         recordRunFailure(
                                 "SCHEDULER_WATCHDOG",
                                 "Scheduler made no progress for " + WATCHDOG_MILLIS + "ms with no running work",
@@ -335,9 +368,38 @@ public final class ExecutionEngine {
         }
     }
 
+    private boolean noRunnableWork() {
+        return runningJobs == 0
+                && ready.isEmpty()
+                && cleanupReady.isEmpty()
+                && deferredAdmissions.isEmpty()
+                && pendingTimers.get() == 0;
+    }
+
+    private void resumeAdmissions() {
+        while (!finished && !deferredAdmissions.isEmpty() && !publisher.isBackpressured()) {
+            final var state = deferredAdmissions.poll();
+            if (state.attempt == null) {
+                admit(state);
+            } else {
+                startRetry(state);
+            }
+        }
+    }
+
     private void dispatchReady() {
-        while (!finished && runningJobs < workerLimit && !ready.isEmpty()) {
-            dispatch(ready.poll());
+        while (!finished && runningJobs < workerLimit && (!ready.isEmpty() || !cleanupReady.isEmpty())) {
+            final var next = ready.peek();
+            final var cleanup = cleanupReady.peek();
+            if (next != null
+                    && !publisher.isBackpressured()
+                    && (cleanup == null || JOB_ORDER.compare(next, cleanup) < 0)) {
+                dispatch(ready.remove());
+            } else if (cleanup != null) {
+                dispatch(cleanupReady.remove());
+            } else {
+                return;
+            }
         }
     }
 
@@ -378,6 +440,8 @@ public final class ExecutionEngine {
     private void handle(final Object event) {
         if (event instanceof CancelRun cancel) {
             onRunCanceled(cancel.reason);
+        } else if (event == ListenerProgress.INSTANCE) {
+            listenerWakePending.set(false);
         } else if (event instanceof JobCompleted completed) {
             onJobCompleted(completed);
         } else if (event instanceof ResourceAvailable available) {
@@ -414,15 +478,12 @@ public final class ExecutionEngine {
             return;
         }
         switch (completed.job.kind) {
-            case PREPARE -> onPrepared(state, outcome);
             case CONDITION -> onCondition(state, outcome);
             case BEFORE -> onBefore(state, completed.job.index, outcome);
             case BODY -> onBody(state, outcome);
             case AFTER -> onAfter(state, completed.job.index, outcome);
-            case RELEASE -> onReleased(state, outcome);
             case UNTIL -> onUntil(state, outcome);
         }
-        dispatchReady();
     }
 
     private void onRunCanceled(final String reason) {
@@ -442,7 +503,6 @@ public final class ExecutionEngine {
         } else {
             scheduleGrace(root);
         }
-        dispatchReady();
     }
 
     // --------------------------------------------------------------------------------------------
@@ -459,6 +519,10 @@ public final class ExecutionEngine {
         }
         if (failFast && state.parent != null && state.parent.compiled.failFastScope() && rootFailureSeen) {
             markTerminal(state, Status.skipped("failFast: a root task already failed"), "failFast");
+            return;
+        }
+        if (publisher.isBackpressured()) {
+            deferredAdmissions.add(state);
             return;
         }
         if (state.parent != null
@@ -494,7 +558,7 @@ public final class ExecutionEngine {
         final var attempt = state.beginAttempt();
         emit(state, TaskPhase.ADMITTED, Status.RUNNING, attempt.index);
         scheduleTimeout(state);
-        schedulePrepare(state);
+        startConditionOrBefore(state);
     }
 
     private void releaseAdmission(final OccurrenceState state) {
@@ -550,57 +614,7 @@ public final class ExecutionEngine {
     // Phases
     // --------------------------------------------------------------------------------------------
 
-    private void schedulePrepare(final OccurrenceState state) {
-        state.stage = OccurrenceState.Stage.PREPARING;
-        submit(state, JobKind.PREPARE, 0, () -> prepare(state));
-    }
-
-    private JobOutcome prepare(final OccurrenceState state) throws Throwable {
-        final var attempt = state.attempt;
-        final var task = state.compiled.task();
-        final var context = new ExecutionContextImpl(this, state, attempt.index);
-        for (ResourceDeclaration declaration : task.resources()) {
-            checkAcquisitionCancellation(state);
-            final var value = declaration.factory().create(context);
-            if (value == null) {
-                throw new IllegalStateException(
-                        "Resource factory returned null for " + declaration.key() + " at " + state.path);
-            }
-            attempt.resources.put(declaration.key(), value);
-            attempt.acquired.add(declaration);
-        }
-        final var factory = task.instanceFactory().orElse(null);
-        if (factory != null) {
-            checkAcquisitionCancellation(state);
-            final var instance = factory.create();
-            if (instance == null) {
-                throw new IllegalStateException("Primary instance factory returned null at " + state.path);
-            }
-            attempt.instance = instance;
-        }
-        return JobOutcome.ok();
-    }
-
-    private void checkAcquisitionCancellation(final OccurrenceState state) {
-        if (state.isCanceled()) {
-            throw new CancellationException(reasonOr(state, "canceled"));
-        }
-    }
-
-    private void onPrepared(final OccurrenceState state, final JobOutcome outcome) {
-        final var attempt = state.attempt;
-        if (outcome.error != null) {
-            final var status = classify(outcome.error, state);
-            attempt.fail("RESOURCES", messageFor(status, outcome.error, state), outcome.error);
-            attempt.phases.add(
-                    PhaseResult.of(TaskPhase.RESOURCES_ACQUIRED, "resources", status, List.of(lastFailure(attempt))));
-            emit(state, TaskPhase.RESOURCES_ACQUIRED, status, attempt.index);
-            finishUnstartedChildren(state, "resources were not acquired");
-            releaseResources(state);
-            return;
-        }
-        attempt.phases.add(PhaseResult.of(TaskPhase.RESOURCES_ACQUIRED, "resources", Status.PASSED, List.of()));
-        emit(state, TaskPhase.RESOURCES_ACQUIRED, Status.PASSED, attempt.index);
+    private void startConditionOrBefore(final OccurrenceState state) {
         if (state.isCanceled()) {
             skipNormalWork(state);
             return;
@@ -612,7 +626,7 @@ public final class ExecutionEngine {
                     state,
                     JobKind.CONDITION,
                     0,
-                    () -> JobOutcome.value(condition.test(new ExecutionContextImpl(this, state, attempt.index))));
+                    () -> JobOutcome.value(condition.test(new ExecutionContextImpl(this, state, state.attempt.index))));
             return;
         }
         startBefore(state);
@@ -668,12 +682,14 @@ public final class ExecutionEngine {
     private void onBefore(final OccurrenceState state, final int index, final JobOutcome outcome) {
         final var attempt = state.attempt;
         final var status = outcome.error == null ? Status.PASSED : classify(outcome.error, state);
+        final var hooks = state.compiled.task().before();
+        final var label = hookLabel(hooks.get(index), index);
         if (outcome.error != null) {
-            attempt.fail("BEFORE[" + index + "]", messageFor(status, outcome.error, state), outcome.error);
+            attempt.fail("BEFORE[" + label + "]", messageFor(status, outcome.error, state), outcome.error);
         }
         attempt.phases.add(PhaseResult.of(
                 TaskPhase.BEFORE,
-                "before[" + index + "]",
+                "before[" + label + "]",
                 status,
                 outcome.error == null ? List.of() : List.of(lastFailure(attempt))));
         emit(state, TaskPhase.BEFORE, status, attempt.index);
@@ -683,7 +699,7 @@ public final class ExecutionEngine {
             for (var i = index + 1; i < remaining.size(); i++) {
                 attempt.phases.add(PhaseResult.of(
                         TaskPhase.BEFORE,
-                        "before[" + i + "]",
+                        "before[" + hookLabel(remaining.get(i), i) + "]",
                         Status.skipped("a previous before callback did not pass"),
                         List.of()));
             }
@@ -716,12 +732,17 @@ public final class ExecutionEngine {
     private void onBody(final OccurrenceState state, final JobOutcome outcome) {
         final var attempt = state.attempt;
         final var status = outcome.error == null ? Status.PASSED : classify(outcome.error, state);
+        final var body = state.compiled.task().body().orElse(null);
+        final var label = body == null ? "body" : "body[" + hookLabel(body, 0) + "]";
         attempt.bodyStatus = status;
         if (outcome.error != null) {
-            attempt.fail("BODY", messageFor(status, outcome.error, state), outcome.error);
+            attempt.fail(
+                    "BODY[" + (body == null ? "0" : hookLabel(body, 0)) + "]",
+                    messageFor(status, outcome.error, state),
+                    outcome.error);
         }
         attempt.phases.add(PhaseResult.of(
-                TaskPhase.BODY, "body", status, outcome.error == null ? List.of() : List.of(lastFailure(attempt))));
+                TaskPhase.BODY, label, status, outcome.error == null ? List.of() : List.of(lastFailure(attempt))));
         emit(state, TaskPhase.BODY, status, attempt.index);
         if (!status.isPassed()) {
             finishUnstartedChildren(state, "body " + status.kind());
@@ -855,7 +876,7 @@ public final class ExecutionEngine {
         final var attempt = state.attempt;
         final var callbacks = state.compiled.task().after();
         if (attempt.afterIndex < 0) {
-            releaseResources(state);
+            finishAttempt(state);
             return;
         }
         final var index = attempt.afterIndex--;
@@ -869,66 +890,30 @@ public final class ExecutionEngine {
     private void onAfter(final OccurrenceState state, final int index, final JobOutcome outcome) {
         final var attempt = state.attempt;
         final var status = outcome.error == null ? Status.PASSED : classify(outcome.error, state);
+        final var label = hookLabel(state.compiled.task().after().get(index), index);
         if (outcome.error != null) {
-            attempt.fail("AFTER[" + index + "]", messageFor(status, outcome.error, state), outcome.error);
+            attempt.fail("AFTER[" + label + "]", messageFor(status, outcome.error, state), outcome.error);
         }
         attempt.phases.add(PhaseResult.of(
                 TaskPhase.AFTER,
-                "after[" + index + "]",
+                "after[" + label + "]",
                 status,
                 outcome.error == null ? List.of() : List.of(lastFailure(attempt))));
         emit(state, TaskPhase.AFTER, status, attempt.index);
         scheduleNextAfter(state);
     }
 
-    private void releaseResources(final OccurrenceState state) {
-        final var attempt = state.attempt;
-        if (attempt.acquired.isEmpty()) {
-            finishAttempt(state);
-            return;
-        }
-        state.stage = OccurrenceState.Stage.RELEASING;
-        submit(state, JobKind.RELEASE, 0, () -> {
-            final var errors = new ArrayList<Throwable>();
-            final var names = new ArrayList<String>();
-            final var context = new ExecutionContextImpl(this, state, attempt.index);
-            for (int i = attempt.acquired.size() - 1; i >= 0; i--) {
-                final var declaration = attempt.acquired.get(i);
-                final var value = attempt.resources.get(declaration.key());
-                final var releaser = declaration.releaser().orElse(null);
-                if (releaser == null || value == null) {
-                    continue;
-                }
-                try {
-                    releaser.release(value, context);
-                } catch (Throwable t) {
-                    UnrecoverableErrors.rethrowIfUnrecoverable(Throwables.unwrap(t));
-                    errors.add(t);
-                    names.add(declaration.key().qualifiedName());
-                }
-            }
-            return JobOutcome.errors(errors, names);
-        });
-    }
-
-    private void onReleased(final OccurrenceState state, final JobOutcome outcome) {
-        final var attempt = state.attempt;
-        final var errors = outcome.errors;
-        final var failures = new ArrayList<Failure>();
-        final var statuses = new ArrayList<Status>();
-        for (int i = 0; i < errors.size(); i++) {
-            final var error = errors.get(i);
-            final var key = i < outcome.errorLabels.size() ? outcome.errorLabels.get(i) : "resource";
-            failures.add(attempt.fail(
-                    "RESOURCE_RELEASE[" + key + "]",
-                    "Failed to release resource " + key + ": " + describe(error),
-                    error));
-            statuses.add(classify(error, state));
-        }
-        final var status = statuses.isEmpty() ? Status.PASSED : Status.mostSevere(statuses);
-        attempt.phases.add(PhaseResult.of(TaskPhase.RESOURCES_RELEASED, "resources", status, failures));
-        emit(state, TaskPhase.RESOURCES_RELEASED, status, attempt.index);
-        finishAttempt(state);
+    /**
+     * Returns the label for a resolved hook: its identifier when it has one, otherwise its declaration position.
+     *
+     * <p>A name-bound hook reports {@code before[setUp]}; a programmatic callback keeps {@code before[0]}.
+     *
+     * @param callback the hook; must not be {@code null}
+     * @param index the declaration position
+     * @return the label; never {@code null}
+     */
+    private static String hookLabel(final Object callback, final int index) {
+        return callback instanceof IdentifiedHook hook ? hook.id() : Integer.toString(index);
     }
 
     // --------------------------------------------------------------------------------------------
@@ -989,6 +974,10 @@ public final class ExecutionEngine {
      */
     private void concludeAttempt(final OccurrenceState state, final Boolean untilStops) {
         final var attempt = state.attempt;
+        // No user code can read the scope after this point: `after` hooks have run and the repeat predicate, if any,
+        // has been evaluated. Close and clear so every reference the scope held is dropped.
+        attempt.contextClosed = true;
+        attempt.context.clear();
         recordAttempt(state, attempt.attemptStatus);
         if (finished) {
             return;
@@ -1045,6 +1034,10 @@ public final class ExecutionEngine {
         pendingTimers.decrementAndGet();
         final var state = ready.state;
         state.retryTimer = null;
+        startRetry(state);
+    }
+
+    private void startRetry(final OccurrenceState state) {
         if (state.isTerminal() || finished) {
             return;
         }
@@ -1052,10 +1045,13 @@ public final class ExecutionEngine {
             terminalize(state, finalStatus(state));
             return;
         }
+        if (publisher.isBackpressured()) {
+            deferredAdmissions.add(state);
+            return;
+        }
         state.beginAttempt();
         scheduleTimeout(state);
-        schedulePrepare(state);
-        dispatchReady();
+        startConditionOrBefore(state);
     }
 
     private Status finalStatus(final OccurrenceState state) {
@@ -1228,7 +1224,6 @@ public final class ExecutionEngine {
         } else {
             scheduleGrace(state);
         }
-        dispatchReady();
     }
 
     /**
@@ -1307,7 +1302,6 @@ public final class ExecutionEngine {
 
     private void onResourceAvailable(final ResourceAvailable available) {
         admit(available.state);
-        dispatchReady();
     }
 
     private void cancelSubtree(final OccurrenceState state, final String reason) {
@@ -1355,7 +1349,7 @@ public final class ExecutionEngine {
     private void withdrawQueuedNormalWork(final OccurrenceState state) {
         // Normal work that has not reached a worker never starts once cancellation is requested. It completes as if
         // its callback had observed the interruption at once, so the usual handlers finalize the occurrence; queued
-        // finalizers (AFTER, RELEASE) still run.
+        // finalizers (AFTER) still run.
         final var withdrawn = new ArrayList<Job>();
         for (Job job : ready) {
             if (job.state() == state && job.kind().isNormalWork()) {
@@ -1376,7 +1370,7 @@ public final class ExecutionEngine {
         return attempt != null
                 && attempt.completedNanos != 0
                 && state.outstandingJobs == 0
-                && (state.stage == OccurrenceState.Stage.AFTER || state.stage == OccurrenceState.Stage.RELEASING);
+                && state.stage == OccurrenceState.Stage.AFTER;
     }
 
     private void skipNormalWork(final OccurrenceState state) {
@@ -1416,14 +1410,14 @@ public final class ExecutionEngine {
             return;
         }
         switch (state.stage) {
-            case NEW, ADMITTED, PREPARING, CONDITION, BEFORE, BODY -> goAfter(state);
+            case NEW, ADMITTED, CONDITION, BEFORE, BODY -> goAfter(state);
             case CHILDREN -> {
                 if (!childrenFinalizing) {
                     goAfter(state);
                 }
                 // Otherwise onChildCompleted completes the children phase once the last child is terminal.
             }
-            case AFTER, RELEASING, TERMINAL -> {
+            case AFTER, TERMINAL -> {
                 // already finalizing
             }
         }
@@ -1481,7 +1475,7 @@ public final class ExecutionEngine {
         state.outstandingJobs++;
         final var job = new Job(state, kind, index, work, jobSequence++, state.compiled.preOrderIndex());
         inFlight.add(job);
-        ready.add(job);
+        (kind.isNormalWork() ? ready : cleanupReady).add(job);
     }
 
     private Status classify(final Throwable throwable, final OccurrenceState state) {
@@ -1499,7 +1493,8 @@ public final class ExecutionEngine {
         if (unwrapped instanceof SkipException skip) {
             return Status.skipped(skip.getMessage(), unwrapped);
         }
-        if (state.isCanceled()) {
+        if (state.isCanceled()
+                && (unwrapped instanceof InterruptedException || unwrapped instanceof CancellationException)) {
             return Status.canceled(reasonOr(state, "canceled"), unwrapped);
         }
         return Status.failed(describe(unwrapped), unwrapped);
@@ -1592,12 +1587,11 @@ public final class ExecutionEngine {
     // --------------------------------------------------------------------------------------------
 
     private enum JobKind {
-        PREPARE(true),
         CONDITION(true),
         BEFORE(true),
         BODY(true),
         AFTER(false),
-        RELEASE(false),
+
         UNTIL(true);
 
         private final boolean normalWork;
@@ -1631,6 +1625,10 @@ public final class ExecutionEngine {
     private record RetryReady(OccurrenceState state, int generation) {}
 
     private record CancelRun(String reason) {}
+
+    private enum ListenerProgress {
+        INSTANCE
+    }
 
     private static final class JobOutcome {
 

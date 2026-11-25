@@ -16,33 +16,37 @@ import org.paramixel.api.support.*;
 ## Authoring
 
 ```java
-Task definition = parallel("Matrix", Pool.named("environments"))
-        .each(environments, env -> instance(env.name(), () -> new Probe(env))
-                .before(Probe::start)
-                .sequential("checks", checks -> checks
-                        .independent()
-                        .step("health", Probe::checkHealth)
-                        .step("metrics", Probe::checkMetrics))
-                .after(Probe::stop))
-        .build();
+final var root = parallel(MySuite.class, "Matrix", Pool.named("environments"));
+for (final var env : environments) {
+    root.child(sequential(env.name())
+            .bind("environment", env)
+            .before("start")
+            .child(sequential("checks")
+                    .step("health")
+                    .step("metrics"))
+            .after("stop"));
+}
+Task definition = root.build();
+
+@Paramixel.Id("health")
+public static void health(final Context context) {
+    context.require("environment", Environment.class).checkHealth();
+}
 ```
 
 | Call | Meaning |
 | --- | --- |
-| `task(name)` / `sequential(name)` | Sequential container |
+| `sequential(name)` / `sequential(Owner.class, name)` | Sequential container, unanchored or anchored for hook ids |
 | `parallel(name, Pool.named("p"))` | Parallel container; direct children hold one permit each |
-| `instance(name, supplier)` | Owns one instance per attempt |
-| `.before(cb)` / `.after(cb)` | Lifecycle on the owning task; `after` runs in reverse order |
-| `.step(name, op)` | Child step; returns the enclosing builder |
+| `.before(id)` / `.after(id)` | Lifecycle on the owning task; `after` runs in reverse order |
+| `.step(id)` | Body-only child step; `.body(id)` puts a body on the current occurrence |
 | `.step(name, op, children -> …)` | Child step with its own sequential subtree |
 | `.independent()` / `.dependent()` | Sequential failure continuation (parallel has neither) |
-| `.when(name, predicate, …)` / `.onlyIf(predicate)` | Runtime condition |
-| `.repeat(name, r -> r.maxIterations(n)…)` | Bounded replay |
+| `.onlyIf(id)` | Runtime condition, resolved hook must return `boolean` |
+| `child(repeat(name).maxIterations(n).until(id))` | Bounded replay |
 | `.retry(RetryPolicy…)` | Bounded re-attempt |
 | `.timeout(Duration)` | Cooperative deadline |
 | `.isolated("lock")` | Exclusive logical lock |
-| `.resource(Key, factory[, release])` | Secondary resource |
-| `.each(items, mapper)` | Eager typed expansion |
 | `.shuffle(seed)` / `.tags(…)` | Ordering and metadata |
 | `.build()` | Immutable snapshot |
 

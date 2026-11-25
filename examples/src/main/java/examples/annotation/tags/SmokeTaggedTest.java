@@ -16,15 +16,21 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.Tasks.instance;
+import static org.paramixel.api.Tasks.sequential;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
 
 /**
  * Example factory tagged as {@code "smoke"} for tag-based selection.
+ *
+ * <p>The annotation feeds discovery; the builder call feeds the compiled task's own metadata. Tags select suites, not
+ * hooks, so the hook below is not tagged.
  */
 public class SmokeTaggedTest {
+
+    private static final String ID_TEST = "test";
 
     /**
      * Returns a definition tagged as {@code "smoke"}.
@@ -34,23 +40,19 @@ public class SmokeTaggedTest {
     @Paramixel.Factory
     @Paramixel.Tag("smoke")
     public static Task factory() {
-        return instance("SmokeTaggedTest", SmokeTaggedTest::new)
+        return sequential(SmokeTaggedTest.class, "SmokeTaggedTest")
                 .tags("smoke")
-                .step("test", SmokeTaggedTest::test)
+                .step(ID_TEST)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
-     */
-    public SmokeTaggedTest() {
-        // Intentionally empty
-    }
-
-    /**
      * Trivial body so the example stays focused on selection.
+     *
+     * @param context the execution context
      */
-    public void test() {
+    @Paramixel.Id(ID_TEST)
+    public static void test(final Context context) {
         // Intentionally empty
     }
 }

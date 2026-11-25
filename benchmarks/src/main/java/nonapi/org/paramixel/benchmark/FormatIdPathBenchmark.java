@@ -71,9 +71,9 @@ public class FormatIdPathBenchmark {
 
         @Setup(Level.Trial)
         public void setup() {
-            final var builder = Tasks.parallel("root", Pool.named("p"));
+            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("p"));
             for (var i = 0; i < size; i++) {
-                builder.step("step-" + i, () -> {});
+                builder.step(BenchmarkTree.ID_NOOP);
             }
             final CompiledPlan plan = new PlanCompiler(
                             Configuration.of(Map.of("paramixel.parallelism.p", "8")), Map.of())

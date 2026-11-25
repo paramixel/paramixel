@@ -16,19 +16,27 @@
 
 package examples;
 
-import static org.paramixel.api.Tasks.instance;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Tasks.sequential;
 
-import java.util.Objects;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
 
 /**
- * Demonstrates a stateful fixture whose steps exchange state through the instance.
+ * Demonstrates two steps exchanging state through the context scope.
+ *
+ * <p>The steps are siblings in a sequential chain, so they share one scope: what {@code setValue} stores is what
+ * {@code validate} reads, with no fixture object and no captured variable in between. The value is dropped when the
+ * scope ends — the framework does not close anything, it just stops holding the reference.
  */
 public class CustomActionTest {
 
-    private String value;
+    private static final String ID_SET_VALUE = "setValue";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String VALUE = "value";
 
     /**
      * Runs the factory and exits the JVM.
@@ -46,32 +54,29 @@ public class CustomActionTest {
      */
     @Paramixel.Factory
     public static Task factory() {
-        return instance(CustomActionTest.class.getName(), CustomActionTest::new)
-                .step("setValue", CustomActionTest::setValue)
-                .step("validate", CustomActionTest::validate)
+        return sequential(CustomActionTest.class, "CustomActionTest")
+                .step(ID_SET_VALUE)
+                .step(ID_VALIDATE)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
+     * Stores the value for the next sibling.
+     *
+     * @param context the execution context
      */
-    public CustomActionTest() {
-        // Intentionally empty
+    @Paramixel.Id(ID_SET_VALUE)
+    public static void setValue(final Context context) {
+        context.put(VALUE, "set by a step");
     }
 
     /**
-     * Sets the shared state.
+     * Reads the value stored by the previous sibling.
+     *
+     * @param context the execution context
      */
-    public void setValue() {
-        value = "set by a step";
-    }
-
-    /**
-     * Verifies the shared state.
-     */
-    public void validate() {
-        if (!Objects.equals(value, "set by a step")) {
-            throw new AssertionError("Expected <set by a step> but was <" + value + ">");
-        }
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        assertThat(context.require(VALUE, String.class)).isEqualTo("set by a step");
     }
 }

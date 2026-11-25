@@ -73,9 +73,9 @@ public class CompilePlanBenchmark {
 
         @Setup(Level.Trial)
         public void setup() {
-            var builder = Tasks.parallel("root", Pool.named("p"));
+            var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("p"));
             for (var i = 0; i < size; i++) {
-                builder.step("step-" + i, () -> {});
+                builder.step(BenchmarkTree.ID_NOOP);
             }
             definition = builder.build();
             compiler = new PlanCompiler(Configuration.of(Map.of("paramixel.parallelism.p", "8")), Map.of());

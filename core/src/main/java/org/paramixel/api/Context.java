@@ -20,15 +20,19 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Read-only execution metadata and explicitly keyed resources for one occurrence.
+ * Execution metadata and the state store of one occurrence's scope.
  *
- * <p>A context belongs to one execution occurrence of one run. It exposes stable identity, the effective
- * configuration, the declared primary instance of the nearest lexical {@code instance} binding, and any secondary
- * resources declared by the occurrence or its ancestors.
+ * <p>A context belongs to one execution occurrence of one run. It exposes stable identity, the effective configuration,
+ * and the named entries of the scope the occurrence belongs to. A scope is created at the run root, at every direct child
+ * of a {@code parallel} group, and at every task carrying {@code retry} or {@code repeat}; sequential descendants share
+ * the nearest one, and parallel siblings never see each other's entries.
  *
- * <p>Primary fixtures are <strong>not</strong> looked up by {@link Class}; typed callbacks receive them directly, and
- * additional objects are reached through an explicit {@link Key}. A context never exposes mutable execution state and
- * must not be retained after its callback returns.
+ * <p>Reads resolve from the current scope and then each enclosing scope, nearest first. Writes land in the scope of the
+ * nearest scope-owning self-or-ancestor, and a write from an attempt that has been superseded is discarded.
+ *
+ * <p>The framework never closes a stored value and never probes for {@link AutoCloseable}: release is authored in an
+ * {@code after} hook, with {@link #find(String, Class)} for whatever a partial {@code before} managed to store. A
+ * context must not be retained after its callback returns.
  *
  * <p>This interface is not for implementation by users: the framework supplies the only implementations.
  */
@@ -114,40 +118,61 @@ public interface Context {
     Optional<String> cancellationReason();
 
     /**
-     * Returns the primary instance of the nearest lexical {@code instance} binding.
+     * Stores a value in the context of the scope this occurrence belongs to.
      *
-     * <p>Typed callbacks receive this instance as their argument; the method exists for framework adapters and for
-     * advanced code that needs the raw value. A nested {@code instance} task establishes its own binding and does
-     * not make an outer instance implicitly available through this method.
+     * <p>A scope is created at the run root, at every direct child of a {@code parallel} group, and at every task
+     * carrying {@code retry} or {@code repeat}. Sequential descendants share the nearest enclosing scope, so a value
+     * stored by one step is visible to the next sibling and to the enclosing group's {@code after} hook; parallel
+     * siblings never see each other's entries. A scope is cleared when its owner finishes.
      *
-     * <p>The binding is lexical and does not depend on when the method is called. An {@code instance} task creates its
-     * instance after its own resources, so a {@code ResourceFactory} declared on that same task cannot read the
-     * instance: the call fails rather than returning an outer instance.
+     * <p>The framework never closes a stored value: it does not test for {@link AutoCloseable} and offers no release
+     * hook. Close a resource in an {@code after} hook and drop the reference with {@link #remove(String)} when the
+     * scope outlives the object's usefulness; anything left when the scope ends is dropped for you.
      *
-     * @return the bound primary instance; never {@code null}
-     * @throws IllegalStateException if no primary instance is bound in this occurrence's lexical scope, or if the bound
-     *     instance has not been created yet
+     * <p>A write from an attempt that has already been superseded — after a timeout, a cancellation, or a hook that
+     * ignored interruption — is discarded, so an abandoned callback cannot contaminate the next attempt.
+     *
+     * @param name the entry name; must not be {@code null} or blank
+     * @param value the value; must not be {@code null}
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws IllegalArgumentException if {@code name} is blank
      */
-    Object primaryInstance();
+    void put(String name, Object value);
 
     /**
-     * Returns the resource bound to the supplied key in this scope or an enclosing scope.
+     * Removes an entry from the context of the scope this occurrence belongs to.
      *
-     * @param <T> the resource type
-     * @param key the resource key; must not be {@code null}
-     * @return the resource
-     * @throws NullPointerException if {@code key} is {@code null}
-     * @throws org.paramixel.api.exception.ResourceException if the resource is not available
+     * <p>Removing is independent of releasing: the framework does not close the value, and removing an entry that is
+     * not present is not an error.
+     *
+     * @param name the entry name; must not be {@code null}
+     * @throws NullPointerException if {@code name} is {@code null}
      */
-    <T> T require(Key<T> key);
+    void remove(String name);
 
     /**
-     * Returns the resource bound to the supplied key, when available.
+     * Returns the entry stored under {@code name} in this scope or an enclosing scope.
      *
-     * @param <T> the resource type
-     * @param key the resource key; must not be {@code null}
-     * @return the resource, or an empty optional
-     * @throws NullPointerException if {@code key} is {@code null}
+     * @param <T> the entry type
+     * @param name the entry name; must not be {@code null}
+     * @param type the expected type; must not be {@code null}
+     * @return the entry; never {@code null}
+     * @throws NullPointerException if an argument is {@code null}
+     * @throws org.paramixel.api.exception.ContextException if the entry is absent or holds an incompatible type
      */
-    <T> Optional<T> find(Key<T> key);
+    <T> T require(String name, Class<T> type);
+
+    /**
+     * Returns the entry stored under {@code name}, when available.
+     *
+     * <p>This is the teardown form: an {@code after} hook can release whatever a partially completed {@code before}
+     * hook managed to store, without masking the original failure.
+     *
+     * @param <T> the entry type
+     * @param name the entry name; must not be {@code null}
+     * @param type the expected type; must not be {@code null}
+     * @return the entry, or an empty optional when it is absent or holds an incompatible type
+     * @throws NullPointerException if an argument is {@code null}
+     */
+    <T> Optional<T> find(String name, Class<T> type);
 }

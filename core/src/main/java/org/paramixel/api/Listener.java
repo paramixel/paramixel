@@ -27,14 +27,15 @@ import nonapi.org.paramixel.reporting.DefaultListeners;
  * <ul>
  *   <li>Events are produced by the scheduler and delivered by a dedicated dispatcher thread, so listener code never
  *       runs while the scheduler holds a permit, plan, or lock.</li>
- *   <li>The dispatcher queue is bounded. When it is full, the producer applies backpressure rather than dropping an
- *       event, which slows admission instead of corrupting the event stream.</li>
+ *   <li>A full listener queue pauses new work rather than dropping events. Timeouts, cancellation, and cleanup still
+ *       advance; their events and events from in-flight work use a bounded reserve sized to the plan.</li>
  *   <li>An exception thrown by a listener is isolated and recorded as a run diagnostic. It never changes a task's
  *       semantic pass/fail status. Unrecoverable VM errors are propagated to the runner.</li>
- *   <li>{@link #onRunCompleted(Result)} is delivered after all task events were drained, so reporting cannot race with
- *       finalization. The drain is bounded by {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}: when a listener does
- *       not drain in time, the remaining events are discarded and a {@code LISTENER_DRAIN_TIMEOUT} run diagnostic is
- *       recorded rather than hidden.</li>
+ *   <li>{@link #onRunCompleted(Result)} runs on the dispatcher after all events were delivered. If delivery stops
+ *       making progress under backpressure or during final delivery for
+ *       {@link Configuration#LISTENER_DRAIN_TIMEOUT_MILLIS}, the dispatcher is interrupted and undelivered events
+ *       are discarded. The result records a {@value #DRAIN_TIMEOUT_DIAGNOSTIC} infrastructure failure with a nonzero
+ *       exit code, independently of its task outcomes. If event delivery stalls, completion is not invoked.</li>
  *   <li>The {@link Result} passed to {@link #onRunCompleted(Result)} already carries the run's diagnostics, including
  *       infrastructure diagnostics such as {@code NON_QUIESCENT} and listener failures recorded during delivery.</li>
  *   <li>A listener must not re-enter the running {@link Runner}; doing so is rejected.</li>
@@ -47,6 +48,9 @@ public interface Listener {
 
     /** A listener that ignores every callback. */
     Listener NOOP = new Listener() {};
+
+    /** Run failure phase and diagnostic code for stalled listener delivery. */
+    String DRAIN_TIMEOUT_DIAGNOSTIC = "LISTENER_DRAIN_TIMEOUT";
 
     /**
      * Returns the default listener chain: status and summary console output, plus a report file writer when
@@ -98,7 +102,7 @@ public interface Listener {
     /**
      * Invoked for each lifecycle event of each occurrence.
      *
-     * <p>Exactly one {@link TaskPhase#TERMINAL} event is delivered per occurrence.
+     * <p>On a complete event stream, exactly one {@link TaskPhase#TERMINAL} event is delivered per occurrence.
      *
      * @param event the event; never {@code null}
      */
@@ -107,7 +111,7 @@ public interface Listener {
     }
 
     /**
-     * Invoked once after the run completed and all task events were delivered, or after the bounded drain gave up.
+     * Invoked once after the run completed and all task events were delivered. Not invoked for an incomplete stream.
      *
      * @param result the immutable result, including the run's diagnostics; never {@code null}
      */

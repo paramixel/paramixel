@@ -31,22 +31,24 @@ under a parent compiles into a distinct execution occurrence with its own identi
 A task may have a body, children, or both. Its normal phase order is:
 
 ```
-admission → resources → instance → before → body → child group → after → release → terminal
+admission → condition → before → body → child group → after → terminal
 ```
 
 The body runs before and independently of the children group; body success gates the children. Finalization never
-depends on success: `after` callbacks run in reverse declaration order and are all attempted.
+depends on success: `after` hooks run in reverse declaration order and are all attempted.
 
 ```java
-instance(environment.name(), () -> new KafkaTest(environment))
-    .before(KafkaTest::setUp)
-    .sequential("Messaging", messaging -> messaging
-        .step("Produce", KafkaTest::produce, children -> children
+sequential(environment.name())
+    .bind(ENVIRONMENT, environment)
+    .before(ID_SET_UP)
+    .child(sequential("Messaging")
             .independent()
-            .step("Verify topic", KafkaTest::verifyTopic)
-            .step("Verify offsets", KafkaTest::verifyOffsets))
-        .step("Consume", KafkaTest::consume))
-    .after(KafkaTest::tearDown);
+            .child(sequential("Produce")
+                    .body(ID_PRODUCE)
+                    .child(sequential("Verify topic").independent().step(ID_VERIFY_TOPIC))
+                    .child(sequential("Verify offsets").independent().step(ID_VERIFY_OFFSETS)))
+            .step(ID_CONSUME))
+    .after(ID_TEAR_DOWN);
 ```
 
 ## Sequential and parallel
@@ -55,15 +57,18 @@ instance(environment.name(), () -> new KafkaTest(environment))
 string pool identifier does not compile.
 
 ```java
-Task definition = parallel("Compatibility matrix", Pool.named("environments"))
-        .each(environments, env -> instance(env.name(), () -> new Probe(env))
-                .step("Verify", Probe::verify))
-        .build();
+final var root = parallel(MySuite.class, "Compatibility matrix", Pool.named("environments"));
+for (final var environment : environments) {
+    root.child(sequential(environment.name())
+            .bind(ENVIRONMENT, environment)
+            .step(ID_VERIFY));
+}
+Task definition = root.build();
 ```
 
 A parallel task has no `dependent()`/`independent()` method: it is always *attempt-all-unless-explicitly-canceled*.
-Parallel siblings that share an inherited instance are concurrent calls on the same object; Paramixel does not
-implicitly synchronize them.
+Parallel siblings own separate context scopes, so they cannot see each other's entries; a fixture shared by several
+branches is published with `bind` on the parent, and Paramixel does not implicitly synchronize calls on it.
 
 ## Dependent and independent
 
@@ -77,10 +82,9 @@ switches, and they affect only the direct children of the task that declares the
 | --- | --- |
 | `timeout(Duration)` | Cooperative deadline for the task and its subtree |
 | `retry(RetryPolicy)` | Bounded re-attempt of a non-success status |
-| `repeat(name, r -> …)` | Bounded intentional replay with an optional stop predicate |
-| `when(name, predicate, …)` / `onlyIf(predicate)` | Runtime condition evaluated after admission |
+| `child(repeat(name).maxIterations(n).until(id))` | Bounded intentional replay with an optional stop predicate |
+| `onlyIf(id)` | Runtime condition evaluated after admission; the hook returns `boolean` |
 | `isolated(lockName)` | Exclusive logical lock held for the task's lifetime |
-| `resource(Key, factory[, release])` | Typed secondary resource with reverse-order release |
 | `tags(String…)` | Diagnostics, selection, and reporting metadata |
 | `shuffle(seed)` / `shuffle()` | Reproducible child order, recorded in the result |
 

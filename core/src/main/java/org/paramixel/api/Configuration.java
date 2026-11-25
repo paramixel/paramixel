@@ -48,10 +48,11 @@ import org.paramixel.api.exception.ConfigurationException;
  *       <td>number of available processors</td></tr>
  *   <tr><td>{@code paramixel.shutdown.graceMillis}</td><td>how long a timed-out or canceled callback may take to
  *       quiesce before the run is reported non-quiescent</td><td>{@code 10000}</td></tr>
- *   <tr><td>{@code paramixel.listener.queue.capacity}</td><td>bounded listener event queue capacity</td>
- *       <td>{@code 8192}</td></tr>
- *   <tr><td>{@code paramixel.listener.drainTimeoutMillis}</td><td>how long the end of a run waits for listeners to
- *       drain queued events before discarding the rest and recording a diagnostic</td><td>{@code 30000}</td></tr>
+ *   <tr><td>{@code paramixel.listener.queue.capacity}</td><td>queued listener events at which new work pauses;
+ *       in-flight work and cleanup have a separately bounded reserve</td><td>{@code 8192}</td></tr>
+ *   <tr><td>{@code paramixel.listener.drainTimeoutMillis}</td><td>maximum interval without listener progress under
+ *       backpressure or during final delivery, before the run reports incomplete listener reporting</td>
+ *       <td>{@code 30000}</td></tr>
  *   <tr><td>{@code paramixel.ansi}</td><td>{@code true}, {@code false} or {@code auto}</td><td>{@code auto}</td></tr>
  *   <tr><td>{@code paramixel.failureOnSkip}</td><td>map a skipped run to a failing exit code</td>
  *       <td>{@code true}</td></tr>
@@ -96,10 +97,10 @@ public interface Configuration {
     /** Configuration key controlling the bounded shutdown grace period, in milliseconds. */
     String SHUTDOWN_GRACE_MILLIS = "paramixel.shutdown.graceMillis";
 
-    /** Configuration key controlling the bounded listener event queue capacity. */
+    /** Configuration key controlling the listener backlog at which scheduling applies backpressure. */
     String LISTENER_QUEUE_CAPACITY = "paramixel.listener.queue.capacity";
 
-    /** Configuration key controlling the bounded wait for listeners to drain queued events, in milliseconds. */
+    /** Configuration key controlling the maximum no-progress interval for pressured or final listener delivery. */
     String LISTENER_DRAIN_TIMEOUT_MILLIS = "paramixel.listener.drainTimeoutMillis";
 
     /** Configuration key controlling ANSI escape code output in console listeners. */

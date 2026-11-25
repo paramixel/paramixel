@@ -42,7 +42,6 @@ public final class CompiledOccurrence {
     private final ExecutionMode mode;
     private final String poolName;
     private final int budget;
-    private final String bindingSlot;
     private final int preOrderIndex;
     private final int depth;
     private final boolean failFastScope;
@@ -67,7 +66,6 @@ public final class CompiledOccurrence {
         this.mode = task.mode();
         this.poolName = task.pool().map(Pool::name).orElse(null);
         this.budget = scheduling.budget();
-        this.bindingSlot = scheduling.bindingSlot();
         this.preOrderIndex = scheduling.preOrderIndex();
         this.depth = scheduling.depth();
         this.failFastScope = scheduling.failFastScope();
@@ -90,12 +88,11 @@ public final class CompiledOccurrence {
      * The scheduling facts the compiler resolved for an occurrence.
      *
      * @param budget the child admission budget
-     * @param bindingSlot the lexical instance binding slot, or {@code null}
      * @param preOrderIndex the depth-first pre-order index
      * @param depth the nesting depth
      * @param failFastScope whether the occurrence honors the run-level fail-fast policy
      */
-    record Scheduling(int budget, String bindingSlot, int preOrderIndex, int depth, boolean failFastScope) {}
+    record Scheduling(int budget, int preOrderIndex, int depth, boolean failFastScope) {}
 
     /**
      * Returns the occurrence identifier, derived from the structural ordinal path.
@@ -181,18 +178,6 @@ public final class CompiledOccurrence {
      */
     public int budget() {
         return budget;
-    }
-
-    /**
-     * Returns the identifier of the nearest enclosing instance-owning occurrence.
-     *
-     * <p>This is the lexical binding slot: callbacks of this occurrence receive exactly the instance that belongs to
-     * that slot, and no reflective type lookup is involved.
-     *
-     * @return the binding slot identifier, or {@code null} when no instance is bound in this scope
-     */
-    public String bindingSlot() {
-        return bindingSlot;
     }
 
     /**

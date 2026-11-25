@@ -17,8 +17,8 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.Tasks.task;
 
 import java.lang.reflect.Field;
@@ -77,7 +77,7 @@ class TimeoutTest {
     void uncooperativeTimeout() {
         final CountDownLatch stuckStarted = new CountDownLatch(1);
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = instance("instance", Object::new)
+        final Task definition = sequential("instance")
                 .timeout(Duration.ofMillis(100))
                 .step("stuck", () -> {
                     stuckStarted.countDown();
@@ -114,15 +114,11 @@ class TimeoutTest {
                 .parallel(
                         "children",
                         Pool.named("p"),
-                        children -> children.child(instance("first", () -> {
-                                            created.incrementAndGet();
-                                            return new Object();
-                                        })
+                        children -> children.child(sequential("first")
+                                        .before(created::incrementAndGet)
                                         .step("hold", () -> block.await(5, TimeUnit.SECONDS)))
-                                .child(instance("second", () -> {
-                                            created.incrementAndGet();
-                                            return new Object();
-                                        })
+                                .child(sequential("second")
+                                        .before(created::incrementAndGet)
                                         .step("quick", () -> {})))
                 .build();
 
@@ -144,7 +140,7 @@ class TimeoutTest {
     void timeoutDuringBefore() {
         final AtomicInteger bodyCalls = new AtomicInteger();
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = instance("instance", Object::new)
+        final Task definition = sequential("instance")
                 .timeout(Duration.ofMillis(100))
                 .before(() -> Thread.sleep(5000L))
                 .step("body", bodyCalls::incrementAndGet)
@@ -208,19 +204,11 @@ class TimeoutTest {
         // inside the shutdown grace regardless of host core count or load.
         final CountDownLatch release = new CountDownLatch(1);
         final Task definition = parallel("root", Pool.named("p"))
-                .child(instance("blocker", () -> {
-                            created.incrementAndGet();
-                            return new Object();
-                        })
-                        .step("hold", () -> {
-                            started.countDown();
-                            release.await(60, TimeUnit.SECONDS);
-                        }))
-                .child(instance("waiter", () -> {
-                            created.incrementAndGet();
-                            return new Object();
-                        })
-                        .step("quick", () -> {}))
+                .child(sequential("blocker").before(created::incrementAndGet).step("hold", () -> {
+                    started.countDown();
+                    release.await(60, TimeUnit.SECONDS);
+                }))
+                .child(sequential("waiter").before(created::incrementAndGet).step("quick", () -> {}))
                 .build();
 
         final var runner = Runner.builder()
@@ -301,15 +289,14 @@ class TimeoutTest {
     @Test
     @DisplayName("TIME-08: a timeout while the subtree is idle still finalizes every started descendant")
     void timeoutWhileSubtreeIdleFinalizesStartedDescendants() {
-        final Key<String> handle = Key.named("timeout", "handle", String.class);
         final AtomicInteger afterCalls = new AtomicInteger();
         final AtomicInteger released = new AtomicInteger();
         final CountDownLatch firstAttemptFailed = new CountDownLatch(1);
         final Task definition = task("root")
                 .timeout(Duration.ofMillis(300))
                 .child(Tasks.sequential("fixture")
-                        .resource(handle, () -> "open", value -> released.incrementAndGet())
                         .after(afterCalls::incrementAndGet)
+                        .after(() -> released.incrementAndGet())
                         .child(Tasks.sequential("flaky")
                                 .retry(RetryPolicy.builder()
                                         .maxAttempts(3)
@@ -328,7 +315,7 @@ class TimeoutTest {
         assertThat(result.isQuiescent()).isTrue();
         assertThat(result.root().orElseThrow().timedOut()).isTrue();
         assertThat(afterCalls).as("fixture after callbacks").hasValue(1);
-        assertThat(released).as("fixture resource releases").hasValue(1);
+        assertThat(released).as("fixture finalizers").hasValue(1);
     }
 
     @Test
@@ -401,10 +388,8 @@ class TimeoutTest {
         // never started when the timeout and the shutdown grace expire.
         final Task definition = parallel("root", Pool.named("p"))
                 .step("busy", () -> Thread.sleep(1500L))
-                .child(instance("queued", () -> {
-                            created.incrementAndGet();
-                            return new Object();
-                        })
+                .child(sequential("queued")
+                        .before(created::incrementAndGet)
                         .timeout(Duration.ofMillis(100))
                         .step("quick", quickCalls::incrementAndGet))
                 .build();

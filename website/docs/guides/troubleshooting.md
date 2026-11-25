@@ -11,10 +11,21 @@ A parallel task names a pool with no capacity. Set `paramixel.parallelism.x` or 
 `Runner.builder().pool(Pool.named("x"), n)`. Discovery itself uses a pool named `discovery`, which defaults to
 `paramixel.parallelism`.
 
-## "Task uses typed instance callbacks but no enclosing task owns a primary instance"
+## "Id \"x\" used by step(...) in a definition with no anchor"
 
-A callback referenced an instance type without a lexical binding, for example `sequential("root").step("x", Test::m)`.
-Wrap the task in `instance(name, factory)` or use a no-argument callback.
+The definition refers to a hook identifier but never names the class that declares it. Root the definition at
+`Tasks.sequential(MyTest.class, "name")` — one class literal per definition root, inherited by everything attached below
+it.
+
+## "Unknown id \"x\" used by step(...)"
+
+No `@Paramixel.Id("x")` method is declared by the anchor class. Identifiers are class-scoped: inheritance is not
+consulted, so a hook declared in a base class is never resolved and shared behaviour is a plain static delegation.
+
+## "Context entry ... holds X but Y was requested"
+
+`require(name, Type)` checks assignability against the stored value. Use `find(name, Type)` where absence or a different
+type is expected — typically in an `after` hook releasing whatever a partial `before` managed to store.
 
 ## "Pool 'x' is already active on this ancestry path"
 

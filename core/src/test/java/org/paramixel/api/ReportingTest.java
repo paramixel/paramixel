@@ -17,6 +17,7 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.paramixel.api.Tasks.task;
 
 import java.io.ByteArrayInputStream;
@@ -24,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
@@ -36,6 +38,7 @@ import nonapi.org.paramixel.reporting.ReportFileListener;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.support.RetryPolicy;
 import org.w3c.dom.Element;
 
@@ -68,6 +71,16 @@ class ReportingTest {
         assertThat(result.status().kind()).isEqualTo(Status.Kind.FAILED);
         assertThat(file).exists();
         return file;
+    }
+
+    @Test
+    void malformedReportPathIsAConfigurationError() {
+        final var configuration = Configuration.of(Map.of(Configuration.REPORT_FILE, "report\0.json"));
+
+        assertThatThrownBy(() -> Runner.builder().configuration(configuration).build())
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining(Configuration.REPORT_FILE)
+                .hasCauseInstanceOf(InvalidPathException.class);
     }
 
     @Test

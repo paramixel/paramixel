@@ -16,9 +16,11 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * A disabled factory that must never be invoked.
@@ -37,10 +39,16 @@ public final class DisabledFixture {
     @Paramixel.Disabled("disabled for discovery tests")
     @Paramixel.Factory
     public static Task factory() {
-        return Tasks.task("disabled")
-                .step("run", () -> {
-                    throw new IllegalStateException("disabled factory was invoked");
-                })
-                .build();
+        return sequential(DisabledFixture.class, "disabled").step("run").build();
+    }
+
+    /**
+     * Records this fixture's execution.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        throw new IllegalStateException("disabled factory was invoked");
     }
 }

@@ -17,17 +17,29 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
 
 /**
- * Demonstrates one owned instance shared by several steps, with setup before and teardown after.
+ * Demonstrates one fixture shared by several steps, with setup before and teardown after.
+ *
+ * <p>The four hooks are siblings in one sequential chain, so they share a context scope: the fixture stored by
+ * {@code setUp} is the same object in both steps and in {@code tearDown}. That is the whole mechanism — there is no
+ * separate instance lifecycle to configure.
  */
 public class SetUpTearDownLifecycleTest {
+
+    private static final String ID_SET_UP = "setUp";
+    private static final String ID_TEST_ONE = "testOne";
+    private static final String ID_TEST_TWO = "testTwo";
+    private static final String ID_TEAR_DOWN = "tearDown";
+
+    private static final String FIXTURE = "fixture";
 
     private static final int EXPECTED_TEST_COUNT = 2;
 
@@ -53,26 +65,24 @@ public class SetUpTearDownLifecycleTest {
     public static Task factory() {
         resetCounts();
 
-        return instance("FullLifecycleTest", SetUpTearDownLifecycleTest::new)
-                .before(SetUpTearDownLifecycleTest::setUp)
-                .step("testOne", SetUpTearDownLifecycleTest::testOne)
-                .step("testTwo", SetUpTearDownLifecycleTest::testTwo)
-                .after(SetUpTearDownLifecycleTest::tearDown)
+        return sequential(SetUpTearDownLifecycleTest.class, "SetUpTearDownLifecycleTest")
+                .before(ID_SET_UP)
+                .step(ID_TEST_ONE)
+                .step(ID_TEST_TWO)
+                .after(ID_TEAR_DOWN)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
+     * Creates the fixture and runs setup on it.
+     *
+     * @param context the execution context
      */
-    public SetUpTearDownLifecycleTest() {
-        // Intentionally empty
-    }
-
-    /**
-     * Records setup.
-     */
-    public void setUp() {
-        setUpCount.incrementAndGet();
+    @Paramixel.Id(ID_SET_UP)
+    public static void setUp(final Context context) {
+        final var fixture = new SetUpTearDownLifecycleTest();
+        context.put(FIXTURE, fixture);
+        fixture.setUp();
     }
 
     /**
@@ -90,7 +100,7 @@ public class SetUpTearDownLifecycleTest {
     }
 
     /**
-     * Verifies the lifecycle counts.
+     * Verifies the lifecycle counts and releases the fixture.
      */
     public void tearDown() {
         tearDownCount.incrementAndGet();
@@ -98,6 +108,43 @@ public class SetUpTearDownLifecycleTest {
         assertThat(setUpCount.get()).isEqualTo(1);
         assertThat(testCount.get()).isEqualTo(EXPECTED_TEST_COUNT);
         assertThat(tearDownCount.get()).isEqualTo(1);
+    }
+
+    /**
+     * Runs the first test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_ONE)
+    public static void runTestOne(final Context context) {
+        context.require(FIXTURE, SetUpTearDownLifecycleTest.class).testOne();
+    }
+
+    /**
+     * Runs the second test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_TWO)
+    public static void runTestTwo(final Context context) {
+        context.require(FIXTURE, SetUpTearDownLifecycleTest.class).testTwo();
+    }
+
+    /**
+     * Tears the fixture down, if the attempt managed to create one.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDown(final Context context) {
+        context.find(FIXTURE, SetUpTearDownLifecycleTest.class).ifPresent(SetUpTearDownLifecycleTest::tearDown);
+    }
+
+    /**
+     * Records setup.
+     */
+    public void setUp() {
+        setUpCount.incrementAndGet();
     }
 
     private static void resetCounts() {

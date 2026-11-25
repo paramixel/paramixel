@@ -14,8 +14,8 @@ may add a final layer for pool capacities via `Runner.Builder.pool(Pool, int)`.
 | `paramixel.parallelism.<name>` | Capacity of the named pool `<name>` | none (required) |
 | `paramixel.workers` | Maximum execution worker threads | processors |
 | `paramixel.shutdown.graceMillis` | Bounded wait for a canceled callback to quiesce | `10000` |
-| `paramixel.listener.queue.capacity` | Bounded listener event queue | `8192` |
-| `paramixel.listener.drainTimeoutMillis` | Bounded wait for listeners to drain queued events at the end of a run | `30000` |
+| `paramixel.listener.queue.capacity` | Queued listener events at which normal work pauses; in-flight and cleanup events have a bounded reserve | `8192` |
+| `paramixel.listener.drainTimeoutMillis` | Maximum interval without listener progress under backpressure or during final delivery | `30000` |
 | `paramixel.ansi` | Console color: `true`, `false`, `auto` | `auto` |
 | `paramixel.failureOnSkip` | Map a skipped run to a failing exit code | `true` |
 | `paramixel.failureOnAbort` | Map an aborted run to a failing exit code | `true` |

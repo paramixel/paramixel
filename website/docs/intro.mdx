@@ -10,24 +10,38 @@ Paramixel turns expensive Java integration tests into **immutable task definitio
 runs, executed with bounded concurrency, and reported from a single immutable result.
 
 ```java
-import static org.paramixel.api.Tasks.*;
+import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
-Task definition = parallel("Environments", Pool.named("environments"))
-        .each(environments, environment -> instance(environment.name(), () -> new Scenario(environment))
-                .before(Scenario::start)
-                .sequential("checks", checks -> checks
-                        .step("health", Scenario::checkHealth)
-                        .step("metrics", Scenario::checkMetrics))
-                .after(Scenario::stop))
-        .build();
+public class IntroSuite {
 
-try (Runner runner = Runner.builder()
-        .pool(Pool.named("environments"), 3)
-        .build()) {
-    Result result = runner.run(definition);
-    System.exit(result.exitCode());
+    private static final String ENVIRONMENT = "environment";
+    private static final String FIXTURE = "fixture";
+
+    @Paramixel.Factory
+    public static Task factory() {
+        final var root = parallel(IntroSuite.class, "Environments", Pool.named("environments"));
+        for (final var environment : environments) {
+            root.child(sequential(environment.name())
+                    .bind(ENVIRONMENT, environment)
+                    .before("start")
+                    .child(sequential("checks").step("health").step("metrics"))
+                    .after("stop"));
+        }
+        return root.build();
+    }
+
+    @Paramixel.Id("start")
+    public static void start(final Context context) {
+        final var scenario = new Scenario(context.require(ENVIRONMENT, Environment.class));
+        context.put(FIXTURE, scenario);
+        scenario.start();
+    }
 }
 ```
+
+Hooks are ordinary static methods named by a stable identifier; the definition names its class once and everything below
+inherits it.
 
 ## What you get
 

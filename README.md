@@ -7,27 +7,46 @@ bodies and subtrees. The compiler derives execution dependencies, resource scope
 execution metadata; the scheduler executes occurrences with bounded concurrency and deterministic admission priorities.
 
 ```java
-import static org.paramixel.api.Tasks.*;
+import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
-Task definition = parallel("Environments", Pool.named("environments"))
-        .each(environments, environment -> instance(environment.name(), () -> new Scenario(environment))
-                .before(Scenario::start)
-                .sequential("checks", checks -> checks
-                        .step("health", Scenario::checkHealth)
-                        .step("metrics", Scenario::checkMetrics))
-                .after(Scenario::stop))
-        .build();
+public class ScenarioTest {
 
-try (Runner runner = Runner.builder()
-        .pool(Pool.named("environments"), 3)
-        .build()) {
-    Result result = runner.run(definition);
-    System.exit(result.exitCode());
+    private static final String ID_START = "start";
+    private static final String ID_HEALTH = "health";
+    private static final String ID_METRICS = "metrics";
+    private static final String ID_STOP = "stop";
+    private static final String ENVIRONMENT = "environment";
+    private static final String FIXTURE = "fixture";
+
+    public static void main(final String[] args) {
+        System.exit(Runner.builder().build().run(factory()).exitCode());
+    }
+
+    @Paramixel.Factory
+    public static Task factory() {
+        final var root = parallel(ScenarioTest.class, "Environments", Pool.named("environments"));
+        for (final var environment : environments) {
+            root.child(sequential(environment.name())
+                    .bind(ENVIRONMENT, environment)
+                    .before(ID_START)
+                    .child(sequential("checks").step(ID_HEALTH).step(ID_METRICS))
+                    .after(ID_STOP));
+        }
+        return root.build();
+    }
+
+    @Paramixel.Id(ID_START)
+    public static void start(final Context context) {
+        final var fixture = new Scenario(context.require(ENVIRONMENT, Environment.class));
+        context.put(FIXTURE, fixture);
+        fixture.start();
+    }
 }
 ```
 
-No class tokens on steps, no reflective fixture lookup, no unchecked casts. `T` is inferred from the supplier and carried
-through nested groups.
+One class literal per definition root, one identifier per hook, and ordinary static Java for the behaviour: no functional
+interfaces, no reflective fixture lookup, and no unchecked casts. Hooks read what they need from the context by name.
 
 ## Requirements
 
@@ -50,24 +69,25 @@ One immutable definition type, `Task`:
 - **`sequential` / `parallel`** describe how a task's direct children run. `parallel` always names a `Pool`.
 - **`dependent()` / `independent()`** describe only *failure continuation* of ordered children, so they exist on
   sequential builders only. `dependent` is the default.
-- **`instance(name, supplier)`** owns one lazily created instance per execution attempt. Lifecycle is `before` /
-  `after`; there is no separate instantiate/destroy ceremony and no implicit `AutoCloseable` closing.
-- **`step(name, operation, children -> ...)`** attaches a subtree explicitly. There is no hidden "current step" cursor.
-- **`each(items, mapper)`** expands eagerly at definition time and may produce builders bound to different instance
-  types.
-- **`when`, `repeat`, `retry`, `timeout`, `isolated`, `tags`, `shuffle`, `resource`** are typed declarations on the
-  definition, validated before anything runs.
+- **`@Paramixel.Id`** names a hook; the tree refers to it by that identifier, which is also the label reported for the
+  hook. Hooks must be `public static` and take one `Context` (plus a `Status` for repeat predicates).
+- **`bind(name, value)`** publishes authoring-time data into the context scope; `put`/`require`/`find`/`remove` are the
+  runtime store. The framework never closes a stored value and never probes for `AutoCloseable` — release is authored in
+  `after`, with `find` for partial state.
+- **`.step(id)`** adds a body-only child; **`.body(id)`** puts a body on the occurrence itself, which is how a step keeps
+  both a body and children.
+- **`repeat`, `retry`, `timeout`, `isolated`, `tags`, `shuffle`, `onlyIf(id)`** are declarations on the definition,
+  validated before anything runs.
 
-Building a definition, compiling a plan, and discovering factories are all side-effect free: no instance factory,
-lifecycle callback, body, or runtime predicate runs until the scheduler admits an occurrence.
+Building a definition, compiling a plan, and discovering factories are all side-effect free: no hook, body, or runtime
+predicate runs until the scheduler admits an occurrence.
 
 ## Pools, workers, and cancellation
 
 A `Pool` is a logical concurrency budget, never a thread pool. Capacity comes from `Runner.Builder.pool(Pool, int)` or
 `paramixel.parallelism.<name>`, with the builder winning.
 
-- Each direct child of a parallel task holds one permit from admission through instance creation, body, children,
-  `after`, and resource release.
+- Each direct child of a parallel task holds one permit from admission through its body, children, and `after` hooks.
 - Waiting for a permit or a lock never occupies a worker thread.
 - Nested use of the same pool on one ancestry path, undefined pools, and provable acquisition-order cycles are rejected
   before execution.
@@ -84,9 +104,9 @@ pass. `Result.status()` is the semantic outcome; `Result.exitCode()` applies `pa
 
 ## Discovery
 
-`@Paramixel.Factory` methods must be `public static`, take no parameters, and return a `Task` or a builder. Returning
-`null` is an explicit skip. `@BeforeAll` / `@AfterAll` wrap the discovered run, `@Disabled` excludes a factory, `@Tag`
-and `Selector` select, and `@Priority` orders.
+`@Paramixel.Factory` methods must be `public static`, take no parameters, and return a `Task` or a builder, rooted at the
+factory's own class so its identifiers resolve. Returning `null` is an explicit skip. `@BeforeAll` / `@AfterAll` wrap the
+discovered run, `@Disabled` excludes a factory, `@Tag` and `Selector` select, and `@Priority` orders.
 
 `Runner.run(Task)` executes exactly the definition you supply: no classpath scan and no hooks. `Runner.run()`
 discovers. `Launcher` owns `System.exit`.

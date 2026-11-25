@@ -17,10 +17,11 @@
 package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -29,13 +30,20 @@ import org.paramixel.api.support.Backoff;
 import org.paramixel.api.support.RetryPolicy;
 
 /**
- * Demonstrates a bounded retry policy on an owned fixture.
+ * Demonstrates a bounded retry policy on a per-attempt fixture.
  *
- * <p>Retry is not repeat: only a status the policy names triggers another attempt, attempts never overlap, and an owned
- * fixture is recreated for each attempt with its {@code after} callback running in between. Historical failures stay
- * visible in the result as attempt nodes.
+ * <p>Retry is not repeat: only a status the policy names triggers another attempt, and attempts never overlap. A
+ * retried task owns its context scope, so every attempt starts empty: the {@code before} hook builds a fresh fixture,
+ * and the fixture from the failed attempt is gone before the next one begins. Historical failures stay visible in the
+ * result as attempt nodes.
  */
 public class RetryTest {
+
+    private static final String ID_CREATE = "create";
+    private static final String ID_RETRY = "retry";
+    private static final String ID_TEAR_DOWN = "tearDown";
+
+    private static final String FIXTURE = "fixture";
 
     private static final AtomicInteger attempts = new AtomicInteger();
     private static final AtomicInteger instancesCreated = new AtomicInteger();
@@ -63,13 +71,14 @@ public class RetryTest {
         attempts.set(0);
         instancesCreated.set(0);
 
-        return instance("retry-example", RetryTest::new)
+        return sequential(RetryTest.class, "retry-example")
                 .retry(RetryPolicy.builder()
                         .maxAttempts(3)
                         .backoff(Backoff.linear(Duration.ofMillis(25)))
                         .build())
-                .step("retry", RetryTest::retry)
-                .after(RetryTest::tearDown)
+                .before(ID_CREATE)
+                .step(ID_RETRY)
+                .after(ID_TEAR_DOWN)
                 .build();
     }
 
@@ -86,5 +95,35 @@ public class RetryTest {
 
     private void tearDown() {
         assertThat(instancesCreated.get()).isEqualTo(Math.min(3, attempts.get()));
+    }
+
+    /**
+     * Creates this attempt's fixture.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CREATE)
+    public static void create(final Context context) {
+        context.put(FIXTURE, new RetryTest());
+    }
+
+    /**
+     * Runs one attempt of the flaky operation.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_RETRY)
+    public static void runRetry(final Context context) {
+        context.require(FIXTURE, RetryTest.class).retry();
+    }
+
+    /**
+     * Tears down this attempt's fixture, if it was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void runTearDown(final Context context) {
+        context.find(FIXTURE, RetryTest.class).ifPresent(RetryTest::tearDown);
     }
 }

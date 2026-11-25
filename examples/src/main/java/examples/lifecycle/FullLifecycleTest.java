@@ -17,23 +17,35 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
 
 /**
- * Demonstrates static setup, per-instance setup, per-test before/after, instance teardown, and static teardown.
+ * Demonstrates static setup, fixture setup, per-test before/after, fixture teardown, and static teardown.
  *
- * <p>The nesting shows the 7.0 lifecycle model: {@code before} and {@code after} belong to the task that declares
- * them, run in declaration order and reverse declaration order respectively, and inner tasks inherit the outer
- * instance without repeating a class token.
+ * <p>Each level is an occurrence with its own hooks: {@code before} and {@code after} belong to the task that declares
+ * them, run in declaration order and reverse declaration order respectively, and a step with a body and its own hooks
+ * is written as a child group with {@code .body(id)}. The fixture lives in the scope of the group that created it, so
+ * every descendant resolves it by name.
  */
 public class FullLifecycleTest {
+
+    private static final String ID_STATIC_SET_UP = "staticSetUp";
+    private static final String ID_SET_UP = "setUp";
+    private static final String ID_BEFORE_EACH = "beforeEach";
+    private static final String ID_TEST_ONE = "testOne";
+    private static final String ID_TEST_TWO = "testTwo";
+    private static final String ID_AFTER_EACH = "afterEach";
+    private static final String ID_TEAR_DOWN = "tearDown";
+    private static final String ID_STATIC_TEAR_DOWN = "staticTearDown";
+
+    private static final String FIXTURE = "fixture";
 
     private static final List<String> callOrder = new ArrayList<>();
 
@@ -53,32 +65,104 @@ public class FullLifecycleTest {
      */
     @Paramixel.Factory
     public static Task factory() {
-        return sequential("FullLifecycleTest")
-                .before(FullLifecycleTest::staticSetUp)
-                .child(instance("instance", FullLifecycleTest::new)
-                        .before(FullLifecycleTest::setUp)
-                        .sequential(
-                                "tests",
-                                tests -> tests.step(
-                                                "testOne",
-                                                FullLifecycleTest::testOne,
-                                                children -> children.before(FullLifecycleTest::beforeEach)
-                                                        .after(FullLifecycleTest::afterEach))
-                                        .step(
-                                                "testTwo",
-                                                FullLifecycleTest::testTwo,
-                                                children -> children.before(FullLifecycleTest::beforeEach)
-                                                        .after(FullLifecycleTest::afterEach)))
-                        .after(FullLifecycleTest::tearDown))
-                .after(FullLifecycleTest::staticTearDown)
+        return sequential(FullLifecycleTest.class, "FullLifecycleTest")
+                .before(ID_STATIC_SET_UP)
+                .child(sequential("instance")
+                        .before(ID_SET_UP)
+                        .child(sequential("tests")
+                                .child(sequential("testOne")
+                                        .body(ID_TEST_ONE)
+                                        .before(ID_BEFORE_EACH)
+                                        .after(ID_AFTER_EACH))
+                                .child(sequential("testTwo")
+                                        .body(ID_TEST_TWO)
+                                        .before(ID_BEFORE_EACH)
+                                        .after(ID_AFTER_EACH)))
+                        .after(ID_TEAR_DOWN))
+                .after(ID_STATIC_TEAR_DOWN)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
+     * Clears the recorded call order.
+     *
+     * @param context the execution context
      */
-    public FullLifecycleTest() {
-        // Intentionally empty
+    @Paramixel.Id(ID_STATIC_SET_UP)
+    public static void staticSetUpHook(final Context context) {
+        staticSetUp();
+    }
+
+    /**
+     * Creates the fixture and records fixture setup.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SET_UP)
+    public static void setUpHook(final Context context) {
+        final var fixture = new FullLifecycleTest();
+        context.put(FIXTURE, fixture);
+        fixture.setUp();
+    }
+
+    /**
+     * Records per-test setup.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE_EACH)
+    public static void beforeEachHook(final Context context) {
+        context.require(FIXTURE, FullLifecycleTest.class).beforeEach();
+    }
+
+    /**
+     * First test body.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_ONE)
+    public static void testOneHook(final Context context) {
+        context.require(FIXTURE, FullLifecycleTest.class).testOne();
+    }
+
+    /**
+     * Second test body.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_TWO)
+    public static void testTwoHook(final Context context) {
+        context.require(FIXTURE, FullLifecycleTest.class).testTwo();
+    }
+
+    /**
+     * Records per-test cleanup.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER_EACH)
+    public static void afterEachHook(final Context context) {
+        context.require(FIXTURE, FullLifecycleTest.class).afterEach();
+    }
+
+    /**
+     * Records fixture teardown, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDownHook(final Context context) {
+        context.find(FIXTURE, FullLifecycleTest.class).ifPresent(FullLifecycleTest::tearDown);
+    }
+
+    /**
+     * Records static teardown and verifies the recorded order.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_STATIC_TEAR_DOWN)
+    public static void staticTearDownHook(final Context context) {
+        staticTearDown();
     }
 
     /**
@@ -90,7 +174,7 @@ public class FullLifecycleTest {
     }
 
     /**
-     * Records per-instance setup.
+     * Records fixture setup.
      */
     public void setUp() {
         callOrder.add("setUp");
@@ -125,7 +209,7 @@ public class FullLifecycleTest {
     }
 
     /**
-     * Records per-instance cleanup.
+     * Records fixture cleanup.
      */
     public void tearDown() {
         callOrder.add("tearDown");

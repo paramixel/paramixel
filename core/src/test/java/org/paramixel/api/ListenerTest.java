@@ -39,6 +39,8 @@ import nonapi.org.paramixel.reporting.ReportingDispatcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Listener contract: event ordering, exactly one terminal event per occurrence, and error isolation.
@@ -196,20 +198,17 @@ class ListenerTest {
 
     @Test
     @Timeout(30)
-    @DisplayName("a listener that does not drain in time is reported, and no event is delivered after onRunCompleted")
+    @DisplayName("a listener that does not drain in time cannot complete the report or rewrite passing task outcomes")
     void blockedListenerDrainIsBoundedAndReported() throws InterruptedException {
         final var blocked = new CountDownLatch(1);
         final var release = new CountDownLatch(1);
         final var dispatcher = new AtomicReference<Thread>();
         final var completionStarted = new AtomicBoolean();
-        final var eventsAfterCompletion = new AtomicInteger();
-        final var diagnosticsAtCompletion = new AtomicReference<List<String>>();
+        final var eventsDelivered = new AtomicInteger();
         final var listener = new Listener() {
             @Override
             public void onTaskEvent(final TaskEvent event) {
-                if (completionStarted.get()) {
-                    eventsAfterCompletion.incrementAndGet();
-                }
+                eventsDelivered.incrementAndGet();
                 if (event.phase() == TaskPhase.BODY
                         && "a".equals(event.name())
                         && dispatcher.compareAndSet(null, Thread.currentThread())) {
@@ -225,7 +224,6 @@ class ListenerTest {
             @Override
             public void onRunCompleted(final Result result) {
                 completionStarted.set(true);
-                diagnosticsAtCompletion.set(result.diagnostics());
             }
         };
         final Task definition = task("root")
@@ -256,10 +254,219 @@ class ListenerTest {
         assertThat(result.diagnostics())
                 .anySatisfy(
                         diagnostic -> assertThat(diagnostic).contains(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC));
-        assertThat(diagnosticsAtCompletion.get())
-                .anySatisfy(
-                        diagnostic -> assertThat(diagnostic).contains(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC));
-        assertThat(eventsAfterCompletion).hasValue(0);
+        assertThat(result.exitCode()).isEqualTo(1);
+        assertThat(result.isQuiescent()).isTrue();
+        assertThat(result.failures())
+                .extracting(Failure::phase)
+                .containsExactly(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC);
+        assertThat(completionStarted).isFalse();
+        assertThat(eventsDelivered).hasValue(3);
+    }
+
+    @Test
+    @Timeout(15)
+    void saturatedListenerCanResumeWithoutLosingOrReorderingEvents() throws Exception {
+        final var listening = new CountDownLatch(1);
+        final var allowDelivery = new CountDownLatch(1);
+        final var bodyStarted = new CountDownLatch(1);
+        final var events = new ArrayList<TaskEvent>();
+        final var listener = new Listener() {
+            @Override
+            public void onTaskEvent(final TaskEvent event) {
+                if (events.isEmpty()) {
+                    listening.countDown();
+                    try {
+                        allowDelivery.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                events.add(event);
+            }
+        };
+        final var definition = task("root")
+                .onlyIf(context -> true)
+                .before(bodyStarted::countDown)
+                .step("work", () -> {})
+                .build();
+        try (var runner = smallQueueRunner(listener, 5_000)) {
+            final var run = startRun(runner, definition);
+            try {
+                assertThat(listening.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(bodyStarted.await(250, TimeUnit.MILLISECONDS)).isFalse();
+                allowDelivery.countDown();
+                final var result = run.get(5, TimeUnit.SECONDS);
+                assertThat(bodyStarted.getCount()).isZero();
+                assertThat(result.exitCode()).isZero();
+                assertThat(events).extracting(TaskEvent::sequence).containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
+                assertThat(events.stream()
+                                .filter(event -> event.phase() == TaskPhase.TERMINAL)
+                                .count())
+                        .isEqualTo(result.occurrenceCount());
+            } finally {
+                allowDelivery.countDown();
+            }
+        }
+    }
+
+    @Test
+    @Timeout(15)
+    void saturatedListenerStopsTheRunAndSuppressesCompletion() throws Exception {
+        final var listening = new CountDownLatch(1);
+        final var release = new CountDownLatch(1);
+        final var completed = new AtomicBoolean();
+        final var listener = new Listener() {
+            @Override
+            public void onTaskEvent(final TaskEvent event) {
+                listening.countDown();
+                awaitIgnoringInterruption(release);
+            }
+
+            @Override
+            public void onRunCompleted(final Result result) {
+                completed.set(true);
+            }
+        };
+        final var calls = new AtomicInteger();
+        final var definition = task("root").step("work", calls::incrementAndGet).build();
+        try (var runner = smallQueueRunner(listener, 300)) {
+            final var run = startRun(runner, definition);
+            try {
+                assertThat(listening.await(5, TimeUnit.SECONDS)).isTrue();
+                final var result = run.get(3, TimeUnit.SECONDS);
+                assertThat(result.status().kind()).isEqualTo(Status.Kind.CANCELED);
+                assertThat(result.isQuiescent()).isTrue();
+                assertThat(result.exitCode()).isNotZero();
+                assertThat(result.failures())
+                        .extracting(Failure::phase)
+                        .contains(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC);
+                assertThat(result.diagnostics()).anyMatch(message -> message.contains("incomplete"));
+                assertThat(completed).isFalse();
+                assertThat(calls).hasValue(0);
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @Timeout(20)
+    void closeAndTimeoutCanFinalizeAnActiveChildWhileListenerIsBlocked(final boolean close) throws Exception {
+        final var blocked = new CountDownLatch(1);
+        final var releaseListener = new CountDownLatch(1);
+        final var active = new CountDownLatch(1);
+        final var interrupted = new CountDownLatch(1);
+        final var allowBodyReturn = new CountDownLatch(1);
+        final var finalized = new CountDownLatch(1);
+        final var listener = new Listener() {
+            @Override
+            public void onTaskEvent(final TaskEvent event) {
+                if (event.phase() == TaskPhase.BODY && event.name().equals("marker")) {
+                    blocked.countDown();
+                    awaitIgnoringInterruption(releaseListener);
+                }
+            }
+        };
+        final var definition = parallel("root", Pool.named("p"))
+                .step(
+                        "active",
+                        () -> {
+                            active.countDown();
+                            try {
+                                allowBodyReturn.await();
+                            } catch (InterruptedException e) {
+                                interrupted.countDown();
+                                throw e;
+                            }
+                        },
+                        settings -> {
+                            settings.after(finalized::countDown);
+                            if (!close) {
+                                settings.timeout(Duration.ofSeconds(2));
+                            }
+                        })
+                .step("marker", () -> active.await(5, TimeUnit.SECONDS))
+                .build();
+        try (var runner = smallQueueRunner(listener, 10_000)) {
+            final var run = startRun(runner, definition);
+            try {
+                assertThat(blocked.await(5, TimeUnit.SECONDS)).isTrue();
+                if (close) {
+                    runner.close();
+                }
+                assertThat(interrupted.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(finalized.await(5, TimeUnit.SECONDS)).isTrue();
+                releaseListener.countDown();
+                final var result = run.get(5, TimeUnit.SECONDS);
+                assertThat(result.isQuiescent()).isTrue();
+                assertThat(result.failures()).isEmpty();
+                assertThat(result.status().kind()).isEqualTo(close ? Status.Kind.CANCELED : Status.Kind.FAILED);
+                assertThat(result.timedOutCount()).isEqualTo(close ? 0 : 1);
+            } finally {
+                releaseListener.countDown();
+                allowBodyReturn.countDown();
+            }
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void completionCallbackIsAlsoBoundedWithoutChangingTaskStatus() throws Exception {
+        final var release = new CountDownLatch(1);
+        final var completed = new CountDownLatch(1);
+        final var listener = new Listener() {
+            @Override
+            public void onRunCompleted(final Result result) {
+                completed.countDown();
+                awaitIgnoringInterruption(release);
+            }
+        };
+        try (var runner = smallQueueRunner(listener, 500)) {
+            final var run = startRun(runner, task("root").step("pass", () -> {}).build());
+            try {
+                assertThat(completed.await(3, TimeUnit.SECONDS)).isTrue();
+                final var result = run.get(3, TimeUnit.SECONDS);
+                assertThat(result.status().isPassed()).isTrue();
+                assertThat(result.isQuiescent()).isTrue();
+                assertThat(result.exitCode()).isEqualTo(1);
+                assertThat(result.failures())
+                        .extracting(Failure::phase)
+                        .containsExactly(ReportingDispatcher.DRAIN_TIMEOUT_DIAGNOSTIC);
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    private static Runner smallQueueRunner(final Listener listener, final long drainMillis) {
+        return Runner.builder()
+                .listener(listener)
+                .configuration(Configuration.of(Map.of(
+                        Configuration.LISTENER_QUEUE_CAPACITY, "1",
+                        Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS, Long.toString(drainMillis),
+                        Configuration.WORKERS, "2")))
+                .pool(Pool.named("p"), 2)
+                .build();
+    }
+
+    private static FutureTask<Result> startRun(final Runner runner, final Task definition) {
+        final var run = new FutureTask<>(() -> runner.run(definition));
+        final var caller = new Thread(run);
+        caller.setDaemon(true);
+        caller.start();
+        return run;
+    }
+
+    private static void awaitIgnoringInterruption(final CountDownLatch release) {
+        for (; ; ) {
+            try {
+                release.await();
+                return;
+            } catch (InterruptedException ignored) {
+                // Model an uncooperative listener; the test always releases it in finally.
+            }
+        }
     }
 
     @Test

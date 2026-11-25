@@ -17,21 +17,29 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
 
 /**
- * Demonstrates that the framework does not implicitly close an owned instance.
+ * Demonstrates that the framework does not implicitly close a fixture held in the context.
  *
- * <p>{@code SimpleTest} implements {@link AutoCloseable}, yet {@code close()} runs only because an explicit
- * {@code after} callback calls it. Implicit closing was deliberately removed in 7.0: it makes ownership ambiguous when
- * a fixture is shared with an enclosing scope.
+ * <p>The fixture implements {@link AutoCloseable}, yet {@code close()} runs only because an explicit {@code after}
+ * hook calls it. The framework never probes for {@link AutoCloseable}: it drops the reference when the scope ends and
+ * nothing more. The {@code after} hook uses {@code find}, so a partially completed {@code before} cannot mask the
+ * original failure.
  */
 public class SimpleTest implements AutoCloseable {
+
+    private static final String ID_CREATE = "create";
+    private static final String ID_TEST_ONE = "testOne";
+    private static final String ID_CLOSE = "close";
+
+    private static final String FIXTURE = "fixture";
 
     private static final AtomicInteger testCount = new AtomicInteger();
 
@@ -53,17 +61,21 @@ public class SimpleTest implements AutoCloseable {
     public static Task factory() {
         testCount.set(0);
 
-        return instance("SimpleTest", SimpleTest::new)
-                .step("testOne", SimpleTest::testOne)
-                .after(SimpleTest::close)
+        return sequential(SimpleTest.class, "SimpleTest")
+                .before(ID_CREATE)
+                .step(ID_TEST_ONE)
+                .after(ID_CLOSE)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
+     * Creates the fixture for this attempt.
+     *
+     * @param context the execution context
      */
-    public SimpleTest() {
-        // Intentionally empty
+    @Paramixel.Id(ID_CREATE)
+    public static void create(final Context context) {
+        context.put(FIXTURE, new SimpleTest());
     }
 
     /**
@@ -71,6 +83,26 @@ public class SimpleTest implements AutoCloseable {
      */
     public void testOne() {
         testCount.incrementAndGet();
+    }
+
+    /**
+     * Test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_ONE)
+    public static void testOne(final Context context) {
+        context.require(FIXTURE, SimpleTest.class).testOne();
+    }
+
+    /**
+     * Releases the fixture, if the attempt managed to create one.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CLOSE)
+    public static void releaseFixture(final Context context) {
+        context.find(FIXTURE, SimpleTest.class).ifPresent(SimpleTest::close);
     }
 
     @Override

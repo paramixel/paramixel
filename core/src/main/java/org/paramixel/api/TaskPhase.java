@@ -20,7 +20,7 @@ package org.paramixel.api;
  * The lifecycle phases reported by Paramixel.
  *
  * <p>The order of the constants is the normal phase order of a task occurrence:
- * {@code ADMITTED → RESOURCES_ACQUIRED → BEFORE → BODY → CHILDREN → AFTER → RESOURCES_RELEASED → TERMINAL}.
+ * {@code ADMITTED → CONDITION → BEFORE → BODY → CHILDREN → AFTER → TERMINAL}.
  * A task without a phase skips it. A {@code CONDITION} phase is reported only when the task declares a condition.
  */
 public enum TaskPhase {
@@ -31,8 +31,7 @@ public enum TaskPhase {
     /** A runtime condition of the task was evaluated. */
     CONDITION,
 
-    /** The task acquired its declared keyed resources and its primary instance. */
-    RESOURCES_ACQUIRED,
+    /** A runtime condition of the task was evaluated. */
 
     /** A {@code before} callback ran. */
     BEFORE,
@@ -50,7 +49,6 @@ public enum TaskPhase {
     AFTER,
 
     /** The task released its remaining keyed resources. */
-    RESOURCES_RELEASED,
 
     /** The task reached its terminal status. */
     TERMINAL

@@ -201,6 +201,22 @@ class StatusOutputTest {
     }
 
     @Test
+    @DisplayName("the run totals are separated from the result tree by a rule")
+    void totalsAreSeparatedFromTheTreeByRule() {
+        final var definition = task("consume").build();
+
+        final var lines = run(definition);
+
+        final var totals = lines.indexOf(lines.stream()
+                .filter(line -> line.startsWith(PREFIX + "occurrences: "))
+                .findFirst()
+                .orElseThrow());
+        assertThat(totals).isGreaterThan(0);
+        assertThat(lines.get(totals - 1)).isEqualTo(PREFIX + "-------");
+        assertThat(lines).doesNotContain("");
+    }
+
+    @Test
     @DisplayName("the summary header is separated from the run footer by a rule")
     void summaryHeaderIsSeparatedFromFooterByRule() {
         final var definition = task("root").step("pass", () -> {}).build();

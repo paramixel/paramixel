@@ -16,14 +16,22 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * Run-level hooks used by discovery tests.
+ *
+ * <p>The three definitions share one hook method and one step name. Each binds its own name, so the hook branches on
+ * data instead of on a method reference, and every definition keeps the exact shape (and path) the discovery assertions
+ * expect.
  */
 public final class HookFixture {
+
+    private static final String HOOK = "hook";
 
     private HookFixture() {
         // Intentionally empty
@@ -36,13 +44,9 @@ public final class HookFixture {
      */
     @Paramixel.BeforeAll
     public static Task beforeAll() {
-        return Tasks.task("beforeAll")
-                .step("run", () -> {
-                    DiscoveryFixtures.RECORDED.add("beforeAll");
-                    if (DiscoveryFixtures.failBeforeAll) {
-                        throw new IllegalStateException("beforeAll failed");
-                    }
-                })
+        return sequential(HookFixture.class, "beforeAll")
+                .bind(HOOK, "beforeAll")
+                .step("run")
                 .build();
     }
 
@@ -53,8 +57,9 @@ public final class HookFixture {
      */
     @Paramixel.AfterAll
     public static Task afterAll() {
-        return Tasks.task("afterAll")
-                .step("run", () -> DiscoveryFixtures.RECORDED.add("afterAll"))
+        return sequential(HookFixture.class, "afterAll")
+                .bind(HOOK, "afterAll")
+                .step("run")
                 .build();
     }
 
@@ -68,11 +73,26 @@ public final class HookFixture {
         if (!DiscoveryFixtures.failAfterAll) {
             return null;
         }
-        return Tasks.task("failingAfterAll")
-                .step("run", () -> {
-                    DiscoveryFixtures.RECORDED.add("failingAfterAll");
-                    throw new IllegalStateException("afterAll failed");
-                })
+        return sequential(HookFixture.class, "failingAfterAll")
+                .bind(HOOK, "failingAfterAll")
+                .step("run")
                 .build();
+    }
+
+    /**
+     * Runs one of the three hook definitions.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        final var name = context.require(HOOK, String.class);
+        DiscoveryFixtures.RECORDED.add(name);
+        if ("beforeAll".equals(name) && DiscoveryFixtures.failBeforeAll) {
+            throw new IllegalStateException("beforeAll failed");
+        }
+        if ("failingAfterAll".equals(name)) {
+            throw new IllegalStateException("afterAll failed");
+        }
     }
 }

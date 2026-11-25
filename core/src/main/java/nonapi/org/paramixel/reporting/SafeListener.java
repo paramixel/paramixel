@@ -47,15 +47,12 @@ final class SafeListener implements Listener {
     }
 
     /**
-     * Returns the listener diagnostics recorded since the previous call and forgets them, so each diagnostic is
-     * reported exactly once.
+     * Returns a snapshot of the listener diagnostics.
      *
      * @return the immutable diagnostics; never {@code null}
      */
-    synchronized List<String> drainDiagnostics() {
-        final var drained = List.copyOf(diagnostics);
-        diagnostics.clear();
-        return drained;
+    synchronized List<String> diagnostics() {
+        return List.copyOf(diagnostics);
     }
 
     @Override
@@ -97,11 +94,24 @@ final class SafeListener implements Listener {
         }
     }
 
-    private synchronized void record(final String callback, final Throwable throwable) {
+    private void record(final String callback, final Throwable throwable) {
+        final String detail;
+        try {
+            detail = throwable.getMessage();
+        } catch (Throwable formattingFailure) {
+            UnrecoverableErrors.rethrowIfUnrecoverable(formattingFailure);
+            appendDiagnostic(
+                    "Listener " + callback + " threw " + throwable.getClass().getName());
+            return;
+        }
+        appendDiagnostic(
+                "Listener " + callback + " threw " + throwable.getClass().getName() + ": " + detail);
+    }
+
+    private synchronized void appendDiagnostic(final String message) {
         failureCount++;
         if (failureCount <= MAX_RECORDED_FAILURES) {
-            diagnostics.add("Listener " + callback + " threw "
-                    + throwable.getClass().getName() + ": " + throwable.getMessage());
+            diagnostics.add(message);
         }
     }
 }

@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import org.paramixel.api.Listener;
 import org.paramixel.api.PhaseResult;
 import org.paramixel.api.Result;
 import org.paramixel.api.TaskResult;
+import org.paramixel.api.exception.ConfigurationException;
 
 /**
  * Writes a machine-readable or printable report file when the run completes.
@@ -59,11 +61,21 @@ public final class ReportFileListener implements Listener {
      *
      * @param configuration the effective configuration, used to resolve {@link Configuration#REPORT_FILE}; must not be
      *     {@code null}
+     * @throws ConfigurationException if the configured report path is malformed
      */
     public ReportFileListener(final Configuration configuration) {
-        this(Path.of(configuration
+        this(reportPath(configuration));
+    }
+
+    private static Path reportPath(final Configuration configuration) {
+        final var value = configuration
                 .getString(Configuration.REPORT_FILE)
-                .orElseThrow(() -> new IllegalArgumentException("report file is not configured"))));
+                .orElseThrow(() -> new IllegalArgumentException("report file is not configured"));
+        try {
+            return Path.of(value);
+        } catch (InvalidPathException e) {
+            throw new ConfigurationException("Invalid path for '" + Configuration.REPORT_FILE + "'", e);
+        }
     }
 
     /**

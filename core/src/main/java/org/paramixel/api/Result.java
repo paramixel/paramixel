@@ -30,13 +30,15 @@ import java.util.TreeMap;
  *
  * <p>{@link #status()} is the semantic aggregate status of the run and is never rewritten to reflect exit-code policy.
  * {@link #exitCode()} applies the configured mapping ({@code failureOnSkip}, {@code failureOnAbort},
- * {@code failIfNoTests}) and is the single authority for a process exit code.
+ * {@code failIfNoTests}) and accounts for infrastructure failures such as incomplete listener reporting. It is the
+ * single authority for a process exit code.
  *
  * <p>{@link #isQuiescent()} is the honesty flag for timeouts. It is {@code true} for a normally settled run, where no
  * framework worker, permit, or finalizer remains active. It is {@code false} when a callback ignored cooperative
  * cancellation past the shutdown grace period: user work may still be running, finalizers were deliberately withheld
  * to avoid touching resources that the stuck callback is still mutating, and permits may still be held. A non-quiescent
- * run never reports clean finalization, and its exit code is non-zero.
+ * run never reports clean finalization, and its exit code is non-zero. Task quiescence is independent of listener
+ * delivery: a stalled reporting callback can outlive a quiescent task run.
  */
 public final class Result {
 
@@ -121,7 +123,7 @@ public final class Result {
     /**
      * Returns whether the run settled completely.
      *
-     * @return {@code true} when no framework worker, permit, finalizer, or callback remains active
+     * @return {@code true} when no task worker, permit, finalizer, or callback remains active
      */
     public boolean isQuiescent() {
         return quiescent;
@@ -284,13 +286,35 @@ public final class Result {
         }
         final var merged = new ArrayList<>(diagnostics);
         additional.forEach(value -> merged.add(Objects.requireNonNull(value, "diagnostic is null")));
+        return copy(exitCode, failures, merged);
+    }
+
+    /**
+     * Returns a copy with an additional run-level infrastructure failure and a nonzero exit code.
+     * Task statuses and task quiescence are preserved.
+     *
+     * @param failure the failure to record; must not be {@code null}
+     * @return the new result; never {@code null}
+     * @throws NullPointerException if {@code failure} is {@code null}
+     */
+    public Result withInfrastructureFailure(final Failure failure) {
+        Objects.requireNonNull(failure, "failure is null");
+        final var updatedFailures = new ArrayList<>(failures);
+        updatedFailures.add(Failure.of(
+                failure.phase(), failure.message(), failure.throwable().orElse(null), failures.isEmpty()));
+        final var updatedDiagnostics = new ArrayList<>(diagnostics);
+        updatedDiagnostics.add(failure.phase() + ": " + failure.message());
+        return copy(exitCode == 0 ? 1 : exitCode, updatedFailures, updatedDiagnostics);
+    }
+
+    private Result copy(final int code, final List<Failure> runFailures, final List<String> runDiagnostics) {
         final var builder = builder()
                 .runId(runId)
-                .status(status, exitCode, quiescent)
+                .status(status, code, quiescent)
                 .timings(startedAt, completedAt)
                 .root(root)
-                .failures(failures)
-                .diagnostics(merged)
+                .failures(runFailures)
+                .diagnostics(runDiagnostics)
                 .configurationSummary(configurationSummary)
                 .shuffleSeed(shuffleSeed)
                 .occurrenceCount(occurrenceCount)

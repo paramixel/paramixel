@@ -17,11 +17,11 @@
 package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -115,6 +115,14 @@ public class MixedArgumentTest {
         }
     }
 
+    private static final String ID_SET_UP = "setUp";
+    private static final String ID_TEST_ONE = "testOne";
+    private static final String ID_TEAR_DOWN = "tearDown";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String ARGUMENT = "argument";
+    private static final String FIXTURE = "fixture";
+
     private static final int EXPECTED_ARGUMENT_COUNT = 3;
 
     private static final AtomicInteger setUpCount = new AtomicInteger();
@@ -141,23 +149,62 @@ public class MixedArgumentTest {
     @Paramixel.Factory
     public static Task factory() {
         resetCounts();
-
-        return sequential("MixedArgumentTest")
-                .each(
-                        List.of(
-                                new StringArgument("paramixel"),
-                                new IntegerArgument(42),
-                                new PointArgument(new Point(3, 7))),
-                        testArgument -> instance(testArgument.name(), () -> new MixedArgumentTest(testArgument))
-                                .before(MixedArgumentTest::setUp)
-                                .step("testOne", MixedArgumentTest::testOne)
-                                .after(MixedArgumentTest::tearDown))
-                .after(MixedArgumentTest::validate)
-                .build();
+        final var root = sequential(MixedArgumentTest.class, "MixedArgumentTest");
+        for (final var testArgument :
+                List.of(new StringArgument("paramixel"), new IntegerArgument(42), new PointArgument(new Point(3, 7)))) {
+            root.child(sequential(testArgument.name())
+                    .bind(ARGUMENT, testArgument)
+                    .before(ID_SET_UP)
+                    .step(ID_TEST_ONE)
+                    .after(ID_TEAR_DOWN));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
     private MixedArgumentTest(final TestArgument testArgument) {
         this.testArgument = testArgument;
+    }
+
+    /**
+     * Builds this branch's fixture and records setup.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SET_UP)
+    public static void setUpHook(final Context context) {
+        final var fixture = new MixedArgumentTest(context.require(ARGUMENT, TestArgument.class));
+        context.put(FIXTURE, fixture);
+        fixture.setUp();
+    }
+
+    /**
+     * Runs the argument-specific test.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_ONE)
+    public static void testOneHook(final Context context) {
+        context.require(FIXTURE, MixedArgumentTest.class).testOne();
+    }
+
+    /**
+     * Records teardown, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDownHook(final Context context) {
+        context.find(FIXTURE, MixedArgumentTest.class).ifPresent(MixedArgumentTest::tearDown);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
     }
 
     /**

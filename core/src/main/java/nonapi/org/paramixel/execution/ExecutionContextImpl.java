@@ -16,14 +16,12 @@
 
 package nonapi.org.paramixel.execution;
 
-import java.lang.invoke.MethodType;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Context;
-import org.paramixel.api.Key;
-import org.paramixel.api.exception.ResourceException;
+import org.paramixel.api.exception.ContextException;
 
 /**
  * The read-only {@link Context} view handed to user callbacks.
@@ -36,11 +34,15 @@ final class ExecutionContextImpl implements Context {
     private final ExecutionEngine engine;
     private final OccurrenceState state;
     private final int attempt;
+    private final OccurrenceState.Attempt writerAttempt;
+    private final OccurrenceState.Attempt scope;
 
     ExecutionContextImpl(final ExecutionEngine engine, final OccurrenceState state, final int attempt) {
         this.engine = Objects.requireNonNull(engine, "engine is null");
         this.state = Objects.requireNonNull(state, "state is null");
         this.attempt = attempt;
+        this.writerAttempt = state.attempt;
+        this.scope = state.scopeAttempt();
     }
 
     @Override
@@ -94,56 +96,72 @@ final class ExecutionContextImpl implements Context {
     }
 
     @Override
-    public Object primaryInstance() {
-        final var owner = state.bindingOwner();
-        if (owner == null) {
-            throw new IllegalStateException("No primary instance is bound for occurrence " + state.path
-                    + "; wrap the task in instance(name, factory)");
+    public void put(final String name, final Object value) {
+        Objects.requireNonNull(name, "name is null");
+        Objects.requireNonNull(value, "value is null");
+        if (name.isBlank()) {
+            throw new IllegalArgumentException("Context entry name is blank");
         }
-        final var attempt = owner.attempt;
-        final var instance = attempt == null ? null : attempt.instance;
-        if (instance == null) {
-            throw new IllegalStateException("The primary instance of " + owner.path
-                    + " is not available yet: it is created after that task's resources, so a resource factory"
-                    + " declared on that task cannot read it");
+        final var target = writableScope();
+        if (target != null) {
+            target.context.put(name, value);
         }
-        return instance;
     }
 
     @Override
-    public <T> T require(final Key<T> key) {
-        Objects.requireNonNull(key, "key is null");
-        final var value = state.findResource(key);
+    public void remove(final String name) {
+        Objects.requireNonNull(name, "name is null");
+        final var target = writableScope();
+        if (target != null) {
+            target.context.remove(name);
+        }
+    }
+
+    @Override
+    public <T> T require(final String name, final Class<T> type) {
+        Objects.requireNonNull(name, "name is null");
+        Objects.requireNonNull(type, "type is null");
+        final var value = state.findContextEntry(name);
         if (value == null) {
-            throw new ResourceException(key, state.path, "No resource is bound for key " + key + " at " + state.path);
+            throw new ContextException(name, state.path, "No context entry named \"" + name + "\" at " + state.path);
         }
-        return cast(key, value);
+        if (!type.isInstance(value)) {
+            throw new ContextException(
+                    name,
+                    state.path,
+                    "Context entry \"" + name + "\" at " + state.path + " holds "
+                            + value.getClass().getName() + " but " + type.getName() + " was requested");
+        }
+        return type.cast(value);
     }
 
     @Override
-    public <T> Optional<T> find(final Key<T> key) {
-        Objects.requireNonNull(key, "key is null");
-        final var value = state.findResource(key);
-        return value == null ? Optional.empty() : Optional.of(cast(key, value));
+    public <T> Optional<T> find(final String name, final Class<T> type) {
+        Objects.requireNonNull(name, "name is null");
+        Objects.requireNonNull(type, "type is null");
+        final var value = state.findContextEntry(name);
+        return type.isInstance(value) ? Optional.of(type.cast(value)) : Optional.empty();
     }
 
     /**
-     * Casts a resource value to the key's type.
+     * Returns the attempt this context may write to, or {@code null} when the write must be discarded.
      *
-     * <p>A key declared with a primitive type, such as {@code int.class}, holds the boxed value, so the cast uses the
-     * wrapper type; {@code int.class.cast(42)} would otherwise throw.
+     * <p>A write is discarded when the writer's own attempt has been superseded (a timeout, a cancellation, or a hook
+     * that ignored interruption), when the scope owner has moved on to another attempt, or when the scope was already
+     * closed and cleared. Without this, an abandoned callback could contaminate the next attempt.
      *
-     * @param key the key
-     * @param value the non-null resource value
-     * @param <T> the resource type
-     * @return the typed value
+     * @return the writable attempt, or {@code null}
      */
-    @SuppressWarnings("unchecked")
-    private static <T> T cast(final Key<T> key, final Object value) {
-        final var type = key.type();
-        if (type.isPrimitive()) {
-            return (T) MethodType.methodType(type).wrap().returnType().cast(value);
+    private OccurrenceState.Attempt writableScope() {
+        if (scope == null || scope.contextClosed) {
+            return null;
         }
-        return type.cast(value);
+        if (state.attempt != writerAttempt) {
+            return null;
+        }
+        if (state.scopeAttempt() != scope) {
+            return null;
+        }
+        return scope;
     }
 }

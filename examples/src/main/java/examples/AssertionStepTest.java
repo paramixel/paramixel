@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.exception.FailException.fail;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -27,10 +28,15 @@ import org.paramixel.api.Task;
 /**
  * Demonstrates assertion-style steps that fail through the framework failure signal.
  *
- * <p>A failing step records a {@code FAILED} status with its cause. The result tree is the source of truth, so a
- * reporter never has to inspect exception messages to decide what happened.
+ * <p>Each step is an ordinary static method named by a stable identifier. A failing step records a {@code FAILED}
+ * status with its cause, and the report labels the failure with the identifier, so a reporter never has to inspect
+ * exception messages to decide what happened.
  */
 public class AssertionStepTest {
+
+    private static final String ID_ONE_EQUALS_ONE = "one-equals-one";
+    private static final String ID_TWO_IS_EVEN = "two-is-even";
+    private static final String ID_ASSERTJ_STYLE = "assertj-style";
 
     /**
      * Runs the factory and exits the JVM.
@@ -48,19 +54,45 @@ public class AssertionStepTest {
      */
     @Paramixel.Factory
     public static Task factory() {
-        return sequential("assertion-steps")
-                .step("one-equals-one", () -> {
-                    if (1 != 1) {
-                        throw fail("one is not equal to one");
-                    }
-                })
-                .step("two-is-even", () -> {
-                    final var value = 2;
-                    if (value % 2 != 0) {
-                        throw fail("expected an even value but was " + value);
-                    }
-                })
-                .step("assertj-style", () -> assertThat("paramixel").startsWith("param"))
+        return sequential(AssertionStepTest.class, "assertion-steps")
+                .step(ID_ONE_EQUALS_ONE)
+                .step(ID_TWO_IS_EVEN)
+                .step(ID_ASSERTJ_STYLE)
                 .build();
+    }
+
+    /**
+     * A comparison that holds.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_ONE_EQUALS_ONE)
+    public static void oneEqualsOne(final Context context) {
+        if (1 != 1) {
+            throw fail("one is not equal to one");
+        }
+    }
+
+    /**
+     * A computed assertion that holds.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TWO_IS_EVEN)
+    public static void twoIsEven(final Context context) {
+        final var value = 2;
+        if (value % 2 != 0) {
+            throw fail("expected an even value but was " + value);
+        }
+    }
+
+    /**
+     * An AssertJ-style assertion: AssertJ throws, and the framework records the failure.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_ASSERTJ_STYLE)
+    public static void assertjStyle(final Context context) {
+        assertThat("paramixel").startsWith("param");
     }
 }

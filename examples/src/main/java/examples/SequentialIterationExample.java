@@ -17,11 +17,10 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -30,6 +29,14 @@ import org.paramixel.api.Task;
  * Demonstrates a sequential matrix of fixtures, where every fixture runs its steps before the next fixture starts.
  */
 public class SequentialIterationExample {
+
+    private static final String ID_BEFORE = "before";
+    private static final String ID_TEST = "test";
+    private static final String ID_AFTER = "after";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String INDEX = "index";
+    private static final String FIXTURE = "fixture";
 
     private static final int ARGUMENT_COUNT = 5;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
@@ -61,27 +68,63 @@ public class SequentialIterationExample {
     @Paramixel.Factory
     public static Task factory() {
         resetCounts();
-        final var arguments =
-                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
-
-        return sequential("SequentialIterationExample")
-                .each(
-                        arguments,
-                        value -> instance(
-                                        value,
-                                        () -> new SequentialIterationExample(
-                                                Integer.parseInt(value.substring("string-".length()))))
-                                .before(SequentialIterationExample::before)
-                                .step("test", SequentialIterationExample::test)
-                                .step("test", SequentialIterationExample::test)
-                                .step("test", SequentialIterationExample::test)
-                                .after(SequentialIterationExample::after))
-                .after(SequentialIterationExample::validate)
-                .build();
+        final var root = sequential(SequentialIterationExample.class, "SequentialIterationExample");
+        for (var i = 0; i < ARGUMENT_COUNT; i++) {
+            root.child(sequential("string-" + i)
+                    .bind(INDEX, i)
+                    .before(ID_BEFORE)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .after(ID_AFTER));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
     private SequentialIterationExample(final int argumentIndex) {
         this.argumentIndex = argumentIndex;
+    }
+
+    /**
+     * Builds this branch's fixture and records fixture entry.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE)
+    public static void beforeHook(final Context context) {
+        final var fixture = new SequentialIterationExample(context.require(INDEX, Integer.class));
+        context.put(FIXTURE, fixture);
+        fixture.before();
+    }
+
+    /**
+     * Runs one test body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void testHook(final Context context) {
+        context.require(FIXTURE, SequentialIterationExample.class).test();
+    }
+
+    /**
+     * Records fixture exit, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER)
+    public static void afterHook(final Context context) {
+        context.find(FIXTURE, SequentialIterationExample.class).ifPresent(SequentialIterationExample::after);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
     }
 
     /**

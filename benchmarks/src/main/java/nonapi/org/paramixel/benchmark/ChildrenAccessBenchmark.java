@@ -74,9 +74,11 @@ public class ChildrenAccessBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             final var children = new ArrayList<Task>();
-            final var builder = Tasks.parallel("root", Pool.named("p"));
+            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("p"));
             for (var i = 0; i < size; i++) {
-                children.add(Tasks.task("child-" + i).step("step", () -> {}).build());
+                children.add(Tasks.sequential(BenchmarkTree.class, "child-" + i)
+                        .step(BenchmarkTree.ID_NOOP)
+                        .build());
             }
             children.forEach(builder::child);
             definition = builder.build();

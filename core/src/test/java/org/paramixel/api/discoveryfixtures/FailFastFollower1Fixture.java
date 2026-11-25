@@ -16,14 +16,16 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
+@Paramixel.Priority(15)
 /**
  * A factory admitted after the fail-fast trigger; it records whether it ran.
  */
-@Paramixel.Priority(15)
 public final class FailFastFollower1Fixture {
 
     private FailFastFollower1Fixture() {
@@ -37,8 +39,18 @@ public final class FailFastFollower1Fixture {
      */
     @Paramixel.Factory
     public static Task factory() {
-        return Tasks.task("follower-1")
-                .step("run", () -> DiscoveryFixtures.RECORDED.add("follower-1"))
+        return sequential(FailFastFollower1Fixture.class, "follower-1")
+                .step("run")
                 .build();
+    }
+
+    /**
+     * Records this fixture's execution.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        DiscoveryFixtures.RECORDED.add("follower-1");
     }
 }

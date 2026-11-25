@@ -9,17 +9,17 @@ description: Sequential, parallel, and repetition builder views.
 
 | Builder | Created by | Extra methods |
 | --- | --- | --- |
-| `SequentialBuilder<T>` | `Tasks.task`, `Tasks.sequential`, `Tasks.instance`, `sequential(...)`, `step(..., children -> ...)` | `dependent()`, `independent()` |
-| `ParallelBuilder<T>` | `Tasks.parallel`, `parallel(...)` | none — parallel groups have no continuation policy |
-| `RepeatBuilder<T>` | `Tasks.repeat`, `repeat(...)` | `maxIterations`, `untilPassed`, `until`, `delay` |
+| `SequentialBuilder` | `Tasks.sequential(name)`, `Tasks.sequential(Owner.class, name)`, `sequential(...)` | `dependent()`, `independent()` |
+| `ParallelBuilder` | `Tasks.parallel(name, pool)`, `Tasks.parallel(Owner.class, name, pool)` | none — parallel groups have no continuation policy |
+| `RepeatBuilder` | `Tasks.repeat(name)`, `Tasks.repeat(Owner.class, name)` | `maxIterations`, `untilPassed`, `until(id)`, `delay` |
 
 ## Sequential
 
 ```java
-sequential("Validation", tests -> tests
+sequential(MySuite.class, "Validation")
     .independent()
-    .step("Check A", Test::checkA)
-    .step("Check B", Test::checkB));
+    .step("checkA")
+    .step("checkB");
 ```
 
 If `Check A` fails and `Check B` passes, both run and the group is `FAILED`.
@@ -27,9 +27,10 @@ If `Check A` fails and `Check B` passes, both run and the group is `FAILED`.
 ## Parallel
 
 ```java
-parallel("Environments", Pool.named("environments"), matrix -> matrix
-    .each(environments, env -> instance(env.name(), () -> new Probe(env))
-            .step("Verify", Probe::verify)));
+final var matrix = parallel(MySuite.class, "Environments", Pool.named("environments"));
+for (final var environment : environments) {
+    matrix.child(sequential(environment.name()).bind(ENVIRONMENT, environment).step("verify"));
+}
 ```
 
 Every direct child holds one permit of the named pool for its entire lifetime.

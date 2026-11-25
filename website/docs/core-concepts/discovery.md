@@ -22,10 +22,11 @@ executes.
 ```java
 @Paramixel.Factory
 public static Task factory() {
-    return parallel("Environments", Pool.named("environments"))
-            .each(environments, env -> instance(env.name(), () -> new Probe(env))
-                    .step("verify", Probe::verify))
-            .build();
+    final var root = parallel(MySuite.class, "Environments", Pool.named("environments"));
+    for (final var environment : environments) {
+        root.child(sequential(environment.name()).bind(ENVIRONMENT, environment).step(ID_VERIFY));
+    }
+    return root.build();
 }
 ```
 

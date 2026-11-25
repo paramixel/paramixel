@@ -17,10 +17,12 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.paramixel.api.Tasks.repeat;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -33,6 +35,9 @@ import org.paramixel.api.support.Backoff;
  * stops a pending delay instead of waiting it out.
  */
 public class LoopWithLinearDelayTest {
+
+    private static final String ID_CHECK = "check";
+    private static final String ID_VALIDATE = "validate";
 
     private static final AtomicInteger iterationCount = new AtomicInteger();
 
@@ -54,14 +59,33 @@ public class LoopWithLinearDelayTest {
     @Paramixel.Factory
     public static Task factory() {
         resetCounts();
-        return sequential("loop-fixed-delay-example")
-                .repeat(
-                        "poll",
-                        repeat -> repeat.maxIterations(3)
-                                .delay(Backoff.fixed(Duration.ofMillis(50)))
-                                .step("check", iterationCount::incrementAndGet))
-                .step("validate", () -> assertThat(iterationCount.get()).isEqualTo(3))
+        return sequential(LoopWithLinearDelayTest.class, "loop-fixed-delay-example")
+                .child(repeat("poll")
+                        .maxIterations(3)
+                        .delay(Backoff.fixed(Duration.ofMillis(50)))
+                        .step(ID_CHECK))
+                .step(ID_VALIDATE)
                 .build();
+    }
+
+    /**
+     * Counts one iteration.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CHECK)
+    public static void check(final Context context) {
+        iterationCount.incrementAndGet();
+    }
+
+    /**
+     * Confirms every iteration ran.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        assertThat(iterationCount.get()).isEqualTo(3);
     }
 
     private static void resetCounts() {

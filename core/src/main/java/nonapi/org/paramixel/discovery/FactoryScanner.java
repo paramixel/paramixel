@@ -228,7 +228,9 @@ public final class FactoryScanner {
         while (current != null && current != Object.class) {
             for (Method method : current.getDeclaredMethods()) {
                 final var key = new MethodKey(method.getName(), method.getParameterTypes());
-                if (!seen.add(key) || !method.isAnnotationPresent(Paramixel.Factory.class)) {
+                if (!seen.add(key)
+                        || !method.isAnnotationPresent(Paramixel.Factory.class)
+                        || method.isAnnotationPresent(Paramixel.Disabled.class)) {
                     continue;
                 }
                 if (method.isAnnotationPresent(Paramixel.BeforeAll.class)
@@ -236,7 +238,7 @@ public final class FactoryScanner {
                     throw new ResolverException(
                             "Method " + locationOf(method) + " cannot be both @Paramixel.Factory and a run hook");
                 }
-                if (method.isAnnotationPresent(Paramixel.Disabled.class)) {
+                if (!selector.acceptsClass(current.getPackageName(), current.getName())) {
                     continue;
                 }
                 final var tags = tagsOf(method);
@@ -299,6 +301,27 @@ public final class FactoryScanner {
                 .thenComparing(HookCandidate::methodName);
     }
 
+    /**
+     * Rejects a discovered definition anchored to a class other than the declaring class of the method that built it.
+     *
+     * <p>The anchor is what authorizes a hook's declaring class, so a factory that anchors its tree elsewhere would
+     * wire hooks from a class the discovery contract never inspected. A definition that uses no identifiers has no
+     * anchor and is not affected.
+     *
+     * @param task the definition the method returned; must not be {@code null}
+     * @param method the discovered method; must not be {@code null}
+     * @throws ResolverException if the anchor names a different class
+     */
+    private static void validateAnchor(final Task task, final Method method) {
+        final var anchor = task.anchor().orElse(null);
+        final var declaring = method.getDeclaringClass();
+        if (anchor != null && anchor != declaring) {
+            throw new ResolverException("Definition from " + locationOf(method) + " is anchored to " + anchor.getName()
+                    + "; a discovered method must anchor its definition to its declaring class "
+                    + declaring.getName());
+        }
+    }
+
     private static void validateMethod(final Method method, final String label) {
         final var location = locationOf(method);
         final var modifiers = method.getModifiers();
@@ -335,10 +358,12 @@ public final class FactoryScanner {
                 return Optional.empty();
             }
             if (result instanceof Task task) {
+                validateAnchor(task, method);
                 return Optional.of(task);
             }
-            if (result instanceof TaskBuilder<?, ?> builder) {
+            if (result instanceof TaskBuilder<?> builder) {
                 final var task = builder.build();
+                validateAnchor(task, method);
                 if (task == null) {
                     throw new ResolverException(
                             "Invalid " + label + " method on " + location + ": build() returned null");

@@ -14,21 +14,24 @@
  * limitations under the License.
  */
 
-package org.paramixel.api;
+package org.paramixel.api.discoveryfixtures;
 
-/**
- * Creates a secondary scoped resource. Unlike a {@link TaskFactory}, a resource factory may read resources that were
- * acquired earlier in the same task scope.
- */
-@FunctionalInterface
-public interface ResourceFactory {
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Task;
+
+/** A factory with invalid tag metadata. */
+public final class InvalidTagFixture {
+
+    private InvalidTagFixture() {}
 
     /**
-     * Creates the resource.
+     * Fails if discovery invokes the invalid factory.
      *
-     * @param context the read-only execution context, with resources acquired earlier in the same scope available
-     * @return the resource; {@code null} is rejected and fails the task
-     * @throws Throwable if creation fails
+     * @return never returns normally
      */
-    Object create(Context context) throws Throwable;
+    @Paramixel.Factory
+    @Paramixel.Tag(" ")
+    public static Task factory() {
+        throw new AssertionError("invalid factory was invoked");
+    }
 }

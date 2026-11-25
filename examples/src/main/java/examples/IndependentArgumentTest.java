@@ -17,11 +17,10 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -31,6 +30,13 @@ import org.paramixel.api.Task;
  * fixture reported a non-passing outcome. Independence changes failure continuation, not concurrency.
  */
 public class IndependentArgumentTest {
+
+    private static final String ID_BEFORE = "before";
+    private static final String ID_TEST = "test";
+    private static final String ID_AFTER = "after";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String FIXTURE = "fixture";
 
     private static final int ARGUMENT_COUNT = 5;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
@@ -57,21 +63,18 @@ public class IndependentArgumentTest {
     @Paramixel.Factory
     public static Task factory() {
         resetCounts();
-        final var arguments =
-                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
-
-        return sequential("IndependentArgumentTest")
-                .independent()
-                .each(
-                        arguments,
-                        value -> instance(value, IndependentArgumentTest::new)
-                                .before(IndependentArgumentTest::before)
-                                .step("test", IndependentArgumentTest::test)
-                                .step("test", IndependentArgumentTest::test)
-                                .step("test", IndependentArgumentTest::test)
-                                .after(IndependentArgumentTest::after))
-                .after(IndependentArgumentTest::validate)
-                .build();
+        final var root = sequential(IndependentArgumentTest.class, "IndependentArgumentTest")
+                .independent();
+        for (var i = 0; i < ARGUMENT_COUNT; i++) {
+            final var value = "string-" + i;
+            root.child(sequential(value)
+                    .before(ID_BEFORE)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .after(ID_AFTER));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
     /**
@@ -79,6 +82,48 @@ public class IndependentArgumentTest {
      */
     public IndependentArgumentTest() {
         // Intentionally empty
+    }
+
+    /**
+     * Builds this branch's fixture and records fixture entry.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE)
+    public static void beforeHook(final Context context) {
+        final var fixture = new IndependentArgumentTest();
+        context.put(FIXTURE, fixture);
+        fixture.before();
+    }
+
+    /**
+     * Runs one test body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void testHook(final Context context) {
+        context.require(FIXTURE, IndependentArgumentTest.class).test();
+    }
+
+    /**
+     * Records fixture exit, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER)
+    public static void afterHook(final Context context) {
+        context.find(FIXTURE, IndependentArgumentTest.class).ifPresent(IndependentArgumentTest::after);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
     }
 
     /**

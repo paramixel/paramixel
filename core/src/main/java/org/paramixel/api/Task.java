@@ -18,6 +18,7 @@ package org.paramixel.api;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import org.paramixel.api.support.RepeatPolicy;
@@ -47,11 +48,11 @@ public final class Task {
     private final Pool pool;
     private final boolean dependent;
     private final List<Task> children;
+    private final Class<?> anchor;
+    private final Map<String, Object> bindings;
     private final List<TaskCallback> before;
     private final List<TaskCallback> after;
     private final TaskCallback body;
-    private final TaskFactory instanceFactory;
-    private final boolean requiresPrimaryInstance;
     private final List<String> tags;
     private final Long shuffleSeed;
     private final Predicate<Context> condition;
@@ -59,7 +60,6 @@ public final class Task {
     private final RetryPolicy retry;
     private final RepeatPolicy repeat;
     private final String exclusiveLock;
-    private final List<ResourceDeclaration> resources;
 
     Task(final Structure structure, final Lifecycle lifecycle, final Policies policies) {
         this.name = structure.name();
@@ -67,12 +67,11 @@ public final class Task {
         this.pool = structure.pool();
         this.dependent = structure.dependent();
         this.children = List.copyOf(structure.children());
+        this.anchor = structure.anchor();
+        this.bindings = Map.copyOf(structure.bindings());
         this.before = List.copyOf(lifecycle.before());
         this.after = List.copyOf(lifecycle.after());
         this.body = lifecycle.body();
-        this.instanceFactory = lifecycle.instanceFactory();
-        this.requiresPrimaryInstance = lifecycle.requiresPrimaryInstance();
-        this.resources = List.copyOf(lifecycle.resources());
         this.tags = List.copyOf(policies.tags());
         this.shuffleSeed = policies.shuffleSeed();
         this.condition = policies.condition();
@@ -90,8 +89,17 @@ public final class Task {
      * @param pool the pool of a parallel task, or {@code null}
      * @param dependent whether a non-passing child stops later siblings
      * @param children the ordered children; copied by the constructor
+     * @param anchor the anchor class the definition resolved its ids against, or {@code null}
+     * @param bindings the values seeded into this task's scope, never {@code null}
      */
-    record Structure(String name, ExecutionMode mode, Pool pool, boolean dependent, List<Task> children) {}
+    record Structure(
+            String name,
+            ExecutionMode mode,
+            Pool pool,
+            boolean dependent,
+            List<Task> children,
+            Class<?> anchor,
+            Map<String, Object> bindings) {}
 
     /**
      * The lifecycle part of a definition, handed from {@link TaskBuilder#build()} to the constructor.
@@ -99,17 +107,8 @@ public final class Task {
      * @param before the before callbacks; copied by the constructor
      * @param after the after callbacks; copied by the constructor
      * @param body the body, or {@code null}
-     * @param instanceFactory the primary instance factory, or {@code null}
-     * @param requiresPrimaryInstance whether typed callbacks need an inherited instance
-     * @param resources the resource declarations; copied by the constructor
      */
-    record Lifecycle(
-            List<TaskCallback> before,
-            List<TaskCallback> after,
-            TaskCallback body,
-            TaskFactory instanceFactory,
-            boolean requiresPrimaryInstance,
-            List<ResourceDeclaration> resources) {}
+    record Lifecycle(List<TaskCallback> before, List<TaskCallback> after, TaskCallback body) {}
 
     /**
      * The execution policies of a definition, handed from {@link TaskBuilder#build()} to the constructor.
@@ -184,6 +183,32 @@ public final class Task {
     }
 
     /**
+     * Returns the anchor class this definition resolved its hook identifiers against.
+     *
+     * <p>The anchor is named once at the definition root and inherited by the builders attached to it. A task
+     * attached from another definition keeps that definition's anchor. Discovery compares the root's anchor with the
+     * declaring class of the factory that produced it.
+     *
+     * @return the anchor, or an empty optional for a definition that uses no identifiers
+     */
+    public Optional<Class<?>> anchor() {
+        return Optional.ofNullable(anchor);
+    }
+
+    /**
+     * Returns the values seeded into this task's scope at the start of every attempt.
+     *
+     * <p>A bound value is captured when the definition is authored, so the same object is handed to every attempt.
+     * A value that must be re-created per attempt belongs in a {@code before} hook with
+     * {@link Context#put(String, Object)}, not here.
+     *
+     * @return the immutable bindings; never {@code null}
+     */
+    public Map<String, Object> bindings() {
+        return bindings;
+    }
+
+    /**
      * Returns the {@code before} callbacks in declaration order.
      *
      * @return the immutable ordered callbacks; never {@code null}
@@ -210,27 +235,6 @@ public final class Task {
      */
     public Optional<TaskCallback> body() {
         return Optional.ofNullable(body);
-    }
-
-    /**
-     * Returns the factory of the primary instance owned by this task, if any.
-     *
-     * @return the instance factory, or an empty optional
-     */
-    public Optional<TaskFactory> instanceFactory() {
-        return Optional.ofNullable(instanceFactory);
-    }
-
-    /**
-     * Returns whether this task or one of its callbacks needs a primary instance bound by an enclosing task.
-     *
-     * <p>The compiler uses this to reject a definition whose typed callbacks have no lexical instance binding, before
-     * any user code runs.
-     *
-     * @return {@code true} when a primary instance is required
-     */
-    public boolean requiresPrimaryInstance() {
-        return requiresPrimaryInstance;
     }
 
     /**
@@ -297,17 +301,8 @@ public final class Task {
     }
 
     /**
-     * Returns the declared secondary resources.
-     *
-     * @return the immutable declarations; never {@code null}
-     */
-    public List<ResourceDeclaration> resources() {
-        return resources;
-    }
-
-    /**
      * Returns whether this task is a pure no-op that runs no user code: no body, no children, no {@code before} or
-     * {@code after} callbacks, no instance or resource factory, no condition, and no repeat policy.
+     * {@code after} callbacks, no condition, and no repeat policy.
      *
      * <p>Execution metadata such as a timeout, retry policy, exclusive lock, pool, tags, or shuffle seed does not count
      * as work: it only governs how work runs, so a task that declares nothing else is still empty.
@@ -321,8 +316,6 @@ public final class Task {
                 && children.isEmpty()
                 && before.isEmpty()
                 && after.isEmpty()
-                && instanceFactory == null
-                && resources.isEmpty()
                 && condition == null
                 && repeat == null;
     }

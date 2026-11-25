@@ -17,17 +17,29 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
+import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
 
 /**
- * Demonstrates a single owned instance shared by two test steps.
+ * Demonstrates one fixture shared by two sibling steps.
+ *
+ * <p>The two steps are siblings in a sequential chain, so they share one context scope: the fixture stored by the
+ * {@code before} hook is the same object in both, and neither step has to be told about the other. The {@code after}
+ * hook reads it back with {@code find} and closes it explicitly — the framework never closes anything.
  */
 public class TestLifecycleTest implements AutoCloseable {
+
+    private static final String ID_CREATE = "create";
+    private static final String ID_TEST_ONE = "testOne";
+    private static final String ID_TEST_TWO = "testTwo";
+    private static final String ID_CLOSE = "close";
+
+    private static final String FIXTURE = "fixture";
 
     private static final int EXPECTED_TEST_COUNT = 2;
 
@@ -51,18 +63,22 @@ public class TestLifecycleTest implements AutoCloseable {
     public static Task factory() {
         testCount.set(0);
 
-        return instance("TestLifecycleTest", TestLifecycleTest::new)
-                .step("testOne", TestLifecycleTest::testOne)
-                .step("testTwo", TestLifecycleTest::testTwo)
-                .after(TestLifecycleTest::close)
+        return sequential(TestLifecycleTest.class, "TestLifecycleTest")
+                .before(ID_CREATE)
+                .step(ID_TEST_ONE)
+                .step(ID_TEST_TWO)
+                .after(ID_CLOSE)
                 .build();
     }
 
     /**
-     * No-argument constructor used by the framework.
+     * Creates the fixture for this attempt.
+     *
+     * @param context the execution context
      */
-    public TestLifecycleTest() {
-        // Intentionally empty
+    @Paramixel.Id(ID_CREATE)
+    public static void create(final Context context) {
+        context.put(FIXTURE, new TestLifecycleTest());
     }
 
     /**
@@ -77,6 +93,36 @@ public class TestLifecycleTest implements AutoCloseable {
      */
     public void testTwo() {
         testCount.incrementAndGet();
+    }
+
+    /**
+     * Runs the first test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_ONE)
+    public static void runTestOne(final Context context) {
+        context.require(FIXTURE, TestLifecycleTest.class).testOne();
+    }
+
+    /**
+     * Runs the second test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_TWO)
+    public static void runTestTwo(final Context context) {
+        context.require(FIXTURE, TestLifecycleTest.class).testTwo();
+    }
+
+    /**
+     * Releases the fixture, if the attempt managed to create one.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CLOSE)
+    public static void releaseFixture(final Context context) {
+        context.find(FIXTURE, TestLifecycleTest.class).ifPresent(TestLifecycleTest::close);
     }
 
     @Override

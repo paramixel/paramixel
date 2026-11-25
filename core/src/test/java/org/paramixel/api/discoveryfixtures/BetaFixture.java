@@ -16,14 +16,16 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.SequentialBuilder;
-import org.paramixel.api.Tasks;
 
+@Paramixel.Priority(10)
 /**
  * A builder-returning, high-priority factory used by discovery tests.
  */
-@Paramixel.Priority(10)
 public final class BetaFixture {
 
     private BetaFixture() {
@@ -33,11 +35,21 @@ public final class BetaFixture {
     /**
      * Returns a builder that records its execution; a factory may return a builder instead of a task.
      *
-     * @return the definition builder
+     * @return the definition
      */
-    @Paramixel.Factory
     @Paramixel.Tag("beta")
-    public static SequentialBuilder<Void> factory() {
-        return Tasks.task("beta").tags("beta").step("run", () -> DiscoveryFixtures.RECORDED.add("beta"));
+    @Paramixel.Factory
+    public static SequentialBuilder factory() {
+        return sequential(BetaFixture.class, "beta").tags("beta").step("run");
+    }
+
+    /**
+     * Records this fixture's execution.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        DiscoveryFixtures.RECORDED.add("beta");
     }
 }

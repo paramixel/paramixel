@@ -16,13 +16,14 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.exception.AbortException.abort;
 import static org.paramixel.api.exception.SkipException.skip;
 
 import java.time.Duration;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * The first factory of the fail-fast scenarios; it ends as {@link DiscoveryFixtures#failFastMode} selects.
@@ -41,27 +42,45 @@ public final class FailFastTriggerFixture {
      */
     @Paramixel.Factory
     public static Task factory() {
-        final var mode = DiscoveryFixtures.failFastMode;
-        final var trigger = Tasks.task("trigger");
-        switch (mode) {
-            case "condition" -> trigger.onlyIf(context -> false);
-            case "timeout" -> trigger.timeout(Duration.ofMillis(50));
+        final var builder = sequential(FailFastTriggerFixture.class, "trigger");
+        switch (DiscoveryFixtures.failFastMode) {
+            case "condition" -> builder.onlyIf("never");
+            case "timeout" -> builder.timeout(Duration.ofMillis(50));
             default -> {
                 // No extra declaration
             }
         }
-        return trigger.step("run", () -> {
-                    DiscoveryFixtures.RECORDED.add("trigger");
-                    switch (mode) {
-                        case "skip" -> throw skip("deliberately skipped");
-                        case "abort" -> throw abort("assumption not met");
-                        case "fail" -> throw new IllegalStateException("trigger failed");
-                        case "timeout" -> Thread.sleep(5000L);
-                        default -> {
-                            // Passes
-                        }
-                    }
-                })
-                .build();
+        return builder.step("run").build();
+    }
+
+    /**
+     * Runs the trigger body in the mode the scenario selected.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the timeout scenario interrupts the body
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) throws InterruptedException {
+        DiscoveryFixtures.RECORDED.add("trigger");
+        switch (DiscoveryFixtures.failFastMode) {
+            case "skip" -> throw skip("deliberately skipped");
+            case "abort" -> throw abort("assumption not met");
+            case "fail" -> throw new IllegalStateException("trigger failed");
+            case "timeout" -> Thread.sleep(5000L);
+            default -> {
+                // Passes
+            }
+        }
+    }
+
+    /**
+     * The condition scenario's predicate; always false, so the occurrence is skipped.
+     *
+     * @param context the execution context
+     * @return {@code false}
+     */
+    @Paramixel.Id("never")
+    public static boolean never(final Context context) {
+        return false;
     }
 }

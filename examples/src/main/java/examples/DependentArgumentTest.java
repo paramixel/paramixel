@@ -17,11 +17,10 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
@@ -29,8 +28,19 @@ import org.paramixel.api.Task;
 /**
  * Demonstrates a dependent sequence of fixtures: each fixture runs its three tests in order, and the next fixture starts
  * only after the previous one finished, so at most one fixture is active at a time.
+ *
+ * <p>The parameter is authoring data — {@code bind} publishes the index and the {@code before} hook builds the fixture
+ * from it, per branch. Nothing is captured in a lambda, so every hook is an ordinary method a reader can find by name.
  */
 public class DependentArgumentTest {
+
+    private static final String ID_BEFORE = "before";
+    private static final String ID_TEST = "test";
+    private static final String ID_AFTER = "after";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String INDEX = "index";
+    private static final String FIXTURE = "fixture";
 
     private static final int ARGUMENT_COUNT = 5;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
@@ -62,27 +72,63 @@ public class DependentArgumentTest {
     @Paramixel.Factory
     public static Task factory() {
         resetCounts();
-        final var arguments =
-                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
-
-        return sequential("DependentArgumentTest")
-                .each(
-                        arguments,
-                        value -> instance(
-                                        value,
-                                        () -> new DependentArgumentTest(
-                                                Integer.parseInt(value.substring("string-".length()))))
-                                .before(DependentArgumentTest::before)
-                                .step("test", DependentArgumentTest::test)
-                                .step("test", DependentArgumentTest::test)
-                                .step("test", DependentArgumentTest::test)
-                                .after(DependentArgumentTest::after))
-                .after(DependentArgumentTest::validate)
-                .build();
+        final var root = sequential(DependentArgumentTest.class, "DependentArgumentTest");
+        for (var i = 0; i < ARGUMENT_COUNT; i++) {
+            root.child(sequential("string-" + i)
+                    .bind(INDEX, i)
+                    .before(ID_BEFORE)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .after(ID_AFTER));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
     private DependentArgumentTest(final int argumentIndex) {
         this.argumentIndex = argumentIndex;
+    }
+
+    /**
+     * Builds this branch's fixture and records fixture entry.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE)
+    public static void beforeHook(final Context context) {
+        final var fixture = new DependentArgumentTest(context.require(INDEX, Integer.class));
+        context.put(FIXTURE, fixture);
+        fixture.before();
+    }
+
+    /**
+     * Runs one test body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void testHook(final Context context) {
+        context.require(FIXTURE, DependentArgumentTest.class).test();
+    }
+
+    /**
+     * Records fixture exit, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER)
+    public static void afterHook(final Context context) {
+        context.find(FIXTURE, DependentArgumentTest.class).ifPresent(DependentArgumentTest::after);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
     }
 
     /**

@@ -17,12 +17,13 @@
 package examples.altcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.instance;
 import static org.paramixel.api.Tasks.parallel;
+import static org.paramixel.api.Tasks.sequential;
 
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
 import org.bson.Document;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
@@ -34,6 +35,13 @@ import org.paramixel.api.Task;
  * asserts the stored value matches.
  */
 public class MongoDBTest {
+
+    private static final String ID_SET_UP = "setUp";
+    private static final String ID_TEST_INSERT_QUERY = "testInsertAndQuery()";
+    private static final String ID_TEAR_DOWN = "tearDown";
+
+    private static final String ENVIRONMENT = "environment";
+    private static final String FIXTURE = "fixture";
 
     private static final Logger LOGGER = Logger.createLogger(MongoDBTest.class);
 
@@ -58,14 +66,47 @@ public class MongoDBTest {
      */
     @Paramixel.Factory
     public static Task factory() throws Throwable {
-        return parallel(MongoDBTest.class.getName(), Pool.named("environments"))
-                .each(
-                        MongoDBTestEnvironment.createTestEnvironments(),
-                        environment -> instance(environment.name(), () -> new MongoDBTest(environment))
-                                .before(MongoDBTest::setUp)
-                                .step("testInsertAndQuery()", MongoDBTest::testInsertAndQuery)
-                                .after(MongoDBTest::tearDown))
-                .build();
+        final var root = parallel(MongoDBTest.class, "MongoDBTest", Pool.named("environments"));
+        for (final var environment : MongoDBTestEnvironment.createTestEnvironments()) {
+            root.child(sequential(environment.name())
+                    .bind(ENVIRONMENT, environment)
+                    .before(ID_SET_UP)
+                    .step(ID_TEST_INSERT_QUERY)
+                    .after(ID_TEAR_DOWN));
+        }
+        return root.build();
+    }
+
+    /**
+     * Builds this branch's fixture and runs its setup.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SET_UP)
+    public static void setUpHook(final Context context) throws Throwable {
+        final var fixture = new MongoDBTest(context.require(ENVIRONMENT, MongoDBTestEnvironment.class));
+        context.put(FIXTURE, fixture);
+        fixture.setUp();
+    }
+
+    /**
+     * Runs the testInsertAndQuery body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_INSERT_QUERY)
+    public static void testInsertAndQueryHook(final Context context) throws Throwable {
+        context.require(FIXTURE, MongoDBTest.class).testInsertAndQuery();
+    }
+
+    /**
+     * Releases the fixture, if it was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDownHook(final Context context) {
+        context.find(FIXTURE, MongoDBTest.class).ifPresent(MongoDBTest::tearDown);
     }
 
     private MongoDBTest(final MongoDBTestEnvironment environment) {

@@ -239,6 +239,13 @@ public class ParamixelMojo extends AbstractMojo {
                 .build();
 
         var result = runner.run(selector);
+        final var reportingFailure = result.failures().stream()
+                .filter(failure -> Listener.DRAIN_TIMEOUT_DIAGNOSTIC.equals(failure.phase()))
+                .findFirst();
+        if (reportingFailure.isPresent()) {
+            final var failure = reportingFailure.orElseThrow();
+            throw new MojoExecutionException(failure.phase() + ": " + failure.message());
+        }
         if (result.root().isEmpty()) {
             if (configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true)) {
                 throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");

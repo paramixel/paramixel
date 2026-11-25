@@ -16,9 +16,11 @@
 
 package org.paramixel.api.discoveryfixtures;
 
+import static org.paramixel.api.Tasks.sequential;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * A tagged factory used by discovery tests.
@@ -34,12 +36,19 @@ public final class AlphaFixture {
      *
      * @return the definition
      */
-    @Paramixel.Factory
     @Paramixel.Tag("alpha")
+    @Paramixel.Factory
     public static Task factory() {
-        return Tasks.task("alpha")
-                .tags("alpha")
-                .step("run", () -> DiscoveryFixtures.RECORDED.add("alpha"))
-                .build();
+        return sequential(AlphaFixture.class, "alpha").tags("alpha").step("run").build();
+    }
+
+    /**
+     * Records this fixture's execution.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("run")
+    public static void run(final Context context) {
+        DiscoveryFixtures.RECORDED.add("alpha");
     }
 }

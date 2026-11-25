@@ -13,8 +13,8 @@ public interface Result { /* read-only accessors */ }
 | --- | --- |
 | `runId()` | Stable identifier of the run |
 | `status()` | Semantic aggregate status, never rewritten by exit policy |
-| `exitCode()` | Process exit code after `failureOnSkip`, `failureOnAbort`, and `failIfNoTests` |
-| `isQuiescent()` | `false` when work may still be running and cleanup was withheld |
+| `exitCode()` | Process exit code after `failureOnSkip`, `failureOnAbort`, `failIfNoTests`, and infrastructure failures |
+| `isQuiescent()` | `false` when task work may still be running and cleanup was withheld; independent of listener delivery |
 | `root()` | Immutable `TaskResult` tree |
 | `failures()` | Run-level infrastructure failures |
 | `diagnostics()` | Warnings and infrastructure notes |
@@ -52,4 +52,6 @@ rather than hiding the partial execution.
 Console output, JSON, XML, HTML, and text reports are generated from the same `Result`. Report formats follow the file
 extension configured with `paramixel.report.file`; secrets are redacted and the full environment is never dumped.
 Reporters must distinguish a successful retry from its historical attempts: use `attemptCount()` and the `ATTEMPT`
-nodes for retry history, and the status counters for occurrence outcomes.
+nodes for retry history, and the status counters for occurrence outcomes. If listener delivery stalls, the event stream
+and configured reports may be incomplete. The result returned by `Runner` remains authoritative for task outcomes and
+includes a `LISTENER_DRAIN_TIMEOUT` infrastructure failure and a nonzero exit code.
