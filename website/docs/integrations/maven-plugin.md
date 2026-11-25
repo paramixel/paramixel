@@ -43,6 +43,9 @@ Configuration precedence, from lowest to highest: Paramixel defaults, the test-c
 lower layers in effect, so `paramixel.failFast` or `paramixel.match.class.regex` in `paramixel.properties` or
 `<properties>` applies unless the matching parameter is configured.
 
-The mojo never calls `System.exit`: a non-zero result exit code becomes a `MojoFailureException`, and configuration,
-discovery, or plan errors become a `MojoExecutionException`. With `strictThreadLifecycle`, non-daemon threads that retain
-the test classloader are reported as an error rather than a warning.
+The four runner flags `failIfNoTests`, `failureOnSkip`, `failureOnAbort`, and `failFast` accept `true` and `false`,
+ignoring case and surrounding whitespace. Malformed effective values fail before factory invocation.
+
+The mojo reports a failed or canceled run as `MojoFailureException`. Configuration, discovery, and plan errors become
+`MojoExecutionException`, as does empty discovery with `failIfNoTests` enabled. With `strictThreadLifecycle`,
+non-daemon threads that retain the test classloader are reported as an error rather than a warning.

@@ -27,11 +27,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ClassGraph;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ClassInfo;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ScanResult;
-import nonapi.org.paramixel.compiler.PlanCompiler;
 import nonapi.org.paramixel.reporting.Constants;
 import nonapi.org.paramixel.selector.ConcreteSelector;
 import org.paramixel.api.Configuration;
@@ -41,6 +41,7 @@ import org.paramixel.api.Pool;
 import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 import org.paramixel.api.TaskBuilder;
+import org.paramixel.api.exception.CompilationException;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
@@ -91,6 +92,7 @@ public final class FactoryScanner {
     private final ConcreteSelector selector;
     private final boolean shuffled;
     private final long shuffleSeed;
+    private final BooleanSupplier cancellationRequested;
     private final List<String> skipped = new ArrayList<>();
 
     /**
@@ -100,27 +102,33 @@ public final class FactoryScanner {
      * @param selector the selection filter; must not be {@code null}
      * @param shuffled whether to shuffle discovered factories
      * @param shuffleSeed the shuffle seed when {@code shuffled} is {@code true}
+     * @param cancellationRequested whether discovery should stop invoking methods
      * @throws NullPointerException if an argument is {@code null}
      */
     public FactoryScanner(
             final Configuration configuration,
             final Selector selector,
             final boolean shuffled,
-            final long shuffleSeed) {
+            final long shuffleSeed,
+            final BooleanSupplier cancellationRequested) {
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
         this.selector = ConcreteSelector.require(selector);
         this.shuffled = shuffled;
         this.shuffleSeed = shuffleSeed;
+        this.cancellationRequested = Objects.requireNonNull(cancellationRequested, "cancellationRequested is null");
     }
 
     /**
      * Scans the classpath and composes the discovered definition.
      *
-     * @return the discovered root definition, or an empty optional when no factory matched
+     * @return the discovered definition and its framework groups, or empty when no factory contributed a task
      * @throws ResolverException if a discovered method is invalid or cannot be invoked
      */
-    public Optional<Task> discover() {
+    public Optional<DiscoveredTasks> discover() {
         skipped.clear();
+        if (cancellationRequested.getAsBoolean()) {
+            return Optional.empty();
+        }
         final var factories = new ArrayList<FactoryCandidate>();
         final var beforeHooks = new ArrayList<HookCandidate>();
         final var afterHooks = new ArrayList<HookCandidate>();
@@ -131,6 +139,9 @@ public final class FactoryScanner {
                 .ignoreClassVisibility()
                 .ignoreMethodVisibility()
                 .scan()) {
+            if (cancellationRequested.getAsBoolean()) {
+                return Optional.empty();
+            }
             // The scan also returns subclasses that inherit an annotated method, and resolving a subclass walks up to
             // the declaring class, so the same static factory can resolve more than once; it is invoked only once.
             final var resolvedFactories = new HashSet<Method>();
@@ -155,27 +166,35 @@ public final class FactoryScanner {
         factories.sort(factoryOrder());
 
         final var root = Sequential.builder(Constants.ROOT_NAME).independent();
-        root.tags(PlanCompiler.STRUCTURAL_TAG);
         final var run = Sequential.builder("run");
-        run.tags(PlanCompiler.STRUCTURAL_TAG);
         final var beforeGroup = buildHookGroup("BeforeAll hooks", beforeHooks, true);
         beforeGroup.ifPresent(run::step);
         final var tasks = Parallel.builder("tasks", Pool.named(DISCOVERY_POOL));
-        tasks.tags(PlanCompiler.FAIL_FAST_SCOPE_TAG, PlanCompiler.STRUCTURAL_TAG);
         if (shuffled) {
             tasks.shuffle(shuffleSeed);
         }
+        final var factoryTags = new ArrayList<List<String>>();
         for (FactoryCandidate candidate : factories) {
-            invoke(candidate.method(), "@Paramixel.TaskFactory").ifPresent(tasks::step);
+            if (cancellationRequested.getAsBoolean()) {
+                return Optional.empty();
+            }
+            invoke(candidate.method(), "@Paramixel.TaskFactory").ifPresent(task -> {
+                tasks.step(task);
+                factoryTags.add(candidate.tags());
+            });
+        }
+        if (cancellationRequested.getAsBoolean()) {
+            return Optional.empty();
         }
         final var taskGroup = tasks.build();
         if (taskGroup.children().isEmpty()) {
             return Optional.empty();
         }
         run.step(taskGroup);
-        root.step(run);
+        final var runGroup = run.build();
+        root.step(runGroup);
         buildHookGroup("AfterAll hooks", afterHooks, false).ifPresent(root::step);
-        return Optional.of(root.build());
+        return Optional.of(new DiscoveredTasks(root.build(), runGroup, taskGroup, List.copyOf(factoryTags)));
     }
 
     /**
@@ -209,6 +228,9 @@ public final class FactoryScanner {
             group.independent();
         }
         for (HookCandidate candidate : candidates) {
+            if (cancellationRequested.getAsBoolean()) {
+                break;
+            }
             invoke(candidate.method(), name).ifPresent(group::step);
         }
         return Optional.of(group.build());
@@ -217,7 +239,9 @@ public final class FactoryScanner {
     private void collectHooks(
             final Class<?> clazz, final Class<? extends Annotation> annotation, final List<HookCandidate> target) {
         for (Method method : clazz.getDeclaredMethods()) {
-            if (!method.isAnnotationPresent(annotation) || method.isAnnotationPresent(Paramixel.Disabled.class)) {
+            if (!method.isAnnotationPresent(annotation)
+                    || method.isAnnotationPresent(Paramixel.Disabled.class)
+                    || method.isAnnotationPresent(Paramixel.TaskFactory.class)) {
                 continue;
             }
             validateMethod(method, "@" + annotation.getSimpleName(), false);
@@ -232,7 +256,7 @@ public final class FactoryScanner {
 
     private Optional<FactoryCandidate> resolveFactoryMethod(final Class<?> clazz) {
         final var seen = new HashSet<MethodKey>();
-        final var candidates = new ArrayList<Method>();
+        final var candidates = new ArrayList<FactoryCandidate>();
         var current = clazz;
         while (current != null && current != Object.class) {
             for (Method method : current.getDeclaredMethods()) {
@@ -242,11 +266,6 @@ public final class FactoryScanner {
                         || method.isAnnotationPresent(Paramixel.Disabled.class)) {
                     continue;
                 }
-                if (method.isAnnotationPresent(Paramixel.BeforeAll.class)
-                        || method.isAnnotationPresent(Paramixel.AfterAll.class)) {
-                    throw new ResolverException(
-                            "Method " + locationOf(method) + " cannot be both @Paramixel.TaskFactory and a run hook");
-                }
                 if (!selector.acceptsClass(current.getPackageName(), current.getName())) {
                     continue;
                 }
@@ -254,8 +273,19 @@ public final class FactoryScanner {
                 if (!selector.test(current.getPackageName(), current.getName(), tags)) {
                     continue;
                 }
+                if (method.isAnnotationPresent(Paramixel.BeforeAll.class)
+                        || method.isAnnotationPresent(Paramixel.AfterAll.class)) {
+                    throw new ResolverException(
+                            "Method " + locationOf(method) + " cannot be both @Paramixel.TaskFactory and a run hook");
+                }
                 validateMethod(method, "@Paramixel.TaskFactory", true);
-                candidates.add(method);
+                candidates.add(new FactoryCandidate(
+                        priorityOf(method),
+                        current.getPackageName(),
+                        current.getName(),
+                        method.getName(),
+                        method,
+                        tags));
             }
             current = current.getSuperclass();
         }
@@ -263,6 +293,7 @@ public final class FactoryScanner {
             throw new ResolverException(
                     "Class " + clazz.getName() + " has more than one @Paramixel.TaskFactory method: "
                             + candidates.stream()
+                                    .map(FactoryCandidate::method)
                                     .map(FactoryScanner::locationOf)
                                     .sorted()
                                     .toList()
@@ -272,13 +303,7 @@ public final class FactoryScanner {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
-        final var method = candidates.get(0);
-        return Optional.of(new FactoryCandidate(
-                priorityOf(method),
-                method.getDeclaringClass().getPackageName(),
-                method.getDeclaringClass().getName(),
-                method.getName(),
-                method));
+        return Optional.of(candidates.get(0));
     }
 
     private static List<String> tagsOf(final Method method) {
@@ -289,7 +314,7 @@ public final class FactoryScanner {
             }
             tags.add(tag.value());
         }
-        return tags;
+        return List.copyOf(tags);
     }
 
     private static int priorityOf(final Method method) {
@@ -412,6 +437,9 @@ public final class FactoryScanner {
                     throw new LinkageError("Cannot access " + label + " method " + location, inner);
                 }
             }
+            if (cancellationRequested.getAsBoolean()) {
+                return Optional.empty();
+            }
             if (result == null) {
                 skipped.add(label + " method " + location + " returned null and was skipped");
                 return Optional.empty();
@@ -422,17 +450,23 @@ public final class FactoryScanner {
             }
             if (result instanceof TaskBuilder<?> builder) {
                 final var task = builder.build();
-                validateAnchor(task, method);
+                if (cancellationRequested.getAsBoolean()) {
+                    return Optional.empty();
+                }
                 if (task == null) {
                     throw new ResolverException(
                             "Invalid " + label + " method on " + location + ": build() returned null");
                 }
+                validateAnchor(task, method);
                 return Optional.of(task);
             }
             throw new ResolverException(
                     "Invalid " + label + " method on " + location + ": return type must be Task or TaskBuilder");
         } catch (InvocationTargetException e) {
             final var cause = e.getCause() == null ? e : e.getCause();
+            if (cause instanceof CompilationException compilation) {
+                throw compilation;
+            }
             if (cause instanceof Error error) {
                 throw error;
             }
@@ -455,6 +489,16 @@ public final class FactoryScanner {
         return method.getDeclaringClass().getName() + "#" + method.getName();
     }
 
+    /**
+     * The discovered tree and the framework groups recognized by the compiler.
+     *
+     * @param root the discovered root
+     * @param runGroup the group that gates factory tasks on the before-all hooks
+     * @param factoryGroup the group whose children honor discovery fail-fast
+     * @param factoryTags the annotation tags in the factory group's declaration order
+     */
+    public record DiscoveredTasks(Task root, Task runGroup, Task factoryGroup, List<List<String>> factoryTags) {}
+
     private record MethodKey(String name, Class<?>[] parameterTypes) {
 
         @Override
@@ -475,7 +519,7 @@ public final class FactoryScanner {
     }
 
     private record FactoryCandidate(
-            int priority, String packageName, String className, String methodName, Method method) {}
+            int priority, String packageName, String className, String methodName, Method method, List<String> tags) {}
 
     private record HookCandidate(
             int priority, String packageName, String className, String methodName, Method method) {}

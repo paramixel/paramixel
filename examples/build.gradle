@@ -13,7 +13,7 @@ dependencies {
 def paramixelTest = tasks.register('paramixelTest', JavaExec) {
     dependsOn classes
     group = 'verification'
-    description = 'Discovers and executes Paramixel action trees'
+    description = 'Discovers and executes Paramixel task trees'
     mainClass = 'org.paramixel.api.Launcher'
     classpath = sourceSets.main.runtimeClasspath
 }

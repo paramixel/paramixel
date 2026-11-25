@@ -33,11 +33,11 @@ not padded, so paths are not column-aligned across different statuses.
 The console summary is introduced by a title bracketed in horizontal rules, and the run totals are separated from the
 result tree by a rule. The summary shows each occurrence once with its final outcome, summarizing retry or repeat
 history on the occurrence line, so console output never contradicts the counters. The tree is drawn from the left margin
-with box-drawing connectors (`├──`, `└──`, `│`); each line is the task name and its qualifiers, then the outcome, elapsed
-time, and reason. Because the status follows the name, connectors align without padding labels, and a summary line does
-not begin with a status label the way a live status line does. Only a task that schedules children carries a
-`(sequential)` or `(parallel)` suffix: a leaf task runs its own body, so naming a scheduling mode for it would claim
-something that never happens:
+with box-drawing connectors (`├─`, `└─`, `│`) and three columns of indentation per level. Each line shows the task name
+and its qualifiers, then the outcome, elapsed time, and reason. Because the status follows the name, connectors align
+without padding labels, and a summary line does not begin with a status label the way a live status line does. Only a
+task that schedules children carries a `(sequential)` or `(parallel)` suffix: a leaf task runs its own body, so naming
+a scheduling mode for it would claim something that never happens:
 
 ```text
 [PARAMIXEL] PASS run 5c0f… in 1 s 240 ms
@@ -45,7 +45,7 @@ something that never happens:
 [PARAMIXEL] Paramixel Summary
 [PARAMIXEL] -----------------
 [PARAMIXEL] retry-example (sequential) PASS (1200 ms) — 3 attempts, 2 failed
-[PARAMIXEL] └── retry PASS (400 ms)
+[PARAMIXEL] └─ retry PASS (400 ms)
 [PARAMIXEL] -------
 [PARAMIXEL] occurrences: 2 passed: 2 failed: 0 skipped: 0 aborted: 0 canceled: 0 timedOut: 0 attempts: 3
 [PARAMIXEL] result: PASS exitCode: 0 elapsed: 1 s 240 ms

@@ -81,9 +81,9 @@ public interface Listener {
     }
 
     /**
-     * Invoked after factory discovery produced the definition that will run.
+     * Invoked after the runner finishes discovery.
      *
-     * @param root the discovered root definition, or an empty optional when no factory contributes a task
+     * @param root the discovered root definition, or an empty optional when no task is contributed or discovery is canceled
      */
     default void onDiscoveryCompleted(final Optional<Task> root) {
         // Intentionally empty

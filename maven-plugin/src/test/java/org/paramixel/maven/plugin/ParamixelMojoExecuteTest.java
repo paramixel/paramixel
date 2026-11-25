@@ -49,7 +49,13 @@ import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
+import org.paramixel.api.Paramixel;
+import org.paramixel.api.Result;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Status;
 import org.paramixel.api.Task;
+import org.paramixel.api.exception.CompilationException;
+import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.maven.plugin.fixtures.LingeringFailingMojoFixture;
 import org.paramixel.maven.plugin.fixtures.PassingMojoFixture;
 
@@ -58,6 +64,54 @@ class ParamixelMojoExecuteTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    @ResourceLock(Resources.SYSTEM_PROPERTIES)
+    void validatesEffectiveRunnerFlagsAfterMavenOverrides() throws Exception {
+        final var mojo = newMojo(tempDir, "SkippingMojoFixture");
+        setField(mojo, "failureOnSkip", "treu");
+        final var previous = System.clearProperty(Configuration.FAILURE_ON_SKIP);
+        try {
+            assertThatThrownBy(mojo::execute)
+                    .isInstanceOf(MojoExecutionException.class)
+                    .hasCauseInstanceOf(ConfigurationException.class)
+                    .hasMessageContaining(Configuration.FAILURE_ON_SKIP);
+            System.setProperty(Configuration.FAILURE_ON_SKIP, " FaLsE ");
+            assertThatCode(mojo::execute).doesNotThrowAnyException();
+        } finally {
+            if (previous == null) {
+                System.clearProperty(Configuration.FAILURE_ON_SKIP);
+            } else {
+                System.setProperty(Configuration.FAILURE_ON_SKIP, previous);
+            }
+        }
+    }
+
+    @Test
+    void includesCompilationDiagnosticsInTheBuildFailure() throws Exception {
+        final var mojo = newMojo(tempDir, "CompilingMojoFixture");
+        assertThatThrownBy(mojo::execute)
+                .isInstanceOf(MojoExecutionException.class)
+                .hasCauseInstanceOf(CompilationException.class)
+                .hasMessageContaining("Failed to compile Paramixel tests")
+                .hasMessageContaining("missing");
+    }
+
+    @Test
+    void aRootlessCanceledResultFailsTheBuild() {
+        final var result = Result.builder()
+                .runId("canceled")
+                .status(Status.canceled("runner closed"), 1, true)
+                .build();
+        assertThatThrownBy(() -> new ParamixelMojo().checkResult(result)).isInstanceOf(MojoFailureException.class);
+    }
+
+    public static final class CompilingMojoFixture {
+        @Paramixel.TaskFactory
+        public static Task factory() {
+            return Sequential.builder("invalid").step("missing").build();
+        }
+    }
 
     @Nested
     @DisplayName("skipTests")
@@ -158,7 +212,7 @@ class ParamixelMojoExecuteTest {
         @DisplayName("execute succeeds when failureOnSkip is false")
         void executeSucceedsWhenFailureOnSkipIsFalse() throws Exception {
             var mojo = newMojo(tempDir, "SkippingMojoFixture");
-            setField(mojo, "failureOnSkip", false);
+            setField(mojo, "failureOnSkip", "false");
 
             var original = Thread.currentThread().getContextClassLoader();
             try {
@@ -173,7 +227,7 @@ class ParamixelMojoExecuteTest {
         @DisplayName("execute throws MojoFailureException when failureOnSkip is true")
         void executeThrowsMojoFailureExceptionWhenFailureOnSkipIsTrue() throws Exception {
             var mojo = newMojo(tempDir, "SkippingMojoFixture");
-            setField(mojo, "failureOnSkip", true);
+            setField(mojo, "failureOnSkip", "true");
 
             var original = Thread.currentThread().getContextClassLoader();
             try {
@@ -193,7 +247,7 @@ class ParamixelMojoExecuteTest {
         @DisplayName("execute throws MojoFailureException for failing fixture with failFast")
         void executeThrowsForFailingFixtureWithFailFast() throws Exception {
             var mojo = newMojo(tempDir, "FailingMojoFixture");
-            setField(mojo, "failFast", true);
+            setField(mojo, "failFast", "true");
 
             var original = Thread.currentThread().getContextClassLoader();
             try {
@@ -208,7 +262,7 @@ class ParamixelMojoExecuteTest {
         @DisplayName("execute succeeds for passing fixture with failFast")
         void executeSucceedsForPassingFixtureWithFailFast() throws Exception {
             var mojo = newMojo(tempDir, "PassingMojoFixture");
-            setField(mojo, "failFast", true);
+            setField(mojo, "failFast", "true");
 
             var original = Thread.currentThread().getContextClassLoader();
             try {
@@ -228,7 +282,7 @@ class ParamixelMojoExecuteTest {
         @DisplayName("execute succeeds when failIfNoTests is false")
         void executeSucceedsWhenFailIfNoTestsIsFalse() throws Exception {
             var mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
-            setField(mojo, "failIfNoTests", false);
+            setField(mojo, "failIfNoTests", "false");
 
             var original = Thread.currentThread().getContextClassLoader();
             try {
@@ -243,7 +297,7 @@ class ParamixelMojoExecuteTest {
         @DisplayName("execute throws MojoExecutionException when failIfNoTests is true")
         void executeThrowsMojoExecutionExceptionWhenFailIfNoTestsIsTrue() throws Exception {
             var mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
-            setField(mojo, "failIfNoTests", true);
+            setField(mojo, "failIfNoTests", "true");
 
             var original = Thread.currentThread().getContextClassLoader();
             try {
@@ -261,7 +315,7 @@ class ParamixelMojoExecuteTest {
     @ResourceLock(Resources.SYSTEM_OUT)
     void reportingStallFailsTheBuildEvenWhenAnEmptyRunWouldPass() throws Exception {
         var mojo = newMojo(tempDir, "NoSuchMojoFixtureShouldExist");
-        setField(mojo, "failIfNoTests", false);
+        setField(mojo, "failIfNoTests", "false");
         var timeout = new ParamixelMojo.Property();
         timeout.setKey(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS);
         timeout.setValue("500");

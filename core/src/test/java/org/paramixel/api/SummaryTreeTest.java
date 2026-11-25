@@ -58,10 +58,10 @@ class SummaryTreeTest {
         assertThat(tree)
                 .containsExactly(
                         "root (sequential) PASS (N ms)",
-                        "├── alpha (sequential) PASS (N ms)",
-                        "│   ├── a1 PASS (N ms)",
-                        "│   └── a2 PASS (N ms)",
-                        "└── beta PASS (N ms)");
+                        "├─ alpha (sequential) PASS (N ms)",
+                        "│  ├─ a1 PASS (N ms)",
+                        "│  └─ a2 PASS (N ms)",
+                        "└─ beta PASS (N ms)");
     }
 
     @Test
@@ -77,7 +77,7 @@ class SummaryTreeTest {
         final var tree = tree(definition);
 
         assertThat(tree).anySatisfy(line -> {
-            assertThat(line).startsWith("└── never SKIP");
+            assertThat(line).startsWith("└─ never SKIP");
             assertThat(line).doesNotContain(" ms)");
         });
     }
@@ -95,8 +95,7 @@ class SummaryTreeTest {
         assertThat(tree)
                 .filteredOn(line -> !line.startsWith("root"))
                 .allSatisfy(line -> assertThat(line)
-                        .matches(
-                                "^(│   |    )*(├── |└── )\\S.* (PASS|FAIL|SKIP|ABORT|CANCEL)( \\([^)]*\\))?( — .*)?$"));
+                        .matches("^(│  |   )*(├─ |└─ )\\S.* (PASS|FAIL|SKIP|ABORT|CANCEL)( \\([^)]*\\))?( — .*)?$"));
     }
 
     @Test
@@ -129,15 +128,15 @@ class SummaryTreeTest {
         assertThat(tree)
                 .containsExactly(
                         "root (sequential) PASS (N ms)",
-                        "├── setup (sequential) [before] PASS (N ms)",
-                        "│   └── s1 PASS (N ms)",
-                        "├── retried (sequential) PASS (N ms) — 2 attempts, 1 failed",
-                        "│   ├── attempt 1 of 2 retried FAIL (N ms) — superseded",
-                        "│   │   └── probe FAIL (N ms)",
-                        "│   └── attempt 2 of 2 retried PASS (N ms)",
-                        "│       └── probe PASS (N ms)",
-                        "└── cleanup (sequential) [after] PASS (N ms)",
-                        "    └── c1 PASS (N ms)");
+                        "├─ setup (sequential) [before] PASS (N ms)",
+                        "│  └─ s1 PASS (N ms)",
+                        "├─ retried (sequential) PASS (N ms) — 2 attempts, 1 failed",
+                        "│  ├─ attempt 1 of 2 retried FAIL (N ms) — superseded",
+                        "│  │  └─ probe FAIL (N ms)",
+                        "│  └─ attempt 2 of 2 retried PASS (N ms)",
+                        "│     └─ probe PASS (N ms)",
+                        "└─ cleanup (sequential) [after] PASS (N ms)",
+                        "   └─ c1 PASS (N ms)");
     }
 
     private static List<String> tree(final Task definition) {

@@ -5,8 +5,8 @@ description: How annotated factories become a validated root definition.
 
 # Discovery
 
-Discovery turns annotated static factories into one root definition, validates every matched method, and only then
-executes.
+Discovery validates the matched provider declarations, invokes them to produce definitions, and compiles the composed
+plan before executing task callbacks.
 
 ## Annotations
 
@@ -35,6 +35,8 @@ an explicit skip with a recorded reason. If every selected factory returns `null
 `paramixel.failIfNoTests` decides the exit code. Any other invalid shape — not `static`, parameters other than the sole
 `Configuration`, or an unrelated return type — fails the run with `ResolverException` **before** any discovered test code
 runs.
+
+Definition validation failures reported as `CompilationException` retain their diagnostics in either return form.
 
 ## Configuration-driven structure
 
@@ -92,3 +94,9 @@ Paramixel (independent sequential root)
 `Selector` filters by package tree, class, and tag patterns. The selector passed to `Runner.run(Selector)` is used
 exactly as given; if it ignores configured `paramixel.match.*` keys, the runner warns instead of merging them silently.
 When nothing matches, the run reports `SKIPPED` and `paramixel.failIfNoTests` (default `true`) decides the exit code.
+
+Tag selection reads the factory's annotations. On its discovered root occurrence, Paramixel appends missing
+annotation tags after builder tags. The merged list appears in `Context.tags()` and `TaskResult.tags()`.
+
+Standalone `@BeforeAll` and `@AfterAll` methods are run-wide. A method carrying both `@TaskFactory` and a run-hook
+annotation is rejected when selected as a factory and is otherwise ignored.

@@ -94,7 +94,7 @@ public interface Context {
     int attempt();
 
     /**
-     * Returns the tags declared by this occurrence.
+     * Returns the tags of this occurrence, including factory annotation tags on a discovered root task.
      *
      * @return the immutable tags; never {@code null}
      */

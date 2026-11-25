@@ -18,8 +18,13 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
+import org.paramixel.api.discoveryfixtures.AlphaFixture;
+import org.paramixel.api.discoveryfixtures.DiscoveryFixtures;
 
 /**
  * Command-line launcher contract: help, usage errors, and exit codes without terminating the JVM.
@@ -38,5 +43,30 @@ class LauncherTest {
     void unknownArgumentIsUsageError() {
         assertThat(Launcher.execute(new String[] {"--nope"})).isEqualTo(2);
         assertThat(Launcher.execute((String[]) null)).isNotNegative();
+    }
+
+    @Test
+    @ResourceLock(Resources.SYSTEM_PROPERTIES)
+    void malformedRunnerFlagExitsAsInvalidConfiguration() {
+        DiscoveryFixtures.reset();
+        final var previousClass =
+                System.setProperty(Configuration.MATCH_CLASS_REGEX, Pattern.quote(AlphaFixture.class.getName()));
+        final var previousFlag = System.setProperty(Configuration.FAILURE_ON_SKIP, "false");
+        try {
+            assertThat(Launcher.execute()).isZero();
+            System.setProperty(Configuration.FAILURE_ON_SKIP, "treu");
+            assertThat(Launcher.execute()).isEqualTo(2);
+        } finally {
+            restoreProperty(Configuration.FAILURE_ON_SKIP, previousFlag);
+            restoreProperty(Configuration.MATCH_CLASS_REGEX, previousClass);
+        }
+    }
+
+    private static void restoreProperty(final String key, final String value) {
+        if (value == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, value);
+        }
     }
 }

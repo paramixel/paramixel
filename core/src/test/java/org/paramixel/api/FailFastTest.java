@@ -34,6 +34,30 @@ import org.paramixel.api.selector.Selector;
  */
 class FailFastTest {
 
+    @Test
+    void userTagsDoNotChangeDirectTaskAdmissionOrPaths() {
+        final var definition = Sequential.builder("root")
+                .independent()
+                .tags("paramixel.discovery.tasks", "paramixel.structural")
+                .step("fail", () -> {
+                    throw new AssertionError("expected");
+                })
+                .step("next", () -> {});
+
+        try (var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(Map.of(Configuration.FAIL_FAST, "true")))
+                .build()) {
+            final var root = runner.run(definition).root().orElseThrow();
+
+            assertThat(root.tags()).containsExactly("paramixel.discovery.tasks", "paramixel.structural");
+            assertThat(root.children()).extracting(TaskResult::path).containsExactly("root > fail", "root > next");
+            assertThat(root.children())
+                    .extracting(child -> child.status().kind())
+                    .containsExactly(Status.Kind.FAILED, Status.Kind.PASSED);
+        }
+    }
+
     @BeforeEach
     void reset() {
         DiscoveryFixtures.reset();

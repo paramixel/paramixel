@@ -51,3 +51,5 @@ Repeat.builder(MySuite.class, "readiness")
 
 `maxIterations` is mandatory. Each iteration is a distinct attempt in the result tree, and a repeated task owns its
 context scope, so every iteration starts with an empty scope.
+The two `until` overloads set the same predicate. The latest call wins, and a hook ID resolves against the effective
+anchor of each build. `untilPassed()` can be combined with either overload.

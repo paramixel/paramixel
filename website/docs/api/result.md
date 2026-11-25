@@ -35,6 +35,9 @@ TaskResult
 `parameters()` holds the node's plan parameters: the values it declared with `bind`, rendered at build time. They are
 never copied onto descendants, and a value stored at runtime with `Context.put` is not a parameter.
 
+On a discovered factory's root occurrence and its attempts, `tags()` contains builder tags followed by missing
+annotation tags. Other tasks report their builder tags. Tags are available in the result API.
+
 `slot()` says whether the node is an ordinary child of its parent or that parent's `before` or `after` subtree. A phase
 subtree is reported under its owner, with its own children beneath it.
 

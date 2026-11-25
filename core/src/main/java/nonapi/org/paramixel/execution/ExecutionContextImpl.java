@@ -82,7 +82,7 @@ final class ExecutionContextImpl implements Context {
 
     @Override
     public List<String> tags() {
-        return state.compiled.task().tags();
+        return state.compiled.tags();
     }
 
     @Override

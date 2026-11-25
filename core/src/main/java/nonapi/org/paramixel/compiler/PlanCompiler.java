@@ -40,10 +40,10 @@ import org.paramixel.api.support.RepeatPolicy;
 import org.paramixel.api.support.RetryPolicy;
 
 /**
- * Compiles an immutable task definition into an immutable plan, validating every invariant before any user code runs.
+ * Compiles an immutable task definition into an immutable plan before task callbacks run.
  *
- * <p>Compilation is pure and repeatable: it never invokes a factory, lifecycle callback, body, or runtime predicate, so
- * a definition that fails validation cannot have produced side effects.
+ * <p>Compilation never invokes a factory, lifecycle callback, body, or runtime predicate.
+ * Discovery can invoke providers before compilation to obtain the definitions.
  *
  * <p>Validation collects independent diagnostics instead of failing at the first problem. Errors prevent execution;
  * warnings are exposed on the plan. The compiler states its own limit honestly: it can prove structural facts such as
@@ -62,16 +62,6 @@ public final class PlanCompiler {
     /** FNV-1a 64-bit prime used by {@link #definitionId(Task)}. */
     private static final long FNV_PRIME = 0x100000001b3L;
 
-    /** Tag that marks the discovery task group, whose children honor the run-level fail-fast policy. */
-    public static final String FAIL_FAST_SCOPE_TAG = "paramixel.discovery.tasks";
-
-    /**
-     * Tag that marks framework scaffolding: nodes the discovery composition adds for gating, scheduling, and hook
-     * wrapping. Such a node keeps its own name as its display path, and its children start a fresh display path, so
-     * user-facing paths never repeat a constant {@code Paramixel > run > tasks} segment.
-     */
-    public static final String STRUCTURAL_TAG = "paramixel.structural";
-
     /**
      * Separator between levels of a display path, for example {@code KafkaTest > apache/kafka:3.7.2 > tests}.
      *
@@ -82,6 +72,9 @@ public final class PlanCompiler {
 
     private final Configuration configuration;
     private final Map<Pool, Integer> poolOverrides;
+    private final Set<Task> discoveryGroups;
+    private final Task failFastGroup;
+    private final List<List<String>> factoryTags;
     private final List<Diagnostic> diagnostics = new ArrayList<>();
     private final Map<String, Integer> capacities = new LinkedHashMap<>();
     private final Set<String> reportedUndefinedPools = new HashSet<>();
@@ -94,8 +87,29 @@ public final class PlanCompiler {
      * @throws NullPointerException if an argument is {@code null}
      */
     public PlanCompiler(final Configuration configuration, final Map<Pool, Integer> poolOverrides) {
+        this(configuration, poolOverrides, Set.of(), null, List.of());
+    }
+
+    /**
+     * Creates a compiler for a composed discovery tree.
+     *
+     * @param configuration the effective configuration
+     * @param poolOverrides explicit capacities that take precedence over configuration
+     * @param discoveryGroups framework groups omitted from descendant display paths
+     * @param failFastGroup the group whose children honor discovery fail-fast, or {@code null}
+     * @param factoryTags annotation tags by child position in the discovery factory group
+     */
+    public PlanCompiler(
+            final Configuration configuration,
+            final Map<Pool, Integer> poolOverrides,
+            final Set<Task> discoveryGroups,
+            final Task failFastGroup,
+            final List<List<String>> factoryTags) {
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
         this.poolOverrides = Map.copyOf(Objects.requireNonNull(poolOverrides, "poolOverrides is null"));
+        this.discoveryGroups = Set.copyOf(discoveryGroups);
+        this.failFastGroup = failFastGroup;
+        this.factoryTags = factoryTags.stream().map(List::copyOf).toList();
     }
 
     /**
@@ -112,7 +126,8 @@ public final class PlanCompiler {
         capacities.clear();
         reportedUndefinedPools.clear();
         final var counter = new AtomicInteger();
-        final var compiledRoot = expand(root, "0", null, null, 0, CompiledOccurrence.PhaseSlot.CHILD, counter);
+        final var compiledRoot =
+                expand(root, "0", null, null, 0, CompiledOccurrence.PhaseSlot.CHILD, counter, List.of());
         final var occurrences = new ArrayList<CompiledOccurrence>();
         collectPreOrder(compiledRoot, occurrences);
         validate(root, compiledRoot);
@@ -147,15 +162,16 @@ public final class PlanCompiler {
             final String parentDisplayPath,
             final int depth,
             final CompiledOccurrence.PhaseSlot slot,
-            final AtomicInteger counter) {
+            final AtomicInteger counter,
+            final List<String> annotationTags) {
         final var mode = task.mode();
         final var poolName = task.pool().map(Pool::name).orElse(null);
-        final var structural = task.tags().contains(STRUCTURAL_TAG);
+        final var structural = discoveryGroups.contains(task);
         final var path = structural || parentDisplayPath == null
                 ? task.name()
                 : parentDisplayPath + PATH_SEPARATOR + task.name();
         final var budget = mode == ExecutionMode.PARALLEL ? capacityOf(poolName, path) : 1;
-        final var failFastScope = task.tags().contains(FAIL_FAST_SCOPE_TAG);
+        final var failFastScope = task == failFastGroup;
         final var childDisplayPath = structural ? null : path;
         final var index = counter.getAndIncrement();
         // Pre-order stays owner, before subtree, children, after subtree so admission priority reads the same way as
@@ -171,15 +187,16 @@ public final class PlanCompiler {
         final var ordered = orderedChildren(task);
         final var childOccurrences = new ArrayList<CompiledOccurrence>(ordered.size());
         var ordinal = 0;
-        for (Task child : ordered) {
+        for (var child : ordered) {
             childOccurrences.add(expand(
-                    child,
+                    child.task(),
                     id + "." + ordinal,
                     id,
                     childDisplayPath,
                     depth + 1,
                     CompiledOccurrence.PhaseSlot.CHILD,
-                    counter));
+                    counter,
+                    child.annotationTags()));
             ordinal++;
         }
         final var afterPhase = expandPhase(
@@ -190,11 +207,13 @@ public final class PlanCompiler {
                 depth + 1,
                 CompiledOccurrence.PhaseSlot.AFTER,
                 counter);
-        final var executionOrder = ordered.stream().map(Task::name).toList();
+        final var executionOrder =
+                ordered.stream().map(child -> child.task().name()).toList();
         return new CompiledOccurrence(
                 task,
                 new CompiledOccurrence.Identity(id, definitionId(task), parentId, path),
                 new CompiledOccurrence.Scheduling(budget, index, depth, failFastScope, slot),
+                effectiveTags(task.tags(), annotationTags),
                 executionOrder,
                 childOccurrences,
                 beforePhase,
@@ -225,13 +244,18 @@ public final class PlanCompiler {
             final CompiledOccurrence.PhaseSlot slot,
             final AtomicInteger counter) {
         if (hook instanceof PhaseHook.Subtree subtree) {
-            return expand(subtree.task(), id, parentId, parentDisplayPath, depth, slot, counter);
+            return expand(subtree.task(), id, parentId, parentDisplayPath, depth, slot, counter, List.of());
         }
         return null;
     }
 
-    private static List<Task> orderedChildren(final Task task) {
-        final var children = new ArrayList<>(task.children());
+    private List<ChildPlacement> orderedChildren(final Task task) {
+        final var definitions = task.children();
+        final var children = new ArrayList<ChildPlacement>(definitions.size());
+        for (var index = 0; index < definitions.size(); index++) {
+            final var tags = task == failFastGroup ? factoryTags.get(index) : List.<String>of();
+            children.add(new ChildPlacement(definitions.get(index), tags));
+        }
         final var seed = task.shuffleSeed().orElse(null);
         if (seed == null || children.size() < 2) {
             return children;
@@ -246,6 +270,22 @@ public final class PlanCompiler {
         }
         return children;
     }
+
+    private static List<String> effectiveTags(final List<String> builderTags, final List<String> annotationTags) {
+        if (annotationTags.isEmpty()) {
+            return builderTags;
+        }
+        final var tags = new ArrayList<>(builderTags);
+        final var seen = new HashSet<>(builderTags);
+        for (String tag : annotationTags) {
+            if (seen.add(tag)) {
+                tags.add(tag);
+            }
+        }
+        return tags;
+    }
+
+    private record ChildPlacement(Task task, List<String> annotationTags) {}
 
     private int capacityOf(final String poolName, final String path) {
         if (poolName == null) {

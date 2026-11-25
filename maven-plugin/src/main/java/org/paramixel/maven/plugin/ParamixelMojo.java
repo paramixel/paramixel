@@ -40,6 +40,7 @@ import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
 import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
+import org.paramixel.api.exception.CompilationException;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
@@ -50,9 +51,8 @@ import org.paramixel.api.selector.Selector;
  *
  * <p>The mojo resolves task factories from the test classpath using the runner's internal classpath scanner,
  * executes them with a {@link Runner}, and fails the build when {@link Result#exitCode()} is non-zero.
- * Configuration-based promotion rules ({@code failureOnSkip}, {@code failureOnAbort}) are already
- * applied by the result's effective status, so skipped and aborted outcomes are promoted to failed when
- * the corresponding flags are enabled.
+ * Configuration-based rules such as {@code failureOnSkip} and {@code failureOnAbort} determine the exit code
+ * for skipped and aborted results.
  *
  * <p>The task definition is executed exactly once. The result is returned directly from the runner,
  * avoiding redundant re-execution.
@@ -104,7 +104,7 @@ public class ParamixelMojo extends AbstractMojo {
      * otherwise the Paramixel default ({@code true}).
      */
     @Parameter(property = "paramixel.failIfNoTests")
-    private Boolean failIfNoTests;
+    private String failIfNoTests;
 
     /**
      * When {@code true}, SKIP results are treated as failures and cause the build to fail.
@@ -113,7 +113,7 @@ public class ParamixelMojo extends AbstractMojo {
      * otherwise the Paramixel default ({@code true}).
      */
     @Parameter(property = "paramixel.failureOnSkip")
-    private Boolean failureOnSkip;
+    private String failureOnSkip;
 
     /**
      * When {@code true}, ABORTED results are treated as failures and cause the build to fail.
@@ -122,7 +122,7 @@ public class ParamixelMojo extends AbstractMojo {
      * otherwise the Paramixel default ({@code true}).
      */
     @Parameter(property = "paramixel.failureOnAbort")
-    private Boolean failureOnAbort;
+    private String failureOnAbort;
 
     /**
      * When {@code true}, the scheduler skips remaining unscheduled root children after the first
@@ -132,7 +132,7 @@ public class ParamixelMojo extends AbstractMojo {
      * otherwise the Paramixel default ({@code false}).
      */
     @Parameter(property = "paramixel.failFast")
-    private Boolean failFast;
+    private String failFast;
 
     /**
      * Path to the per-run summary report; when unset, no report file is generated.
@@ -220,6 +220,11 @@ public class ParamixelMojo extends AbstractMojo {
             finishExecution(originalClassLoader, testClassLoader, preExecutionThreads, null);
         } catch (ConfigurationException e) {
             throw new MojoExecutionException("Failed to build Paramixel configuration: " + e.getMessage(), e);
+        } catch (CompilationException e) {
+            final var diagnostics = String.join("\n", e.diagnostics());
+            final var message = Objects.toString(e.getMessage(), "Invalid definition or execution plan");
+            final var details = message.contains(diagnostics) ? message : message + "\n" + diagnostics;
+            throw new MojoExecutionException("Failed to compile Paramixel tests: " + details, e);
         } catch (ResolverException e) {
             throw new MojoExecutionException("Failed to resolve Paramixel factories: " + e.getMessage(), e);
         } catch (MojoFailureException | MojoExecutionException e) {
@@ -238,7 +243,10 @@ public class ParamixelMojo extends AbstractMojo {
                 .listener(Listener.defaultListener(configuration))
                 .build();
 
-        var result = runner.run(selector);
+        checkResult(runner.run(selector));
+    }
+
+    void checkResult(final Result result) throws MojoExecutionException, MojoFailureException {
         final var reportingFailure = result.failures().stream()
                 .filter(failure -> Listener.DRAIN_TIMEOUT_DIAGNOSTIC.equals(failure.phase()))
                 .findFirst();
@@ -246,8 +254,8 @@ public class ParamixelMojo extends AbstractMojo {
             final var failure = reportingFailure.orElseThrow();
             throw new MojoExecutionException(failure.phase() + ": " + failure.message());
         }
-        if (result.root().isEmpty()) {
-            if (configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true)) {
+        if (result.root().isEmpty() && result.status().isSkipped()) {
+            if (result.exitCode() != 0) {
                 throw new MojoExecutionException("No Paramixel tests found and failIfNoTests is true");
             }
 
@@ -457,9 +465,9 @@ public class ParamixelMojo extends AbstractMojo {
         }
     }
 
-    private static void putIfSet(final Map<String, String> configuration, final String key, final Boolean value) {
+    private static void putIfSet(final Map<String, String> configuration, final String key, final String value) {
         if (value != null) {
-            configuration.put(key, value.toString());
+            configuration.put(key, value);
         }
     }
 

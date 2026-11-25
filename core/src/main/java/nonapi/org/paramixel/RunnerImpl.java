@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -93,7 +94,7 @@ public final class RunnerImpl implements Runner {
         Objects.requireNonNull(definition, "definition is null");
         acquire();
         try {
-            return execute(definition, false, null);
+            return execute(definition, RunFlags.from(configuration));
         } finally {
             running.set(false);
         }
@@ -102,7 +103,13 @@ public final class RunnerImpl implements Runner {
     @Override
     public Result run(final TaskBuilder<?> definition) {
         Objects.requireNonNull(definition, "definition is null");
-        return run(definition.build());
+        acquire();
+        try {
+            final var flags = RunFlags.from(configuration);
+            return execute(definition.build(), flags);
+        } finally {
+            running.set(false);
+        }
     }
 
     @Override
@@ -177,6 +184,7 @@ public final class RunnerImpl implements Runner {
     }
 
     private Result discoverAndExecute(final ConcreteSelector selector) {
+        final var flags = RunFlags.from(configuration);
         final var runId = FastUUID.generateUuid();
         try (var dispatcher = new ReportingDispatcher(listener, configuration)) {
             dispatcher.runStarted(configuration);
@@ -188,42 +196,50 @@ public final class RunnerImpl implements Runner {
             seedDiscoveryPool(overrides);
             dispatcher.discoveryStarted();
             final var effectiveSelector = selector.resolve(configuration);
-            final var scanner = new FactoryScanner(configuration, effectiveSelector, shuffled, shuffleSeed);
+            final var scanner =
+                    new FactoryScanner(configuration, effectiveSelector, shuffled, shuffleSeed, () -> closed);
             final var discovered = scanner.discover();
             scanner.skipped().forEach(dispatcher::warning);
-            dispatcher.discoveryCompleted(discovered);
-            if (discovered.isEmpty()) {
-                return finishEmptyDiscovery(runId, dispatcher);
+            final var canceled = closed;
+            final var runnable = canceled ? Optional.<FactoryScanner.DiscoveredTasks>empty() : discovered;
+            dispatcher.discoveryCompleted(runnable.map(FactoryScanner.DiscoveredTasks::root));
+            if (runnable.isEmpty()) {
+                return finishWithoutRoot(runId, dispatcher, flags, canceled);
             }
-            return executeDiscovered(runId, discovered.orElseThrow(), overrides, true, dispatcher);
+            final var tasks = runnable.orElseThrow();
+            final var compiler = new PlanCompiler(
+                    configuration,
+                    overrides,
+                    Set.of(tasks.root(), tasks.runGroup(), tasks.factoryGroup()),
+                    tasks.factoryGroup(),
+                    tasks.factoryTags());
+            return executePlan(runId, tasks.root(), compiler, shuffled ? shuffleSeed : null, dispatcher, flags);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while delivering listener events", e);
         }
     }
 
-    private Result execute(final Task definition, final boolean discoveryRun, final ReportingDispatcher existing) {
+    private Result execute(final Task definition, final RunFlags flags) {
         final var runId = FastUUID.generateUuid();
-        if (existing != null) {
-            return executeDiscovered(runId, definition, new LinkedHashMap<>(poolOverrides), discoveryRun, existing);
-        }
         try (var dispatcher = new ReportingDispatcher(listener, configuration)) {
             dispatcher.runStarted(configuration);
             warnAboutUnknownKeys(dispatcher);
-            return executeDiscovered(runId, definition, new LinkedHashMap<>(poolOverrides), discoveryRun, dispatcher);
+            return executePlan(
+                    runId, definition, new PlanCompiler(configuration, poolOverrides), null, dispatcher, flags);
         }
     }
 
-    private Result executeDiscovered(
+    private Result executePlan(
             final String runId,
             final Task definition,
-            final Map<Pool, Integer> overrides,
-            final boolean discoveryRun,
-            final ReportingDispatcher dispatcher) {
-        final var plan = new PlanCompiler(configuration, overrides).compile(definition);
+            final PlanCompiler compiler,
+            final Long discoveryShuffleSeed,
+            final ReportingDispatcher dispatcher,
+            final RunFlags flags) {
+        final var plan = compiler.compile(definition);
         plan.warnings().forEach(warning -> dispatcher.warning(warning.toString()));
-        final var engine = new ExecutionEngine(
-                runId, plan, configuration, dispatcher, discoveryRun && shuffled ? shuffleSeed : null);
+        final var engine = new ExecutionEngine(runId, plan, configuration, dispatcher, discoveryShuffleSeed, flags);
         activeEngine.set(engine);
         if (closed) {
             // close() may have run before the engine was published (for example during discovery) and found nothing
@@ -269,12 +285,13 @@ public final class RunnerImpl implements Runner {
         overrides.put(pool, capacity);
     }
 
-    private Result finishEmptyDiscovery(final String runId, final ReportingDispatcher dispatcher)
+    private Result finishWithoutRoot(
+            final String runId, final ReportingDispatcher dispatcher, final RunFlags flags, final boolean canceled)
             throws InterruptedException {
         final Status status;
         final int exitCode;
         final List<String> warnings;
-        if (closed) {
+        if (canceled) {
             status = Status.canceled("runner closed");
             exitCode = 1;
             warnings = List.of();
@@ -282,7 +299,7 @@ public final class RunnerImpl implements Runner {
         } else {
             // An empty discovery follows the separately configured failIfNoTests rule, not the skip mapping.
             status = Status.skipped("no task factories were discovered");
-            exitCode = configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true) ? 1 : 0;
+            exitCode = flags.failIfNoTests() ? 1 : 0;
             warnings = List.of("No @Paramixel.TaskFactory method contributed a task for the requested selection");
         }
         final var result = Result.builder()

@@ -82,7 +82,9 @@ import org.paramixel.api.exception.ConfigurationException;
  * {@link Listener#onWarning(String)} so a typo such as {@code paramixel.parallelism.enviroments} does not fail
  * silently. Invalid values fail before any test code runs.
  *
- * <p>All typed getters return {@link Optional}; an invalid value throws {@link ConfigurationException}.
+ * <p>Typed getters return {@link Optional}. An invalid numeric value throws {@link ConfigurationException}.
+ * The boolean getter uses permissive parsing. A runner separately validates the effective values of
+ * {@link #FAILURE_ON_SKIP}, {@link #FAILURE_ON_ABORT}, {@link #FAIL_IF_NO_TESTS}, and {@link #FAIL_FAST}.
  */
 public interface Configuration {
 

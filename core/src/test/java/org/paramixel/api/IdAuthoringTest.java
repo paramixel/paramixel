@@ -17,10 +17,12 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.exception.AbortException;
@@ -186,6 +188,54 @@ class IdAuthoringTest {
     }
 
     @Test
+    void allHookReferencesUseTheSameUtf16LengthLimit() {
+        final List<Function<String, TaskBuilder<?>>> references = List.of(
+                id -> Sequential.builder("before").before(id),
+                id -> Sequential.builder("step").step(id),
+                id -> Sequential.builder("body").body(id),
+                id -> Sequential.builder("after").after(id),
+                id -> Sequential.builder("condition").onlyIf(id),
+                id -> Repeat.builder("until").until(id));
+        final var maximum = "\uD83D\uDE00".repeat(32);
+        for (var reference : references) {
+            assertThat(reference.apply(maximum)).isNotNull();
+            assertThatThrownBy(() -> reference.apply(maximum + "x"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("64 UTF-16 code units");
+        }
+        assertThat(Sequential.builder("x".repeat(512)).build().name()).hasSize(512);
+        assertThatThrownBy(() -> Sequential.builder("x".repeat(513))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void repeatPredicateResolvesAgainstEachBuildsAnchor() {
+        final var repeat = Repeat.builder("repeat").maxIterations(3).until("stop");
+        assertThat(problems(repeat::build))
+                .anySatisfy(diagnostic -> assertThat(diagnostic).contains("until", "no anchor"));
+
+        final var early = Sequential.builder(Hooks.class, "early").step(repeat).build();
+        final var late =
+                Sequential.builder(NeverStops.class, "late").step(repeat).build();
+
+        assertThat(run(early).attemptCount()).isEqualTo(1);
+        assertThat(run(late).attemptCount()).isEqualTo(3);
+        assertThat(run(early).attemptCount()).isEqualTo(1);
+    }
+
+    @Test
+    void repeatPredicateOverloadsReplaceEachOther() {
+        final var repeat = Repeat.builder(Hooks.class, "repeat")
+                .maxIterations(3)
+                .until("missing")
+                .until((context, status) -> false);
+        final var lambda = repeat.build();
+        final var identified = repeat.until("stop").build();
+
+        assertThat(run(lambda).attemptCount()).isEqualTo(3);
+        assertThat(run(identified).attemptCount()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("ID-12: a resolved hook is labelled by its id, not by its position")
     void hookLabelsUseIds() {
         final var result = run(Sequential.builder(Hooks.class, "root")
@@ -301,6 +351,19 @@ class IdAuthoringTest {
         @Paramixel.Id("converged")
         public static boolean converged(final Context context, final Status status) {
             return Records.EVENTS.size() >= 2;
+        }
+
+        @Paramixel.Id("stop")
+        public static boolean stop(final Context context, final Status status) {
+            return true;
+        }
+    }
+
+    public static final class NeverStops {
+
+        @Paramixel.Id("stop")
+        public static Boolean stop(final Context context, final Status status) {
+            return null;
         }
     }
 

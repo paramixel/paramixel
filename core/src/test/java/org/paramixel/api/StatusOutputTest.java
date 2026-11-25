@@ -136,9 +136,9 @@ class StatusOutputTest {
         final var lines = run(definition);
 
         assertThat(lines).anyMatch(line -> isTreeLine(line, "group \\(sequential\\) PASS \\(\\d+ ms\\)"));
-        assertThat(lines).anyMatch(line -> isTreeLine(line, "├── parent \\(sequential\\) PASS \\(\\d+ ms\\)"));
-        assertThat(lines).anyMatch(line -> isTreeLine(line, "│   └── child PASS \\(\\d+ ms\\)"));
-        assertThat(lines).anyMatch(line -> isTreeLine(line, "└── sibling PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "├─ parent \\(sequential\\) PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "│  └─ child PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "└─ sibling PASS \\(\\d+ ms\\)"));
     }
 
     @Test
@@ -150,7 +150,7 @@ class StatusOutputTest {
         final var lines = run(definition);
 
         assertThat(lines).anyMatch(line -> isTreeLine(line, "group \\(sequential\\) PASS \\(\\d+ ms\\)"));
-        assertThat(lines).anyMatch(line -> isTreeLine(line, "└── leaf PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "└─ leaf PASS \\(\\d+ ms\\)"));
         assertThat(lines).noneMatch(line -> line.contains("leaf (sequential)"));
         assertThat(lines).noneMatch(line -> line.contains("leaf (parallel)"));
     }
@@ -174,8 +174,8 @@ class StatusOutputTest {
         assertThat(lines).anyMatch(line -> isTreeLine(line, "root \\(sequential\\) PASS \\(\\d+ ms\\)"));
         assertThat(lines)
                 .anyMatch(line ->
-                        isTreeLine(line, "└── retried \\(sequential\\) PASS \\(\\d+ ms\\) — 2 attempts, 1 failed"));
-        assertThat(lines).anyMatch(line -> isTreeLine(line, "    └── probe PASS \\(\\d+ ms\\)"));
+                        isTreeLine(line, "└─ retried \\(sequential\\) PASS \\(\\d+ ms\\) — 2 attempts, 1 failed"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "   └─ probe PASS \\(\\d+ ms\\)"));
     }
 
     @Test

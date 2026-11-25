@@ -51,11 +51,8 @@ class CompileProofTest {
         final var apiLocation =
                 Task.class.getProtectionDomain().getCodeSource().getLocation().getPath();
         final var classpath = apiLocation + File.pathSeparator + System.getProperty("java.class.path");
-        final var windows =
-                System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
-        final var javac = Path.of(System.getProperty("java.home"), "bin", windows ? "javac.exe" : "javac");
         final var process = new ProcessBuilder(
-                        javac.toString(),
+                        javaTool("javac"),
                         "-classpath",
                         classpath,
                         "-d",
@@ -93,6 +90,111 @@ class CompileProofTest {
         assertThat(compiles(className, body))
                 .as("expected %s to fail compilation", className)
                 .isFalse();
+    }
+
+    private static String javaTool(final String name) {
+        final var windows =
+                System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        return Path.of(System.getProperty("java.home"), "bin", windows ? name + ".exe" : name)
+                .toString();
+    }
+
+    @Test
+    void namedModuleHooksAreValidatedWhileBuilding() throws Exception {
+        final var moduleInfo = tempDir.resolve("module-info.java");
+        Files.writeString(moduleInfo, "module sample { requires org.paramixel.api; }");
+        final var source = tempDir.resolve("ModuleProbe.java");
+        Files.writeString(source, """
+                package probe;
+
+                import org.paramixel.api.*;
+                import org.paramixel.api.exception.CompilationException;
+
+                public final class ModuleProbe {
+                    @Paramixel.Id("check")
+                    public static void check(Context context) {}
+
+                    public static void main(String[] args) {
+                        var anchor = args[0].equals("open") ? HiddenHooks.class : ModuleProbe.class;
+                        var builder = Sequential.builder(anchor, "probe").body("check");
+                        if (args[0].equals("closed")) {
+                            try {
+                                builder.build();
+                                throw new AssertionError("Expected an inaccessible-hook diagnostic");
+                            } catch (CompilationException expected) {
+                                if (expected.diagnostics().stream().noneMatch(message ->
+                                        message.contains("inaccessible method") && message.contains("org.paramixel.api"))) {
+                                    throw new AssertionError(expected.diagnostics());
+                                }
+                            }
+                            return;
+                        }
+                        try (var runner = Runner.builder().listener(Listener.NOOP).build()) {
+                            if (!runner.run(builder).status().isPassed()) {
+                                throw new AssertionError("Expected the hook to execute");
+                            }
+                        }
+                    }
+                }
+
+                final class HiddenHooks {
+                    @Paramixel.Id("check")
+                    public static void check(Context context) {}
+                }
+                """);
+        final var api = Path.of(
+                Task.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        final var output = tempDir.resolve("module");
+        assertCommandSucceeds(
+                javaTool("javac"),
+                "--module-path",
+                api.toString(),
+                "-d",
+                output.toString(),
+                moduleInfo.toString(),
+                source.toString());
+
+        final var modulePath = api + File.pathSeparator + output;
+        assertCommandSucceeds(
+                javaTool("java"), "--module-path", modulePath, "-m", "sample/probe.ModuleProbe", "closed");
+        assertCommandSucceeds(
+                javaTool("java"),
+                "--module-path",
+                modulePath,
+                "--add-exports",
+                "sample/probe=org.paramixel.api",
+                "-m",
+                "sample/probe.ModuleProbe",
+                "exported");
+        assertCommandSucceeds(
+                javaTool("java"),
+                "--module-path",
+                modulePath,
+                "--add-opens",
+                "sample/probe=org.paramixel.api",
+                "-m",
+                "sample/probe.ModuleProbe",
+                "open");
+    }
+
+    private void assertCommandSucceeds(final String... command) throws IOException, InterruptedException {
+        final var log = Files.createTempFile(tempDir, "process-", ".log");
+        final var process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .redirectOutput(log.toFile())
+                .start();
+        try {
+            assertThat(process.waitFor(30, TimeUnit.SECONDS))
+                    .as("process completed: %s", (Object) command)
+                    .isTrue();
+            assertThat(process.exitValue())
+                    .as("%s%n%s", String.join(" ", command), Files.readString(log))
+                    .isZero();
+        } finally {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+            }
+        }
     }
 
     @Test

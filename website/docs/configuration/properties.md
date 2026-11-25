@@ -43,8 +43,11 @@ a capacity above the worker limit adds no concurrency.
 
 ## Validation
 
-An unknown `paramixel.*` key is reported as a warning. Invalid values fail before any test code runs:
-`ConfigurationException` for configuration, `CompilationException` for a plan (including an undefined pool).
+An unknown `paramixel.*` key is reported as a warning. The effective values of `paramixel.failureOnSkip`,
+`paramixel.failureOnAbort`, `paramixel.failIfNoTests`, and `paramixel.failFast` accept only `true` or `false`,
+ignoring case and surrounding whitespace. An absent flag uses its default. A malformed value raises
+`ConfigurationException` before factory invocation or task execution. Invalid plans, including undefined pools,
+raise `CompilationException` before task callbacks run.
 
 ## Example
 

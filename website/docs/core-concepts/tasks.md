@@ -87,7 +87,7 @@ switches, and they affect only the direct children of the task that declares the
 | `child(Repeat.builder(name).maxIterations(n).until(id))` | Bounded intentional replay with an optional stop predicate |
 | `onlyIf(id)` | Runtime condition evaluated after admission; the hook returns `boolean` |
 | `isolated(lockName)` | Exclusive logical lock held for the task's lifetime |
-| `tags(String…)` | Diagnostics, selection, and reporting metadata |
+| `tags(String…)` | Runtime context and result metadata |
 | `shuffle(seed)` / `shuffle()` | Reproducible child order, recorded in the result |
 
 ## Next

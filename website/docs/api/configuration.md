@@ -22,8 +22,13 @@ Optional<Boolean> failFast = configuration.getBoolean(Configuration.FAIL_FAST);
 
 ## Typed accessors
 
-`getString`, `getBoolean`, `getInteger`, `getLong`, `get(key, transformer)`, and `keySet()` return optionals; an invalid
-value throws `ConfigurationException`. `Configuration.poolKey(name)` builds `paramixel.parallelism.<name>`.
+The typed getters return optionals. Invalid numeric values and errors from `get(key, transformer)` throw
+`ConfigurationException`. `keySet()` returns a set of property names. `Configuration.poolKey(name)` builds
+`paramixel.parallelism.<name>`.
+
+`getBoolean()` and `parseBoolean()` recognize `true` case-insensitively after stripping surrounding whitespace.
+Other present values evaluate to `false`. The runner separately validates its four built-in boolean flags after
+configuration precedence is applied.
 
 Unknown `paramixel.*` keys are reported as warnings at run start. Secret-looking values are redacted from diagnostics and
 reports.

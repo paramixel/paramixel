@@ -221,7 +221,7 @@ public final class TaskResult {
     }
 
     /**
-     * Returns the declared tags.
+     * Returns the occurrence tags, including factory annotation tags on a discovered root task and its attempts.
      *
      * @return the immutable tags; never {@code null}
      */

@@ -34,8 +34,7 @@ import org.paramixel.api.selector.Selector;
  * <ul>
  *   <li>{@link #run(Task)} executes a definition you built. It performs no discovery, no classpath scan, and runs no
  *       {@code @BeforeAll}/{@code @AfterAll} hooks: the definition is the complete run.</li>
- *   <li>{@link #run(TaskBuilder)} builds the definition you authored and executes it with exactly the semantics of
- *       {@link #run(Task)}, so a {@code main} method can pass a factory's result directly.</li>
+ *   <li>{@link #run(TaskBuilder)} acquires the run slot, builds the definition, and executes it as a direct run.</li>
  *   <li>{@link #run(Selector)} discovers factories using exactly the supplied selector and nothing else. A configured
  *       {@code paramixel.match.*} key that the selector does not use is reported as a warning rather than merged
  *       silently.</li>
@@ -46,12 +45,16 @@ import org.paramixel.api.selector.Selector;
  * {@link IllegalStateException} instead of producing undefined behavior. Independent runner instances may run
  * concurrently and share no mutable framework state.
  *
- * <p>{@link #close()} requests cooperative cancellation of an active run and releases long-lived runner resources. It is
- * idempotent, so try-with-resources and an explicit shutdown can both be used.
+ * <p>{@link #close()} requests cooperative cancellation of an active run and releases long-lived runner resources.
+ * During discovery the cancellation request is checked between invocations of factory and run-hook provider methods.
+ * If cancellation is observed before the handoff to plan compilation and the current provider returns normally,
+ * partial definitions are discarded and the run returns {@link Status#CANCELED} with no root and exit code 1.
+ * Closing is idempotent, so try-with-resources and an explicit shutdown can both be used.
  *
- * <p>Validation happens before execution: an invalid definition, an undefined pool, or an illegal plan throws
- * {@link CompilationException}; an invalid configuration throws {@link ConfigurationException}; discovery problems
- * throw {@link ResolverException}. In all three cases no factory, lifecycle callback, or body has run.
+ * <p>Runner flags are validated before factory invocation or task execution. Malformed flags throw
+ * {@link ConfigurationException}. Discovery invokes providers to obtain definitions, which are then compiled before
+ * any task callback runs. Definition and plan errors reported by the compiler throw {@link CompilationException}.
+ * Invalid provider declarations and other provider invocation failures throw {@link ResolverException}.
  *
  * @see Result
  * @see Launcher
@@ -89,16 +92,15 @@ public interface Runner extends AutoCloseable {
     /**
      * Builds the supplied definition and executes it.
      *
-     * <p>This is exactly {@code run(definition.build())}: it performs no discovery and runs no
-     * {@code @BeforeAll}/{@code @AfterAll} hooks. It accepts a builder so a {@code main} method can hand over whatever a
-     * {@link Paramixel.TaskFactory} returned.
+     * <p>The runner acquires its run slot before building the definition. The resulting task executes directly without
+     * discovery or {@code @BeforeAll}/{@code @AfterAll} hooks.
      *
      * @param definition the definition builder; must not be {@code null}
      * @return the result; never {@code null}
      * @throws NullPointerException if {@code definition} is {@code null}
      * @throws ConfigurationException if the configuration is invalid
      * @throws CompilationException if the definition or plan is invalid
-     * @throws IllegalStateException if a run is already in progress on this runner
+     * @throws IllegalStateException if this runner is closed or already has a run in progress
      */
     Result run(TaskBuilder<?> definition);
 

@@ -38,6 +38,7 @@ import org.paramixel.api.discoveryfixtures.ShapeMismatchBaseFixture;
 import org.paramixel.api.discoveryfixtures.ShapeMismatchSubFixture;
 import org.paramixel.api.discoveryfixtures.SkippingFactoryFixture;
 import org.paramixel.api.discoveryfixtures.TooManyParametersFactoryFixture;
+import org.paramixel.api.exception.CompilationException;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
@@ -88,6 +89,32 @@ class TaskFactoryDiscoveryTest {
         assertThat(result.status().isPassed()).isTrue();
         assertThat(DiscoveryFixtures.RECORDED).contains("builder-factory");
         assertThat(allNames(result.root().orElseThrow())).contains("builder-factory");
+    }
+
+    @Test
+    void bothFactoryReturnFormsRetainCompilationDiagnostics() {
+        for (Class<?> fixture : List.of(InvalidBuiltTaskFactory.class, InvalidReturnedBuilderFactory.class)) {
+            assertThatThrownBy(() -> discover(fixture))
+                    .isInstanceOfSatisfying(
+                            CompilationException.class,
+                            exception -> assertThat(exception.diagnostics())
+                                    .anySatisfy(
+                                            diagnostic -> assertThat(diagnostic).contains("missing")));
+        }
+    }
+
+    static final class InvalidBuiltTaskFactory {
+        @Paramixel.TaskFactory
+        public static Task factory() {
+            return Sequential.builder("invalid").step("missing").build();
+        }
+    }
+
+    static final class InvalidReturnedBuilderFactory {
+        @Paramixel.TaskFactory
+        public static TaskBuilder<?> factory() {
+            return Sequential.builder("invalid").step("missing");
+        }
     }
 
     @Test

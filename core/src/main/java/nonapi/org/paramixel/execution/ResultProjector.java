@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import nonapi.org.paramixel.RunFlags;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Failure;
 import org.paramixel.api.Result;
@@ -54,22 +55,22 @@ final class ResultProjector {
      * @param configuration the effective configuration; must not be {@code null}
      * @param poolCapacities the resolved pool capacities; must not be {@code null}
      * @param discoveryShuffleSeed the discovery shuffle seed to report, or {@code null}
+     * @param flags the validated run flags
      * @throws NullPointerException if a required argument is {@code null}
      */
     ResultProjector(
             final String runId,
             final Configuration configuration,
             final Map<String, Integer> poolCapacities,
-            final Long discoveryShuffleSeed) {
+            final Long discoveryShuffleSeed,
+            final RunFlags flags) {
         this.runId = Objects.requireNonNull(runId, "runId is null");
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
         // A LinkedHashMap copy keeps the plan's pool order, which the configuration summary reports.
         this.poolCapacities = Collections.unmodifiableMap(
                 new LinkedHashMap<>(Objects.requireNonNull(poolCapacities, "poolCapacities is null")));
-        this.failureOnSkip =
-                configuration.getBoolean(Configuration.FAILURE_ON_SKIP).orElse(true);
-        this.failureOnAbort =
-                configuration.getBoolean(Configuration.FAILURE_ON_ABORT).orElse(true);
+        this.failureOnSkip = flags.failureOnSkip();
+        this.failureOnAbort = flags.failureOnAbort();
         this.discoveryShuffleSeed = discoveryShuffleSeed;
     }
 
@@ -135,7 +136,7 @@ final class ResultProjector {
                         state.path)
                 .parameters(state.compiled.task().parameters())
                 .slot(slotOf(state))
-                .tags(state.compiled.task().tags())
+                .tags(state.compiled.tags())
                 .attributes(
                         state.compiled.mode(),
                         state.compiled.poolName(),
@@ -179,7 +180,7 @@ final class ResultProjector {
                         state.path)
                 .parameters(state.compiled.task().parameters())
                 .slot(slotOf(state))
-                .tags(state.compiled.task().tags())
+                .tags(state.compiled.tags())
                 .attributes(
                         state.compiled.mode(),
                         state.compiled.poolName(),

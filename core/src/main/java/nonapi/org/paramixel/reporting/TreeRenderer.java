@@ -56,16 +56,16 @@ final class TreeRenderer {
     }
 
     /** The branch drawn before a child that has a later sibling. */
-    private static final String BRANCH = "├── ";
+    private static final String BRANCH = "├─ ";
 
     /** The branch drawn before the last child of a node. */
-    private static final String LAST_BRANCH = "└── ";
+    private static final String LAST_BRANCH = "└─ ";
 
     /** The continuation drawn under a node that has a later sibling. */
-    private static final String CONTINUATION = "│   ";
+    private static final String CONTINUATION = "│  ";
 
     /** The blank continuation drawn under the last child of a node. */
-    private static final String BLANK = "    ";
+    private static final String BLANK = "   ";
 
     private TreeRenderer() {
         // Intentionally empty

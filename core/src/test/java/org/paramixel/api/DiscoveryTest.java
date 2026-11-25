@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -30,12 +32,14 @@ import nonapi.org.paramixel.discovery.FactoryScanner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.paramixel.api.discoveryfixtures.AlphaFixture;
 import org.paramixel.api.discoveryfixtures.CloseDuringDiscoveryFixture;
 import org.paramixel.api.discoveryfixtures.DisabledConflictingFactoryFixture;
 import org.paramixel.api.discoveryfixtures.DiscoveryFixtures;
 import org.paramixel.api.discoveryfixtures.InvalidFactoryFixture;
 import org.paramixel.api.discoveryfixtures.InvalidTagFixture;
 import org.paramixel.api.discoveryfixtures.SkippingFactoryFixture;
+import org.paramixel.api.exception.CompilationException;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
@@ -47,6 +51,17 @@ class DiscoveryTest {
 
     /** Number of distinct shuffle seeds exercised by the reproducibility sweep. */
     private static final int SHUFFLE_SEED_SWEEP = 8;
+
+    private static final ConcurrentLinkedQueue<List<String>> REPEAT_TAGS = new ConcurrentLinkedQueue<>();
+    private static final Task SHARED_TAGGED_TASK = Repeat.builder("shared")
+            .maxIterations(2)
+            .until((context, status) -> {
+                REPEAT_TAGS.add(context.tags());
+                return true;
+            })
+            .tags("local", "overlap")
+            .step(Sequential.builder("child").tags("child").step("work", () -> {}))
+            .build();
 
     private static Selector fixtures() {
         return Selector.builder()
@@ -365,6 +380,166 @@ class DiscoveryTest {
     }
 
     @Test
+    void closeDuringDiscoverySkipsTheNextFactory() {
+        try (var runner = runner()) {
+            DiscoveryFixtures.factoryHook = runner::close;
+            final var result = runner.run(Selector.builder()
+                    .classOf(CloseDuringDiscoveryFixture.class)
+                    .classOf(LaterFactory.class)
+                    .build());
+
+            assertThat(result.status().isCanceled()).isTrue();
+            assertThat(DiscoveryFixtures.RECORDED).doesNotContain("later-factory");
+        }
+    }
+
+    @Test
+    void canceledDiscoveryDiscardsValidAndInvalidDefinitions() {
+        for (Class<?> fixture :
+                List.of(CloseDuringDiscoveryFixture.class, CanceledPlanFactory.class, CanceledBuilderFactory.class)) {
+            final var completed = new ArrayList<Optional<Task>>();
+            try (var runner = Runner.builder()
+                    .configuration(Configuration.of(Map.of(Configuration.FAIL_IF_NO_TESTS, "false")))
+                    .listener(new Listener() {
+                        @Override
+                        public void onDiscoveryCompleted(final Optional<Task> root) {
+                            completed.add(root);
+                        }
+                    })
+                    .build()) {
+                DiscoveryFixtures.factoryHook = runner::close;
+                final var result =
+                        runner.run(Selector.builder().classOf(fixture).build());
+                assertThat(completed).containsExactly(Optional.empty());
+                assertThat(result.root()).isEmpty();
+                assertThat(result.status().isCanceled()).isTrue();
+                assertThat(result.exitCode()).isEqualTo(1);
+                assertThat(result.isQuiescent()).isTrue();
+            }
+        }
+        assertThat(DiscoveryFixtures.RECORDED).isEmpty();
+    }
+
+    @Test
+    void aProviderCompilationFailureStillSurfacesAfterClose() {
+        try (var runner = runner()) {
+            DiscoveryFixtures.factoryHook = runner::close;
+            assertThatThrownBy(() -> runner.run(Selector.builder()
+                            .classOf(ClosingThrowingFactory.class)
+                            .build()))
+                    .isInstanceOf(CompilationException.class)
+                    .hasMessageContaining("provider compilation failure");
+        }
+    }
+
+    @Test
+    void factoryTagsFollowThePlacementThroughShuffleAndAttempts() {
+        REPEAT_TAGS.clear();
+        final var first = List.of("local", "overlap", "first");
+        final var second = List.of("local", "overlap", "second");
+        final var selector = Selector.builder()
+                .classOf(FirstTaggedFactory.class)
+                .classOf(SecondTaggedFactory.class)
+                .tagPattern(Pattern.compile("first|second"))
+                .build();
+        try (var runner = shuffled(2)) {
+            final var result = runner.run(selector);
+            final var roots = discoveryTasks(result).children();
+            assertThat(roots).extracting(TaskResult::tags).containsExactly(second, first);
+            for (TaskResult root : roots) {
+                assertThat(root.children()).singleElement().satisfies(attempt -> {
+                    assertThat(attempt.tags()).isEqualTo(root.tags());
+                    assertThat(attempt.children()).extracting(TaskResult::tags).containsExactly(List.of("child"));
+                });
+            }
+            assertThat(REPEAT_TAGS).containsExactlyInAnyOrder(first, second);
+
+            final var direct = runner.run(SHARED_TAGGED_TASK);
+            assertThat(direct.root().orElseThrow().tags()).containsExactly("local", "overlap");
+            assertThat(REPEAT_TAGS).contains(List.of("local", "overlap"));
+        }
+    }
+
+    static final class CanceledPlanFactory {
+        @Paramixel.TaskFactory
+        public static Task factory() {
+            DiscoveryFixtures.factoryHook.run();
+            return Parallel.builder("invalid", Pool.named("missing")).build();
+        }
+    }
+
+    static final class CanceledBuilderFactory {
+        @Paramixel.TaskFactory
+        public static TaskBuilder<?> factory() {
+            DiscoveryFixtures.factoryHook.run();
+            return Sequential.builder("invalid").step("missing");
+        }
+    }
+
+    static final class ClosingThrowingFactory {
+        @Paramixel.TaskFactory
+        public static Task factory() {
+            DiscoveryFixtures.factoryHook.run();
+            throw new CompilationException("provider compilation failure");
+        }
+    }
+
+    static final class FirstTaggedFactory {
+        @Paramixel.TaskFactory
+        @Paramixel.Tag("overlap")
+        @Paramixel.Tag("first")
+        @Paramixel.Tag("first")
+        public static Task factory() {
+            return SHARED_TAGGED_TASK;
+        }
+    }
+
+    static final class SecondTaggedFactory {
+        @Paramixel.TaskFactory
+        @Paramixel.Tag("second")
+        public static Task factory() {
+            return SHARED_TAGGED_TASK;
+        }
+    }
+
+    @Test
+    void aDualRoleMethodIsRejectedOnlyWhenSelectedAsAFactory() {
+        try (var runner = runner()) {
+            final var result =
+                    runner.run(Selector.builder().classOf(AlphaFixture.class).build());
+
+            assertThat(result.status().isPassed()).isTrue();
+            assertThat(DiscoveryFixtures.RECORDED).contains("beforeAll", "alpha", "afterAll");
+            assertThat(DiscoveryFixtures.RECORDED).doesNotContain("conflicting-method");
+
+            assertThatThrownBy(() -> runner.run(
+                            Selector.builder().classOf(ConflictingFactory.class).build()))
+                    .isInstanceOf(ResolverException.class)
+                    .hasMessageContaining("cannot be both @Paramixel.TaskFactory and a run hook");
+        }
+    }
+
+    @Paramixel.Priority(-1)
+    static final class LaterFactory {
+
+        @Paramixel.TaskFactory
+        public static TaskBuilder<?> factory() {
+            DiscoveryFixtures.RECORDED.add("later-factory");
+            return Sequential.builder("later");
+        }
+    }
+
+    static final class ConflictingFactory {
+
+        @Paramixel.TaskFactory
+        @Paramixel.BeforeAll
+        public static TaskBuilder<?> factory() {
+            DiscoveryFixtures.RECORDED.add("conflicting-method");
+            return Sequential.builder("conflicting");
+        }
+    }
+
+    @Test
     void closeDuringDiscoveryCancelsEvenIfNoFactoryContributedATask() {
         final var selector =
                 Selector.builder().classOf(SkippingFactoryFixture.class).build();
@@ -460,7 +635,7 @@ class DiscoveryTest {
 
     @Test
     @DisplayName("concurrent runs on one runner are rejected")
-    void concurrentRunsAreRejected() {
+    void concurrentRunsAreRejected() throws InterruptedException {
         final var runner = runner();
         final var started = new CountDownLatch(1);
         final var release = new CountDownLatch(1);
@@ -478,10 +653,13 @@ class DiscoveryTest {
             assertThatThrownBy(() -> runner.run(definition))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("already in progress");
+            assertThatThrownBy(() -> runner.run(throwingBinding()))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("already in progress");
+        } finally {
             release.countDown();
             thread.join(5000L);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            runner.close();
         }
 
         assertThat(thread.isAlive()).isFalse();
@@ -591,20 +769,27 @@ class DiscoveryTest {
     }
 
     @Test
-    void booleanEngineSettingsUseTheDocumentedFalseFallback() {
+    void discoveryRejectsMalformedRunnerFlagsBeforeInvokingFactories() {
         final var selector =
                 Selector.builder().classOf(CloseDuringDiscoveryFixture.class).build();
-        for (String key :
-                List.of(Configuration.FAIL_FAST, Configuration.FAILURE_ON_SKIP, Configuration.FAILURE_ON_ABORT)) {
+        DiscoveryFixtures.factoryHook = () -> DiscoveryFixtures.RECORDED.add("factory invoked");
+        for (String key : List.of(
+                Configuration.FAIL_FAST,
+                Configuration.FAILURE_ON_SKIP,
+                Configuration.FAILURE_ON_ABORT,
+                Configuration.FAIL_IF_NO_TESTS)) {
             final var configuration = Configuration.of(Map.of(key, "not-true"));
             try (var runner = Runner.builder()
                     .listener(Listener.NOOP)
                     .configuration(configuration)
                     .build()) {
                 assertThat(configuration.getBoolean(key)).as(key).hasValue(false);
-                assertThat(runner.run(selector).status().kind()).as(key).isEqualTo(Status.Kind.PASSED);
+                assertThatThrownBy(() -> runner.run(selector))
+                        .isInstanceOf(ConfigurationException.class)
+                        .hasMessageContaining(key);
             }
         }
+        assertThat(DiscoveryFixtures.RECORDED).isEmpty();
     }
 
     @Test
@@ -616,5 +801,27 @@ class DiscoveryTest {
         assertThatThrownBy(() -> runner.run(Sequential.builder("x").build()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("closed");
+        assertThatThrownBy(() -> runner.run(throwingBinding()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("closed");
+    }
+
+    @Test
+    void buildFailureReleasesTheRunSlot() {
+        try (var runner = runner()) {
+            assertThatThrownBy(() -> runner.run(Sequential.builder("invalid").step("missing")))
+                    .isInstanceOf(CompilationException.class);
+            assertThat(runner.run(Sequential.builder("valid")).status().isPassed())
+                    .isTrue();
+        }
+    }
+
+    private static TaskBuilder<?> throwingBinding() {
+        return Sequential.builder("must not build").bind("sentinel", new Object() {
+            @Override
+            public String toString() {
+                throw new AssertionError("the rejected builder rendered a bound value");
+            }
+        });
     }
 }

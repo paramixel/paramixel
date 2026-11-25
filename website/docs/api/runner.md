@@ -19,14 +19,17 @@ int exitCode = result.exitCode();
 ```
 
 `Runner` is `AutoCloseable`. `close()` requests cooperative cancellation of an active run, including one that is still
-discovering factories, and is idempotent; a closed runner rejects further runs. If discovery is canceled and no
-factory contributes a task, the result is `CANCELED` with no root, regardless of `paramixel.failIfNoTests`.
+discovering factories, and is idempotent. A closed runner rejects further runs. Discovery checks cancellation between
+provider calls. A provider already invoked can finish its current call. When it returns normally and cancellation is
+observed before compilation, the runner discards partial definitions, signals discovery completion with an empty
+optional, and returns `CANCELED` with no root and exit code `1`. Provider exceptions still surface.
 
 ## Entry points
 
 | Method | Behavior |
 | --- | --- |
 | `run(Task)` | Executes the supplied definition. No classpath scan and no `@BeforeAll`/`@AfterAll`. |
+| `run(TaskBuilder<?>)` | Acquires the run slot before building, then executes the definition directly. |
 | `run(Selector)` | Discovers factories with exactly that selector. A configured `paramixel.match.*` key the selector does not use is reported as a warning instead of being merged silently. |
 | `run()` | Discovers with the configured selection. |
 
@@ -34,9 +37,10 @@ factory contributes a task, the result is `CANCELED` with no root, regardless of
 
 - **One run at a time per instance.** A concurrent call throws `IllegalStateException`; independent runners may run
   concurrently and share no mutable framework state.
-- **Validation first.** Invalid configuration throws `ConfigurationException`; an invalid definition or plan throws
-  `CompilationException`; discovery problems throw `ResolverException`. In every case no factory, lifecycle callback, or
-  body has run.
+- **Validation first.** Malformed runner flags throw `ConfigurationException` before provider or task callbacks run.
+  Discovery invokes providers to produce definitions. Definition and plan validation complete before task callbacks run.
+  A `CompilationException` surfaces regardless of the factory return type. Invalid declarations and other provider
+  invocation errors surface as `ResolverException`.
 - **Synchronous completion.** A normal run returns after every occurrence settled and every finalizer ran.
 - **Non-quiescent runs.** A run whose callback ignored cancellation past the grace period returns with
   `result.isQuiescent() == false`, withheld cleanup, and a non-zero exit code.

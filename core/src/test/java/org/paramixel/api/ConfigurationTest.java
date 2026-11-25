@@ -110,6 +110,35 @@ class ConfigurationTest {
     }
 
     @Test
+    void directRunsRejectBlankRunnerFlagsBeforeCallbacksOrBuilderWork() {
+        final var configuration = Configuration.of(Map.of(Configuration.FAILURE_ON_SKIP, " "));
+        final var builder = Sequential.builder("invalid configuration").bind("value", new Object() {
+            @Override
+            public String toString() {
+                throw new AssertionError("must validate before building");
+            }
+        });
+        final var task = Sequential.builder("invalid configuration")
+                .step("work", () -> {
+                    throw new AssertionError("must validate before callbacks");
+                })
+                .build();
+        try (var runner = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(configuration)
+                .build()) {
+            assertThat(configuration.getBoolean(Configuration.FAILURE_ON_SKIP)).hasValue(false);
+            assertThat(Configuration.parseBoolean("treu")).isFalse();
+            assertThatThrownBy(() -> runner.run(task))
+                    .isInstanceOf(ConfigurationException.class)
+                    .hasMessageContaining(Configuration.FAILURE_ON_SKIP);
+            assertThatThrownBy(() -> runner.run(builder))
+                    .isInstanceOf(ConfigurationException.class)
+                    .hasMessageContaining(Configuration.FAILURE_ON_SKIP);
+        }
+    }
+
+    @Test
     @DisplayName("pool keys follow the documented naming rule")
     void poolKeys() {
         assertThat(Configuration.poolKey("environments")).isEqualTo("paramixel.parallelism.environments");

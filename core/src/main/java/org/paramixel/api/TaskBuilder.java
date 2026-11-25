@@ -75,6 +75,7 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
 
     private static final Pattern VALID_RESOURCE_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_.-]*");
     private static final int MAX_NAME_LENGTH = 512;
+    private static final int MAX_ID_LENGTH = 64;
 
     private final String name;
     private final ExecutionMode mode;
@@ -94,7 +95,6 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
     private Predicate<Context> condition;
     private Duration timeout;
     private RetryPolicy retry;
-    private RepeatPolicy repeat;
     private String exclusiveLock;
 
     /**
@@ -187,10 +187,10 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
      * <p>{@code before} may be called at most once per node. Several setup phases are composed into one subtree:
      * {@code .before(Sequential.builder("setup").step(setUpA).step(setUpB))}.
      *
-     * @param id the hook identifier; must not be {@code null} or blank
+     * @param id the hook identifier; must be nonblank and at most 64 UTF-16 code units
      * @return this builder
      * @throws NullPointerException if {@code id} is {@code null}
-     * @throws IllegalArgumentException if {@code id} is blank
+     * @throws IllegalArgumentException if {@code id} is blank or longer than 64 UTF-16 code units
      * @throws IllegalStateException if this node already has a {@code before} slot
      */
     public S before(final String id) {
@@ -244,10 +244,10 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
      * complete declares {@code .independent()}:
      * {@code .after(Sequential.builder("cleanup").independent().step(tearDownB).step(tearDownA))}.
      *
-     * @param id the hook identifier; must not be {@code null} or blank
+     * @param id the hook identifier; must be nonblank and at most 64 UTF-16 code units
      * @return this builder
      * @throws NullPointerException if {@code id} is {@code null}
-     * @throws IllegalArgumentException if {@code id} is blank
+     * @throws IllegalArgumentException if {@code id} is blank or longer than 64 UTF-16 code units
      * @throws IllegalStateException if this node already has an {@code after} slot
      */
     public S after(final String id) {
@@ -294,10 +294,10 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
     /**
      * Adds a step whose body is the identified hook and whose name is the identifier.
      *
-     * @param id the hook identifier; must not be {@code null} or blank
+     * @param id the hook identifier; must be nonblank and at most 64 UTF-16 code units
      * @return this builder
      * @throws NullPointerException if {@code id} is {@code null}
-     * @throws IllegalArgumentException if {@code id} is blank
+     * @throws IllegalArgumentException if {@code id} is blank or longer than 64 UTF-16 code units
      */
     public S step(final String id) {
         steps.add(new PendingChild(requireId(id)));
@@ -340,10 +340,10 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
      * <p>A body is an attribute of one occurrence, so a task can have both a body and steps: this is the surface that
      * keeps a body-bearing step expressible.
      *
-     * @param id the hook identifier; must not be {@code null} or blank
+     * @param id the hook identifier; must be nonblank and at most 64 UTF-16 code units
      * @return this builder
      * @throws NullPointerException if {@code id} is {@code null}
-     * @throws IllegalArgumentException if {@code id} is blank
+     * @throws IllegalArgumentException if {@code id} is blank or longer than 64 UTF-16 code units
      */
     public S body(final String id) {
         this.bodyId = requireId(id);
@@ -351,12 +351,13 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
     }
 
     /**
-     * Adds a runtime condition by identifier; the identified hook must return {@code boolean}.
+     * Adds a runtime condition by identifier. The hook takes a {@link Context}, returns {@code boolean} or
+     * {@code Boolean}, and can declare unchecked exceptions.
      *
-     * @param id the hook identifier; must not be {@code null} or blank
+     * @param id the hook identifier; must be nonblank and at most 64 UTF-16 code units
      * @return this builder
      * @throws NullPointerException if {@code id} is {@code null}
-     * @throws IllegalArgumentException if {@code id} is blank
+     * @throws IllegalArgumentException if {@code id} is blank or longer than 64 UTF-16 code units
      */
     public S onlyIf(final String id) {
         this.conditionId = requireId(id);
@@ -379,10 +380,13 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
         }
     }
 
-    private static String requireId(final String id) {
+    static String requireId(final String id) {
         Objects.requireNonNull(id, "id is null");
         if (id.isBlank()) {
             throw new IllegalArgumentException("Hook id is blank");
+        }
+        if (id.length() > MAX_ID_LENGTH) {
+            throw new IllegalArgumentException("Hook id must be at most " + MAX_ID_LENGTH + " UTF-16 code units");
         }
         return id;
     }
@@ -630,7 +634,7 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
     }
 
     /**
-     * Adds tags for diagnostics, selection, and reporting.
+     * Adds tags to the task for runtime context and result metadata.
      *
      * @param values the tag values; must not be {@code null} and must not contain {@code null} or blank values
      * @return this builder
@@ -725,7 +729,7 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
      */
     public Task build() {
         final var context = new BuildContext();
-        final var task = materialize(null, context);
+        final var task = context.materialize(this, null, "the root task '" + name + "'");
         if (!context.problems().isEmpty()) {
             throw new CompilationException(
                     context.problems().size()
@@ -740,14 +744,13 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
     /**
      * Materializes this definition against an anchor, appending every problem to the supplied context.
      *
-     * <p>Subclasses override this rather than {@link #build()} so that a deferred subtree still passes through their own
-     * policy handling.
-     *
      * @param inheritedAnchor the anchor of the parent builder, or {@code null} for a root
      * @param context the build context collecting problems and builder placements
      * @return the immutable task; never {@code null}
      */
-    Task materialize(final Class<?> inheritedAnchor, final BuildContext context) {
+    private Task materialize(final Class<?> inheritedAnchor, final BuildContext context) {
+        final Class<?> effectiveAnchor = effectiveAnchor(inheritedAnchor);
+        final var repeat = materializeRepeat(effectiveAnchor, context);
         final Long effectiveSeed;
         if (shuffleRequested) {
             if (shuffleSeed == null) {
@@ -757,18 +760,18 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
         } else {
             effectiveSeed = null;
         }
-        final Class<?> effectiveAnchor = effectiveAnchor(inheritedAnchor);
-
         final var resolvedSteps = new ArrayList<Task>(steps.size());
         for (final Object step : steps) {
             if (step instanceof Task task) {
                 resolvedSteps.add(task);
             } else if (step instanceof TaskBuilder<?> deferred) {
-                resolvedSteps.add(materializeChild(deferred, effectiveAnchor, context, "a step"));
+                final var task = context.materialize(deferred, effectiveAnchor, placement(deferred, "a step"));
+                if (task != null) {
+                    resolvedSteps.add(task);
+                }
             } else {
                 final var pending = (PendingChild) step;
-                final var single = new SequentialBuilder(pending.id);
-                single.setBody(new PendingHook(pending.id, IdRole.STEP));
+                final TaskBuilder<?> single = stepTask(pending.id, new PendingHook(pending.id, IdRole.STEP));
                 resolvedSteps.add(single.materialize(effectiveAnchor, context));
             }
         }
@@ -819,25 +822,11 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
             return new PhaseHook.Subtree(task);
         }
         if (slot instanceof TaskBuilder<?> deferred) {
-            final var placement = role == IdRole.BEFORE ? "the before slot" : "the after slot";
-            return new PhaseHook.Subtree(materializeChild(deferred, effectiveAnchor, context, placement));
+            final var slotName = role == IdRole.BEFORE ? "the before slot" : "the after slot";
+            final var task = context.materialize(deferred, effectiveAnchor, placement(deferred, slotName));
+            return task == null ? null : new PhaseHook.Subtree(task);
         }
         return new PhaseHook.Callback((TaskCallback) slot);
-    }
-
-    /**
-     * Materializes one attached builder, recording its placement.
-     *
-     * @param child the attached builder; must not be {@code null}
-     * @param effectiveAnchor the anchor inherited from this builder
-     * @param context the build context
-     * @param slot the human-readable slot the builder was attached to
-     * @return the materialized subtree; never {@code null}
-     */
-    private Task materializeChild(
-            final TaskBuilder<?> child, final Class<?> effectiveAnchor, final BuildContext context, final String slot) {
-        final var nested = context.attach(child, placement(child, slot)) ? context : context.isolated();
-        return child.materialize(effectiveAnchor, nested);
     }
 
     private String placement(final TaskBuilder<?> child, final String slot) {
@@ -861,7 +850,7 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
      * @param inheritedAnchor the parent's anchor, or {@code null}
      * @return the effective anchor, or {@code null} when the definition names none
      */
-    final Class<?> effectiveAnchor(final Class<?> inheritedAnchor) {
+    private Class<?> effectiveAnchor(final Class<?> inheritedAnchor) {
         return anchor != null ? anchor : inheritedAnchor;
     }
 
@@ -877,8 +866,8 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
         this.body = Objects.requireNonNull(value, "body is null");
     }
 
-    final void setRepeat(final RepeatPolicy value) {
-        this.repeat = value;
+    RepeatPolicy materializeRepeat(final Class<?> effectiveAnchor, final BuildContext context) {
+        return null;
     }
 
     private SequentialBuilder stepTask(final String stepName, final TaskCallback operation) {
@@ -895,50 +884,45 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
      */
     static final class BuildContext {
 
-        private final List<String> problems;
-        private final Map<TaskBuilder<?>, String> placements;
-
-        private BuildContext(final List<String> problems, final Map<TaskBuilder<?>, String> placements) {
-            this.problems = problems;
-            this.placements = placements;
-        }
-
-        BuildContext() {
-            this(new ArrayList<>(), new IdentityHashMap<>());
-        }
+        private final List<String> problems = new ArrayList<>();
+        private final Map<TaskBuilder<?>, String> placements = new IdentityHashMap<>();
+        private final List<TaskBuilder<?>> active = new ArrayList<>();
 
         List<String> problems() {
             return problems;
         }
 
         /**
-         * Records that a builder was attached at a placement.
+         * Builds the subtree at its first placement and records repeated or cyclic attachments.
          *
          * @param builder the attached builder; must not be {@code null}
+         * @param inheritedAnchor the anchor inherited from the parent builder, or {@code null}
          * @param placement the human-readable placement; must not be {@code null}
-         * @return {@code true} when this is the first attachment of the builder in this tree
+         * @return the materialized subtree, or {@code null} if the attachment is invalid
          */
-        boolean attach(final TaskBuilder<?> builder, final String placement) {
+        Task materialize(final TaskBuilder<?> builder, final Class<?> inheritedAnchor, final String placement) {
             final var previous = placements.putIfAbsent(builder, placement);
-            if (previous == null) {
-                return true;
+            if (previous != null) {
+                final var ancestor = active.indexOf(builder);
+                if (ancestor >= 0) {
+                    final var path = active.subList(ancestor, active.size()).stream()
+                            .map(TaskBuilder::builderName)
+                            .toList();
+                    problems.add("Builder cycle: " + String.join(" -> ", path) + " -> " + builder.builderName() + " at "
+                            + placement);
+                } else {
+                    problems.add("Builder '" + builder.builderName() + "' is attached more than once in one tree, at "
+                            + previous + " and at " + placement
+                            + "; build it once and pass the resulting Task where the same subtree must appear twice");
+                }
+                return null;
             }
-            problems.add("Builder '" + builder.builderName() + "' is attached more than once in one tree, at "
-                    + previous + " and at " + placement
-                    + "; build it once and pass the resulting Task where the same subtree must appear twice");
-            return false;
-        }
-
-        /**
-         * Returns a context that reports into the same problems but tracks placements separately.
-         *
-         * <p>It is used to materialize a subtree whose root is already a reported duplicate: its own builders were
-         * checked by the first materialization, so re-checking them would only repeat the same finding.
-         *
-         * @return the isolated context; never {@code null}
-         */
-        BuildContext isolated() {
-            return new BuildContext(problems, new IdentityHashMap<>());
+            active.add(builder);
+            try {
+                return builder.materialize(inheritedAnchor, this);
+            } finally {
+                active.remove(active.size() - 1);
+            }
         }
     }
 

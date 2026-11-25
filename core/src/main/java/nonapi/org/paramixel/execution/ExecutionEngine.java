@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import nonapi.org.paramixel.RunFlags;
 import nonapi.org.paramixel.authoring.IdentifiedHook;
 import nonapi.org.paramixel.compiler.CompiledOccurrence;
 import nonapi.org.paramixel.compiler.CompiledPlan;
@@ -151,7 +152,7 @@ public final class ExecutionEngine {
             final CompiledPlan plan,
             final Configuration configuration,
             final EventPublisher publisher) {
-        this(runId, plan, configuration, publisher, null);
+        this(runId, plan, configuration, publisher, null, RunFlags.from(configuration));
     }
 
     /**
@@ -162,6 +163,7 @@ public final class ExecutionEngine {
      * @param configuration the effective configuration; must not be {@code null}
      * @param publisher the event publisher; must not be {@code null}
      * @param discoveryShuffleSeed the discovery shuffle seed to report, or {@code null}
+     * @param flags the validated run flags
      * @throws NullPointerException if a required argument is {@code null}
      */
     public ExecutionEngine(
@@ -169,7 +171,8 @@ public final class ExecutionEngine {
             final CompiledPlan plan,
             final Configuration configuration,
             final EventPublisher publisher,
-            final Long discoveryShuffleSeed) {
+            final Long discoveryShuffleSeed,
+            final RunFlags flags) {
         this.runId = Objects.requireNonNull(runId, "runId is null");
         this.plan = Objects.requireNonNull(plan, "plan is null");
         this.configuration = Objects.requireNonNull(configuration, "configuration is null");
@@ -178,8 +181,8 @@ public final class ExecutionEngine {
         final var graceMillis =
                 positiveSetting(configuration, Configuration.SHUTDOWN_GRACE_MILLIS, DEFAULT_GRACE_MILLIS);
         this.grace = Duration.ofMillis(graceMillis);
-        this.failFast = configuration.getBoolean(Configuration.FAIL_FAST).orElse(false);
-        this.projector = new ResultProjector(runId, configuration, plan.poolCapacities(), discoveryShuffleSeed);
+        this.failFast = flags.failFast();
+        this.projector = new ResultProjector(runId, configuration, plan.poolCapacities(), discoveryShuffleSeed, flags);
         final var poolCapacities = new LinkedHashMap<String, Integer>();
         poolCapacities.putAll(plan.poolCapacities());
         this.pools =

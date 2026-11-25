@@ -85,8 +85,8 @@ One sealed definition type, `Task`, implemented by `Sequential`, `Parallel`, and
 - **`repeat`, `retry`, `timeout`, `isolated`, `tags`, `shuffle`, `onlyIf(id)`** are declarations on the definition,
   validated before anything runs.
 
-Building a definition, compiling a plan, and discovering factories are all side-effect free: no hook, body, or runtime
-predicate runs until the scheduler admits an occurrence.
+Discovery invokes providers to obtain task definitions. Paramixel validates the resulting plan before running a task
+hook, body, or runtime predicate.
 
 ## Pools, workers, and cancellation
 
@@ -137,6 +137,8 @@ capacities explicitly. The main keys:
 | `paramixel.report.file` | report file; format follows the extension | none |
 
 An unknown `paramixel.*` key is reported as a warning rather than silently ignored.
+The four boolean runner flags above accept `true` and `false`, ignoring case and surrounding whitespace. A malformed
+effective value fails configuration validation.
 
 ## Build and test
 

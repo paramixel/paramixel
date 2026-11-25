@@ -209,7 +209,8 @@ class ResultModelTest {
 
         final var permissive = Runner.builder()
                 .listener(Listener.NOOP)
-                .configuration(Configuration.of(Map.of(Configuration.FAILURE_ON_ABORT, "false")))
+                .configuration(Configuration.of(
+                        Map.of(Configuration.FAILURE_ON_ABORT, " FaLsE ", Configuration.FAIL_FAST, " TrUe ")))
                 .build()
                 .run(aborted);
         assertThat(permissive.status().kind()).isEqualTo(Status.Kind.ABORTED);

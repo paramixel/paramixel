@@ -144,6 +144,13 @@ public final class IdResolver {
                     + "; expected " + mismatch);
             return null;
         }
+        if (!method.canAccess(null) && !method.trySetAccessible()) {
+            problems.add("Id \"" + id + "\" used by " + role.label() + "(...) resolves to an inaccessible method "
+                    + signature(method) + " in " + anchor.getName()
+                    + ". Export the package for public access or open it"
+                    + " to org.paramixel.api");
+            return null;
+        }
         return method;
     }
 
@@ -190,8 +197,8 @@ public final class IdResolver {
     private static String expected(final IdRole role) {
         return switch (role) {
             case BEFORE, STEP, BODY, AFTER -> "void m(Context)";
-            case CONDITION -> "boolean m(Context)";
-            case UNTIL -> "boolean m(Context, Status)";
+            case CONDITION -> "boolean m(Context) or Boolean m(Context)";
+            case UNTIL -> "boolean m(Context, Status) or Boolean m(Context, Status)";
         };
     }
 

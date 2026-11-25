@@ -139,6 +139,20 @@ class TaskAuthoringTest {
     }
 
     @Test
+    void builderCycleReportsItsPathAndOtherAuthoringErrors() {
+        final var root = Sequential.builder("root");
+        root.before(Sequential.builder("setup").after(root)).step("missing");
+
+        assertThatThrownBy(root::build)
+                .isInstanceOfSatisfying(
+                        CompilationException.class,
+                        exception -> assertThat(exception.diagnostics())
+                                .anySatisfy(diagnostic -> assertThat(diagnostic)
+                                        .contains("Builder cycle: root -> setup -> root", "the after slot"))
+                                .anySatisfy(diagnostic -> assertThat(diagnostic).contains("missing", "no anchor")));
+    }
+
+    @Test
     @DisplayName("AUTH-05: the same built task may still be placed twice")
     void oneTaskPlacedTwiceCompiles() {
         final var shared = Sequential.builder("shared")

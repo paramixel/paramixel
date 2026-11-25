@@ -61,6 +61,7 @@ public final class CompiledOccurrence {
     private final String name;
     private final String path;
     private final Task task;
+    private final List<String> tags;
     private final ExecutionMode mode;
     private final String poolName;
     private final int budget;
@@ -78,11 +79,13 @@ public final class CompiledOccurrence {
             final Task task,
             final Identity identity,
             final Scheduling scheduling,
+            final List<String> tags,
             final List<String> executionOrder,
             final List<CompiledOccurrence> children,
             final CompiledOccurrence beforePhase,
             final CompiledOccurrence afterPhase) {
         this.task = Objects.requireNonNull(task, "task is null");
+        this.tags = List.copyOf(tags);
         Objects.requireNonNull(identity, "identity is null");
         Objects.requireNonNull(scheduling, "scheduling is null");
         this.id = Objects.requireNonNull(identity.id(), "id is null");
@@ -179,6 +182,15 @@ public final class CompiledOccurrence {
      */
     public Task task() {
         return task;
+    }
+
+    /**
+     * Returns the effective tags on this occurrence.
+     *
+     * @return the immutable tags
+     */
+    public List<String> tags() {
+        return tags;
     }
 
     /**

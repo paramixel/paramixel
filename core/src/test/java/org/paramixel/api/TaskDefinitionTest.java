@@ -113,8 +113,8 @@ class TaskDefinitionTest {
     }
 
     @Test
-    @DisplayName("the legacy action hierarchy is gone")
-    void legacyActionApiIsRemoved() {
+    @DisplayName("removed execution types are unavailable")
+    void removedExecutionTypesAreUnavailable() {
         assertThatThrownBy(() -> Class.forName("org.paramixel.api.action.Action"))
                 .isInstanceOf(ClassNotFoundException.class);
         assertThatThrownBy(() -> Class.forName("org.paramixel.api.Descriptor"))

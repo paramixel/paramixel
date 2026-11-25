@@ -62,6 +62,19 @@ The class literal appears **once per definition root**; everything attached belo
 only against methods declared by that class — inheritance is not consulted — and they are also the labels reported for
 the hooks (`before[start]`, `body[health]`).
 
+Hook IDs have a maximum of 64 UTF-16 code units across all named builder methods. An overlong reference throws
+`IllegalArgumentException` at the builder call. The display-name limit for tasks is 512 UTF-16 code units.
+
+| Builder method | Public static hook signature |
+| --- | --- |
+| `before(id)`, `step(id)`, `body(id)`, `after(id)` | `void hook(Context)`, optionally with checked exceptions |
+| `onlyIf(id)` | `boolean hook(Context)` or `Boolean hook(Context)` |
+| `RepeatBuilder.until(id)` | `boolean hook(Context, Status)` or `Boolean hook(Context, Status)` |
+
+Predicate hooks can declare unchecked exceptions. A boxed `null` result is treated as `false`. In a named Java module,
+export the package of a public anchor to `org.paramixel.api` or open it to that module. A non-public anchor requires
+an open package. The builder checks access when it resolves the hook.
+
 ## Composing several setup or cleanup phases
 
 Because each slot holds one thing, several phases are composed into a subtree rather than repeated:
@@ -114,6 +127,7 @@ public static void setUp(final Context context) throws Exception {
 - Passing the same builder instance more than once anywhere in one tree is an authoring error reported at build time.
   Pass a built `Task` twice when the same subtree must appear in two places; each placement compiles to its own
   occurrence.
+- A cycle through a step, before slot, or after slot is reported with its builder path in a `CompilationException`.
 - `bind` places a value in the node's scope before its `before` slot runs, so the slot, the steps, the `after` slot, and
   every descendant see it. A descendant that binds the same name shadows it inside its own subtree only.
 - `build()` returns a deep snapshot, may be called repeatedly, and performs no user work.

@@ -19,10 +19,10 @@ package org.paramixel.api.exception;
 import java.util.List;
 
 /**
- * Thrown when a run's definition, configuration, or resource declaration fails validation before execution.
+ * Thrown when a definition or execution plan fails validation before task execution.
  *
- * <p>Compilation is side-effect free and completes before any factory, lifecycle callback, or test body runs, so a
- * {@code CompilationException} guarantees that no user code was executed.
+ * <p>Discovery can invoke factory and run-hook provider methods to obtain definitions before compilation.
+ * Definition and plan validation complete before task callbacks run.
  *
  * <p>The exception carries every independent diagnostic the compiler found, in a deterministic order, rather than only
  * the first one.

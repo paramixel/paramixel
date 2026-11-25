@@ -90,34 +90,32 @@ public final class RepeatBuilder extends TaskBuilder<RepeatBuilder> {
 
     /**
      * Stops iterating when the supplied predicate returns {@code true}.
+     * Replaces any predicate set with either {@code until} overload.
      *
      * @param untilPredicate the predicate; must not be {@code null}
      * @return this builder
      * @throws NullPointerException if {@code untilPredicate} is {@code null}
      */
     public RepeatBuilder until(final BiPredicate<Context, Status> untilPredicate) {
-        Objects.requireNonNull(untilPredicate, "until is null");
         policy.until(untilPredicate);
+        untilId = null;
         return this;
     }
 
     /**
      * Stops iterating when the identified hook returns {@code true}.
      *
-     * <p>The hook takes two parameters — {@code boolean m(Context, Status)} — because the decision depends on the
-     * outcome of the iteration that just finished.
+     * <p>The hook takes a {@link Context} and the current iteration's {@link Status}. It returns {@code boolean} or
+     * {@code Boolean} and can declare unchecked exceptions. This replaces any predicate set with either
+     * {@code until} overload.
      *
-     * @param id the hook identifier; must not be {@code null} or blank
+     * @param id the hook identifier; must be nonblank and at most 64 UTF-16 code units
      * @return this builder
      * @throws NullPointerException if {@code id} is {@code null}
-     * @throws IllegalArgumentException if {@code id} is blank
+     * @throws IllegalArgumentException if {@code id} is blank or longer than 64 UTF-16 code units
      */
     public RepeatBuilder until(final String id) {
-        Objects.requireNonNull(id, "id is null");
-        if (id.isBlank()) {
-            throw new IllegalArgumentException("Hook id is blank");
-        }
-        this.untilId = id;
+        this.untilId = requireId(id);
         return this;
     }
 
@@ -135,16 +133,22 @@ public final class RepeatBuilder extends TaskBuilder<RepeatBuilder> {
     }
 
     @Override
-    Task materialize(final Class<?> inheritedAnchor, final BuildContext context) {
-        if (untilId != null) {
-            final var predicate =
-                    IdResolver.resolveUntil(untilId, effectiveAnchor(inheritedAnchor), context.problems());
-            if (predicate != null) {
-                policy.until(predicate);
-            }
-            untilId = null;
+    RepeatPolicy materializeRepeat(final Class<?> effectiveAnchor, final BuildContext context) {
+        final var settings = policy.build();
+        if (untilId == null) {
+            return settings;
         }
-        setRepeat(policy.build());
-        return super.materialize(inheritedAnchor, context);
+        final var predicate = IdResolver.resolveUntil(untilId, effectiveAnchor, context.problems());
+        if (predicate == null) {
+            return settings;
+        }
+        final var resolved = RepeatPolicy.builder()
+                .maxIterations(settings.maxIterations())
+                .delay(settings.delay())
+                .until(predicate);
+        if (settings.untilPassed()) {
+            resolved.untilPassed();
+        }
+        return resolved.build();
     }
 }

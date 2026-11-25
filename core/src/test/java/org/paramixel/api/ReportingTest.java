@@ -166,12 +166,12 @@ class ReportingTest {
         final var content = Files.readString(report("report.log"));
 
         assertThat(content).contains("Paramixel run");
-        assertThat(content.lines().anyMatch(line -> line.matches("^├── pass PASS \\(\\d+ ms\\)$")))
+        assertThat(content.lines().anyMatch(line -> line.matches("^├─ pass PASS \\(\\d+ ms\\)$")))
                 .isTrue();
         assertThat(content.lines()
-                        .anyMatch(line -> line.matches("^└── fail \\(sequential\\) FAIL \\(\\d+ ms\\)( — .*)?$")))
+                        .anyMatch(line -> line.matches("^└─ fail \\(sequential\\) FAIL \\(\\d+ ms\\)( — .*)?$")))
                 .isTrue();
-        assertThat(content.lines().anyMatch(line -> line.matches("^    └── nested SKIP( — .*)?$")))
+        assertThat(content.lines().anyMatch(line -> line.matches("^   └─ nested SKIP( — .*)?$")))
                 .isTrue();
     }
 

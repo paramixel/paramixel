@@ -71,19 +71,29 @@ public final class Paramixel {
     /**
      * Binds a stable identifier to a hook method.
      *
-     * <p>The annotated method must be {@code public static}, take exactly one {@link org.paramixel.api.Context}
-     * parameter, and return {@code void} — or {@code boolean} when the identifier is used for a predicate
-     * ({@code .onlyIf(id)} and {@code repeat().until(id)}). It may declare checked exceptions; a hook that
-     * declares them runs exactly as an ordinary method call would.
+     * <p>The annotated method must be {@code public static}. Its signature depends on the builder method:
+     * <ul>
+     *   <li>{@code before}, {@code step}, {@code body}, and {@code after}: {@code void m(Context)}, with checked
+     *       exceptions allowed.</li>
+     *   <li>{@code onlyIf}: {@code boolean m(Context)} or {@code Boolean m(Context)}.</li>
+     *   <li>{@code until} on {@link RepeatBuilder}: {@code boolean m(Context, Status)} or
+     *       {@code Boolean m(Context, Status)}.</li>
+     * </ul>
+     * Predicate methods may only declare unchecked exceptions. A boxed {@code null} predicate result is treated as
+     * {@code false}.
+     *
+     * <p>For an anchor in a named module, make a public anchor accessible by exporting its package to
+     * {@code org.paramixel.api}, or open the package to that module. A non-public anchor requires an open package.
+     * Inaccessible methods are reported when the definition is built.
      *
      * <p>The identifier resolves only against methods declared by the definition's <strong>anchor class</strong> —
      * the class named once at the definition root, as in
      * {@code Sequential.builder(MyTest.class, "MyTest")}. Inheritance is not consulted, and an identifier that is
      * declared in a class that is not the anchor of a definition is never resolved.
      *
-     * <p>Identifiers must be unique within the anchor class, and the identifier is also the label reported for the
-     * hook ({@code before[setUp]}, {@code body[work]}). Ids are not selectable in 7.0.0: {@link Selector} filters
-     * classes, so tagging a hook has no effect and is rejected.
+     * <p>Identifiers must be nonblank, at most 64 UTF-16 code units, and unique within the anchor class.
+     * The identifier is also the label reported for the hook ({@code before[setUp]}, {@code body[work]}).
+     * {@link Selector} filters discovered factories by class, package, or factory tags.
      *
      * @see Sequential#builder(Class, String)
      */
@@ -95,7 +105,7 @@ public final class Paramixel {
         /**
          * Returns the stable identifier of the hook.
          *
-         * @return the identifier; must not be blank
+         * @return the identifier; must be nonblank and at most 64 UTF-16 code units
          */
         String value();
     }
@@ -187,8 +197,8 @@ public final class Paramixel {
     }
 
     /**
-     * Declares a logical tag for a factory method, consumed by {@link Selector} for
-     * tag-based discovery filtering.
+     * Declares a factory tag for discovery filtering by {@link Selector}. On the discovered root occurrence, the
+     * framework appends missing annotation tags after builder tags in both the context and the result.
      */
     @Documented
     @Retention(RetentionPolicy.RUNTIME)

@@ -39,7 +39,7 @@ part of the owning node's scope chain and appears under it in the result tree.
 ## Guarantees
 
 - **Immutable.** Deeply immutable structure; collections are defensively copied.
-- **Lazy.** Building, compiling, and discovering never invoke a factory, lifecycle callback, body, or runtime predicate.
+- **Lazy execution.** Discovery calls providers to obtain definitions. Task callbacks run after plan validation.
 - **Reusable.** A definition may appear under several parents; each placement is a distinct compiled occurrence with
   distinct identity and per-run state.
 - **Not for construction.** Tasks are created by a builder's `build()`; the sealed interface admits no other
