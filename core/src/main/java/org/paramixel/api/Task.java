@@ -84,6 +84,10 @@ public sealed interface Task permits Sequential, Parallel, Repeat {
     /**
      * Returns the concurrency budget of this task's direct children.
      *
+     * <p>The budget is a cap, not a reservation: the pool's capacity bounds how many direct children of parallel tasks
+     * hold a permit from it at one time, while {@code paramixel.workers} bounds how many task callbacks execute at
+     * once.
+     *
      * @return the pool of a {@link Parallel} task, or an empty optional
      */
     Optional<Pool> pool();

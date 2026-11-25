@@ -110,9 +110,12 @@ pass. `Result.status()` is the semantic outcome; `Result.exitCode()` applies `pa
 
 ## Discovery
 
-`@Paramixel.TaskFactory` methods must be `public static`, take no parameters, and return a `Task` or a builder, rooted at the
-factory's own class so its identifiers resolve. Returning `null` is an explicit skip. `@BeforeAll` / `@AfterAll` wrap the
-discovered run, `@Disabled` excludes a factory, `@Tag` and `Selector` select, and `@Priority` orders.
+`@Paramixel.TaskFactory` methods must be `public static`, take no parameters or exactly one `Configuration`, and return
+a `Task` or a builder, rooted at the factory's own class so its identifiers resolve. The `Configuration` parameter is the
+run's effective configuration, so configuration can decide the *shape* of the definition — which environments to author,
+which branches to include — rather than only what its tasks do at execution time. Returning `null` is an explicit skip.
+`@BeforeAll` / `@AfterAll` wrap the discovered run, `@Disabled` excludes a factory, `@Tag` and `Selector` select, and
+`@Priority` orders.
 
 `Runner.run(Task)` executes exactly the definition you supply: no classpath scan and no hooks. `Runner.run()`
 discovers. `Launcher` owns `System.exit`.

@@ -41,6 +41,9 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
   U+FFFD, and an unpaired surrogate in a message no longer prevents a report file from being written.
 - A `@Paramixel.TaskFactory` or hook method that returns `null` is reported as a warning naming the method, and the warning
   is kept in the run diagnostics.
+- A `@Paramixel.TaskFactory` method may declare one `Configuration` parameter (or none) and receives the run's effective
+  configuration, so configuration can determine the shape of the definition. The parameter is optional and independent of
+  the return type; `@BeforeAll` and `@AfterAll` methods still take no parameters.
 - An invalid `paramixel.workers`, `paramixel.shutdown.graceMillis`, or `paramixel.parallelism` fails a discovery run
   with `ConfigurationException` before any factory is invoked. A non-positive `paramixel.parallelism` is rejected
   instead of being raised to one.

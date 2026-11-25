@@ -41,13 +41,24 @@ public final class Paramixel {
     /**
      * Marks a method as a task factory discovered by classpath scanning.
      *
-     * <p>Task factory methods must be {@code public static}, take no parameters, and return a {@link Task} or a
-     * {@link TaskBuilder}. A returned builder is built by the framework. Returning {@code null} is an explicit skip
-     * with a recorded reason: the factory contributes no definition and discovery continues.
+     * <p>Task factory methods must be {@code public static} and take no parameters or exactly one
+     * {@link Configuration} parameter, returning a {@link Task} or a {@link TaskBuilder}. A returned builder is built by
+     * the framework.
+     *
+     * <p>Declaring the {@link Configuration} parameter hands the factory the run's effective configuration, so a factory
+     * can decide the <em>shape</em> of its definition — which environments to author, which branches to include — rather
+     * than only what its tasks do at execution time. The injected configuration is the same object
+     * {@link Context#configuration()} exposes and has already been validated. The parameter is optional: a no-parameter
+     * factory is unchanged, and the return type is independent of whether the parameter is declared.
+     *
+     * <p>Returning {@code null} is an explicit skip with a recorded reason: the factory contributes no definition and
+     * discovery continues. That makes a configuration-driven factory able to opt out of contributing a definition at
+     * all.
      *
      * <p>Discovery validates every matched factory before any test work runs, so an invalid shape fails the run with
      * {@link org.paramixel.api.exception.ResolverException} rather than executing a partial suite.
      *
+     * @see Configuration
      * @see Runner
      * @see Task
      * @see TaskBuilder

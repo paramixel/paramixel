@@ -12,7 +12,7 @@ executes.
 
 | Annotation | Purpose |
 | --- | --- |
-| `@Paramixel.TaskFactory` | `public static`, no parameters, returns `Task` or a builder |
+| `@Paramixel.TaskFactory` | `public static`, no parameters or one `Configuration`, returns `Task` or a builder |
 | `@Paramixel.BeforeAll` | Runs before the discovered factories; gates them |
 | `@Paramixel.AfterAll` | Runs after the started run, even when a factory failed |
 | `@Paramixel.Disabled` | Excludes a factory |
@@ -32,9 +32,36 @@ public static TaskBuilder<?> factory() {
 
 A factory may return a built `Task` or a `TaskBuilder<?>`; the framework builds a builder. A factory returning `null` is
 an explicit skip with a recorded reason. If every selected factory returns `null`,
-`paramixel.failIfNoTests` decides the exit code. Any other invalid shape — not `static`, has
-parameters, or returns an unrelated type — fails the run with `ResolverException` **before** any discovered test code
+`paramixel.failIfNoTests` decides the exit code. Any other invalid shape — not `static`, parameters other than the sole
+`Configuration`, or an unrelated return type — fails the run with `ResolverException` **before** any discovered test code
 runs.
+
+## Configuration-driven structure
+
+A factory may declare one `Configuration` parameter to receive the run's effective configuration. That is the same object
+`Context.configuration()` exposes, and it has already been validated before the factory is invoked, so the factory can
+decide what to author rather than only what the authored tasks do:
+
+```java
+@Paramixel.TaskFactory
+public static TaskBuilder<?> factory(final Configuration configuration) {
+    final var environments = configuration
+            .getString("example.environments")
+            .map(value -> value.split(","))
+            .orElse(new String[] {"postgres"});
+    final var root = Parallel.builder(MySuite.class, "Environments", Pool.named("environments"));
+    for (final var environment : environments) {
+        root.step(Sequential.builder(environment.trim()).step(ID_VERIFY));
+    }
+    return root;
+}
+```
+
+- The parameter is optional; a no-parameter factory is unchanged, and the return type is independent of it, so all four
+  combinations of `Task` or `TaskBuilder` with or without the parameter are accepted.
+- The type must be exactly `org.paramixel.api.Configuration`; any other parameter count or type fails discovery.
+- Combining the parameter with a `null` return lets a factory opt out of contributing a definition at all.
+- `@BeforeAll` and `@AfterAll` methods take no parameters.
 
 ## Composed structure
 

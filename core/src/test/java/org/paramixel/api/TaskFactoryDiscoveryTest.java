@@ -22,20 +22,29 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.paramixel.api.discoveryfixtures.AlphaFixture;
+import org.paramixel.api.discoveryfixtures.AmbiguousShapeFactoryFixture;
 import org.paramixel.api.discoveryfixtures.BuilderFactoryFixture;
+import org.paramixel.api.discoveryfixtures.ConfiguredBuilderFactoryFixture;
+import org.paramixel.api.discoveryfixtures.ConfiguredTaskFactoryFixture;
 import org.paramixel.api.discoveryfixtures.DiscoveryFixtures;
 import org.paramixel.api.discoveryfixtures.InvalidFactoryFixture;
+import org.paramixel.api.discoveryfixtures.NonConfigurationParameterFactoryFixture;
+import org.paramixel.api.discoveryfixtures.ShapeMismatchBaseFixture;
+import org.paramixel.api.discoveryfixtures.ShapeMismatchSubFixture;
 import org.paramixel.api.discoveryfixtures.SkippingFactoryFixture;
+import org.paramixel.api.discoveryfixtures.TooManyParametersFactoryFixture;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
 /**
- * The {@link Paramixel.TaskFactory} contract: both supported return types are accepted, {@code null} is a recorded
- * skip, and an unsupported shape fails discovery with {@link ResolverException}.
+ * The {@link Paramixel.TaskFactory} contract: both supported return types are accepted with or without the optional
+ * {@link Configuration} parameter, {@code null} is a recorded skip, and an unsupported shape fails discovery with
+ * {@link ResolverException}.
  */
 class TaskFactoryDiscoveryTest {
 
@@ -127,5 +136,100 @@ class TaskFactoryDiscoveryTest {
     @DisplayName("FACTORY-06: the legacy Tasks entry point is gone")
     void tasksEntryPointIsRemoved() {
         assertThatThrownBy(() -> Class.forName("org.paramixel.api.Tasks")).isInstanceOf(ClassNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("FACTORY-07: a factory may take the run Configuration and shape its definition from it")
+    void configurationParameterDrivesStructure() {
+        final var enabled = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(
+                        Map.of(Configuration.ANSI, "false", ConfiguredBuilderFactoryFixture.EXTRA_STEP_KEY, "true")))
+                .build()
+                .run(Selector.builder()
+                        .classOf(ConfiguredBuilderFactoryFixture.class)
+                        .build());
+
+        assertThat(enabled.status().isPassed()).isTrue();
+        assertThat(allNames(enabled.root().orElseThrow())).contains("base", "extra");
+        assertThat(DiscoveryFixtures.RECORDED).contains("base", "extra");
+
+        DiscoveryFixtures.RECORDED.clear();
+        final var disabled = discover(ConfiguredBuilderFactoryFixture.class);
+
+        assertThat(disabled.status().isPassed()).isTrue();
+        assertThat(allNames(disabled.root().orElseThrow())).contains("base").doesNotContain("extra");
+        assertThat(DiscoveryFixtures.RECORDED).contains("base").doesNotContain("extra");
+    }
+
+    @Test
+    @DisplayName("FACTORY-08: a factory taking Configuration may return a built Task")
+    void configurationParameterAcceptsTaskReturnType() {
+        final var result = Runner.builder()
+                .listener(Listener.NOOP)
+                .configuration(Configuration.of(
+                        Map.of(Configuration.ANSI, "false", ConfiguredTaskFactoryFixture.SUFFIX_KEY, "kafka")))
+                .build()
+                .run(Selector.builder()
+                        .classOf(ConfiguredTaskFactoryFixture.class)
+                        .build());
+
+        assertThat(result.status().isPassed()).isTrue();
+        assertThat(allNames(result.root().orElseThrow())).contains("configured-kafka");
+        assertThat(DiscoveryFixtures.RECORDED).contains("configured-task");
+    }
+
+    @Test
+    @DisplayName("FACTORY-09: a parameter that is not the run Configuration is rejected")
+    void nonConfigurationParameterIsRejected() {
+        assertThatThrownBy(() -> discover(NonConfigurationParameterFactoryFixture.class))
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining(NonConfigurationParameterFactoryFixture.class.getName())
+                .hasMessageContaining(
+                        "must take no parameters or exactly one org.paramixel.api.Configuration parameter")
+                .hasMessageContaining("java.lang.String");
+        assertThat(DiscoveryFixtures.RECORDED).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FACTORY-10: more than the one supported parameter is rejected")
+    void extraParametersAreRejected() {
+        assertThatThrownBy(() -> discover(TooManyParametersFactoryFixture.class))
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining(TooManyParametersFactoryFixture.class.getName())
+                .hasMessageContaining(
+                        "must take no parameters or exactly one org.paramixel.api.Configuration parameter");
+        assertThat(DiscoveryFixtures.RECORDED).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FACTORY-11: two factory declarations in one class are rejected")
+    void twoDeclarationsInOneClassAreRejected() {
+        assertThatThrownBy(() -> discover(AmbiguousShapeFactoryFixture.class))
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining(AmbiguousShapeFactoryFixture.class.getName())
+                .hasMessageContaining("has more than one @Paramixel.TaskFactory method")
+                .hasMessageContaining("repeat the same parameter shape");
+        assertThat(DiscoveryFixtures.RECORDED).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FACTORY-12: a subclass that changes the inherited factory's shape is rejected")
+    void changedInheritedShapeIsRejected() {
+        final var selector = Selector.builder()
+                .packageTreeOf(DiscoveryFixtures.class)
+                .classPattern(Pattern.compile(".*ShapeMismatch(Base|Sub)Fixture"))
+                .build();
+
+        assertThatThrownBy(() -> Runner.builder()
+                        .listener(Listener.NOOP)
+                        .configuration(Configuration.of(Map.of(Configuration.ANSI, "false")))
+                        .build()
+                        .run(selector))
+                .isInstanceOf(ResolverException.class)
+                .hasMessageContaining("has more than one @Paramixel.TaskFactory method")
+                .hasMessageContaining(ShapeMismatchBaseFixture.class.getName())
+                .hasMessageContaining(ShapeMismatchSubFixture.class.getName());
+        assertThat(DiscoveryFixtures.RECORDED).isEmpty();
     }
 }

@@ -17,9 +17,10 @@ description: Module layout and discovery requirements for a Paramixel project.
 
 ## Discovery requirements
 
-- Factory methods are `public static`, take no parameters, and return `Task` or a builder.
-- Return `null` to skip a factory explicitly.
-- `@BeforeAll` / `@AfterAll` methods follow the same shape and wrap the discovered run.
+- Factory methods are `public static`, take no parameters or one `Configuration`, and return `Task` or a builder.
+- Declaring the `Configuration` parameter gives the factory the run's effective configuration, so configuration can decide
+  which tasks are authored. Return `null` to skip a factory explicitly.
+- `@BeforeAll` / `@AfterAll` methods take no parameters and return `Task` or a builder; they wrap the discovered run.
 - Test classes may live under `src/main/java` when the Maven plugin executes them during the `test` phase, or under
   `src/test/java` when the test classpath is used.
 

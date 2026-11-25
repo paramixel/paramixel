@@ -74,6 +74,10 @@ import org.paramixel.api.exception.ConfigurationException;
  *       <td>none: print everything</td></tr>
  * </table>
  *
+ * <p>A pool capacity is a cap, not a reservation: it bounds how many direct children of parallel tasks hold a permit
+ * from that pool at one time, creates no threads, and reserves no share of the runner. {@code paramixel.workers} bounds
+ * how many task callbacks execute at once across every pool, so a capacity above that limit adds no concurrency.
+ *
  * <p>An unrecognized key that starts with {@code paramixel.} is reported once through
  * {@link Listener#onWarning(String)} so a typo such as {@code paramixel.parallelism.enviroments} does not fail
  * silently. Invalid values fail before any test code runs.

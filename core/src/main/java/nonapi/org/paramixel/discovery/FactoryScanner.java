@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ClassGraph;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ClassInfo;
 import nonapi.org.paramixel.classgraph.io.github.classgraph.ScanResult;
@@ -47,9 +48,16 @@ import org.paramixel.api.selector.Selector;
  * Discovers {@link Paramixel.TaskFactory}, {@link Paramixel.BeforeAll}, and {@link Paramixel.AfterAll} methods on
  * the classpath and composes them into one definition.
  *
- * <p>Discovery validates every matched method — {@code public static}, no parameters, returning {@link Task} or a
- * {@link TaskBuilder} — before any discovered test work runs, so an invalid factory fails the run with
- * {@link ResolverException} instead of executing a partial suite.
+ * <p>Discovery validates every matched method — {@code public static}, no parameters or exactly one
+ * {@link Configuration} parameter, returning {@link Task} or a {@link TaskBuilder} — before any discovered test work
+ * runs, so an invalid factory fails the run with {@link ResolverException} instead of executing a partial suite.
+ *
+ * <p>A factory may declare a single {@link Configuration} parameter to receive the run's effective configuration, the
+ * same instance {@link org.paramixel.api.Context#configuration()} exposes, so that configuration can determine the shape
+ * of the definition rather than only the behavior of its tasks. The parameter is optional, and the return type is
+ * independent of it, so every combination of {@link Task} or {@link TaskBuilder} with or without the parameter is
+ * accepted. The configuration passed to a factory has already been validated, so a factory never has to re-check it.
+ * Run hooks are declared without parameters.
  *
  * <p>A factory that returns {@code null} is an explicit skip: the factory contributes no definition and discovery
  * continues. That is the one defined meaning of {@code null} from a discovered method; a {@code null} element produced
@@ -212,7 +220,7 @@ public final class FactoryScanner {
             if (!method.isAnnotationPresent(annotation) || method.isAnnotationPresent(Paramixel.Disabled.class)) {
                 continue;
             }
-            validateMethod(method, "@" + annotation.getSimpleName());
+            validateMethod(method, "@" + annotation.getSimpleName(), false);
             target.add(new HookCandidate(
                     priorityOf(method),
                     method.getDeclaringClass().getPackageName(),
@@ -246,7 +254,7 @@ public final class FactoryScanner {
                 if (!selector.test(current.getPackageName(), current.getName(), tags)) {
                     continue;
                 }
-                validateMethod(method, "@Paramixel.TaskFactory");
+                validateMethod(method, "@Paramixel.TaskFactory", true);
                 candidates.add(method);
             }
             current = current.getSuperclass();
@@ -257,7 +265,9 @@ public final class FactoryScanner {
                             + candidates.stream()
                                     .map(FactoryScanner::locationOf)
                                     .sorted()
-                                    .toList());
+                                    .toList()
+                            + "; declare one factory per class and repeat the same parameter shape to override an"
+                            + " inherited factory");
         }
         if (candidates.isEmpty()) {
             return Optional.empty();
@@ -324,15 +334,21 @@ public final class FactoryScanner {
         }
     }
 
-    private static void validateMethod(final Method method, final String label) {
+    /**
+     * Validates the shape of a discovered method.
+     *
+     * @param method the discovered method; must not be {@code null}
+     * @param label the annotation name used in diagnostics; must not be {@code null}
+     * @param configurationParameter whether the method may declare the one supported configuration parameter
+     * @throws ResolverException if the method shape is invalid
+     */
+    private static void validateMethod(final Method method, final String label, final boolean configurationParameter) {
         final var location = locationOf(method);
         final var modifiers = method.getModifiers();
         if (!Modifier.isPublic(modifiers) || !Modifier.isStatic(modifiers)) {
             throw new ResolverException("Invalid " + label + " method on " + location + ": must be public static");
         }
-        if (method.getParameterCount() != 0) {
-            throw new ResolverException("Invalid " + label + " method on " + location + ": must have no parameters");
-        }
+        validateParameters(method, label, configurationParameter);
         if (!Task.class.isAssignableFrom(method.getReturnType())
                 && !TaskBuilder.class.isAssignableFrom(method.getReturnType())) {
             throw new ResolverException(
@@ -340,17 +356,58 @@ public final class FactoryScanner {
         }
     }
 
+    /**
+     * Validates the parameter list of a discovered method.
+     *
+     * <p>A factory accepts no parameters or exactly one {@link Configuration} parameter; every other discovered method
+     * accepts no parameters. The configuration type must match exactly, because the framework supplies its own
+     * configuration instance and cannot produce a subtype or a supertype on the caller's behalf.
+     *
+     * @param method the discovered method; must not be {@code null}
+     * @param label the annotation name used in diagnostics; must not be {@code null}
+     * @param configurationParameter whether the method may declare the one supported configuration parameter
+     * @throws ResolverException if the parameter list is invalid
+     */
+    private static void validateParameters(
+            final Method method, final String label, final boolean configurationParameter) {
+        final var location = locationOf(method);
+        final var count = method.getParameterCount();
+        if (count == 0) {
+            return;
+        }
+        if (configurationParameter && count == 1 && method.getParameterTypes()[0] == Configuration.class) {
+            return;
+        }
+        if (!configurationParameter) {
+            throw new ResolverException("Invalid " + label + " method on " + location + ": must have no parameters");
+        }
+        throw new ResolverException(
+                "Invalid " + label + " method on " + location + ": must take no parameters or exactly" + " one "
+                        + Configuration.class.getName() + " parameter but took " + describeParameters(method));
+    }
+
+    /**
+     * Describes the declared parameter types of a method for diagnostics.
+     *
+     * @param method the method; must not be {@code null}
+     * @return the comma-separated parameter type names; never {@code null}
+     */
+    private static String describeParameters(final Method method) {
+        return Arrays.stream(method.getParameterTypes()).map(Class::getName).collect(Collectors.joining(", "));
+    }
+
     @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
     private Optional<Task> invoke(final Method method, final String label) {
         final var location = locationOf(method);
+        final var arguments = argumentsFor(method);
         try {
             Object result;
             try {
-                result = method.invoke(null);
+                result = method.invoke(null, arguments);
             } catch (IllegalAccessException e) {
                 method.setAccessible(true);
                 try {
-                    result = method.invoke(null);
+                    result = method.invoke(null, arguments);
                 } catch (IllegalAccessException inner) {
                     throw new LinkageError("Cannot access " + label + " method " + location, inner);
                 }
@@ -381,6 +438,17 @@ public final class FactoryScanner {
             }
             throw new ResolverException("Failed to invoke " + label + " method on " + location, cause);
         }
+    }
+
+    /**
+     * Returns the arguments a discovered method is invoked with.
+     *
+     * @param method the discovered method; must not be {@code null}
+     * @return the run configuration when the method declares its one parameter, otherwise an empty array; never
+     *     {@code null}
+     */
+    private Object[] argumentsFor(final Method method) {
+        return method.getParameterCount() == 1 ? new Object[] {configuration} : new Object[0];
     }
 
     private static String locationOf(final Method method) {

@@ -41,7 +41,8 @@ factory contributes a task, the result is `CANCELED` with no root, regardless of
 - **Non-quiescent runs.** A run whose callback ignored cancellation past the grace period returns with
   `result.isQuiescent() == false`, withheld cleanup, and a non-zero exit code.
 - **Pool capacity precedence.** `Runner.Builder.pool(Pool, int)` → `paramixel.parallelism.<name>` → error for a user
-  pool. `paramixel.workers` separately bounds execution threads.
+  pool. A capacity is a cap, not a reservation: it creates no threads and guarantees no concurrency, and
+  `paramixel.workers` separately bounds execution threads, so a capacity above that limit adds no concurrency.
 
 ## Builder
 

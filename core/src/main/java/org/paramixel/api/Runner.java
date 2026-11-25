@@ -179,6 +179,11 @@ public interface Runner extends AutoCloseable {
          * <p>This override takes precedence over a configured property. A pool that a parallel task names but that is
          * neither configured here nor by property fails validation before any test code runs.
          *
+         * <p>The capacity is a cap, not a reservation: it bounds how many direct children of parallel tasks hold a
+         * permit from this pool at one time, creates no threads, and does not guarantee that many children run
+         * concurrently. {@code paramixel.workers} bounds execution threads separately, so a capacity above that limit
+         * adds no concurrency.
+         *
          * @param pool the pool; must not be {@code null}
          * @param capacity the capacity; must be positive
          * @return this builder
