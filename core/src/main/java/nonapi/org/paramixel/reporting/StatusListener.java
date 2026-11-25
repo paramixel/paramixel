@@ -81,9 +81,7 @@ public final class StatusListener implements Listener {
         if (event.phase() != TaskPhase.TIMEOUT && event.phase() != TaskPhase.TERMINAL) {
             return;
         }
-        final var timing = event.elapsed()
-                .map(elapsed -> " (" + elapsed.toMillis() + " ms)")
-                .orElse("");
+        final var timing = event.elapsed().map(console::elapsed).orElse("");
         final var reason =
                 event.status().message().map(message -> " — " + message).orElse("");
         out.println(console.line(console.label(event.status()) + " " + event.path() + timing + reason));

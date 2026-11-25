@@ -16,10 +16,9 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 import org.paramixel.api.exception.SkipException;
 
@@ -36,9 +35,11 @@ public final class SkippingMojoFixture {
      *
      * @return a definition that signals a skip
      */
-    @Paramixel.Factory
-    public static Task action() {
-        return sequential(SkippingMojoFixture.class, "mojo-skip").step("skip").build();
+    @Paramixel.TaskFactory
+    public static Task task() {
+        return Sequential.builder(SkippingMojoFixture.class, "mojo-skip")
+                .step("skip")
+                .build();
     }
 
     /**

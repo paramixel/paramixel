@@ -14,7 +14,7 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
 - `Task` / `TaskBuilder` / `Tasks` replace `Action`, `ActionBuilder`, and the per-shape classes.
 - Fixtures live in the per-scope context: `bind(name, value)` seeds it, `put`/`require`/`find`/`remove` manage it,
   and `after` hooks release it. The framework never closes a stored value and never probes for `AutoCloseable`.
-- `parallel(name, Pool.named("..."))` replaces raw string pool identifiers; `Pool` is a value object.
+- `Parallel.builder(name, Pool.named("..."))` replaces raw string pool identifiers; `Pool` is a value object.
 - `sequential` / `parallel` describe concurrency; `dependent()` / `independent()` describe only failure continuation and
   exist on sequential builders only.
 - `repeat` (bounded replay) and `RetryPolicy` (bounded re-attempt) are distinct, typed policies.
@@ -39,7 +39,7 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
   starts the next attempt.
 - XML and HTML reports replace characters that XML 1.0 forbids (such as ANSI escape codes in failure messages) with
   U+FFFD, and an unpaired surrogate in a message no longer prevents a report file from being written.
-- A `@Paramixel.Factory` or hook method that returns `null` is reported as a warning naming the method, and the warning
+- A `@Paramixel.TaskFactory` or hook method that returns `null` is reported as a warning naming the method, and the warning
   is kept in the run diagnostics.
 - An invalid `paramixel.workers`, `paramixel.shutdown.graceMillis`, or `paramixel.parallelism` fails a discovery run
   with `ConfigurationException` before any factory is invoked. A non-positive `paramixel.parallelism` is rejected

@@ -12,7 +12,7 @@ executes.
 
 | Annotation | Purpose |
 | --- | --- |
-| `@Paramixel.Factory` | `public static`, no parameters, returns `Task` or a builder |
+| `@Paramixel.TaskFactory` | `public static`, no parameters, returns `Task` or a builder |
 | `@Paramixel.BeforeAll` | Runs before the discovered factories; gates them |
 | `@Paramixel.AfterAll` | Runs after the started run, even when a factory failed |
 | `@Paramixel.Disabled` | Excludes a factory |
@@ -20,17 +20,18 @@ executes.
 | `@Paramixel.Priority` | Deterministic discovery ordering |
 
 ```java
-@Paramixel.Factory
-public static Task factory() {
-    final var root = parallel(MySuite.class, "Environments", Pool.named("environments"));
+@Paramixel.TaskFactory
+public static TaskBuilder<?> factory() {
+    final var root = Parallel.builder(MySuite.class, "Environments", Pool.named("environments"));
     for (final var environment : environments) {
-        root.child(sequential(environment.name()).bind(ENVIRONMENT, environment).step(ID_VERIFY));
+        root.step(Sequential.builder(environment.name()).bind(ENVIRONMENT, environment).step(ID_VERIFY));
     }
-    return root.build();
+    return root;
 }
 ```
 
-A factory returning `null` is an explicit skip with a recorded reason. If every selected factory returns `null`,
+A factory may return a built `Task` or a `TaskBuilder<?>`; the framework builds a builder. A factory returning `null` is
+an explicit skip with a recorded reason. If every selected factory returns `null`,
 `paramixel.failIfNoTests` decides the exit code. Any other invalid shape — not `static`, has
 parameters, or returns an unrelated type — fails the run with `ResolverException` **before** any discovered test code
 runs.
@@ -41,22 +42,23 @@ runs.
 Paramixel (independent sequential root)
   run (dependent sequential)
     BeforeAll hooks (when any)
-    actions (parallel, pool "discovery")   ← discovered factories
+    tasks (parallel, pool "discovery")    ← discovered factories
   AfterAll hooks (when any)
 ```
 
 - A failing `BeforeAll` hook skips the factories.
 - `AfterAll` hooks still run after a started run, in reverse order. A failing hook does not prevent the remaining
   `AfterAll` hooks from running.
-- `actions` is the fail-fast scope: with `paramixel.failFast=true`, a failed factory (`FAILED`, including a timeout)
+- `tasks` is the fail-fast scope: with `paramixel.failFast=true`, a failed factory (`FAILED`, including a timeout)
   stops admitting later ones. A skipped or aborted factory does not.
 - Capacity of the `discovery` pool defaults to `paramixel.parallelism`; override it with
   `Runner.Builder.pool(Pool.named("discovery"), n)` or `paramixel.parallelism.discovery`.
 
 ## Direct execution versus discovery
 
-`Runner.run(Task)` executes exactly the supplied definition: no classpath scan, no hooks, no selection. Discovery happens
-only through `Runner.run()` and `Runner.run(Selector)`.
+`Runner.run(Task)` executes exactly the supplied definition: no classpath scan, no hooks, no selection.
+`Runner.run(TaskBuilder<?>)` builds the definition first and then behaves identically. Discovery happens only through
+`Runner.run()` and `Runner.run(Selector)`.
 
 ## Selection
 

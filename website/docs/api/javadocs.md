@@ -26,7 +26,6 @@ The Gradle build also enforces Javadoc quality for core sources:
 ## Public packages
 
 - `org.paramixel.api`
-- `org.paramixel.api.action`
 - `org.paramixel.api.exception`
 - `org.paramixel.api.selector`
 - `org.paramixel.api.support`

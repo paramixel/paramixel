@@ -38,6 +38,7 @@ import org.paramixel.api.Result;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Status;
 import org.paramixel.api.Task;
+import org.paramixel.api.TaskBuilder;
 import org.paramixel.api.exception.ConfigurationException;
 import org.paramixel.api.selector.Selector;
 
@@ -96,6 +97,12 @@ public final class RunnerImpl implements Runner {
         } finally {
             running.set(false);
         }
+    }
+
+    @Override
+    public Result run(final TaskBuilder<?> definition) {
+        Objects.requireNonNull(definition, "definition is null");
+        return run(definition.build());
     }
 
     @Override
@@ -276,7 +283,7 @@ public final class RunnerImpl implements Runner {
             // An empty discovery follows the separately configured failIfNoTests rule, not the skip mapping.
             status = Status.skipped("no task factories were discovered");
             exitCode = configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS).orElse(true) ? 1 : 0;
-            warnings = List.of("No @Paramixel.Factory method contributed a task for the requested selection");
+            warnings = List.of("No @Paramixel.TaskFactory method contributed a task for the requested selection");
         }
         final var result = Result.builder()
                 .runId(runId)

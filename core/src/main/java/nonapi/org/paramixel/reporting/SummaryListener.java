@@ -36,6 +36,12 @@ public final class SummaryListener implements Listener {
     /** The horizontal rule that separates the console sections from the result tree and the run totals. */
     private static final String RULE = "-".repeat(7);
 
+    /** Title of the console summary block. */
+    private static final String SUMMARY_TITLE = "Paramixel Summary";
+
+    /** The horizontal rule that brackets the summary title; its width matches the title. */
+    private static final String TITLE_RULE = "-".repeat(SUMMARY_TITLE.length());
+
     private final ConsoleSupport console;
     private final PrintStream out;
 
@@ -53,8 +59,9 @@ public final class SummaryListener implements Listener {
     @Override
     public void onRunCompleted(final Result result) {
         if (console.enabled("summary.header")) {
-            out.println(console.line(console.color(AnsiColor.BOLD_GRAY_TEXT, RULE)));
-            out.println(console.line(console.color(AnsiColor.BOLD_WHITE_TEXT, "Summary")));
+            out.println(console.line(console.color(AnsiColor.BOLD_GRAY_TEXT, TITLE_RULE)));
+            out.println(console.line(console.color(AnsiColor.BOLD_WHITE_TEXT, SUMMARY_TITLE)));
+            out.println(console.line(console.color(AnsiColor.BOLD_GRAY_TEXT, TITLE_RULE)));
         }
         result.root().ifPresent(root -> {
             if (console.enabled("summary.tree")) {

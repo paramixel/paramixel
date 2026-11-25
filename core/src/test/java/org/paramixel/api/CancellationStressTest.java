@@ -17,9 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
-import static org.paramixel.api.Tasks.task;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -45,7 +42,7 @@ class CancellationStressTest {
         final var calls = new AtomicInteger();
         final var secondAttemptRunning = new CountDownLatch(1);
         final var release = new CountDownLatch(1);
-        final var definition = task("retried")
+        final var definition = Sequential.builder("retried")
                 .retry(RetryPolicy.attempts(2))
                 .step("work", () -> {
                     if (calls.incrementAndGet() == 1) {
@@ -94,7 +91,7 @@ class CancellationStressTest {
     void cancellationDuringRepeatPredicateMarksTheCurrentAttemptCanceled() throws Exception {
         final var checking = new CountDownLatch(1);
         final var release = new CountDownLatch(1);
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .repeat(
                         "repeated",
                         repeat -> repeat.maxIterations(2)
@@ -144,7 +141,7 @@ class CancellationStressTest {
         final var release = new CountDownLatch(1);
         final var childCalls = new AtomicInteger();
         final var afterCalls = new AtomicInteger();
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .before(() -> {
                     starting.countDown();
                     release.await();
@@ -184,7 +181,7 @@ class CancellationStressTest {
         final var bodyStarted = new CountDownLatch(1);
         final var release = new CountDownLatch(1);
         final var afterFailure = new IllegalStateException("after failed");
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .step("work", () -> {
                     bodyStarted.countDown();
                     release.await();
@@ -242,10 +239,10 @@ class CancellationStressTest {
         // is quiescent regardless of host core count or load.
         final var started = new CountDownLatch(1);
         final var release = new CountDownLatch(1);
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 4).boxed().toList(),
-                        index -> task("child-" + index).step("wait", () -> {
+                        index -> Sequential.builder("child-" + index).step("wait", () -> {
                             started.countDown();
                             release.await(60, TimeUnit.SECONDS);
                         }))
@@ -278,7 +275,7 @@ class CancellationStressTest {
     @DisplayName("repeated cancellation requests stay idempotent")
     void repeatedCloseIsIdempotent() {
         final var started = new CountDownLatch(1);
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .step("wait", () -> {
                     started.countDown();
                     Thread.sleep(5000L);
@@ -307,10 +304,10 @@ class CancellationStressTest {
     void highContentionInterleavings() {
         final AtomicInteger active = new AtomicInteger();
         final AtomicInteger peak = new AtomicInteger();
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 200).boxed().toList(),
-                        index -> sequential("child-" + index)
+                        index -> Sequential.builder("child-" + index)
                                 .independent()
                                 .step("one", () -> {
                                     final var current = active.incrementAndGet();
@@ -343,12 +340,14 @@ class CancellationStressTest {
     @DisplayName("retry and cancellation interacting repeatedly stays consistent")
     void retryAndCancellation() {
         final AtomicInteger attempts = new AtomicInteger();
-        final Task definition = sequential("root")
-                .child(sequential("retried").retry(RetryPolicy.attempts(50)).step("probe", () -> {
-                    attempts.incrementAndGet();
-                    Thread.sleep(5L);
-                    throw new IllegalStateException("always fails");
-                }))
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
+                        .retry(RetryPolicy.attempts(50))
+                        .step("probe", () -> {
+                            attempts.incrementAndGet();
+                            Thread.sleep(5L);
+                            throw new IllegalStateException("always fails");
+                        }))
                 .build();
         final var runner = runner(2, 2000);
         final List<Result> results = new ArrayList<>();
@@ -374,13 +373,15 @@ class CancellationStressTest {
         final var afterCalls = new AtomicInteger();
         final var released = new AtomicInteger();
         final var firstAttemptsFailed = new CountDownLatch(2);
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 2).boxed().toList(),
-                        index -> sequential("fixture-" + index)
-                                .after(afterCalls::incrementAndGet)
-                                .after(() -> released.incrementAndGet())
-                                .child(sequential("flaky")
+                        index -> Sequential.builder("fixture-" + index)
+                                .after(Sequential.builder("cleanup")
+                                        .independent()
+                                        .step("release", () -> released.incrementAndGet())
+                                        .step("count", afterCalls::incrementAndGet))
+                                .step(Sequential.builder("flaky")
                                         .retry(RetryPolicy.builder()
                                                 .maxAttempts(3)
                                                 .backoff(Backoff.fixed(Duration.ofSeconds(30)))
@@ -421,8 +422,8 @@ class CancellationStressTest {
     void closeDuringRetryBackoffEndsPromptly() throws InterruptedException {
         final var attempts = new AtomicInteger();
         final var firstAttemptFailed = new CountDownLatch(1);
-        final Task definition = sequential("root")
-                .child(sequential("retried")
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.builder()
                                 .maxAttempts(3)
                                 .backoff(Backoff.fixed(Duration.ofSeconds(30)))

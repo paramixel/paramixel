@@ -17,7 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,9 +45,9 @@ class IdAuthoringTest {
         return failures;
     }
 
-    private static List<String> problems(final Runnable action) {
+    private static List<String> problems(final Runnable body) {
         try {
-            action.run();
+            body.run();
         } catch (final CompilationException e) {
             return e.diagnostics();
         }
@@ -61,7 +60,7 @@ class IdAuthoringTest {
         final var recorder = Records.EVENTS;
         recorder.clear();
 
-        final var result = run(sequential(Hooks.class, "root")
+        final var result = run(Sequential.builder(Hooks.class, "root")
                 .before("first")
                 .step("work")
                 .after("last")
@@ -76,8 +75,8 @@ class IdAuthoringTest {
     void anchorIsInherited() {
         Records.EVENTS.clear();
 
-        final var result = run(sequential(Hooks.class, "root")
-                .child(sequential("group").before("first").step("work"))
+        final var result = run(Sequential.builder(Hooks.class, "root")
+                .step(Sequential.builder("group").before("first").step("work"))
                 .build());
 
         assertThat(result.status()).isEqualTo(Status.PASSED);
@@ -87,8 +86,8 @@ class IdAuthoringTest {
     @Test
     @DisplayName("ID-03: a hook may declare checked exceptions")
     void checkedExceptionsAreAllowed() {
-        final var result =
-                run(sequential(Hooks.class, "root").step("throwsChecked").build());
+        final var result = run(
+                Sequential.builder(Hooks.class, "root").step("throwsChecked").build());
 
         assertThat(result.status().isFailed()).isTrue();
         assertThat(allFailures(result.root().orElseThrow()))
@@ -100,7 +99,8 @@ class IdAuthoringTest {
     void unknownIdIsRejected() {
         Records.EVENTS.clear();
 
-        assertThat(problems(() -> sequential(Hooks.class, "root").step("wor").build()))
+        assertThat(problems(() ->
+                        Sequential.builder(Hooks.class, "root").step("wor").build()))
                 .anySatisfy(diagnostic ->
                         assertThat(diagnostic).contains("Unknown id").contains("candidates"));
 
@@ -110,31 +110,32 @@ class IdAuthoringTest {
     @Test
     @DisplayName("ID-05: an id used without an anchor is rejected")
     void missingAnchorIsRejected() {
-        assertThat(problems(() -> sequential("root").step("work").build()))
+        assertThat(problems(() -> Sequential.builder("root").step("work").build()))
                 .anySatisfy(diagnostic -> assertThat(diagnostic).contains("no anchor"));
     }
 
     @Test
     @DisplayName("ID-06: a duplicated id is rejected")
     void duplicateIdIsRejected() {
-        assertThat(problems(
-                        () -> sequential(Duplicates.class, "root").step("dup").build()))
+        assertThat(problems(() ->
+                        Sequential.builder(Duplicates.class, "root").step("dup").build()))
                 .anySatisfy(diagnostic -> assertThat(diagnostic).contains("declared 2 times"));
     }
 
     @Test
     @DisplayName("ID-07: a hook with the wrong shape is rejected per role")
     void wrongShapeIsRejected() {
-        assertThat(problems(() ->
-                        sequential(Malformed.class, "root").before("notStatic").build()))
+        assertThat(problems(() -> Sequential.builder(Malformed.class, "root")
+                        .before("notStatic")
+                        .build()))
                 .anySatisfy(diagnostic -> assertThat(diagnostic).contains("must be public static"));
 
-        assertThat(problems(() -> sequential(Malformed.class, "root")
+        assertThat(problems(() -> Sequential.builder(Malformed.class, "root")
                         .body("returnsSomething")
                         .build()))
                 .anySatisfy(diagnostic -> assertThat(diagnostic).contains("expected void m(Context)"));
 
-        assertThat(problems(() -> sequential(Malformed.class, "root")
+        assertThat(problems(() -> Sequential.builder(Malformed.class, "root")
                         .body("twoParameters")
                         .build()))
                 .anySatisfy(diagnostic -> assertThat(diagnostic).contains("expected void m(Context)"));
@@ -143,7 +144,7 @@ class IdAuthoringTest {
     @Test
     @DisplayName("ID-08: all problems are reported together")
     void problemsAreAggregated() {
-        assertThat(problems(() -> sequential(Malformed.class, "root")
+        assertThat(problems(() -> Sequential.builder(Malformed.class, "root")
                         .step("missing")
                         .step("twoParameters")
                         .build()))
@@ -153,17 +154,19 @@ class IdAuthoringTest {
     @Test
     @DisplayName("ID-09: FailException, SkipException and AbortException keep their classification")
     void hookExceptionClassification() {
-        assertThat(run(sequential(Hooks.class, "root").step("fails").build())
+        assertThat(run(Sequential.builder(Hooks.class, "root").step("fails").build())
                         .status()
                         .isFailed())
                 .isTrue();
 
-        final var skipped = run(sequential(Hooks.class, "root").step("skips").build());
+        final var skipped =
+                run(Sequential.builder(Hooks.class, "root").step("skips").build());
         assertThat(skipped.status().isSkipped()).isTrue();
         assertThat(allFailures(skipped.root().orElseThrow()))
                 .anySatisfy(failure -> assertThat(failure.message()).contains("not now"));
 
-        final var aborted = run(sequential(Hooks.class, "root").step("aborts").build());
+        final var aborted =
+                run(Sequential.builder(Hooks.class, "root").step("aborts").build());
         assertThat(aborted.status().isTerminal()).isTrue();
     }
 
@@ -172,7 +175,7 @@ class IdAuthoringTest {
     void repeatPredicate() {
         Records.EVENTS.clear();
 
-        final var result = run(Tasks.repeat(Hooks.class, "again")
+        final var result = run(Repeat.builder(Hooks.class, "again")
                 .maxIterations(3)
                 .until("converged")
                 .step("count")
@@ -185,7 +188,7 @@ class IdAuthoringTest {
     @Test
     @DisplayName("ID-12: a resolved hook is labelled by its id, not by its position")
     void hookLabelsUseIds() {
-        final var result = run(sequential(Hooks.class, "root")
+        final var result = run(Sequential.builder(Hooks.class, "root")
                 .before("first")
                 .step("work")
                 .after("last")
@@ -209,8 +212,9 @@ class IdAuthoringTest {
         Records.EVENTS.clear();
 
         // Built bottom-up: no anchor anywhere except the root, and the ids still resolve.
-        final var definition = sequential(Hooks.class, "root")
-                .child(sequential("suite").child(sequential("inner").step("work")))
+        final var definition = Sequential.builder(Hooks.class, "root")
+                .step(Sequential.builder("suite")
+                        .step(Sequential.builder("inner").step("work")))
                 .build();
 
         assertThat(definition.children().get(0).children().get(0).name()).isEqualTo("inner");
@@ -218,8 +222,9 @@ class IdAuthoringTest {
         assertThat(Records.EVENTS).containsExactly("work");
 
         // The same shape with no anchor at all is still an authoring error.
-        assertThat(problems(() -> sequential("root")
-                        .child(sequential("suite").child(sequential("inner").step("work")))
+        assertThat(problems(() -> Sequential.builder("root")
+                        .step(Sequential.builder("suite")
+                                .step(Sequential.builder("inner").step("work")))
                         .build()))
                 .anySatisfy(diagnostic -> assertThat(diagnostic).contains("no anchor"));
     }
@@ -227,7 +232,8 @@ class IdAuthoringTest {
     @Test
     @DisplayName("ID-11: an unanchored definition that uses no id still builds and runs")
     void unanchoredWithoutIdsStillRuns() {
-        final var result = run(sequential("plain").step("unnamed", () -> {}).build());
+        final var result =
+                run(Sequential.builder("plain").step("unnamed", () -> {}).build());
         assertThat(result.status()).isEqualTo(Status.PASSED);
     }
 

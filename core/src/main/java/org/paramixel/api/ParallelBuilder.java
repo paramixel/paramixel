@@ -19,7 +19,7 @@ package org.paramixel.api;
 import java.util.Objects;
 
 /**
- * Authors a parallel task: direct children are eligible concurrently, bounded by a {@link Pool}.
+ * Authors a {@link Parallel} task: direct children are eligible concurrently, bounded by a {@link Pool}.
  *
  * <p>A parallel task has no {@code dependent}/{@code independent} policy: it is always
  * <em>attempt-all-unless-explicitly-canceled</em>. A failed sibling does not cancel other siblings; the group
@@ -38,5 +38,22 @@ public final class ParallelBuilder extends TaskBuilder<ParallelBuilder> {
     @Override
     protected ParallelBuilder self() {
         return this;
+    }
+
+    @Override
+    Parallel newTask(final TaskState state) {
+        return new Parallel(state);
+    }
+
+    /**
+     * Builds the immutable parallel task.
+     *
+     * @return the immutable task; never {@code null}
+     * @throws org.paramixel.api.exception.CompilationException if an identifier is unknown, ambiguous, malformed, or has
+     *     no anchor, or if one builder is attached more than once in this tree
+     */
+    @Override
+    public Parallel build() {
+        return (Parallel) super.build();
     }
 }

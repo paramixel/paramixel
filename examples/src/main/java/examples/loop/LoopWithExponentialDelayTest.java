@@ -17,14 +17,14 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.repeat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Repeat;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 import org.paramixel.api.support.Backoff;
 
@@ -55,11 +55,11 @@ public class LoopWithExponentialDelayTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         resetCounts();
-        return sequential(LoopWithExponentialDelayTest.class, "loop-exponential-delay-example")
-                .child(repeat("poll")
+        return Sequential.builder(LoopWithExponentialDelayTest.class, "loop-exponential-delay-example")
+                .step(Repeat.builder("poll")
                         .maxIterations(4)
                         .delay(Backoff.exponential(Duration.ofMillis(10), Duration.ofMillis(40)))
                         .step(ID_CHECK))

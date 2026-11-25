@@ -33,7 +33,7 @@ public final class SkippingFactoryFixture {
      *
      * @return {@code null}
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     @Paramixel.Tag("skipping")
     public static Task factory() {
         final var hook = DiscoveryFixtures.factoryHook;

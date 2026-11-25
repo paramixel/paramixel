@@ -16,13 +16,13 @@
 
 package org.paramixel.api.discoveryfixtures;
 
-import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.exception.AbortException.abort;
 import static org.paramixel.api.exception.SkipException.skip;
 
 import java.time.Duration;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -40,9 +40,9 @@ public final class FailFastTriggerFixture {
      *
      * @return the definition
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        final var builder = sequential(FailFastTriggerFixture.class, "trigger");
+        final var builder = Sequential.builder(FailFastTriggerFixture.class, "trigger");
         switch (DiscoveryFixtures.failFastMode) {
             case "condition" -> builder.onlyIf("never");
             case "timeout" -> builder.timeout(Duration.ofMillis(50));

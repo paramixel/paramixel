@@ -38,8 +38,8 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Pool;
-import org.paramixel.api.Tasks;
 
 /**
  * Measures reads of compiled occurrence identity, which reporting performs per event and per result node.
@@ -71,7 +71,7 @@ public class FormatIdPathBenchmark {
 
         @Setup(Level.Trial)
         public void setup() {
-            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("p"));
+            final var builder = Parallel.builder(BenchmarkTree.class, "root", Pool.named("p"));
             for (var i = 0; i < size; i++) {
                 builder.step(BenchmarkTree.ID_NOOP);
             }

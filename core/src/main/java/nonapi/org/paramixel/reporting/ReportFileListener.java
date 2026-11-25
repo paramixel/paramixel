@@ -42,10 +42,18 @@ import org.paramixel.api.exception.ConfigurationException;
  *
  * <p>The format follows the file extension: {@code .json}, {@code .xml}, {@code .html}; anything else is plain text.
  * Every format is generated from the same immutable {@link Result}, so a report cannot disagree with console output.
- * Secrets are not written: the report contains the redacted configuration summary, statuses, reasons, and stack traces
- * only.
+ * Secrets are not written: the report contains the redacted configuration summary, statuses, reasons, renderings of
+ * plan parameters, and stack traces only. A plan parameter is a value the author declared with {@code bind}; values a
+ * test stores at runtime with {@code Context.put} are never reported.
+ *
+ * <p>The report schema is version {@value #SCHEMA_VERSION}. Version 2 added the per-node {@code parameters} object,
+ * the {@code slot} field that marks a {@code before} or {@code after} subtree, and the XML {@code <parameter>}
+ * children.
  */
 public final class ReportFileListener implements Listener {
+
+    /** The report schema version written into every structured report. */
+    public static final int SCHEMA_VERSION = 2;
 
     private static final String HTML_TITLE_END_AND_STYLE = "</title>\n"
             + "<style>body{font-family:sans-serif}table{border-collapse:collapse}"
@@ -120,7 +128,7 @@ public final class ReportFileListener implements Listener {
 
     private static String json(final Result result) {
         final var out = new StringBuilder(1024);
-        out.append("{\n  \"schemaVersion\": 1,\n  \"run\": {\n    \"id\": ")
+        out.append("{\n  \"schemaVersion\": 2,\n  \"run\": {\n    \"id\": ")
                 .append(quote(result.runId()))
                 .append(",\n    \"status\": ")
                 .append(quote(result.status().kind().name()))
@@ -185,10 +193,14 @@ public final class ReportFileListener implements Listener {
                 .append(quote(node.name()))
                 .append(",\n    \"path\": ")
                 .append(quote(node.path()))
+                .append(",\n    \"parameters\": ")
+                .append(jsonParameters(node.parameters()))
                 .append(",\n    \"mode\": ")
                 .append(quote(node.mode().name()))
                 .append(",\n    \"pool\": ")
                 .append(node.poolName().map(ReportFileListener::quote).orElse("null"))
+                .append(",\n    \"slot\": ")
+                .append(quote(node.slot().name()))
                 .append(",\n    \"lock\": ")
                 .append(node.exclusiveLock().map(ReportFileListener::quote).orElse("null"))
                 .append(",\n    \"shuffleSeed\": ")
@@ -247,6 +259,19 @@ public final class ReportFileListener implements Listener {
         return (int) node.children().stream()
                 .filter(child -> child.kind() == TaskResult.Kind.ATTEMPT)
                 .count();
+    }
+
+    private static String jsonParameters(final Map<String, String> parameters) {
+        final var out = new StringBuilder("{");
+        var first = true;
+        for (Map.Entry<String, String> entry : parameters.entrySet()) {
+            if (!first) {
+                out.append(", ");
+            }
+            first = false;
+            out.append(quote(entry.getKey())).append(": ").append(quote(entry.getValue()));
+        }
+        return out.append('}').toString();
     }
 
     private static String jsonFailures(final List<Failure> failures) {
@@ -315,7 +340,7 @@ public final class ReportFileListener implements Listener {
 
     private static String xml(final Result result) {
         final var out = new StringBuilder(256);
-        out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<paramixel schemaVersion=\"1\">\n  <run id=\"")
+        out.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<paramixel schemaVersion=\"2\">\n  <run id=\"")
                 .append(escapeXml(result.runId()))
                 .append("\" status=\"")
                 .append(result.status().kind().name())
@@ -345,6 +370,8 @@ public final class ReportFileListener implements Listener {
                 .append(escapeXml(node.name()))
                 .append("\" status=\"")
                 .append(node.status().kind().name())
+                .append("\" slot=\"")
+                .append(node.slot().name())
                 .append('"');
         node.reason()
                 .ifPresent(reason ->
@@ -360,6 +387,14 @@ public final class ReportFileListener implements Listener {
                     .append('"');
         }
         out.append(">\n");
+        for (Map.Entry<String, String> parameter : node.parameters().entrySet()) {
+            out.append(indent)
+                    .append("  <parameter name=\"")
+                    .append(escapeXml(parameter.getKey()))
+                    .append("\" value=\"")
+                    .append(escapeXml(parameter.getValue()))
+                    .append("\"/>\n");
+        }
         for (Failure failure : node.failures()) {
             out.append(indent)
                     .append("  <failure phase=\"")
@@ -487,12 +522,26 @@ public final class ReportFileListener implements Listener {
                 .append(
                         node.kind() == TaskResult.Kind.ATTEMPT && node.attemptIndex() < attemptTotal
                                 ? "ATTEMPT (superseded)"
-                                : node.kind())
+                                : node.kind()
+                                        + (node.slot() == TaskResult.Slot.CHILD
+                                                ? ""
+                                                : " (" + node.slot().name().toLowerCase(Locale.ROOT) + ")"))
                 .append("</td><td>")
                 .append(node.status().kind())
                 .append("</td><td>")
                 .append(node.reason().map(ReportFileListener::escape).orElse(""))
                 .append("</td></tr>\n");
+        if (!node.parameters().isEmpty()) {
+            out.append("<tr class=\"detail\"><td colspan=\"4\"><details><summary>parameters</summary><ul>");
+            for (Map.Entry<String, String> parameter : node.parameters().entrySet()) {
+                out.append("<li><code>")
+                        .append(escape(parameter.getKey()))
+                        .append("</code> = ")
+                        .append(escape(parameter.getValue()))
+                        .append("</li>");
+            }
+            out.append("</ul></details></td></tr>\n");
+        }
         final var childAttemptTotal = attemptTotalOf(node);
         for (TaskResult child : node.children()) {
             appendHtml(out, child, depth + 1, childAttemptTotal);

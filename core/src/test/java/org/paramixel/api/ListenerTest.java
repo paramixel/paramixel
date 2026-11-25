@@ -18,8 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.task;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -51,8 +49,8 @@ class ListenerTest {
     @DisplayName("each occurrence produces exactly one terminal event, delivered in order")
     void terminalEventsAreExactlyOnce() {
         final var listener = new RecordingListener();
-        final var definition = parallel("root", Pool.named("p"))
-                .each(List.of("a", "b", "c"), name -> task(name).step("work", () -> {}))
+        final var definition = Parallel.builder("root", Pool.named("p"))
+                .each(List.of("a", "b", "c"), name -> Sequential.builder(name).step("work", () -> {}))
                 .build();
 
         final var result = Runner.builder()
@@ -79,7 +77,7 @@ class ListenerTest {
     @DisplayName("per-occurrence phase order is legal")
     void phaseOrderIsLegal() {
         final var listener = new RecordingListener();
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .step("body", () -> {}, children -> children.step("nested", () -> {}))
                 .build();
 
@@ -116,7 +114,7 @@ class ListenerTest {
         final var result = Runner.builder()
                 .listener(listener)
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(result.diagnostics())
@@ -134,8 +132,10 @@ class ListenerTest {
             }
         };
 
-        final var result =
-                Runner.builder().listener(listener).build().run(task("empty").build());
+        final var result = Runner.builder()
+                .listener(listener)
+                .build()
+                .run(Sequential.builder("empty").build());
 
         assertThat(warnings).hasValue(1);
         assertThat(result.diagnostics())
@@ -162,7 +162,7 @@ class ListenerTest {
         final var result = Runner.builder()
                 .listener(listener)
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(started).hasValue(1);
         assertThat(completed).hasValue(1);
@@ -179,7 +179,7 @@ class ListenerTest {
                 seen.set(result.diagnostics());
             }
         };
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .timeout(Duration.ofMillis(80))
                 .step("stuck", () -> ignoreInterruptionFor(Duration.ofMillis(400)))
                 .build();
@@ -226,7 +226,7 @@ class ListenerTest {
                 completionStarted.set(true);
             }
         };
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .step("a", () -> {})
                 .step("b", () -> {})
                 .step("c", () -> {})
@@ -284,7 +284,7 @@ class ListenerTest {
                 events.add(event);
             }
         };
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .onlyIf(context -> true)
                 .before(bodyStarted::countDown)
                 .step("work", () -> {})
@@ -328,7 +328,8 @@ class ListenerTest {
             }
         };
         final var calls = new AtomicInteger();
-        final var definition = task("root").step("work", calls::incrementAndGet).build();
+        final var definition =
+                Sequential.builder("root").step("work", calls::incrementAndGet).build();
         try (var runner = smallQueueRunner(listener, 300)) {
             final var run = startRun(runner, definition);
             try {
@@ -368,7 +369,7 @@ class ListenerTest {
                 }
             }
         };
-        final var definition = parallel("root", Pool.named("p"))
+        final var definition = Parallel.builder("root", Pool.named("p"))
                 .step(
                         "active",
                         () -> {
@@ -423,7 +424,8 @@ class ListenerTest {
             }
         };
         try (var runner = smallQueueRunner(listener, 500)) {
-            final var run = startRun(runner, task("root").step("pass", () -> {}).build());
+            final var run = startRun(
+                    runner, Sequential.builder("root").step("pass", () -> {}).build());
             try {
                 assertThat(completed.await(3, TimeUnit.SECONDS)).isTrue();
                 final var result = run.get(3, TimeUnit.SECONDS);
@@ -477,7 +479,7 @@ class ListenerTest {
         final var result = Runner.builder()
                 .listener(listener)
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(result.diagnostics())
@@ -503,7 +505,7 @@ class ListenerTest {
         final var result = Runner.builder()
                 .listener(listener)
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(terminal).hasValue(result.occurrenceCount());
@@ -518,7 +520,7 @@ class ListenerTest {
                 throw fatal;
             }
         };
-        final var definition = task("root").step("work", () -> {}).build();
+        final var definition = Sequential.builder("root").step("work", () -> {}).build();
         try (var runner = Runner.builder()
                 .listener(listener)
                 .configuration(Configuration.of(Map.of(Configuration.LISTENER_QUEUE_CAPACITY, "1")))
@@ -558,7 +560,7 @@ class ListenerTest {
         final var result = Runner.builder()
                 .listener(Listener.NOOP)
                 .build()
-                .run(task("root").build());
+                .run(Sequential.builder("root").build());
         try (var dispatcher = new ReportingDispatcher(listener, Configuration.of(Map.of()))) {
             dispatcher.warning("waiting listener");
             assertThat(listening.await(5, TimeUnit.SECONDS)).isTrue();

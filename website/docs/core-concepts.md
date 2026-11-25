@@ -41,7 +41,7 @@ reported as cleanly finalized.
 
 Continue with:
 
-- [Tasks](core-concepts/actions)
+- [Tasks](core-concepts/tasks)
 - [Lifecycle and scope](core-concepts/elements)
 - [Discovery](core-concepts/discovery)
 - [Data-driven testing](core-concepts/data-driven-testing)

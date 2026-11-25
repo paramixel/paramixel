@@ -17,12 +17,12 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -57,11 +57,11 @@ public class SimpleTest implements AutoCloseable {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         testCount.set(0);
 
-        return sequential(SimpleTest.class, "SimpleTest")
+        return Sequential.builder(SimpleTest.class, "SimpleTest")
                 .before(ID_CREATE)
                 .step(ID_TEST_ONE)
                 .after(ID_CLOSE)

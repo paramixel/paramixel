@@ -17,16 +17,16 @@
 package examples.altcontainers.mongodb;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import com.mongodb.client.MongoClients;
 import examples.support.Logger;
 import org.bson.Document;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -48,7 +48,7 @@ public class MongoDBTest {
     private final MongoDBTestEnvironment environment;
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the task factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      * @throws Throwable if environment creation fails
@@ -64,11 +64,11 @@ public class MongoDBTest {
      * @return the definition for this test
      * @throws Throwable if environment creation fails
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() throws Throwable {
-        final var root = parallel(MongoDBTest.class, "MongoDBTest", Pool.named("environments"));
+        final var root = Parallel.builder(MongoDBTest.class, "MongoDBTest", Pool.named("environments"));
         for (final var environment : MongoDBTestEnvironment.createTestEnvironments()) {
-            root.child(sequential(environment.name())
+            root.step(Sequential.builder(environment.name())
                     .bind(ENVIRONMENT, environment)
                     .before(ID_SET_UP)
                     .step(ID_TEST_INSERT_QUERY)

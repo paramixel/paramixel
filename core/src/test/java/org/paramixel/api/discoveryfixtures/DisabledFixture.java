@@ -16,10 +16,9 @@
 
 package org.paramixel.api.discoveryfixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -37,9 +36,9 @@ public final class DisabledFixture {
      * @return the definition
      */
     @Paramixel.Disabled("disabled for discovery tests")
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return sequential(DisabledFixture.class, "disabled").step("run").build();
+        return Sequential.builder(DisabledFixture.class, "disabled").step("run").build();
     }
 
     /**

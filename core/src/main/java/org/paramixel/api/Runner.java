@@ -34,6 +34,8 @@ import org.paramixel.api.selector.Selector;
  * <ul>
  *   <li>{@link #run(Task)} executes a definition you built. It performs no discovery, no classpath scan, and runs no
  *       {@code @BeforeAll}/{@code @AfterAll} hooks: the definition is the complete run.</li>
+ *   <li>{@link #run(TaskBuilder)} builds the definition you authored and executes it with exactly the semantics of
+ *       {@link #run(Task)}, so a {@code main} method can pass a factory's result directly.</li>
  *   <li>{@link #run(Selector)} discovers factories using exactly the supplied selector and nothing else. A configured
  *       {@code paramixel.match.*} key that the selector does not use is reported as a warning rather than merged
  *       silently.</li>
@@ -83,6 +85,22 @@ public interface Runner extends AutoCloseable {
      * @throws IllegalStateException if a run is already in progress on this runner
      */
     Result run(Task definition);
+
+    /**
+     * Builds the supplied definition and executes it.
+     *
+     * <p>This is exactly {@code run(definition.build())}: it performs no discovery and runs no
+     * {@code @BeforeAll}/{@code @AfterAll} hooks. It accepts a builder so a {@code main} method can hand over whatever a
+     * {@link Paramixel.TaskFactory} returned.
+     *
+     * @param definition the definition builder; must not be {@code null}
+     * @return the result; never {@code null}
+     * @throws NullPointerException if {@code definition} is {@code null}
+     * @throws ConfigurationException if the configuration is invalid
+     * @throws CompilationException if the definition or plan is invalid
+     * @throws IllegalStateException if a run is already in progress on this runner
+     */
+    Result run(TaskBuilder<?> definition);
 
     /**
      * Discovers factories matching exactly the supplied selector and executes them.

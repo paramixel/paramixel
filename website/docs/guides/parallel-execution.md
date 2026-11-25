@@ -10,9 +10,9 @@ description: Named pools, permit lifetimes, admission order, and honest limits.
 ```java
 private static final Pool ENVIRONMENTS = Pool.named("environments");
 
-final var root = parallel(MySuite.class, "Compatibility matrix", ENVIRONMENTS);
+final var root = Parallel.builder(MySuite.class, "Compatibility matrix", ENVIRONMENTS);
 for (final var environment : environments) {
-    root.child(sequential(environment.name()).bind(ENVIRONMENT, environment).step("check"));
+    root.step(Sequential.builder(environment.name()).bind(ENVIRONMENT, environment).step("check"));
 }
 Task definition = root.build();
 
@@ -45,7 +45,7 @@ waiting for its children, so a one-worker run of a nested tree still completes.
 - Nesting the same pool on one ancestry path is rejected at compile time, regardless of configured capacity.
 - Provable pool/lock acquisition-order cycles are rejected with both resource names and the offending task path. The
   check follows runtime order: a task takes its parent's pool permit, then its own `isolated` lock at admission, and
-  only then do its children take permits of its own pool. So `parallel(..., pool).isolated(lock)` on one path and a
+  only then do its children take permits of its own pool. So `Parallel.builder(..., pool).isolated(lock)` on one path and a
   `pool` child that is `isolated(lock)` on another path form a cycle.
 - A scheduler that cannot make progress fails the run with a diagnostic instead of hanging.
 

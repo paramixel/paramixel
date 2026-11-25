@@ -39,11 +39,11 @@ public final class Paramixel {
     }
 
     /**
-     * Marks a method as a factory discovered by classpath scanning.
+     * Marks a method as a task factory discovered by classpath scanning.
      *
-     * <p>Factory methods must be {@code public static}, take no parameters, and return a {@link Task} or a
-     * {@link TaskBuilder}. A returned builder is built immediately. Returning {@code null} is an explicit skip with a
-     * recorded reason: the factory contributes no definition and discovery continues.
+     * <p>Task factory methods must be {@code public static}, take no parameters, and return a {@link Task} or a
+     * {@link TaskBuilder}. A returned builder is built by the framework. Returning {@code null} is an explicit skip
+     * with a recorded reason: the factory contributes no definition and discovery continues.
      *
      * <p>Discovery validates every matched factory before any test work runs, so an invalid shape fails the run with
      * {@link org.paramixel.api.exception.ResolverException} rather than executing a partial suite.
@@ -55,7 +55,7 @@ public final class Paramixel {
     @Documented
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
-    public @interface Factory {}
+    public @interface TaskFactory {}
 
     /**
      * Binds a stable identifier to a hook method.
@@ -66,15 +66,15 @@ public final class Paramixel {
      * declares them runs exactly as an ordinary method call would.
      *
      * <p>The identifier resolves only against methods declared by the definition's <strong>anchor class</strong> —
-     * the class named once at the definition root, as in {@code Tasks.sequential(MyTest.class, "MyTest")}.
-     * Inheritance is not consulted, and an identifier that is declared in a class that is not the anchor of a
-     * definition is never resolved.
+     * the class named once at the definition root, as in
+     * {@code Sequential.builder(MyTest.class, "MyTest")}. Inheritance is not consulted, and an identifier that is
+     * declared in a class that is not the anchor of a definition is never resolved.
      *
      * <p>Identifiers must be unique within the anchor class, and the identifier is also the label reported for the
      * hook ({@code before[setUp]}, {@code body[work]}). Ids are not selectable in 7.0.0: {@link Selector} filters
      * classes, so tagging a hook has no effect and is rejected.
      *
-     * @see org.paramixel.api.Tasks
+     * @see Sequential#builder(Class, String)
      */
     @Documented
     @Retention(RetentionPolicy.RUNTIME)
@@ -90,7 +90,7 @@ public final class Paramixel {
     }
 
     /**
-     * Marks a method that executes once before any discovered test actions
+     * Marks a method that executes once before any discovered test tasks
      * within a runner invocation.
      *
      * <p>The method must be {@code public static}, take zero parameters, and return a {@link Task} or
@@ -108,7 +108,7 @@ public final class Paramixel {
     public @interface BeforeAll {}
 
     /**
-     * Marks a method that executes once after all discovered test actions
+     * Marks a method that executes once after all discovered test tasks
      * within a runner invocation.
      *
      * <p>The method must be {@code public static}, take zero parameters, and return a {@link Task} or
@@ -127,7 +127,7 @@ public final class Paramixel {
      * Declares discovery ordering priority for a discovered factory class.
      *
      * <p>Higher priority classes are ordered earlier when the framework builds the discovered
-     * root action. Priority affects scheduling admission order only; concurrent execution does not
+     * root task. Priority affects scheduling admission order only; concurrent execution does not
      * imply completion order.
      */
     @Documented
@@ -152,7 +152,7 @@ public final class Paramixel {
     public @interface Disabled {
 
         /**
-         * Returns an optional explanation describing why the action is disabled.
+         * Returns an optional explanation describing why the task is disabled.
          *
          * @return the disable reason, or an empty string when no reason is supplied
          */

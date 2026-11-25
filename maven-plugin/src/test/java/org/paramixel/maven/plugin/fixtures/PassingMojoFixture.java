@@ -16,10 +16,9 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -35,9 +34,11 @@ public final class PassingMojoFixture {
      *
      * @return a definition named {@code "mojo-pass"}
      */
-    @Paramixel.Factory
-    public static Task action() {
-        return sequential(PassingMojoFixture.class, "mojo-pass").step("test").build();
+    @Paramixel.TaskFactory
+    public static Task task() {
+        return Sequential.builder(PassingMojoFixture.class, "mojo-pass")
+                .step("test")
+                .build();
     }
 
     /**

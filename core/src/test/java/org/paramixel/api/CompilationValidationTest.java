@@ -18,9 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
-import static org.paramixel.api.Tasks.task;
 
 import java.time.Duration;
 import java.util.Map;
@@ -51,8 +48,8 @@ class CompilationValidationTest {
     @DisplayName("SCHED-05: nesting the same pool on one path is rejected before execution")
     void nestedSamePoolIsRejected() {
         final AtomicInteger factories = new AtomicInteger();
-        final Task definition = parallel("outer", Pool.named("p"))
-                .parallel("inner", Pool.named("p"), inner -> inner.child(sequential("instance")))
+        final Task definition = Parallel.builder("outer", Pool.named("p"))
+                .parallel("inner", Pool.named("p"), inner -> inner.step(Sequential.builder("instance")))
                 .build();
 
         final var error = compileError(definition, Map.of(Pool.named("p"), 4));
@@ -65,7 +62,7 @@ class CompilationValidationTest {
     @Test
     @DisplayName("SCHED-06: a cyclic cross-pool acquisition order is rejected")
     void acquisitionCycleIsRejected() {
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .independent()
                 .parallel(
                         "a-then-b",
@@ -87,16 +84,16 @@ class CompilationValidationTest {
     @DisplayName("SCHED-08: a lock held around an owned pool and the reverse order elsewhere is rejected")
     void lockAroundOwnedPoolCycleIsRejected() {
         final AtomicInteger calls = new AtomicInteger();
-        final Task lockThenPool = parallel("lock-then-pool", Pool.named("p"))
+        final Task lockThenPool = Parallel.builder("lock-then-pool", Pool.named("p"))
                 .isolated("l")
                 .step("child", calls::incrementAndGet)
                 .build();
-        final Task poolThenLock = parallel("pool-then-lock", Pool.named("p"))
-                .child(task("locked").isolated("l").step("work", calls::incrementAndGet))
+        final Task poolThenLock = Parallel.builder("pool-then-lock", Pool.named("p"))
+                .step(Sequential.builder("locked").isolated("l").step("work", calls::incrementAndGet))
                 .build();
-        final Task definition = parallel("root", Pool.named("root"))
-                .child(lockThenPool)
-                .child(poolThenLock)
+        final Task definition = Parallel.builder("root", Pool.named("root"))
+                .step(lockThenPool)
+                .step(poolThenLock)
                 .build();
 
         final var error = compileError(definition, Map.of(Pool.named("root"), 2, Pool.named("p"), 1));
@@ -110,16 +107,16 @@ class CompilationValidationTest {
     void childlessParallelTaskDoesNotCreateAnAcquisitionCycle() {
         final var pool = Pool.named("p");
         final var calls = new AtomicInteger();
-        final var lockOnly = parallel("lock-only", pool)
+        final var lockOnly = Parallel.builder("lock-only", pool)
                 .isolated("l")
                 .before(calls::incrementAndGet)
                 .build();
-        final var poolThenLock = parallel("pool-then-lock", pool)
-                .child(task("locked").isolated("l").before(calls::incrementAndGet))
+        final var poolThenLock = Parallel.builder("pool-then-lock", pool)
+                .step(Sequential.builder("locked").isolated("l").before(calls::incrementAndGet))
                 .build();
-        final var definition = parallel("root", Pool.named("root"))
-                .child(lockOnly)
-                .child(poolThenLock)
+        final var definition = Parallel.builder("root", Pool.named("root"))
+                .step(lockOnly)
+                .step(poolThenLock)
                 .build();
 
         try (var runner = Runner.builder()
@@ -136,7 +133,7 @@ class CompilationValidationTest {
     @DisplayName("SCHED-09: a lock held around an owned pool compiles when no path inverts the order")
     void lockAroundOwnedPoolWithoutInversionRuns() {
         final AtomicInteger calls = new AtomicInteger();
-        final Task definition = parallel("lock-then-pool", Pool.named("p"))
+        final Task definition = Parallel.builder("lock-then-pool", Pool.named("p"))
                 .isolated("l")
                 .step("first", calls::incrementAndGet)
                 .step("second", calls::incrementAndGet)
@@ -157,7 +154,7 @@ class CompilationValidationTest {
     @DisplayName("SCHED-07: an undefined pool is rejected before any user callback")
     void undefinedPoolIsRejected() {
         final AtomicInteger calls = new AtomicInteger();
-        final Task definition = parallel("root", Pool.named("missing"))
+        final Task definition = Parallel.builder("root", Pool.named("missing"))
                 .step("work", calls::incrementAndGet)
                 .build();
 
@@ -171,7 +168,7 @@ class CompilationValidationTest {
     @Test
     @DisplayName("retry and repeat cannot be combined")
     void retryAndRepeatAreRejected() {
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .repeat(
                         "both",
                         repeat -> repeat.maxIterations(2)
@@ -206,10 +203,10 @@ class CompilationValidationTest {
     @Test
     @DisplayName("all independent errors are aggregated into one exception")
     void diagnosticsAreAggregated() {
-        final Task definition = task("root")
-                .child(sequential("dangling"))
-                .child(parallel("undefined-pool", Pool.named("a")).step("work", () -> {}))
-                .child(parallel("undefined-pool-2", Pool.named("b")))
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("dangling"))
+                .step(Parallel.builder("undefined-pool", Pool.named("a")).step("work", () -> {}))
+                .step(Parallel.builder("undefined-pool-2", Pool.named("b")))
                 .build();
 
         final var error = compileError(definition, Map.of());
@@ -222,14 +219,15 @@ class CompilationValidationTest {
     @Test
     @DisplayName("invalid timeout and unknown configuration are rejected")
     void invalidConfigurationIsRejected() {
-        assertThatThrownBy(() -> task("root").timeout(Duration.ofSeconds(-1)))
+        assertThatThrownBy(() -> Sequential.builder("root").timeout(Duration.ofSeconds(-1)))
                 .isInstanceOf(IllegalArgumentException.class);
 
         final var runner = Runner.builder()
                 .listener(Listener.NOOP)
                 .configuration(Configuration.of(Map.of(Configuration.WORKERS, "0")))
                 .build();
-        assertThatThrownBy(() -> runner.run(task("root").step("work", () -> {}).build()))
+        assertThatThrownBy(() -> runner.run(
+                        Sequential.builder("root").step("work", () -> {}).build()))
                 .isInstanceOf(ConfigurationException.class)
                 .hasMessageContaining(Configuration.WORKERS);
     }

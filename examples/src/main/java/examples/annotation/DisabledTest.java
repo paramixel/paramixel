@@ -16,11 +16,10 @@
 
 package examples.annotation;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.selector.Selector;
@@ -53,9 +52,9 @@ public class DisabledTest {
      * @return a task that would fail if executed
      */
     @Paramixel.Disabled("covered by discovery skip behavior")
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return sequential(DisabledTest.class, "[scenario]")
+        return Sequential.builder(DisabledTest.class, "[scenario]")
                 .step(ID_SHOULD_NOT_RUN)
                 .build();
     }

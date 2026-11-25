@@ -25,7 +25,7 @@ import nonapi.org.paramixel.selector.ConcreteSelector;
 import org.paramixel.api.Configuration;
 
 /**
- * Describes which discovered {@code @Paramixel.Factory} methods a run selects.
+ * Describes which discovered {@code @Paramixel.TaskFactory} methods a run selects.
  *
  * <p>A selector is built with {@link #builder()}, which offers one code-anchored and one name-based form per
  * dimension, each with an {@code exclude…} twin:

@@ -17,8 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
-import static org.paramixel.api.Tasks.task;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +40,7 @@ class SequentialPolicyTest {
     @DisplayName("FAIL-01: dependent sequence stops after a failure with an explicit reason")
     void dependentStopsAfterFailure() {
         final AtomicInteger later = new AtomicInteger();
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .step("a", () -> {
                     throw new IllegalStateException("boom");
                 })
@@ -65,7 +63,7 @@ class SequentialPolicyTest {
     @DisplayName("FAIL-02: independent sequence attempts every child and still aggregates failure")
     void independentContinuesAfterFailure() {
         final List<String> calls = new ArrayList<>();
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .independent()
                 .step("a", () -> {
                     calls.add("a");
@@ -86,7 +84,7 @@ class SequentialPolicyTest {
     @DisplayName("FAIL-03: a dependent sequence stops after an assumption abort")
     void dependentStopsAfterAbort() {
         final AtomicInteger later = new AtomicInteger();
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .step("a", () -> {
                     throw AbortException.abort("assumption failed");
                 })
@@ -106,7 +104,7 @@ class SequentialPolicyTest {
     @DisplayName("FAIL-04: independent sequences continue after an abort or a skip")
     void independentContinuesAfterAbortAndSkip() {
         final List<String> calls = new ArrayList<>();
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .independent()
                 .step("abort", () -> {
                     calls.add("abort");
@@ -128,7 +126,7 @@ class SequentialPolicyTest {
     @Test
     @DisplayName("FAIL-06: a passed body with a failed child reports the task as failed")
     void bodyPassesButChildFails() {
-        final Task definition = task("task")
+        final Task definition = Sequential.builder("task")
                 .step(
                         "body",
                         () -> {},
@@ -151,7 +149,7 @@ class SequentialPolicyTest {
     @DisplayName("FAIL-07: an independent inner group does not make the outer sequence independent")
     void innerIndependentDoesNotAffectOuter() {
         final AtomicInteger outer = new AtomicInteger();
-        final Task definition = sequential("outer")
+        final Task definition = Sequential.builder("outer")
                 .sequential(
                         "inner",
                         inner -> inner.independent()
@@ -172,7 +170,7 @@ class SequentialPolicyTest {
     @Test
     @DisplayName("FAIL-08: mixed passed and skipped children aggregate to skipped")
     void skippedIsNotPassing() {
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .independent()
                 .step("pass", () -> {})
                 .step("skip", () -> {
@@ -189,7 +187,7 @@ class SequentialPolicyTest {
     @Test
     @DisplayName("skip and abort map to the configured exit code without rewriting the status")
     void exitPolicyIsSeparateFromStatus() {
-        final Task skipped = task("root")
+        final Task skipped = Sequential.builder("root")
                 .step("skip", () -> {
                     throw SkipException.skip("not applicable");
                 })
@@ -213,7 +211,7 @@ class SequentialPolicyTest {
     @Test
     @DisplayName("an empty named task passes and is reported as a no-op")
     void emptyTaskPasses() {
-        final var result = run(task("empty").build());
+        final var result = run(Sequential.builder("empty").build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(result.diagnostics())

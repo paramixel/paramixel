@@ -116,6 +116,19 @@ public class KafkaTestEnvironment implements AutoCloseable {
     }
 
     /**
+     * Returns the Docker image this environment starts.
+     *
+     * <p>The binding is reported as a plan parameter, so the rendering is what a report reader sees:
+     * {@code apache/kafka:4.3.0}.
+     *
+     * @return the Docker image name
+     */
+    @Override
+    public String toString() {
+        return dockerImageName;
+    }
+
+    /**
      * Creates a new Docker network and starts the Kafka container on it. The network
      * is owned by this environment; {@link #close()} will stop both the container
      * and the network.

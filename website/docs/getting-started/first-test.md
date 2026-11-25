@@ -5,36 +5,45 @@ description: Write and run a minimal Paramixel task definition.
 
 # Quick Start: Your First Definition
 
-Create a class with a public static factory method annotated with `@Paramixel.Factory`. The method returns a `Task`, a
+Create a class with a public static factory method annotated with `@Paramixel.TaskFactory`. The method returns a `Task`, a
 builder, or `null`. Returning `null` is an explicit skip with a recorded reason.
 
 ```java
 package com.example;
 
-import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.exception.FailException.fail;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.Task;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.SequentialBuilder;
 
 public final class LoginSmokeTest {
 
-    @Paramixel.Factory
-    public static Task factory() {
-        return sequential("login smoke")
-                .step("open login page", LoginSmokeTest::openLoginPage)
-                .step("submit credentials", LoginSmokeTest::submitCredentials)
-                .step("user is signed in", () -> {
-                    if (!isSignedIn()) {
-                        throw fail("user is not signed in");
-                    }
-                })
-                .build();
+    private static final String ID_OPEN = "openLoginPage";
+    private static final String ID_SUBMIT = "submitCredentials";
+    private static final String ID_ASSERT = "assertSignedIn";
+
+    @Paramixel.TaskFactory
+    public static SequentialBuilder factory() {
+        return Sequential.builder(LoginSmokeTest.class, "login smoke")
+                .step(ID_OPEN)
+                .step(ID_SUBMIT)
+                .step(ID_ASSERT);
     }
 
-    private static void openLoginPage() {}
+    @Paramixel.Id(ID_OPEN)
+    public static void openLoginPage(final Context context) {}
 
-    private static void submitCredentials() {}
+    @Paramixel.Id(ID_SUBMIT)
+    public static void submitCredentials(final Context context) {}
+
+    @Paramixel.Id(ID_ASSERT)
+    public static void assertSignedIn(final Context context) {
+        if (!isSignedIn()) {
+            throw fail("user is not signed in");
+        }
+    }
 
     private static boolean isSignedIn() {
         return true;
@@ -48,7 +57,7 @@ public final class LoginSmokeTest {
 ./mvnw test
 ```
 
-The Maven plugin discovers the factory, compiles and validates the definition, then executes it. The run fails the build
+The Maven plugin discovers the factory, builds and validates the definition, then executes it. The run fails the build
 if the result's exit code is non-zero.
 
 ## Run it programmatically
@@ -61,21 +70,21 @@ try (Runner runner = Runner.builder().build()) {
 ```
 
 `Runner.run(Task)` performs no discovery and runs no `@BeforeAll`/`@AfterAll` hooks: the supplied definition is the whole
-run.
+run. `Runner.run(TaskBuilder<?>)` builds what you authored and runs it, which is why a `main` method can pass a factory's
+result directly.
 
 ## Add a fixture
 
 ```java
 private static final String FIXTURE = "browser";
 
-@Paramixel.Factory
-public static Task factory() {
-    return sequential(FirstTest.class, "browser")
+@Paramixel.TaskFactory
+public static SequentialBuilder factory() {
+    return Sequential.builder(LoginSmokeTest.class, "browser")
             .before("launch")
             .step("openLoginPage")
             .step("submitCredentials")
-            .after("close")
-            .build();
+            .after("close");
 }
 
 @Paramixel.Id("launch")
@@ -99,6 +108,6 @@ the original failure, and the framework never closes anything itself.
 
 ## Next
 
-- [Tasks](../core-concepts/actions) — the definition model.
+- [Tasks](../core-concepts/tasks) — the definition model.
 - [Lifecycle and scope](../core-concepts/elements) — phases and finalization.
 - [Quick reference](../guides/quick-reference) — the full authoring surface.

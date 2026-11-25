@@ -32,5 +32,5 @@ withheld and the run is not claimed to be cleanly finalized.
 ## Next
 
 - [Quick start](../getting-started/first-test)
-- [Tasks](../core-concepts/actions)
+- [Tasks](../core-concepts/tasks)
 - [Parallel execution](../guides/parallel-execution)

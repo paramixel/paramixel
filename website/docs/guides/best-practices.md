@@ -5,25 +5,27 @@ description: Patterns that keep definitions readable and results trustworthy.
 
 # Best Practices
 
-## One instance per environment
+## One fixture per environment
 
-Use `instance` once per environment and let nested groups inherit it. Avoid capturing shared mutable state in static
-fields when children run in parallel.
+Build the fixture once per environment in that branch's `before` slot, bind what already exists, and let nested groups
+read it from the shared scope. Avoid capturing shared mutable state in static fields when branches run in parallel.
 
 ## Name every boundary
 
-Named groups and steps are what a failing report shows first. `sequential("tests", …)` keeps a readable reporting
+Named groups and steps are what a failing report shows first. `Sequential.builder("tests")` keeps a readable reporting
 boundary without creating a scope.
 
 ## Prefer `after` over implicit cleanup
 
-`after` runs in reverse declaration order and is always attempted. Do not rely on `AutoCloseable` being closed
-implicitly; Paramixel deliberately does not do it.
+The `after` slot runs once the node has started, whatever failed, and an `after` subtree keeps running when the run is
+canceled. Compose several cleanup phases with
+`.after(Sequential.builder("cleanup").independent().step(a).step(b))`, because a sequential cleanup is `dependent()` by
+default. Do not rely on `AutoCloseable` being closed implicitly; Paramixel deliberately does not do it.
 
 ## Keep cleanup idempotent
 
 A failing body still runs finalizers. Finalizers should tolerate partial setup and be safe to run when the operation did
-not complete.
+not complete; use `Context.find` in the `after` slot for anything a failed `before` may not have stored.
 
 ## Treat retry as a policy, not a loop
 
@@ -39,6 +41,11 @@ non-quiescent result and withheld cleanup; check `result.isQuiescent()` in CI if
 
 Define every named pool, do not nest the same pool, and size pools for the resource they protect (containers, ports,
 licenses), not for CPU count.
+
+## Bind what exists, put what you create
+
+`bind` values are rendered into report files as plan parameters; `put` values are never reported. Declaring what already
+exists with `bind` is what makes a report readable without leaking runtime objects.
 
 ## Validate before running
 

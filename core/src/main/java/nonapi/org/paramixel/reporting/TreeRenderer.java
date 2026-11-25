@@ -16,6 +16,7 @@
 
 package nonapi.org.paramixel.reporting;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -24,9 +25,11 @@ import org.paramixel.api.Status;
 import org.paramixel.api.TaskResult;
 
 /**
- * Renders an immutable result tree as indented text.
+ * Renders an immutable result tree as tree-shaped text.
  *
- * <p>Every rendered line begins with the short status label at column 0; the tree indentation follows the label.
+ * <p>Each node is rendered as its name, its scheduling mode and phase qualifiers, then its outcome: the short status
+ * label, the elapsed time, the attempt history, and the reason. Ancestors and siblings are drawn with box-drawing
+ * connectors at the left margin, so the hierarchy is visible without padding status labels into a fixed column.
  *
  * <p>Two modes keep the console honest and the reports complete:
  *
@@ -51,6 +54,18 @@ final class TreeRenderer {
         /** Show every attempt, marking superseded attempts. */
         DETAIL
     }
+
+    /** The branch drawn before a child that has a later sibling. */
+    private static final String BRANCH = "├── ";
+
+    /** The branch drawn before the last child of a node. */
+    private static final String LAST_BRANCH = "└── ";
+
+    /** The continuation drawn under a node that has a later sibling. */
+    private static final String CONTINUATION = "│   ";
+
+    /** The blank continuation drawn under the last child of a node. */
+    private static final String BLANK = "    ";
 
     private TreeRenderer() {
         // Intentionally empty
@@ -88,43 +103,115 @@ final class TreeRenderer {
      */
     static List<String> render(final TaskResult root, final ConsoleSupport console, final Mode mode) {
         final var lines = new ArrayList<String>();
-        append(lines, root, 0, console, mode, null);
+        append(lines, root, "", true, true, console, mode, null);
         return lines;
     }
 
     private static void append(
             final List<String> lines,
             final TaskResult result,
-            final int depth,
+            final String prefix,
+            final boolean last,
+            final boolean root,
             final ConsoleSupport console,
             final Mode mode,
             final AttemptInfo attemptInfo) {
-        final var indent = "  ".repeat(depth);
         final var attempts = attemptsOf(result);
-        final var label = console.label(result.status());
+        final var connector = root ? "" : last ? LAST_BRANCH : BRANCH;
         final var attemptPrefix =
                 attemptInfo == null ? "" : "attempt " + attemptInfo.index() + " of " + attemptInfo.total() + " ";
         final var superseded = attemptInfo != null && attemptInfo.superseded() ? " — superseded" : "";
         final var history = historyOf(attempts);
         final var message = result.reason().map(reason -> " — " + reason).orElse("");
-        final var modeText = result.kind() == TaskResult.Kind.TASK
+        final var modeText = result.kind() == TaskResult.Kind.TASK && schedulesChildren(result)
                 ? " (" + result.mode().name().toLowerCase(Locale.ROOT) + ")"
                 : "";
-        lines.add(label + " " + indent + attemptPrefix + result.name() + modeText + superseded + history + message);
-        if (mode == Mode.CONSOLE && !attempts.isEmpty()) {
-            final var last = attempts.get(attempts.size() - 1);
-            for (TaskResult child : last.children()) {
-                append(lines, child, depth + 1, console, mode, null);
-            }
-            return;
-        }
-        final var children = result.children();
-        for (TaskResult child : children) {
+        // A subtree given to a before or after slot is rendered under its owner and labelled with that phase. Plan
+        // parameters are report-only, so they never appear on a console line.
+        final var slotText = result.slot() == TaskResult.Slot.CHILD
+                ? ""
+                : " [" + result.slot().name().toLowerCase(Locale.ROOT) + "]";
+        final var elapsed = elapsedOf(result, console);
+        lines.add(prefix
+                + connector
+                + attemptPrefix
+                + result.name()
+                + modeText
+                + slotText
+                + " "
+                + console.label(result.status())
+                + elapsed
+                + superseded
+                + history
+                + message);
+        final var childPrefix = prefix + (root ? "" : last ? BLANK : CONTINUATION);
+        final var children = visibleChildren(result, mode, attempts);
+        for (int i = 0; i < children.size(); i++) {
+            final var child = children.get(i);
             final var childInfo = child.kind() == TaskResult.Kind.ATTEMPT
                     ? new AttemptInfo(child.attemptIndex(), attempts.size(), child.attemptIndex() < attempts.size())
                     : null;
-            append(lines, child, depth + 1, console, mode, childInfo);
+            append(lines, child, childPrefix, i == children.size() - 1, false, console, mode, childInfo);
         }
+    }
+
+    /**
+     * Returns the children that the selected mode prints under a node.
+     *
+     * <p>Console output shows each occurrence once, so a retried or repeated occurrence is represented by its last
+     * attempt and the attempt nodes themselves are not printed. Detail output prints the attempt nodes.
+     *
+     * @param result the node; must not be {@code null}
+     * @param mode the rendering mode; must not be {@code null}
+     * @param attempts the attempt children of the node; must not be {@code null}
+     * @return the children to render; never {@code null}
+     */
+    private static List<TaskResult> visibleChildren(
+            final TaskResult result, final Mode mode, final List<TaskResult> attempts) {
+        if (mode == Mode.CONSOLE && !attempts.isEmpty()) {
+            return attempts.get(attempts.size() - 1).children();
+        }
+        return result.children();
+    }
+
+    /**
+     * Returns the elapsed-time suffix of one node.
+     *
+     * <p>Execution and finalization are measured on the engine's monotonic clock and clamped at zero. Their sum is the
+     * span from admission to completion for a task, which is the span a live status line reports, and the span from
+     * attempt start to completion for an attempt node. A node that never ran has neither duration, so it has no time.
+     *
+     * @param result the node; must not be {@code null}
+     * @param console the console formatting; must not be {@code null}
+     * @return the suffix, or an empty string when no duration was measured; never {@code null}
+     */
+    private static String elapsedOf(final TaskResult result, final ConsoleSupport console) {
+        final var execution = result.executionDuration();
+        final var finalization = result.finalizationDuration();
+        if (execution.isEmpty() && finalization.isEmpty()) {
+            return "";
+        }
+        final var elapsed = execution.orElse(Duration.ZERO).plus(finalization.orElse(Duration.ZERO));
+        return console.elapsed(elapsed);
+    }
+
+    /**
+     * Returns whether a result schedules child tasks.
+     *
+     * <p>A mode describes how children are scheduled, so it says nothing about a leaf task that only runs a body.
+     * Attempt nodes are history rather than structure and are looked through: a retried group still has children, and
+     * a retried leaf still has none.
+     *
+     * @param result the result to inspect; must not be {@code null}
+     * @return {@code true} when the result schedules at least one child task
+     */
+    private static boolean schedulesChildren(final TaskResult result) {
+        for (TaskResult child : result.children()) {
+            if (child.kind() == TaskResult.Kind.TASK || schedulesChildren(child)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<TaskResult> attemptsOf(final TaskResult result) {

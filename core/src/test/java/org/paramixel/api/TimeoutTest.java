@@ -17,9 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
-import static org.paramixel.api.Tasks.task;
 
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -55,7 +52,7 @@ class TimeoutTest {
     @DisplayName("TIME-01: a cooperative body is interrupted, finalizers run, and the task fails")
     void cooperativeTimeout() {
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = task("group")
+        final Task definition = Sequential.builder("group")
                 .timeout(Duration.ofMillis(100))
                 .step("body", () -> Thread.sleep(5000L), children -> children.step("child", () -> {}))
                 .after(afterCalls::incrementAndGet)
@@ -77,7 +74,7 @@ class TimeoutTest {
     void uncooperativeTimeout() {
         final CountDownLatch stuckStarted = new CountDownLatch(1);
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = sequential("instance")
+        final Task definition = Sequential.builder("instance")
                 .timeout(Duration.ofMillis(100))
                 .step("stuck", () -> {
                     stuckStarted.countDown();
@@ -109,15 +106,15 @@ class TimeoutTest {
     void queuedChildrenNeverCreateFixtures() {
         final AtomicInteger created = new AtomicInteger();
         final CountDownLatch block = new CountDownLatch(1);
-        final Task definition = task("group")
+        final Task definition = Sequential.builder("group")
                 .timeout(Duration.ofMillis(150))
                 .parallel(
                         "children",
                         Pool.named("p"),
-                        children -> children.child(sequential("first")
+                        children -> children.step(Sequential.builder("first")
                                         .before(created::incrementAndGet)
                                         .step("hold", () -> block.await(5, TimeUnit.SECONDS)))
-                                .child(sequential("second")
+                                .step(Sequential.builder("second")
                                         .before(created::incrementAndGet)
                                         .step("quick", () -> {})))
                 .build();
@@ -140,7 +137,7 @@ class TimeoutTest {
     void timeoutDuringBefore() {
         final AtomicInteger bodyCalls = new AtomicInteger();
         final AtomicInteger afterCalls = new AtomicInteger();
-        final Task definition = sequential("instance")
+        final Task definition = Sequential.builder("instance")
                 .timeout(Duration.ofMillis(100))
                 .before(() -> Thread.sleep(5000L))
                 .step("body", bodyCalls::incrementAndGet)
@@ -158,7 +155,7 @@ class TimeoutTest {
     @Test
     @DisplayName("TIME-05: the engine's own result carries its infrastructure diagnostics, independent of the runner")
     void engineResultCarriesInfrastructureDiagnostics() {
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .timeout(Duration.ofMillis(80))
                 .step("stuck", () -> {
                     final var deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(400);
@@ -203,12 +200,16 @@ class TimeoutTest {
         // The blocker blocks until released instead of sleeping for the grace period, so cancellation settles well
         // inside the shutdown grace regardless of host core count or load.
         final CountDownLatch release = new CountDownLatch(1);
-        final Task definition = parallel("root", Pool.named("p"))
-                .child(sequential("blocker").before(created::incrementAndGet).step("hold", () -> {
-                    started.countDown();
-                    release.await(60, TimeUnit.SECONDS);
-                }))
-                .child(sequential("waiter").before(created::incrementAndGet).step("quick", () -> {}))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
+                .step(Sequential.builder("blocker")
+                        .before(created::incrementAndGet)
+                        .step("hold", () -> {
+                            started.countDown();
+                            release.await(60, TimeUnit.SECONDS);
+                        }))
+                .step(Sequential.builder("waiter")
+                        .before(created::incrementAndGet)
+                        .step("quick", () -> {}))
                 .build();
 
         final var runner = Runner.builder()
@@ -237,7 +238,7 @@ class TimeoutTest {
     @DisplayName("TIME-06: grace covers only the interrupted callback, not finalizers that start after it quiesced")
     void graceDoesNotCoverFinalizersStartedAfterQuiescence() {
         final AtomicInteger afterCompleted = new AtomicInteger();
-        final Task definition = task("group")
+        final Task definition = Sequential.builder("group")
                 .timeout(Duration.ofMillis(100))
                 .step("body", () -> Thread.sleep(5000L))
                 .after(() -> {
@@ -261,7 +262,7 @@ class TimeoutTest {
     @DisplayName("TIME-07: a callback that polls Context.isCanceled() observes the timeout and quiesces")
     void pollingCallbackObservesTimeout() {
         final AtomicInteger observed = new AtomicInteger();
-        final Task definition = task("group")
+        final Task definition = Sequential.builder("group")
                 .timeout(Duration.ofMillis(100))
                 .stepWithContext("spin", (Context context) -> {
                     // Busy-polls without blocking, so only the cancellation flag can end the loop in time; the safety
@@ -292,12 +293,14 @@ class TimeoutTest {
         final AtomicInteger afterCalls = new AtomicInteger();
         final AtomicInteger released = new AtomicInteger();
         final CountDownLatch firstAttemptFailed = new CountDownLatch(1);
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .timeout(Duration.ofMillis(300))
-                .child(Tasks.sequential("fixture")
-                        .after(afterCalls::incrementAndGet)
-                        .after(() -> released.incrementAndGet())
-                        .child(Tasks.sequential("flaky")
+                .step(Sequential.builder("fixture")
+                        .after(Sequential.builder("cleanup")
+                                .independent()
+                                .step("release", () -> released.incrementAndGet())
+                                .step("count", afterCalls::incrementAndGet))
+                        .step(Sequential.builder("flaky")
                                 .retry(RetryPolicy.builder()
                                         .maxAttempts(3)
                                         .backoff(Backoff.fixed(Duration.ofSeconds(30)))
@@ -322,8 +325,8 @@ class TimeoutTest {
     @DisplayName("TIME-09: zero-delay retries keep the engine's pending-timer count balanced")
     void zeroDelayRetriesKeepTimerAccountingBalanced() throws Exception {
         // A negative pending-timer count disables the stall detection, which only fires when the count is zero.
-        final Task definition = task("root")
-                .child(Tasks.sequential("retried")
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.attempts(3))
                         .step("probe", () -> {
                             throw new IllegalStateException("always fails");
@@ -357,7 +360,7 @@ class TimeoutTest {
     void timeoutDoesNotSpanRetryDelay() {
         final AtomicInteger attempts = new AtomicInteger();
         // Each attempt restarts the deadline, so the delay between attempts must not be charged to either attempt.
-        final Task definition = task("flaky")
+        final Task definition = Sequential.builder("flaky")
                 .timeout(Duration.ofMillis(200))
                 .retry(RetryPolicy.builder()
                         .maxAttempts(2)
@@ -386,9 +389,9 @@ class TimeoutTest {
         final AtomicInteger quickCalls = new AtomicInteger();
         // One worker: the busy step occupies it, so the timed-out task's first job waits in the ready queue and has
         // never started when the timeout and the shutdown grace expire.
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .step("busy", () -> Thread.sleep(1500L))
-                .child(sequential("queued")
+                .step(Sequential.builder("queued")
                         .before(created::incrementAndGet)
                         .timeout(Duration.ofMillis(100))
                         .step("quick", quickCalls::incrementAndGet))

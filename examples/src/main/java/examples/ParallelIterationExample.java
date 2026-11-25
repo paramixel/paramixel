@@ -17,14 +17,14 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -65,15 +65,19 @@ public class ParallelIterationExample {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         resetCounts();
-        final var root = parallel(ParallelIterationExample.class, "ParallelIterationExample", Pool.named("methods"));
+        final var root =
+                Parallel.builder(ParallelIterationExample.class, "ParallelIterationExample", Pool.named("methods"));
         for (var i = 0; i < ARGUMENT_COUNT; i++) {
             final var value = "string-" + i;
-            root.child(sequential(value)
+            root.step(Sequential.builder(value)
                     .before(ID_BEFORE)
-                    .child(sequential("tests").step(ID_TEST).step(ID_TEST).step(ID_TEST))
+                    .step(Sequential.builder("tests")
+                            .step(ID_TEST)
+                            .step(ID_TEST)
+                            .step(ID_TEST))
                     .after(ID_AFTER));
         }
         return root.after(ID_VALIDATE).build();

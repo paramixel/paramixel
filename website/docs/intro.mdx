@@ -10,22 +10,20 @@ Paramixel turns expensive Java integration tests into **immutable task definitio
 runs, executed with bounded concurrency, and reported from a single immutable result.
 
 ```java
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 public class IntroSuite {
 
     private static final String ENVIRONMENT = "environment";
     private static final String FIXTURE = "fixture";
 
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        final var root = parallel(IntroSuite.class, "Environments", Pool.named("environments"));
+        final var root = Parallel.builder(IntroSuite.class, "Environments", Pool.named("environments"));
         for (final var environment : environments) {
-            root.child(sequential(environment.name())
+            root.step(Sequential.builder(environment.name())
                     .bind(ENVIRONMENT, environment)
                     .before("start")
-                    .child(sequential("checks").step("health").step("metrics"))
+                    .step(Sequential.builder("checks").step("health").step("metrics"))
                     .after("stop"));
         }
         return root.build();
@@ -60,6 +58,6 @@ inherits it.
 
 - [Quick start](getting-started/first-test)
 - [Core concepts](core-concepts)
-- [Tasks](core-concepts/actions)
+- [Tasks](core-concepts/tasks)
 - [Parallel execution](guides/parallel-execution)
 - [Migrating from 6.x](guides/migration-6-to-7)

@@ -83,7 +83,7 @@ public final class Launcher {
     private static void printUsage() {
         System.out.println("Usage: paramixel [--help]");
         System.out.println();
-        System.out.println("Discovers and executes every @Paramixel.Factory on the classpath.");
+        System.out.println("Discovers and executes every @Paramixel.TaskFactory on the classpath.");
         System.out.println("Configuration keys are read from paramixel.properties and JVM system properties.");
     }
 }

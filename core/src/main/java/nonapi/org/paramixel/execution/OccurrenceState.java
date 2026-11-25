@@ -208,6 +208,12 @@ final class OccurrenceState {
         for (CompiledOccurrence child : compiled.children()) {
             fresh.children.add(new OccurrenceState(engine, child, this, Instant.now(), false));
         }
+        if (compiled.beforePhase() != null) {
+            fresh.beforeChild = new OccurrenceState(engine, compiled.beforePhase(), this, Instant.now(), false);
+        }
+        if (compiled.afterPhase() != null) {
+            fresh.afterChild = new OccurrenceState(engine, compiled.afterPhase(), this, Instant.now(), false);
+        }
         final var now = Instant.now();
         fresh.startedAt = now;
         fresh.startNanos = System.nanoTime();
@@ -215,12 +221,6 @@ final class OccurrenceState {
             startedAt = now;
         }
         attempt = fresh;
-        final var scope = scopeAttempt();
-        if (scope != null) {
-            for (final var binding : compiled.task().bindings().entrySet()) {
-                scope.context.put(binding.getKey(), binding.getValue());
-            }
-        }
         return fresh;
     }
 
@@ -237,14 +237,19 @@ final class OccurrenceState {
      * Returns whether this occurrence owns a context scope.
      *
      * <p>A scope is created at the run root, at every direct child of a {@code parallel} group, and at every task that
-     * carries {@code retry} or {@code repeat}. Ownership is a static property of the tree, so the compiler and the
-     * runtime cannot disagree about it.
+     * carries {@code retry} or {@code repeat}. A {@code before} or {@code after} subtree never owns a scope. Ownership
+     * is a static property of the tree, so the compiler and the runtime cannot disagree about it.
      *
      * @return {@code true} when this occurrence owns a scope
      */
     boolean isScopeOwner() {
         if (parent == null) {
             return true;
+        }
+        if (compiled.slot() != CompiledOccurrence.PhaseSlot.CHILD) {
+            // A before or after subtree belongs to its owner's sequential chain: it must read and write the owner's
+            // scope even when the owner is parallel, whose ordinary direct children each own a scope of their own.
+            return false;
         }
         final var task = compiled.task();
         return parent.compiled.task().mode() == ExecutionMode.PARALLEL
@@ -282,8 +287,9 @@ final class OccurrenceState {
      * @return the value, or {@code null}
      */
     Object findContextEntry(final String name) {
-        var current = this;
-        while (current != null) {
+        // A runtime entry wins over a plan parameter of the same name, so a hook can override a bound value for the
+        // rest of its scope and Context.remove(name) reveals the binding again.
+        for (var current = this; current != null; current = current.parent) {
             final var candidate = current.attempt;
             if (candidate != null) {
                 final var value = candidate.context.get(name);
@@ -291,7 +297,14 @@ final class OccurrenceState {
                     return value;
                 }
             }
-            current = current.parent;
+        }
+        // Bindings are read from the immutable plan along the occurrence chain, nearest first, so a descendant's
+        // binding shadows an ancestor's only inside its own subtree and never leaks to a sibling.
+        for (var current = this; current != null; current = current.parent) {
+            final var value = current.compiled.task().bindings().get(name);
+            if (value != null) {
+                return value;
+            }
         }
         return null;
     }
@@ -334,6 +347,18 @@ final class OccurrenceState {
         final List<Failure> failures = new ArrayList<>();
 
         /**
+         * The occurrence of this attempt's {@code before} subtree, or {@code null} when the slot is absent or holds a
+         * hook.
+         */
+        OccurrenceState beforeChild;
+
+        /**
+         * The occurrence of this attempt's {@code after} subtree, or {@code null} when the slot is absent or holds a
+         * hook.
+         */
+        OccurrenceState afterChild;
+
+        /**
          * The named context entries of the scope this attempt owns.
          */
         final ConcurrentHashMap<String, Object> context = new ConcurrentHashMap<>();
@@ -347,9 +372,6 @@ final class OccurrenceState {
         Status bodyStatus;
         Status conditionStatus;
         String reason;
-        int beforeIndex;
-        int beforeFailedAtIndex = -1;
-        int afterIndex;
         int childCursor;
         Status attemptStatus;
         Instant startedAt;

@@ -16,6 +16,7 @@
 
 package nonapi.org.paramixel.reporting;
 
+import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -175,6 +176,19 @@ final class ConsoleSupport {
      */
     String inlineLabel(final Status status) {
         return label(status);
+    }
+
+    /**
+     * Formats an elapsed duration for a status or summary-tree line.
+     *
+     * <p>Per-line timing is whole milliseconds, matching every status line. The compact hour/minute/second form is
+     * reserved for the run footer and totals, so the two forms cannot drift apart as output changes.
+     *
+     * @param duration the elapsed duration; must not be {@code null}
+     * @return the elapsed-time suffix, including its leading space; never {@code null}
+     */
+    String elapsed(final Duration duration) {
+        return " (" + duration.toMillis() + " ms)";
     }
 
     /**

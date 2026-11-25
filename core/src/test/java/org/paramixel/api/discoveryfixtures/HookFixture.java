@@ -16,10 +16,9 @@
 
 package org.paramixel.api.discoveryfixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -44,7 +43,7 @@ public final class HookFixture {
      */
     @Paramixel.BeforeAll
     public static Task beforeAll() {
-        return sequential(HookFixture.class, "beforeAll")
+        return Sequential.builder(HookFixture.class, "beforeAll")
                 .bind(HOOK, "beforeAll")
                 .step("run")
                 .build();
@@ -57,7 +56,7 @@ public final class HookFixture {
      */
     @Paramixel.AfterAll
     public static Task afterAll() {
-        return sequential(HookFixture.class, "afterAll")
+        return Sequential.builder(HookFixture.class, "afterAll")
                 .bind(HOOK, "afterAll")
                 .step("run")
                 .build();
@@ -73,7 +72,7 @@ public final class HookFixture {
         if (!DiscoveryFixtures.failAfterAll) {
             return null;
         }
-        return sequential(HookFixture.class, "failingAfterAll")
+        return Sequential.builder(HookFixture.class, "failingAfterAll")
                 .bind(HOOK, "failingAfterAll")
                 .step("run")
                 .build();

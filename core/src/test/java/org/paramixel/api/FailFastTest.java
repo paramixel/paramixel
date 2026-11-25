@@ -62,20 +62,20 @@ class FailFastTest {
     }
 
     /**
-     * Returns the discovered factory group: {@code Paramixel > run > actions}.
+     * Returns the discovered factory group: {@code Paramixel > run > tasks}.
      *
      * @param result a discovery run result
-     * @return the actions group
+     * @return the tasks group
      */
-    private static TaskResult actions(final Result result) {
+    private static TaskResult tasks(final Result result) {
         return result.root().orElseThrow().children().get(0).children().stream()
-                .filter(child -> child.name().equals("actions"))
+                .filter(child -> child.name().equals("tasks"))
                 .findFirst()
                 .orElseThrow();
     }
 
     private static TaskResult factory(final Result result, final String name) {
-        return actions(result).children().stream()
+        return tasks(result).children().stream()
                 .filter(child -> child.name().equals(name))
                 .findFirst()
                 .orElseThrow();

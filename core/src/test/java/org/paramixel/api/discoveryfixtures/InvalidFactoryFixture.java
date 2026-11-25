@@ -32,7 +32,7 @@ public final class InvalidFactoryFixture {
      *
      * @return a string
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static String factory() {
         return "not a task";
     }

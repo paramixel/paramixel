@@ -16,6 +16,7 @@
 
 package nonapi.org.paramixel.compiler;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.paramixel.api.ExecutionMode;
@@ -26,12 +27,33 @@ import org.paramixel.api.Task;
  * One compiled occurrence of a {@link Task}.
  *
  * <p>A definition can be included several times in one plan; the compiler materializes a distinct {@code
- * CompiledOccurrence} per inclusion, with a distinct occurrence identifier and its own binding slot, so per-run state
- * never keys on user-provided object identity.
+ * CompiledOccurrence} per inclusion, with a distinct occurrence identifier and its own scope, so per-run state never
+ * keys on user-provided object identity.
  *
- * <p>Everything here is immutable and safe to read concurrently. No execution state and no fixture is stored.
+ * <p>An occurrence also carries up to two <em>phase</em> occurrences: the subtree given to its {@code before} slot and
+ * the subtree given to its {@code after} slot. They are occurrences, not children: the runtime admits them in the
+ * {@code BEFORE} and {@code AFTER} stages, they appear under the owning occurrence in the result tree, and they never
+ * take part in the children phase. A hook slot is not an occurrence — it stays a callback and is reported as a phase of
+ * its owner.
+ *
+ * <p>Everything here is immutable and safe to read concurrently. No execution state and no runtime value is stored.
  */
 public final class CompiledOccurrence {
+
+    /**
+     * Where an occurrence sits in its owner's lifecycle.
+     */
+    public enum PhaseSlot {
+
+        /** An ordinary child of the owner. */
+        CHILD,
+
+        /** The {@code before} subtree of the owner. */
+        BEFORE,
+
+        /** The {@code after} subtree of the owner. */
+        AFTER
+    }
 
     private final String id;
     private final String definitionId;
@@ -46,15 +68,20 @@ public final class CompiledOccurrence {
     private final int depth;
     private final boolean failFastScope;
     private final Long shuffleSeed;
+    private final PhaseSlot slot;
     private final List<String> executionOrder;
     private final List<CompiledOccurrence> children;
+    private final CompiledOccurrence beforePhase;
+    private final CompiledOccurrence afterPhase;
 
     CompiledOccurrence(
             final Task task,
             final Identity identity,
             final Scheduling scheduling,
             final List<String> executionOrder,
-            final List<CompiledOccurrence> children) {
+            final List<CompiledOccurrence> children,
+            final CompiledOccurrence beforePhase,
+            final CompiledOccurrence afterPhase) {
         this.task = Objects.requireNonNull(task, "task is null");
         Objects.requireNonNull(identity, "identity is null");
         Objects.requireNonNull(scheduling, "scheduling is null");
@@ -70,8 +97,11 @@ public final class CompiledOccurrence {
         this.depth = scheduling.depth();
         this.failFastScope = scheduling.failFastScope();
         this.shuffleSeed = task.shuffleSeed().orElse(null);
+        this.slot = Objects.requireNonNull(scheduling.slot(), "slot is null");
         this.executionOrder = List.copyOf(executionOrder);
         this.children = List.copyOf(children);
+        this.beforePhase = beforePhase;
+        this.afterPhase = afterPhase;
     }
 
     /**
@@ -91,8 +121,9 @@ public final class CompiledOccurrence {
      * @param preOrderIndex the depth-first pre-order index
      * @param depth the nesting depth
      * @param failFastScope whether the occurrence honors the run-level fail-fast policy
+     * @param slot the occurrence's place in its owner's lifecycle
      */
-    record Scheduling(int budget, int preOrderIndex, int depth, boolean failFastScope) {}
+    record Scheduling(int budget, int preOrderIndex, int depth, boolean failFastScope, PhaseSlot slot) {}
 
     /**
      * Returns the occurrence identifier, derived from the structural ordinal path.
@@ -217,6 +248,15 @@ public final class CompiledOccurrence {
     }
 
     /**
+     * Returns where this occurrence sits in its owner's lifecycle.
+     *
+     * @return the slot; never {@code null}
+     */
+    public PhaseSlot slot() {
+        return slot;
+    }
+
+    /**
      * Returns the direct child names in effective execution order.
      *
      * @return the immutable names; never {@code null}
@@ -228,10 +268,46 @@ public final class CompiledOccurrence {
     /**
      * Returns the direct child occurrences in effective execution order.
      *
+     * <p>Phase subtrees are not children; use {@link #beforePhase()} and {@link #afterPhase()}.
+     *
      * @return the immutable children; never {@code null}
      */
     public List<CompiledOccurrence> children() {
         return children;
+    }
+
+    /**
+     * Returns the compiled {@code before} subtree of this occurrence, if the node declares one.
+     *
+     * @return the before occurrence, or {@code null} when the slot is absent or holds a hook
+     */
+    public CompiledOccurrence beforePhase() {
+        return beforePhase;
+    }
+
+    /**
+     * Returns the compiled {@code after} subtree of this occurrence, if the node declares one.
+     *
+     * @return the after occurrence, or {@code null} when the slot is absent or holds a hook
+     */
+    public CompiledOccurrence afterPhase() {
+        return afterPhase;
+    }
+
+    /**
+     * Returns every phase occurrence of this occurrence, {@code before} first.
+     *
+     * @return the immutable phase occurrences; never {@code null}
+     */
+    public List<CompiledOccurrence> phaseOccurrences() {
+        final var phases = new ArrayList<CompiledOccurrence>(2);
+        if (beforePhase != null) {
+            phases.add(beforePhase);
+        }
+        if (afterPhase != null) {
+            phases.add(afterPhase);
+        }
+        return phases;
     }
 
     @Override

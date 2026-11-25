@@ -18,7 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -45,8 +44,8 @@ class RetryRepeatTest {
     @DisplayName("FAIL-12: a retry that eventually passes reports the task passed and keeps attempts")
     void retryPassesAfterFailures() {
         final AtomicInteger attempts = new AtomicInteger();
-        final Task definition = sequential("root")
-                .child(sequential("retried")
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.builder()
                                 .maxAttempts(3)
                                 .backoff(Backoff.fixed(Duration.ofMillis(5)))
@@ -75,11 +74,13 @@ class RetryRepeatTest {
     @DisplayName("FAIL-13: retry exhaustion keeps every attempt and reports failure")
     void retryExhaustion() {
         final AtomicInteger attempts = new AtomicInteger();
-        final Task definition = sequential("root")
-                .child(sequential("retried").retry(RetryPolicy.attempts(3)).step("probe", () -> {
-                    attempts.incrementAndGet();
-                    throw new IllegalStateException("always fails");
-                }))
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
+                        .retry(RetryPolicy.attempts(3))
+                        .step("probe", () -> {
+                            attempts.incrementAndGet();
+                            throw new IllegalStateException("always fails");
+                        }))
                 .build();
 
         final var result = run(definition);
@@ -96,7 +97,7 @@ class RetryRepeatTest {
     void attemptsDoNotOverlap() {
         final AtomicInteger running = new AtomicInteger();
         final AtomicInteger maxRunning = new AtomicInteger();
-        final Task definition = sequential("retried")
+        final Task definition = Sequential.builder("retried")
                 .retry(RetryPolicy.attempts(3))
                 .step("probe", () -> {
                     final var current = running.incrementAndGet();
@@ -119,8 +120,8 @@ class RetryRepeatTest {
     @DisplayName("a business failure is retried but cancellation is never retried")
     void cancellationIsNotRetried() {
         final AtomicInteger attempts = new AtomicInteger();
-        final Task definition = sequential("root")
-                .child(sequential("canceled")
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("canceled")
                         .retry(RetryPolicy.builder()
                                 .maxAttempts(3)
                                 .retryOn(Status.Kind.FAILED, Status.Kind.SKIPPED)
@@ -138,7 +139,7 @@ class RetryRepeatTest {
     @DisplayName("FAIL-15: a throwing repeat until-predicate fails the task instead of escaping the run")
     void throwingUntilPredicateFailsTask() {
         final AtomicInteger iterations = new AtomicInteger();
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .repeat(
                         "repeated",
                         repeat -> repeat.maxIterations(3)
@@ -163,7 +164,7 @@ class RetryRepeatTest {
     @DisplayName("FAIL-16: a repeat until-predicate runs on a worker thread and stops the repetition")
     void untilPredicateRunsOnWorkerThread() {
         final List<String> threads = Collections.synchronizedList(new ArrayList<>());
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .repeat(
                         "repeated",
                         repeat -> repeat.maxIterations(5)
@@ -186,7 +187,7 @@ class RetryRepeatTest {
     @DisplayName("FAIL-14: repeat untilPassed stops on the first passing iteration")
     void repeatUntilPassed() {
         final AtomicInteger iterations = new AtomicInteger();
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .repeat(
                         "poll",
                         repeat -> repeat.maxIterations(5)
@@ -213,7 +214,7 @@ class RetryRepeatTest {
     @DisplayName("repeat without a stop policy runs every iteration and aggregates severity")
     void repeatRunsAllIterations() {
         final AtomicInteger iterations = new AtomicInteger();
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .repeat(
                         "replay",
                         repeat -> repeat.maxIterations(3).step("probe", () -> {
@@ -292,8 +293,8 @@ class RetryRepeatTest {
     @Test
     @DisplayName("a false condition on one attempt does not leave its skip reason on a later passing attempt")
     void retryDoesNotKeepStaleConditionReason() {
-        final Task definition = sequential("root")
-                .child(sequential("retried")
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.builder()
                                 .maxAttempts(2)
                                 .retryOn(Status.Kind.SKIPPED)
@@ -317,8 +318,8 @@ class RetryRepeatTest {
     @Test
     @DisplayName("a retry that fails after a false condition reports no skip reason")
     void retryFailureAfterFalseConditionHasNoSkipReason() {
-        final Task definition = sequential("root")
-                .child(sequential("retried")
+        final Task definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.builder()
                                 .maxAttempts(2)
                                 .retryOn(Status.Kind.FAILED, Status.Kind.SKIPPED)
@@ -339,7 +340,7 @@ class RetryRepeatTest {
     @Test
     @DisplayName("a repeat whose earlier iteration decides the outcome keeps that iteration's skip reason")
     void repeatKeepsReasonOfDecidingIteration() {
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .repeat(
                         "repeated",
                         repeat -> repeat.maxIterations(2)

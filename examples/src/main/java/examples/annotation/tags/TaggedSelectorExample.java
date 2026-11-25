@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Demonstrates building a {@link Selector} that filters action factories by tag using
+ * Demonstrates building a {@link Selector} that filters task factories by tag using
  * a regular expression match.
  */
 public final class TaggedSelectorExample {
@@ -30,7 +30,7 @@ public final class TaggedSelectorExample {
     }
 
     /**
-     * Creates a selector that selects action factories in this package tagged
+     * Creates a selector that selects task factories in this package tagged
      * with exactly {@code "smoke"}.
      *
      * @return a tag-filtered selector

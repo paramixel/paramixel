@@ -85,9 +85,9 @@ final class SafeListener implements Listener {
         guard("onRunCompleted", () -> delegate.onRunCompleted(result));
     }
 
-    private void guard(final String callback, final Runnable action) {
+    private void guard(final String callback, final Runnable body) {
         try {
-            action.run();
+            body.run();
         } catch (Throwable t) {
             UnrecoverableErrors.rethrowIfUnrecoverable(t);
             record(callback, t);

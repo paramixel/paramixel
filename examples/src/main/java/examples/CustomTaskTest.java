@@ -17,11 +17,11 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
 
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -31,7 +31,7 @@ import org.paramixel.api.Task;
  * {@code validate} reads, with no fixture object and no captured variable in between. The value is dropped when the
  * scope ends — the framework does not close anything, it just stops holding the reference.
  */
-public class CustomActionTest {
+public class CustomTaskTest {
 
     private static final String ID_SET_VALUE = "setValue";
     private static final String ID_VALIDATE = "validate";
@@ -52,9 +52,9 @@ public class CustomActionTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return sequential(CustomActionTest.class, "CustomActionTest")
+        return Sequential.builder(CustomTaskTest.class, "CustomTaskTest")
                 .step(ID_SET_VALUE)
                 .step(ID_VALIDATE)
                 .build();

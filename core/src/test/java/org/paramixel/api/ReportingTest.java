@@ -18,7 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.task;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -51,7 +50,7 @@ class ReportingTest {
     Path tempDir;
 
     private static Task definition() {
-        return task("root")
+        return Sequential.builder("root")
                 .step("pass", () -> {})
                 .step(
                         "fail",
@@ -88,7 +87,7 @@ class ReportingTest {
     void jsonReport() throws Exception {
         final var content = Files.readString(report("report.json"));
 
-        assertThat(content).contains("\"schemaVersion\": 1");
+        assertThat(content).contains("\"schemaVersion\": 2");
         assertThat(content).contains("\"status\": \"FAILED\"");
         assertThat(content).contains("\"occurrenceId\": \"0\"");
         assertThat(content).contains("\"path\": \"root > fail\"");
@@ -114,7 +113,7 @@ class ReportingTest {
         final var name = "task\twith\na\rname";
         final var reason = "reason\r\nsecond\tline";
         final var file = tempDir.resolve("attributes.xml");
-        final var definition = task(name)
+        final var definition = Sequential.builder(name)
                 .before(() -> {
                     throw new IllegalStateException(reason);
                 })
@@ -143,7 +142,7 @@ class ReportingTest {
         Runner.builder()
                 .listener(ReportFileListenerFactory.listener(file))
                 .build()
-                .run(task(name).step("work", () -> {}).build());
+                .run(Sequential.builder(name).step("work", () -> {}).build());
         final var document = DocumentBuilderFactory.newInstance()
                 .newDocumentBuilder()
                 .parse(new ByteArrayInputStream(Files.readAllBytes(file)));
@@ -167,7 +166,12 @@ class ReportingTest {
         final var content = Files.readString(report("report.log"));
 
         assertThat(content).contains("Paramixel run");
-        assertThat(content.lines().anyMatch(line -> line.matches("^PASS +pass \\(sequential\\)$")))
+        assertThat(content.lines().anyMatch(line -> line.matches("^├── pass PASS \\(\\d+ ms\\)$")))
+                .isTrue();
+        assertThat(content.lines()
+                        .anyMatch(line -> line.matches("^└── fail \\(sequential\\) FAIL \\(\\d+ ms\\)( — .*)?$")))
+                .isTrue();
+        assertThat(content.lines().anyMatch(line -> line.matches("^    └── nested SKIP( — .*)?$")))
                 .isTrue();
     }
 
@@ -191,8 +195,8 @@ class ReportingTest {
     @DisplayName("detailed reports keep superseded attempts with explicit markers")
     void detailedReportsKeepSupersededAttempts() throws Exception {
         final var attempts = new AtomicInteger();
-        final Supplier<Task> definition = () -> task("root")
-                .child(Tasks.sequential("retried")
+        final Supplier<Task> definition = () -> Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.attempts(3))
                         .step("probe", () -> {
                             if (attempts.incrementAndGet() < 3) {
@@ -206,6 +210,7 @@ class ReportingTest {
 
         final var text = Files.readString(textFile);
         assertThat(text).contains("3 attempts, 2 failed");
+        assertThat(text).contains("retried (sequential)");
         assertThat(text).contains("attempt 1 of 3");
         assertThat(text).contains("superseded");
         assertThat(text).contains("attempt 3 of 3");
@@ -223,7 +228,7 @@ class ReportingTest {
     @Test
     @DisplayName("the JSON report gives a retried root task its attempt total")
     void jsonReportsRootAttemptTotal() throws Exception {
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .retry(RetryPolicy.attempts(2))
                 .step("fail", () -> {
                     throw new IllegalStateException("boom");
@@ -270,7 +275,7 @@ class ReportingTest {
     @Test
     @DisplayName("the XML report stays well-formed when names and messages contain control characters")
     void xmlReportReplacesIllegalControlCharacters() throws Exception {
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .step("bell\u0007step", () -> {
                     throw new IllegalStateException("bad \u0001 byte and \u001b[31mANSI\u001b[0m color");
                 })
@@ -292,7 +297,7 @@ class ReportingTest {
     @Test
     @DisplayName("a report is still written when a failure message contains an unpaired surrogate")
     void reportWrittenDespiteUnpairedSurrogate() throws Exception {
-        final Task definition = task("root")
+        final Task definition = Sequential.builder("root")
                 .step("truncated", () -> {
                     // A message cut in the middle of a surrogate pair, as naive truncation of an emoji produces.
                     throw new IllegalStateException("cut \uD83D");
@@ -311,7 +316,7 @@ class ReportingTest {
     }
 
     private static Task nonQuiescentDefinition() {
-        return task("root")
+        return Sequential.builder("root")
                 .timeout(Duration.ofMillis(80))
                 .step("stuck", () -> {
                     final var deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(400);

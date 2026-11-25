@@ -17,12 +17,12 @@
 package examples.fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -57,14 +57,14 @@ public final class MetricsTest {
      *
      * @return the definition
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        final var root = parallel(MetricsTest.class, "MetricsTest", Pool.named("docker"));
+        final var root = Parallel.builder(MetricsTest.class, "MetricsTest", Pool.named("docker"));
         for (final var environment : Environment.supported()) {
-            root.child(sequential(environment.name())
+            root.step(Sequential.builder(environment.name())
                     .bind(ENVIRONMENT, environment)
                     .before(ID_SET_UP)
-                    .child(sequential("tests")
+                    .step(Sequential.builder("tests")
                             .step(ID_TEST_HEALTHY)
                             .step(ID_TEST_TEXT_METRICS)
                             .step(ID_TEST_NAMED_METRICS)

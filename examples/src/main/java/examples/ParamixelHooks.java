@@ -18,8 +18,8 @@ package examples;
 
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * Demonstrates run-level before and after hooks.
@@ -47,7 +47,7 @@ public final class ParamixelHooks {
      */
     @Paramixel.BeforeAll
     public static Task beforeAll() {
-        return Tasks.sequential(ParamixelHooks.class, ParamixelHooks.class.getSimpleName() + ".beforeAll")
+        return Sequential.builder(ParamixelHooks.class, ParamixelHooks.class.getSimpleName() + ".beforeAll")
                 .step(ID_RUN_BEFORE)
                 .build();
     }
@@ -59,7 +59,7 @@ public final class ParamixelHooks {
      */
     @Paramixel.AfterAll
     public static Task afterAll() {
-        return Tasks.sequential(ParamixelHooks.class, ParamixelHooks.class.getSimpleName() + ".afterAll")
+        return Sequential.builder(ParamixelHooks.class, ParamixelHooks.class.getSimpleName() + ".afterAll")
                 .step(ID_RUN_AFTER)
                 .build();
     }

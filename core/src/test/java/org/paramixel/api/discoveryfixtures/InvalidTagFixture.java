@@ -29,7 +29,7 @@ public final class InvalidTagFixture {
      *
      * @return never returns normally
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     @Paramixel.Tag(" ")
     public static Task factory() {
         throw new AssertionError("invalid factory was invoked");

@@ -120,6 +120,11 @@ public interface Context {
     /**
      * Stores a value in the context of the scope this occurrence belongs to.
      *
+     * <p>This is the runtime half of the two-way split. A value that must be created while the test runs — a started
+     * container, a client, a temporary directory — is created in a {@code before} hook and stored here. A value that
+     * already exists when the plan is built is declared with {@code bind} instead; it is then a plan parameter and
+     * appears in report files.
+     *
      * <p>A scope is created at the run root, at every direct child of a {@code parallel} group, and at every task
      * carrying {@code retry} or {@code repeat}. Sequential descendants share the nearest enclosing scope, so a value
      * stored by one step is visible to the next sibling and to the enclosing group's {@code after} hook; parallel
@@ -132,6 +137,8 @@ public interface Context {
      * <p>A write from an attempt that has already been superseded — after a timeout, a cancellation, or a hook that
      * ignored interruption — is discarded, so an abandoned callback cannot contaminate the next attempt.
      *
+     * <p>A stored value shadows a {@code bind} of the same name for the scope and everything below it.
+     *
      * @param name the entry name; must not be {@code null} or blank
      * @param value the value; must not be {@code null}
      * @throws NullPointerException if an argument is {@code null}
@@ -140,10 +147,11 @@ public interface Context {
     void put(String name, Object value);
 
     /**
-     * Removes an entry from the context of the scope this occurrence belongs to.
+     * Removes a stored entry from the context of the scope this occurrence belongs to.
      *
      * <p>Removing is independent of releasing: the framework does not close the value, and removing an entry that is
-     * not present is not an error.
+     * not present is not an error. A value declared with {@code bind} is a plan parameter rather than an entry, so it
+     * cannot be removed; it stays visible to the subtree that declared it.
      *
      * @param name the entry name; must not be {@code null}
      * @throws NullPointerException if {@code name} is {@code null}
@@ -151,7 +159,10 @@ public interface Context {
     void remove(String name);
 
     /**
-     * Returns the entry stored under {@code name} in this scope or an enclosing scope.
+     * Returns the entry named {@code name}, searching this scope, enclosing scopes, and {@code bind} declarations.
+     *
+     * <p>A value stored with {@link #put(String, Object)} takes precedence over a {@code bind} of the same name, so a
+     * hook can override a plan parameter at runtime for the rest of its scope.
      *
      * @param <T> the entry type
      * @param name the entry name; must not be {@code null}

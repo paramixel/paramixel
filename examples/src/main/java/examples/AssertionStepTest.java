@@ -17,12 +17,12 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
 import static org.paramixel.api.exception.FailException.fail;
 
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -52,9 +52,9 @@ public class AssertionStepTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return sequential(AssertionStepTest.class, "assertion-steps")
+        return Sequential.builder(AssertionStepTest.class, "assertion-steps")
                 .step(ID_ONE_EQUALS_ONE)
                 .step(ID_TWO_IS_EVEN)
                 .step(ID_ASSERTJ_STYLE)

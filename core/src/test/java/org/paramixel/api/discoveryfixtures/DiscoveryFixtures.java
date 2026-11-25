@@ -34,7 +34,7 @@ public final class DiscoveryFixtures {
     /** Whether to add an after-all hook that fails before the normal after-all hook. */
     public static volatile boolean failAfterAll;
 
-    /** An action the close-during-discovery factory runs while it is being invoked, or {@code null}. */
+    /** A task the close-during-discovery factory runs while it is being invoked, or {@code null}. */
     public static volatile Runnable factoryHook;
 
     /**

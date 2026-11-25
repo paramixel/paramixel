@@ -16,10 +16,9 @@
 
 package org.paramixel.api.discoveryfixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.SequentialBuilder;
 
 @Paramixel.Priority(10)
@@ -38,9 +37,9 @@ public final class BetaFixture {
      * @return the definition
      */
     @Paramixel.Tag("beta")
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static SequentialBuilder factory() {
-        return sequential(BetaFixture.class, "beta").tags("beta").step("run");
+        return Sequential.builder(BetaFixture.class, "beta").tags("beta").step("run");
     }
 
     /**

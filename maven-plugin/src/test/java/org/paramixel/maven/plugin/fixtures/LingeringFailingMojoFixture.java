@@ -16,13 +16,12 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -54,9 +53,9 @@ public final class LingeringFailingMojoFixture {
      *
      * @return the definition
      */
-    @Paramixel.Factory
-    public static Task action() {
-        return sequential(LingeringFailingMojoFixture.class, "lingering-fail")
+    @Paramixel.TaskFactory
+    public static Task task() {
+        return Sequential.builder(LingeringFailingMojoFixture.class, "lingering-fail")
                 .step("spawn-lingering-thread")
                 .step("fail")
                 .build();

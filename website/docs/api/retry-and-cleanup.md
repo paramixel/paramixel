@@ -10,31 +10,32 @@ description: Bounded advanced policies with distinct semantics.
 | Policy | Purpose | Stop condition |
 | --- | --- | --- |
 | `retry(RetryPolicy)` | Re-attempt a non-success outcome | Attempt limit, non-triggering status |
-| `repeat(name, …)` | Intentional replay of a subtree | `maxIterations`, `untilPassed`, predicate |
+| `Repeat.builder(name)` | Intentional replay of a subtree | `maxIterations`, `untilPassed`, predicate |
 
 A repeat `until` predicate is user code: it runs on an execution worker after each iteration, like a `when` condition.
 If it throws, the failure is recorded on that iteration, the task fails, and repetition stops.
 
 ```java
-step -> step
-    .retry(RetryPolicy.builder()
-            .maxAttempts(3)
-            .backoff(Backoff.linear(Duration.ofMillis(100)))
-            .build());
+Sequential.builder(MySuite.class, "flaky")
+        .retry(RetryPolicy.builder()
+                .maxAttempts(3)
+                .backoff(Backoff.linear(Duration.ofMillis(100)))
+                .build())
+        .step("probe");
 ```
 
 - Retry triggers default to `FAILED`, and only `FAILED` and `SKIPPED` are accepted (`RetryPolicy.RETRYABLE_KINDS`).
   `PASSED` is rejected so a passing task is never re-run, and `CANCELED` and `ABORTED` are rejected so cancellation and
   assumption failures are not retried automatically.
 - Attempts never overlap.
-- Retrying an owned `instance` task creates a fresh instance per attempt and runs its `after` callbacks between
-  attempts; retrying a nested step reuses the inherited instance.
+- A retried task owns its context scope, so an owned fixture is rebuilt per attempt: the `before` hook runs again and
+  the `after` slot runs between attempts.
 - A successful later attempt passes the task while all attempts remain visible in the result.
 
 ## Timeout
 
 ```java
-task("bounded").timeout(Duration.ofSeconds(2)).step("work", Test::work);
+Sequential.builder(MySuite.class, "bounded").timeout(Duration.ofSeconds(2)).step("work");
 ```
 
 The timeout uses a monotonic clock. On expiry the running callback is interrupted, no new work is admitted in the
@@ -44,10 +45,13 @@ code is non-zero. Paramixel does not claim it can stop arbitrary Java code.
 
 ## Cleanup
 
-`after` callbacks are the cleanup mechanism:
+The `after` slot is the cleanup mechanism:
 
-- They run in reverse declaration order and are all attempted.
-- They are not implicit destructors: a fixture implementing `AutoCloseable` is not closed unless a callback closes it.
-- A failure in one `after` callback does not prevent the others, and the original operational failure stays primary.
-- Keyed resources are released after `after`, in reverse acquisition order. If cancellation interrupts acquisition,
-  the runner stops starting new factories and releases resources acquired before acquisition stopped.
+- It runs once the node has started, whatever failed before it, and it is a single slot.
+- Several cleanup phases are composed into one subtree:
+  `.after(Sequential.builder("cleanup").independent().step(tearDownB).step(tearDownA))`. A `Sequential` cleanup subtree
+  is `dependent()` by default, so a failing cleanup step skips the later ones; `independent()` makes every step run.
+- They are not implicit destructors: a fixture implementing `AutoCloseable` is not closed unless a slot closes it.
+- The original operational failure stays primary; a cleanup failure adds to the occurrence's failures without hiding it.
+- If cancellation interrupts the run, an `after` subtree still runs: finalization is not skipped. A cleanup that hangs is
+  still interrupted, and a cleanup that ignores interruption produces a non-quiescent result.

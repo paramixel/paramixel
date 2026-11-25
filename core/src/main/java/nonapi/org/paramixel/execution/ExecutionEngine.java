@@ -40,12 +40,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import nonapi.org.paramixel.authoring.IdentifiedHook;
+import nonapi.org.paramixel.compiler.CompiledOccurrence;
 import nonapi.org.paramixel.compiler.CompiledPlan;
 import nonapi.org.paramixel.support.Throwables;
 import nonapi.org.paramixel.support.UnrecoverableErrors;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.ExecutionMode;
 import org.paramixel.api.Failure;
+import org.paramixel.api.PhaseHook;
 import org.paramixel.api.PhaseResult;
 import org.paramixel.api.Result;
 import org.paramixel.api.Status;
@@ -311,8 +313,8 @@ public final class ExecutionEngine {
         long reserve = 1;
         for (var occurrence : plan.preOrder()) {
             reserve += (long) EVENT_RESERVE_PER_OCCURRENCE
-                    + occurrence.task().before().size()
-                    + occurrence.task().after().size();
+                    + (occurrence.task().before().isPresent() ? 1 : 0)
+                    + (occurrence.task().after().isPresent() ? 1 : 0);
         }
         return reserve;
     }
@@ -513,7 +515,7 @@ public final class ExecutionEngine {
         if (state.isTerminal() || finished) {
             return;
         }
-        if (state.isCanceled()) {
+        if (state.isCanceled() && !isFinalizationWork(state)) {
             markTerminal(state, Status.canceled(reasonOr(state, "canceled")), reasonOr(state, "canceled"));
             return;
         }
@@ -615,7 +617,7 @@ public final class ExecutionEngine {
     // --------------------------------------------------------------------------------------------
 
     private void startConditionOrBefore(final OccurrenceState state) {
-        if (state.isCanceled()) {
+        if (state.isCanceled() && !isFinalizationWork(state)) {
             skipNormalWork(state);
             return;
         }
@@ -652,7 +654,7 @@ public final class ExecutionEngine {
             skipNormalWork(state);
             return;
         }
-        if (state.isCanceled()) {
+        if (state.isCanceled() && !isFinalizationWork(state)) {
             skipNormalWork(state);
             return;
         }
@@ -661,29 +663,28 @@ public final class ExecutionEngine {
 
     private void startBefore(final OccurrenceState state) {
         state.stage = OccurrenceState.Stage.BEFORE;
-        scheduleNextBefore(state);
-    }
-
-    private void scheduleNextBefore(final OccurrenceState state) {
         final var attempt = state.attempt;
-        final var callbacks = state.compiled.task().before();
-        if (attempt.beforeIndex >= callbacks.size()) {
-            startBody(state);
+        final var slot = state.compiled.task().before().orElse(null);
+        if (slot instanceof PhaseHook.Callback hook) {
+            submit(state, JobKind.BEFORE, 0, () -> {
+                hook.callback().execute(new ExecutionContextImpl(this, state, attempt.index));
+                return JobOutcome.ok();
+            });
             return;
         }
-        final var index = attempt.beforeIndex++;
-        final var callback = callbacks.get(index);
-        submit(state, JobKind.BEFORE, index, () -> {
-            callback.execute(new ExecutionContextImpl(this, state, attempt.index));
-            return JobOutcome.ok();
-        });
+        if (attempt.beforeChild != null) {
+            admit(attempt.beforeChild);
+            return;
+        }
+        startBody(state);
     }
 
     private void onBefore(final OccurrenceState state, final int index, final JobOutcome outcome) {
         final var attempt = state.attempt;
         final var status = outcome.error == null ? Status.PASSED : classify(outcome.error, state);
-        final var hooks = state.compiled.task().before();
-        final var label = hookLabel(hooks.get(index), index);
+        final var slot = state.compiled.task().before().orElse(null);
+        final var callback = slot instanceof PhaseHook.Callback hook ? hook.callback() : null;
+        final var label = callback == null ? Integer.toString(index) : hookLabel(callback, index);
         if (outcome.error != null) {
             attempt.fail("BEFORE[" + label + "]", messageFor(status, outcome.error, state), outcome.error);
         }
@@ -694,25 +695,42 @@ public final class ExecutionEngine {
                 outcome.error == null ? List.of() : List.of(lastFailure(attempt))));
         emit(state, TaskPhase.BEFORE, status, attempt.index);
         if (!status.isPassed()) {
-            attempt.beforeFailedAtIndex = index;
-            final var remaining = state.compiled.task().before();
-            for (var i = index + 1; i < remaining.size(); i++) {
-                attempt.phases.add(PhaseResult.of(
-                        TaskPhase.BEFORE,
-                        "before[" + hookLabel(remaining.get(i), i) + "]",
-                        Status.skipped("a previous before callback did not pass"),
-                        List.of()));
-            }
-            attempt.beforeIndex = remaining.size();
             finishUnstartedChildren(state, "before did not pass");
             goAfter(state);
             return;
         }
-        if (state.isCanceled()) {
+        if (state.isCanceled() && !isFinalizationWork(state)) {
             skipNormalWork(state);
             return;
         }
-        scheduleNextBefore(state);
+        startBody(state);
+    }
+
+    /**
+     * Handles the completion of the {@code before} subtree of an occurrence.
+     *
+     * <p>A subtree failure is a {@code before} failure: the node's steps are skipped and its {@code after} slot still
+     * runs. A subtree that went through the {@code skipNormalWork} path — cancellation or timeout — is reported with
+     * its own terminal status and every step stays skipped.
+     *
+     * @param parent the owning occurrence
+     * @param child the completed before subtree
+     */
+    private void onBeforePhaseCompleted(final OccurrenceState parent, final OccurrenceState child) {
+        final var attempt = parent.attempt;
+        final var status = child.status;
+        attempt.phases.add(PhaseResult.of(TaskPhase.BEFORE, "before[" + child.name + "]", status, List.of()));
+        emit(parent, TaskPhase.BEFORE, status, attempt.index);
+        if (!status.isPassed()) {
+            finishUnstartedChildren(parent, parent.isCanceled() ? reasonOr(parent, "canceled") : "before did not pass");
+            goAfter(parent);
+            return;
+        }
+        if ((parent.isCanceled() || parent.timedOut) && !isFinalizationWork(parent)) {
+            skipNormalWork(parent);
+            return;
+        }
+        startBody(parent);
     }
 
     private void startBody(final OccurrenceState state) {
@@ -749,7 +767,7 @@ public final class ExecutionEngine {
             goAfter(state);
             return;
         }
-        if (state.isCanceled()) {
+        if (state.isCanceled() && !isFinalizationWork(state)) {
             skipNormalWork(state);
             return;
         }
@@ -774,14 +792,25 @@ public final class ExecutionEngine {
 
     private void onChildCompleted(final OccurrenceState child) {
         final var parent = child.parent;
-        if (parent == null || parent.isTerminal() || parent.stage != OccurrenceState.Stage.CHILDREN) {
+        if (parent == null || parent.isTerminal()) {
+            return;
+        }
+        if (child.compiled.slot() == CompiledOccurrence.PhaseSlot.BEFORE) {
+            onBeforePhaseCompleted(parent, child);
+            return;
+        }
+        if (child.compiled.slot() == CompiledOccurrence.PhaseSlot.AFTER) {
+            onAfterPhaseCompleted(parent, child);
+            return;
+        }
+        if (parent.stage != OccurrenceState.Stage.CHILDREN) {
             return;
         }
         final var attempt = parent.attempt;
         if (!child.status.isPassed()) {
             parent.status = Status.RUNNING;
         }
-        if (parent.isCanceled()) {
+        if (parent.isCanceled() && !isFinalizationWork(parent)) {
             // A canceled parent never admits another child. Children that already started finish their own
             // finalizers, so the children phase completes only once every child is terminal, whichever child
             // reported last.
@@ -866,31 +895,29 @@ public final class ExecutionEngine {
     private void goAfter(final OccurrenceState state) {
         final var attempt = state.attempt;
         state.stage = OccurrenceState.Stage.AFTER;
-        attempt.afterIndex = state.compiled.task().after().size() - 1;
         attempt.finalizationStartNanos = System.nanoTime();
         state.finalizationStartNanos = attempt.finalizationStartNanos;
-        scheduleNextAfter(state);
-    }
-
-    private void scheduleNextAfter(final OccurrenceState state) {
-        final var attempt = state.attempt;
-        final var callbacks = state.compiled.task().after();
-        if (attempt.afterIndex < 0) {
-            finishAttempt(state);
+        final var slot = state.compiled.task().after().orElse(null);
+        if (slot instanceof PhaseHook.Callback hook) {
+            submit(state, JobKind.AFTER, 0, () -> {
+                hook.callback().execute(new ExecutionContextImpl(this, state, attempt.index));
+                return JobOutcome.ok();
+            });
             return;
         }
-        final var index = attempt.afterIndex--;
-        final var callback = callbacks.get(index);
-        submit(state, JobKind.AFTER, index, () -> {
-            callback.execute(new ExecutionContextImpl(this, state, attempt.index));
-            return JobOutcome.ok();
-        });
+        if (attempt.afterChild != null) {
+            admit(attempt.afterChild);
+            return;
+        }
+        finishAttempt(state);
     }
 
     private void onAfter(final OccurrenceState state, final int index, final JobOutcome outcome) {
         final var attempt = state.attempt;
         final var status = outcome.error == null ? Status.PASSED : classify(outcome.error, state);
-        final var label = hookLabel(state.compiled.task().after().get(index), index);
+        final var slot = state.compiled.task().after().orElse(null);
+        final var callback = slot instanceof PhaseHook.Callback hook ? hook.callback() : null;
+        final var label = callback == null ? Integer.toString(index) : hookLabel(callback, index);
         if (outcome.error != null) {
             attempt.fail("AFTER[" + label + "]", messageFor(status, outcome.error, state), outcome.error);
         }
@@ -900,7 +927,21 @@ public final class ExecutionEngine {
                 status,
                 outcome.error == null ? List.of() : List.of(lastFailure(attempt))));
         emit(state, TaskPhase.AFTER, status, attempt.index);
-        scheduleNextAfter(state);
+        finishAttempt(state);
+    }
+
+    /**
+     * Handles the completion of the {@code after} subtree of an occurrence.
+     *
+     * @param parent the owning occurrence
+     * @param child the completed after subtree
+     */
+    private void onAfterPhaseCompleted(final OccurrenceState parent, final OccurrenceState child) {
+        final var attempt = parent.attempt;
+        final var status = child.status;
+        attempt.phases.add(PhaseResult.of(TaskPhase.AFTER, "after[" + child.name + "]", status, List.of()));
+        emit(parent, TaskPhase.AFTER, status, attempt.index);
+        finishAttempt(parent);
     }
 
     /**
@@ -1062,7 +1103,7 @@ public final class ExecutionEngine {
                     + state.compiled.task().timeout().map(Duration::toString).orElse("the configured deadline"));
             return Status.mostSevere(List.of(timeout, aggregate));
         }
-        if (state.isCanceled()) {
+        if (state.isCanceled() && !isFinalizationWork(state)) {
             return Status.mostSevere(List.of(Status.canceled(reasonOr(state, "canceled")), aggregate));
         }
         final var repeat = state.compiled.task().repeat().orElse(null);
@@ -1102,11 +1143,14 @@ public final class ExecutionEngine {
         for (OccurrenceState child : attempt.children) {
             statuses.add(child.status);
         }
+        for (OccurrenceState phase : phaseChildren(state)) {
+            statuses.add(phase.status);
+        }
         if (state.timedOut) {
             statuses.add(Status.failed("timed out"));
         }
         final var aggregate = Status.mostSevere(statuses);
-        if (aggregate.isPassed() && state.isCanceled()) {
+        if (aggregate.isPassed() && state.isCanceled() && !isFinalizationWork(state)) {
             return Status.canceled(reasonOr(state, "canceled"));
         }
         return aggregate;
@@ -1169,6 +1213,11 @@ public final class ExecutionEngine {
             for (OccurrenceState child : attempt.children) {
                 if (!child.isTerminal()) {
                     markTerminal(child, status.isCanceled() ? Status.canceled(reason) : Status.skipped(reason), reason);
+                }
+            }
+            for (OccurrenceState phase : phaseChildren(state)) {
+                if (!phase.isTerminal()) {
+                    markTerminal(phase, status.isCanceled() ? Status.canceled(reason) : Status.skipped(reason), reason);
                 }
             }
         }
@@ -1336,6 +1385,11 @@ public final class ExecutionEngine {
                     cancelSubtree(child, reason);
                 }
             }
+            for (OccurrenceState phase : phaseChildren(state)) {
+                if (!phase.isTerminal()) {
+                    cancelSubtree(phase, reason);
+                }
+            }
         }
     }
 
@@ -1409,16 +1463,43 @@ public final class ExecutionEngine {
             terminalize(state, finalStatus(state));
             return;
         }
+        var phaseFinalizing = false;
+        final var phase = awaitedPhase(state);
+        if (phase != null && !phase.isTerminal()) {
+            if (state.stage == OccurrenceState.Stage.AFTER) {
+                // Finalization is never skipped: the after subtree runs even for a canceled or timed-out node.
+                phaseFinalizing = true;
+            } else if (state.isCanceled() || state.timedOut) {
+                final var reason = reasonOr(state, "canceled");
+                cancelSubtree(phase, reason);
+                if (!phase.isTerminal()) {
+                    // A started phase subtree already acquired resources and may have run user code: it must run its
+                    // own finalizers, and this occurrence's finalizers wait until it has.
+                    if (activeJobCount(phase) == 0) {
+                        skipNormalWork(phase);
+                    }
+                    phaseFinalizing = !phase.isTerminal();
+                }
+            } else {
+                markTerminal(phase, Status.skipped("parent normal work did not complete"), "parent skipped");
+            }
+        }
         switch (state.stage) {
-            case NEW, ADMITTED, CONDITION, BEFORE, BODY -> goAfter(state);
+            case NEW, ADMITTED, CONDITION, BODY -> goAfter(state);
+            case BEFORE -> {
+                if (!phaseFinalizing) {
+                    goAfter(state);
+                }
+                // Otherwise the before subtree's completion handler moves to the after phase once it is terminal.
+            }
             case CHILDREN -> {
-                if (!childrenFinalizing) {
+                if (!childrenFinalizing && !phaseFinalizing) {
                     goAfter(state);
                 }
                 // Otherwise onChildCompleted completes the children phase once the last child is terminal.
             }
             case AFTER, TERMINAL -> {
-                // already finalizing
+                // already finalizing; the after phase completes when its hook job or subtree finishes
             }
         }
     }
@@ -1429,8 +1510,69 @@ public final class ExecutionEngine {
             for (OccurrenceState child : state.attempt.children) {
                 total += activeJobCount(child);
             }
+            for (OccurrenceState phase : phaseChildren(state)) {
+                total += activeJobCount(phase);
+            }
         }
         return total;
+    }
+
+    /**
+     * Returns whether an occurrence belongs to an {@code after} subtree.
+     *
+     * <p>Finalization is not normal work: once a node has started, its after subtree runs even when the run was
+     * canceled or timed out, exactly as the after callbacks of a canceled node always did. A hook inside the subtree can
+     * still observe {@link org.paramixel.api.Context#isCanceled()}, and a cleanup that hangs is still interrupted.
+     *
+     * @param state the occurrence; must not be {@code null}
+     * @return {@code true} when the occurrence is inside an after subtree
+     */
+    private static boolean isFinalizationWork(final OccurrenceState state) {
+        for (var current = state; current != null; current = current.parent) {
+            if (current.compiled.slot() == CompiledOccurrence.PhaseSlot.AFTER) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns the phase subtree occurrences of an occurrence's current attempt.
+     *
+     * @param state the occurrence; must not be {@code null}
+     * @return the present phase occurrences; never {@code null}
+     */
+    private static List<OccurrenceState> phaseChildren(final OccurrenceState state) {
+        final var attempt = state.attempt;
+        if (attempt == null) {
+            return List.of();
+        }
+        final var phases = new ArrayList<OccurrenceState>(2);
+        if (attempt.beforeChild != null) {
+            phases.add(attempt.beforeChild);
+        }
+        if (attempt.afterChild != null) {
+            phases.add(attempt.afterChild);
+        }
+        return phases;
+    }
+
+    /**
+     * Returns the phase subtree that the occurrence's current stage is waiting for.
+     *
+     * @param state the occurrence; must not be {@code null}
+     * @return the phase occurrence, or {@code null} when the current stage owns none
+     */
+    private static OccurrenceState awaitedPhase(final OccurrenceState state) {
+        final var attempt = state.attempt;
+        if (attempt == null) {
+            return null;
+        }
+        return switch (state.stage) {
+            case BEFORE -> attempt.beforeChild;
+            case AFTER -> attempt.afterChild;
+            default -> null;
+        };
     }
 
     private void abandon() {
@@ -1455,6 +1597,9 @@ public final class ExecutionEngine {
             if (state.attempt != null) {
                 for (OccurrenceState child : state.attempt.children) {
                     markIncomplete(child);
+                }
+                for (OccurrenceState phase : phaseChildren(state)) {
+                    markIncomplete(phase);
                 }
                 if (state.attempt.index > state.attemptNodes.size()) {
                     recordAttempt(state, state.status);

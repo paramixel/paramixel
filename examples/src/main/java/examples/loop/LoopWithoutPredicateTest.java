@@ -17,13 +17,13 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.repeat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Repeat;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -56,12 +56,12 @@ public class LoopWithoutPredicateTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         resetCounts();
-        return sequential(LoopWithoutPredicateTest.class, "loop-example")
-                .child(repeat("dependent-loop").maxIterations(3).step(ID_STEP_DEPENDENT))
-                .child(repeat("independent-loop").maxIterations(3).step(ID_STEP_INDEPENDENT))
+        return Sequential.builder(LoopWithoutPredicateTest.class, "loop-example")
+                .step(Repeat.builder("dependent-loop").maxIterations(3).step(ID_STEP_DEPENDENT))
+                .step(Repeat.builder("independent-loop").maxIterations(3).step(ID_STEP_INDEPENDENT))
                 .step(ID_VALIDATE)
                 .build();
     }

@@ -34,9 +34,9 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * Measures definition build and plan compilation throughput for a fixed tree shape.
@@ -73,7 +73,7 @@ public class CompilePlanBenchmark {
 
         @Setup(Level.Trial)
         public void setup() {
-            var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("p"));
+            var builder = Parallel.builder(BenchmarkTree.class, "root", Pool.named("p"));
             for (var i = 0; i < size; i++) {
                 builder.step(BenchmarkTree.ID_NOOP);
             }

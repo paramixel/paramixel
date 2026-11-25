@@ -32,6 +32,7 @@ import java.util.SplittableRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.ExecutionMode;
+import org.paramixel.api.PhaseHook;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Task;
 import org.paramixel.api.exception.CompilationException;
@@ -61,13 +62,13 @@ public final class PlanCompiler {
     /** FNV-1a 64-bit prime used by {@link #definitionId(Task)}. */
     private static final long FNV_PRIME = 0x100000001b3L;
 
-    /** Tag that marks the discovery factory group, whose children honor the run-level fail-fast policy. */
-    public static final String FAIL_FAST_SCOPE_TAG = "paramixel.discovery.actions";
+    /** Tag that marks the discovery task group, whose children honor the run-level fail-fast policy. */
+    public static final String FAIL_FAST_SCOPE_TAG = "paramixel.discovery.tasks";
 
     /**
      * Tag that marks framework scaffolding: nodes the discovery composition adds for gating, scheduling, and hook
      * wrapping. Such a node keeps its own name as its display path, and its children start a fresh display path, so
-     * user-facing paths never repeat a constant {@code Paramixel > run > actions} segment.
+     * user-facing paths never repeat a constant {@code Paramixel > run > tasks} segment.
      */
     public static final String STRUCTURAL_TAG = "paramixel.structural";
 
@@ -111,7 +112,7 @@ public final class PlanCompiler {
         capacities.clear();
         reportedUndefinedPools.clear();
         final var counter = new AtomicInteger();
-        final var compiledRoot = expand(root, "0", null, null, 0, counter);
+        final var compiledRoot = expand(root, "0", null, null, 0, CompiledOccurrence.PhaseSlot.CHILD, counter);
         final var occurrences = new ArrayList<CompiledOccurrence>();
         collectPreOrder(compiledRoot, occurrences);
         validate(root, compiledRoot);
@@ -145,6 +146,7 @@ public final class PlanCompiler {
             final String parentId,
             final String parentDisplayPath,
             final int depth,
+            final CompiledOccurrence.PhaseSlot slot,
             final AtomicInteger counter) {
         final var mode = task.mode();
         final var poolName = task.pool().map(Pool::name).orElse(null);
@@ -156,20 +158,76 @@ public final class PlanCompiler {
         final var failFastScope = task.tags().contains(FAIL_FAST_SCOPE_TAG);
         final var childDisplayPath = structural ? null : path;
         final var index = counter.getAndIncrement();
+        // Pre-order stays owner, before subtree, children, after subtree so admission priority reads the same way as
+        // the lifecycle that actually runs.
+        final var beforePhase = expandPhase(
+                task.before().orElse(null),
+                id + ".before",
+                id,
+                childDisplayPath,
+                depth + 1,
+                CompiledOccurrence.PhaseSlot.BEFORE,
+                counter);
         final var ordered = orderedChildren(task);
         final var childOccurrences = new ArrayList<CompiledOccurrence>(ordered.size());
         var ordinal = 0;
         for (Task child : ordered) {
-            childOccurrences.add(expand(child, id + "." + ordinal, id, childDisplayPath, depth + 1, counter));
+            childOccurrences.add(expand(
+                    child,
+                    id + "." + ordinal,
+                    id,
+                    childDisplayPath,
+                    depth + 1,
+                    CompiledOccurrence.PhaseSlot.CHILD,
+                    counter));
             ordinal++;
         }
+        final var afterPhase = expandPhase(
+                task.after().orElse(null),
+                id + ".after",
+                id,
+                childDisplayPath,
+                depth + 1,
+                CompiledOccurrence.PhaseSlot.AFTER,
+                counter);
         final var executionOrder = ordered.stream().map(Task::name).toList();
         return new CompiledOccurrence(
                 task,
                 new CompiledOccurrence.Identity(id, definitionId(task), parentId, path),
-                new CompiledOccurrence.Scheduling(budget, index, depth, failFastScope),
+                new CompiledOccurrence.Scheduling(budget, index, depth, failFastScope, slot),
                 executionOrder,
-                childOccurrences);
+                childOccurrences,
+                beforePhase,
+                afterPhase);
+    }
+
+    /**
+     * Expands a phase slot into an occurrence.
+     *
+     * <p>A slot that holds an identified hook is not an occurrence: the hook runs as a callback of its owner and is
+     * reported as a phase of that owner. Only a subtree slot produces a node in the compiled tree.
+     *
+     * @param hook the slot, or {@code null}
+     * @param id the occurrence identifier of the phase occurrence
+     * @param parentId the owning occurrence identifier
+     * @param parentDisplayPath the owning occurrence's child display path, or {@code null}
+     * @param depth the phase occurrence depth
+     * @param slot the slot being expanded
+     * @param counter the pre-order counter
+     * @return the phase occurrence, or {@code null} when the slot holds no subtree
+     */
+    private CompiledOccurrence expandPhase(
+            final PhaseHook hook,
+            final String id,
+            final String parentId,
+            final String parentDisplayPath,
+            final int depth,
+            final CompiledOccurrence.PhaseSlot slot,
+            final AtomicInteger counter) {
+        if (hook instanceof PhaseHook.Subtree subtree) {
+            return expand(subtree.task(), id, parentId, parentDisplayPath, depth, slot, counter);
+        }
+        return null;
     }
 
     private static List<Task> orderedChildren(final Task task) {
@@ -236,6 +294,7 @@ public final class PlanCompiler {
 
     private void collectPreOrder(final CompiledOccurrence occurrence, final List<CompiledOccurrence> target) {
         target.add(occurrence);
+        occurrence.phaseOccurrences().forEach(phase -> collectPreOrder(phase, target));
         occurrence.children().forEach(child -> collectPreOrder(child, target));
     }
 
@@ -259,7 +318,7 @@ public final class PlanCompiler {
                     "PARALLEL_WITHOUT_POOL",
                     path,
                     "Parallel task has no pool",
-                    "Use parallel(name, Pool.named(\"...\"), ...)"));
+                    "Use Parallel.builder(name, Pool.named(\"...\"))"));
         }
         task.timeout().ifPresent(timeout -> checkTimeout(timeout, path));
         if (task.retry().isPresent() && task.repeat().isPresent()) {
@@ -300,6 +359,9 @@ public final class PlanCompiler {
         final var childLocks = new LinkedHashSet<>(ancestorLocks);
         if (lockName != null) {
             childLocks.add(lockName);
+        }
+        for (CompiledOccurrence phase : occurrence.phaseOccurrences()) {
+            checkTask(phase.task(), phase, childAncestors, childPools, childLocks);
         }
         for (CompiledOccurrence child : occurrence.children()) {
             checkTask(child.task(), child, childAncestors, childPools, childLocks);
@@ -377,6 +439,9 @@ public final class PlanCompiler {
             edges.computeIfAbsent(from, key -> new LinkedHashSet<>()).add(to);
             examples.putIfAbsent(from, occurrence.path());
         }
+        for (CompiledOccurrence phase : occurrence.phaseOccurrences()) {
+            collectAcquisitionEdges(phase, resources, edges, examples);
+        }
         for (CompiledOccurrence child : occurrence.children()) {
             collectAcquisitionEdges(child, resources, edges, examples);
         }
@@ -441,8 +506,8 @@ public final class PlanCompiler {
         hash = hashText(task.mode().name(), hash);
         hash = hashText(task.pool().map(Pool::name).orElse(""), hash);
         hash = hashText(task.body().isPresent() ? "b" : "-", hash);
-        hash = hashText(Integer.toString(task.before().size()), hash);
-        hash = hashText(Integer.toString(task.after().size()), hash);
+        hash = hashPhaseHook(task.before().orElse(null), hash);
+        hash = hashPhaseHook(task.after().orElse(null), hash);
         hash = hashText(task.condition().isPresent() ? "c" : "-", hash);
         for (Task child : task.children()) {
             hash = hashText("[", hash);
@@ -450,6 +515,16 @@ public final class PlanCompiler {
             hash = hashText("]", hash);
         }
         return hash;
+    }
+
+    private static long hashPhaseHook(final PhaseHook hook, final long seed) {
+        if (hook == null) {
+            return hashText("-", seed);
+        }
+        if (hook instanceof PhaseHook.Subtree subtree) {
+            return hashTask(subtree.task(), hashText("subtree", seed));
+        }
+        return hashText("hook", seed);
     }
 
     private static long hashText(final String text, final long seed) {

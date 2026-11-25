@@ -17,8 +17,6 @@
 package examples.altcontainers.nginx;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import examples.support.Logger;
 import java.io.BufferedReader;
@@ -26,9 +24,11 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -50,7 +50,7 @@ public class NginxTest {
     private final NginxTestEnvironment environment;
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the task factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      * @throws Throwable if environment creation fails
@@ -68,11 +68,11 @@ public class NginxTest {
      * @return the definition for this test
      * @throws Throwable if environment creation fails
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() throws Throwable {
-        final var root = parallel(NginxTest.class, "NginxTest", Pool.named("environments"));
+        final var root = Parallel.builder(NginxTest.class, "NginxTest", Pool.named("environments"));
         for (final var environment : NginxTestEnvironment.createTestEnvironments()) {
-            root.child(sequential(environment.name())
+            root.step(Sequential.builder(environment.name())
                     .bind(ENVIRONMENT, environment)
                     .before(ID_SET_UP)
                     .step(ID_TEST_GET)

@@ -34,17 +34,18 @@ import nonapi.org.paramixel.compiler.PlanCompiler;
 import nonapi.org.paramixel.reporting.Constants;
 import nonapi.org.paramixel.selector.ConcreteSelector;
 import org.paramixel.api.Configuration;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 import org.paramixel.api.TaskBuilder;
-import org.paramixel.api.Tasks;
 import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Discovers {@link Paramixel.Factory}, {@link Paramixel.BeforeAll}, and {@link Paramixel.AfterAll} methods on the
- * classpath and composes them into one definition.
+ * Discovers {@link Paramixel.TaskFactory}, {@link Paramixel.BeforeAll}, and {@link Paramixel.AfterAll} methods on
+ * the classpath and composes them into one definition.
  *
  * <p>Discovery validates every matched method — {@code public static}, no parameters, returning {@link Task} or a
  * {@link TaskBuilder} — before any discovered test work runs, so an invalid factory fails the run with
@@ -60,13 +61,13 @@ import org.paramixel.api.selector.Selector;
  * Paramixel (independent sequential root)
  *   run (dependent sequential)
  *     BeforeAll hooks (when any)
- *     actions (parallel, pool "discovery")   &lt;- discovered factories
+ *     tasks (parallel, pool "discovery")   &lt;- discovered factories
  *   AfterAll hooks (when any)
  * </pre>
  *
  * <p>The independent root guarantees that {@code AfterAll} hooks run after a started run even when a factory or a
  * {@code BeforeAll} hook failed; the dependent {@code run} group guarantees that a failing {@code BeforeAll} hook skips
- * the factories. The {@code actions} group carries the run-level fail-fast scope and uses the {@code discovery} pool,
+ * the factories. The {@code tasks} group carries the run-level fail-fast scope and uses the {@code discovery} pool,
  * whose capacity defaults to {@code paramixel.parallelism}.
  */
 public final class FactoryScanner {
@@ -74,7 +75,7 @@ public final class FactoryScanner {
     /** Name of the pool that bounds concurrent discovered factories. */
     public static final String DISCOVERY_POOL = "discovery";
 
-    private static final String FACTORY_ANNOTATION = Paramixel.Factory.class.getName();
+    private static final String FACTORY_ANNOTATION = Paramixel.TaskFactory.class.getName();
     private static final String BEFORE_ALL_ANNOTATION = Paramixel.BeforeAll.class.getName();
     private static final String AFTER_ALL_ANNOTATION = Paramixel.AfterAll.class.getName();
 
@@ -145,27 +146,27 @@ public final class FactoryScanner {
         afterHooks.sort(hookOrder().reversed());
         factories.sort(factoryOrder());
 
-        final var root = Tasks.sequential(Constants.ROOT_NAME).independent();
+        final var root = Sequential.builder(Constants.ROOT_NAME).independent();
         root.tags(PlanCompiler.STRUCTURAL_TAG);
-        final var run = Tasks.sequential("run");
+        final var run = Sequential.builder("run");
         run.tags(PlanCompiler.STRUCTURAL_TAG);
         final var beforeGroup = buildHookGroup("BeforeAll hooks", beforeHooks, true);
-        beforeGroup.ifPresent(run::child);
-        final var actions = Tasks.parallel("actions", Pool.named(DISCOVERY_POOL));
-        actions.tags(PlanCompiler.FAIL_FAST_SCOPE_TAG, PlanCompiler.STRUCTURAL_TAG);
+        beforeGroup.ifPresent(run::step);
+        final var tasks = Parallel.builder("tasks", Pool.named(DISCOVERY_POOL));
+        tasks.tags(PlanCompiler.FAIL_FAST_SCOPE_TAG, PlanCompiler.STRUCTURAL_TAG);
         if (shuffled) {
-            actions.shuffle(shuffleSeed);
+            tasks.shuffle(shuffleSeed);
         }
         for (FactoryCandidate candidate : factories) {
-            invoke(candidate.method(), "@Paramixel.Factory").ifPresent(actions::child);
+            invoke(candidate.method(), "@Paramixel.TaskFactory").ifPresent(tasks::step);
         }
-        final var actionGroup = actions.build();
-        if (actionGroup.children().isEmpty()) {
+        final var taskGroup = tasks.build();
+        if (taskGroup.children().isEmpty()) {
             return Optional.empty();
         }
-        run.child(actionGroup);
-        root.child(run);
-        buildHookGroup("AfterAll hooks", afterHooks, false).ifPresent(root::child);
+        run.step(taskGroup);
+        root.step(run);
+        buildHookGroup("AfterAll hooks", afterHooks, false).ifPresent(root::step);
         return Optional.of(root.build());
     }
 
@@ -195,12 +196,12 @@ public final class FactoryScanner {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
-        final var group = Tasks.sequential(name);
+        final var group = Sequential.builder(name);
         if (!dependent) {
             group.independent();
         }
         for (HookCandidate candidate : candidates) {
-            invoke(candidate.method(), name).ifPresent(group::child);
+            invoke(candidate.method(), name).ifPresent(group::step);
         }
         return Optional.of(group.build());
     }
@@ -229,14 +230,14 @@ public final class FactoryScanner {
             for (Method method : current.getDeclaredMethods()) {
                 final var key = new MethodKey(method.getName(), method.getParameterTypes());
                 if (!seen.add(key)
-                        || !method.isAnnotationPresent(Paramixel.Factory.class)
+                        || !method.isAnnotationPresent(Paramixel.TaskFactory.class)
                         || method.isAnnotationPresent(Paramixel.Disabled.class)) {
                     continue;
                 }
                 if (method.isAnnotationPresent(Paramixel.BeforeAll.class)
                         || method.isAnnotationPresent(Paramixel.AfterAll.class)) {
                     throw new ResolverException(
-                            "Method " + locationOf(method) + " cannot be both @Paramixel.Factory and a run hook");
+                            "Method " + locationOf(method) + " cannot be both @Paramixel.TaskFactory and a run hook");
                 }
                 if (!selector.acceptsClass(current.getPackageName(), current.getName())) {
                     continue;
@@ -245,17 +246,18 @@ public final class FactoryScanner {
                 if (!selector.test(current.getPackageName(), current.getName(), tags)) {
                     continue;
                 }
-                validateMethod(method, "@Paramixel.Factory");
+                validateMethod(method, "@Paramixel.TaskFactory");
                 candidates.add(method);
             }
             current = current.getSuperclass();
         }
         if (candidates.size() > 1) {
-            throw new ResolverException("Class " + clazz.getName() + " has more than one @Paramixel.Factory method: "
-                    + candidates.stream()
-                            .map(FactoryScanner::locationOf)
-                            .sorted()
-                            .toList());
+            throw new ResolverException(
+                    "Class " + clazz.getName() + " has more than one @Paramixel.TaskFactory method: "
+                            + candidates.stream()
+                                    .map(FactoryScanner::locationOf)
+                                    .sorted()
+                                    .toList());
         }
         if (candidates.isEmpty()) {
             return Optional.empty();

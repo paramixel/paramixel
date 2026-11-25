@@ -17,16 +17,16 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.repeat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
+import org.paramixel.api.Repeat;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 import org.paramixel.api.exception.FailException;
 
@@ -35,8 +35,8 @@ import org.paramixel.api.exception.FailException;
  * condition, an exclusive lock, lifecycle hooks, and assertion steps.
  *
  * <p>Every behaviour is a named static method, and every reference to it is a string. A group that needs a body and its
- * own children is written as {@code child(sequential(name).body(id)…)}; a group that is only a condition is written
- * {@code child(sequential(name).onlyIf(id)…)}.
+ * own children is written as {@code step(Sequential.builder(name).body(id)…)}; a group that is only a condition is
+ * written {@code step(Sequential.builder(name).onlyIf(id)…)}.
  */
 public class NamedBuilderExample {
 
@@ -73,21 +73,23 @@ public class NamedBuilderExample {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         reset();
 
-        return sequential(NamedBuilderExample.class, "NamedBuilderExample")
-                .child(sequential("suite")
+        return Sequential.builder(NamedBuilderExample.class, "NamedBuilderExample")
+                .step(Sequential.builder("suite")
                         .step(ID_STEP_DEMO)
-                        .child(parallel("parallel-demo", Pool.named("examples"))
+                        .step(Parallel.builder("parallel-demo", Pool.named("examples"))
                                 .step(ID_BRANCH_1)
                                 .step(ID_BRANCH_2)
                                 .step(ID_BRANCH_3))
-                        .child(repeat("repeat-demo").maxIterations(3).step(ID_REPEATED))
+                        .step(Repeat.builder("repeat-demo").maxIterations(3).step(ID_REPEATED))
                         .step(ID_SLEEP_DEMO)
                         .timeout(Duration.ofSeconds(5))
-                        .child(sequential("conditional-demo").onlyIf(ID_ALWAYS).step(ID_RUNS_WHEN_TRUE))
+                        .step(Sequential.builder("conditional-demo")
+                                .onlyIf(ID_ALWAYS)
+                                .step(ID_RUNS_WHEN_TRUE))
                         .isolated("test-lock")
                         .step(ID_SERIALIZED)
                         .before(ID_BEFORE_DEMO)

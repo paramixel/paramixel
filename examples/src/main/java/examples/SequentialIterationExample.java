@@ -17,12 +17,12 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -65,12 +65,12 @@ public class SequentialIterationExample {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         resetCounts();
-        final var root = sequential(SequentialIterationExample.class, "SequentialIterationExample");
+        final var root = Sequential.builder(SequentialIterationExample.class, "SequentialIterationExample");
         for (var i = 0; i < ARGUMENT_COUNT; i++) {
-            root.child(sequential("string-" + i)
+            root.step(Sequential.builder("string-" + i)
                     .bind(INDEX, i)
                     .before(ID_BEFORE)
                     .step(ID_TEST)

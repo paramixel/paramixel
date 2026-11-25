@@ -8,7 +8,6 @@ description: The 7.0 authoring and execution surface on one page.
 ## Imports
 
 ```java
-import static org.paramixel.api.Tasks.*;
 import org.paramixel.api.*;
 import org.paramixel.api.support.*;
 ```
@@ -16,17 +15,17 @@ import org.paramixel.api.support.*;
 ## Authoring
 
 ```java
-final var root = parallel(MySuite.class, "Matrix", Pool.named("environments"));
+final var root = Parallel.builder(MySuite.class, "Matrix", Pool.named("environments"));
 for (final var env : environments) {
-    root.child(sequential(env.name())
+    root.step(Sequential.builder(env.name())
             .bind("environment", env)
             .before("start")
-            .child(sequential("checks")
+            .step(Sequential.builder("checks")
                     .step("health")
                     .step("metrics"))
             .after("stop"));
 }
-Task definition = root.build();
+Parallel definition = root.build();
 
 @Paramixel.Id("health")
 public static void health(final Context context) {
@@ -36,19 +35,21 @@ public static void health(final Context context) {
 
 | Call | Meaning |
 | --- | --- |
-| `sequential(name)` / `sequential(Owner.class, name)` | Sequential container, unanchored or anchored for hook ids |
-| `parallel(name, Pool.named("p"))` | Parallel container; direct children hold one permit each |
-| `.before(id)` / `.after(id)` | Lifecycle on the owning task; `after` runs in reverse order |
+| `Sequential.builder(name)` / `Sequential.builder(Owner.class, name)` | Sequential node, unanchored or anchored for hook ids |
+| `Parallel.builder(name, Pool.named("p"))` | Parallel node; direct children hold one permit each |
+| `Repeat.builder(name).maxIterations(n)` | Bounded replay with an optional `until(...)` |
+| `.bind(name, value)` | Plan parameter: a value that already exists at build time |
+| `.before(id)` / `.before(Task or builder)` | One setup slot; compose several phases with a sequential subtree |
+| `.after(id)` / `.after(Task or builder)` | One cleanup slot; runs once the node has started, whatever failed |
 | `.step(id)` | Body-only child step; `.body(id)` puts a body on the current occurrence |
-| `.step(name, op, children -> …)` | Child step with its own sequential subtree |
+| `.step(Task or builder)` | Child subtree, materialized when the parent is built |
 | `.independent()` / `.dependent()` | Sequential failure continuation (parallel has neither) |
 | `.onlyIf(id)` | Runtime condition, resolved hook must return `boolean` |
-| `child(repeat(name).maxIterations(n).until(id))` | Bounded replay |
 | `.retry(RetryPolicy…)` | Bounded re-attempt |
 | `.timeout(Duration)` | Cooperative deadline |
 | `.isolated("lock")` | Exclusive logical lock |
 | `.shuffle(seed)` / `.tags(…)` | Ordering and metadata |
-| `.build()` | Immutable snapshot |
+| `.build()` | Immutable snapshot of the concrete node type |
 
 ## Running
 

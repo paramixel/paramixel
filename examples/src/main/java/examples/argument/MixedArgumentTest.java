@@ -17,13 +17,13 @@
 package examples.argument;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -146,13 +146,13 @@ public class MixedArgumentTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         resetCounts();
-        final var root = sequential(MixedArgumentTest.class, "MixedArgumentTest");
+        final var root = Sequential.builder(MixedArgumentTest.class, "MixedArgumentTest");
         for (final var testArgument :
                 List.of(new StringArgument("paramixel"), new IntegerArgument(42), new PointArgument(new Point(3, 7)))) {
-            root.child(sequential(testArgument.name())
+            root.step(Sequential.builder(testArgument.name())
                     .bind(ARGUMENT, testArgument)
                     .before(ID_SET_UP)
                     .step(ID_TEST_ONE)

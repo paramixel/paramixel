@@ -16,10 +16,9 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -35,9 +34,11 @@ public final class FailingMojoFixture {
      *
      * @return a definition that fails with a runtime exception
      */
-    @Paramixel.Factory
-    public static Task action() {
-        return sequential(FailingMojoFixture.class, "mojo-fail").step("fail").build();
+    @Paramixel.TaskFactory
+    public static Task task() {
+        return Sequential.builder(FailingMojoFixture.class, "mojo-fail")
+                .step("fail")
+                .build();
     }
 
     /**

@@ -14,7 +14,7 @@ A parallel task names a pool with no capacity. Set `paramixel.parallelism.x` or 
 ## "Id \"x\" used by step(...) in a definition with no anchor"
 
 The definition refers to a hook identifier but never names the class that declares it. Root the definition at
-`Tasks.sequential(MyTest.class, "name")` — one class literal per definition root, inherited by everything attached below
+`Sequential.builder(MyTest.class, "name")` — one class literal per definition root, inherited by everything attached below
 it.
 
 ## "Unknown id \"x\" used by step(...)"
@@ -52,5 +52,5 @@ Listener failures are isolated and recorded as diagnostics. Check `result.diagno
 
 ## Nothing was discovered
 
-`Runner.run()` with no matching `@Paramixel.Factory` reports `SKIPPED` and fails by default
+`Runner.run()` with no matching `@Paramixel.TaskFactory` reports `SKIPPED` and fails by default
 (`paramixel.failIfNoTests=true`). Check the selector, `@Disabled`, and tag filters.

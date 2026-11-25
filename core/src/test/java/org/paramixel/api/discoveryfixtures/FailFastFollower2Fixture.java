@@ -16,10 +16,9 @@
 
 package org.paramixel.api.discoveryfixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 @Paramixel.Priority(10)
@@ -37,9 +36,9 @@ public final class FailFastFollower2Fixture {
      *
      * @return the definition
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return sequential(FailFastFollower2Fixture.class, "follower-2")
+        return Sequential.builder(FailFastFollower2Fixture.class, "follower-2")
                 .step("run")
                 .build();
     }

@@ -18,7 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.task;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -80,12 +79,12 @@ class DiscoveryTest {
     }
 
     /**
-     * Returns the discovered factory group: {@code Paramixel > run > actions}.
+     * Returns the discovered factory group: {@code Paramixel > run > tasks}.
      *
      * @param result a discovery run result
-     * @return the actions group
+     * @return the tasks group
      */
-    private static TaskResult discoveryActions(final Result result) {
+    private static TaskResult discoveryTasks(final Result result) {
         return result.root().orElseThrow().children().get(0).children().get(1);
     }
 
@@ -97,7 +96,7 @@ class DiscoveryTest {
      * @return the factory names in plan order
      */
     private static List<String> discoveredOrder(final Result result) {
-        return discoveryActions(result).executionOrder();
+        return discoveryTasks(result).executionOrder();
     }
 
     @BeforeEach
@@ -154,19 +153,18 @@ class DiscoveryTest {
         assertThat(root.path()).isEqualTo("Paramixel");
         final var run = root.children().get(0);
         assertThat(run.path()).isEqualTo("run");
-        final var actions = run.children().get(1);
-        assertThat(actions.path()).isEqualTo("actions");
-        final var factoryPaths =
-                actions.children().stream().map(TaskResult::path).toList();
+        final var tasks = run.children().get(1);
+        assertThat(tasks.path()).isEqualTo("tasks");
+        final var factoryPaths = tasks.children().stream().map(TaskResult::path).toList();
         assertThat(factoryPaths).contains("alpha", "beta");
-        final var alphaStep = actions.children().stream()
+        final var alphaStep = tasks.children().stream()
                 .filter(node -> node.name().equals("alpha"))
                 .findFirst()
                 .orElseThrow()
                 .children()
                 .get(0);
         assertThat(alphaStep.path()).isEqualTo("alpha > run");
-        assertThat(factoryPaths).noneMatch(path -> path.startsWith("Paramixel > run > actions"));
+        assertThat(factoryPaths).noneMatch(path -> path.startsWith("Paramixel > run > tasks"));
     }
 
     @Test
@@ -282,7 +280,8 @@ class DiscoveryTest {
     @Test
     @DisplayName("direct execution never scans the classpath or runs hooks")
     void directRunSkipsDiscovery() {
-        final var result = runner().run(task("direct").step("work", () -> {}).build());
+        final var result =
+                runner().run(Sequential.builder("direct").step("work", () -> {}).build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(DiscoveryFixtures.RECORDED).isEmpty();
@@ -299,7 +298,7 @@ class DiscoveryTest {
         assertThat(result.exitCode()).isEqualTo(1);
         assertThat(result.root()).isEmpty();
         assertThat(result.diagnostics())
-                .anySatisfy(diagnostic -> assertThat(diagnostic).contains("No @Paramixel.Factory"));
+                .anySatisfy(diagnostic -> assertThat(diagnostic).contains("No @Paramixel.TaskFactory"));
     }
 
     @Test
@@ -465,7 +464,7 @@ class DiscoveryTest {
         final var runner = runner();
         final var started = new CountDownLatch(1);
         final var release = new CountDownLatch(1);
-        final var definition = task("slow")
+        final var definition = Sequential.builder("slow")
                 .step("work", () -> {
                     started.countDown();
                     release.await(5, TimeUnit.SECONDS);
@@ -614,7 +613,7 @@ class DiscoveryTest {
         final var runner = runner();
         runner.close();
 
-        assertThatThrownBy(() -> runner.run(task("x").build()))
+        assertThatThrownBy(() -> runner.run(Sequential.builder("x").build()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("closed");
     }

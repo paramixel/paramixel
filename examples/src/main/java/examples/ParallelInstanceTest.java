@@ -17,17 +17,17 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -76,19 +76,21 @@ public class ParallelInstanceTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         resetCounts();
 
-        return sequential(ParallelInstanceTest.class, "ParallelInstanceTest")
+        return Sequential.builder(ParallelInstanceTest.class, "ParallelInstanceTest")
                 .bind(FIXTURE, new ParallelInstanceTest())
                 .before(ID_NOOP)
-                .child(parallel("parallel-methods", Pool.named("methods"))
+                .step(Parallel.builder("parallel-methods", Pool.named("methods"))
                         .step(ID_METHOD_1)
                         .step(ID_METHOD_2)
                         .step(ID_METHOD_3))
-                .after(ID_NOOP)
-                .after(ID_VALIDATE)
+                .after(Sequential.builder("cleanup")
+                        .independent()
+                        .step(ID_VALIDATE)
+                        .step(ID_NOOP))
                 .build();
     }
 

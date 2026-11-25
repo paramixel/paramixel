@@ -30,7 +30,7 @@ public final class DisabledConflictingFactoryFixture {
      * @return never returns normally
      */
     @Paramixel.Disabled
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     @Paramixel.BeforeAll
     public static Task factory() {
         throw new AssertionError("disabled factory or hook was invoked");

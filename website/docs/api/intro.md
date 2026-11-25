@@ -24,10 +24,19 @@ The public API is `org.paramixel.api`, with sub-packages for exceptions, selecto
 ## Minimal example
 
 ```java
-Task definition = Tasks.sequential("Smoke tests")
-        .step("Ping", () -> ping())
-        .step("Version", () -> checkVersion())
-        .build();
+SequentialBuilder definition = Sequential.builder(SmokeTest.class, "Smoke tests")
+        .step("ping")
+        .step("version");
+
+@Paramixel.Id("ping")
+public static void ping(final Context context) {
+    // ...
+}
+
+@Paramixel.Id("version")
+public static void version(final Context context) {
+    // ...
+}
 
 try (Runner runner = Runner.builder().build()) {
     Result result = runner.run(definition);

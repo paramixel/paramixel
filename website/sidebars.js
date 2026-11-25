@@ -23,7 +23,7 @@ const sidebars = {
       items: [
         'core-concepts',
         'core-concepts/elements',
-        'core-concepts/actions',
+        'core-concepts/tasks',
         'core-concepts/discovery',
         'core-concepts/data-driven-testing',
       ],
@@ -85,7 +85,7 @@ const sidebars = {
         'api/intro',
         'api/status',
         'api/result',
-        'api/action',
+        'api/task',
         'api/builder',
         'api/named-builders',
         'api/descriptor-and-metadata',

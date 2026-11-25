@@ -17,8 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.task;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -58,7 +56,7 @@ class StatusOutputTest {
     @Test
     @DisplayName("status lines are not indented and start with an unpadded short label")
     void statusLinesAreLeftAlignedWithoutPadding() {
-        final var definition = parallel("root", Pool.named("p"))
+        final var definition = Parallel.builder("root", Pool.named("p"))
                 .step("pass", () -> {})
                 .step("skip", () -> {
                     throw SkipException.skip("not applicable");
@@ -97,7 +95,7 @@ class StatusOutputTest {
     @DisplayName("terminal status lines end with the elapsed time in milliseconds")
     void terminalLinesCarryElapsedTime() {
         final var definition =
-                task("root").step("slow", () -> Thread.sleep(15L)).build();
+                Sequential.builder("root").step("slow", () -> Thread.sleep(15L)).build();
 
         final var lines = run(definition);
 
@@ -111,7 +109,7 @@ class StatusOutputTest {
     @Test
     @DisplayName("failures keep the reason after the elapsed time")
     void failureLinesCarryElapsedAndReason() {
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .step("failing", () -> {
                     throw new IllegalStateException("boom");
                 })
@@ -128,28 +126,64 @@ class StatusOutputTest {
     }
 
     @Test
-    @DisplayName("summary tree lines also start with the label at column zero")
-    void summaryTreeKeepsTheLeftColumn() {
-        final var definition = task("group")
-                .step("parent", () -> {}, children -> children.step("child", () -> {}))
+    @DisplayName("summary tree draws children under connectors at the left margin")
+    void summaryTreeUsesConnectors() {
+        final var definition = Sequential.builder("group")
+                .step(Sequential.builder("parent").step("child", () -> {}).build())
+                .step("sibling", () -> {})
                 .build();
 
         final var lines = run(definition);
 
-        final var treeLines =
-                lines.stream().filter(line -> line.contains("(sequential)")).toList();
-        assertThat(treeLines).isNotEmpty();
-        for (String line : treeLines) {
-            assertThat(line).matches("^\\[PARAMIXEL\\] (PASS|FAIL|SKIP|ABORT|CANCEL) .*");
-        }
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "group \\(sequential\\) PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "├── parent \\(sequential\\) PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "│   └── child PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "└── sibling PASS \\(\\d+ ms\\)"));
+    }
+
+    @Test
+    @DisplayName("only tasks that schedule children carry a mode suffix")
+    void onlyTasksThatScheduleChildrenCarryAModeSuffix() {
+        final var definition =
+                Sequential.builder("group").step("leaf", () -> {}).build();
+
+        final var lines = run(definition);
+
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "group \\(sequential\\) PASS \\(\\d+ ms\\)"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "└── leaf PASS \\(\\d+ ms\\)"));
+        assertThat(lines).noneMatch(line -> line.contains("leaf (sequential)"));
+        assertThat(lines).noneMatch(line -> line.contains("leaf (parallel)"));
+    }
+
+    @Test
+    @DisplayName("a retried task keeps its mode suffix in the summary")
+    void retriedTaskKeepsItsModeSuffix() {
+        final var attempts = new AtomicInteger();
+        final var definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
+                        .retry(RetryPolicy.attempts(2))
+                        .step("probe", () -> {
+                            if (attempts.incrementAndGet() < 2) {
+                                throw new IllegalStateException("not yet");
+                            }
+                        }))
+                .build();
+
+        final var lines = run(definition);
+
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "root \\(sequential\\) PASS \\(\\d+ ms\\)"));
+        assertThat(lines)
+                .anyMatch(line ->
+                        isTreeLine(line, "└── retried \\(sequential\\) PASS \\(\\d+ ms\\) — 2 attempts, 1 failed"));
+        assertThat(lines).anyMatch(line -> isTreeLine(line, "    └── probe PASS \\(\\d+ ms\\)"));
     }
 
     @Test
     @DisplayName("console summary shows final outcomes only and notes attempt history")
     void consoleSummaryHidesSupersededAttempts() {
         final var attempts = new AtomicInteger();
-        final var definition = task("root")
-                .child(Tasks.sequential("retried")
+        final var definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.attempts(3))
                         .step("probe", () -> {
                             if (attempts.incrementAndGet() < 3) {
@@ -161,7 +195,7 @@ class StatusOutputTest {
         final var lines = run(definition);
 
         assertThat(attempts).hasValue(3);
-        assertThat(lines).noneMatch(line -> line.matches("^\\[PARAMIXEL\\] (PASS|FAIL) +attempt .*"));
+        assertThat(lines).noneMatch(line -> line.contains("attempt "));
         assertThat(lines).anySatisfy(line -> assertThat(line).contains("3 attempts, 2 failed"));
         assertThat(lines).anySatisfy(line -> assertThat(line).contains("result: PASS exitCode: 0"));
         assertThat(lines)
@@ -171,7 +205,7 @@ class StatusOutputTest {
     @Test
     @DisplayName("run footer uses the same short label")
     void footerUsesShortLabel() {
-        final var definition = task("root").step("pass", () -> {}).build();
+        final var definition = Sequential.builder("root").step("pass", () -> {}).build();
 
         final var lines = run(definition);
 
@@ -203,7 +237,7 @@ class StatusOutputTest {
     @Test
     @DisplayName("the run totals are separated from the result tree by a rule")
     void totalsAreSeparatedFromTheTreeByRule() {
-        final var definition = task("consume").build();
+        final var definition = Sequential.builder("consume").build();
 
         final var lines = run(definition);
 
@@ -217,9 +251,9 @@ class StatusOutputTest {
     }
 
     @Test
-    @DisplayName("the summary header is separated from the run footer by a rule")
+    @DisplayName("the summary header is a bracketed title separated from the run footer by a rule")
     void summaryHeaderIsSeparatedFromFooterByRule() {
-        final var definition = task("root").step("pass", () -> {}).build();
+        final var definition = Sequential.builder("root").step("pass", () -> {}).build();
 
         final var lines = run(definition);
 
@@ -227,8 +261,14 @@ class StatusOutputTest {
                 .filter(line -> line.startsWith(PREFIX + "PASS run "))
                 .findFirst()
                 .orElseThrow());
-        assertThat(lines).contains(PREFIX + "-------");
-        assertThat(lines.get(footer + 1)).isEqualTo(PREFIX + "-------");
-        assertThat(lines.get(footer + 2)).isEqualTo(PREFIX + "Summary");
+        final var titleRule = PREFIX + "-".repeat("Paramixel Summary".length());
+        assertThat(lines.get(footer + 1)).isEqualTo(titleRule);
+        assertThat(lines.get(footer + 2)).isEqualTo(PREFIX + "Paramixel Summary");
+        assertThat(lines.get(footer + 3)).isEqualTo(titleRule);
+        assertThat(lines.get(footer + 4)).startsWith(PREFIX + "root (sequential) PASS");
+    }
+
+    private static boolean isTreeLine(final String line, final String tree) {
+        return line.matches(Pattern.quote(PREFIX) + tree);
     }
 }

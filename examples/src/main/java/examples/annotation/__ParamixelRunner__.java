@@ -20,13 +20,13 @@ import org.paramixel.api.Runner;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Entry point for the Paramixel runner that discovers and executes all action factories
+ * Entry point for the Paramixel runner that discovers and executes all task factories
  * in the {@code examples.annotation} package.
  */
 public class __ParamixelRunner__ {
 
     /**
-     * Discovers and executes all action factories in this package, then exits the JVM.
+     * Discovers and executes all task factories in this package, then exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */

@@ -17,8 +17,6 @@
 package examples.altcontainers.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import examples.altcontainers.util.RandomUtil;
 import examples.support.Logger;
@@ -34,36 +32,43 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.Task;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.TaskBuilder;
 
 /**
- * Parameterized integration test that starts Kafka containers for each Docker image
- * listed in {@code /docker-images.txt}, produces a message, consumes it, and asserts
- * the round-trip content matches.
+ * Parameterized integration test that starts Kafka containers for each Docker image listed in
+ * {@code /docker-images.txt}, produces a message, consumes it, and asserts the round-trip content matches.
+ *
+ * <p>The test is fully static, so the definition is the only state. The environment already exists when the plan is
+ * built and is declared with {@code bind}, which also makes it a readable plan parameter in report files. The message
+ * only exists once the test runs, so {@code produce} stores it with {@link Context#put(String, Object)} and
+ * {@code consume} reads it back by name.
  */
-public class KafkaTest {
+public final class KafkaTest {
 
     private static final String ID_SET_UP = "setUp";
-    private static final String ID_PRODUCE = "produce()";
-    private static final String ID_CONSUME = "consume()";
+    private static final String ID_PRODUCE = "produce";
+    private static final String ID_CONSUME = "consume";
     private static final String ID_TEAR_DOWN = "tearDown";
 
     private static final String ENVIRONMENT = "environment";
-    private static final String FIXTURE = "fixture";
+    private static final String MESSAGE = "message";
 
     private static final Logger LOGGER = Logger.createLogger(KafkaTest.class);
     private static final String TOPIC = "test";
     private static final String GROUP_ID = "test-group-id";
     private static final String EARLIEST = "earliest";
 
-    private final KafkaTestEnvironment environment;
-    private String message;
+    private KafkaTest() {
+        // Intentionally empty
+    }
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the task factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      * @throws Throwable if environment creation fails
@@ -73,73 +78,35 @@ public class KafkaTest {
     }
 
     /**
-     * Builds a parallel task tree with one instance branch per Kafka Docker image,
-     * each managing a {@code KafkaTest} instance with setUp, produce, consume, and
-     * tearDown lifecycle.
+     * Builds a parallel task tree with one branch per Kafka Docker image, each binding its environment, starting it in
+     * the branch's {@code before} hook, running the produce/consume steps, and closing it in {@code after}.
      *
      * @return the definition for this test
      * @throws Throwable if environment creation fails
      */
-    @Paramixel.Factory
-    public static Task factory() throws Throwable {
-        final var root = parallel(KafkaTest.class, "KafkaTest", Pool.named("environments"));
+    @Paramixel.TaskFactory
+    public static TaskBuilder<?> factory() throws Throwable {
+        final var root = Parallel.builder(KafkaTest.class, "KafkaTest", Pool.named("environments"));
         for (final var environment : KafkaTestEnvironment.createTestEnvironments()) {
-            root.child(sequential(environment.name())
+            root.step(Sequential.builder(environment.name())
                     .bind(ENVIRONMENT, environment)
                     .before(ID_SET_UP)
-                    .child(sequential("tests").step(ID_PRODUCE).step(ID_CONSUME))
+                    .step(Sequential.builder("tests").step(ID_PRODUCE).step(ID_CONSUME))
                     .after(ID_TEAR_DOWN));
         }
-        return root.build();
+        return root;
     }
 
     /**
-     * Builds this branch's fixture and runs its setup.
+     * Starts this branch's environment and creates the topic.
      *
      * @param context the execution context
+     * @throws Throwable if the environment cannot be started
      */
     @Paramixel.Id(ID_SET_UP)
-    public static void setUpHook(final Context context) throws Throwable {
-        final var fixture = new KafkaTest(context.require(ENVIRONMENT, KafkaTestEnvironment.class));
-        context.put(FIXTURE, fixture);
-        fixture.setUp();
-    }
+    public static void setUp(final Context context) throws Throwable {
+        final var environment = context.require(ENVIRONMENT, KafkaTestEnvironment.class);
 
-    /**
-     * Runs the produce body of this branch.
-     *
-     * @param context the execution context
-     */
-    @Paramixel.Id(ID_PRODUCE)
-    public static void produceHook(final Context context) throws Throwable {
-        context.require(FIXTURE, KafkaTest.class).produce();
-    }
-
-    /**
-     * Runs the consume body of this branch.
-     *
-     * @param context the execution context
-     */
-    @Paramixel.Id(ID_CONSUME)
-    public static void consumeHook(final Context context) throws Throwable {
-        context.require(FIXTURE, KafkaTest.class).consume();
-    }
-
-    /**
-     * Releases the fixture, if it was created.
-     *
-     * @param context the execution context
-     */
-    @Paramixel.Id(ID_TEAR_DOWN)
-    public static void tearDownHook(final Context context) {
-        context.find(FIXTURE, KafkaTest.class).ifPresent(KafkaTest::tearDown);
-    }
-
-    private KafkaTest(final KafkaTestEnvironment environment) {
-        this.environment = environment;
-    }
-
-    public void setUp() throws Throwable {
         LOGGER.info("[%s] initialize test environment ...", environment.name());
 
         environment.initialize();
@@ -149,34 +116,54 @@ public class KafkaTest {
         environment.createTopic(TOPIC);
     }
 
-    public void produce() throws Throwable {
+    /**
+     * Produces one random message and stores it for the consume step.
+     *
+     * @param context the execution context
+     * @throws Throwable if producing fails
+     */
+    @Paramixel.Id(ID_PRODUCE)
+    public static void produce(final Context context) throws Throwable {
+        final var environment = context.require(ENVIRONMENT, KafkaTestEnvironment.class);
+
         LOGGER.info("[%s] testing produce() ...", environment.name());
 
-        message = RandomUtil.getRandomString(16);
+        final var message = RandomUtil.getRandomString(16);
 
         LOGGER.info("[%s] producing message [%s] ...", environment.name(), message);
 
-        try (var producer = createKafkaProducer()) {
+        try (var producer = createKafkaProducer(environment)) {
             producer.send(new ProducerRecord<>(TOPIC, message)).get();
             producer.flush();
         }
 
+        context.put(MESSAGE, message);
+
         LOGGER.info("[%s] message [%s] produced", environment.name(), message);
     }
 
-    public void consume() {
+    /**
+     * Consumes the message produced by the previous step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CONSUME)
+    public static void consume(final Context context) {
+        final var environment = context.require(ENVIRONMENT, KafkaTestEnvironment.class);
+        final var message = context.require(MESSAGE, String.class);
+
         LOGGER.info("[%s] expected message [%s]", environment.name(), message);
 
         var messageMatched = false;
         var attempts = 0;
         final var maxAttempts = 5;
-        var pollTimeout = Duration.ofSeconds(2);
+        final var pollTimeout = Duration.ofSeconds(2);
 
-        try (var consumer = createKafkaConsumer()) {
+        try (var consumer = createKafkaConsumer(environment)) {
             consumer.subscribe(List.of(TOPIC));
 
             while (!messageMatched && attempts < maxAttempts) {
-                var consumerRecords = consumer.poll(pollTimeout);
+                final var consumerRecords = consumer.poll(pollTimeout);
                 for (ConsumerRecord<String, String> consumerRecord : consumerRecords) {
                     LOGGER.info("[%s] consumed message [%s]", environment.name(), consumerRecord.value());
                     assertThat(consumerRecord.value()).isEqualTo(message);
@@ -195,22 +182,30 @@ public class KafkaTest {
         }
     }
 
-    public void tearDown() {
+    /**
+     * Stops this branch's environment.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEAR_DOWN)
+    public static void tearDown(final Context context) {
+        final var environment = context.require(ENVIRONMENT, KafkaTestEnvironment.class);
+
         LOGGER.info("[%s] destroy test environment ...", environment.name());
 
         environment.close();
     }
 
-    private KafkaProducer<String, String> createKafkaProducer() {
-        var properties = new Properties();
+    private static KafkaProducer<String, String> createKafkaProducer(final KafkaTestEnvironment environment) {
+        final var properties = new Properties();
         properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, environment.getBootstrapServers());
         properties.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         properties.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         return new KafkaProducer<>(properties);
     }
 
-    private KafkaConsumer<String, String> createKafkaConsumer() {
-        var properties = new Properties();
+    private static KafkaConsumer<String, String> createKafkaConsumer(final KafkaTestEnvironment environment) {
+        final var properties = new Properties();
         properties.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, environment.getBootstrapServers());
         properties.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         properties.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());

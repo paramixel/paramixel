@@ -7,10 +7,7 @@ bodies and subtrees. The compiler derives execution dependencies, resource scope
 execution metadata; the scheduler executes occurrences with bounded concurrency and deterministic admission priorities.
 
 ```java
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
-
-public class ScenarioTest {
+public final class ScenarioTest {
 
     private static final String ID_START = "start";
     private static final String ID_HEALTH = "health";
@@ -23,17 +20,17 @@ public class ScenarioTest {
         System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
-    @Paramixel.Factory
-    public static Task factory() {
-        final var root = parallel(ScenarioTest.class, "Environments", Pool.named("environments"));
+    @Paramixel.TaskFactory
+    public static TaskBuilder<?> factory() {
+        final var root = Parallel.builder(ScenarioTest.class, "Environments", Pool.named("environments"));
         for (final var environment : environments) {
-            root.child(sequential(environment.name())
+            root.step(Sequential.builder(environment.name())
                     .bind(ENVIRONMENT, environment)
                     .before(ID_START)
-                    .child(sequential("checks").step(ID_HEALTH).step(ID_METRICS))
+                    .step(Sequential.builder("checks").step(ID_HEALTH).step(ID_METRICS))
                     .after(ID_STOP));
         }
-        return root.build();
+        return root;
     }
 
     @Paramixel.Id(ID_START)
@@ -45,8 +42,10 @@ public class ScenarioTest {
 }
 ```
 
-One class literal per definition root, one identifier per hook, and ordinary static Java for the behaviour: no functional
-interfaces, no reflective fixture lookup, and no unchecked casts. Hooks read what they need from the context by name.
+Every node is `bind* → before? → step+ → after?`: `bind` declares data that already exists when the plan is built,
+`before` and `after` each carry at most one id, task, or builder, and `step` adds children. One class literal per
+definition root, one identifier per hook, and ordinary static Java for the behaviour: no functional interfaces, no
+reflective fixture lookup, and no unchecked casts. Hooks read what they need from the context by name.
 
 ## Requirements
 
@@ -64,18 +63,25 @@ interfaces, no reflective fixture lookup, and no unchecked casts. Hooks read wha
 
 ## The model
 
-One immutable definition type, `Task`:
+One sealed definition type, `Task`, implemented by `Sequential`, `Parallel`, and `Repeat`:
 
-- **`sequential` / `parallel`** describe how a task's direct children run. `parallel` always names a `Pool`.
+- **`Sequential.builder(...)` / `Parallel.builder(...)` / `Repeat.builder(...)`** are the authoring entry points.
+  `Parallel` always names a `Pool`; `Repeat` always names a finite `maxIterations`.
 - **`dependent()` / `independent()`** describe only *failure continuation* of ordered children, so they exist on
   sequential builders only. `dependent` is the default.
 - **`@Paramixel.Id`** names a hook; the tree refers to it by that identifier, which is also the label reported for the
   hook. Hooks must be `public static` and take one `Context` (plus a `Status` for repeat predicates).
-- **`bind(name, value)`** publishes authoring-time data into the context scope; `put`/`require`/`find`/`remove` are the
-  runtime store. The framework never closes a stored value and never probes for `AutoCloseable` — release is authored in
+- **`bind(name, value)`** declares data that already exists when the plan is built: it is seeded into the node's scope
+  before its `before` slot and reported as a plan parameter. `put`/`require`/`find`/`remove` are the runtime store, for
+  resources created while the test runs (a started container, a client, a temporary directory). The framework never closes a stored value and never probes for `AutoCloseable` — release is authored in
   `after`, with `find` for partial state.
 - **`.step(id)`** adds a body-only child; **`.body(id)`** puts a body on the occurrence itself, which is how a step keeps
   both a body and children.
+- **`.before(...)` / `.after(...)`** take an id, a `Task`, or a builder and may be called once each. Several setup or
+  cleanup phases compose into one subtree, for example
+  `.after(Sequential.builder("cleanup").independent().step(tearDownB).step(tearDownA))`; a `Sequential` cleanup subtree
+  is `dependent()` by default, so a failing cleanup step skips the later ones, and `independent()` is how a cleanup that
+  must always finish declares itself.
 - **`repeat`, `retry`, `timeout`, `isolated`, `tags`, `shuffle`, `onlyIf(id)`** are declarations on the definition,
   validated before anything runs.
 
@@ -104,7 +110,7 @@ pass. `Result.status()` is the semantic outcome; `Result.exitCode()` applies `pa
 
 ## Discovery
 
-`@Paramixel.Factory` methods must be `public static`, take no parameters, and return a `Task` or a builder, rooted at the
+`@Paramixel.TaskFactory` methods must be `public static`, take no parameters, and return a `Task` or a builder, rooted at the
 factory's own class so its identifiers resolve. Returning `null` is an explicit skip. `@BeforeAll` / `@AfterAll` wrap the
 discovered run, `@Disabled` excludes a factory, `@Tag` and `Selector` select, and `@Priority` orders.
 

@@ -19,8 +19,6 @@ package org.paramixel.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assumptions.assumeThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.task;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -122,7 +120,7 @@ class ConfigurationTest {
     @DisplayName("runner pool overrides take precedence over configuration")
     void poolPrecedence() {
         final var definition =
-                parallel("root", Pool.named("p")).step("work", () -> {}).build();
+                Parallel.builder("root", Pool.named("p")).step("work", () -> {}).build();
         final var configuration = Configuration.of(Map.of("paramixel.parallelism.p", "1"));
 
         final var fromConfiguration = new PlanCompiler(configuration, Map.of()).compile(definition);
@@ -136,7 +134,7 @@ class ConfigurationTest {
     @DisplayName("processor-relative pool expressions resolve to at least one")
     void coresExpressions() {
         final var definition =
-                parallel("root", Pool.named("p")).step("work", () -> {}).build();
+                Parallel.builder("root", Pool.named("p")).step("work", () -> {}).build();
         for (String expression : new String[] {"@cores", "@cores*2", "@cores/2", "@cores*1000"}) {
             final var plan = new PlanCompiler(Configuration.of(Map.of("paramixel.parallelism.p", expression)), Map.of())
                     .compile(definition);
@@ -151,7 +149,7 @@ class ConfigurationTest {
                 .as("overflow needs at least two processors")
                 .isGreaterThanOrEqualTo(2);
         final var definition =
-                parallel("root", Pool.named("p")).step("work", () -> {}).build();
+                Parallel.builder("root", Pool.named("p")).step("work", () -> {}).build();
         // cores * operand exceeds Long.MAX_VALUE for any core count of two or more.
         final var expression = "@cores*" + (Long.MAX_VALUE / 2 + 1);
 
@@ -165,7 +163,7 @@ class ConfigurationTest {
     @DisplayName("an invalid pool capacity fails compilation with a repair hint")
     void invalidPoolCapacity() {
         final var definition =
-                parallel("root", Pool.named("p")).step("work", () -> {}).build();
+                Parallel.builder("root", Pool.named("p")).step("work", () -> {}).build();
 
         assertThatThrownBy(() -> new PlanCompiler(Configuration.of(Map.of("paramixel.parallelism.p", "zero")), Map.of())
                         .compile(definition))
@@ -181,7 +179,7 @@ class ConfigurationTest {
                 .listener(Listener.NOOP)
                 .configuration(Configuration.of(Map.of("paramixel.unexpectedSetting", "2")))
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(result.diagnostics())
@@ -198,7 +196,8 @@ class ConfigurationTest {
                 .configuration(Configuration.of(Map.of(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS, "0")))
                 .build();
 
-        assertThatThrownBy(() -> invalid.run(task("root").step("work", () -> {}).build()))
+        assertThatThrownBy(() -> invalid.run(
+                        Sequential.builder("root").step("work", () -> {}).build()))
                 .isInstanceOf(ConfigurationException.class)
                 .hasMessageContaining(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS);
 
@@ -206,7 +205,7 @@ class ConfigurationTest {
                 .listener(Listener.NOOP)
                 .configuration(Configuration.of(Map.of(Configuration.LISTENER_DRAIN_TIMEOUT_MILLIS, "1000")))
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
         assertThat(result.diagnostics())
@@ -220,7 +219,7 @@ class ConfigurationTest {
                 .listener(Listener.NOOP)
                 .configuration(Configuration.of(Map.of(Configuration.SHUTDOWN_GRACE_MILLIS, "3000000000")))
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(result.status().kind()).isEqualTo(Status.Kind.PASSED);
     }

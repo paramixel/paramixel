@@ -17,9 +17,6 @@
 package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
-import static org.paramixel.api.Tasks.task;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,10 +47,10 @@ class ParallelSchedulingTest {
     void poolCapacityIsEnforced() {
         final AtomicInteger active = new AtomicInteger();
         final AtomicInteger peak = new AtomicInteger();
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 100).boxed().toList(),
-                        index -> task("child-" + index).step("work", () -> {
+                        index -> Sequential.builder("child-" + index).step("work", () -> {
                             final var current = active.incrementAndGet();
                             peak.accumulateAndGet(current, Math::max);
                             try {
@@ -77,10 +74,10 @@ class ParallelSchedulingTest {
     void sharedPoolIsGlobal() {
         final AtomicInteger active = new AtomicInteger();
         final AtomicInteger peak = new AtomicInteger();
-        final Task group = parallel("group", Pool.named("shared"))
+        final Task group = Parallel.builder("group", Pool.named("shared"))
                 .each(
                         IntStream.range(0, 10).boxed().toList(),
-                        index -> task("child-" + index).step("work", () -> {
+                        index -> Sequential.builder("child-" + index).step("work", () -> {
                             final var current = active.incrementAndGet();
                             peak.accumulateAndGet(current, Math::max);
                             try {
@@ -91,8 +88,8 @@ class ParallelSchedulingTest {
                         }))
                 .build();
 
-        final Task definition = task("root")
-                .step("first", () -> {}, children -> children.child(group))
+        final Task definition = Sequential.builder("root")
+                .step("first", () -> {}, children -> children.step(group))
                 .build();
 
         final var result = Runner.builder()
@@ -108,7 +105,7 @@ class ParallelSchedulingTest {
     @Test
     @DisplayName("SCHED-04: nested groups with distinct pools complete and report every child")
     void nestedDistinctPoolsComplete() {
-        final Task definition = parallel("outer", Pool.named("outer"))
+        final Task definition = Parallel.builder("outer", Pool.named("outer"))
                 .parallel(
                         "middle",
                         Pool.named("middle"),
@@ -135,7 +132,7 @@ class ParallelSchedulingTest {
     @DisplayName("SCHED-03: a parent waiting on children does not occupy a worker")
     void coordinatorDoesNotPinWorker() {
         // With a single worker, a parent that stayed on the worker while waiting for its child would deadlock.
-        final Task definition = sequential("root")
+        final Task definition = Sequential.builder("root")
                 .step("nested", () -> {}, children -> children.step("inner", () -> Thread.sleep(5L)))
                 .step("after", () -> {})
                 .build();
@@ -160,9 +157,9 @@ class ParallelSchedulingTest {
         // a1, a2 must precede b1. What is *not* guaranteed — and was never deterministic — is the interleaving of
         // bodies across branches that are admitted at the same time.
         final List<String> order = Collections.synchronizedList(new ArrayList<>());
-        final Task definition = parallel("root", Pool.named("p"))
-                .child(sequential("a").step("a1", () -> order.add("a1")).step("a2", () -> order.add("a2")))
-                .child(task("b").step("b1", () -> order.add("b1")))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
+                .step(Sequential.builder("a").step("a1", () -> order.add("a1")).step("a2", () -> order.add("a2")))
+                .step(Sequential.builder("b").step("b1", () -> order.add("b1")))
                 .build();
 
         final var result = run(definition, Pool.named("p"), 1);
@@ -175,7 +172,7 @@ class ParallelSchedulingTest {
     @DisplayName("SCHED-11: a failed parallel sibling does not cancel other siblings")
     void failureDoesNotCancelSiblings() {
         final AtomicInteger passed = new AtomicInteger();
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .step("fail", () -> {
                     throw new IllegalStateException("boom");
                 })
@@ -195,10 +192,10 @@ class ParallelSchedulingTest {
         final AtomicInteger active = new AtomicInteger();
         final AtomicInteger peak = new AtomicInteger();
         final AtomicInteger finalized = new AtomicInteger();
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 4).boxed().toList(),
-                        index -> sequential("item-" + index)
+                        index -> Sequential.builder("item-" + index)
                                 .before(() -> {
                                     final var current = active.incrementAndGet();
                                     peak.accumulateAndGet(current, Math::max);
@@ -223,11 +220,13 @@ class ParallelSchedulingTest {
     void noFixtureWhileWaiting() {
         final AtomicInteger created = new AtomicInteger();
         final CountDownLatch release = new CountDownLatch(1);
-        final Task definition = parallel("root", Pool.named("p"))
-                .child(sequential("blocker")
+        final Task definition = Parallel.builder("root", Pool.named("p"))
+                .step(Sequential.builder("blocker")
                         .before(created::incrementAndGet)
                         .step("hold", () -> release.await(5, TimeUnit.SECONDS)))
-                .child(sequential("waiter").before(created::incrementAndGet).step("quick", () -> {}))
+                .step(Sequential.builder("waiter")
+                        .before(created::incrementAndGet)
+                        .step("quick", () -> {}))
                 .build();
 
         final Thread releaser = new Thread(() -> {
@@ -253,10 +252,12 @@ class ParallelSchedulingTest {
     @Test
     @DisplayName("SCHED-15: a large finite tree terminates with a stable result cardinality")
     void largeTreeTerminates() {
-        final Task definition = parallel("root", Pool.named("p"))
+        final Task definition = Parallel.builder("root", Pool.named("p"))
                 .each(
                         IntStream.range(0, 500).boxed().toList(),
-                        index -> task("child-" + index).step("one", () -> {}).step("two", () -> {}))
+                        index -> Sequential.builder("child-" + index)
+                                .step("one", () -> {})
+                                .step("two", () -> {}))
                 .build();
 
         final var result = run(definition, Pool.named("p"), 8);

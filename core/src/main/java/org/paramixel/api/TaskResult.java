@@ -19,7 +19,10 @@ package org.paramixel.api;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -50,12 +53,29 @@ public final class TaskResult {
         ATTEMPT
     }
 
+    /**
+     * Where a result node sits in its parent's lifecycle.
+     */
+    public enum Slot {
+
+        /** An ordinary child of the parent. */
+        CHILD,
+
+        /** The parent's {@code before} subtree. */
+        BEFORE,
+
+        /** The parent's {@code after} subtree. */
+        AFTER
+    }
+
     private final Kind kind;
     private final String occurrenceId;
     private final String definitionId;
     private final String parentOccurrenceId;
     private final String name;
     private final String path;
+    private final Map<String, String> parameters;
+    private final Slot slot;
     private final List<String> tags;
     private final ExecutionMode mode;
     private final String poolName;
@@ -85,6 +105,8 @@ public final class TaskResult {
         this.parentOccurrenceId = builder.identity.parentOccurrenceId();
         this.name = builder.identity.name();
         this.path = builder.identity.path();
+        this.parameters = Collections.unmodifiableMap(new LinkedHashMap<>(builder.parameters));
+        this.slot = builder.slot;
         this.tags = List.copyOf(builder.tags);
         this.mode = builder.attributes.mode();
         this.poolName = builder.attributes.poolName();
@@ -173,6 +195,29 @@ public final class TaskResult {
      */
     public String path() {
         return path;
+    }
+
+    /**
+     * Returns the plan parameters declared on this node.
+     *
+     * <p>A parameter is a value the node declared with {@code bind}, rendered once when the plan was built with
+     * {@link Object#toString()} and truncated to 256 characters plus {@code …}. Parameters belong to the node that
+     * declared them: they are never copied onto descendants, and a value stored at runtime with
+     * {@link Context#put(String, Object)} is never reported.
+     *
+     * @return the immutable rendered parameters, in declaration order; never {@code null}
+     */
+    public Map<String, String> parameters() {
+        return parameters;
+    }
+
+    /**
+     * Returns where this node sits in its parent's lifecycle.
+     *
+     * @return the slot; never {@code null}
+     */
+    public Slot slot() {
+        return slot;
     }
 
     /**
@@ -408,6 +453,8 @@ public final class TaskResult {
 
         private Kind kind = Kind.TASK;
         private Identity identity = new Identity(null, null, null, null, null);
+        private Map<String, String> parameters = new LinkedHashMap<>();
+        private Slot slot = Slot.CHILD;
         private List<String> tags = new ArrayList<>();
         private Attributes attributes = new Attributes(ExecutionMode.SEQUENTIAL, null, null, null, List.of());
         private Status status = Status.PENDING;
@@ -452,6 +499,28 @@ public final class TaskResult {
                 final String name,
                 final String path) {
             this.identity = new Identity(occurrenceId, definitionId, parentOccurrenceId, name, path);
+            return this;
+        }
+
+        /**
+         * Sets the rendered plan parameters.
+         *
+         * @param values the parameters; must not be {@code null}
+         * @return this builder
+         */
+        public Builder parameters(final Map<String, String> values) {
+            this.parameters = new LinkedHashMap<>(Objects.requireNonNull(values, "parameters is null"));
+            return this;
+        }
+
+        /**
+         * Sets where this node sits in its parent's lifecycle.
+         *
+         * @param value the slot; must not be {@code null}
+         * @return this builder
+         */
+        public Builder slot(final Slot value) {
+            this.slot = Objects.requireNonNull(value, "slot is null");
             return this;
         }
 
@@ -610,6 +679,7 @@ public final class TaskResult {
             Objects.requireNonNull(identity.path(), "path is null");
             Objects.requireNonNull(status, "status is null");
             Objects.requireNonNull(attributes.mode(), "mode is null");
+            Objects.requireNonNull(slot, "slot is null");
             return new TaskResult(this);
         }
     }

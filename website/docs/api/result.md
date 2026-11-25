@@ -26,10 +26,17 @@ public interface Result { /* read-only accessors */ }
 ```text
 TaskResult
   kind (TASK or ATTEMPT), occurrenceId, definitionId, parentOccurrenceId, name, path, tags
+  parameters (the node's rendered bind values), slot (CHILD, BEFORE, AFTER)
   mode, pool, lock, shuffleSeed, executionOrder
   status, bodyStatus, phases, children, failures, reason, attemptIndex, timedOut
   queuedAt, admittedAt, startedAt, completedAt, wait/execution/finalization durations
 ```
+
+`parameters()` holds the node's plan parameters: the values it declared with `bind`, rendered at build time. They are
+never copied onto descendants, and a value stored at runtime with `Context.put` is not a parameter.
+
+`slot()` says whether the node is an ordinary child of its parent or that parent's `before` or `after` subtree. A phase
+subtree is reported under its owner, with its own children beneath it.
 
 Two facts are deliberately separate: `status()` is the aggregate including children and finalizers, while
 `bodyStatus()` is the outcome of the task's own body. A passed body cannot conceal a failed subtree.

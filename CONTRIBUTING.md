@@ -142,7 +142,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 ### Writing Tests
 
 - Place tests in the `examples/` module under `src/main/java/`
-- Use the `@Paramixel.Factory` annotation on static methods that return `Action` trees
+- Use the `@Paramixel.TaskFactory` annotation on static methods that return a `Task` or a `TaskBuilder`
 - Use descriptive test names and argument names
 - Test edge cases and error conditions
 

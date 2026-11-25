@@ -22,6 +22,10 @@ package org.paramixel.api;
  * <p>The order of the constants is the normal phase order of a task occurrence:
  * {@code ADMITTED → CONDITION → BEFORE → BODY → CHILDREN → AFTER → TERMINAL}.
  * A task without a phase skips it. A {@code CONDITION} phase is reported only when the task declares a condition.
+ *
+ * <p>A {@code BEFORE} or {@code AFTER} phase result is reported for an identified hook slot ({@code before[setUp]}). A
+ * slot that holds a task subtree is reported as an occurrence under its owner instead, and that occurrence carries its
+ * own phases.
  */
 public enum TaskPhase {
 
@@ -31,9 +35,7 @@ public enum TaskPhase {
     /** A runtime condition of the task was evaluated. */
     CONDITION,
 
-    /** A runtime condition of the task was evaluated. */
-
-    /** A {@code before} callback ran. */
+    /** A {@code before} hook ran. */
     BEFORE,
 
     /** The task's own body operation ran. */
@@ -45,10 +47,8 @@ public enum TaskPhase {
     /** The task's direct child group ran. */
     CHILDREN,
 
-    /** An {@code after} callback ran. */
+    /** An {@code after} hook ran. */
     AFTER,
-
-    /** The task released its remaining keyed resources. */
 
     /** The task reached its terminal status. */
     TERMINAL

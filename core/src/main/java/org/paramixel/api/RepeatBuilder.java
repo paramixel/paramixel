@@ -16,21 +16,22 @@
 
 package org.paramixel.api;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 import nonapi.org.paramixel.authoring.IdResolver;
 import org.paramixel.api.support.Backoff;
 import org.paramixel.api.support.RepeatPolicy;
+import org.paramixel.api.support.RetryPolicy;
 
 /**
- * Authors a bounded repetition task.
+ * Authors a {@link Repeat} task.
  *
  * <p>The iteration bound is mandatory: {@link #maxIterations(int)} must be called before the definition can be built.
  * Each iteration is a distinct execution attempt with its own status and timestamps. A repeated task owns its context
  * scope, so every iteration starts with an empty scope and state written by one iteration never reaches the next.
- * @see org.paramixel.api.support.RepeatPolicy
- * @see org.paramixel.api.support.RetryPolicy
+ *
+ * @see RepeatPolicy
+ * @see RetryPolicy
  */
 public final class RepeatBuilder extends TaskBuilder<RepeatBuilder> {
 
@@ -45,6 +46,24 @@ public final class RepeatBuilder extends TaskBuilder<RepeatBuilder> {
     @Override
     protected RepeatBuilder self() {
         return this;
+    }
+
+    @Override
+    Repeat newTask(final TaskState state) {
+        return new Repeat(state);
+    }
+
+    /**
+     * Builds the immutable repetition task.
+     *
+     * @return the immutable task; never {@code null}
+     * @throws IllegalStateException if no iteration bound was declared
+     * @throws org.paramixel.api.exception.CompilationException if an identifier is unknown, ambiguous, malformed, or has
+     *     no anchor, or if one builder is attached more than once in this tree
+     */
+    @Override
+    public Repeat build() {
+        return (Repeat) super.build();
     }
 
     /**
@@ -72,13 +91,13 @@ public final class RepeatBuilder extends TaskBuilder<RepeatBuilder> {
     /**
      * Stops iterating when the supplied predicate returns {@code true}.
      *
-     * @param until the predicate; must not be {@code null}
+     * @param untilPredicate the predicate; must not be {@code null}
      * @return this builder
-     * @throws NullPointerException if {@code until} is {@code null}
+     * @throws NullPointerException if {@code untilPredicate} is {@code null}
      */
-    public RepeatBuilder until(final BiPredicate<Context, Status> until) {
-        Objects.requireNonNull(until, "until is null");
-        policy.until(until);
+    public RepeatBuilder until(final BiPredicate<Context, Status> untilPredicate) {
+        Objects.requireNonNull(untilPredicate, "until is null");
+        policy.until(untilPredicate);
         return this;
     }
 
@@ -116,15 +135,16 @@ public final class RepeatBuilder extends TaskBuilder<RepeatBuilder> {
     }
 
     @Override
-    Task materialize(final Class<?> inheritedAnchor, final List<String> problems) {
+    Task materialize(final Class<?> inheritedAnchor, final BuildContext context) {
         if (untilId != null) {
-            final var predicate = IdResolver.resolveUntil(untilId, effectiveAnchor(inheritedAnchor), problems);
+            final var predicate =
+                    IdResolver.resolveUntil(untilId, effectiveAnchor(inheritedAnchor), context.problems());
             if (predicate != null) {
                 policy.until(predicate);
             }
             untilId = null;
         }
         setRepeat(policy.build());
-        return super.materialize(inheritedAnchor, problems);
+        return super.materialize(inheritedAnchor, context);
     }
 }

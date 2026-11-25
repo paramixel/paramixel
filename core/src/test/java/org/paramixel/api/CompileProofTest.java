@@ -99,13 +99,12 @@ class CompileProofTest {
     @DisplayName("API-01: the canonical per-environment fixture compiles without class tokens on steps")
     void basicTestExampleCompiles() throws IOException {
         assertCompiles("BasicStyleTest", """
-                import static org.paramixel.api.Tasks.parallel;
-                import static org.paramixel.api.Tasks.sequential;
-
                 import java.util.List;
                 import org.paramixel.api.Context;
+                import org.paramixel.api.Parallel;
                 import org.paramixel.api.Paramixel;
                 import org.paramixel.api.Pool;
+                import org.paramixel.api.Sequential;
                 import org.paramixel.api.Task;
 
                 public final class BasicStyleTest {
@@ -116,14 +115,14 @@ class CompileProofTest {
                     private static final String SET_UP = "setUp";
                     private static final String TEAR_DOWN = "tearDown";
 
-                    @Paramixel.Factory
+                    @Paramixel.TaskFactory
                     public static Task factory() throws Throwable {
-                        final var root = parallel(BasicStyleTest.class, "BasicStyleTest", Pool.named("environments"));
+                        final var root = Parallel.builder(BasicStyleTest.class, "BasicStyleTest", Pool.named("environments"));
                         for (final var environment : List.of(new Environment("plain"), new Environment("tls"))) {
-                            root.child(sequential(environment.name())
+                            root.step(Sequential.builder(environment.name())
                                     .bind(ENVIRONMENT, environment)
                                     .before(SET_UP)
-                                    .child(sequential("tests")
+                                    .step(Sequential.builder("tests")
                                             .step("testHealthy")
                                             .step("testTextMetrics")
                                             .step("testOpenMetrics"))
@@ -156,13 +155,12 @@ class CompileProofTest {
     @DisplayName("API-02: the canonical compatibility matrix compiles")
     void kafkaExampleCompiles() throws IOException {
         assertCompiles("KafkaStyleTest", """
-                import static org.paramixel.api.Tasks.parallel;
-                import static org.paramixel.api.Tasks.sequential;
-
                 import java.util.List;
                 import org.paramixel.api.Context;
+                import org.paramixel.api.Parallel;
                 import org.paramixel.api.Paramixel;
                 import org.paramixel.api.Pool;
+                import org.paramixel.api.Sequential;
                 import org.paramixel.api.Task;
 
                 public final class KafkaStyleTest {
@@ -172,14 +170,14 @@ class CompileProofTest {
                     private static final String ENVIRONMENT = "environment";
                     private static final String MESSAGE = "message";
 
-                    @Paramixel.Factory
+                    @Paramixel.TaskFactory
                     public static Task factory() throws Throwable {
-                        final var root = parallel(KafkaStyleTest.class, "Kafka compatibility", Pool.named("environments"));
+                        final var root = Parallel.builder(KafkaStyleTest.class, "Kafka compatibility", Pool.named("environments"));
                         for (final var environment : List.of(new Environment("kafka-1"), new Environment("kafka-2"))) {
-                            root.child(sequential(environment.name())
+                            root.step(Sequential.builder(environment.name())
                                     .bind(ENVIRONMENT, environment)
                                     .before("setUp")
-                                    .child(sequential("tests").step("produce").step("consume"))
+                                    .step(Sequential.builder("tests").step("produce").step("consume"))
                                     .after("tearDown"));
                         }
                         return root.build();
@@ -208,13 +206,12 @@ class CompileProofTest {
     @DisplayName("API-03/06/07: nested subtrees, bodies with children, and heterogeneous matrices compile")
     void nestedAndHeterogeneousExamplesCompile() throws IOException {
         assertCompiles("NestedStyleTest", """
-                import static org.paramixel.api.Tasks.parallel;
-                import static org.paramixel.api.Tasks.sequential;
-
                 import java.util.List;
                 import org.paramixel.api.Context;
+                import org.paramixel.api.Parallel;
                 import org.paramixel.api.Paramixel;
                 import org.paramixel.api.Pool;
+                import org.paramixel.api.Sequential;
                 import org.paramixel.api.Task;
 
                 public final class NestedStyleTest {
@@ -229,27 +226,27 @@ class CompileProofTest {
                     private static final String INDEX = "index";
 
                     public static Task definition() {
-                        final var root = sequential(NestedStyleTest.class, "Integration suite")
+                        final var root = Sequential.builder(NestedStyleTest.class, "Integration suite")
                                 .step("validateConfiguration");
                         for (final Fixture fixture : List.of(new One(), new Two())) {
-                            root.child(sequential(fixture.getClass().getSimpleName())
+                            root.step(Sequential.builder(fixture.getClass().getSimpleName())
                                     .bind(FIXTURE, fixture)
                                     .before("verifySetup")
                                     .step("verify")
                                     .after("verifyTeardown"));
                         }
-                        root.child(sequential("Group").step("ping"));
-                        final var matrix = parallel("Matrix", Pool.named("environments"));
+                        root.step(Sequential.builder("Group").step("ping"));
+                        final var matrix = Parallel.builder("Matrix", Pool.named("environments"));
                         for (final var name : List.of("a", "b")) {
-                            matrix.child(sequential(name)
+                            matrix.step(Sequential.builder(name)
                                     .bind(INDEX, name)
-                                    .child(sequential("Consume")
+                                    .step(Sequential.builder("Consume")
                                             .body("consume")
-                                            .child(parallel("Record checks", Pool.named("checks"))
+                                            .step(Parallel.builder("Record checks", Pool.named("checks"))
                                                     .step("verifyPayload")
                                                     .step("verifyHeaders"))));
                         }
-                        return root.child(matrix).build();
+                        return root.step(matrix).build();
                     }
 
                     @Paramixel.Id("validateConfiguration")
@@ -285,12 +282,12 @@ class CompileProofTest {
     @DisplayName("API-04: independent() does not exist on a parallel builder")
     void independentOnParallelDoesNotCompile() throws IOException {
         assertDoesNotCompile("ParallelIndependent", """
-                import static org.paramixel.api.Tasks.*;
+                import org.paramixel.api.Parallel;
                 import org.paramixel.api.Pool;
 
                 public final class ParallelIndependent {
                     public static void definition() {
-                        parallel("x", Pool.named("p")).independent();
+                        Parallel.builder("x", Pool.named("p")).independent();
                     }
                 }
                 """);
@@ -300,11 +297,11 @@ class CompileProofTest {
     @DisplayName("API-05: a raw string pool identifier does not compile")
     void rawStringPoolDoesNotCompile() throws IOException {
         assertDoesNotCompile("RawStringPool", """
-                import org.paramixel.api.Tasks;
+                import org.paramixel.api.Parallel;
 
                 public final class RawStringPool {
                     public static void definition() {
-                        Tasks.parallel("x", "pool");
+                        Parallel.builder("x", "pool");
                     }
                 }
                 """);
@@ -314,7 +311,7 @@ class CompileProofTest {
     @DisplayName("API-08: the typed authoring surface is not public")
     void typedAuthoringSurfaceIsNotPublic() throws IOException {
         assertDoesNotCompile("TypedInstance", """
-                import static org.paramixel.api.Tasks.instance;
+                import static org.paramixel.api.Sequential.instance;
 
                 public final class TypedInstance {
 
@@ -327,11 +324,11 @@ class CompileProofTest {
                 """);
 
         assertDoesNotCompile("TypedStep", """
-                import static org.paramixel.api.Tasks.sequential;
+                import org.paramixel.api.Sequential;
 
                 public final class TypedStep {
                     public static void definition() {
-                        sequential("x").step("run", () -> {});
+                        Sequential.builder("x").step("run", () -> {});
                     }
                 }
                 """);

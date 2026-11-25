@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * trailing whitespace are rejected at construction time rather than being trimmed. Equal names produce equal values,
  * so two independently constructed references to {@code "environments"} are interchangeable.
  *
- * @see org.paramixel.api.Tasks#parallel(String, Pool)
+ * @see Parallel#builder(String, Pool)
  */
 public final class Pool {
 

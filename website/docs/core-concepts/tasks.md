@@ -9,22 +9,24 @@ description: One immutable definition type for steps, groups, instance scopes, c
 repetition, and a timeout boundary are all the same immutable `Task` with different typed attributes.
 
 ```java
-public final class Task {
-    public String name();
-    public ExecutionMode mode();          // SEQUENTIAL or PARALLEL
-    public Optional<Pool> pool();
-    public boolean dependent();
-    public List<Task> children();
-    public List<TaskCallback> before();
-    public List<TaskCallback> after();
-    public Optional<TaskCallback> body();
-    public Optional<TaskFactory> instanceFactory();
-    // condition, timeout, retry, repeat, exclusive lock, resources, tags, shuffle seed
+public sealed interface Task permits Sequential, Parallel, Repeat {
+    String name();
+    ExecutionMode mode();                 // SEQUENTIAL or PARALLEL
+    Optional<Pool> pool();
+    boolean dependent();
+    List<Task> children();
+    Optional<Class<?>> anchor();
+    Map<String, Object> bindings();
+    Map<String, String> parameters();
+    Optional<PhaseHook> before();
+    Optional<PhaseHook> after();
+    Optional<TaskCallback> body();
+    // condition, timeout, retry, repeat, exclusive lock, tags, shuffle seed, isEmpty
 }
 ```
 
 A task holds no status, no fixture, and no timestamps. It is a definition, and a definition is reusable: each inclusion
-under a parent compiles into a distinct execution occurrence with its own identity and its own owned instance.
+under a parent compiles into a distinct execution occurrence with its own identity and its own scope.
 
 ## Body plus children
 
@@ -35,31 +37,31 @@ admission → condition → before → body → child group → after → termin
 ```
 
 The body runs before and independently of the children group; body success gates the children. Finalization never
-depends on success: `after` hooks run in reverse declaration order and are all attempted.
+depends on success: the `after` slot runs once the node has started, whatever failed before it.
 
 ```java
-sequential(environment.name())
-    .bind(ENVIRONMENT, environment)
-    .before(ID_SET_UP)
-    .child(sequential("Messaging")
-            .independent()
-            .child(sequential("Produce")
-                    .body(ID_PRODUCE)
-                    .child(sequential("Verify topic").independent().step(ID_VERIFY_TOPIC))
-                    .child(sequential("Verify offsets").independent().step(ID_VERIFY_OFFSETS)))
-            .step(ID_CONSUME))
-    .after(ID_TEAR_DOWN);
+Sequential.builder(MySuite.class, environment.name())
+        .bind(ENVIRONMENT, environment)
+        .before(ID_SET_UP)
+        .step(Sequential.builder("Messaging")
+                .independent()
+                .step(Sequential.builder("Produce")
+                        .body(ID_PRODUCE)
+                        .step(Sequential.builder("Verify topic").independent().step(ID_VERIFY_TOPIC))
+                        .step(Sequential.builder("Verify offsets").independent().step(ID_VERIFY_OFFSETS)))
+                .step(ID_CONSUME))
+        .after(ID_TEAR_DOWN);
 ```
 
 ## Sequential and parallel
 
-`sequential` and `parallel` describe how a task's **direct children** run. `parallel` always names a `Pool`; a raw
-string pool identifier does not compile.
+`Sequential.builder(...)` and `Parallel.builder(...)` describe how a task's **direct children** run. `parallel` always
+names a `Pool`; a raw string pool identifier does not compile.
 
 ```java
-final var root = parallel(MySuite.class, "Compatibility matrix", Pool.named("environments"));
+final var root = Parallel.builder(MySuite.class, "Compatibility matrix", Pool.named("environments"));
 for (final var environment : environments) {
-    root.child(sequential(environment.name())
+    root.step(Sequential.builder(environment.name())
             .bind(ENVIRONMENT, environment)
             .step(ID_VERIFY));
 }
@@ -82,7 +84,7 @@ switches, and they affect only the direct children of the task that declares the
 | --- | --- |
 | `timeout(Duration)` | Cooperative deadline for the task and its subtree |
 | `retry(RetryPolicy)` | Bounded re-attempt of a non-success status |
-| `child(repeat(name).maxIterations(n).until(id))` | Bounded intentional replay with an optional stop predicate |
+| `child(Repeat.builder(name).maxIterations(n).until(id))` | Bounded intentional replay with an optional stop predicate |
 | `onlyIf(id)` | Runtime condition evaluated after admission; the hook returns `boolean` |
 | `isolated(lockName)` | Exclusive logical lock held for the task's lifetime |
 | `tags(String…)` | Diagnostics, selection, and reporting metadata |

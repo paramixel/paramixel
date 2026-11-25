@@ -121,7 +121,7 @@ public final class IdResolver {
         if (anchor == null) {
             problems.add("Id \"" + id + "\" used by " + role.label()
                     + "(...) in a definition with no anchor; root the definition at"
-                    + " Tasks.sequential(Owner.class, \"name\") so ids can be resolved");
+                    + " Sequential.builder(Owner.class, \"name\") so ids can be resolved");
             return null;
         }
         final var index = declaredIds(anchor);

@@ -17,13 +17,13 @@
 package examples.retry;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.support.Backoff;
@@ -66,12 +66,12 @@ public class RetryTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         attempts.set(0);
         instancesCreated.set(0);
 
-        return sequential(RetryTest.class, "retry-example")
+        return Sequential.builder(RetryTest.class, "retry-example")
                 .retry(RetryPolicy.builder()
                         .maxAttempts(3)
                         .backoff(Backoff.linear(Duration.ofMillis(25)))

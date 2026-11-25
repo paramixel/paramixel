@@ -1,6 +1,6 @@
 ---
 title: TaskBuilder
-description: Typed fluent authoring with generic instance inheritance and immutable snapshots.
+description: The single-slot authoring surface for before, step, and after.
 ---
 
 # TaskBuilder
@@ -8,15 +8,18 @@ description: Typed fluent authoring with generic instance inheritance and immuta
 ```java
 public abstract class TaskBuilder<S extends TaskBuilder<S>> {
     public S before(String id);
-    public S after(String id);
+    public S before(Task task);
+    public S before(TaskBuilder<?> builder);
     public S step(String id);
+    public S step(Task task);
+    public S step(TaskBuilder<?> builder);
+    public S after(String id);
+    public S after(Task task);
+    public S after(TaskBuilder<?> builder);
     public S body(String id);
     public S onlyIf(String id);
 
     public S bind(String name, Object value);
-    public S child(Task child);
-    public S child(TaskBuilder<?> child);
-    public S children(Collection<? extends TaskBuilder<?>> builders);
 
     public S shuffle();
     public S shuffle(long seed);
@@ -24,84 +27,107 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
     public S timeout(Duration timeout);
     public S retry(RetryPolicy policy);
     public S isolated(String lockName);
-    public Task build();
 }
 ```
+
+`build()` is declared by each concrete builder and returns that builder's node type: `SequentialBuilder.build()` returns
+`Sequential`, `ParallelBuilder.build()` returns `Parallel`, and `RepeatBuilder.build()` returns `Repeat`.
 
 Every hook is an ordinary `public static` method named by a stable identifier, and the tree refers to it by that
 identifier. There is no functional-interface overload and no generic instance type.
 
-## Anchors and identifiers
+## The node grammar
+
+Every node is exactly:
+
+```
+bind*  →  before?  →  step+  →  after?
+```
+
+- `bind` declares a value that **already exists when the plan is built**. It may be called any number of times, never
+  accepts a supplier or lambda, and a duplicate name on one node throws `IllegalArgumentException`.
+- `before` and `after` are **single slots**. Each takes an annotation id, a `Task`, or a `TaskBuilder`; a second call
+  throws `IllegalStateException` at the call site.
+- `step` adds children in declaration order and takes the same three argument kinds.
 
 ```java
-public class ScenarioTest {
-
-    private static final String ID_START = "start";
-    private static final String ID_HEALTH = "health";
-    private static final String ID_STOP = "stop";
-    private static final String FIXTURE = "fixture";
-
-    @Paramixel.Factory
-    public static Task factory() {
-        return sequential(ScenarioTest.class, "ScenarioTest")
-                .bind(FIXTURE, new Scenario())
-                .before(ID_START)
-                .child(sequential("checks").step(ID_HEALTH))
-                .after(ID_STOP)
-                .build();
-    }
-
-    @Paramixel.Id(ID_START)
-    public static void start(final Context context) {
-        context.require(FIXTURE, Scenario.class).start();
-    }
-}
+Sequential.builder(ScenarioTest.class, "ScenarioTest")
+        .bind(ENVIRONMENT, environment)
+        .before(ID_START)
+        .step(Sequential.builder("checks").step(ID_HEALTH))
+        .after(ID_STOP);
 ```
 
 The class literal appears **once per definition root**; everything attached below it inherits it. Identifiers resolve
 only against methods declared by that class — inheritance is not consulted — and they are also the labels reported for
 the hooks (`before[start]`, `body[health]`).
 
+## Composing several setup or cleanup phases
+
+Because each slot holds one thing, several phases are composed into a subtree rather than repeated:
+
+```java
+// two setup phases, in order
+.before(Sequential.builder("setup").step(ID_START_DB).step(ID_START_APP))
+
+// two cleanup phases, keeping reverse order and run-all behavior
+.after(Sequential.builder("cleanup").independent().step(ID_STOP_APP).step(ID_STOP_DB))
+```
+
+A `Sequential` cleanup subtree is `dependent()` by default, so a failing cleanup step skips the later ones;
+`independent()` is how a cleanup that must always finish declares itself.
+
+## Bound values versus runtime state
+
+`bind` and `put` are deliberately different:
+
+| | `bind(name, value)` | `put(name, value)` |
+| --- | --- | --- |
+| When the value exists | Before the plan is built | While the test runs |
+| Where it is declared | On the node, visible to its subtree | In the scope of the occurrence that writes it |
+| Reported | Yes, as a plan parameter | Never |
+| Accepts a lambda or supplier | No | Not applicable: the value is passed in already created |
+
+A value that only exists while the test runs — a started container, a client, a temporary directory — is created in the
+`before` slot and stored with `put`:
+
+```java
+Sequential.builder(MyTest.class, "scenario")
+        .bind(ENVIRONMENT, environment)
+        .before(ID_SET_UP)
+        .step(ID_CHECK)
+        .after(ID_TEAR_DOWN);
+
+@Paramixel.Id(ID_SET_UP)
+public static void setUp(final Context context) throws Exception {
+    final var client = Client.start(context.require(ENVIRONMENT, Environment.class));
+    context.put(CLIENT, client);
+}
+```
+
 ## Builder rules
 
 - Identifiers are resolved when the definition is built, before any hook runs; every problem in one definition is
   reported together as a `CompilationException`.
-- `before` hooks run in declaration order until one fails; `after` hooks run in **reverse** declaration order and are
-  all attempted.
-- There is no hidden "current step". `.step(id)` adds a body-only child; a child that needs **both** a body and
-  children is written `child(sequential(name).body(id)…)`.
-- `.body(id)` attaches a body to the occurrence the builder already describes, which is how a body-bearing step keeps its
-  one-occurrence shape.
-- `bind` seeds the scope at the start of every attempt; a name must be unique on its own task.
-- Adding a builder snapshots it when it references no identifier; one that does is materialized when the anchor is
-  known, so treat it as immutable after attachment.
+- A builder passed to `before`, `step`, or `after` is **held**, not built: it is materialized when the parent is built,
+  so a change made to it after it was passed in still takes effect.
+- Passing the same builder instance more than once anywhere in one tree is an authoring error reported at build time.
+  Pass a built `Task` twice when the same subtree must appear in two places; each placement compiles to its own
+  occurrence.
+- `bind` places a value in the node's scope before its `before` slot runs, so the slot, the steps, the `after` slot, and
+  every descendant see it. A descendant that binds the same name shadows it inside its own subtree only.
 - `build()` returns a deep snapshot, may be called repeatedly, and performs no user work.
 
 ## Compile-time guidance
 
 - `.independent()` exists only on `SequentialBuilder`.
-- `parallel(name, Pool.named("x"))` requires a `Pool`; a second `String` does not compile.
-- `Tasks.instance(...)` and the callback overloads no longer exist: authoring goes through identifiers.
+- `Parallel.builder(name, Pool.named("x"))` requires a `Pool`; a second `String` does not compile.
+- `child(...)` and `children(...)` do not exist: children are added with `step(...)`.
+- A lambda body does not compile as a `before`, `step`, or `after` argument: the authoring surface takes an id, a
+  `Task`, or a `TaskBuilder`.
 - An identifier used in a definition with no anchor is rejected when the definition is built.
-
-
-- `before` callbacks run in declaration order until one fails; `after` callbacks run in **reverse** declaration order and
-  are all attempted.
-- There is no hidden "current step". Children are attached with the three-argument `step`, which takes an explicit
-  child-configuration callback.
-- `each` expands eagerly at definition time; a null mapping fails the definition immediately.
-- Adding a builder snapshots it: later mutation of the child cannot change an attached subtree.
-- `build()` returns a deep snapshot, may be called repeatedly, and performs no user work.
-
-## Compile-time guidance
-
-- `.independent()` exists only on `SequentialBuilder`.
-- `parallel(name, Pool.named("x"), …)` requires a `Pool`; a second `String` does not compile.
-- No-argument callbacks compile on a builder with no instance binding.
-- The explicit context-aware methods (`beforeWithContext`, `stepWithContext`, …) avoid ambiguous overloads for
-  one-argument method references.
 
 ## Next
 
-- [Named builders](../api/named-builders) — `sequential`, `parallel`, and repetition views.
+- [Named builders](../api/named-builders) — `Sequential`, `Parallel`, and repetition views.
 - [Result](../api/result) — what a run produces.

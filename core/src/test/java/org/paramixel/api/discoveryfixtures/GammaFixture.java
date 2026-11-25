@@ -16,10 +16,9 @@
 
 package org.paramixel.api.discoveryfixtures;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -37,9 +36,12 @@ public final class GammaFixture {
      * @return the definition
      */
     @Paramixel.Tag("gamma")
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return sequential(GammaFixture.class, "gamma").tags("gamma").step("run").build();
+        return Sequential.builder(GammaFixture.class, "gamma")
+                .tags("gamma")
+                .step("run")
+                .build();
     }
 
     /**

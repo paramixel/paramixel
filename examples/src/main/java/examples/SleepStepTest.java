@@ -16,12 +16,11 @@
 
 package examples;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import java.util.concurrent.ThreadLocalRandom;
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -51,9 +50,9 @@ public class SleepStepTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return sequential(SleepStepTest.class, "sleep-steps")
+        return Sequential.builder(SleepStepTest.class, "sleep-steps")
                 .step(ID_FIXED_PAUSE)
                 .step(ID_RANDOM_PAUSE)
                 .step(ID_NO_PAUSE)

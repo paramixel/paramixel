@@ -16,10 +16,9 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.Tasks.sequential;
-
 import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -34,11 +33,11 @@ public class CriticalTaggedTest {
      *
      * @return the definition
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
     public static Task factory() {
-        return sequential(CriticalTaggedTest.class, "CriticalTaggedTest")
+        return Sequential.builder(CriticalTaggedTest.class, "CriticalTaggedTest")
                 .tags("smoke-fast", "critical")
                 .step(ID_TEST)
                 .build();

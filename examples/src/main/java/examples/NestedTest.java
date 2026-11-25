@@ -17,15 +17,15 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.SequentialBuilder;
 import org.paramixel.api.Task;
 
@@ -69,11 +69,11 @@ public class NestedTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
-        return parallel(NestedTest.class, "NestedTest", Pool.named("examples"))
-                .child(branch("Nested1"))
-                .child(branch("Nested2"))
+        return Parallel.builder(NestedTest.class, "NestedTest", Pool.named("examples"))
+                .step(branch("Nested1"))
+                .step(branch("Nested2"))
                 .build();
     }
 
@@ -87,13 +87,13 @@ public class NestedTest {
      * @return the branch definition
      */
     private static SequentialBuilder branch(final String name) {
-        return sequential(name)
+        return Sequential.builder(name)
                 .before(ID_CREATE)
-                .child(sequential("testOne")
+                .step(Sequential.builder("testOne")
                         .body(ID_TEST_ONE)
                         .before(ID_BEFORE_EACH)
                         .after(ID_AFTER_EACH))
-                .child(sequential("testTwo")
+                .step(Sequential.builder("testTwo")
                         .body(ID_TEST_TWO)
                         .before(ID_BEFORE_EACH)
                         .after(ID_AFTER_EACH))

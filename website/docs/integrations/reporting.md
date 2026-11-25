@@ -27,23 +27,33 @@ from display paths, so a factory's path starts at the factory name instead of re
 Levels of a display path are separated by ` > `, so a slash inside a task name (a Docker image, URL, or file path) never
 looks like a level boundary. Stable identity is `occurrenceId`, never the path.
 
-Labels are `PASS`, `FAIL`, `SKIP`, `ABORT`, and `CANCEL`; `PEND`/`RUN` are used for in-flight kinds. Because labels are
-not padded, paths are not column-aligned across different statuses.
+Labels are `PASS`, `FAIL`, `SKIP`, `ABORT`, and `CANCEL`; `PEND`/`RUN` are used for in-flight kinds. Status lines are
+not padded, so paths are not column-aligned across different statuses.
 
-The console summary is separated from the status footer by a horizontal rule, and the run totals are separated from the
-result tree the same way. The summary shows each occurrence once with its final outcome, summarizing retry or repeat
-history on the occurrence line, so console output never contradicts the counters:
+The console summary is introduced by a title bracketed in horizontal rules, and the run totals are separated from the
+result tree by a rule. The summary shows each occurrence once with its final outcome, summarizing retry or repeat
+history on the occurrence line, so console output never contradicts the counters. The tree is drawn from the left margin
+with box-drawing connectors (`├──`, `└──`, `│`); each line is the task name and its qualifiers, then the outcome, elapsed
+time, and reason. Because the status follows the name, connectors align without padding labels, and a summary line does
+not begin with a status label the way a live status line does. Only a task that schedules children carries a
+`(sequential)` or `(parallel)` suffix: a leaf task runs its own body, so naming a scheduling mode for it would claim
+something that never happens:
 
 ```text
 [PARAMIXEL] PASS run 5c0f… in 1 s 240 ms
-[PARAMIXEL] -------
-[PARAMIXEL] Summary
-[PARAMIXEL] PASS retry-example (sequential) — 3 attempts, 2 failed
-[PARAMIXEL] PASS   retry (sequential)
+[PARAMIXEL] -----------------
+[PARAMIXEL] Paramixel Summary
+[PARAMIXEL] -----------------
+[PARAMIXEL] retry-example (sequential) PASS (1200 ms) — 3 attempts, 2 failed
+[PARAMIXEL] └── retry PASS (400 ms)
 [PARAMIXEL] -------
 [PARAMIXEL] occurrences: 2 passed: 2 failed: 0 skipped: 0 aborted: 0 canceled: 0 timedOut: 0 attempts: 3
 [PARAMIXEL] result: PASS exitCode: 0 elapsed: 1 s 240 ms
 ```
+
+Per-node elapsed time is whole milliseconds, the same unit as a live status line, and a node that never ran has no time.
+The compact hour/minute/second form is used only for the run footer and totals. The text report renders the same tree,
+including the `attempt k of n` nodes and `[before]`/`[after]` phase markers.
 
 Report files, by contrast, keep every attempt. Each attempt is labeled `attempt k of n`, and superseded attempts are
 marked `superseded` in the text and HTML reports and with `"superseded": true` plus `"attemptTotal"` in JSON.
@@ -59,8 +69,21 @@ Set `paramixel.report.file`. The format follows the extension:
 | `.html` / `.htm` | Status-colored table |
 | anything else | Printable tree text |
 
-Reports include run identifiers, occurrence and definition identifiers, paths, statuses, explicit reasons, stack traces,
-redacted configuration, and counters. They never include the full environment.
+Reports include run identifiers, occurrence and definition identifiers, paths, plan parameters, statuses, explicit
+reasons, stack traces, redacted configuration, and counters. They never include the full environment.
+
+### Schema version 2
+
+Every structured report carries `schemaVersion: 2`. Version 2 added three things:
+
+| Field | Where | Meaning |
+| --- | --- | --- |
+| `parameters` | JSON object on each node, immediately after `path`; `<parameter name="…" value="…"/>` children in XML; a collapsed detail row in HTML | The values the node declared with `bind`, rendered once at build time with `String.valueOf` and truncated at 256 characters plus `…`. `{}` when the node binds nothing. |
+| `slot` | JSON field and XML attribute on each node | `CHILD`, `BEFORE`, or `AFTER`: a `before`/`after` subtree is reported under its owner and marked with its phase. |
+| Phase nodes | Console and report trees | A subtree given to a `before` or `after` slot appears as a node with its own children. An identified hook stays a phase of its owner (`before[setUp]`). |
+
+Plan parameters describe the plan. Values a test stores at runtime with `Context.put` are never reported, and parameters
+are never printed in console output.
 
 ## Metrics
 

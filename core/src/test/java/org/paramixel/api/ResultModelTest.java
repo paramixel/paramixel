@@ -18,8 +18,6 @@ package org.paramixel.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.task;
 
 import java.time.Duration;
 import java.util.List;
@@ -39,7 +37,7 @@ class ResultModelTest {
     @Test
     void deliberateSkipExposesItsExplicitReason() {
         final var reason = "fixture unavailable";
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .step("skipped", () -> {
                     throw SkipException.skip(reason);
                 })
@@ -59,9 +57,9 @@ class ResultModelTest {
     @Test
     @DisplayName("execution and finalization durations end at the occurrence's completion, not at projection")
     void durationsEndAtCompletion() {
-        final var definition = task("root")
-                .child(task("quick").step("work", () -> {}).after(() -> {}))
-                .child(task("slow").step("work", () -> Thread.sleep(600L)))
+        final var definition = Sequential.builder("root")
+                .step(Sequential.builder("quick").step("work", () -> {}).after(() -> {}))
+                .step(Sequential.builder("slow").step("work", () -> Thread.sleep(600L)))
                 .build();
 
         final var quick = run(definition).root().orElseThrow().children().get(0);
@@ -75,7 +73,7 @@ class ResultModelTest {
     @Test
     @DisplayName("result trees are immutable snapshots with stable identity")
     void resultIsImmutableSnapshot() {
-        final var definition = task("root").step("one", () -> {}).build();
+        final var definition = Sequential.builder("root").step("one", () -> {}).build();
         final var first = run(definition);
         final var second = run(definition);
 
@@ -91,7 +89,7 @@ class ResultModelTest {
     @Test
     @DisplayName("display paths separate levels with ' > ' so slashes inside names stay within one level")
     void displayPathSeparatesLevelsWithGreaterThan() {
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .sequential("apache/kafka:3.7.2", image -> image.step("produce()", () -> {}))
                 .build();
         final var image = run(definition).root().orElseThrow().children().get(0);
@@ -103,7 +101,7 @@ class ResultModelTest {
     @Test
     @DisplayName("counters count occurrences once regardless of phases")
     void countersCountOccurrencesOnce() {
-        final var definition = parallel("root", Pool.named("p"))
+        final var definition = Parallel.builder("root", Pool.named("p"))
                 .step("pass", () -> {})
                 .step("skip", () -> {
                     throw SkipException.skip("no");
@@ -157,8 +155,8 @@ class ResultModelTest {
     @Test
     @DisplayName("a retried-and-passed run is a passing run")
     void retriedRunPasses() {
-        final var definition = task("root")
-                .child(task("retried")
+        final var definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.attempts(2))
                         .step("probe", new AtomicInteger()::incrementAndGet))
                 .build();
@@ -174,8 +172,8 @@ class ResultModelTest {
     @DisplayName("a successful retry does not count historical attempt failures as occurrences")
     void retriedAttemptsAreNotCountedAsFailures() {
         final var attempts = new AtomicInteger();
-        final var definition = task("root")
-                .child(Tasks.sequential("retried")
+        final var definition = Sequential.builder("root")
+                .step(Sequential.builder("retried")
                         .retry(RetryPolicy.attempts(3))
                         .step("probe", () -> {
                             if (attempts.incrementAndGet() < 3) {
@@ -202,7 +200,7 @@ class ResultModelTest {
     @Test
     @DisplayName("exit code honors failureOnAbort and failureOnSkip configuration")
     void exitCodeConfiguration() {
-        final Task aborted = task("root")
+        final Task aborted = Sequential.builder("root")
                 .step("abort", () -> {
                     throw AbortException.abort("assumption");
                 })
@@ -228,7 +226,7 @@ class ResultModelTest {
                         "paramixel.token", "super-secret",
                         "unrelated.key", "ignored")))
                 .build()
-                .run(task("root").step("work", () -> {}).build());
+                .run(Sequential.builder("root").step("work", () -> {}).build());
 
         assertThat(result.configurationSummary()).containsEntry("paramixel.ansi", "false");
         assertThat(result.configurationSummary()).containsEntry("paramixel.token", "***");
@@ -238,7 +236,7 @@ class ResultModelTest {
     @Test
     @DisplayName("result counters and status are stable after a later run")
     void laterRunDoesNotMutateEarlierResult() {
-        final var definition = task("root").step("work", () -> {}).build();
+        final var definition = Sequential.builder("root").step("work", () -> {}).build();
         final var first = run(definition);
         final var firstSnapshot = first.root().orElseThrow();
         run(definition);
@@ -250,7 +248,7 @@ class ResultModelTest {
     @Test
     @DisplayName("failure precedence puts the operation failure first")
     void failurePrecedence() {
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .after(() -> {
                     throw new IllegalStateException("cleanup failed");
                 })
@@ -329,7 +327,7 @@ class ResultModelTest {
     @Test
     @DisplayName("engine counters satisfy the builder's consistency rules for a mixed run")
     void engineCountersAreConsistent() {
-        final var definition = task("root")
+        final var definition = Sequential.builder("root")
                 .independent()
                 .step("passes", () -> {})
                 .step("fails", () -> {

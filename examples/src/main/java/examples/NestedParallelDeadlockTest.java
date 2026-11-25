@@ -17,14 +17,14 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Tasks.parallel;
-import static org.paramixel.api.Tasks.sequential;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
+import org.paramixel.api.Sequential;
 import org.paramixel.api.Task;
 
 /**
@@ -71,24 +71,24 @@ public class NestedParallelDeadlockTest {
      *
      * @return the definition for this test
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     public static Task factory() {
         executedCount.set(0);
 
-        return sequential(NestedParallelDeadlockTest.class, "NestedParallelDeadlockTest")
-                .child(parallel("root", Pool.named("outer"))
-                        .child(parallel("mid1", Pool.named("middle"))
-                                .child(parallel("leaf1", Pool.named("inner"))
+        return Sequential.builder(NestedParallelDeadlockTest.class, "NestedParallelDeadlockTest")
+                .step(Parallel.builder("root", Pool.named("outer"))
+                        .step(Parallel.builder("mid1", Pool.named("middle"))
+                                .step(Parallel.builder("leaf1", Pool.named("inner"))
                                         .step(ID_L1_1)
                                         .step(ID_L1_2))
-                                .child(parallel("leaf2", Pool.named("inner"))
+                                .step(Parallel.builder("leaf2", Pool.named("inner"))
                                         .step(ID_L2_1)
                                         .step(ID_L2_2)))
-                        .child(parallel("mid2", Pool.named("middle"))
-                                .child(parallel("leaf3", Pool.named("inner"))
+                        .step(Parallel.builder("mid2", Pool.named("middle"))
+                                .step(Parallel.builder("leaf3", Pool.named("inner"))
                                         .step(ID_L3_1)
                                         .step(ID_L3_2))
-                                .child(parallel("leaf4", Pool.named("inner"))
+                                .step(Parallel.builder("leaf4", Pool.named("inner"))
                                         .step(ID_L4_1)
                                         .step(ID_L4_2))))
                 .step(ID_VALIDATE)

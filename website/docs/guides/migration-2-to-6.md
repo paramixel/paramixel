@@ -7,6 +7,10 @@ description: Upgrade plan for moving Paramixel 2.x projects to 6.0.0.
 
 Use this plan when upgrading a Paramixel 2.x project directly to 6.0.0.
 
+> **Historical guide.** This page records the upgrade path to Paramixel 6.x, whose action API is documented in the
+> versioned 6.x documentation. The sample at the end uses the current 7.0 authoring surface; see
+> [Migrating from 6.x to 7.0](migration-6-to-7.md) for the differences.
+
 ## Migration focus
 
 - Replace 2.x imports with the 6.0.0 `org.paramixel.api` package set.
@@ -16,7 +20,7 @@ Use this plan when upgrading a Paramixel 2.x project directly to 6.0.0.
 ## 6.0.0 target checkpoints
 
 - Use Java 17+ and imports from `org.paramixel.api`, `org.paramixel.api.action`, `org.paramixel.api.selector`, and `org.paramixel.api.support`.
-- Define discovery entry points as public static methods annotated with `@Paramixel.Factory`.
+- Define discovery entry points as public static methods annotated with `@Paramixel.TaskFactory`.
 - Return `Action`, `Builder`, or `null` from factories; `null` produces a skipped outcome.
 - Build action trees with `Sequential`, `Parallel`, `Scope`, `Instance`, `Repeat`, `Timeout`, `Step`, and `Assert` (`Static` is deprecated since 6.2 — use `Scope` instead).
 - Read execution state from `Result.descriptor()` and the descriptor tree.
@@ -32,23 +36,34 @@ Use this plan when upgrading a Paramixel 2.x project directly to 6.0.0.
 4. Run the Paramixel examples or your factory package with `mvn paramixel:test`, `mvn test`, or a Gradle `JavaExec` task that invokes `org.paramixel.api.Runner`.
 5. Enable `paramixel.report.file` during validation so the descriptor tree and aggregate outcome are visible.
 
-## Minimal 6.0.0 factory
+## Minimal current factory
+
+The 6.x factory returned an `Action`; the current surface returns a `Task` or a `TaskBuilder` and names node kinds by
+type:
 
 ```java
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.SequentialBuilder;
 
 public final class SmokeTest {
-    @Paramixel.Factory
+
+    @Paramixel.TaskFactory
     @Paramixel.Tag("smoke")
-    public static Action smoke() {
-        return sequential("smoke")
-                .child(step("arrange", ctx -> arrange()))
-                .child(step("act", ctx -> act()))
-                .child(step("assert", ctx -> assertResult()))
-                .build();
+    public static SequentialBuilder smoke() {
+        return Sequential.builder(SmokeTest.class, "smoke").step("arrange").step("act").step("assert");
     }
+
+    @Paramixel.Id("arrange")
+    public static void arrange(final Context context) {}
+
+    @Paramixel.Id("act")
+    public static void act(final Context context) {}
+
+    @Paramixel.Id("assert")
+    public static void assertResult(final Context context) {}
 }
 ```
+
+See [Migrating from 6.x to 7.0](migration-6-to-7.md) for the full mapping.

@@ -133,6 +133,8 @@ final class ResultProjector {
                         state.parent == null ? null : state.parent.id,
                         state.name,
                         state.path)
+                .parameters(state.compiled.task().parameters())
+                .slot(slotOf(state))
                 .tags(state.compiled.task().tags())
                 .attributes(
                         state.compiled.mode(),
@@ -147,7 +149,7 @@ final class ResultProjector {
                                 : reasonOf(status, attempt))
                 .timedOut(state.timedOut)
                 .phases(attempt.phases)
-                .children(resultsOf(attempt.children))
+                .children(resultsOf(attempt))
                 .failures(attempt.failures)
                 .timings(
                         state.queuedAt,
@@ -175,6 +177,8 @@ final class ResultProjector {
                         state.parent == null ? null : state.parent.id,
                         state.name,
                         state.path)
+                .parameters(state.compiled.task().parameters())
+                .slot(slotOf(state))
                 .tags(state.compiled.task().tags())
                 .attributes(
                         state.compiled.mode(),
@@ -202,7 +206,7 @@ final class ResultProjector {
         if (!state.attemptNodes.isEmpty()) {
             builder.children(state.attemptNodes);
         } else if (attempt != null) {
-            builder.children(resultsOf(attempt.children));
+            builder.children(resultsOf(attempt));
         }
         if (attempt != null) {
             builder.phases(attempt.phases).failures(attempt.failures);
@@ -243,12 +247,33 @@ final class ResultProjector {
         return status.isSkipped() ? status.message().orElse(null) : null;
     }
 
-    private List<TaskResult> resultsOf(final List<OccurrenceState> children) {
-        final var results = new ArrayList<TaskResult>(children.size());
-        for (OccurrenceState child : children) {
+    /**
+     * Projects the children of one attempt in lifecycle order: the {@code before} subtree, the ordinary children, then
+     * the {@code after} subtree.
+     *
+     * @param attempt the attempt; must not be {@code null}
+     * @return the projected children; never {@code null}
+     */
+    private List<TaskResult> resultsOf(final OccurrenceState.Attempt attempt) {
+        final var results = new ArrayList<TaskResult>(attempt.children.size() + 2);
+        if (attempt.beforeChild != null) {
+            results.add(toResult(attempt.beforeChild));
+        }
+        for (OccurrenceState child : attempt.children) {
             results.add(toResult(child));
         }
+        if (attempt.afterChild != null) {
+            results.add(toResult(attempt.afterChild));
+        }
         return results;
+    }
+
+    private static TaskResult.Slot slotOf(final OccurrenceState state) {
+        return switch (state.compiled.slot()) {
+            case BEFORE -> TaskResult.Slot.BEFORE;
+            case AFTER -> TaskResult.Slot.AFTER;
+            case CHILD -> TaskResult.Slot.CHILD;
+        };
     }
 
     private int exitCodeFor(final Status status, final boolean quiescent) {
@@ -357,8 +382,14 @@ final class ResultProjector {
             attempts += state.attemptNodes.size();
             final var attempt = state.attempt;
             if (attempt != null) {
+                if (attempt.beforeChild != null) {
+                    add(attempt.beforeChild);
+                }
                 for (OccurrenceState child : attempt.children) {
                     add(child);
+                }
+                if (attempt.afterChild != null) {
+                    add(attempt.afterChild);
                 }
             }
         }

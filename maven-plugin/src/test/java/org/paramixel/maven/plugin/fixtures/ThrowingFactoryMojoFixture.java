@@ -20,7 +20,7 @@ import org.paramixel.api.Paramixel;
 import org.paramixel.api.Task;
 
 /**
- * Fixture whose {@code @Paramixel.Factory} method always throws, used to verify that the Maven mojo wraps factory
+ * Fixture whose {@code @Paramixel.TaskFactory} method always throws, used to verify that the Maven mojo wraps factory
  * exceptions as {@link org.apache.maven.plugin.MojoExecutionException}.
  */
 public final class ThrowingFactoryMojoFixture {
@@ -33,8 +33,8 @@ public final class ThrowingFactoryMojoFixture {
      * @return never returns normally
      * @throws IllegalStateException always, with message {@code "factory exploded"}
      */
-    @Paramixel.Factory
-    public static Task action() {
+    @Paramixel.TaskFactory
+    public static Task task() {
         throw new IllegalStateException("factory exploded");
     }
 }

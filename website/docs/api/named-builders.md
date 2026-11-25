@@ -5,18 +5,22 @@ description: Sequential, parallel, and repetition builder views.
 
 # Builder Variants
 
-`Tasks` returns one of three builder views. The view determines which policies compile.
+Each node kind is a public type with static `builder` factories. The builder decides which policies compile, and
+`build()` returns the node type.
 
-| Builder | Created by | Extra methods |
-| --- | --- | --- |
-| `SequentialBuilder` | `Tasks.sequential(name)`, `Tasks.sequential(Owner.class, name)`, `sequential(...)` | `dependent()`, `independent()` |
-| `ParallelBuilder` | `Tasks.parallel(name, pool)`, `Tasks.parallel(Owner.class, name, pool)` | none — parallel groups have no continuation policy |
-| `RepeatBuilder` | `Tasks.repeat(name)`, `Tasks.repeat(Owner.class, name)` | `maxIterations`, `untilPassed`, `until(id)`, `delay` |
+| Node | Builder | Created by | Extra policy methods |
+| --- | --- | --- | --- |
+| `Sequential` | `SequentialBuilder` | `Sequential.builder(name)`, `Sequential.builder(Owner.class, name)` | `dependent()`, `independent()` |
+| `Parallel` | `ParallelBuilder` | `Parallel.builder(name, pool)`, `Parallel.builder(Owner.class, name, pool)` | none — parallel groups have no continuation policy |
+| `Repeat` | `RepeatBuilder` | `Repeat.builder(name)`, `Repeat.builder(Owner.class, name)` | `maxIterations`, `untilPassed`, `until(id)`, `delay` |
+
+`SequentialBuilder.build()` returns `Sequential`, `ParallelBuilder.build()` returns `Parallel`, and
+`RepeatBuilder.build()` returns `Repeat`, so a helper method can declare the node type it produces.
 
 ## Sequential
 
 ```java
-sequential(MySuite.class, "Validation")
+Sequential.builder(MySuite.class, "Validation")
     .independent()
     .step("checkA")
     .step("checkB");
@@ -27,9 +31,9 @@ If `Check A` fails and `Check B` passes, both run and the group is `FAILED`.
 ## Parallel
 
 ```java
-final var matrix = parallel(MySuite.class, "Environments", Pool.named("environments"));
+final var matrix = Parallel.builder(MySuite.class, "Environments", Pool.named("environments"));
 for (final var environment : environments) {
-    matrix.child(sequential(environment.name()).bind(ENVIRONMENT, environment).step("verify"));
+    matrix.step(Sequential.builder(environment.name()).bind(ENVIRONMENT, environment).step("verify"));
 }
 ```
 
@@ -38,12 +42,12 @@ Every direct child holds one permit of the named pool for its entire lifetime.
 ## Repetition
 
 ```java
-repeat("Poll readiness", poll -> poll
+Repeat.builder(MySuite.class, "readiness")
     .maxIterations(5)
     .untilPassed()
     .delay(Backoff.fixed(Duration.ofMillis(250)))
-    .step("Probe", Probe::assertReady));
+    .step("probe");
 ```
 
-`maxIterations` is mandatory. Each iteration is a distinct attempt in the result tree, and an owned `instance` task inside
-the repeated subtree is re-instantiated per iteration.
+`maxIterations` is mandatory. Each iteration is a distinct attempt in the result tree, and a repeated task owns its
+context scope, so every iteration starts with an empty scope.

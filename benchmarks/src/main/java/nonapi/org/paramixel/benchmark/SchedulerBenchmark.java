@@ -34,10 +34,10 @@ import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
 import org.paramixel.api.Configuration;
 import org.paramixel.api.Listener;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
 import org.paramixel.api.Task;
-import org.paramixel.api.Tasks;
 
 /**
  * JMH benchmarks for the Paramixel scheduler.
@@ -116,7 +116,7 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = SchedulerBenchmark.runner(parallelism);
-            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("bench"));
+            final var builder = Parallel.builder(BenchmarkTree.class, "root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
                 final long sleepMillis = i % 4 == 0 ? 5L : 1L;
                 builder.step(BenchmarkTree.ID_SLEEP);
@@ -143,7 +143,7 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = SchedulerBenchmark.runner(parallelism);
-            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("bench"));
+            final var builder = Parallel.builder(BenchmarkTree.class, "root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
                 builder.step(BenchmarkTree.ID_SLEEP);
             }
@@ -166,7 +166,7 @@ public class SchedulerBenchmark {
         @Setup(Level.Trial)
         public void setup() {
             runner = SchedulerBenchmark.runner(8);
-            final var builder = Tasks.parallel(BenchmarkTree.class, "root", Pool.named("bench"));
+            final var builder = Parallel.builder(BenchmarkTree.class, "root", Pool.named("bench"));
             for (var i = 0; i < childCount; i++) {
                 builder.step(BenchmarkTree.ID_NOOP);
             }
