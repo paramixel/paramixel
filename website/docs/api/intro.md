@@ -10,16 +10,17 @@ The public API is `org.paramixel.api`, with sub-packages for exceptions, selecto
 | Type | Role |
 | --- | --- |
 | `Task` | The single immutable definition |
-| `Tasks`, `TaskBuilder`, `SequentialBuilder`, `ParallelBuilder`, `RepeatBuilder` | Authoring |
+| `TaskBuilder`, `SequentialBuilder`, `ParallelBuilder`, `RepeatBuilder` | Authoring |
 | `Pool` | Logical concurrency budget (a value object) |
-| `Key` | Typed key for secondary resources |
-| `Context` | Read-only per-occurrence metadata and resources |
+| `Context` | Per-occurrence metadata plus the scope's state store |
 | `Runner` | Compile, schedule, report; one run at a time |
 | `Result`, `TaskResult`, `PhaseResult`, `Failure` | Immutable outcome tree |
-| `Status`, `ExecutionMode`, `TaskPhase` | Enumerations |
+| `Status` | Immutable status value; `Status.Kind` is the enum |
+| `ExecutionMode`, `TaskPhase` | Enumerations |
 | `Listener`, `TaskEvent` | Event contract |
 | `Paramixel` | Discovery annotations |
 | `Launcher` | CLI entry point that owns `System.exit` |
+| `Version` | The framework version string |
 
 ## Minimal example
 

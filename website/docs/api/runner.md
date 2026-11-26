@@ -45,7 +45,7 @@ optional, and returns `CANCELED` with no root and exit code `1`. Provider except
 - **Non-quiescent runs.** A run whose callback ignored cancellation past the grace period returns with
   `result.isQuiescent() == false`, withheld cleanup, and a non-zero exit code.
 - **Pool capacity precedence.** `Runner.Builder.pool(Pool, int)` → `paramixel.parallelism.<name>` → error for a user
-  pool. A capacity is a cap, not a reservation: it creates no threads and guarantees no concurrency, and
+  pool. A capacity is a cap, not a reservation: it creates no threads and does not guarantee concurrency, and
   `paramixel.workers` separately bounds execution threads, so a capacity above that limit adds no concurrency.
 
 ## Builder
@@ -55,11 +55,24 @@ Runner.Builder builder = Runner.builder()
         .configuration(configuration)
         .pool(Pool.named("environments"), 3)
         .listener(listener)
-        .shuffle(seed);          // or shuffle() for a seed chosen at build time
+        .shuffle(seed);          // or shuffle() to generate a seed
 ```
 
 `shuffle` affects discovery ordering only; a direct definition controls its own shuffle. The effective seed is reported
 in `Result.shuffleSeed()`.
+
+## Launcher and exit codes
+
+`Launcher` is the command-line entry point. `Launcher.execute(String...)` runs discovery and returns the exit code
+without terminating the JVM; `Launcher.main(String[])` calls `System.exit` with it. It accepts only `--help` or `-h`;
+any other nonblank argument is a usage error. Select a subset with `paramixel.match.*` or by calling `Runner` with a
+`Selector` from your own `main` method.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | The run passed under the configured exit policy, or help was requested |
+| `1` | The run failed, was canceled, reporting was incomplete, or the exit policy mapped it to failure |
+| `2` | A usage error, or a configuration, definition, or discovery error that prevented the run from starting |
 
 ## Next
 

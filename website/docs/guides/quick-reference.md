@@ -9,6 +9,8 @@ description: The 7.0 authoring and execution surface on one page.
 
 ```java
 import org.paramixel.api.*;
+import org.paramixel.api.exception.*;
+import org.paramixel.api.selector.*;
 import org.paramixel.api.support.*;
 ```
 
@@ -54,14 +56,16 @@ public static void health(final Context context) {
 ## Running
 
 ```java
+final var configuration = Configuration.defaultConfiguration();
+final int exitCode;
 try (Runner runner = Runner.builder()
-        .configuration(Configuration.defaultConfiguration())
+        .configuration(configuration)
         .pool(Pool.named("environments"), 3)
-        .listener(Listener.defaultListener(Configuration.defaultConfiguration()))
+        .listener(Listener.defaultListener(configuration))
         .build()) {
-    Result result = runner.run(definition);
-    System.exit(result.exitCode());
+    exitCode = runner.run(definition).exitCode();
 }
+System.exit(exitCode);
 ```
 
 ## Statuses
@@ -88,3 +92,6 @@ throw AbortException.abort("precondition");
 | `paramixel.failureOnSkip` / `failureOnAbort` | `true` |
 | `paramixel.failIfNoTests` | `true` |
 | `paramixel.failFast` | `false` |
+
+The remaining keys — `paramixel.ansi`, `paramixel.report.file`, `paramixel.match.*`, and `paramixel.listener.*` — are
+listed in [Properties](../configuration/properties).

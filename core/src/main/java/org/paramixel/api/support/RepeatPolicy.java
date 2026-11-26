@@ -27,9 +27,10 @@ import org.paramixel.api.Status;
  * An immutable repetition policy for a task.
  *
  * <p><strong>Repeat is not retry.</strong> Repetition runs the same subtree an intentional, bounded number of times —
- * for example to poll a service until it is ready — rather than re-attempting a failure. Each iteration has its own
- * result identity and timestamps, and an owned {@code instance} task inside the repeated subtree is recreated
- * for every iteration.
+ * for example to poll a service until it is ready — rather than re-attempting a failure. Each iteration is a distinct
+ * attempt with its own result identity and timestamps, and a repeated task owns its context scope, so a fixture built
+ * in its {@code before} slot is rebuilt for every iteration and state written by one iteration never reaches the
+ * next.
  *
  * <p>Iteration always stops at {@link #maxIterations()}. It may also stop early when {@link #untilPassed()} is set and
  * an iteration passes, or when the optional {@code until} predicate returns {@code true} for an iteration.

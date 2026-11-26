@@ -10,7 +10,7 @@ JMH benchmarks for Paramixel compilation, definition-traversal, and scheduler pe
 ## Build
 
 ```bash
-./mvnw package -pl benchmarks -DskipTests -Dparamixel.skipTests
+./mvnw package -pl benchmarks -am -DskipTests -Dparamixel.skipTests
 ```
 
 Creates a fat JAR at `benchmarks/target/benchmarks.jar`.

@@ -6,7 +6,7 @@ description: What Paramixel is and how a definition becomes a result.
 # Introduction
 
 Paramixel builds tests from **immutable task definitions**. A definition declares a tree of tasks with lifecycle
-callbacks, instance factories, named concurrency budgets, conditions, repetition, retries, and timeouts. The compiler
+callbacks, a per-scope state store, named concurrency budgets, conditions, repetition, retries, and timeouts. The compiler
 validates the tree; the scheduler executes it with bounded concurrency; the run produces one immutable `Result`.
 
 ## The pieces
@@ -20,7 +20,7 @@ validates the tree; the scheduler executes it with bounded concurrency; the run 
 ## Why definitions are separate from execution
 
 A definition can be validated without side effects, reused across runs, and compiled into distinct occurrences with
-their own identity and owned instances. A validation error therefore guarantees that no factory, lifecycle callback, or
+their own identity and context scope. A validation error therefore guarantees that no factory, lifecycle callback, or
 test body ran.
 
 ## What a run reports

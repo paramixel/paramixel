@@ -5,7 +5,7 @@ description: Common failures and the invariant behind them.
 
 # Troubleshooting
 
-## "Parallel pool 'x' is not defined"
+## "Parallel pool 'x' has no configured capacity"
 
 A parallel task names a pool with no capacity. Set `paramixel.parallelism.x` or call
 `Runner.builder().pool(Pool.named("x"), n)`. Discovery itself uses a pool named `discovery`, which defaults to
@@ -35,7 +35,7 @@ capacity change cannot turn a passing plan into a deadlock.
 ## Everything is `SKIPPED`
 
 - A dependent sequence stops after the first non-passing child, including `ABORTED` and `SKIPPED`.
-- A `when(...)` condition evaluated to false.
+- An `onlyIf(...)` condition evaluated to false.
 - A body failed, so its children were skipped.
 
 Inspect the child `reason()` and the parent `phases()`; a skipped child always carries an explicit reason.

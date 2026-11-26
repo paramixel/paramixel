@@ -26,7 +26,7 @@ precedence is `Runner.Builder.pool` → `paramixel.parallelism.<name>` → error
 ## Capacity is a cap, not a reservation
 
 A capacity bounds how many direct children of parallel tasks may hold a permit from the same pool at one time. It
-reserves no share of the runner, creates no threads, and guarantees no concurrency. Two limits apply together:
+reserves no share of the runner, creates no threads, and does not guarantee concurrency. Two limits apply together:
 
 ```
 concurrent children of one pool ≤ min(pool capacity, free workers)
@@ -48,8 +48,8 @@ Two consequences worth planning around:
 
 ## Permit lifetime
 
-Each direct child of a parallel task holds exactly one permit from admission through instance creation, `before`, body,
-nested groups, `after`, and resource release. A parent does not consume its own children's permits. Nested groups with a
+Each direct child of a parallel task holds exactly one permit from admission through its `before` slot, body, nested
+groups, and `after` slot. A parent does not consume its own children's permits. Nested groups with a
 different pool acquire additional permits for their own children.
 
 ## Admission order
@@ -75,5 +75,5 @@ waiting for its children, so a one-worker run of a nested tree still completes.
 ## Honest limits
 
 Paramixel cannot preempt a running callback, make a shared fixture thread-safe, or forcibly stop code that ignores
-interruption. Parallel children sharing an inherited instance are concurrent calls on that object; guard, isolate, or
-split the scope.
+interruption. Parallel children reading a value bound on the parent are concurrent calls on that object; guard, isolate,
+or split the scope.

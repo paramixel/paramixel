@@ -53,8 +53,10 @@ public final class LoginSmokeTest {
 
 ## Run it
 
+This assumes the Maven plugin is configured as shown in [Installation](../getting-started/installation).
+
 ```bash
-./mvnw test
+mvn test
 ```
 
 The Maven plugin discovers the factory, builds and validates the definition, then executes it. The run fails the build

@@ -1,11 +1,11 @@
 ---
 title: Tasks
-description: One immutable definition type for steps, groups, instance scopes, conditions, repetition, and timeouts.
+description: One immutable definition type for steps, groups, conditions, repetition, and timeouts.
 ---
 
 # Tasks
 
-`Task` is the only execution definition type in Paramixel 7. A step, a group, an instance scope, a conditional, a
+`Task` is the only execution definition type in Paramixel 7. A step, a group, a scope, a conditional, a
 repetition, and a timeout boundary are all the same immutable `Task` with different typed attributes.
 
 ```java
@@ -36,8 +36,8 @@ A task may have a body, children, or both. Its normal phase order is:
 admission → condition → before → body → child group → after → terminal
 ```
 
-The body runs before and independently of the children group; body success gates the children. Finalization never
-depends on success: the `after` slot runs once the node has started, whatever failed before it.
+The body runs before the children group, and body success gates the children. Finalization never depends on success:
+the `after` slot runs once the node has started, whatever failed before it.
 
 ```java
 Sequential.builder(MySuite.class, environment.name())
@@ -84,7 +84,7 @@ switches, and they affect only the direct children of the task that declares the
 | --- | --- |
 | `timeout(Duration)` | Cooperative deadline for the task and its subtree |
 | `retry(RetryPolicy)` | Bounded re-attempt of a non-success status |
-| `child(Repeat.builder(name).maxIterations(n).until(id))` | Bounded intentional replay with an optional stop predicate |
+| `step(Repeat.builder(name).maxIterations(n).until(id))` | Bounded intentional replay with an optional stop predicate |
 | `onlyIf(id)` | Runtime condition evaluated after admission; the hook returns `boolean` |
 | `isolated(lockName)` | Exclusive logical lock held for the task's lifetime |
 | `tags(String…)` | Runtime context and result metadata |
@@ -92,6 +92,6 @@ switches, and they affect only the direct children of the task that declares the
 
 ## Next
 
-- [Lifecycle](../core-concepts/elements) — how instance ownership and finalization work.
+- [Lifecycle](../core-concepts/elements) — how fixture ownership and finalization work.
 - [Discovery](../core-concepts/discovery) — how factories become a root definition.
-- [Data-driven testing](../core-concepts/data-driven-testing) — typed matrices with `each`.
+- [Data-driven testing](../core-concepts/data-driven-testing) — typed matrices built with a loop.

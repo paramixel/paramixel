@@ -27,9 +27,10 @@ import org.paramixel.api.Status;
  * An immutable retry policy for a task.
  *
  * <p><strong>Retry is not repeat.</strong> A retry re-attempts the same task only after a non-success outcome that the
- * policy names, up to a finite attempt limit, and never concurrently. An instance owned by an {@code instance} task is
- * recreated for each attempt and its {@code after} callbacks run between attempts; retrying a nested step reuses the
- * inherited instance and does not reconstruct its ancestor.
+ * policy names, up to a finite attempt limit, and never concurrently. A retried task owns its context scope, so each
+ * attempt starts with an empty scope: a fixture built in its {@code before} slot is rebuilt, and its {@code after}
+ * hooks run before the next attempt begins. Entries inherited from an enclosing scope stay visible, and an ancestor's
+ * scope is never reconstructed.
  *
  * <p>The trigger set defaults to {@link Status.Kind#FAILED} only and may contain only the kinds in
  * {@link #RETRYABLE_KINDS}: {@link Status.Kind#FAILED} and {@link Status.Kind#SKIPPED}. A passing outcome is never

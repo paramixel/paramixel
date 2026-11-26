@@ -32,8 +32,9 @@ import java.util.Optional;
  * <ul>
  *   <li>{@link Kind#ABORTED} — the test code decided that a precondition or assumption did not hold
  *       ({@link org.paramixel.api.exception.AbortException}). The task is not a failure and not a cancellation.</li>
- *   <li>{@link Kind#CANCELED} — the run, a timeout, or a shutdown stopped the task cooperatively. The task never
- *       produced a verdict of its own.</li>
+ *   <li>{@link Kind#CANCELED} — the run, a shutdown, or a timeout on an enclosing task stopped this task
+ *       cooperatively. The task never produced a verdict of its own. A task whose own timeout expires is
+ *       {@link #FAILED} with an explicit timeout reason; only its descendants are {@link Kind#CANCELED}.</li>
  * </ul>
  *
  * <p>Aggregation uses the fixed severity order {@code FAILED > CANCELED > ABORTED > SKIPPED > PASSED}
@@ -63,7 +64,7 @@ public final class Status {
         /** An assumption or precondition abort signal ({@link org.paramixel.api.exception.AbortException}). */
         ABORTED(true, 3),
 
-        /** Cooperative cancellation, timeout-driven abortion, or run shutdown. */
+        /** Cooperative cancellation or run shutdown; also the descendants of a task whose timeout expired. */
         CANCELED(true, 4),
 
         /** An operation, validation-at-runtime, timeout, or finalization failed. */
@@ -112,7 +113,7 @@ public final class Status {
     /** An assumption or precondition did not hold. */
     public static final Status ABORTED = new Status(Kind.ABORTED, null, null);
 
-    /** Cooperative cancellation or timeout-driven abortion. */
+    /** Cooperative cancellation or run shutdown; also the descendants of a task whose timeout expired. */
     public static final Status CANCELED = new Status(Kind.CANCELED, null, null);
 
     /** An operation, validation-at-runtime, or finalization failed. */

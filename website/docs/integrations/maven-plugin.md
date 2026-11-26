@@ -34,7 +34,9 @@ The Maven plugin artifact is `org.paramixel:maven-plugin`; the goal prefix is `p
 | `failureOnAbort` | `paramixel.failureOnAbort` | `true` |
 | `failFast` | `paramixel.failFast` | `false` |
 | `reportFile` | `paramixel.report.file` | none |
-| `matchPackage` / `matchClass` / `matchTag` | `paramixel.match.*` | none |
+| `matchPackage` | `paramixel.match.package.regex` | none |
+| `matchClass` | `paramixel.match.class.regex` | none |
+| `matchTag` | `paramixel.match.tag.regex` | none |
 | `properties` | — | additional configuration keys |
 | `strictThreadLifecycle` | `paramixel.strictThreadLifecycle` | `false` |
 

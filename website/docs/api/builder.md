@@ -1,6 +1,6 @@
 ---
 title: TaskBuilder
-description: The single-slot authoring surface for before, step, and after.
+description: The typed authoring surface for binds, bodies, hooks, children, and policies.
 ---
 
 # TaskBuilder
@@ -30,7 +30,7 @@ public abstract class TaskBuilder<S extends TaskBuilder<S>> {
 }
 ```
 
-`build()` is declared by each concrete builder and returns that builder's node type: `SequentialBuilder.build()` returns
+`build()` is overridden by each concrete builder to return that builder's node type: `SequentialBuilder.build()` returns
 `Sequential`, `ParallelBuilder.build()` returns `Parallel`, and `RepeatBuilder.build()` returns `Repeat`.
 
 Every hook is an ordinary `public static` method named by a stable identifier, and the tree refers to it by that
@@ -41,8 +41,11 @@ identifier. There is no functional-interface overload and no generic instance ty
 Every node is exactly:
 
 ```
-bind*  →  before?  →  step+  →  after?
+bind*  →  before?  →  body? step*  →  after?
 ```
+
+A node may declare a body, children, or both. A node that declares neither is a no-op: it passes when admitted, and
+the compiler reports an `EMPTY_TASK` warning.
 
 - `bind` declares a value that **already exists when the plan is built**. It may be called any number of times, never
   accepts a supplier or lambda, and a duplicate name on one node throws `IllegalArgumentException`.

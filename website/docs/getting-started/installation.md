@@ -13,7 +13,7 @@ Paramixel requires Java 17 or newer.
 <dependency>
   <groupId>org.paramixel</groupId>
   <artifactId>core</artifactId>
-  <version>6.1.0</version>
+  <version>7.0.0</version>
 </dependency>
 ```
 
@@ -25,7 +25,7 @@ Use the core dependency when running task definitions programmatically or when c
 <plugin>
   <groupId>org.paramixel</groupId>
   <artifactId>maven-plugin</artifactId>
-  <version>6.1.0</version>
+  <version>7.0.0</version>
   <executions>
     <execution>
       <goals>

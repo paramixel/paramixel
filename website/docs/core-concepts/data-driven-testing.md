@@ -1,6 +1,6 @@
 ---
 title: Data-Driven Testing
-description: Typed matrices with each, without casts or repeated class tokens.
+description: Typed matrices without casts or repeated class tokens.
 ---
 
 # Data-Driven Testing
@@ -40,8 +40,8 @@ for (final var environment : environments) {
 Parallel definition = matrix.build();
 ```
 
-Shuffling reorders admission for the task's direct children. The effective seed and resolved order are recorded in the
-result (`shuffleSeed()`, `executionOrder()`), and the same definition plus seed always yields the same order.
+Shuffling reorders admission for the task's direct children. The effective seed and resolved order are recorded on the
+node's `TaskResult` (`shuffleSeed()`, `executionOrder()`), and the same definition plus seed always yields the same order.
 
 ## Sharing state
 

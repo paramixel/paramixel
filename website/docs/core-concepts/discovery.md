@@ -15,9 +15,9 @@ plan before executing task callbacks.
 | `@Paramixel.TaskFactory` | `public static`, no parameters or one `Configuration`, returns `Task` or a builder |
 | `@Paramixel.BeforeAll` | Runs before the discovered factories; gates them |
 | `@Paramixel.AfterAll` | Runs after the started run, even when a factory failed |
-| `@Paramixel.Disabled` | Excludes a factory |
+| `@Paramixel.Disabled` | Excludes a factory or run hook |
 | `@Paramixel.Tag` | Selection and reporting metadata |
-| `@Paramixel.Priority` | Deterministic discovery ordering |
+| `@Paramixel.Priority` | Discovery and run-hook ordering for a class (declared on the type) |
 
 ```java
 @Paramixel.TaskFactory
@@ -75,7 +75,7 @@ Paramixel (independent sequential root)
   AfterAll hooks (when any)
 ```
 
-- A failing `BeforeAll` hook skips the factories.
+- A failing or skipping `BeforeAll` hook skips the factories.
 - `AfterAll` hooks still run after a started run, in reverse order. A failing hook does not prevent the remaining
   `AfterAll` hooks from running.
 - `tasks` is the fail-fast scope: with `paramixel.failFast=true`, a failed factory (`FAILED`, including a timeout)

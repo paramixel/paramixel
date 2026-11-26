@@ -10,12 +10,12 @@ Tests live under `src/main/java/` (not `src/test/java/`) because they are execut
 
 | Package | Purpose | Has Runner |
 |---|---|---|
-| `examples` | Parallel/sequential matrices, assertion and sleep steps, nested pools, lifecycle and retry examples | Yes |
+| `examples` | Parallel/sequential matrices, argument variants, assertion and sleep steps, nested pools, named builders, discovery hooks | Yes |
 | `examples.annotation` | `@Disabled` annotation behavior | Yes |
 | `examples.annotation.tags` | Tag-based test selection | Yes |
 | `examples.argument` | Argument type variants (primitives, collections, custom types, etc.) | Yes |
-| `examples.lifecycle` | Custom listeners and full lifecycle | Yes |
-| `examples.retry` | Bounded retry policies, fresh instance per attempt, attempt history | Yes |
+| `examples.lifecycle` | Static setup, fixture setup and teardown, per-test before/after hooks, explicit cleanup | Yes |
+| `examples.retry` | Bounded retry policies, fixture rebuilt per attempt, attempt history | Yes |
 | `examples.support` | Shared utilities (Logger, Resource, Debug) | N/A |
 | `examples.isolated` | Exclusive lock serialization inside parallel work | Yes |
 | `examples.loop` | Bounded `repeat` with `until`, `untilPassed`, and `Backoff` delays | Yes |
@@ -58,7 +58,7 @@ Each container type follows an `XxxTest.java` + `XxxTestEnvironment.java` + `Xxx
 
 Altcontainers ships no service modules, so all image configuration is stated explicitly in each spec.
 
-Shared utilities live in `examples.altcontainers.util/`:
+Shared utilities live in the `examples.altcontainers.util` package:
 
 - `ContainerLogConsumer` — Streams container output to `System.out`
 - `RandomUtil` — Generates random strings and numbers
@@ -69,8 +69,8 @@ Container image versions are loaded from package-relative `docker-images.txt` cl
 
 ### Container Cleanup on JVM Crash
 
-Altcontainers' reaper provides automatic cleanup if the JVM crashes mid-test. The core module launches a separate
-reaper process per JVM session; it holds a TCP connection to the application as a liveness signal and, when that
+Altcontainers' reaper provides automatic cleanup if the JVM crashes mid-test. Altcontainers' core module launches a
+separate reaper process per JVM session; it holds a TCP connection to the application as a liveness signal and, when that
 connection drops, destroys every container and network carrying the session's labels — including after `SIGKILL`,
 OOM, and other hard crashes. The `setUp()`/`tearDown()` lifecycle in each `*TestEnvironment` handles normal
 execution; the reaper is the safety net for abnormal exits.

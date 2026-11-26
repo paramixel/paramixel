@@ -6,7 +6,7 @@ description: The immutable outcome of a run, and the single source of truth for 
 # Result
 
 ```java
-public interface Result { /* read-only accessors */ }
+public final class Result { /* immutable; obtain it from a Runner run */ }
 ```
 
 | Accessor | Meaning |
@@ -15,10 +15,10 @@ public interface Result { /* read-only accessors */ }
 | `status()` | Semantic aggregate status, never rewritten by exit policy |
 | `exitCode()` | Process exit code after `failureOnSkip`, `failureOnAbort`, `failIfNoTests`, and infrastructure failures |
 | `isQuiescent()` | `false` when task work may still be running and cleanup was withheld; independent of listener delivery |
-| `root()` | Immutable `TaskResult` tree |
+| `root()` | `Optional<TaskResult>` root of the immutable tree; empty when nothing executed |
 | `failures()` | Run-level infrastructure failures |
 | `diagnostics()` | Warnings and infrastructure notes |
-| `configurationSummary()` | Redacted configuration actually used |
+| `configurationSummary()` | Redacted summary of the effective Paramixel configuration |
 | `occurrenceCount()` / `attemptCount()` | Logical occurrences and attempt nodes; status counts sum to `occurrenceCount()` |
 
 ## TaskResult
@@ -27,7 +27,7 @@ public interface Result { /* read-only accessors */ }
 TaskResult
   kind (TASK or ATTEMPT), occurrenceId, definitionId, parentOccurrenceId, name, path, tags
   parameters (the node's rendered bind values), slot (CHILD, BEFORE, AFTER)
-  mode, pool, lock, shuffleSeed, executionOrder
+  mode, poolName, exclusiveLock, shuffleSeed, executionOrder
   status, bodyStatus, phases, children, failures, reason, attemptIndex, timedOut
   queuedAt, admittedAt, startedAt, completedAt, wait/execution/finalization durations
 ```

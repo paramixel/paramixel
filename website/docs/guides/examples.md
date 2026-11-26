@@ -13,13 +13,14 @@ The `examples` module holds definitions executed by the Paramixel Maven plugin d
 
 | Package | Demonstrates |
 | --- | --- |
-| `examples` | Parallel and sequential matrices, assertion and sleep steps, isolation, retry, hooks |
-| `examples.lifecycle` | Static setup, per-instance lifecycle, per-test before/after, explicit cleanup |
+| `examples` | Parallel and sequential matrices, argument variants, assertion and sleep steps, nested pools, and hooks |
+| `examples.lifecycle` | Static setup, fixture setup and teardown, per-test before/after hooks, explicit cleanup |
 | `examples.isolated` | Exclusive lock serialization inside parallel work |
-| `examples.loop` | Bounded repetition with fixed, exponential, and predicate-driven stops |
-| `examples.retry` | Retry after failure, fresh instance per attempt, attempt history |
+| `examples.loop` | Bounded repetition with fixed and exponential delays, with and without a stop predicate |
+| `examples.retry` | Retry after failure, fixture rebuilt per attempt, linear and exponential backoff, attempt history |
 | `examples.argument` | Heterogeneous argument types in one matrix without casts |
-| `examples.annotation` | `@Disabled` and tag selection |
+| `examples.annotation` | `@Disabled` behavior |
+| `examples.annotation.tags` | Tag-based selection across several factories |
 | `examples.fixtures` | The fixture-per-environment shape with a bounded pool |
 | `examples.altcontainers` | Kafka, MongoDB, and Nginx environments with real containers |
 

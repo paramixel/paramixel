@@ -38,8 +38,8 @@ paramixel.parallelism.checks=@cores*2
 ```
 
 A pool capacity is a cap, not a reservation: it bounds how many direct children of parallel tasks hold a permit from
-that pool at one time and guarantees no concurrency. `paramixel.workers` bounds how many task callbacks run at once, so
-a capacity above the worker limit adds no concurrency.
+that pool at one time, reserves no share of the runner, and does not guarantee concurrency. `paramixel.workers` bounds
+how many task callbacks run at once, so a capacity above the worker limit adds no concurrency.
 
 ## Validation
 

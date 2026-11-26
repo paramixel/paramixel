@@ -75,14 +75,30 @@ worse than they are:
 - `core/` - Main library (public API + implementation)
 - `maven-plugin/` - Maven plugin for test execution
 - `examples/` - Test classes and examples using Paramixel's own framework
+- `benchmarks/` - JMH benchmarks for compilation and scheduling (see [BENCHMARKS.md](BENCHMARKS.md))
 - `assets/` - License header template and shared resources
+- `scripts/` - Release and documentation automation
 - `website/` - Docusaurus documentation site
+
+### Documentation
+
+The Docusaurus site lives in `website/`. Building it requires Node.js 20 or newer, `npm`, `jq`, and `awk`.
+
+```bash
+./scripts/build-documentation.sh    # validate sidebars, frontmatter, and links, then build
+./scripts/serve-documentation.sh    # build and serve the site locally
+```
+
+Edit active documentation in `website/docs/`. `website/versioned_docs/`, `website/versioned_sidebars/`, and
+`website/versions.json` are release snapshots: do not edit them when updating the unreleased documentation.
 
 ## Coding Standards
 
 ### Javadoc
 
-See `AGENTS.md` (## Javadoc) for guidelines on writing Javadoc comments.
+Public API members carry Javadoc with `@param`, `@return`, and `@throws` where they apply. The Maven build enforces this:
+`maven-javadoc-plugin` runs with `doclint=all` and `-Werror`, so a missing or malformed tag fails
+`./mvnw clean verify`.
 
 ### Code Formatting
 
@@ -119,8 +135,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 
 - Follow existing code style and patterns
 - Write clear, self-documenting code with meaningful variable names
-- Add Javadoc for public APIs
-- Follow `AGENTS.md` (## Javadoc) for Javadoc conventions
+- Add Javadoc for public APIs; the build fails on a Javadoc warning
 - Keep methods focused and reasonably sized
 - Write unit tests for new functionality
 
@@ -129,13 +144,13 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (requires Docker for the examples module)
 ./mvnw test
 
-# Build + PMD analysis
+# Build, tests, Javadoc, formatting, and PMD checks
 ./mvnw verify
 
-# Build without Paramixel tests
+# Build without running Paramixel tests
 ./mvnw clean install -Dparamixel.skipTests
 ```
 

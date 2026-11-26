@@ -52,8 +52,9 @@ public final class TaskEvent {
     public int attempt();
     public Status status();
     public Instant timestamp();
+    public Optional<Duration> elapsed();
 }
 ```
 
-Phases: `ADMITTED`, `CONDITION`, `BEFORE`, `BODY`, `CHILDREN`, `TIMEOUT`, `AFTER`, `TERMINAL`. A complete stream delivers exactly one `TERMINAL` event per occurrence; events for
+Phases: `ADMITTED`, `CONDITION`, `BEFORE`, `BODY`, `TIMEOUT`, `CHILDREN`, `AFTER`, `TERMINAL`. A complete stream delivers exactly one `TERMINAL` event per occurrence; events for
 the same occurrence always respect legal phase order.

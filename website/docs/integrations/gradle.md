@@ -30,3 +30,6 @@ tasks.named('paramixelTest') {
 ```
 
 Ensure the task classpath contains Paramixel core and the classes with `@Paramixel.TaskFactory` methods.
+
+The launcher accepts only `--help` / `-h`; any other argument is a usage error. Select a subset with the
+`paramixel.match.*` system properties, or call `Runner` with a `Selector` from a `main` method.

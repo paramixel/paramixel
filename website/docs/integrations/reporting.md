@@ -10,16 +10,17 @@ Every reporter reads the same immutable `Result`, so console output, report file
 ## Console
 
 `Listener.defaultListener(configuration)` wires the status lines and the summary tree. Sections can be suppressed with
-`paramixel.listener.exclude` (`status`, `summary.tree`, `quiet`, `all`, or individual section names). Colors follow
-`paramixel.ansi` (`true`, `false`, `auto`).
+`paramixel.listener.exclude`: `status` (status header and footer), `summary.tree`, `summary.header`, `summary.footer`,
+`quiet` (status and summary tree), `all`, or any single section token. Colors follow `paramixel.ansi` (`true`, `false`,
+`auto`).
 
-Every console line begins with `[PARAMIXEL] `; the word `PARAMIXEL` is blue when ANSI output is enabled. Status lines use
-an unpadded short label followed by one space, and they end with the occurrence's elapsed time:
+Every Paramixel console line begins with `[PARAMIXEL] `; the word `PARAMIXEL` is blue when ANSI output is enabled. Status
+lines use an unpadded short label followed by one space, and they end with the occurrence's elapsed time:
 
 ```text
 [PARAMIXEL] PASS KafkaTest > apache/kafka:3.7.2 > tests > produce() (42 ms)
 [PARAMIXEL] FAIL Probe > verify (3 ms) — java.lang.AssertionError: boom
-[PARAMIXEL] PASS run 5c0f… in 1 s 240 ms
+[PARAMIXEL] PASS run (1240 ms)
 ```
 
 Framework scaffolding added by discovery (the synthetic root, the hook-gating group, and the factory group) is excluded
@@ -40,7 +41,7 @@ task that schedules children carries a `(sequential)` or `(parallel)` suffix: a 
 a scheduling mode for it would claim something that never happens:
 
 ```text
-[PARAMIXEL] PASS run 5c0f… in 1 s 240 ms
+[PARAMIXEL] PASS run (1240 ms)
 [PARAMIXEL] -----------------
 [PARAMIXEL] Paramixel Summary
 [PARAMIXEL] -----------------
@@ -55,8 +56,9 @@ Per-node elapsed time is whole milliseconds, the same unit as a live status line
 The compact hour/minute/second form is used only for the run footer and totals. The text report renders the same tree,
 including the `attempt k of n` nodes and `[before]`/`[after]` phase markers.
 
-Report files, by contrast, keep every attempt. Each attempt is labeled `attempt k of n`, and superseded attempts are
-marked `superseded` in the text and HTML reports and with `"superseded": true` plus `"attemptTotal"` in JSON.
+Report files, by contrast, keep every attempt. The text report labels each attempt `attempt k of n` and marks superseded
+attempts `superseded`; the HTML report labels them `ATTEMPT` and `ATTEMPT (superseded)`, and JSON nodes carry
+`"superseded"` and `"attemptTotal"`.
 
 ## Report files
 
@@ -69,12 +71,15 @@ Set `paramixel.report.file`. The format follows the extension:
 | `.html` / `.htm` | Status-colored table |
 | anything else | Printable tree text |
 
-Reports include run identifiers, occurrence and definition identifiers, paths, plan parameters, statuses, explicit
-reasons, stack traces, redacted configuration, and counters. They never include the full environment.
+JSON carries the complete read model: run metadata, the redacted configuration summary, counters, diagnostics, and a
+tree with occurrence and definition identifiers, paths, plan parameters, slots, statuses, phases, reasons, and
+failures. XML carries the run header and the same tree with occurrence identifiers, parameters, slots, statuses,
+reasons, and failure phases and messages. The HTML and text reports show the readable tree and reasons. No report
+includes the full environment.
 
 ### Schema version 2
 
-Every structured report carries `schemaVersion: 2`. Version 2 added three things:
+Every JSON and XML report carries `schemaVersion: 2`. Version 2 added three things:
 
 | Field | Where | Meaning |
 | --- | --- | --- |

@@ -27,7 +27,7 @@ package org.paramixel.api;
  *   <li>{@code 2} — a usage error or an invalid configuration, definition, or discovery result.</li>
  * </ul>
  *
- * <p>Supported arguments: {@code --help} prints usage; any other argument is a usage error. Use
+ * <p>Supported arguments: {@code --help} or {@code -h} prints usage; any other argument is a usage error. Use
  * {@link Runner#run(org.paramixel.api.selector.Selector)} or {@code paramixel.match.*} configuration to select a
  * subset of discovered factories.
  */

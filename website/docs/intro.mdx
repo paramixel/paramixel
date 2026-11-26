@@ -43,10 +43,10 @@ inherits it.
 
 ## What you get
 
-- **Typed authoring, untyped execution.** `T` is inferred from the instance supplier and carried through nested groups;
+- **Typed authoring, untyped execution.** Builders are typed, so a helper method can declare the node type it returns;
   the runtime `Task` is a single immutable type.
-- **One definition type.** Steps, groups, instance scopes, conditions, repetition, retries, and timeouts are attributes
-  of `Task`, not separate runtime classes.
+- **One definition type.** Steps, groups, conditions, repetition, retries, and timeouts are attributes of `Task`, not
+  separate runtime classes.
 - **Validation before execution.** Undefined pools, illegal nesting, acquisition cycles, and missing bindings fail before
   any fixture is created.
 - **Deterministic scheduling.** Named pools bound concurrency, permits are held for whole subtrees, waiting never occupies

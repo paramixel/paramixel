@@ -42,8 +42,9 @@ public final class ScenarioTest {
 }
 ```
 
-Every node is `bind* → before? → step+ → after?`: `bind` declares data that already exists when the plan is built,
-`before` and `after` each carry at most one id, task, or builder, and `step` adds children. One class literal per
+Every node is `bind* → before? → body? step* → after?`: `bind` declares data that already exists when the plan is
+built, `before` and `after` each carry at most one id, task, or builder, `body` puts a body on the node itself, and
+`step` adds children. One class literal per
 definition root, one identifier per hook, and ordinary static Java for the behaviour: no functional interfaces, no
 reflective fixture lookup, and no unchecked casts. Hooks read what they need from the context by name.
 
@@ -114,8 +115,8 @@ pass. `Result.status()` is the semantic outcome; `Result.exitCode()` applies `pa
 a `Task` or a builder, rooted at the factory's own class so its identifiers resolve. The `Configuration` parameter is the
 run's effective configuration, so configuration can decide the *shape* of the definition — which environments to author,
 which branches to include — rather than only what its tasks do at execution time. Returning `null` is an explicit skip.
-`@BeforeAll` / `@AfterAll` wrap the discovered run, `@Disabled` excludes a factory, `@Tag` and `Selector` select, and
-`@Priority` orders.
+`@BeforeAll` / `@AfterAll` wrap the discovered run, `@Disabled` excludes a factory or run hook, `@Tag` and `Selector`
+select, and `@Priority` orders.
 
 `Runner.run(Task)` executes exactly the definition you supply: no classpath scan and no hooks. `Runner.run()`
 discovers. `Launcher` owns `System.exit`.
@@ -145,7 +146,7 @@ effective value fails configuration validation.
 ```bash
 ./mvnw spotless:apply          # format before any validation
 ./mvnw clean verify            # full validation: tests, Javadoc, Spotless, PMD
-./mvnw test -Dparamixel.skipTests   # core unit tests only
+./mvnw test -Dparamixel.skipTests   # JUnit tests only; skip Paramixel definition execution
 ./mvnw test -pl examples       # example integration tests (requires Docker)
 ```
 

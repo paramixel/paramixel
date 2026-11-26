@@ -40,8 +40,8 @@ non-quiescent result and withheld cleanup; check `result.isQuiescent()` in CI if
 ## Keep pools honest
 
 Define every named pool, do not nest the same pool, and size pools for the resource they protect (containers, ports,
-licenses), not for CPU count. A capacity is a cap, not a reservation: it guarantees no concurrency, so raising it above
-`paramixel.workers` changes nothing.
+licenses), not for CPU count. A capacity is a cap, not a reservation: it does not guarantee concurrency, so raising it
+above `paramixel.workers` changes nothing.
 
 ## Bind what exists, put what you create
 

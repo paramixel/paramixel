@@ -29,7 +29,8 @@ Task definition = Sequential.builder(DatabaseWorkflowTest.class, "database workf
         .build();
 ```
 
-The fixture is created lazily per attempt, `after` runs even when a step fails, and nothing is closed implicitly.
+The fixture is created by the `before` slot when the branch is admitted, `after` runs even when a step fails, and
+nothing is closed implicitly.
 
 ## Compatibility matrix
 
@@ -71,9 +72,9 @@ RepeatBuilder definition = Repeat.builder(MySuite.class, "readiness")
 ## Isolated resource access
 
 ```java
-Task definition = Parallel.builder("matrix", Pool.named("environments"))
-        .step(Sequential.builder("group-a").isolated("db").step("seed", Db::seed))
-        .step(Sequential.builder("group-b").isolated("db").step("seed", Db::seed))
+Task definition = Parallel.builder(MySuite.class, "matrix", Pool.named("environments"))
+        .step(Sequential.builder(MySuite.class, "group-a").isolated("db").step("seed"))
+        .step(Sequential.builder(MySuite.class, "group-b").isolated("db").step("seed"))
         .build();
 ```
 
@@ -82,6 +83,6 @@ Both groups run, but their bodies never overlap.
 ## Fail-fast at the root
 
 `paramixel.failFast=true` stops admitting new root tasks after a root task fails (`FAILED`, which includes a timeout).
-A deliberate skip (`throw skip(...)` or a false `when`/`onlyIf` condition) and an assumption abort (`throw abort(...)`)
+A deliberate skip (`throw skip(...)` or a false `onlyIf` condition) and an assumption abort (`throw abort(...)`)
 are not failures and do not trigger it. Already-running work finishes; roots that are not admitted are `SKIPPED` with an
 explicit `failFast` reason.

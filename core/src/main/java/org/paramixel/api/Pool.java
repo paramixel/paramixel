@@ -28,10 +28,10 @@ import java.util.regex.Pattern;
  * enforces it.
  *
  * <p>Capacity is a <strong>cap, not a reservation</strong>. It bounds how many direct children of parallel tasks hold a
- * permit from this pool at one time; it reserves no share of the runner, guarantees no concurrency, and creates no
- * threads. {@code paramixel.workers} (default: available processors) separately bounds how many task callbacks execute
- * at once across every pool, so a capacity above that limit adds no concurrency, and a pool can stay below its capacity
- * because another pool occupies the workers.
+ * permit from this pool at one time; it reserves no share of the runner, does not guarantee concurrency, and creates
+ * no threads. {@code paramixel.workers} (default: available processors) separately bounds how many task callbacks
+ * execute at once across every pool, so a capacity above that limit adds no concurrency, and a pool can stay below its
+ * capacity because another pool occupies the workers.
  *
  * <p>Names are case-sensitive and must match {@code [A-Za-z][A-Za-z0-9_-]*}; blank names and names with leading or
  * trailing whitespace are rejected at construction time rather than being trimmed. Equal names produce equal values,

@@ -20,7 +20,7 @@ status.throwable();   // Optional[cause]
 | `FAILED` | yes | Operation, runtime validation, timeout, or finalizer failed |
 | `SKIPPED` | yes | Condition false, dependency unsatisfied, selection, or stop policy |
 | `ABORTED` | yes | Assumption or precondition abort |
-| `CANCELED` | yes | Run cancellation, shutdown, or timeout-driven abortion |
+| `CANCELED` | yes | Run cancellation, shutdown, or a descendant canceled by a timeout |
 
 `ABORTED` and `CANCELED` are intentionally distinct: an assumption failure is a test verdict, while cancellation means
 the task never produced one.

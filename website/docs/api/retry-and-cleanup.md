@@ -12,8 +12,11 @@ description: Bounded advanced policies with distinct semantics.
 | `retry(RetryPolicy)` | Re-attempt a non-success outcome | Attempt limit, non-triggering status |
 | `Repeat.builder(name)` | Intentional replay of a subtree | `maxIterations`, `untilPassed`, predicate |
 
-A repeat `until` predicate is user code: it runs on an execution worker after each iteration, like a `when` condition.
-If it throws, the failure is recorded on that iteration, the task fails, and repetition stops.
+Both policies require a finite bound between 1 and 10,000: `RetryPolicy.MAX_ATTEMPTS` and
+`RepeatPolicy.MAX_ITERATIONS`. A larger value is rejected as unbounded work.
+
+A repeat `until` predicate is user code: it runs on an execution worker after each iteration, like an `onlyIf`
+condition. If it throws, the failure is recorded on that iteration, the task fails, and repetition stops.
 
 ```java
 Sequential.builder(MySuite.class, "flaky")

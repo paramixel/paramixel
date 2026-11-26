@@ -1,6 +1,6 @@
 ---
 title: Lifecycle and Scope
-description: Instance ownership, phases, finalization order, and failure precedence.
+description: Fixture ownership, phases, finalization order, and failure precedence.
 ---
 
 # Lifecycle and Scope
@@ -35,8 +35,8 @@ public static void stop(final Context context) {
   never share one.
 - Nothing runs at definition, build, or compile time; the hook runs when the occurrence is admitted.
 - An `after` slot uses `find`, so a partially completed `before` cannot mask the original failure.
-- A factory that throws must clean up its own partially acquired objects, because Paramixel cannot reach an object that
-  was never returned.
+- A `before` hook that throws must clean up objects it acquired but never stored, because Paramixel can only release
+  what a later `after` hook can `find`.
 
 ## Phases
 

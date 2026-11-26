@@ -12,7 +12,7 @@ All framework exceptions extend `ParamixelException`.
 | `ConfigurationException` | Invalid or unloadable configuration; thrown before any test code runs |
 | `CompilationException` | Invalid definition or plan; carries the collected diagnostics |
 | `ResolverException` | Invalid or uninvocable discovery factory |
-| `ResourceException` | A required `Key` resource is not available; names the key and occurrence path |
+| `ContextException` | A requested context entry is missing or holds a different type; names the entry and occurrence path |
 | `FailException` | Author-signaled failure (`FAILED`) |
 | `SkipException` | Author-signaled skip (`SKIPPED`) |
 | `AbortException` | Author-signaled assumption abort (`ABORTED`) |

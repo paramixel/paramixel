@@ -11,15 +11,14 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
 
 **Highlights**
 
-- `Task` / `TaskBuilder` / `Tasks` replace `Action`, `ActionBuilder`, and the per-shape classes.
+- `Task` / `TaskBuilder` replace `Action`, `ActionBuilder`, and the per-shape classes.
 - Fixtures live in the per-scope context: `bind(name, value)` seeds it, `put`/`require`/`find`/`remove` manage it,
   and `after` hooks release it. The framework never closes a stored value and never probes for `AutoCloseable`.
 - `Parallel.builder(name, Pool.named("..."))` replaces raw string pool identifiers; `Pool` is a value object.
 - `sequential` / `parallel` describe concurrency; `dependent()` / `independent()` describe only failure continuation and
   exist on sequential builders only.
 - `repeat` (bounded replay) and `RetryPolicy` (bounded re-attempt) are distinct, typed policies.
-- `when` / `onlyIf` conditions, `timeout`, `isolated`, typed `Key` resources, `tags`, and reproducible `shuffle` are
-  attributes of any task.
+- `onlyIf` conditions, `timeout`, `isolated`, `tags`, and reproducible `shuffle` are attributes of any task.
 - A pure compiler validates the plan and aggregates diagnostics before any user code runs.
 - A single-threaded scheduler with a worker pool replaces the previous engine: deterministic depth-first admission,
   non-blocking waits, explicit permit lifetimes, and deadlock protection.
@@ -39,8 +38,9 @@ Greenfield refactor. The public action hierarchy was replaced by one immutable `
   starts the next attempt.
 - XML and HTML reports replace characters that XML 1.0 forbids (such as ANSI escape codes in failure messages) with
   U+FFFD, and an unpaired surrogate in a message no longer prevents a report file from being written.
-- A `@Paramixel.TaskFactory` or hook method that returns `null` is reported as a warning naming the method, and the warning
-  is kept in the run diagnostics.
+- A `@Paramixel.TaskFactory` method or a `@BeforeAll`/`@AfterAll` run hook that returns `null` is reported as a warning
+  naming the method, and the warning is kept in the run diagnostics. A factory builder whose `build()` returns `null`
+  is reported as a `ResolverException` instead.
 - A `@Paramixel.TaskFactory` method may declare one `Configuration` parameter (or none) and receives the run's effective
   configuration, so configuration can determine the shape of the definition. The parameter is optional and independent of
   the return type; `@BeforeAll` and `@AfterAll` methods still take no parameters.

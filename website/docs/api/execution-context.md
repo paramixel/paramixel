@@ -1,6 +1,6 @@
 ---
 title: Context
-description: Read-only execution metadata plus the per-scope state store.
+description: Per-occurrence execution metadata plus the per-scope state store.
 ---
 
 # Context
@@ -24,25 +24,25 @@ public interface Context {
 }
 ```
 
-A context belongs to one occurrence of one attempt. It exposes stable identity, the effective configuration, and a state
-store shared by every occurrence in the same **scope**.
+A context belongs to one occurrence of one attempt. It exposes stable read-only identity metadata, the effective
+configuration, and a mutable state store shared by every occurrence in the same **scope**.
 
 ## Scope state
 
 ```java
 @Paramixel.Id("allocate")
 public static void allocate(final Context context) {
-    context.put("client", new HttpClient());          // stored in this scope
+    context.put("client", Client.start());             // stored in this scope
 }
 
 @Paramixel.Id("call")
 public static void call(final Context context) {
-    context.require("client", HttpClient.class).send(request);
+    context.require("client", Client.class).send(request);
 }
 
 @Paramixel.Id("deallocate")
 public static void deallocate(final Context context) {
-    context.find("client", HttpClient.class).ifPresent(HttpClient::close);
+    context.find("client", Client.class).ifPresent(Client::close);
 }
 ```
 
