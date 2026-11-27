@@ -40,6 +40,10 @@ report-file writer when `paramixel.report.file` is set.
 
 ## TaskEvent
 
+`onWarning(String)` reports conditions that do not fail the run but change behavior — for example, a
+configuration key that was removed and now has no effect. The runner reports each detected condition
+at most once per JVM, before execution begins.
+
 ```java
 public final class TaskEvent {
     public long sequence();                 // monotonic per run

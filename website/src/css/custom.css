@@ -132,6 +132,23 @@
   color: #ffffff;
 }
 
+/* Unmaintained version banner */
+.notice-unmaintained {
+  --ifm-alert-background-color: #fdecea;
+  --ifm-alert-background-color-highlight: #f7c6c1;
+  --ifm-alert-border-color: #d9534f;
+  --ifm-alert-color: #611a15;
+  --ifm-alert-foreground-color: #611a15;
+}
+
+[data-theme='dark'] .notice-unmaintained {
+  --ifm-alert-background-color: #3b1f1f;
+  --ifm-alert-background-color-highlight: #5a2b2a;
+  --ifm-alert-border-color: #b4534f;
+  --ifm-alert-color: #ffd9d6;
+  --ifm-alert-foreground-color: #ffd9d6;
+}
+
 /* Responsive adjustments */
 @media screen and (max-width: 996px) {
   :root {
