@@ -1,0 +1,111 @@
+# Build configuration for Paramixel, mirroring .github/workflows/build.yaml.
+#
+# Java is preinstalled on the runner VMs under /opt/java/<N> (17, 21 and 25 are
+# the versions CI covers). "requires" keeps a job queued for a runner that has
+# the JDK, and "paths" puts its bin directory in front of PATH. Centralia does
+# not install or discover tools. The documentation job in CI is not mirrored.
+#
+# Validate with:
+#   centralia validate .centralia/build.riffle
+
+jobs : {
+    build-java-17 : {
+        triggers : [
+            push
+            pull-request
+        ]
+        executor : native
+        labels : [
+            linux
+        ]
+        timeout : 1h
+        requires : [
+            /opt/java/17/bin/java
+        ]
+        paths : [
+            /opt/java/17/bin
+        ]
+        environment : {
+            JAVA_HOME : /opt/java/17
+            MAVEN_OPTS : -Xmx2g -XX:+UseG1GC
+        }
+        commands : [
+            ./mvnw spotless:check
+            ./mvnw -B clean install
+        ]
+    }
+    build-java-21 : {
+        triggers : [
+            push
+            pull-request
+        ]
+        executor : native
+        labels : [
+            linux
+        ]
+        timeout : 1h
+        requires : [
+            /opt/java/21/bin/java
+        ]
+        paths : [
+            /opt/java/21/bin
+        ]
+        environment : {
+            JAVA_HOME : /opt/java/21
+            MAVEN_OPTS : -Xmx2g -XX:+UseG1GC
+        }
+        commands : [
+            ./mvnw spotless:check
+            ./mvnw -B clean install
+        ]
+    }
+    build-java-25 : {
+        triggers : [
+            push
+            pull-request
+        ]
+        executor : native
+        labels : [
+            linux
+        ]
+        timeout : 1h
+        requires : [
+            /opt/java/25/bin/java
+        ]
+        paths : [
+            /opt/java/25/bin
+        ]
+        environment : {
+            JAVA_HOME : /opt/java/25
+            MAVEN_OPTS : -Xmx2g -XX:+UseG1GC
+        }
+        commands : [
+            ./mvnw spotless:check
+            ./mvnw -B clean install -Dspotbugs.skip=true -Dpmd.skip=true
+        ]
+    }
+    gradle-java-17 : {
+        triggers : [
+            push
+            pull-request
+        ]
+        executor : native
+        labels : [
+            linux
+        ]
+        timeout : 1h
+        requires : [
+            /opt/java/17/bin/java
+        ]
+        paths : [
+            /opt/java/17/bin
+        ]
+        environment : {
+            JAVA_HOME : /opt/java/17
+            GRADLE_OPTS : -Xmx2g -XX:+UseG1GC
+        }
+        commands : [
+            ./gradlew check --no-daemon
+        ]
+    }
+}
