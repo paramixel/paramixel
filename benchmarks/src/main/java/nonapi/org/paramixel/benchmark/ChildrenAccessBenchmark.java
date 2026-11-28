@@ -16,8 +16,8 @@
 
 package nonapi.org.paramixel.benchmark;
 
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -32,50 +32,57 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.paramixel.api.Status;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.Parallel;
+import org.paramixel.api.Pool;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Micro-benchmark measuring throughput of {@link ConcreteDescriptor#children()} calls.
+ * Measures the cost of traversing an immutable definition tree.
  *
- * <p>Measures the cost of {@code List.copyOf()} on every call vs. a cached unmodifiable view.
+ * <p>A definition is read repeatedly by compilation and reporting, so traversal must not copy collections or allocate
+ * per child.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 3, time = 3)
-@Measurement(iterations = 5, time = 3)
-@Fork(2)
+@Warmup(iterations = 3, time = 2)
+@Measurement(iterations = 5, time = 2)
+@Fork(1)
 @Threads(1)
 public class ChildrenAccessBenchmark {
 
     @Benchmark
-    public void accessChildren(ChildrenAccessState state, Blackhole blackhole) {
-        for (var i = 0; i < state.accessCount; i++) {
-            blackhole.consume(state.parent.children());
+    public void accessChildren(final ChildrenAccessState state, final Blackhole blackhole) {
+        blackhole.consume(count(state.definition));
+    }
+
+    private static int count(final Task task) {
+        var total = 1;
+        for (Task child : task.children()) {
+            total += count(child);
         }
+        return total;
     }
 
     @State(Scope.Benchmark)
     public static class ChildrenAccessState {
 
-        @Param({"10", "50", "200"})
-        private int childCount;
+        @Param({"10", "100", "1000"})
+        private int size;
 
-        @Param({"100", "1000"})
-        private int accessCount;
-
-        private ConcreteDescriptor parent;
+        private Task definition;
 
         @Setup(Level.Trial)
         public void setup() {
-            var parentAction = Step.of("parent", ctx -> {});
-            parent = new ConcreteDescriptor(parentAction);
-            parent.setStatus(Status.RUNNING);
-            for (var i = 0; i < childCount; i++) {
-                var childAction = Step.of("child-" + i, ctx -> {});
-                var child = new ConcreteDescriptor(parent, childAction);
-                parent.addChild(child);
+            final var children = new ArrayList<Task>();
+            final var builder = Parallel.builder(BenchmarkTree.class, "root", Pool.named("p"));
+            for (var i = 0; i < size; i++) {
+                children.add(Sequential.builder(BenchmarkTree.class, "child-" + i)
+                        .step(BenchmarkTree.ID_NOOP)
+                        .build());
             }
+            children.forEach(builder::step);
+            definition = builder.build();
         }
     }
 }

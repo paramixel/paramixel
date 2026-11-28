@@ -17,53 +17,75 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Repeat;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Loop;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
+import org.paramixel.api.support.Backoff;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Loop} action with a
- * constant inter-iteration delay ({@link org.paramixel.api.action.Loop.DelayPolicy.Linear}).
- * Verifies that the loop execution accounts for the configured delay between iterations.
+ * Demonstrates a fixed delay between iterations.
+ *
+ * <p>Delays are scheduled on a timer, not by blocking a worker thread, and they are cancelable: a run cancellation
+ * stops a pending delay instead of waiting it out.
  */
 public class LoopWithLinearDelayTest {
+
+    private static final String ID_CHECK = "check";
+    private static final String ID_VALIDATE = "validate";
 
     private static final AtomicInteger iterationCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
-     * Builds an action tree that exercises loop with constant inter-iteration delay.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
-    @Paramixel.Factory
-    public static Action factory() {
+    @Paramixel.TaskFactory
+    public static Task factory() {
         resetCounts();
-        return sequential("loop-linear-delay-example")
-                .child(loop("poll")
-                        .body(step("check", context -> iterationCount.incrementAndGet()))
+        return Sequential.builder(LoopWithLinearDelayTest.class, "loop-fixed-delay-example")
+                .step(Repeat.builder("poll")
                         .maxIterations(3)
-                        .delay(new Loop.DelayPolicy.Linear(Duration.ofMillis(100))))
-                .child(step("validate", context -> {
-                    assertThat(iterationCount.get()).isEqualTo(3);
-                }))
+                        .delay(Backoff.fixed(Duration.ofMillis(50)))
+                        .step(ID_CHECK))
+                .step(ID_VALIDATE)
                 .build();
+    }
+
+    /**
+     * Counts one iteration.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CHECK)
+    public static void check(final Context context) {
+        iterationCount.incrementAndGet();
+    }
+
+    /**
+     * Confirms every iteration ran.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        assertThat(iterationCount.get()).isEqualTo(3);
     }
 
     private static void resetCounts() {

@@ -1,0 +1,69 @@
+/*
+ * Copyright (c) 2026-present Douglas Hoard
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package nonapi.org.paramixel.execution;
+
+import org.paramixel.api.TaskEvent;
+
+/**
+ * Receives execution events and warnings from the engine.
+ *
+ * <p>Implementations must be non-blocking with respect to scheduler state: the engine calls these methods on its own
+ * thread while it owns the scheduling decision, so an implementation that dispatches to a separate thread (with a
+ * bounded queue and backpressure) is expected.
+ *
+ * <p>Run-level infrastructure diagnostics are deliberately not published here. The engine keeps them and attaches them
+ * to the {@link org.paramixel.api.Result} it returns, so they never depend on listener delivery to be recorded.
+ */
+public interface EventPublisher {
+
+    /**
+     * Publishes one lifecycle event.
+     *
+     * @param event the event; never {@code null}
+     */
+    void publish(TaskEvent event);
+
+    /**
+     * Publishes a warning that does not fail the run.
+     *
+     * @param message the warning; never {@code null}
+     */
+    void warning(String message);
+
+    /**
+     * Prepares for execution, when publishing must not block the scheduler.
+     *
+     * @param reserve bounded space for events produced by admitted work under pressure
+     * @param wakeup notifies the engine when capacity returns or delivery fails
+     */
+    default void beginExecution(final long reserve, final Runnable wakeup) {}
+
+    /** @return whether normal work must wait for the listener */
+    default boolean isBackpressured() {
+        return false;
+    }
+
+    /** @return the remaining stall budget under pressure, or {@link Long#MAX_VALUE} otherwise */
+    default long nanosUntilStall() {
+        return Long.MAX_VALUE;
+    }
+
+    /** @return whether delivery has failed, including if the stall budget just expired */
+    default boolean executionStalled() {
+        return false;
+    }
+}

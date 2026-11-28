@@ -18,7 +18,7 @@ package nonapi.org.paramixel.support;
 
 /**
  * Rethrows non-{@code StackOverflowError} {@code VirtualMachineError} throwables immediately while all other
- * throwables are captured in action results.
+ * throwables are captured in task results.
  *
  * <p>Non-{@link StackOverflowError} {@link VirtualMachineError} throwables are unrecoverable. They indicate
  * JVM-level integrity or resource problems and should always terminate execution immediately. All other
@@ -34,7 +34,7 @@ package nonapi.org.paramixel.support;
  * </ul>
  *
  * <p>{@link StackOverflowError} is intentionally recoverable. It often represents a localized recursion bug in
- * user or test code. Once the stack unwinds to Paramixel's catch boundary, it should be reportable as an action
+ * user or test code. Once the stack unwinds to Paramixel's catch boundary, it should be reportable as a task
  * or test failure.
  */
 public final class UnrecoverableErrors {

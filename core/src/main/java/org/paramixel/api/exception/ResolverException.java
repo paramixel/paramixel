@@ -20,14 +20,15 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Signals that action discovery or action-factory resolution failed during classpath scanning.
+ * Signals that factory discovery or factory resolution failed during classpath scanning.
  *
- * <p>Thrown by resolver components when an annotated factory method is missing required
- * parameters, returns an incompatible type, conflicts with another factory, or cannot
- * be invoked. This exception halts startup — callers must correct the action class or
- * factory method and restart.
+ * <p>Thrown when an annotated factory method is not {@code public static}, declares parameters, returns an
+ * incompatible type, conflicts with another factory in the same hierarchy, or cannot be invoked. Discovery validates
+ * every factory before any discovered test work executes, so this exception halts the run before user callbacks.
  */
-public final class ResolverException extends RuntimeException {
+public final class ResolverException extends ParamixelException {
+
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates a resolver exception with the supplied message.

@@ -1,68 +1,97 @@
 ---
 title: Quick Reference
-description: Common APIs, annotations, and configuration keys.
+description: The 7.0 authoring and execution surface on one page.
 ---
 
 # Quick Reference
 
-## Minimal factory
+## Imports
 
 ```java
-import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import org.paramixel.api.*;
+import org.paramixel.api.exception.*;
+import org.paramixel.api.selector.*;
+import org.paramixel.api.support.*;
+```
 
-@Paramixel.Factory
-public static Action smoke() {
-    return sequential("smoke")
-            .child(step("step", ctx -> doWork()))
-            .build();
+## Authoring
+
+```java
+final var root = Parallel.builder(MySuite.class, "Matrix", Pool.named("environments"));
+for (final var env : environments) {
+    root.step(Sequential.builder(env.name())
+            .bind("environment", env)
+            .before("start")
+            .step(Sequential.builder("checks")
+                    .step("health")
+                    .step("metrics"))
+            .after("stop"));
+}
+Parallel definition = root.build();
+
+@Paramixel.Id("health")
+public static void health(final Context context) {
+    context.require("environment", Environment.class).checkHealth();
 }
 ```
 
-## Using named builders
+| Call | Meaning |
+| --- | --- |
+| `Sequential.builder(name)` / `Sequential.builder(Owner.class, name)` | Sequential node, unanchored or anchored for hook ids |
+| `Parallel.builder(name, Pool.named("p"))` | Parallel node; direct children hold one permit each |
+| `Repeat.builder(name).maxIterations(n)` | Bounded replay with an optional `until(...)` |
+| `.bind(name, value)` | Plan parameter: a value that already exists at build time |
+| `.before(id)` / `.before(Task or builder)` | One setup slot; compose several phases with a sequential subtree |
+| `.after(id)` / `.after(Task or builder)` | One cleanup slot; runs once the node has started, whatever failed |
+| `.step(id)` | Body-only child step; `.body(id)` puts a body on the current occurrence |
+| `.step(Task or builder)` | Child subtree, materialized when the parent is built |
+| `.independent()` / `.dependent()` | Sequential failure continuation (parallel has neither) |
+| `.onlyIf(id)` | Runtime condition, resolved hook must return `boolean` |
+| `.retry(RetryPolicy…)` | Bounded re-attempt |
+| `.timeout(Duration)` | Cooperative deadline |
+| `.isolated("lock")` | Exclusive logical lock |
+| `.shuffle(seed)` / `.tags(…)` | Ordering and metadata |
+| `.build()` | Immutable snapshot of the concrete node type |
 
-For shorter action tree definitions, use the named builder factories:
+## Running
 
 ```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-@Paramixel.Factory
-public static Action smoke() {
-    return sequential("smoke")
-        .child(step("arrange", ctx -> arrange()))
-        .child(step("act", ctx -> act()))
-        .child(step("assert", ctx -> assertResult()))
-        .build();
+final var configuration = Configuration.defaultConfiguration();
+final int exitCode;
+try (Runner runner = Runner.builder()
+        .configuration(configuration)
+        .pool(Pool.named("environments"), 3)
+        .listener(Listener.defaultListener(configuration))
+        .build()) {
+    exitCode = runner.run(definition).exitCode();
 }
+System.exit(exitCode);
 ```
 
-See [Named Builders](../api/named-builders) for the full method reference.
+## Statuses
 
+`PASSED`, `FAILED`, `SKIPPED`, `ABORTED`, `CANCELED`; severity
+`FAILED > CANCELED > ABORTED > SKIPPED > PASSED`.
 
-## Annotations
+## Signals
 
-| Annotation | Target | Purpose |
-| --- | --- | --- |
-| `@Paramixel.Factory` | method | Marks a public static factory returning `Action`, `Builder`, or `null`. |
-| `@Paramixel.BeforeAll` | method | Marks a public static runner-level hook that executes once before discovered test actions. |
-| `@Paramixel.AfterAll` | method | Marks a public static runner-level hook that executes once after discovered test actions. |
-| `@Paramixel.Disabled` | method | Excludes a factory or hook from discovery. |
-| `@Paramixel.Tag` | method | Repeatable tag used by selectors and regex filters. |
-| `@Paramixel.Priority` | class | Orders discovered classes before root action construction. |
-| `@Paramixel.Id` | method | Identifies methods for `AnnotationResolver`. |
-
-Use `@Paramixel.BeforeAll` and `@Paramixel.AfterAll` for runner-wide lifecycle around all discovered factory actions. Use `Scope` for setup and teardown that belongs to one test or action tree.
+```java
+throw FailException.fail("assertion");
+throw SkipException.skip("not applicable");
+throw AbortException.abort("precondition");
+```
 
 ## Configuration
 
-See [Configuration API](../api/configuration) for the complete list of supported configuration keys with defaults and descriptions.
+| Key | Default |
+| --- | --- |
+| `paramixel.parallelism` | processors |
+| `paramixel.parallelism.<pool>` | required for user pools |
+| `paramixel.workers` | processors |
+| `paramixel.shutdown.graceMillis` | `10000` |
+| `paramixel.failureOnSkip` / `failureOnAbort` | `true` |
+| `paramixel.failIfNoTests` | `true` |
+| `paramixel.failFast` | `false` |
 
-## Maven
-
-```bash
-mvn paramixel:test
-mvn test -Dparamixel.match.tag.regex=smoke
-```
+The remaining keys — `paramixel.ansi`, `paramixel.report.file`, `paramixel.match.*`, and `paramixel.listener.*` — are
+listed in [Properties](../configuration/properties).

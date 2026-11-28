@@ -17,51 +17,85 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Repeat;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Status;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Loop} action with a
- * termination predicate (polling mode). Verifies that the loop stops
- * when the predicate is satisfied before maxIterations is exhausted.
+ * Demonstrates repetition with an explicit stop predicate.
+ *
+ * <p>The predicate is evaluated after each iteration with the iteration status, and the iteration bound still applies,
+ * so a predicate that never becomes true cannot create unbounded work. The predicate is the one hook that takes a
+ * second parameter.
  */
 public class LoopWithPredicateTest {
+
+    private static final String ID_CHECK = "check";
+    private static final String ID_POLLED = "polled";
+    private static final String ID_VALIDATE = "validate";
 
     private static final AtomicInteger pollCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
-     * Builds an action tree that exercises polling with a termination predicate.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
-    @Paramixel.Factory
-    public static Action factory() {
+    @Paramixel.TaskFactory
+    public static Task factory() {
         resetCounts();
-        return sequential("loop-predicate-example")
-                .child(loop("poll")
-                        .body(step("check", context -> pollCount.incrementAndGet()))
-                        .until(context -> pollCount.get() >= 4)
-                        .maxIterations(10))
-                .child(step("validate", context -> {
-                    assertThat(pollCount.get()).isEqualTo(4);
-                }))
+        return Sequential.builder(LoopWithPredicateTest.class, "loop-predicate-example")
+                .step(Repeat.builder("poll").maxIterations(10).until(ID_POLLED).step(ID_CHECK))
+                .step(ID_VALIDATE)
                 .build();
+    }
+
+    /**
+     * Counts one poll.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CHECK)
+    public static void check(final Context context) {
+        pollCount.incrementAndGet();
+    }
+
+    /**
+     * Stops iterating once enough polls have run.
+     *
+     * @param context the execution context
+     * @param status the status of the iteration that just finished
+     * @return {@code true} when the loop should stop
+     */
+    @Paramixel.Id(ID_POLLED)
+    public static boolean polled(final Context context, final Status status) {
+        return pollCount.get() >= 4;
+    }
+
+    /**
+     * Confirms the predicate stopped the loop at the expected count.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        assertThat(pollCount.get()).isEqualTo(4);
     }
 
     private static void resetCounts() {

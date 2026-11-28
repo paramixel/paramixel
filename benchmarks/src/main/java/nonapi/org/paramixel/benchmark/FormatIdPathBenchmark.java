@@ -18,9 +18,11 @@ package nonapi.org.paramixel.benchmark;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import nonapi.org.paramixel.action.ConcreteDescriptor;
-import nonapi.org.paramixel.listener.Listeners;
+import nonapi.org.paramixel.compiler.CompiledOccurrence;
+import nonapi.org.paramixel.compiler.CompiledPlan;
+import nonapi.org.paramixel.compiler.PlanCompiler;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -35,90 +37,48 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.paramixel.api.Descriptor;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.Configuration;
+import org.paramixel.api.Parallel;
+import org.paramixel.api.Pool;
 
 /**
- * Micro-benchmark measuring throughput of {@link Listeners#formatIdPath(Descriptor)}.
- *
- * <p>Measures the cost of walking the parent chain and joining id strings for
- * descriptor trees of varying depth and leaf count.
+ * Measures reads of compiled occurrence identity, which reporting performs per event and per result node.
  */
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = 3, time = 3)
-@Measurement(iterations = 5, time = 3)
-@Fork(2)
+@Warmup(iterations = 3, time = 2)
+@Measurement(iterations = 5, time = 2)
+@Fork(1)
 @Threads(1)
 public class FormatIdPathBenchmark {
 
     @Benchmark
-    public void formatIdPathFirstCall(DescriptorTreeState state, Blackhole blackhole) {
-        for (var leaf : state.leaves) {
-            blackhole.consume(Listeners.formatIdPath(leaf));
-        }
-    }
-
-    @Benchmark
-    public void formatIdPathCachedCall(DescriptorTreeState state, Blackhole blackhole) {
-        // First call populates cache; subsequent calls hit cache
-        // This simulates the scheduler pattern: same descriptors called repeatedly
-        for (var i = 0; i < state.repeatCount; i++) {
-            for (var leaf : state.leaves) {
-                blackhole.consume(Listeners.formatIdPath(leaf));
-            }
+    public void scanIdentities(final DescriptorTreeState state, final Blackhole blackhole) {
+        for (CompiledOccurrence occurrence : state.occurrences) {
+            blackhole.consume(occurrence.id());
+            blackhole.consume(occurrence.definitionId());
+            blackhole.consume(occurrence.path());
         }
     }
 
     @State(Scope.Benchmark)
     public static class DescriptorTreeState {
 
-        @Param({"100", "1000"})
-        private int leafCount;
+        @Param({"10", "100", "1000"})
+        private int size;
 
-        @Param({"3", "5", "10"})
-        private int depth;
-
-        @Param({"10"})
-        private int repeatCount;
-
-        List<Descriptor> leaves;
+        private List<CompiledOccurrence> occurrences;
 
         @Setup(Level.Trial)
         public void setup() {
-            leaves = new ArrayList<>();
-            var root = new ConcreteDescriptor(Step.of("root", context -> {}));
-            buildTree(root, 1, leafCount, depth);
-            root.freeze();
-        }
-
-        private void buildTree(
-                final ConcreteDescriptor parent, final int currentDepth, final int totalLeaves, final int maxDepth) {
-            if (currentDepth >= maxDepth) {
-                // This level becomes leaves
-                for (var i = 0; i < totalLeaves; i++) {
-                    var leaf = new ConcreteDescriptor(parent, Step.of("leaf-" + i, context -> {}));
-                    parent.addChild(leaf);
-                    leaves.add(leaf);
-                }
-                return;
+            final var builder = Parallel.builder(BenchmarkTree.class, "root", Pool.named("p"));
+            for (var i = 0; i < size; i++) {
+                builder.step(BenchmarkTree.ID_NOOP);
             }
-
-            // Distribute leaves across children at this level
-            // Use branching factor that creates a balanced tree
-            var branchingFactor = Math.max(2, (int) Math.ceil(Math.pow(totalLeaves, 1.0 / (maxDepth - currentDepth))));
-            var leavesPerChild = totalLeaves / branchingFactor;
-            var remainder = totalLeaves % branchingFactor;
-
-            for (var i = 0; i < branchingFactor; i++) {
-                var childLeaves = leavesPerChild + (i < remainder ? 1 : 0);
-                if (childLeaves <= 0) {
-                    continue;
-                }
-                var child = new ConcreteDescriptor(parent, Step.of("node-" + currentDepth + "-" + i, context -> {}));
-                parent.addChild(child);
-                buildTree(child, currentDepth + 1, childLeaves, maxDepth);
-            }
+            final CompiledPlan plan = new PlanCompiler(
+                            Configuration.of(Map.of("paramixel.parallelism.p", "8")), Map.of())
+                    .compile(builder.build());
+            occurrences = new ArrayList<>(plan.preOrder());
         }
     }
 }

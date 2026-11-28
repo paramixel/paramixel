@@ -1,48 +1,75 @@
 ---
 title: Context
-description: Runtime services available to actions.
+description: Per-occurrence execution metadata plus the per-scope state store.
 ---
 
 # Context
 
-`Context` is passed to `ContextConsumer` functions during step execution. It is the action-facing view of the current run, providing access to configuration and fixture instances.
-
 ```java
-package org.paramixel.api;
-
 public interface Context {
     Configuration configuration();
-    <T> Optional<T> instance(Class<T> type);
-    default <T> T requireInstance(Class<T> type);
-    static <T> ContextConsumer withInstance(
-            Class<T> type,
-            InstanceConsumer<? super T> consumer);
+    String runId();
+    String occurrenceId();
+    Optional<String> parentOccurrenceId();
+    String name();
+    String path();
+    int attempt();
+    List<String> tags();
+    boolean isCanceled();
+    Optional<String> cancellationReason();
+    void put(String name, Object value);
+    void remove(String name);
+    <T> T require(String name, Class<T> type);
+    <T> Optional<T> find(String name, Class<T> type);
 }
 ```
 
-## Configuration access
+A context belongs to one occurrence of one attempt. It exposes stable read-only identity metadata, the effective
+configuration, and a mutable state store shared by every occurrence in the same **scope**.
+
+## Scope state
 
 ```java
-var parallelism = context.configuration()
-        .getInteger("paramixel.parallelism")
-        .orElse(1);
+@Paramixel.Id("allocate")
+public static void allocate(final Context context) {
+    context.put("client", Client.start());             // stored in this scope
+}
+
+@Paramixel.Id("call")
+public static void call(final Context context) {
+    context.require("client", Client.class).send(request);
+}
+
+@Paramixel.Id("deallocate")
+public static void deallocate(final Context context) {
+    context.find("client", Client.class).ifPresent(Client::close);
+}
 ```
 
-## Fixture access
+A scope is created at the run root, at every direct child of a `parallel` group, and at every task carrying `retry` or
+`repeat`. Sequential descendants share the nearest enclosing scope, so a value stored by one step is visible to the next
+sibling and to the group's `after` hook; parallel siblings never see each other's entries.
 
-`Instance` actions make fixture objects available through `Context`.
+- A missing entry throws `ContextException` naming the entry and occurrence path; a type mismatch names both types.
+- `find` returns an empty optional, which is what teardown after a partially completed `before` slot should use.
+- The framework never closes a stored value, and it never probes for `AutoCloseable`. Close resources in `after`;
+  `remove` drops the reference early. Whatever is left when the scope ends is dropped for you.
 
-```java
-import org.paramixel.api.Context;
-import static org.paramixel.api.action.Step.step;
+## Stored values versus bindings
 
-var verifyLogin = step(
-        "verify login",
-        Context.withInstance(Browser.class, browser -> browser.open("/login")));
-```
+`put` and `bind` answer different questions, and only one of them is reported:
 
-Use `context.instance(Type.class)` when a fixture is optional. Use `context.requireInstance(Type.class)` or `Context.withInstance(...)` when the fixture is required.
+| | `bind(name, value)` | `put(name, value)` |
+| --- | --- | --- |
+| What it holds | Data that already exists when the plan is built | A resource created while the test runs |
+| Where it lives | The declaring node's subtree | The scope of the occurrence that writes it |
+| Reported | Yes: a plan parameter in report files | Never |
+| Precedence | Lower: a `put` of the same name shadows it | Higher |
 
-## Outcomes
+`bind` is visible from its node downward, nearest declaration first, so a child that binds the same name shadows the
+ancestor's value inside its own subtree only. A name must be unique on its own node. Because a binding is a plan
+parameter rather than a scope entry, `remove` does not delete it.
 
-Actions communicate outcomes by throwing Paramixel outcome exceptions such as `FailException`, `SkipException`, or `AbortedException`. The execution engine catches these and maps them to terminal `Status` values on the descriptor.
+`put` writes into the nearest scope owner: the run root, a direct child of a `parallel` group, or a task carrying
+`retry` or `repeat`. A write from an attempt that was already superseded — a timeout, a cancellation, or a hook that
+ignored interruption — is discarded.

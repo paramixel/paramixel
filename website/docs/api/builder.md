@@ -1,142 +1,150 @@
 ---
-title: Builder
-description: Mutable builders that produce immutable Action snapshots.
+title: TaskBuilder
+description: The typed authoring surface for binds, bodies, hooks, children, and policies.
 ---
 
-# Builder
-
-`Builder` is a sealed interface for constructing immutable `Action` instances.
+# TaskBuilder
 
 ```java
-public sealed interface Builder
-        permits Conditional.Builder,
-                Instance.Builder,
-                Isolated.Builder,
-                Loop.Builder,
-                Parallel.Builder,
-                Repeat.Builder,
-                Scope.Builder,
-                Sequence.Builder, // Deprecated since 6.2 — use Sequential.Builder instead
-                Sequential.Builder,
-                Static.Builder, // Deprecated since 6.2 — use Scope.Builder instead
-                Timeout.Builder,
-                Until.Builder {
+public abstract class TaskBuilder<S extends TaskBuilder<S>> {
+    public S before(String id);
+    public S before(Task task);
+    public S before(TaskBuilder<?> builder);
+    public S step(String id);
+    public S step(Task task);
+    public S step(TaskBuilder<?> builder);
+    public S after(String id);
+    public S after(Task task);
+    public S after(TaskBuilder<?> builder);
+    public S body(String id);
+    public S onlyIf(String id);
 
-    Action build();
+    public S bind(String name, Object value);
+
+    public S shuffle();
+    public S shuffle(long seed);
+    public S tags(String... values);
+    public S timeout(Duration timeout);
+    public S retry(RetryPolicy policy);
+    public S isolated(String lockName);
 }
 ```
 
-## Design
+`build()` is overridden by each concrete builder to return that builder's node type: `SequentialBuilder.build()` returns
+`Sequential`, `ParallelBuilder.build()` returns `Parallel`, and `RepeatBuilder.build()` returns `Repeat`.
 
-Each `Action` subtype that requires configuration exposes a corresponding `Builder` nested class. Callers configure the builder, then call `build()` to produce an immutable action snapshot. Builders are reusable — `build()` may be called multiple times.
+Every hook is an ordinary `public static` method named by a stable identifier, and the tree refers to it by that
+identifier. There is no functional-interface overload and no generic instance type.
 
-## Builder subtypes
+## The node grammar
 
-| Builder | Produces | Description |
-|---------|----------|-------------|
-| `Sequential.Builder` | `Sequential` | Sequential execution; `.child(action)` adds children, `.dependent()`/`.independent()` controls failure propagation. |
-| `Sequence.Builder` | `Sequence` | Sequential execution; same as `Sequential.Builder`. _(Deprecated since 6.2 — use `Sequential.Builder` instead.)_ |
-| `Parallel.Builder` | `Parallel` | Concurrent execution; `.parallelism(int)` controls in-flight count. |
-| `Scope.Builder` | `Scope` | Before-body-after with lifecycle guarantee. |
-| `Static.Builder` | `Static` | Before-body-after without fixture instance. _(Deprecated since 6.2 — use `Scope.Builder` instead.)_ |
-| `Instance.Builder` | `Instance` | Fixture instance lifecycle; `.body(action)` sets the body. |
-| `Isolated.Builder` | `Isolated` | Named-lock execution; `.body(action)` sets the protected child. |
-| `Repeat.Builder` | `Repeat` | Executes child action N times. _(Deprecated since 6.2 — use `Loop.Builder` instead.)_ |
-| `Loop.Builder` | `Loop` | Executes child action up to `maxIterations` times; `.until(Predicate)` optional, `.delay(...)` optional. `maxIterations` is required. |
-| `Timeout.Builder` | `Timeout` | Executes child action with wall-clock deadline. |
-| `Conditional.Builder` | `Conditional` | Evaluates a runtime predicate and gates body execution. |
-| `Until.Builder` | `Until` | Executes child repeatedly until predicate satisfied, body passes, or iterations exhausted; `.until(Predicate)` optional, rejects `null`. Without `.until()`, the loop stops when the body passes and reports `PASSED`. _(Deprecated since 6.2 — use `Loop.Builder` instead.)_ |
+Every node is exactly:
 
-
-## Named builder entry points
-For common configurations that need quick action tree definitions, each composite action
-provides a static method named after the action (e.g.,
-`Scope.scope(name)`, `Parallel.parallel(name)`) that returns its `Builder`.
-Import these statically as a shorthand. See [Named Builders](named-builders).
-
-Terminal actions `Step` and `Delay` provide named factory methods
-(`step(name, consumer)`, `delay(name, ms)`, `delayRandom(name, min, max)`) that
-return the action directly, also suitable for static imports.
-## Usage
-
-```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-Action action = sequential("flow")
-        .child(step("step one", ctx -> stepOne()))
-        .child(step("step two", ctx -> stepTwo()))
-        .build();
-
-var result = Runner.defaultRunner().run(action);
+```
+bind*  →  before?  →  body? step*  →  after?
 ```
 
-Each action factory method returns a `Builder`:
+A node may declare a body, children, or both. A node that declares neither is a no-op: it passes when admitted, and
+the compiler reports an `EMPTY_TASK` warning.
+
+- `bind` declares a value that **already exists when the plan is built**. It may be called any number of times, never
+  accepts a supplier or lambda, and a duplicate name on one node throws `IllegalArgumentException`.
+- `before` and `after` are **single slots**. Each takes an annotation id, a `Task`, or a `TaskBuilder`; a second call
+  throws `IllegalStateException` at the call site.
+- `step` adds children in declaration order and takes the same three argument kinds.
 
 ```java
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Step.step;
-
-Action scoped = scope("browser test")
-        .before(step("start", ctx -> start()))
-        .body(step("test", ctx -> test()))
-        .after(step("stop", ctx -> stop()))
-        .build();
-
-Action fixture = instance("user test", UserFixture::new)
-        .body(step("verify", Context.withInstance(UserFixture.class, f -> f.verify())))
-        .build();
+Sequential.builder(ScenarioTest.class, "ScenarioTest")
+        .bind(ENVIRONMENT, environment)
+        .before(ID_START)
+        .step(Sequential.builder("checks").step(ID_HEALTH))
+        .after(ID_STOP);
 ```
 
-`Sequential.Builder` supports dependent/independent failure propagation:
+The class literal appears **once per definition root**; everything attached below it inherits it. Identifiers resolve
+only against methods declared by that class — inheritance is not consulted — and they are also the labels reported for
+the hooks (`before[start]`, `body[health]`).
+
+Hook IDs have a maximum of 64 UTF-16 code units across all named builder methods. An overlong reference throws
+`IllegalArgumentException` at the builder call. The display-name limit for tasks is 512 UTF-16 code units.
+
+| Builder method | Public static hook signature |
+| --- | --- |
+| `before(id)`, `step(id)`, `body(id)`, `after(id)` | `void hook(Context)`, optionally with checked exceptions |
+| `onlyIf(id)` | `boolean hook(Context)` or `Boolean hook(Context)` |
+| `RepeatBuilder.until(id)` | `boolean hook(Context, Status)` or `Boolean hook(Context, Status)` |
+
+Predicate hooks can declare unchecked exceptions. A boxed `null` result is treated as `false`. In a named Java module,
+export the package of a public anchor to `org.paramixel.api` or open it to that module. A non-public anchor requires
+an open package. The builder checks access when it resolves the hook.
+
+## Composing several setup or cleanup phases
+
+Because each slot holds one thing, several phases are composed into a subtree rather than repeated:
 
 ```java
-import static org.paramixel.api.action.Sequential.sequential;
+// two setup phases, in order
+.before(Sequential.builder("setup").step(ID_START_DB).step(ID_START_APP))
 
-var dependent = sequential("flow")
-        .dependent()
-        .child(failingStep)
-        .child(skippedStep)
-        .build();
-
-var independent = sequential("flow")
-        .independent()
-        .child(failingStep)
-        .child(stillRunsStep)
-        .build();
+// two cleanup phases, keeping reverse order and run-all behavior
+.after(Sequential.builder("cleanup").independent().step(ID_STOP_APP).step(ID_STOP_DB))
 ```
 
-## Shuffled execution
+A `Sequential` cleanup subtree is `dependent()` by default, so a failing cleanup step skips the later ones;
+`independent()` is how a cleanup that must always finish declares itself.
 
-Both `Sequential.Builder` and `Parallel.Builder` support randomizing child execution order with `.shuffle()`:
+## Bound values versus runtime state
+
+`bind` and `put` are deliberately different:
+
+| | `bind(name, value)` | `put(name, value)` |
+| --- | --- | --- |
+| When the value exists | Before the plan is built | While the test runs |
+| Where it is declared | On the node, visible to its subtree | In the scope of the occurrence that writes it |
+| Reported | Yes, as a plan parameter | Never |
+| Accepts a lambda or supplier | No | Not applicable: the value is passed in already created |
+
+A value that only exists while the test runs — a started container, a client, a temporary directory — is created in the
+`before` slot and stored with `put`:
 
 ```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+Sequential.builder(MyTest.class, "scenario")
+        .bind(ENVIRONMENT, environment)
+        .before(ID_SET_UP)
+        .step(ID_CHECK)
+        .after(ID_TEAR_DOWN);
 
-var seq = sequential("checkout")
-        .shuffle()
-        .child(step("add to cart", ctx -> addToCart()))
-        .child(step("checkout", ctx -> checkout()))
-        .child(step("verify", ctx -> verify()))
-        .build();
+@Paramixel.Id(ID_SET_UP)
+public static void setUp(final Context context) throws Exception {
+    final var client = Client.start(context.require(ENVIRONMENT, Environment.class));
+    context.put(CLIENT, client);
+}
 ```
 
-`.shuffle()` generates a seed from `ThreadLocalRandom` at build time. For reproducible ordering — essential when investigating flaky order-dependent failures — use `.shuffle(long seed)`:
+## Builder rules
 
-```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+- Identifiers are resolved when the definition is built, before any hook runs; every problem in one definition is
+  reported together as a `CompilationException`.
+- A builder passed to `before`, `step`, or `after` is **held**, not built: it is materialized when the parent is built,
+  so a change made to it after it was passed in still takes effect.
+- Passing the same builder instance more than once anywhere in one tree is an authoring error reported at build time.
+  Pass a built `Task` twice when the same subtree must appear in two places; each placement compiles to its own
+  occurrence.
+- A cycle through a step, before slot, or after slot is reported with its builder path in a `CompilationException`.
+- `bind` places a value in the node's scope before its `before` slot runs, so the slot, the steps, the `after` slot, and
+  every descendant see it. A descendant that binds the same name shadows it inside its own subtree only.
+- `build()` returns a deep snapshot, may be called repeatedly, and performs no user work.
 
-var seq = sequential("checkout")
-        .shuffle(42L)
-        .child(step("add to cart", ctx -> addToCart()))
-        .child(step("checkout", ctx -> checkout()))
-        .child(step("verify", ctx -> verify()))
-        .build();
-```
+## Compile-time guidance
 
-The stored seed is accessible via `Sequential.seed()` and `Parallel.seed()`. When `.shuffle()` is not called, `isShuffled()` returns `false` and children execute in insertion order.
+- `.independent()` exists only on `SequentialBuilder`.
+- `Parallel.builder(name, Pool.named("x"))` requires a `Pool`; a second `String` does not compile.
+- `child(...)` and `children(...)` do not exist: children are added with `step(...)`.
+- A lambda body does not compile as a `before`, `step`, or `after` argument: the authoring surface takes an id, a
+  `Task`, or a `TaskBuilder`.
+- An identifier used in a definition with no anchor is rejected when the definition is built.
 
-See [Action](action) for the `Action` sealed interface and its subtypes.
+## Next
+
+- [Named builders](../api/named-builders) — `Sequential`, `Parallel`, and repetition views.
+- [Result](../api/result) — what a run produces.

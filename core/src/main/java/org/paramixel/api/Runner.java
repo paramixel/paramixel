@@ -16,121 +16,123 @@
 
 package org.paramixel.api;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
-import nonapi.org.paramixel.ConcreteRunner;
-import org.paramixel.api.action.Action;
+import nonapi.org.paramixel.RunnerImpl;
+import org.paramixel.api.exception.CompilationException;
 import org.paramixel.api.exception.ConfigurationException;
-import org.paramixel.api.exception.CycleDetectedException;
+import org.paramixel.api.exception.ResolverException;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Executes Paramixel actions and returns results containing descriptor trees and effective aggregate status.
+ * Executes task definitions and returns a {@link Result} for every run.
  *
- * <p>Implementations are not required to be thread-safe. Concurrent use of a single {@code Runner} instance
- * from multiple threads is undefined unless the implementation documents otherwise.
+ * <p>There is one entry point per intent:
+ *
+ * <ul>
+ *   <li>{@link #run(Task)} executes a definition you built. It performs no discovery, no classpath scan, and runs no
+ *       {@code @BeforeAll}/{@code @AfterAll} hooks: the definition is the complete run.</li>
+ *   <li>{@link #run(TaskBuilder)} acquires the run slot, builds the definition, and executes it as a direct run.</li>
+ *   <li>{@link #run(Selector)} discovers factories using exactly the supplied selector and nothing else. A configured
+ *       {@code paramixel.match.*} key that the selector does not use is reported as a warning rather than merged
+ *       silently.</li>
+ *   <li>{@link #run()} discovers factories using the configured selection.</li>
+ * </ul>
+ *
+ * <p><strong>Concurrency contract:</strong> one run at a time per runner instance. A concurrent call is rejected with
+ * {@link IllegalStateException} instead of producing undefined behavior. Independent runner instances may run
+ * concurrently and share no mutable framework state.
+ *
+ * <p>{@link #close()} requests cooperative cancellation of an active run and releases long-lived runner resources.
+ * During discovery the cancellation request is checked between invocations of factory and run-hook provider methods.
+ * If cancellation is observed before the handoff to plan compilation and the current provider returns normally,
+ * partial definitions are discarded and the run returns {@link Status#CANCELED} with no root and exit code 1.
+ * Closing is idempotent, so try-with-resources and an explicit shutdown can both be used.
+ *
+ * <p>Runner flags are validated before factory invocation or task execution. Malformed flags throw
+ * {@link ConfigurationException}. Discovery invokes providers to obtain definitions, which are then compiled before
+ * any task callback runs. Definition and plan errors reported by the compiler throw {@link CompilationException}.
+ * Invalid provider declarations and other provider invocation failures throw {@link ResolverException}.
  *
  * @see Result
+ * @see Launcher
  */
-public interface Runner {
+public interface Runner extends AutoCloseable {
 
     /**
-     * Creates a runner using the default configuration and listener chain.
+     * Creates a builder.
      *
-     * @return a configured runner
-     * @throws ConfigurationException if the classpath resource exists but cannot be loaded
-     */
-    static Runner defaultRunner() {
-        final var configuration = Configuration.defaultConfiguration();
-        return new ConcreteRunner(configuration, Listener.defaultListener(configuration));
-    }
-
-    /**
-     * Creates a builder for runner instances.
-     *
-     * @return a new builder
+     * @return a builder; never {@code null}
      */
     static Builder builder() {
         return new Builder();
     }
 
     /**
-     * Returns the effective configuration used by this runner.
+     * Returns the effective configuration of this runner.
      *
      * @return the configuration; never {@code null}
      */
     Configuration configuration();
 
     /**
-     * Executes the action.
+     * Executes the supplied definition.
      *
-     * @param action the action to execute; must not be {@code null}
-     * @return the run result containing the root descriptor and effective aggregate status; never {@code null}
-     * @throws NullPointerException if {@code action} is {@code null}
-     * @throws IllegalStateException if the builder has already been resolved
-     * @throws CycleDetectedException if discovery detects a cycle
+     * @param definition the definition; must not be {@code null}
+     * @return the result; never {@code null}
+     * @throws NullPointerException if {@code definition} is {@code null}
      * @throws ConfigurationException if the configuration is invalid
+     * @throws CompilationException if the definition or plan is invalid
+     * @throws IllegalStateException if a run is already in progress on this runner
      */
-    Result run(Action action);
+    Result run(Task definition);
 
     /**
-     * Resolves an action with the supplied selector and executes it when present.
+     * Builds the supplied definition and executes it.
      *
-     * @param selector the selector used to locate an action; must not be {@code null}
-     * @return the run result, or empty when no action is resolved
+     * <p>The runner acquires its run slot before building the definition. The resulting task executes directly without
+     * discovery or {@code @BeforeAll}/{@code @AfterAll} hooks.
+     *
+     * @param definition the definition builder; must not be {@code null}
+     * @return the result; never {@code null}
+     * @throws NullPointerException if {@code definition} is {@code null}
+     * @throws ConfigurationException if the configuration is invalid
+     * @throws CompilationException if the definition or plan is invalid
+     * @throws IllegalStateException if this runner is closed or already has a run in progress
+     */
+    Result run(TaskBuilder<?> definition);
+
+    /**
+     * Discovers factories matching exactly the supplied selector and executes them.
+     *
+     * @param selector the selector; must not be {@code null}
+     * @return the result, with no root when no factory contributes a task; never {@code null}
      * @throws NullPointerException if {@code selector} is {@code null}
+     * @throws ConfigurationException if the configuration is invalid
+     * @throws ResolverException if discovery or factory validation fails
+     * @throws CompilationException if the discovered definition is invalid
+     * @throws IllegalStateException if a run is already in progress on this runner
      */
-    Optional<Result> run(Selector selector);
+    Result run(Selector selector);
 
     /**
-     * Executes the action and converts the result
-     * outcome to an exit code.
+     * Discovers factories using the configured selection and executes them.
      *
-     * @param action the action to execute; must not be {@code null}
-     * @return {@code 0} for success and {@code 1} for failure
-     * @throws NullPointerException if {@code action} is {@code null}
-     * @throws IllegalStateException if the builder has already been resolved
+     * @return the result, with no root when no factory contributes a task; never {@code null}
+     * @throws ConfigurationException if the configuration is invalid
+     * @throws ResolverException if discovery or factory validation fails
+     * @throws CompilationException if the discovered definition is invalid
+     * @throws IllegalStateException if a run is already in progress on this runner
      */
-    int runAndReturnExitCode(Action action);
+    Result run();
 
     /**
-     * Resolves an action matching the supplied selector, executes it, and converts
-     * the result outcome to an exit code.
-     *
-     * @param selector the selector used to locate an action; must not be {@code null}
-     * @return {@code 0} for success and {@code 1} for failure
-     * @throws NullPointerException if {@code selector} is {@code null}
+     * Requests cooperative cancellation of an active run and releases runner resources. Idempotent.
      */
-    int runAndReturnExitCode(Selector selector);
-
-    /**
-     * Executes the action and terminates the JVM
-     * with the derived exit code.
-     *
-     * @param action the action to execute; must not be {@code null}
-     * @throws NullPointerException if {@code action} is {@code null}
-     * @throws IllegalStateException if the builder has already been resolved
-     * @throws SecurityException if a security manager prevents {@link System#exit}
-     */
-    void runAndExit(Action action);
-
-    /**
-     * Resolves an action matching the supplied selector and terminates the JVM
-     * with the derived exit code.
-     *
-     * @param selector the selector used to locate an action; must not be {@code null}
-     * @throws NullPointerException if {@code selector} is {@code null}
-     * @throws SecurityException if a security manager prevents {@link System#exit}
-     */
-    void runAndExit(Selector selector);
-
-    /**
-     * Discovers actions from the classpath and executes them.
-     *
-     * @return {@code 0} for success and {@code 1} for failure
-     */
-    int run();
+    @Override
+    void close();
 
     /**
      * Fluent builder for {@link Runner} instances.
@@ -142,6 +144,7 @@ public interface Runner {
         private boolean explicitListener;
         private boolean shuffled;
         private long shuffleSeed;
+        private final Map<Pool, Integer> pools = new LinkedHashMap<>();
 
         private Builder() {
             // Intentionally empty
@@ -152,6 +155,7 @@ public interface Runner {
          *
          * @param configuration the configuration; must not be {@code null}
          * @return this builder
+         * @throws NullPointerException if {@code configuration} is {@code null}
          */
         public Builder configuration(final Configuration configuration) {
             this.configuration = Objects.requireNonNull(configuration, "configuration is null");
@@ -163,6 +167,7 @@ public interface Runner {
          *
          * @param listener the listener; must not be {@code null}
          * @return this builder
+         * @throws NullPointerException if {@code listener} is {@code null}
          */
         public Builder listener(final Listener listener) {
             this.listener = Objects.requireNonNull(listener, "listener is null");
@@ -171,12 +176,36 @@ public interface Runner {
         }
 
         /**
-         * Configures discovered action ordering to be shuffled randomly at build time.
+         * Configures the capacity of a named pool.
          *
-         * <p>The seed is generated from {@link ThreadLocalRandom} when {@link #build()} is called
-         * and applies only to discovery-based execution ({@code run(Selector)} and {@code run()}).
-         * Direct execution via {@code run(Action)} is unaffected — users control their own
-         * builder shuffle for direct trees. For reproducible shuffling, use {@link #shuffle(long)}.
+         * <p>This override takes precedence over a configured property. A pool that a parallel task names but that is
+         * neither configured here nor by property fails validation before any test code runs.
+         *
+         * <p>The capacity is a cap, not a reservation: it bounds how many direct children of parallel tasks hold a
+         * permit from this pool at one time, creates no threads, and does not guarantee that many children run
+         * concurrently. {@code paramixel.workers} bounds execution threads separately, so a capacity above that limit
+         * adds no concurrency.
+         *
+         * @param pool the pool; must not be {@code null}
+         * @param capacity the capacity; must be positive
+         * @return this builder
+         * @throws NullPointerException if {@code pool} is {@code null}
+         * @throws IllegalArgumentException if {@code capacity} is not positive
+         */
+        public Builder pool(final Pool pool, final int capacity) {
+            Objects.requireNonNull(pool, "pool is null");
+            if (capacity <= 0) {
+                throw new IllegalArgumentException("Pool capacity must be positive: " + capacity);
+            }
+            pools.put(pool, capacity);
+            return this;
+        }
+
+        /**
+         * Configures discovery ordering to be shuffled with a seed chosen when the runner is built.
+         *
+         * <p>Applies to discovery runs only; a direct definition controls its own shuffle. The chosen seed is reported
+         * in {@link Result#shuffleSeed()} so the order can be reproduced.
          *
          * @return this builder
          */
@@ -187,12 +216,9 @@ public interface Runner {
         }
 
         /**
-         * Configures discovered action ordering to be shuffled with the supplied seed at build time.
+         * Configures discovery ordering to be shuffled with the supplied seed.
          *
-         * <p>Applies only to discovery-based execution ({@code run(Selector)} and {@code run()}).
-         * Using the same seed produces the same ordering, enabling reproducible flaky-test investigations.
-         *
-         * @param seed the PRNG seed for reproducible shuffling
+         * @param seed the seed; the same seed yields the same discovered order
          * @return this builder
          */
         public Builder shuffle(final long seed) {
@@ -204,25 +230,12 @@ public interface Runner {
         /**
          * Builds the runner.
          *
-         * @return a new runner
+         * @return a runner; never {@code null}
          */
         public Runner build() {
-            final var effectiveConfiguration =
-                    configuration == null ? Configuration.defaultConfiguration() : configuration;
-            if (explicitListener) {
-                return new ConcreteRunner(effectiveConfiguration, listener, shuffled, shuffleSeed);
-            }
-            return new ConcreteRunner(
-                    effectiveConfiguration, Listener.defaultListener(effectiveConfiguration), shuffled, shuffleSeed);
+            final var effective = configuration == null ? Configuration.defaultConfiguration() : configuration;
+            final var effectiveListener = explicitListener ? listener : Listener.defaultListener(effective);
+            return new RunnerImpl(effective, effectiveListener, shuffled, shuffleSeed, new LinkedHashMap<>(pools));
         }
-    }
-
-    /**
-     * Resolves and executes discovered actions using default configuration.
-     *
-     * @param args command-line arguments
-     */
-    static void main(final String[] args) {
-        System.exit(builder().build().run());
     }
 }

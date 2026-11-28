@@ -1,34 +1,49 @@
 ---
-title: "Quick Start: Your First Execution Tree"
-description: Write and run a minimal Paramixel execution tree.
+title: "Quick Start: Your First Definition"
+description: Write and run a minimal Paramixel task definition.
 ---
 
-# Quick Start: Your First Execution Tree
+# Quick Start: Your First Definition
 
-Create a class with a public static factory method annotated with `@Paramixel.Factory`. The method returns an `Action`, a `Builder`, or `null`. Returning `null` means the factory is represented as a skipped action outcome.
+Create a class with a public static factory method annotated with `@Paramixel.TaskFactory`. The method returns a `Task`, a
+builder, or `null`. Returning `null` is an explicit skip with a recorded reason.
 
 ```java
 package com.example;
 
+import static org.paramixel.api.exception.FailException.fail;
+
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Assert.assertTrue;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.SequentialBuilder;
 
 public final class LoginSmokeTest {
-    @Paramixel.Factory
-    public static Action test() {
-        return sequential("login smoke")
-                .child(step("open login page", ctx -> openLoginPage()))
-                .child(step("submit credentials", ctx -> submitCredentials()))
-                .child(assertTrue("user is signed in", LoginSmokeTest::isSignedIn))
-                .build();
+
+    private static final String ID_OPEN = "openLoginPage";
+    private static final String ID_SUBMIT = "submitCredentials";
+    private static final String ID_ASSERT = "assertSignedIn";
+
+    @Paramixel.TaskFactory
+    public static SequentialBuilder factory() {
+        return Sequential.builder(LoginSmokeTest.class, "login smoke")
+                .step(ID_OPEN)
+                .step(ID_SUBMIT)
+                .step(ID_ASSERT);
     }
 
-    private static void openLoginPage() {}
+    @Paramixel.Id(ID_OPEN)
+    public static void openLoginPage(final Context context) {}
 
-    private static void submitCredentials() {}
+    @Paramixel.Id(ID_SUBMIT)
+    public static void submitCredentials(final Context context) {}
+
+    @Paramixel.Id(ID_ASSERT)
+    public static void assertSignedIn(final Context context) {
+        if (!isSignedIn()) {
+            throw fail("user is not signed in");
+        }
+    }
 
     private static boolean isSignedIn() {
         return true;
@@ -36,67 +51,65 @@ public final class LoginSmokeTest {
 }
 ```
 
-This factory builds this execution tree:
+## Run it
 
-```text
-LoginSmokeTest
-└── login smoke
-    ├── open login page
-    ├── submit credentials
-    └── user is signed in
-```
-
-Paramixel executes the tree and returns a result tree with the same shape.
-
-Run with Maven:
+This assumes the Maven plugin is configured as shown in [Installation](../getting-started/installation).
 
 ```bash
 mvn test
 ```
 
-Or invoke the plugin goal directly:
+The Maven plugin discovers the factory, builds and validates the definition, then executes it. The run fails the build
+if the result's exit code is non-zero.
 
-```bash
-mvn paramixel:test
-```
-
-## Programmatic run
+## Run it programmatically
 
 ```java
-import org.paramixel.api.Runner;
-
-var result = Runner.defaultRunner().run(LoginSmokeTest.test());
-if (result.isFailed()) {
-    throw new AssertionError("Paramixel run failed");
+try (Runner runner = Runner.builder().build()) {
+    Result result = runner.run(LoginSmokeTest.factory());
+    System.out.println(result.status() + " exit=" + result.exitCode());
 }
 ```
 
-The returned `Result` exposes the root `Descriptor` and effective aggregate status.
+`Runner.run(Task)` performs no discovery and runs no `@BeforeAll`/`@AfterAll` hooks: the supplied definition is the whole
+run. `Runner.run(TaskBuilder<?>)` builds what you authored and runs it, which is why a `main` method can pass a factory's
+result directly.
 
-## Using named builders
-
-The same test can be written with static imports from each action class:
+## Add a fixture
 
 ```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Assert.assertTrue;
-import static org.paramixel.api.action.Step.step;
+private static final String FIXTURE = "browser";
 
-@Paramixel.Factory
-public static Action test() {
-    return sequential("login smoke")
-        .child(step("open login page", ctx -> openLoginPage()))
-        .child(step("submit credentials", ctx -> submitCredentials()))
-        .child(assertTrue("user is signed in", LoginSmokeTest::isSignedIn))
-        .build();
+@Paramixel.TaskFactory
+public static SequentialBuilder factory() {
+    return Sequential.builder(LoginSmokeTest.class, "browser")
+            .before("launch")
+            .step("openLoginPage")
+            .step("submitCredentials")
+            .after("close");
+}
+
+@Paramixel.Id("launch")
+public static void launch(final Context context) {
+    context.put(FIXTURE, Browser.launch());
+}
+
+@Paramixel.Id("openLoginPage")
+public static void openLoginPage(final Context context) {
+    context.require(FIXTURE, Browser.class).openLoginPage();
+}
+
+@Paramixel.Id("close")
+public static void close(final Context context) {
+    context.find(FIXTURE, Browser.class).ifPresent(Browser::close);
 }
 ```
 
-For the full method reference, see [Named Builders](../api/named-builders).
+The fixture is a plain object stored in the context scope. `find` in the `after` hook means a failed launch cannot mask
+the original failure, and the framework never closes anything itself.
 
+## Next
 
-## Next steps
-
-- [When to Use Paramixel](when-to-use)
-- [Core Concepts](../core-concepts)
-- [Test Shapes](../test-shapes)
+- [Tasks](../core-concepts/tasks) — the definition model.
+- [Lifecycle and scope](../core-concepts/elements) — phases and finalization.
+- [Quick reference](../guides/quick-reference) — the full authoring surface.

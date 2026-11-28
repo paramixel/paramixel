@@ -11,7 +11,7 @@ third-party projects. The original package names have been relocated as noted
 below.
 
 - ClassGraph
-  - Version: 4.8.184
+  - Version: 4.8.184 (the forked source is under core/src/main/java/nonapi/org/paramixel/classgraph)
   - Website: https://github.com/classgraph/classgraph
   - License: MIT License
   - Original packages: io.github.classgraph, nonapi.io.github.classgraph
@@ -21,6 +21,17 @@ below.
     - Copyright (c) 2019-2021 Luke Hutchison
     - Copyright (c) 2016 Johno Crawford
     - Copyright (c) 2017 Harith Elrufaie
+  - Local modifications (fork maintenance notes):
+    - The source is vendored and relocated so Paramixel has no runtime
+      dependency and no unrelocated third-party packages.
+    - Files are excluded from JaCoCo coverage and from published Javadoc (see
+      core/pom.xml); keep the vendored sources in their upstream layout and
+      do not reformat them.
+    - To update: replace the two relocated trees with the sources of the new
+      upstream release, keep the relocation, and re-run the core test suite,
+      which exercises discovery, annotation scanning and class loading.
+    - Paramixel uses only the scanning API (ClassGraph, ScanResult, ClassInfo,
+      MethodInfo, AnnotationInfo); reflection JSON support is unused.
 
 Third-Party Notices
 
@@ -30,11 +41,12 @@ Test and examples are adapted from the following third-party projects
   - Website: https://github.com/verifyica-team/verifyica
   - License: Apache License 2.0
 
-Direct Dependency Inventory (as declared in Maven POM files)
+Direct Dependency Inventory (third-party components declared as direct dependencies in the Maven POM files or the
+Gradle build files; those build files are authoritative)
 
-- Apache Commons Compress
-  - Coordinates: org.apache.commons:commons-compress
-  - Website: https://commons.apache.org/proper/commons-compress/
+- Altcontainers
+  - Coordinates: org.altcontainers:core
+  - Website: https://github.com/altcontainers/altcontainers
   - License: Apache License 2.0
 
 - Apache Kafka Clients
@@ -43,7 +55,7 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - License: Apache License 2.0
 
 - Apache Maven (and related Maven components)
-  - Coordinates: org.apache.maven:*, org.apache.maven.plugin-tools:*, and org.apache.maven.resolver:*
+  - Coordinates: org.apache.maven:*, org.apache.maven.plugin-tools:*
   - Website: https://maven.apache.org/
   - License: Apache License 2.0
 
@@ -52,10 +64,20 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - Website: https://assertj.github.io/doc/
   - License: Apache License 2.0
 
+- JMH (Java Microbenchmark Harness)
+  - Coordinates: org.openjdk.jmh:jmh-core, org.openjdk.jmh:jmh-generator-annprocess
+  - Website: https://openjdk.org/projects/code-tools/jmh/
+  - License: GNU General Public License version 2 with the Classpath Exception
+
 - JUnit Platform / JUnit Jupiter (JUnit Project)
   - Coordinates: org.junit.platform:* and org.junit.jupiter:*
   - Website: https://junit.org/
   - License: Eclipse Public License 2.0 (EPL-2.0)
+
+- Logback
+  - Coordinates: ch.qos.logback:logback-classic
+  - Website: https://logback.qos.ch/
+  - License: Eclipse Public License 2.0 (EPL-2.0) or GNU Lesser General Public License 2.1 (LGPL-2.1)
 
 - MongoDB Java Driver
   - Coordinates: org.mongodb:mongodb-driver-sync
@@ -66,34 +88,6 @@ Direct Dependency Inventory (as declared in Maven POM files)
   - Coordinates: org.slf4j:slf4j-api and org.slf4j:slf4j-nop
   - Website: https://www.slf4j.org/
   - License: MIT
-
-- Testcontainers
-  - Coordinates: org.testcontainers:*
-  - Website: https://testcontainers.com/
-  - License: MIT
-  - Copyright: (c) 2015-2021 Richard North and other authors
-
-Direct Dependency Inventory (as declared in Gradle build files)
-
-- AssertJ
-  - Coordinates: org.assertj:assertj-core
-  - Website: https://assertj.github.io/doc/
-  - License: Apache License 2.0
-
-- Gradle API
-  - Coordinates: gradleApi()
-  - Website: https://gradle.org/
-  - License: Apache License 2.0
-
-- Gradle TestKit
-  - Coordinates: gradleTestKit()
-  - Website: https://gradle.org/
-  - License: Apache License 2.0
-
-- JUnit Platform / JUnit Jupiter (JUnit Project)
-  - Coordinates: org.junit.platform:* and org.junit.jupiter:*
-  - Website: https://junit.org/
-  - License: Eclipse Public License 2.0 (EPL-2.0)
 
 Note: Transitive dependencies pulled in by the above components may carry
 additional license obligations. When redistributing binaries, you must ensure

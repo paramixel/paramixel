@@ -5,19 +5,27 @@ dependencies {
     implementation libs.junit.jupiter
     implementation libs.assertj.core
     implementation libs.slf4j.nop
-    implementation libs.commons.compress
-    implementation libs.testcontainers
-    implementation libs.testcontainers.kafka
+    implementation libs.altcontainers.core
     implementation libs.kafka.clients
-    implementation libs.testcontainers.mongodb
     implementation libs.mongodb.driver.sync
-    implementation libs.testcontainers.nginx
 }
 
-tasks.register('paramixelTest', JavaExec) {
+def paramixelTest = tasks.register('paramixelTest', JavaExec) {
     dependsOn classes
     group = 'verification'
-    description = 'Discovers and executes Paramixel action trees'
-    mainClass = 'org.paramixel.api.Runner'
+    description = 'Discovers and executes Paramixel task trees'
+    mainClass = 'org.paramixel.api.Launcher'
     classpath = sourceSets.main.runtimeClasspath
+}
+
+def paramixelLauncherTest = tasks.register('paramixelLauncherTest', JavaExec) {
+    group = 'verification'
+    description = 'Checks the Paramixel launcher configured for the examples'
+    mainClass.set(paramixelTest.flatMap { it.mainClass })
+    classpath = sourceSets.main.runtimeClasspath
+    args '--help'
+}
+
+tasks.named('check') {
+    dependsOn paramixelLauncherTest
 }

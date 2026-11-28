@@ -17,118 +17,151 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Each.parallel;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates parallel argument execution with bounded parallelism. Verifies that
- * all tests execute exactly once, that concurrent argument count drops to zero on
- * completion, and that peak concurrency stays within the configured limit.
+ * Demonstrates a bounded parallel matrix of fixtures and verifies the configured pool capacity is never exceeded.
+ *
+ * <p>The measurement is a real concurrent counter, not elapsed-time guessing, and the fixture owns the counter so the
+ * check is exact.
  */
 public class ParallelArgumentTest {
 
+    private static final String ID_BEFORE = "before";
+    private static final String ID_TEST = "test";
+    private static final String ID_AFTER = "after";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String FIXTURE = "fixture";
+
     private static final int ARGUMENT_COUNT = 5;
-    private static final int PARALLELISM = 4;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
+
+    /** Matches {@code paramixel.parallelism.methods} in {@code paramixel.properties}. */
+    private static final int CONFIGURED_CAPACITY = 4;
 
     private static final AtomicInteger testCount = new AtomicInteger();
     private static final AtomicInteger concurrentCount = new AtomicInteger();
     private static final AtomicInteger maxConcurrentCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
-     * Builds a parallel argument tree with per-argument before/after callbacks.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
-    @Paramixel.Factory
-    public static Action factory() {
+    @Paramixel.TaskFactory
+    public static Task factory() {
         resetCounts();
-
-        var testName = ParallelArgumentTest.class.getName();
-        var arguments =
-                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
-
-        return scope(testName)
-                .body(parallel(
-                                "arguments",
-                                arguments,
-                                value -> instance(value, ParallelArgumentTest::new)
-                                        .body(scope("scope")
-                                                .before(step(
-                                                        "before()",
-                                                        withInstance(
-                                                                ParallelArgumentTest.class,
-                                                                ParallelArgumentTest::before)))
-                                                .body(sequential(value)
-                                                        .independent()
-                                                        .child(step(
-                                                                "test()",
-                                                                withInstance(
-                                                                        ParallelArgumentTest.class,
-                                                                        ParallelArgumentTest::test)))
-                                                        .child(step(
-                                                                "test()",
-                                                                withInstance(
-                                                                        ParallelArgumentTest.class,
-                                                                        ParallelArgumentTest::test)))
-                                                        .child(step(
-                                                                "test()",
-                                                                withInstance(
-                                                                        ParallelArgumentTest.class,
-                                                                        ParallelArgumentTest::test))))
-                                                .after(step(
-                                                        "after()",
-                                                        withInstance(
-                                                                ParallelArgumentTest.class,
-                                                                ParallelArgumentTest::after)))))
-                        .parallelism(PARALLELISM))
-                .after(step("validate", ignored -> validate()))
-                .build();
+        final var root = Parallel.builder(ParallelArgumentTest.class, "ParallelArgumentTest", Pool.named("methods"));
+        for (var i = 0; i < ARGUMENT_COUNT; i++) {
+            final var value = "string-" + i;
+            root.step(Sequential.builder(value)
+                    .before(ID_BEFORE)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .after(ID_AFTER));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public ParallelArgumentTest() {
         // Intentionally empty
     }
 
+    /**
+     * Builds this branch's fixture and records fixture entry.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE)
+    public static void beforeHook(final Context context) {
+        final var fixture = new ParallelArgumentTest();
+        context.put(FIXTURE, fixture);
+        fixture.before();
+    }
+
+    /**
+     * Runs one test body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void testHook(final Context context) throws InterruptedException {
+        context.require(FIXTURE, ParallelArgumentTest.class).test();
+    }
+
+    /**
+     * Records fixture exit, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER)
+    public static void afterHook(final Context context) {
+        context.find(FIXTURE, ParallelArgumentTest.class).ifPresent(ParallelArgumentTest::after);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
+    }
+
+    /**
+     * Records fixture entry.
+     */
     public void before() {
-        int current = concurrentCount.incrementAndGet();
+        final var current = concurrentCount.incrementAndGet();
         maxConcurrentCount.accumulateAndGet(current, Math::max);
     }
 
-    public void test() {
+    /**
+     * Test body.
+     */
+    public void test() throws InterruptedException {
         testCount.incrementAndGet();
+        Thread.sleep(5L);
     }
 
+    /**
+     * Records fixture exit.
+     */
     public void after() {
         concurrentCount.decrementAndGet();
     }
 
+    /**
+     * Verifies the aggregate expectations.
+     */
     public static void validate() {
         assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
-        assertThat(concurrentCount.get()).isEqualTo(0);
-        assertThat(maxConcurrentCount.get()).isGreaterThan(0);
-        assertThat(maxConcurrentCount.get()).isLessThanOrEqualTo(PARALLELISM);
+        assertThat(concurrentCount.get()).isZero();
+        assertThat(maxConcurrentCount.get()).isBetween(1, CONFIGURED_CAPACITY);
     }
 
     private static void resetCounts() {

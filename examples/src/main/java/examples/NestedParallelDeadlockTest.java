@@ -17,120 +17,184 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
+import org.paramixel.api.Parallel;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Pool;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates that nested Parallel actions complete without deadlock.
+ * Demonstrates that nested parallel groups with distinct pools complete without deadlock and without leaking permits.
  *
- * <p>This test verifies that the scheduler correctly handles deeply nested Parallel
- * structures. The scheduler uses a single shared {@link java.util.concurrent.ThreadPoolExecutor}
- * with semaphore-based admission control (see {@link nonapi.org.paramixel.Scheduler}).
- * When a thread blocks waiting for a child Parallel to complete, it releases its semaphore
- * permit, allowing other leaf actions at any depth to proceed. This prevents deadlock even
- * with multiple levels of nested Parallels sharing the same executor thread pool.</p>
- *
- * <p>Test structure:
- * <ul>
- *   <li>Root Parallel (parallelism=2)</li>
- *   <li>Two mid-level Parallels (parallelism=2 each)</li>
- *   <li>Four leaf Parallels with 2 children each</li>
- * </ul>
- * This creates three levels of nesting, all sharing the single scheduler executor.</p>
+ * <p>Each nested group names a different pool, so the acquisition order is acyclic. Nesting the same pool is rejected at
+ * compile time regardless of configured capacity, because a configuration change could otherwise turn a passing plan
+ * into a deadlock.
  */
 public class NestedParallelDeadlockTest {
 
-    private static final AtomicInteger executedCount = new AtomicInteger();
+    private static final String ID_L1_1 = "l1-1";
+    private static final String ID_L1_2 = "l1-2";
+    private static final String ID_L2_1 = "l2-1";
+    private static final String ID_L2_2 = "l2-2";
+    private static final String ID_L3_1 = "l3-1";
+    private static final String ID_L3_2 = "l3-2";
+    private static final String ID_L4_1 = "l4-1";
+    private static final String ID_L4_2 = "l4-2";
+    private static final String ID_VALIDATE = "validate";
+
     private static final int EXPECTED_EXECUTIONS = 8;
 
+    private static final AtomicInteger executedCount = new AtomicInteger();
+
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         executedCount.set(0);
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder()
+                .pool(Pool.named("outer"), 2)
+                .pool(Pool.named("middle"), 2)
+                .pool(Pool.named("inner"), 2)
+                .build()
+                .run(factory())
+                .exitCode());
     }
 
     /**
-     * Builds a deeply nested Parallel action tree to verify deadlock-free execution.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
-    @Paramixel.Factory
-    public static Action factory() {
+    @Paramixel.TaskFactory
+    public static Task factory() {
         executedCount.set(0);
 
-        var testName = NestedParallelDeadlockTest.class.getName();
-
-        return scope(testName)
-                .body(parallel("root")
-                        .parallelism(2)
-                        .child(parallel("mid1")
-                                .parallelism(2)
-                                .child(parallel("leaf1")
-                                        .child(step("l1-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l1-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        })))
-                                .child(parallel("leaf2")
-                                        .child(step("l2-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l2-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))))
-                        .child(parallel("mid2")
-                                .parallelism(2)
-                                .child(parallel("leaf3")
-                                        .child(step("l3-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l3-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        })))
-                                .child(parallel("leaf4")
-                                        .child(step("l4-1", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        }))
-                                        .child(step("l4-2", context -> {
-                                            executedCount.incrementAndGet();
-                                            sleep(10);
-                                        })))))
-                .after(step("validate", ignored -> validate()))
+        return Sequential.builder(NestedParallelDeadlockTest.class, "NestedParallelDeadlockTest")
+                .step(Parallel.builder("root", Pool.named("outer"))
+                        .step(Parallel.builder("mid1", Pool.named("middle"))
+                                .step(Parallel.builder("leaf1", Pool.named("inner"))
+                                        .step(ID_L1_1)
+                                        .step(ID_L1_2))
+                                .step(Parallel.builder("leaf2", Pool.named("inner"))
+                                        .step(ID_L2_1)
+                                        .step(ID_L2_2)))
+                        .step(Parallel.builder("mid2", Pool.named("middle"))
+                                .step(Parallel.builder("leaf3", Pool.named("inner"))
+                                        .step(ID_L3_1)
+                                        .step(ID_L3_2))
+                                .step(Parallel.builder("leaf4", Pool.named("inner"))
+                                        .step(ID_L4_1)
+                                        .step(ID_L4_2))))
+                .step(ID_VALIDATE)
                 .build();
     }
 
     /**
-     * Validates that all leaf tasks executed exactly once.
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
      */
-    public static void validate() {
-        assertThat(executedCount.get())
-                .as("All leaf tasks should execute exactly once")
-                .isEqualTo(EXPECTED_EXECUTIONS);
+    @Paramixel.Id(ID_L1_1)
+    public static void leafOneOne(final Context context) throws InterruptedException {
+        work();
     }
 
-    private static void sleep(final long millisseconds) {
-        try {
-            Thread.sleep(millisseconds);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+    /**
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_L1_2)
+    public static void leafOneTwo(final Context context) throws InterruptedException {
+        work();
+    }
+
+    /**
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_L2_1)
+    public static void leafTwoOne(final Context context) throws InterruptedException {
+        work();
+    }
+
+    /**
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_L2_2)
+    public static void leafTwoTwo(final Context context) throws InterruptedException {
+        work();
+    }
+
+    /**
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_L3_1)
+    public static void leafThreeOne(final Context context) throws InterruptedException {
+        work();
+    }
+
+    /**
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_L3_2)
+    public static void leafThreeTwo(final Context context) throws InterruptedException {
+        work();
+    }
+
+    /**
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_L4_1)
+    public static void leafFourOne(final Context context) throws InterruptedException {
+        work();
+    }
+
+    /**
+     * Runs one leaf body.
+     *
+     * @param context the execution context
+     * @throws InterruptedException if the callback is interrupted
+     */
+    @Paramixel.Id(ID_L4_2)
+    public static void leafFourTwo(final Context context) throws InterruptedException {
+        work();
+    }
+
+    /**
+     * Confirms every leaf ran.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        assertThat(executedCount.get()).isEqualTo(EXPECTED_EXECUTIONS);
+    }
+
+    private static void work() throws InterruptedException {
+        executedCount.incrementAndGet();
+        Thread.sleep(5L);
     }
 }

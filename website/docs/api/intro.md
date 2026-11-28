@@ -1,35 +1,55 @@
 ---
 title: API Overview
-description: Overview of Paramixel public packages.
+description: The public surface of Paramixel 7.
 ---
 
 # API Overview
 
-Paramixel's public API is under `org.paramixel.api`.
+The public API is `org.paramixel.api`, with sub-packages for exceptions, selectors, and support types.
 
-## Main entry points
+| Type | Role |
+| --- | --- |
+| `Task` | The single immutable definition |
+| `TaskBuilder`, `SequentialBuilder`, `ParallelBuilder`, `RepeatBuilder` | Authoring |
+| `Pool` | Logical concurrency budget (a value object) |
+| `Context` | Per-occurrence metadata plus the scope's state store |
+| `Runner` | Compile, schedule, report; one run at a time |
+| `Result`, `TaskResult`, `PhaseResult`, `Failure` | Immutable outcome tree |
+| `Status` | Immutable status value; `Status.Kind` is the enum |
+| `ExecutionMode`, `TaskPhase` | Enumerations |
+| `Listener`, `TaskEvent` | Event contract |
+| `Paramixel` | Discovery annotations |
+| `Launcher` | CLI entry point that owns `System.exit` |
+| `Version` | The framework version string |
 
-- `Runner` executes actions, selectors, or classpath-discovered factories.
-- `Configuration` provides typed access to properties.
-- `Listener` receives discovery, run, and descriptor callbacks.
-- `Result` exposes the root `Descriptor` and aggregate outcome.
-- `Descriptor` represents one execution occurrence in the tree.
-- `Context` provides runtime services to actions (configuration, fixture access).
-- `Status` represents execution state with severity aggregation.
-- `Paramixel` contains annotations used by discovery and annotation resolution.
+## Minimal example
 
-## Action package
+```java
+SequentialBuilder definition = Sequential.builder(SmokeTest.class, "Smoke tests")
+        .step("ping")
+        .step("version");
 
-`org.paramixel.api.action` contains `Action` (sealed interface with 15 subtypes), `Builder` (sealed interface with 12 subtypes), and built-in action types: `Step`, `Assert`, `Sequential`, `Sequence` _(deprecated — use `Sequential`)_, `Parallel`, `Scope`, `Static` _(deprecated — use `Scope`)_, `Instance`, `Delay`, `Repeat` _(deprecated — use `Loop`)_, `Loop`, `Timeout`, `Conditional`, `Isolated`, `Until` _(deprecated — use `Loop`)_, and the `Each` data-driven utility.
+@Paramixel.Id("ping")
+public static void ping(final Context context) {
+    // ...
+}
 
-## Selector package
+@Paramixel.Id("version")
+public static void version(final Context context) {
+    // ...
+}
 
-`org.paramixel.api.selector` contains discovery selectors for package, class, tag, and boolean composition.
+try (Runner runner = Runner.builder().build()) {
+    Result result = runner.run(definition);
+    System.exit(result.exitCode());
+}
+```
 
-## Support package
+## Guarantees that shape the API
 
-`org.paramixel.api.support` contains `Retry` and `CleanUp` utilities.
-
-## Exception package
-
-`org.paramixel.api.exception` contains framework and outcome exceptions.
+1. Definitions are immutable and lazy.
+2. Configuration and plan validation happen before any user callback.
+3. Pools are logical budgets, not thread pools.
+4. Waiting never occupies a worker thread.
+5. Timeouts are cooperative; non-quiescent work is reported honestly.
+6. `Result` is a single immutable source of truth for console, file, and integration reporting.

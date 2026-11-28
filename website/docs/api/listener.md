@@ -1,73 +1,64 @@
 ---
 title: Listener
-description: Callback interface for discovery and execution events.
+description: Event delivery, isolation, ordering, and bounded buffering.
 ---
 
 # Listener
 
-`Listener` receives lifecycle callbacks during discovery and execution.
+```java
+public interface Listener {
+    default void onRunStarted(Configuration configuration) {}
+    default void onDiscoveryStarted() {}
+    default void onDiscoveryCompleted(Optional<Task> root) {}
+    default void onWarning(String message) {}
+    default void onTaskEvent(TaskEvent event) {}
+    default void onRunCompleted(Result result) {}
+}
+```
 
-## Callbacks
+`Listener.NOOP` ignores everything; `Listener.defaultListener(configuration)` returns the standard console chain plus a
+report-file writer when `paramixel.report.file` is set.
 
-- `initialize(Configuration)`
-- `onDiscoveryStarted()`
-- `onDiscoveryCompleted(Descriptor root)`
-- `onRunStarted()`
-- `onWarning(String message)`
-- `onBeforeExecution(Descriptor descriptor)`
-- `onAfterExecution(Descriptor descriptor)`
-- `onRunCompleted(Result result)`
+## Delivery model
 
-All methods have default no-op implementations, so custom listeners can override only what they need.
+- Events are produced by the scheduler and delivered by one dispatcher thread, so listener code never runs while the
+  scheduler holds a permit or lock.
+- At `paramixel.listener.queue.capacity` (default 8192) queued events, the scheduler pauses admission and ordinary
+  callbacks rather than dropping events. Task deadlines still advance. A bounded reserve sized to the compiled plan
+  holds events from in-flight work, timeouts, cancellation, and cleanup until the listener catches up.
+- An exception thrown by a listener is isolated and recorded as a run diagnostic; it never changes a task's status.
+- `paramixel.listener.drainTimeoutMillis` (default 30000) limits how long delivery can make **no progress** while under
+  backpressure or during final delivery. A slow listener that keeps making progress does not lose events. A stalled
+  listener is interrupted, undelivered events are discarded, and any still-active run is cooperatively canceled.
+  The returned `Result` records `LISTENER_DRAIN_TIMEOUT` and has a nonzero exit code, even if the completed tasks passed.
+  An uncooperative listener may still be running; task quiescence does not imply listener quiescence.
+- `onRunCompleted` runs on the dispatcher thread only after the complete event stream has been delivered. If the
+  completion callback itself stalls, the same no-progress interval bounds the wait for it.
+- The `Result` passed to `onRunCompleted` already carries the run's diagnostics, including infrastructure diagnostics
+  such as `NON_QUIESCENT`, so console summaries and report files show them.
+- A listener must not re-enter the running `Runner`.
+
+## TaskEvent
 
 `onWarning(String)` reports conditions that do not fail the run but change behavior — for example, a
 configuration key that was removed and now has no effect. The runner reports each detected condition
 at most once per JVM, before execution begins.
 
 ```java
-Listener listener = new Listener() {
-    @Override
-    public void onRunCompleted(Result result) {
-        System.out.println(result.isPassed() ? "PASSED" : "NOT PASSED");
-    }
-};
-
-var runner = Runner.builder().listener(listener).build();
+public final class TaskEvent {
+    public long sequence();                 // monotonic per run
+    public String runId();
+    public String occurrenceId();
+    public Optional<String> parentOccurrenceId();
+    public String name();
+    public String path();
+    public TaskPhase phase();
+    public int attempt();
+    public Status status();
+    public Instant timestamp();
+    public Optional<Duration> elapsed();
+}
 ```
 
-`Listener.defaultListener(configuration)` creates the framework's console/report listener chain.
-
-## Console Output
-
-The default listener chain includes `StatusListener`, which prints an execution-start line
-before each descriptor runs and a completion line after it finishes.
-
-**Execution-start format:**
-
-```
-[PARAMIXEL] <id-path> | <display-name-path>
-```
-
-**Completion format:**
-
-```
-[PARAMIXEL] <status> | <id-path> | <display-name-path> <elapsed-ms>
-```
-
-**ID path / thread name correlation** — the `<id-path>` field is the descriptor ID path
-(hyphen-joined chain of four-character descriptor IDs from root to leaf) and is also
-the JVM thread name during execution. The execution engine assigns the thread name via
-`Listeners.formatIdPath(descriptor)`, and `StatusListener` reads it with
-`Thread.currentThread().getName()`. This ensures thread dumps and console output use
-the same identifiers, making it straightforward to correlate a stuck or slow thread
-with a specific test action.
-
-**Example output** for a nested action `suite.child-step`:
-
-```
-[PARAMIXEL] AaBb-CcDd | suite.child-step
-[PARAMIXEL] PASSED | AaBb-CcDd | suite.child-step 42 ms
-```
-
-The `[PARAMIXEL]` prefix uses ANSI bold-blue styling when ANSI is enabled
-(`paramixel.ansi=true` or `auto` with a compatible terminal).
+Phases: `ADMITTED`, `CONDITION`, `BEFORE`, `BODY`, `TIMEOUT`, `CHILDREN`, `AFTER`, `TERMINAL`. A complete stream delivers exactly one `TERMINAL` event per occurrence; events for
+the same occurrence always respect legal phase order.

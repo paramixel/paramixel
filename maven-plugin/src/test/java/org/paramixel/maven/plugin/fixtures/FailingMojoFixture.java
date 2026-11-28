@@ -16,31 +16,38 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Step;
-import org.paramixel.api.exception.FailException;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Fixture whose action throws a {@link FailException} on execution, used to verify that the
- * Maven mojo translates action failures into {@link org.apache.maven.plugin.MojoFailureException}.
+ * Fixture whose step always fails, used to verify that the Maven mojo translates test failures into
+ * {@link org.apache.maven.plugin.MojoFailureException}.
  */
 public final class FailingMojoFixture {
 
     private FailingMojoFixture() {}
 
     /**
-     * Creates an instance action that always throws {@code "boom"} on execution.
+     * Creates a definition that always fails.
      *
-     * @return an {@link Instance} action that fails with a runtime exception
+     * @return a definition that fails with a runtime exception
      */
-    @Paramixel.Factory
-    public static Action action() {
-        return Instance.builder("mojo-fail", Object::new)
-                .body(Step.of("fail", context -> {
-                    throw new RuntimeException("boom");
-                }))
+    @Paramixel.TaskFactory
+    public static Task task() {
+        return Sequential.builder(FailingMojoFixture.class, "mojo-fail")
+                .step("fail")
                 .build();
+    }
+
+    /**
+     * A step that always fails.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("fail")
+    public static void fail(final Context context) {
+        throw new RuntimeException("boom");
     }
 }

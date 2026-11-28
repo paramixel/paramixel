@@ -1,52 +1,34 @@
 ---
 title: Configuration
-description: Typed access to Paramixel configuration properties.
+description: Typed access to Paramixel properties.
 ---
 
 # Configuration
 
-`Configuration` provides typed access to string-backed properties.
+```java
+Configuration configuration = Configuration.defaultConfiguration();
+Optional<Integer> workers = configuration.getInteger(Configuration.WORKERS);
+Optional<Boolean> failFast = configuration.getBoolean(Configuration.FAIL_FAST);
+```
 
-## Factory methods
+## Factories
 
-- `Configuration.defaultConfiguration()` — classpath `paramixel.properties`, JVM system properties, then defaults.
-- `Configuration.classpathConfiguration()` — classpath properties only.
-- `Configuration.systemConfiguration()` — JVM system properties plus defaults.
-- `Configuration.of(Map<String, String>)` — explicit map.
+| Method | Layers |
+| --- | --- |
+| `defaultConfiguration()` | classpath `paramixel.properties` → system properties → defaults |
+| `classpathConfiguration()` | classpath properties only |
+| `systemConfiguration()` | system properties + defaults |
+| `of(Map)` | an explicit map |
 
-## Caching
+## Typed accessors
 
-`Configuration.defaultConfiguration()` caches the first result per classloader and returns
-the cached copy on subsequent calls. This means runtime changes made after the first call
-— for example, `System.setProperty("paramixel.parallelism", "2")` — are **not** reflected.
+The typed getters return optionals. Invalid numeric values and errors from `get(key, transformer)` throw
+`ConfigurationException`. `keySet()` returns a set of property names. `Configuration.poolKey(name)` builds
+`paramixel.parallelism.<name>`.
 
-- To get a snapshot of the **current** system properties, call
-  `Configuration.systemConfiguration()` instead.
-- To construct a fresh configuration with overrides, use
-  `Configuration.of(Map.of(...))` and pass it to
-  `Runner.builder().configuration(configuration)`.
-- If you need a reusable configuration that reflects live system properties, call
-  `systemConfiguration()` each time rather than caching `defaultConfiguration()`.
+`getBoolean()` and `parseBoolean()` recognize `true` case-insensitively after stripping surrounding whitespace.
+Other present values evaluate to `false`. The runner separately validates its four built-in boolean flags after
+configuration precedence is applied.
 
-TL;DR: `defaultConfiguration()` is a **one-time snapshot**. Do not expect it to
-reflect mid-JVM property changes.
-
-## Typed getters
-
-`getString`, `getBoolean`, `getInteger`, `getLong`, `getFloat`, and `getDouble` return `Optional` values. Invalid numeric values throw `ConfigurationException`.
-
-## Keys
-
-| Key | Default | Description |
-| --- | --- | --- |
-| `paramixel.parallelism` | available processors | Maximum concurrently executing branches, including the coordinating threads that hold them. Must be a positive integer. |
-| `paramixel.ansi` | `auto` | Console ANSI mode: `true`, `false`, or `auto`. |
-| `paramixel.failureOnSkip` | `false` | Treat skipped aggregate results as failing exit codes. |
-| `paramixel.failureOnAbort` | `true` | Treat aborted aggregate results as failing exit codes. |
-| `paramixel.failIfNoTests` | `false` | Fail when classpath discovery finds no factories. |
-| `paramixel.failFast` | `false` | Stop scheduling remaining root children after the first failed or aborted action. |
-| `paramixel.report.file` | unset | Write a run report. `.json`, `.xml`, `.html`, `.log`, and `.txt` are recognized; unknown extensions use text. |
-| `paramixel.match.package.regex` | unset | Java regex, using `matches()`, matched against package names. |
-| `paramixel.match.class.regex` | unset | Java regex, using `matches()`, matched against fully qualified class names. |
-| `paramixel.match.tag.regex` | unset | Java regex, using `matches()`, matched against each `@Paramixel.Tag` value. |
-| `paramixel.listener.exclude` | unset | Comma-separated listener sections: `status.header`, `status.footer`, `summary.header`, `summary.tree`, `summary.footer`, plus shorthands `status`, `quiet`, and `all`. |
+Unknown `paramixel.*` keys are reported as warnings at run start. Secret-looking values are redacted from diagnostics and
+reports.

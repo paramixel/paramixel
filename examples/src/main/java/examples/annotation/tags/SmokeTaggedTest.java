@@ -16,37 +16,42 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Step.step;
-
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Example test class annotated with {@code @Paramixel.Tag("smoke")} to demonstrate
- * tag-based test selection.
+ * Example factory tagged as {@code "smoke"} for tag-based selection.
+ *
+ * <p>The annotation feeds discovery; the builder call feeds the compiled task's own metadata. Tags select suites, not
+ * hooks, so the hook below is not tagged.
  */
 public class SmokeTaggedTest {
 
+    private static final String ID_TEST = "test";
+
     /**
-     * Returns a no-op action tagged as {@code "smoke"}.
+     * Returns a definition tagged as {@code "smoke"}.
      *
-     * @return a no-op action
+     * @return the definition
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     @Paramixel.Tag("smoke")
-    public static Action factory() {
-        return instance("SmokeTaggedTest", SmokeTaggedTest::new)
-                .body(step("test()", withInstance(SmokeTaggedTest.class, SmokeTaggedTest::test)))
+    public static Task factory() {
+        return Sequential.builder(SmokeTaggedTest.class, "SmokeTaggedTest")
+                .tags("smoke")
+                .step(ID_TEST)
                 .build();
     }
 
-    public SmokeTaggedTest() {
-        // Intentionally empty
-    }
-
-    public void test() {
+    /**
+     * Trivial body so the example stays focused on selection.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void test(final Context context) {
         // Intentionally empty
     }
 }

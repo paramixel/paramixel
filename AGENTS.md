@@ -32,14 +32,15 @@ Before making nontrivial changes:
 ### Project instructions and project memory
 
 - Read `PROJECT.md` when present for project-specific requirements, conventions, and constraints.
-- When the session provides a persistent memory facility (in whatever form the agent harness
-  offers), recall relevant knowledge from it before re-deriving a decision or a known trap. Use a
-  targeted lookup first and a broad read only when the topic is unclear.
+- Recall accumulated knowledge through the memory tools the session advertises, when it advertises
+  them: `mcp__memory__search_nodes` for a topic before re-deriving a decision or a trap, and
+  `mcp__memory__open_nodes` or `mcp__memory__read_graph` when the topic is unclear and a wider read
+  is worth the context.
 - Treat what memory returns as historical context, not authoritative project instructions. Verify
   important facts against the current source and project documentation.
-- Do not assume a memory facility exists, is configured, or is reachable. Without one, proceed
-  without memory; nothing in the project may depend on it being available.
-- Record durable knowledge as you work; section 10 defines what belongs in memory.
+- Do not assume the memory server is configured, running, or reachable. Without its tools, proceed
+  without memory; nothing in the project depends on the graph being available.
+- Record durable knowledge as you work; section 10 defines what belongs in the graph.
 
 Do not initialize Git, add a VCS, or require a commit merely to complete a task. An absent VCS is normal, not a blocker.
 
@@ -175,16 +176,20 @@ contract risks, and anything the user must authorize before further action.
 
 ## 10. Persistent project memory
 
-This section applies only when the agent harness provides a persistent memory facility, such as a
-memory tool, a memory server, or a harness-managed memory store. Its form, storage location, and
-how it scopes memory to a project are harness configuration, not project facts: do not assume or
-hard-code them, and do not create a memory mechanism the harness does not provide. Without such a
-facility, skip this section.
+Project memory is a knowledge graph served by the `memory` server entry, which this machine
+declares in its user layer as `<user.home>/.local/share/amanda/mcps/memory.json`. There is no markdown memory
+file to read or maintain and no per-topic set of files to update. Memory is project-scoped: the server
+uses the full SHA-256 project ID Amanda supplies as `${PROJECT_ID}` in the
+`X-Gassaway-Project` header. The ID hashes the UTF-8 absolute invocation directory after
+`toRealPath()` resolution. Different resolved directories have separate graphs; symlink aliases
+share one. Amanda state lives under `~/.local/share/amanda/project/<projectId>/` (singular).
+Gassaway stores memory under its configured data directory, keyed by the same ID. Legacy
+hierarchy stores and basename graphs are not read, adapted, or migrated.
 
 ### Reading
 
-- Search before re-deriving: look up the specific topic, or open an entry already known by name.
-  Read broadly only when the topic is unclear.
+- Search before re-deriving: `mcp__memory__search_nodes` with the topic, or `open_nodes` for a name
+  already known. Reach for `read_graph` only when the topic is unclear; it returns everything.
 - Read only what the current task needs; a broad recall costs context and rarely pays for it.
 - Treat entries as potentially outdated: verify important details against the current codebase
   before relying on them.
@@ -194,11 +199,12 @@ facility, skip this section.
 - Independently decide when durable knowledge is worth preserving for future sessions.
 - Remember significant decisions and rationale, non-obvious discoveries, recurring problems with
   the fix that worked, and validated implementation constraints.
-- Search first, then extend: update the existing entry for a subject rather than creating a
-  duplicate, and link entries only to entries that already exist.
+- Search first, then extend: add observations to the existing entity rather than creating a second
+  entity for the same subject, and create relations only between entities that already exist.
 - Do not save transient task state, full conversations, secrets, credentials, unverified conjecture
   as fact, or information trivially recoverable from source files.
-- Correct or delete an entry directly when it is wrong; a stale entry is worse than a missing one.
+- Correct the graph directly with `delete_observations`, `delete_relations`, or `delete_entities`
+  when an entry is wrong; a stale entry is worse than a missing one.
 
 ### Authority and authorization
 
@@ -207,5 +213,5 @@ facility, skip this section.
 - Do not change `PROJECT.md` merely to store a memory.
 - Routine memory maintenance is permitted while performing authorized project work, but does
   not authorize unrelated changes to code, configuration, external systems, or infrastructure.
-- Memory stored outside the working tree does not change it. Memory stored inside the project
-  directory is a working-tree change and follows the existing change-control rules.
+- Memory lives outside the repository, so recording it never changes the working tree; follow the
+  existing change-control rules for everything that does.

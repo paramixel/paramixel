@@ -20,14 +20,17 @@ import java.util.Objects;
 import nonapi.org.paramixel.support.Arguments;
 
 /**
- * Signals that an action should be marked as failed rather than allowed to propagate an unexpected error.
+ * Signals a deliberate, author-initiated failure.
  *
- * <p>This is a deliberate, author-initiated failure — distinct from an uncaught runtime exception.
- * The Paramixel runtime catches {@code FailException} and records the action as failed with the
- * provided message. This exception can be instantiated directly through {@link #FailException(String)} or
- * thrown immediately with {@link #fail()} and {@link #fail(String)}.
+ * <p>Distinct from an uncaught exception only in intent: the runtime records either as
+ * {@link org.paramixel.api.Status.Kind#FAILED} with the original cause, and cleanup still runs.
+ *
+ * <p>Use the factory methods {@link #fail()} and {@link #fail(String)} at the call site:
+ * {@code throw fail("unexpected payload")}.
  */
-public final class FailException extends RuntimeException {
+public final class FailException extends ParamixelException {
+
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates a failure exception with the supplied message.
@@ -42,25 +45,56 @@ public final class FailException extends RuntimeException {
     }
 
     /**
-     * Throws a failure exception with the default message {@code "failed"}.
+     * Creates a failure exception with the supplied message and cause.
      *
-     * @throws FailException always
+     * @param message the exception message
+     * @param cause the cause of the failure; must not be {@code null}
+     * @throws NullPointerException if {@code message} or {@code cause} is {@code null}
+     * @throws IllegalArgumentException if {@code message} is blank
      */
-    public static void fail() {
-        throw new FailException("failed");
+    public FailException(final String message, final Throwable cause) {
+        super(Objects.requireNonNull(message, "message is null"), Objects.requireNonNull(cause, "cause is null"));
+        Arguments.requireNonBlank(message, "message is blank");
     }
 
     /**
-     * Throws a failure exception with the supplied message.
+     * Returns a failure exception with the default message {@code "failed"}.
+     *
+     * <p>Use it as {@code throw fail()}; returning the exception rather than throwing it keeps the
+     * call site explicit and helps the compiler's definite-assignment analysis.
+     *
+     * @return the failure exception; never {@code null}
+     */
+    public static FailException fail() {
+        return new FailException("failed");
+    }
+
+    /**
+     * Returns a failure exception with the supplied message.
+     *
+     * <p>Use it as {@code throw fail("x")}.
      *
      * @param message the exception message
+     * @return the failure exception; never {@code null}
      * @throws NullPointerException if {@code message} is {@code null}
      * @throws IllegalArgumentException if {@code message} is blank
-     * @throws FailException always
      */
-    public static void fail(final String message) {
-        Objects.requireNonNull(message, "message is null");
-        Arguments.requireNonBlank(message, "message is blank");
-        throw new FailException(message);
+    public static FailException fail(final String message) {
+        return new FailException(message);
+    }
+
+    /**
+     * Returns a failure exception with the supplied message and cause.
+     *
+     * <p>Use it as {@code throw fail("x", cause)}.
+     *
+     * @param message the exception message
+     * @param cause the cause of the failure; must not be {@code null}
+     * @return the failure exception; never {@code null}
+     * @throws NullPointerException if {@code message} or {@code cause} is {@code null}
+     * @throws IllegalArgumentException if {@code message} is blank
+     */
+    public static FailException fail(final String message, final Throwable cause) {
+        return new FailException(message, cause);
     }
 }

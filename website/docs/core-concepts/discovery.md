@@ -1,86 +1,102 @@
 ---
 title: Discovery
-description: How Paramixel finds factory methods.
+description: How annotated factories become a validated root definition.
 ---
 
 # Discovery
 
-Classpath discovery finds public static methods annotated with `@Paramixel.Factory`. A factory returns an `Action`, a `Builder`, or `null`.
+Discovery validates the matched provider declarations, invokes them to produce definitions, and compiles the composed
+plan before executing task callbacks.
+
+## Annotations
+
+| Annotation | Purpose |
+| --- | --- |
+| `@Paramixel.TaskFactory` | `public static`, no parameters or one `Configuration`, returns `Task` or a builder |
+| `@Paramixel.BeforeAll` | Runs before the discovered factories; gates them |
+| `@Paramixel.AfterAll` | Runs after the started run, even when a factory failed |
+| `@Paramixel.Disabled` | Excludes a factory or run hook |
+| `@Paramixel.Tag` | Selection and reporting metadata |
+| `@Paramixel.Priority` | Discovery and run-hook ordering for a class (declared on the type) |
 
 ```java
-import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-public final class CheckoutTest {
-    @Paramixel.Factory
-    @Paramixel.Tag("smoke")
-    public static Action checkout() {
-        return sequential("checkout")
-                .child(step("add item", ctx -> addItem()))
-                .child(step("pay", ctx -> pay()))
-                .build();
+@Paramixel.TaskFactory
+public static TaskBuilder<?> factory() {
+    final var root = Parallel.builder(MySuite.class, "Environments", Pool.named("environments"));
+    for (final var environment : environments) {
+        root.step(Sequential.builder(environment.name()).bind(ENVIRONMENT, environment).step(ID_VERIFY));
     }
+    return root;
 }
 ```
 
-## Discovery annotations
+A factory may return a built `Task` or a `TaskBuilder<?>`; the framework builds a builder. A factory returning `null` is
+an explicit skip with a recorded reason. If every selected factory returns `null`,
+`paramixel.failIfNoTests` decides the exit code. Any other invalid shape — not `static`, parameters other than the sole
+`Configuration`, or an unrelated return type — fails the run with `ResolverException` **before** any discovered test code
+runs.
 
-- `@Paramixel.Factory` marks a factory method returning `Action`, `Builder`, or `null`.
-- `@Paramixel.BeforeAll` marks a runner-level hook that executes once before any discovered test actions.
-- `@Paramixel.AfterAll` marks a runner-level hook that executes once after all discovered test actions.
-- `@Paramixel.Disabled` excludes a factory or hook from discovery.
-- `@Paramixel.Tag` is repeatable and supports tag filtering.
-- `@Paramixel.Priority` orders discovered classes before the root action is built.
-- `@Paramixel.Id` is used by `AnnotationResolver`, not factory discovery.
+Definition validation failures reported as `CompilationException` retain their diagnostics in either return form.
 
-## BeforeAll and AfterAll hooks
+## Configuration-driven structure
 
-`@Paramixel.BeforeAll` and `@Paramixel.AfterAll` provide runner-level lifecycle hooks. Use them for setup or teardown that belongs to the whole discovered runner invocation, such as starting shared infrastructure, seeding a shared environment, or cleaning up global resources.
-
-For lifecycle that belongs to one test or one action tree, prefer an explicit [`Scope`](../api/action#composition). A hook is a convenience around the discovered root; conceptually, Paramixel wraps all discovered factory actions in a top-level `Scope` with hook sequences as `before` and `after` actions.
-
-Hooks are `public static` methods returning `Action` or `Builder`, discovered alongside factories during classpath scanning.
+A factory may declare one `Configuration` parameter to receive the run's effective configuration. That is the same object
+`Context.configuration()` exposes, and it has already been validated before the factory is invoked, so the factory can
+decide what to author rather than only what the authored tasks do:
 
 ```java
-import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-public final class SetupTeardown {
-
-    @Paramixel.BeforeAll
-    public static Action setup() {
-        return sequential("setup")
-                .child(step("start server", ctx -> startServer()))
-                .child(step("seed data", ctx -> seedData()))
-                .build();
+@Paramixel.TaskFactory
+public static TaskBuilder<?> factory(final Configuration configuration) {
+    final var environments = configuration
+            .getString("example.environments")
+            .map(value -> value.split(","))
+            .orElse(new String[] {"postgres"});
+    final var root = Parallel.builder(MySuite.class, "Environments", Pool.named("environments"));
+    for (final var environment : environments) {
+        root.step(Sequential.builder(environment.trim()).step(ID_VERIFY));
     }
-
-    @Paramixel.AfterAll
-    public static Action teardown() {
-        return sequential("teardown")
-                .child(step("clean data", ctx -> cleanData()))
-                .child(step("stop server", ctx -> stopServer()))
-                .build();
-    }
+    return root;
 }
 ```
 
-`@BeforeAll` methods execute once before any discovered test actions. A failing or skipped `@BeforeAll` causes the entire run body (all discovered factory actions) to be skipped. `@AfterAll` methods always execute, regardless of earlier failures.
+- The parameter is optional; a no-parameter factory is unchanged, and the return type is independent of it, so all four
+  combinations of `Task` or `TaskBuilder` with or without the parameter are accepted.
+- The type must be exactly `org.paramixel.api.Configuration`; any other parameter count or type fails discovery.
+- Combining the parameter with a `null` return lets a factory opt out of contributing a definition at all.
+- `@BeforeAll` and `@AfterAll` methods take no parameters.
 
-Multiple `@BeforeAll` methods are ordered by `@Paramixel.Priority` on their declaring class, then by package, class, and method name. Multiple `@AfterAll` methods are ordered in reverse.
+## Composed structure
 
-## Filtering
-
-Use configuration keys or selectors:
-
-```properties
-paramixel.match.package.regex=com\.example\.smoke.*
-paramixel.match.class.regex=.*Checkout.*
-paramixel.match.tag.regex=smoke|critical
+```
+Paramixel (independent sequential root)
+  run (dependent sequential)
+    BeforeAll hooks (when any)
+    tasks (parallel, pool "discovery")    ← discovered factories
+  AfterAll hooks (when any)
 ```
 
-The regex filters use Java `Pattern.matches()` semantics. The regex must match the entire string. To match substrings, use wildcards such as `.*pattern.*`.
+- A failing or skipping `BeforeAll` hook skips the factories.
+- `AfterAll` hooks still run after a started run, in reverse order. A failing hook does not prevent the remaining
+  `AfterAll` hooks from running.
+- `tasks` is the fail-fast scope: with `paramixel.failFast=true`, a failed factory (`FAILED`, including a timeout)
+  stops admitting later ones. A skipped or aborted factory does not.
+- Capacity of the `discovery` pool defaults to `paramixel.parallelism`; override it with
+  `Runner.Builder.pool(Pool.named("discovery"), n)` or `paramixel.parallelism.discovery`.
+
+## Direct execution versus discovery
+
+`Runner.run(Task)` executes exactly the supplied definition: no classpath scan, no hooks, no selection.
+`Runner.run(TaskBuilder<?>)` builds the definition first and then behaves identically. Discovery happens only through
+`Runner.run()` and `Runner.run(Selector)`.
+
+## Selection
+
+`Selector` filters by package tree, class, and tag patterns. The selector passed to `Runner.run(Selector)` is used
+exactly as given; if it ignores configured `paramixel.match.*` keys, the runner warns instead of merging them silently.
+When nothing matches, the run reports `SKIPPED` and `paramixel.failIfNoTests` (default `true`) decides the exit code.
+
+Tag selection reads the factory's annotations. On its discovered root occurrence, Paramixel appends missing
+annotation tags after builder tags. The merged list appears in `Context.tags()` and `TaskResult.tags()`.
+
+Standalone `@BeforeAll` and `@AfterAll` methods are run-wide. A method carrying both `@TaskFactory` and a run-hook
+annotation is rejected when selected as a factory and is otherwise ignored.

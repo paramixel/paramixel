@@ -17,56 +17,84 @@
 package examples.loop;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.action.Loop.loop;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
+import org.paramixel.api.Repeat;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates the {@link org.paramixel.api.action.Loop} action without a predicate
- * (run-all mode). Verifies that the child action executes exactly the
- * configured number of times.
+ * Demonstrates bounded repetition: each subtree runs exactly the configured number of iterations.
+ *
+ * <p>Repeat is not retry. Replay is intentional, the bound is mandatory, and every iteration is a distinct attempt in
+ * the result tree. A repeated task owns its context scope, so each iteration starts with an empty scope.
  */
 public class LoopWithoutPredicateTest {
+
+    private static final String ID_STEP_DEPENDENT = "step-dependent";
+    private static final String ID_STEP_INDEPENDENT = "step-independent";
+    private static final String ID_VALIDATE = "validate";
 
     private static final AtomicInteger dependentCount = new AtomicInteger();
     private static final AtomicInteger independentCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
-     * Builds an action tree that exercises dependent and independent loop iterations
-     * without a termination predicate.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
-    @Paramixel.Factory
-    public static Action factory() {
+    @Paramixel.TaskFactory
+    public static Task factory() {
         resetCounts();
-        return sequential("loop-example")
-                .child(loop("dependent-loop")
-                        .body(step("step", context -> dependentCount.incrementAndGet()))
-                        .maxIterations(3))
-                .child(loop("independent-loop")
-                        .body(step("step", context -> independentCount.incrementAndGet()))
-                        .maxIterations(3))
-                .child(step("validate", context -> {
-                    assertThat(dependentCount.get()).isEqualTo(3);
-                    assertThat(independentCount.get()).isEqualTo(3);
-                }))
+        return Sequential.builder(LoopWithoutPredicateTest.class, "loop-example")
+                .step(Repeat.builder("dependent-loop").maxIterations(3).step(ID_STEP_DEPENDENT))
+                .step(Repeat.builder("independent-loop").maxIterations(3).step(ID_STEP_INDEPENDENT))
+                .step(ID_VALIDATE)
                 .build();
+    }
+
+    /**
+     * Counts one iteration of the dependent loop.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_STEP_DEPENDENT)
+    public static void stepDependent(final Context context) {
+        dependentCount.incrementAndGet();
+    }
+
+    /**
+     * Counts one iteration of the independent loop.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_STEP_INDEPENDENT)
+    public static void stepIndependent(final Context context) {
+        independentCount.incrementAndGet();
+    }
+
+    /**
+     * Confirms both loops ran their full bound.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validate(final Context context) {
+        assertThat(dependentCount.get()).isEqualTo(3);
+        assertThat(independentCount.get()).isEqualTo(3);
     }
 
     private static void resetCounts() {

@@ -16,330 +16,359 @@
 
 package org.paramixel.api;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
-import nonapi.org.paramixel.exception.UserCodeException;
-import nonapi.org.paramixel.support.UnrecoverableErrors;
-import org.paramixel.api.exception.AbortedException;
-import org.paramixel.api.exception.FailException;
-import org.paramixel.api.exception.SkipException;
 
 /**
- * Represents the local execution state of a descriptor.
+ * The outcome of one execution occurrence, phase, or attempt.
  *
- * <p>A descriptor starts in {@link #PENDING}, transitions to {@link #RUNNING}, and then
- * reaches exactly one terminal status: {@link #PASSED}, {@link #FAILED}, {@link #SKIPPED},
- * or {@link #ABORTED}.
+ * <p>A status is a {@link Kind} plus an optional human-readable reason and an optional throwable. Instances are
+ * immutable; compare with {@link #kind()} rather than with the canonical constants, because a status that carries a
+ * message is not equal to the message-free constant.
  *
- * <p>Instances are immutable. The canonical instances are available as static constants
- * on this class. Terminal statuses carrying a message or throwable can be created via
- * the named factory methods {@link #failed(String)}, {@link #skipped(String)}, and
- * {@link #aborted(String)}.
+ * <p>Two kinds are easy to confuse and are deliberately distinct:
  *
- * <p>Outcome detail carried by a status is exposed through {@link #message()} and
- * {@link #throwable()}.
+ * <ul>
+ *   <li>{@link Kind#ABORTED} — the test code decided that a precondition or assumption did not hold
+ *       ({@link org.paramixel.api.exception.AbortException}). The task is not a failure and not a cancellation.</li>
+ *   <li>{@link Kind#CANCELED} — the run, a shutdown, or a timeout on an enclosing task stopped this task
+ *       cooperatively. The task never produced a verdict of its own. A task whose own timeout expires is
+ *       {@link #FAILED} with an explicit timeout reason; only its descendants are {@link Kind#CANCELED}.</li>
+ * </ul>
+ *
+ * <p>Aggregation uses the fixed severity order {@code FAILED > CANCELED > ABORTED > SKIPPED > PASSED}
+ * (see {@link #mostSevere(Collection)}).
  */
 public final class Status {
 
     /**
-     * Descriptor has been discovered but has not started execution.
+     * The kind of a status.
+     *
+     * <p>{@link #severity()} orders kinds for aggregation; higher values are more severe.
      */
-    public static final Status PENDING = new Status("PENDING");
+    public enum Kind {
 
-    /**
-     * Descriptor execution has started and has not yet reached a terminal state.
-     */
-    public static final Status RUNNING = new Status("RUNNING");
+        /** The occurrence is compiled but has not been admitted. */
+        PENDING(false, 0),
 
-    /**
-     * Descriptor completed without errors or exceptions.
-     */
-    public static final Status PASSED = new Status("PASSED");
+        /** Execution has started and has not reached a terminal kind. */
+        RUNNING(false, 0),
 
-    /**
-     * Descriptor completed with a failure.
-     */
-    public static final Status FAILED = new Status("FAILED");
+        /** Every required phase succeeded. */
+        PASSED(true, 1),
 
-    /**
-     * Descriptor was deliberately skipped and did not perform normal work.
-     */
-    public static final Status SKIPPED = new Status("SKIPPED");
+        /** Deliberately not executed: condition false, dependency unsatisfied, selection, or stop policy. */
+        SKIPPED(true, 2),
 
-    /**
-     * Descriptor was aborted due to a failed precondition or assumption.
-     */
-    public static final Status ABORTED = new Status("ABORTED");
+        /** An assumption or precondition abort signal ({@link org.paramixel.api.exception.AbortException}). */
+        ABORTED(true, 3),
 
-    private final String statusName;
+        /** Cooperative cancellation or run shutdown; also the descendants of a task whose timeout expired. */
+        CANCELED(true, 4),
+
+        /** An operation, validation-at-runtime, timeout, or finalization failed. */
+        FAILED(true, 5);
+
+        private final boolean terminal;
+        private final int severity;
+
+        Kind(final boolean terminal, final int severity) {
+            this.terminal = terminal;
+            this.severity = severity;
+        }
+
+        /**
+         * Returns whether this kind is terminal.
+         *
+         * @return {@code true} for {@code PASSED}, {@code SKIPPED}, {@code ABORTED}, {@code CANCELED} and
+         *     {@code FAILED}
+         */
+        public boolean isTerminal() {
+            return terminal;
+        }
+
+        /**
+         * Returns the aggregation severity of this kind.
+         *
+         * @return the severity; higher values are more severe
+         */
+        public int severity() {
+            return severity;
+        }
+    }
+
+    /** The occurrence is compiled but has not been admitted. */
+    public static final Status PENDING = new Status(Kind.PENDING, null, null);
+
+    /** Execution has started and has not reached a terminal kind. */
+    public static final Status RUNNING = new Status(Kind.RUNNING, null, null);
+
+    /** Every required phase succeeded. */
+    public static final Status PASSED = new Status(Kind.PASSED, null, null);
+
+    /** Deliberately not executed. */
+    public static final Status SKIPPED = new Status(Kind.SKIPPED, null, null);
+
+    /** An assumption or precondition did not hold. */
+    public static final Status ABORTED = new Status(Kind.ABORTED, null, null);
+
+    /** Cooperative cancellation or run shutdown; also the descendants of a task whose timeout expired. */
+    public static final Status CANCELED = new Status(Kind.CANCELED, null, null);
+
+    /** An operation, validation-at-runtime, or finalization failed. */
+    public static final Status FAILED = new Status(Kind.FAILED, null, null);
+
+    private final Kind kind;
     private final String message;
     private final Throwable throwable;
 
-    private Status(final String statusName) {
-        this.statusName = statusName;
-        this.message = null;
-        this.throwable = null;
-    }
-
-    private Status(final String statusName, final String message) {
-        this.statusName = statusName;
-        this.message = message;
-        this.throwable = null;
-    }
-
-    private Status(final String statusName, final String message, final Throwable throwable) {
-        this.statusName = statusName;
+    private Status(final Kind kind, final String message, final Throwable throwable) {
+        this.kind = Objects.requireNonNull(kind, "kind is null");
         this.message = message;
         this.throwable = throwable;
     }
 
     /**
-     * Creates a {@code FAILED} status with a message.
+     * Creates a {@code FAILED} status.
      *
-     * @param message the status message; must not be {@code null}
-     * @return a failed status with the given message
+     * @param message the reason; must not be {@code null}
+     * @return the status; never {@code null}
      * @throws NullPointerException if {@code message} is {@code null}
      */
     public static Status failed(final String message) {
-        Objects.requireNonNull(message, "message is null");
-        return new Status("FAILED", message);
+        return new Status(Kind.FAILED, Objects.requireNonNull(message, "message is null"), null);
     }
 
     /**
-     * Creates a {@code FAILED} status with a message and throwable.
+     * Creates a {@code FAILED} status carrying a throwable.
      *
-     * @param message the status message; must not be {@code null}
-     * @param throwable the throwable associated with the status; must not be {@code null}
-     * @return a failed status with the given message and throwable
+     * @param message the reason; must not be {@code null}
+     * @param throwable the cause; must not be {@code null}
+     * @return the status; never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
     public static Status failed(final String message, final Throwable throwable) {
-        Objects.requireNonNull(message, "message is null");
-        Objects.requireNonNull(throwable, "throwable is null");
-        return new Status("FAILED", message, throwable);
+        return new Status(
+                Kind.FAILED,
+                Objects.requireNonNull(message, "message is null"),
+                Objects.requireNonNull(throwable, "throwable is null"));
     }
 
     /**
-     * Creates a {@code SKIPPED} status with a message.
+     * Creates a {@code SKIPPED} status.
      *
-     * @param message the status message; must not be {@code null}
-     * @return a skipped status with the given message
+     * @param message the reason; must not be {@code null}
+     * @return the status; never {@code null}
      * @throws NullPointerException if {@code message} is {@code null}
      */
     public static Status skipped(final String message) {
-        Objects.requireNonNull(message, "message is null");
-        return new Status("SKIPPED", message);
+        return new Status(Kind.SKIPPED, Objects.requireNonNull(message, "message is null"), null);
     }
 
     /**
-     * Creates a {@code SKIPPED} status with a message and throwable.
+     * Creates a {@code SKIPPED} status carrying a throwable.
      *
-     * @param message the status message; must not be {@code null}
-     * @param throwable the throwable associated with the status; must not be {@code null}
-     * @return a skipped status with the given message and throwable
+     * @param message the reason; must not be {@code null}
+     * @param throwable the cause; must not be {@code null}
+     * @return the status; never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
     public static Status skipped(final String message, final Throwable throwable) {
-        Objects.requireNonNull(message, "message is null");
-        Objects.requireNonNull(throwable, "throwable is null");
-        return new Status("SKIPPED", message, throwable);
+        return new Status(
+                Kind.SKIPPED,
+                Objects.requireNonNull(message, "message is null"),
+                Objects.requireNonNull(throwable, "throwable is null"));
     }
 
     /**
-     * Creates a {@code ABORTED} status with a message.
+     * Creates an {@code ABORTED} status.
      *
-     * @param message the status message; must not be {@code null}
-     * @return an aborted status with the given message
+     * @param message the reason; must not be {@code null}
+     * @return the status; never {@code null}
      * @throws NullPointerException if {@code message} is {@code null}
      */
     public static Status aborted(final String message) {
-        Objects.requireNonNull(message, "message is null");
-        return new Status("ABORTED", message);
+        return new Status(Kind.ABORTED, Objects.requireNonNull(message, "message is null"), null);
     }
 
     /**
-     * Creates a {@code ABORTED} status with a message and throwable.
+     * Creates an {@code ABORTED} status carrying a throwable.
      *
-     * @param message the status message; must not be {@code null}
-     * @param throwable the throwable associated with the status; must not be {@code null}
-     * @return an aborted status with the given message and throwable
+     * @param message the reason; must not be {@code null}
+     * @param throwable the cause; must not be {@code null}
+     * @return the status; never {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
     public static Status aborted(final String message, final Throwable throwable) {
-        Objects.requireNonNull(message, "message is null");
-        Objects.requireNonNull(throwable, "throwable is null");
-        return new Status("ABORTED", message, throwable);
+        return new Status(
+                Kind.ABORTED,
+                Objects.requireNonNull(message, "message is null"),
+                Objects.requireNonNull(throwable, "throwable is null"));
     }
 
     /**
-     * Returns the name of this status.
+     * Creates a {@code CANCELED} status.
      *
-     * <p>The name matches the canonical constant name: {@code "PENDING"}, {@code "RUNNING"},
-     * {@code "PASSED"}, {@code "FAILED"}, {@code "SKIPPED"}, or {@code "ABORTED"}.
-     *
-     * @return the status name; never {@code null}
+     * @param message the reason; must not be {@code null}
+     * @return the status; never {@code null}
+     * @throws NullPointerException if {@code message} is {@code null}
      */
-    public String name() {
-        return statusName;
+    public static Status canceled(final String message) {
+        return new Status(Kind.CANCELED, Objects.requireNonNull(message, "message is null"), null);
     }
 
     /**
-     * Returns whether this status means execution has not started.
+     * Creates a {@code CANCELED} status carrying a throwable.
      *
-     * @return {@code true} when pending
+     * @param message the reason; must not be {@code null}
+     * @param throwable the cause; must not be {@code null}
+     * @return the status; never {@code null}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public static Status canceled(final String message, final Throwable throwable) {
+        return new Status(
+                Kind.CANCELED,
+                Objects.requireNonNull(message, "message is null"),
+                Objects.requireNonNull(throwable, "throwable is null"));
+    }
+
+    /**
+     * Returns the most severe kind of the supplied statuses.
+     *
+     * <p>Empty input yields {@link #PASSED}: a task with no recorded phases has nothing to fail. The message and
+     * throwable of the returned status are taken from the first status that has the winning kind.
+     *
+     * @param statuses the statuses to aggregate; must not be {@code null} and must not contain {@code null}
+     * @return the most severe status; never {@code null}
+     * @throws NullPointerException if the collection or an element is {@code null}
+     */
+    public static Status mostSevere(final Collection<Status> statuses) {
+        Objects.requireNonNull(statuses, "statuses is null");
+        var result = PASSED;
+        for (Status status : statuses) {
+            Objects.requireNonNull(status, "status is null");
+            if (status.kind.severity > result.kind.severity) {
+                result = status;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns the kind.
+     *
+     * @return the kind; never {@code null}
+     */
+    public Kind kind() {
+        return kind;
+    }
+
+    /**
+     * Returns whether execution has not started.
+     *
+     * @return {@code true} for {@link Kind#PENDING}
      */
     public boolean isPending() {
-        return this == PENDING || "PENDING".equals(statusName);
+        return kind == Kind.PENDING;
     }
 
     /**
-     * Returns whether this status means execution is in progress.
+     * Returns whether execution is in progress.
      *
-     * @return {@code true} when running
+     * @return {@code true} for {@link Kind#RUNNING}
      */
     public boolean isRunning() {
-        return this == RUNNING || "RUNNING".equals(statusName);
+        return kind == Kind.RUNNING;
     }
 
     /**
-     * Returns whether execution completed successfully.
+     * Returns whether the outcome succeeded.
      *
-     * @return {@code true} when passed
+     * @return {@code true} for {@link Kind#PASSED}
      */
     public boolean isPassed() {
-        return this == PASSED || "PASSED".equals(statusName);
+        return kind == Kind.PASSED;
     }
 
     /**
-     * Returns whether execution completed with a failure.
+     * Returns whether the outcome failed.
      *
-     * @return {@code true} when failed
+     * @return {@code true} for {@link Kind#FAILED}
      */
     public boolean isFailed() {
-        return this == FAILED || "FAILED".equals(statusName);
+        return kind == Kind.FAILED;
     }
 
     /**
-     * Returns whether execution was skipped.
+     * Returns whether the outcome was skipped.
      *
-     * @return {@code true} when skipped
+     * @return {@code true} for {@link Kind#SKIPPED}
      */
     public boolean isSkipped() {
-        return this == SKIPPED || "SKIPPED".equals(statusName);
+        return kind == Kind.SKIPPED;
     }
 
     /**
-     * Returns whether execution was aborted.
+     * Returns whether the outcome was an assumption abort.
      *
-     * @return {@code true} when aborted
+     * @return {@code true} for {@link Kind#ABORTED}
      */
     public boolean isAborted() {
-        return this == ABORTED || "ABORTED".equals(statusName);
+        return kind == Kind.ABORTED;
     }
 
     /**
-     * Returns the optional message associated with this status.
+     * Returns whether the outcome was canceled.
      *
-     * @return the message, or empty when no message is available
+     * @return {@code true} for {@link Kind#CANCELED}
+     */
+    public boolean isCanceled() {
+        return kind == Kind.CANCELED;
+    }
+
+    /**
+     * Returns whether the outcome is terminal.
+     *
+     * @return {@code true} when the kind is terminal
+     */
+    public boolean isTerminal() {
+        return kind.isTerminal();
+    }
+
+    /**
+     * Returns the reason, when one is available.
+     *
+     * @return the reason, or an empty optional
      */
     public Optional<String> message() {
         return Optional.ofNullable(message);
     }
 
     /**
-     * Returns the optional throwable associated with this status.
+     * Returns the throwable, when one is available.
      *
-     * @return the throwable, or empty when no throwable is available
+     * @return the throwable, or an empty optional
      */
     public Optional<Throwable> throwable() {
         return Optional.ofNullable(throwable);
     }
 
     /**
-     * Computes the aggregate status from a list of child descriptors.
+     * Returns this status with the supplied message when it has none.
      *
-     * <p>Severity ordering: {@code FAILED} &gt; {@code ABORTED} &gt; {@code RUNNING}/{@code PENDING} &gt;
-     * {@code SKIPPED} &gt; {@code PASSED}. Non-terminal child statuses (RUNNING or PENDING) cause the
-     * aggregate to be {@link #RUNNING}, indicating that execution is incomplete.
-     *
-     * @param descriptors the child descriptors; must not be {@code null}
-     * @return the aggregate status
+     * @param fallback the message to apply; must not be {@code null}
+     * @return this status when it already has a message, otherwise a copy carrying {@code fallback}
+     * @throws NullPointerException if {@code fallback} is {@code null}
      */
-    public static Status aggregate(final List<Descriptor> descriptors) {
-        boolean hasFailed = false;
-        boolean hasAborted = false;
-        boolean hasNonTerminal = false;
-        boolean hasSkipped = false;
-        for (Descriptor descriptor : descriptors) {
-            if (descriptor.isFailed()) {
-                hasFailed = true;
-            }
-            if (descriptor.isAborted()) {
-                hasAborted = true;
-            }
-            if (!descriptor.isCompleted()) {
-                hasNonTerminal = true;
-            }
-            if (descriptor.isSkipped()) {
-                hasSkipped = true;
-            }
-        }
-        if (hasFailed) {
-            return FAILED;
-        }
-        if (hasAborted) {
-            return ABORTED;
-        }
-        if (hasNonTerminal) {
-            return RUNNING;
-        }
-        if (hasSkipped) {
-            return SKIPPED;
-        }
-        return PASSED;
-    }
-
-    /**
-     * Maps a throwable to the corresponding terminal status.
-     *
-     * <p>If the throwable is a framework wrapper, its cause is unwrapped first.
-     * Then {@link AbortedException}, {@link SkipException}, and {@link FailException}
-     * are mapped to their corresponding statuses. Unrecoverable errors are rethrown.
-     * {@link InterruptedException} restores the interrupt flag.
-     *
-     * @param throwable the throwable to map; must not be {@code null}
-     * @return the terminal status; never {@code null}
-     * @throws Error if the throwable is an unrecoverable error
-     */
-    public static Status fromThrowable(final Throwable throwable) {
-        Objects.requireNonNull(throwable, "throwable is null");
-        var t = throwable;
-        if (t instanceof UserCodeException userCodeException) {
-            t = userCodeException.getCause();
-            if (t == null) {
-                t = throwable;
-            }
-        }
-        UnrecoverableErrors.rethrowIfUnrecoverable(t);
-        if (t instanceof InterruptedException) {
-            Thread.currentThread().interrupt();
-        }
-        if (t instanceof AbortedException e) {
-            return aborted(e.getMessage(), e);
-        }
-        if (t instanceof SkipException e) {
-            return skipped(e.getMessage(), e);
-        }
-        if (t instanceof FailException e) {
-            return failed(e.getMessage(), e);
-        }
-        return failed(t.getMessage() != null ? t.getMessage() : "failed", t);
+    public Status withDefaultMessage(final String fallback) {
+        Objects.requireNonNull(fallback, "fallback is null");
+        return message == null ? new Status(kind, fallback, throwable) : this;
     }
 
     @Override
     public String toString() {
-        return statusName;
+        return message == null ? kind.name() : kind.name() + " (" + message + ")";
     }
 
     @Override
@@ -350,13 +379,11 @@ public final class Status {
         if (!(obj instanceof Status other)) {
             return false;
         }
-        return statusName.equals(other.statusName)
-                && Objects.equals(message, other.message)
-                && Objects.equals(throwable, other.throwable);
+        return kind == other.kind && Objects.equals(message, other.message);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(statusName, message, throwable);
+        return Objects.hash(kind, message);
     }
 }

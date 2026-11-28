@@ -1,41 +1,49 @@
 ---
 title: Data-Driven Testing
-description: Build action trees from collections and streams.
+description: Typed matrices without casts or repeated class tokens.
 ---
 
 # Data-Driven Testing
 
-Use `Each.sequential()` and `Each.parallel()` to build action subtrees from `Iterable` or `Stream` inputs.
+A matrix is a loop over the items while the definition is authored. Each item produces its own builder, bindings, and
+hooks, so every item can hold a different fixture type with no casts and no repeated class token.
 
 ```java
-import java.util.List;
-import org.paramixel.api.action.Each;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-var users = List.of("ada", "grace", "linus");
-
-Action spec = Each.sequential("user checks", users,
-        user -> sequential("check " + user)
-                .child(step("load", ctx -> loadUser(user)))
-                .child(step("verify", ctx -> verifyUser(user)))
-                .build())
-        .build();
+final var root = Parallel.builder(MySuite.class, "Environments", Pool.named("environments"));
+for (final var environment : environments) {
+    root.step(Sequential.builder(environment.name())
+            .bind(ENVIRONMENT, environment)
+            .before(ID_START)
+            .step(ID_VERIFY)
+            .after(ID_STOP));
+}
+Parallel definition = root.build();
 ```
 
-Use `Each.sequential` when order matters. Use `Each.parallel` when cases are independent and safe to run concurrently:
+## Rules
+
+- Iteration order is preserved; a set or map with nondeterministic iteration order is the caller's choice and is not
+  presented as stable.
+- The loop runs while the definition is authored. It may capture application objects, but must not run test bodies,
+  create fixtures, or acquire runtime resources: those belong in the branch's `before` slot.
+- A builder passed to `step` is held until the parent is built, so a branch helper can be configured further before
+  `build()`.
+- Heterogeneous branches are allowed: one item may bind `A` and another bind `B`, with no casts.
+
+## Shuffling
 
 ```java
-import org.paramixel.api.action.Each;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-Action parallelSpec = Each.parallel("browser matrix", browsers,
-        browser -> sequential("check " + browser)
-                .child(step("run", ctx -> runBrowserScenario(browser)))
-                .build())
-        .parallelism(3)
-        .build();
+final var matrix = Parallel.builder(MySuite.class, "Matrix", Pool.named("environments")).shuffle(42L);
+for (final var environment : environments) {
+    matrix.step(Sequential.builder(environment.name()).bind(ENVIRONMENT, environment).step(ID_VERIFY));
+}
+Parallel definition = matrix.build();
 ```
 
-Keep data immutable or isolated per child when using parallel execution.
+Shuffling reorders admission for the task's direct children. The effective seed and resolved order are recorded on the
+node's `TaskResult` (`shuffleSeed()`, `executionOrder()`), and the same definition plus seed always yields the same order.
+
+## Sharing state
+
+Each branch owns its own context scope, and a value bound on a branch is visible only inside that branch. Cross-branch
+mutable state in a static field is shared and unsynchronized; if branches run in parallel, guard it or use `isolated`.

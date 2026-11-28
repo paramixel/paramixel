@@ -1,141 +1,79 @@
 ---
 title: Parallel Execution
-description: Run independent action branches concurrently.
+description: Named pools, permit lifetimes, admission order, and honest limits.
 ---
 
 # Parallel Execution
 
-Use `Parallel` for independent work that is safe to run concurrently.
+## Pools are budgets
 
 ```java
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
+private static final Pool ENVIRONMENTS = Pool.named("environments");
 
-Action spec = parallel("browser matrix")
-        .parallelism(3)
-        .child(step("chrome", ctx -> runChrome()))
-        .child(step("firefox", ctx -> runFirefox()))
-        .child(step("webkit", ctx -> runWebkit()))
-        .build();
+final var root = Parallel.builder(MySuite.class, "Compatibility matrix", ENVIRONMENTS);
+for (final var environment : environments) {
+    root.step(Sequential.builder(environment.name()).bind(ENVIRONMENT, environment).step("check"));
+}
+Task definition = root.build();
+
+Runner runner = Runner.builder().pool(ENVIRONMENTS, 3).build();
 ```
 
-```text
-browser matrix
-├── chrome
-├── firefox
-└── webkit
+A `Pool` is a value object: no threads, no global registration, no permits until a run compiles a plan. Capacity
+precedence is `Runner.Builder.pool` → `paramixel.parallelism.<name>` → error for a user pool.
+`paramixel.workers` bounds execution threads separately, so a pool capacity does not silently become a thread count.
+
+## Capacity is a cap, not a reservation
+
+A capacity bounds how many direct children of parallel tasks may hold a permit from the same pool at one time. It
+reserves no share of the runner, creates no threads, and does not guarantee concurrency. Two limits apply together:
+
+```
+concurrent children of one pool ≤ min(pool capacity, free workers)
 ```
 
-## Runner parallelism
+`paramixel.workers` (default: available processors) bounds how many task callbacks run at once across every pool, and
+each run creates its own worker set. A pool configured with capacity 32 on a run limited to 8 workers runs at most 8 of
+its children concurrently, and a pool whose permits are free still waits while every worker is busy elsewhere. Raising
+a capacity above the worker limit cannot add concurrency; raise `paramixel.workers` for that.
 
-`paramixel.parallelism` is the runner-wide concurrency budget, and it is the only global
-concurrency knob. Each executing branch — a `Parallel` child, a `Step` leaf, an `Isolated` body —
-holds one unit of that budget for as long as it runs, and the thread that calls the runner holds one for the whole run, so the budget bounds both the number of
-executing threads and the number of concurrently allocated resources such as containers.
+Two consequences worth planning around:
 
-Execution is depth-first. The thread that reaches a `Parallel` runs its first child itself and
-starts additional workers for the remaining children while budget is available. Every worker simply
-takes the next unstarted child, so children start in declaration order, and a child that blocks
-never prevents its later siblings from starting. If no budget is free, a sibling starts as soon as
-any branch elsewhere in the tree finishes and releases its budget; nothing ever waits for budget
-while holding a resource. `Parallel.parallel(...).parallelism(n)` bounds how many direct children
-of that `Parallel` may be in flight; it is a local window inside the global budget, and it is how
-you reserve room for nested parallelism.
+- **No isolation or fairness between pools.** Ready work is dispatched to the shared worker set in compiled order, not
+  by pool, so one pool's admitted children can occupy every worker and delay another pool's ready children. A pool
+  protects the external resource it names, not its own share of the machine.
+- **Size the two numbers for different questions.** A pool capacity answers "how much of this scarce thing may be in
+  flight" (containers, ports, licenses, connection slots). `paramixel.workers` answers "how much work may this machine
+  run at once".
 
-A `Timeout` runs its child on its own thread, which takes over the slot of the thread waiting for it, so
-the deadline always applies even when the whole budget is in use. A child that ignores interruption may
-keep running briefly after its deadline.
+## Permit lifetime
 
-Siblings that must run at the same time (for example, children that wait on a shared latch) need
-enough budget to actually run together: `paramixel.parallelism` must cover every branch that is
-running concurrently, including the ones above them in the tree.
+Each direct child of a parallel task holds exactly one permit from admission through its `before` slot, body, nested
+groups, and `after` slot. A parent does not consume its own children's permits. Nested groups with a
+different pool acquire additional permits for their own children.
 
-Because the budget counts branches rather than only leaf bodies, a suite that previously peaked at
-`N` concurrent leaves will now peak at `N` concurrent branches. Raise `paramixel.parallelism` if a
-plan needs more concurrent work.
+## Admission order
 
-The former `paramixel.scheduler.queue.capacity` property was removed: there is no
-ready queue any more. Setting it now logs a warning through `Listener.onWarning` and has no effect.
+Ready work is dispatched in compiled depth-first order, so descendants of an admitted branch are considered before an
+unopened sibling. This is an admission preference, not preemption: work that already started runs to completion unless it
+is canceled.
 
-## Best practices
+## Waiting is never a worker
 
-- Share immutable data only.
-- Keep external resources isolated per child.
-- Avoid relying on completion order.
-- Use `@Paramixel.Priority` only for discovery admission order, not as a synchronization mechanism.
-- Keep cleanup in `after` actions or `CleanUp` utilities.
+Waiting for a permit, a lock, a backoff delay, or a child group is asynchronous. A parent never occupies a worker while
+waiting for its children, so a one-worker run of a nested tree still completes.
 
-## Serializing subgroups with Isolated
+## Deadlock protection
 
-`Isolated` serializes its body under a named lock, allowing controlled serialization within a `Parallel`. Combine with `Parallel.parallelism()` to bound concurrent execution of the body's children:
+- Nesting the same pool on one ancestry path is rejected at compile time, regardless of configured capacity.
+- Provable pool/lock acquisition-order cycles are rejected with both resource names and the offending task path. The
+  check follows runtime order: a task takes its parent's pool permit, then its own `isolated` lock at admission, and
+  only then do its children take permits of its own pool. So `Parallel.builder(..., pool).isolated(lock)` on one path and a
+  `pool` child that is `isolated(lock)` on another path form a cycle.
+- A scheduler that cannot make progress fails the run with a diagnostic instead of hanging.
 
-```java
-import org.paramixel.api.action.Action;
-import static org.paramixel.api.action.Isolated.isolated;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Sequential.sequential;
+## Honest limits
 
-Action spec = parallel("suite")
-        .parallelism(4)
-        .child(isolated("database-tests", "db-lock")
-                .body(parallel("db")
-                        .parallelism(2)
-                        .child(queryTest1())
-                        .child(queryTest2())
-                        .build())
-                .build())
-        .child(isolated("api-tests", "db-lock")
-                .body(sequential("api")
-                        .child(createUser())
-                        .child(updateUser())
-                        .build())
-                .build())
-        .build();
-```
-
-```text
-suite
-├── database-tests   (uses db-lock)
-│   └── db
-│       ├── queryTest1
-│       └── queryTest2
-└── api-tests        (uses db-lock)
-    └── api
-        ├── createUser
-        └── updateUser
-```
-
-Two `Isolated` nodes share `"db-lock"`; only one body executes at a time. Each body internally controls its own parallelism via `Parallel.parallelism()`.
-
-## Shuffled execution order
-
-Use `.shuffle()` on `Parallel.Builder` to randomize the order children enter the rolling window, helping surface race conditions that depend on scheduling order:
-
-```java
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
-
-Action spec = parallel("matrix")
-        .parallelism(3)
-        .shuffle()
-        .child(step("chrome", ctx -> runChrome()))
-        .child(step("firefox", ctx -> runFirefox()))
-        .child(step("webkit", ctx -> runWebkit()))
-        .build();
-```
-
-For reproducible flaky-test investigations, supply an explicit seed:
-
-```java
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
-
-Action spec = parallel("matrix")
-        .parallelism(3)
-        .shuffle(42L)
-        .child(step("chrome", ctx -> runChrome()))
-        .child(step("firefox", ctx -> runFirefox()))
-        .child(step("webkit", ctx -> runWebkit()))
-        .build();
-```
+Paramixel cannot preempt a running callback, make a shared fixture thread-safe, or forcibly stop code that ignores
+interruption. Parallel children reading a value bound on the parent are concurrent calls on that object; guard, isolate,
+or split the scope.

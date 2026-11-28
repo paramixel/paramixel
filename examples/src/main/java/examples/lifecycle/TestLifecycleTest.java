@@ -17,51 +17,112 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates one fixture shared by two sibling steps.
+ *
+ * <p>The two steps are siblings in a sequential chain, so they share one context scope: the fixture stored by the
+ * {@code before} hook is the same object in both, and neither step has to be told about the other. The {@code after}
+ * hook reads it back with {@code find} and closes it explicitly — the framework never closes anything.
+ */
 public class TestLifecycleTest implements AutoCloseable {
+
+    private static final String ID_CREATE = "create";
+    private static final String ID_TEST_ONE = "testOne";
+    private static final String ID_TEST_TWO = "testTwo";
+    private static final String ID_CLOSE = "close";
+
+    private static final String FIXTURE = "fixture";
 
     private static final int EXPECTED_TEST_COUNT = 2;
 
     private static final AtomicInteger testCount = new AtomicInteger();
 
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
-    @Paramixel.Factory
-    public static Action factory() {
-        resetCounts();
+    /**
+     * Builds the definition.
+     *
+     * @return the definition for this test
+     */
+    @Paramixel.TaskFactory
+    public static Task factory() {
+        testCount.set(0);
 
-        return instance("FullLifecycleTest", TestLifecycleTest::new)
-                .body(sequential("tests")
-                        .child(step("testOne()", withInstance(TestLifecycleTest.class, TestLifecycleTest::testOne)))
-                        .child(step("testTwo()", withInstance(TestLifecycleTest.class, TestLifecycleTest::testTwo))))
+        return Sequential.builder(TestLifecycleTest.class, "TestLifecycleTest")
+                .before(ID_CREATE)
+                .step(ID_TEST_ONE)
+                .step(ID_TEST_TWO)
+                .after(ID_CLOSE)
                 .build();
     }
 
-    public TestLifecycleTest() {
-        // Intentionally empty
+    /**
+     * Creates the fixture for this attempt.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CREATE)
+    public static void create(final Context context) {
+        context.put(FIXTURE, new TestLifecycleTest());
     }
 
+    /**
+     * First test body.
+     */
     public void testOne() {
         testCount.incrementAndGet();
     }
 
+    /**
+     * Second test body.
+     */
     public void testTwo() {
         testCount.incrementAndGet();
     }
 
-    private static void resetCounts() {
-        testCount.set(0);
+    /**
+     * Runs the first test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_ONE)
+    public static void runTestOne(final Context context) {
+        context.require(FIXTURE, TestLifecycleTest.class).testOne();
+    }
+
+    /**
+     * Runs the second test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_TWO)
+    public static void runTestTwo(final Context context) {
+        context.require(FIXTURE, TestLifecycleTest.class).testTwo();
+    }
+
+    /**
+     * Releases the fixture, if the attempt managed to create one.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CLOSE)
+    public static void releaseFixture(final Context context) {
+        context.find(FIXTURE, TestLifecycleTest.class).ifPresent(TestLifecycleTest::close);
     }
 
     @Override

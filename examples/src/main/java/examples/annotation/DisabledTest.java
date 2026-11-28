@@ -16,43 +16,56 @@
 
 package examples.annotation;
 
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Step.step;
-
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 import org.paramixel.api.exception.FailException;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Verifies that {@code @Paramixel.Disabled} prevents the annotated action factory
- * from being invoked by the runner.
+ * Verifies that {@code @Paramixel.Disabled} prevents a factory from being invoked.
+ *
+ * <p>The disabled factory would fail if it ever ran, so a passing run proves discovery excluded it before invoking any
+ * user code — including before id resolution, which only happens when the factory body executes.
  */
 public class DisabledTest {
 
+    private static final String ID_SHOULD_NOT_RUN = "should-not-run";
+
     /**
-     * Discovers and executes all action factories in this package, then exits the JVM.
+     * Runs discovery in this package and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(Selector.packageTreeOf(DisabledTest.class));
+        System.exit(Runner.builder()
+                .build()
+                .run(Selector.builder().packageTreeOf(DisabledTest.class).build())
+                .exitCode());
     }
 
     /**
-     * Action factory annotated with {@code @Paramixel.Disabled} — must not be
-     * invoked by the runner. If this factory is ever called, the test fails.
+     * A disabled factory that must never be invoked.
      *
-     * @return a flow that would fail if ever executed
+     * @return a task that would fail if executed
      */
-    @Paramixel.Disabled("covered by resolver skip behavior")
-    @Paramixel.Factory
-    public static Action factory() {
-        return scope("[scenario]")
-                .body(step("should-not-run", context -> {
-                    FailException.fail("@Paramixel.Disabled action factory was invoked");
-                }))
+    @Paramixel.Disabled("covered by discovery skip behavior")
+    @Paramixel.TaskFactory
+    public static Task factory() {
+        return Sequential.builder(DisabledTest.class, "[scenario]")
+                .step(ID_SHOULD_NOT_RUN)
                 .build();
+    }
+
+    /**
+     * Fails if it ever runs.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_SHOULD_NOT_RUN)
+    public static void shouldNotRun(final Context context) {
+        throw FailException.fail("@Paramixel.Disabled factory was invoked");
     }
 }

@@ -20,18 +20,21 @@ import org.paramixel.api.Runner;
 import org.paramixel.api.selector.Selector;
 
 /**
- * Entry point for the Paramixel runner that discovers and executes all action factories
+ * Entry point for the Paramixel runner that discovers and executes all task factories
  * in the {@code examples} package and sub-packages.
  */
 public class __ParamixelRunner__ {
 
     /**
-     * Discovers and executes all action factories in this package and sub-packages,
+     * Discovers and executes all task factories in this package and sub-packages,
      * then exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(Selector.packageTreeOf(__ParamixelRunner__.class));
+        System.exit(Runner.builder()
+                .build()
+                .run(Selector.builder().packageTreeOf(__ParamixelRunner__.class).build())
+                .exitCode());
     }
 }

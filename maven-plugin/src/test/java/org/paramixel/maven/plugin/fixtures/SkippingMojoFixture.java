@@ -16,31 +16,39 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 import org.paramixel.api.exception.SkipException;
 
 /**
- * Fixture whose action throws a {@link SkipException} on execution, used to verify that the Maven
- * mojo handles skip semantics according to the {@code failureOnSkip} configuration.
+ * Fixture whose step signals a skip, used to verify that the Maven mojo handles skip semantics according to the
+ * {@code failureOnSkip} configuration.
  */
 public final class SkippingMojoFixture {
 
     private SkippingMojoFixture() {}
 
     /**
-     * Creates an instance action that always throws a {@link SkipException} on execution.
+     * Creates a definition that always skips.
      *
-     * @return an {@link Instance} action that signals a skip
+     * @return a definition that signals a skip
      */
-    @Paramixel.Factory
-    public static Action action() {
-        return Instance.builder("mojo-skip", Object::new)
-                .body(Step.of("skip", context -> {
-                    throw new SkipException("skip requested");
-                }))
+    @Paramixel.TaskFactory
+    public static Task task() {
+        return Sequential.builder(SkippingMojoFixture.class, "mojo-skip")
+                .step("skip")
                 .build();
+    }
+
+    /**
+     * A step that always signals a skip.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("skip")
+    public static void skip(final Context context) {
+        throw new SkipException("skip requested");
     }
 }

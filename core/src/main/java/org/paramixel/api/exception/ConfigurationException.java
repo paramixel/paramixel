@@ -24,9 +24,12 @@ import nonapi.org.paramixel.support.Arguments;
  *
  * <p>Thrown during framework initialization when a configuration property has an illegal value,
  * a required configuration resource cannot be read, or conflicting settings are detected.
- * This exception halts startup — callers must correct the configuration and restart.
+ * This exception halts startup: callers must correct the configuration and restart. Invalid configuration
+ * always fails before any test code runs.
  */
-public final class ConfigurationException extends RuntimeException {
+public final class ConfigurationException extends ParamixelException {
+
+    private static final long serialVersionUID = 1L;
 
     /**
      * Creates a configuration exception with the supplied message.

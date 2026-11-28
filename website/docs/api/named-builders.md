@@ -1,82 +1,55 @@
 ---
-title: Named Builders
-description: Static factory methods for concise action tree definitions.
+title: Builder Variants
+description: Sequential, parallel, and repetition builder views.
 ---
 
-# Named Builders
+# Builder Variants
 
-Each composite action class provides a public static method named after the action
-that returns its `Builder`. Terminal action classes provide named static factory
-methods that return the action directly. Import statically for concise action
-tree definitions.
+Each node kind is a public type with static `builder` factories. The builder decides which policies compile, and
+`build()` returns the node type.
 
-```java
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Delay.delay;
-import static org.paramixel.api.action.Delay.delayRandom;
-```
+| Node | Builder | Created by | Extra policy methods |
+| --- | --- | --- | --- |
+| `Sequential` | `SequentialBuilder` | `Sequential.builder(name)`, `Sequential.builder(Owner.class, name)` | `dependent()`, `independent()` |
+| `Parallel` | `ParallelBuilder` | `Parallel.builder(name, pool)`, `Parallel.builder(Owner.class, name, pool)` | none — parallel groups have no continuation policy |
+| `Repeat` | `RepeatBuilder` | `Repeat.builder(name)`, `Repeat.builder(Owner.class, name)` | `maxIterations`, `untilPassed`, `until(id)`, `delay` |
 
-## Terminal actions (named factory methods)
+`SequentialBuilder.build()` returns `Sequential`, `ParallelBuilder.build()` returns `Parallel`, and
+`RepeatBuilder.build()` returns `Repeat`, so a helper method can declare the node type it produces.
 
-Terminal actions return the action directly rather than a builder:
-
-| Action | Factory | Description |
-|--------|---------|-------------|
-| `Step` | `step(name, consumer)` | Terminal action wrapping user logic. |
-| `Delay` | `delay(name, long)` | Fixed-duration pause in milliseconds. |
-| `Delay` | `delay(name, Duration)` | Fixed-duration pause. |
-| `Delay` | `delayRandom(name, long, long)` | Random-duration pause between bounds. |
-| `Assert` | `assertThat(name, expected, actual)` | Boolean assertion. |
-| `Assert` | `assertThat(name, expected, actual, message)` | Boolean assertion with failure message. |
-| `Assert` | `assertThat(name, expected, supplier)` | Lazy boolean assertion. |
-| `Assert` | `assertThat(name, expected, supplier, message)` | Lazy boolean assertion with failure message. |
-| `Assert` | `assertTrue(name, actual)` | Shorthand for `assertThat(name, true, actual)`. |
-| `Assert` | `assertTrue(name, supplier)` | Shorthand for `assertThat(name, true, supplier)`. |
-| `Assert` | `assertFalse(name, actual)` | Shorthand for `assertThat(name, false, actual)`. |
-| `Assert` | `assertFalse(name, supplier)` | Shorthand for `assertThat(name, false, supplier)`. |
-
-## Composite actions (named builder methods)
-
-| Action | Factory | Builder methods |
-|--------|---------|----------------|
-| `Scope` | `scope(name)` | `before`, `body`, `after` |
-| `Sequential` | `sequential(name)` | `child`, `dependent`/`independent`, `shuffle` |
-| `Parallel` | `parallel(name)` | `child`, `parallelism`, `shuffle` |
-| `Repeat` | `repeat(name)` | `body`, `iterations`. _(Deprecated since 6.2 — use `loop(name)`.)_ |
-| `Loop` | `loop(name)` | `body`, `maxIterations`, `until`, `delay` |
-| `Conditional` | `conditional(name, condition)` | `body` |
-| `Instance` | `instance(name, factory)` / `instance(type)` / `instance(name, type)` | `body` |
-| `Isolated` | `isolated(name, lockName)` | `body` |
-| `Timeout` | `timeout(name)` | `body`, `timeout`/`timeoutMillis` |
-| `Until` | `until(name)` | `body`, `maxIterations`, `until`. _(Deprecated since 6.2 — use `loop(name)`.)_ |
-
-## Usage example
+## Sequential
 
 ```java
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Assert.assertTrue;
-import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Delay.delay;
-
-Action tree = scope("root")
-    .body(sequential("suite")
-        .child(step("login", ctx -> doLogin()))
-        .child(parallel("verify")
-            .child(step("ui", ctx -> checkUi()))
-            .child(step("api", ctx -> checkApi()))
-            .build())
-        .child(assertTrue("verified", true))
-        .build())
-    .body(delay("think-time", 200))
-    .build();
+Sequential.builder(MySuite.class, "Validation")
+    .independent()
+    .step("checkA")
+    .step("checkB");
 ```
 
-## See also
+If `Check A` fails and `Check B` passes, both run and the group is `FAILED`.
 
-- [Action](action) — the sealed interface and its subtypes
-- [Builder](builder) — mutable builders that produce immutable action snapshots
+## Parallel
+
+```java
+final var matrix = Parallel.builder(MySuite.class, "Environments", Pool.named("environments"));
+for (final var environment : environments) {
+    matrix.step(Sequential.builder(environment.name()).bind(ENVIRONMENT, environment).step("verify"));
+}
+```
+
+Every direct child holds one permit of the named pool for its entire lifetime.
+
+## Repetition
+
+```java
+Repeat.builder(MySuite.class, "readiness")
+    .maxIterations(5)
+    .untilPassed()
+    .delay(Backoff.fixed(Duration.ofMillis(250)))
+    .step("probe");
+```
+
+`maxIterations` is mandatory. Each iteration is a distinct attempt in the result tree, and a repeated task owns its
+context scope, so every iteration starts with an empty scope.
+The two `until` overloads set the same predicate. The latest call wins, and a hook ID resolves against the effective
+anchor of each build. `untilPassed()` can be combined with either overload.

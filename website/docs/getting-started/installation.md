@@ -13,11 +13,11 @@ Paramixel requires Java 17 or newer.
 <dependency>
   <groupId>org.paramixel</groupId>
   <artifactId>core</artifactId>
-  <version>6.2.7</version>
+  <version>7.0.0</version>
 </dependency>
 ```
 
-Use the core dependency when running action trees programmatically or when compiling factory classes consumed by the Maven plugin.
+Use the core dependency when running task definitions programmatically or when compiling factory classes consumed by the Maven plugin.
 
 ## Maven plugin
 
@@ -25,7 +25,7 @@ Use the core dependency when running action trees programmatically or when compi
 <plugin>
   <groupId>org.paramixel</groupId>
   <artifactId>maven-plugin</artifactId>
-  <version>6.2.7</version>
+  <version>7.0.0</version>
   <executions>
     <execution>
       <goals>
@@ -40,7 +40,8 @@ The plugin goal prefix is `paramixel`; the executable goal is `paramixel:test` a
 
 ## Gradle
 
-The repository's Gradle build runs Paramixel examples with a custom `JavaExec` task named `paramixelTest` whose main class is `org.paramixel.api.Runner`. If you add a similar task, put Paramixel core and your factory classes on the task classpath.
+Run the repository's examples with `./gradlew :examples:paramixelTest`. This `JavaExec` task starts
+`org.paramixel.api.Launcher` with Paramixel core and the example factories on its classpath.
 
 ## Configuration file
 

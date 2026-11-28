@@ -460,45 +460,82 @@ class ParamixelMojoPropertyTest {
         @DisplayName("failureOnAbort is always written to configuration")
         void failureOnAbortIsAlwaysWritten() throws Exception {
             var mojo = new ParamixelMojo();
-            setField(mojo, "failureOnAbort", true);
+            setField(mojo, "failureOnAbort", "true");
             var configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
             assertThat(configuration.getString(Configuration.FAILURE_ON_ABORT)).contains("true");
 
-            setField(mojo, "failureOnAbort", false);
+            setField(mojo, "failureOnAbort", "false");
             configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
             assertThat(configuration.getString(Configuration.FAILURE_ON_ABORT)).contains("false");
         }
 
         @Test
-        @DisplayName("failureOnSkip is written to configuration only when true")
-        void failureOnSkipIsWrittenOnlyWhenTrue() throws Exception {
+        @DisplayName("failureOnSkip is written explicitly")
+        void failureOnSkipIsWrittenExplicitly() throws Exception {
             var mojo = new ParamixelMojo();
-            setField(mojo, "failureOnSkip", true);
+            setField(mojo, "failureOnSkip", "true");
             var configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
             assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).contains("true");
 
-            setField(mojo, "failureOnSkip", false);
+            setField(mojo, "failureOnSkip", "false");
             configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
-            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).isEmpty();
+            assertThat(configuration.getString(Configuration.FAILURE_ON_SKIP)).contains("false");
         }
 
         @Test
-        @DisplayName("failIfNoTests is written to configuration only when true")
-        void failIfNoTestsIsWrittenOnlyWhenTrue() throws Exception {
+        @DisplayName("POM properties apply to boolean settings whose mojo parameter is not set")
+        void pomPropertiesApplyWhenParametersAreUnset() throws Exception {
             var mojo = new ParamixelMojo();
-            setField(mojo, "failIfNoTests", true);
+            var failFast = new Property();
+            failFast.setKey(Configuration.FAIL_FAST);
+            failFast.setValue("true");
+            var failureOnSkip = new Property();
+            failureOnSkip.setKey(Configuration.FAILURE_ON_SKIP);
+            failureOnSkip.setValue("false");
+            setField(mojo, "properties", List.of(failFast, failureOnSkip));
+
+            var configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+            assertThat(configuration.getBoolean(Configuration.FAIL_FAST)).hasValue(true);
+            assertThat(configuration.getBoolean(Configuration.FAILURE_ON_SKIP)).hasValue(false);
+            assertThat(configuration.getBoolean(Configuration.FAILURE_ON_ABORT)).hasValue(true);
+            assertThat(configuration.getBoolean(Configuration.FAIL_IF_NO_TESTS)).hasValue(true);
+        }
+
+        @Test
+        @DisplayName("an explicitly set mojo parameter still overrides the POM property")
+        void explicitParameterOverridesPomProperty() throws Exception {
+            var mojo = new ParamixelMojo();
+            var failFast = new Property();
+            failFast.setKey(Configuration.FAIL_FAST);
+            failFast.setValue("true");
+            setField(mojo, "properties", List.of(failFast));
+            setField(mojo, "failFast", "false");
+
+            var configuration =
+                    invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
+
+            assertThat(configuration.getBoolean(Configuration.FAIL_FAST)).hasValue(false);
+        }
+
+        @Test
+        @DisplayName("failIfNoTests is written to configuration explicitly")
+        void failIfNoTestsIsWrittenExplicitly() throws Exception {
+            var mojo = new ParamixelMojo();
+            setField(mojo, "failIfNoTests", "true");
             var configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
             assertThat(configuration.getString(Configuration.FAIL_IF_NO_TESTS)).contains("true");
 
-            setField(mojo, "failIfNoTests", false);
+            setField(mojo, "failIfNoTests", "false");
             configuration =
                     invokeBuildConfiguration(mojo, Thread.currentThread().getContextClassLoader());
-            assertThat(configuration.getString(Configuration.FAIL_IF_NO_TESTS)).isEmpty();
+            assertThat(configuration.getString(Configuration.FAIL_IF_NO_TESTS)).contains("false");
         }
     }
 

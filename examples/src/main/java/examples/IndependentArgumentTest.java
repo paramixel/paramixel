@@ -17,24 +17,26 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Each.sequential;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates independent sequential argument execution where arguments run one at a time.
- * Verifies that all tests execute exactly once and that max concurrency never exceeds 1.
+ * Demonstrates an independent sequence of fixtures: every fixture is attempted in declaration order, even if an earlier
+ * fixture reported a non-passing outcome. Independence changes failure continuation, not concurrency.
  */
 public class IndependentArgumentTest {
+
+    private static final String ID_BEFORE = "before";
+    private static final String ID_TEST = "test";
+    private static final String ID_AFTER = "after";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String FIXTURE = "fixture";
 
     private static final int ARGUMENT_COUNT = 5;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
@@ -44,85 +46,114 @@ public class IndependentArgumentTest {
     private static final AtomicInteger maxConcurrentCount = new AtomicInteger();
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
-     * Builds a sequential argument tree with per-argument before/after callbacks.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
-    @Paramixel.Factory
-    public static Action factory() {
+    @Paramixel.TaskFactory
+    public static Task factory() {
         resetCounts();
-
-        var testName = IndependentArgumentTest.class.getName();
-        var arguments =
-                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
-
-        return scope(testName)
-                .body(sequential(
-                                testName,
-                                arguments,
-                                value -> instance(value, IndependentArgumentTest::new)
-                                        .body(scope("scope")
-                                                .before(step(
-                                                        "before()",
-                                                        withInstance(
-                                                                IndependentArgumentTest.class,
-                                                                IndependentArgumentTest::before)))
-                                                .body(sequential(value)
-                                                        .child(step(
-                                                                "test()",
-                                                                withInstance(
-                                                                        IndependentArgumentTest.class,
-                                                                        IndependentArgumentTest::test)))
-                                                        .child(step(
-                                                                "test()",
-                                                                withInstance(
-                                                                        IndependentArgumentTest.class,
-                                                                        IndependentArgumentTest::test)))
-                                                        .child(step(
-                                                                "test()",
-                                                                withInstance(
-                                                                        IndependentArgumentTest.class,
-                                                                        IndependentArgumentTest::test))))
-                                                .after(step(
-                                                        "after()",
-                                                        withInstance(
-                                                                IndependentArgumentTest.class,
-                                                                IndependentArgumentTest::after)))))
-                        .independent())
-                .after(step("validate", ignored -> validate()))
-                .build();
+        final var root = Sequential.builder(IndependentArgumentTest.class, "IndependentArgumentTest")
+                .independent();
+        for (var i = 0; i < ARGUMENT_COUNT; i++) {
+            final var value = "string-" + i;
+            root.step(Sequential.builder(value)
+                    .before(ID_BEFORE)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .after(ID_AFTER));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
+    /**
+     * No-argument constructor used by the framework.
+     */
     public IndependentArgumentTest() {
         // Intentionally empty
     }
 
+    /**
+     * Builds this branch's fixture and records fixture entry.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE)
+    public static void beforeHook(final Context context) {
+        final var fixture = new IndependentArgumentTest();
+        context.put(FIXTURE, fixture);
+        fixture.before();
+    }
+
+    /**
+     * Runs one test body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void testHook(final Context context) {
+        context.require(FIXTURE, IndependentArgumentTest.class).test();
+    }
+
+    /**
+     * Records fixture exit, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER)
+    public static void afterHook(final Context context) {
+        context.find(FIXTURE, IndependentArgumentTest.class).ifPresent(IndependentArgumentTest::after);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
+    }
+
+    /**
+     * Records fixture entry.
+     */
     public void before() {
-        int current = concurrentCount.incrementAndGet();
+        final var current = concurrentCount.incrementAndGet();
         maxConcurrentCount.accumulateAndGet(current, Math::max);
     }
 
+    /**
+     * Test body.
+     */
     public void test() {
         testCount.incrementAndGet();
     }
 
+    /**
+     * Records fixture exit.
+     */
     public void after() {
         concurrentCount.decrementAndGet();
     }
 
+    /**
+     * Verifies the aggregate expectations.
+     */
     public static void validate() {
         assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
-        assertThat(concurrentCount.get()).isEqualTo(0);
+        assertThat(concurrentCount.get()).isZero();
         assertThat(maxConcurrentCount.get()).isEqualTo(1);
     }
 

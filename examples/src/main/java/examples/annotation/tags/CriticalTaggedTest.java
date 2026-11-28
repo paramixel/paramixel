@@ -16,38 +16,40 @@
 
 package examples.annotation.tags;
 
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Step.step;
-
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Example test class annotated with multiple tags ({@code "smoke-fast"} and
- * {@code "critical"}) to demonstrate tag-based test selection with compound tags.
+ * Example factory tagged as both {@code "smoke-fast"} and {@code "critical"} for tag-based selection.
  */
 public class CriticalTaggedTest {
 
+    private static final String ID_TEST = "test";
+
     /**
-     * Returns a no-op action tagged as both {@code "smoke-fast"} and {@code "critical"}.
+     * Returns a definition tagged as both {@code "smoke-fast"} and {@code "critical"}.
      *
-     * @return a no-op action
+     * @return the definition
      */
-    @Paramixel.Factory
+    @Paramixel.TaskFactory
     @Paramixel.Tag("smoke-fast")
     @Paramixel.Tag("critical")
-    public static Action factory() {
-        return instance("CriticalTaggedTest", CriticalTaggedTest::new)
-                .body(step("test()", withInstance(CriticalTaggedTest.class, CriticalTaggedTest::test)))
+    public static Task factory() {
+        return Sequential.builder(CriticalTaggedTest.class, "CriticalTaggedTest")
+                .tags("smoke-fast", "critical")
+                .step(ID_TEST)
                 .build();
     }
 
-    public CriticalTaggedTest() {
-        // Intentionally empty
-    }
-
-    public void test() {
+    /**
+     * Trivial body so the example stays focused on selection.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void test(final Context context) {
         // Intentionally empty
     }
 }

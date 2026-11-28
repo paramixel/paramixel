@@ -58,19 +58,47 @@ cd paramixel
 ./mvnw clean install
 ```
 
+The build runs the examples against real containers, so Docker must be running. Expect two kinds of output that look
+worse than they are:
+
+- **`[PARAMIXEL] FAIL` lines** come from examples and plugin fixtures that deliberately exercise failure paths (a
+  retry policy's failed attempts, a factory that throws). The build result is reported by the `[PARAMIXEL] result:`
+  line and the Maven reactor summary, not by individual attempts.
+- **`WARNING:` lines from the JDK** originate in build tools, not in this code: Maven's Jansi library on JDK 24+ is
+  handled by `.mvn/jvm.config`, while Spotless' use of `sun.misc.Unsafe` and PMD's "Adding current platform … to
+  auxClasspath" notice remain. They are silenced with
+  `MAVEN_OPTS="--sun-misc-unsafe-memory-access=allow"` (JDK 24+) and `PMD_JAVA_DISABLE_AUX_CLASSPATH_WARNINGS=true`
+  respectively.
+
 ### Project Structure
 
 - `core/` - Main library (public API + implementation)
 - `maven-plugin/` - Maven plugin for test execution
 - `examples/` - Test classes and examples using Paramixel's own framework
+- `benchmarks/` - JMH benchmarks for compilation and scheduling (see [BENCHMARKS.md](BENCHMARKS.md))
 - `assets/` - License header template and shared resources
+- `scripts/` - Release and documentation automation
 - `website/` - Docusaurus documentation site
+
+### Documentation
+
+The Docusaurus site lives in `website/`. Building it requires Node.js 20 or newer, `npm`, `jq`, and `awk`.
+
+```bash
+./scripts/build-documentation.sh    # validate sidebars, frontmatter, and links, then build
+./scripts/serve-documentation.sh    # build and serve the site locally
+```
+
+Edit active documentation in `website/docs/`. `website/versioned_docs/`, `website/versioned_sidebars/`, and
+`website/versions.json` are release snapshots: do not edit them when updating the unreleased documentation.
 
 ## Coding Standards
 
 ### Javadoc
 
-See `AGENTS.md` (## Javadoc) for guidelines on writing Javadoc comments.
+Public API members carry Javadoc with `@param`, `@return`, and `@throws` where they apply. The Maven build enforces this:
+`maven-javadoc-plugin` runs with `doclint=all` and `-Werror`, so a missing or malformed tag fails
+`./mvnw clean verify`.
 
 ### Code Formatting
 
@@ -107,8 +135,7 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 
 - Follow existing code style and patterns
 - Write clear, self-documenting code with meaningful variable names
-- Add Javadoc for public APIs
-- Follow `AGENTS.md` (## Javadoc) for Javadoc conventions
+- Add Javadoc for public APIs; the build fails on a Javadoc warning
 - Keep methods focused and reasonably sized
 - Write unit tests for new functionality
 
@@ -117,20 +144,20 @@ All commits must be signed off to satisfy the [Developer Certificate of Origin (
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (requires Docker for the examples module)
 ./mvnw test
 
-# Build + PMD analysis
+# Build, tests, Javadoc, formatting, and PMD checks
 ./mvnw verify
 
-# Build without Paramixel tests
+# Build without running Paramixel tests
 ./mvnw clean install -Dparamixel.skipTests
 ```
 
 ### Writing Tests
 
 - Place tests in the `examples/` module under `src/main/java/`
-- Use the `@Paramixel.Factory` annotation on static methods that return `Action` trees
+- Use the `@Paramixel.TaskFactory` annotation on static methods that return a `Task` or a `TaskBuilder`
 - Use descriptive test names and argument names
 - Test edge cases and error conditions
 

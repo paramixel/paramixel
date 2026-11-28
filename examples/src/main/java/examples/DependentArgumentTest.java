@@ -17,25 +17,30 @@
 package examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Each.sequential;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Demonstrates dependent argument execution where arguments run one at a time.
- * Verifies that each argument waits for the previous argument to complete, that all
- * tests execute exactly once, and that max concurrency never exceeds 1.
+ * Demonstrates a dependent sequence of fixtures: each fixture runs its three tests in order, and the next fixture starts
+ * only after the previous one finished, so at most one fixture is active at a time.
+ *
+ * <p>The parameter is authoring data — {@code bind} publishes the index and the {@code before} hook builds the fixture
+ * from it, per branch. Nothing is captured in a lambda, so every hook is an ordinary method a reader can find by name.
  */
 public class DependentArgumentTest {
+
+    private static final String ID_BEFORE = "before";
+    private static final String ID_TEST = "test";
+    private static final String ID_AFTER = "after";
+    private static final String ID_VALIDATE = "validate";
+
+    private static final String INDEX = "index";
+    private static final String FIXTURE = "fixture";
 
     private static final int ARGUMENT_COUNT = 5;
     private static final int TEST_COUNT_PER_ARGUMENT = 3;
@@ -50,73 +55,103 @@ public class DependentArgumentTest {
     private final int argumentIndex;
 
     /**
-     * Runs the action factory and exits the JVM.
+     * Runs the factory and exits the JVM.
      *
      * @param args command-line arguments (ignored)
      */
     public static void main(final String[] args) {
         resetCounts();
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
     /**
-     * Builds a sequential argument tree with per-argument before/after callbacks.
+     * Builds the definition.
      *
-     * @return the action tree for this test
+     * @return the definition for this test
      */
-    @Paramixel.Factory
-    public static Action factory() {
+    @Paramixel.TaskFactory
+    public static Task factory() {
         resetCounts();
-
-        var testName = DependentArgumentTest.class.getName();
-        var arguments =
-                IntStream.range(0, ARGUMENT_COUNT).mapToObj(i -> "string-" + i).toList();
-
-        return scope(testName)
-                .body(sequential(testName, arguments, value -> {
-                    int argumentIndex = Integer.parseInt(value.substring("string-".length()));
-                    return instance(value, () -> new DependentArgumentTest(argumentIndex))
-                            .body(scope("scope")
-                                    .before(step(
-                                            "before()",
-                                            withInstance(DependentArgumentTest.class, DependentArgumentTest::before)))
-                                    .body(sequential(value)
-                                            .child(step(
-                                                    "test()",
-                                                    withInstance(
-                                                            DependentArgumentTest.class, DependentArgumentTest::test)))
-                                            .child(step(
-                                                    "test()",
-                                                    withInstance(
-                                                            DependentArgumentTest.class, DependentArgumentTest::test)))
-                                            .child(step(
-                                                    "test()",
-                                                    withInstance(
-                                                            DependentArgumentTest.class, DependentArgumentTest::test))))
-                                    .after(step(
-                                            "after()",
-                                            withInstance(DependentArgumentTest.class, DependentArgumentTest::after))));
-                }))
-                .after(step("validate", ignored -> validate()))
-                .build();
+        final var root = Sequential.builder(DependentArgumentTest.class, "DependentArgumentTest");
+        for (var i = 0; i < ARGUMENT_COUNT; i++) {
+            root.step(Sequential.builder("string-" + i)
+                    .bind(INDEX, i)
+                    .before(ID_BEFORE)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .step(ID_TEST)
+                    .after(ID_AFTER));
+        }
+        return root.after(ID_VALIDATE).build();
     }
 
     private DependentArgumentTest(final int argumentIndex) {
         this.argumentIndex = argumentIndex;
     }
 
+    /**
+     * Builds this branch's fixture and records fixture entry.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_BEFORE)
+    public static void beforeHook(final Context context) {
+        final var fixture = new DependentArgumentTest(context.require(INDEX, Integer.class));
+        context.put(FIXTURE, fixture);
+        fixture.before();
+    }
+
+    /**
+     * Runs one test body of this branch.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST)
+    public static void testHook(final Context context) {
+        context.require(FIXTURE, DependentArgumentTest.class).test();
+    }
+
+    /**
+     * Records fixture exit, if the fixture was created.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_AFTER)
+    public static void afterHook(final Context context) {
+        context.find(FIXTURE, DependentArgumentTest.class).ifPresent(DependentArgumentTest::after);
+    }
+
+    /**
+     * Verifies the aggregate expectations.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_VALIDATE)
+    public static void validateHook(final Context context) {
+        validate();
+    }
+
+    /**
+     * Records fixture entry and verifies serialization.
+     */
     public void before() {
-        int current = concurrentCount.incrementAndGet();
+        final var current = concurrentCount.incrementAndGet();
         maxConcurrentCount.accumulateAndGet(current, Math::max);
         beforeCount.incrementAndGet();
         assertThat(nextExpectedArgument.get()).isEqualTo(argumentIndex);
     }
 
+    /**
+     * Test body.
+     */
     public void test() {
         assertThat(concurrentCount.get()).isEqualTo(1);
         testCount.incrementAndGet();
     }
 
+    /**
+     * Records fixture exit.
+     */
     public void after() {
         assertThat(nextExpectedArgument.get()).isEqualTo(argumentIndex);
         afterCount.incrementAndGet();
@@ -124,11 +159,14 @@ public class DependentArgumentTest {
         concurrentCount.decrementAndGet();
     }
 
+    /**
+     * Verifies the aggregate expectations.
+     */
     public static void validate() {
         assertThat(beforeCount.get()).isEqualTo(ARGUMENT_COUNT);
         assertThat(testCount.get()).isEqualTo(ARGUMENT_COUNT * TEST_COUNT_PER_ARGUMENT);
         assertThat(afterCount.get()).isEqualTo(ARGUMENT_COUNT);
-        assertThat(concurrentCount.get()).isEqualTo(0);
+        assertThat(concurrentCount.get()).isZero();
         assertThat(maxConcurrentCount.get()).isEqualTo(1);
         assertThat(nextExpectedArgument.get()).isEqualTo(ARGUMENT_COUNT);
     }

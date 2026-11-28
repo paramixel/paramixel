@@ -17,48 +17,96 @@
 package examples.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.paramixel.api.Context.withInstance;
-import static org.paramixel.api.action.Instance.instance;
-import static org.paramixel.api.action.Step.step;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
 import org.paramixel.api.Runner;
-import org.paramixel.api.action.Action;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
+/**
+ * Demonstrates that the framework does not implicitly close a fixture held in the context.
+ *
+ * <p>The fixture implements {@link AutoCloseable}, yet {@code close()} runs only because an explicit {@code after}
+ * hook calls it. The framework never probes for {@link AutoCloseable}: it drops the reference when the scope ends and
+ * nothing more. The {@code after} hook uses {@code find}, so a partially completed {@code before} cannot mask the
+ * original failure.
+ */
 public class SimpleTest implements AutoCloseable {
 
-    private static final int EXPECTED_TEST_COUNT = 1;
+    private static final String ID_CREATE = "create";
+    private static final String ID_TEST_ONE = "testOne";
+    private static final String ID_CLOSE = "close";
+
+    private static final String FIXTURE = "fixture";
 
     private static final AtomicInteger testCount = new AtomicInteger();
 
+    /**
+     * Runs the factory and exits the JVM.
+     *
+     * @param args command-line arguments (ignored)
+     */
     public static void main(final String[] args) {
-        Runner.defaultRunner().runAndExit(factory());
+        System.exit(Runner.builder().build().run(factory()).exitCode());
     }
 
-    @Paramixel.Factory
-    public static Action factory() {
-        resetCounts();
+    /**
+     * Builds the definition.
+     *
+     * @return the definition for this test
+     */
+    @Paramixel.TaskFactory
+    public static Task factory() {
+        testCount.set(0);
 
-        return instance("FullLifecycleTest", SimpleTest::new)
-                .body(step("testOne()", withInstance(SimpleTest.class, SimpleTest::testOne)))
+        return Sequential.builder(SimpleTest.class, "SimpleTest")
+                .before(ID_CREATE)
+                .step(ID_TEST_ONE)
+                .after(ID_CLOSE)
                 .build();
     }
 
-    public SimpleTest() {
-        // Intentionally empty
+    /**
+     * Creates the fixture for this attempt.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CREATE)
+    public static void create(final Context context) {
+        context.put(FIXTURE, new SimpleTest());
     }
 
+    /**
+     * Test body.
+     */
     public void testOne() {
         testCount.incrementAndGet();
     }
 
-    private static void resetCounts() {
-        testCount.set(0);
+    /**
+     * Test step.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_TEST_ONE)
+    public static void testOne(final Context context) {
+        context.require(FIXTURE, SimpleTest.class).testOne();
+    }
+
+    /**
+     * Releases the fixture, if the attempt managed to create one.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id(ID_CLOSE)
+    public static void releaseFixture(final Context context) {
+        context.find(FIXTURE, SimpleTest.class).ifPresent(SimpleTest::close);
     }
 
     @Override
     public void close() {
-        assertThat(testCount.get()).isEqualTo(EXPECTED_TEST_COUNT);
+        assertThat(testCount.get()).isEqualTo(1);
     }
 }

@@ -138,5 +138,9 @@
 
     <!-- Exclude classpath files -->
     <exclude-pattern>.*/classpath/.*</exclude-pattern>
+
+    <!-- Exclude the forked ClassGraph source (see NOTICES): keeping it aligned with upstream matters more than
+         applying Paramixel's style rules to third-party code -->
+    <exclude-pattern>.*/nonapi/org/paramixel/classgraph/.*</exclude-pattern>
     
 </ruleset>

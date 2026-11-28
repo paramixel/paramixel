@@ -1,180 +1,88 @@
 ---
 title: Test Shapes
-description: Common execution-tree patterns for Paramixel tests.
+description: Reusable definition shapes for common integration testing problems.
 ---
 
 # Test Shapes
 
-Paramixel is useful when a test has a shape that should be visible in code, execution, and reports. These patterns use only the current public API.
-
-## Simple sequence
-
-Use a sequence when steps must run in order.
+## Linear flow
 
 ```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-import static org.paramixel.api.action.Assert.assertTrue;
-
-Action spec = sequential("login smoke")
-        .child(step("open login page", ctx -> openLoginPage()))
-        .child(step("submit credentials", ctx -> submitCredentials()))
-        .child(assertTrue("user is signed in", true))
+Task definition = Sequential.builder(LoginSmokeTest.class, "login smoke")
+        .step("openLoginPage")
+        .step("submitCredentials")
+        .step("assertSignedIn")
         .build();
 ```
 
-```text
-login smoke
-├── open login page
-├── submit credentials
-└── user is signed in
-```
+Each step is a child task. A failing step skips the rest with an explicit reason.
 
-## Lifecycle with setup and teardown
-
-Use a lifecycle shape when setup and cleanup belong to a specific subtree.
+## Fixture with setup and teardown
 
 ```java
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-Action spec = scope("database workflow")
-        .before(step("start database", ctx -> startDatabase()))
-        .body(sequential("checks")
-                .child(step("migrate schema", ctx -> migrateSchema()))
-                .child(step("verify query", ctx -> verifyQuery()))
-                .build())
-        .after(step("stop database", ctx -> stopDatabase()))
+Task definition = Sequential.builder(DatabaseWorkflowTest.class, "database workflow")
+        .bind(DSN, dsn)
+        .before("migrate")
+        .step("insert")
+        .step("query")
+        .after("dropSchema")
         .build();
 ```
 
-```text
-database workflow
-├── before: start database
-├── body: checks
-│   ├── migrate schema
-│   └── verify query
-└── after: stop database
-```
+The fixture is created by the `before` slot when the branch is admitted, `after` runs even when a step fails, and
+nothing is closed implicitly.
 
-## Parallel branches
-
-Use parallel branches when independent scenarios can run concurrently.
+## Compatibility matrix
 
 ```java
-import static org.paramixel.api.action.Parallel.parallel;
-import static org.paramixel.api.action.Step.step;
-
-Action spec = parallel("browser matrix")
-        .parallelism(3)
-        .child(step("chrome", ctx -> runChrome()))
-        .child(step("firefox", ctx -> runFirefox()))
-        .child(step("webkit", ctx -> runWebkit()))
-        .build();
+final var root = Parallel.builder(MySuite.class, "compatibility matrix", Pool.named("environments"));
+for (final var environment : environments) {
+    root.step(Sequential.builder(environment.name())
+            .bind(ENVIRONMENT, environment)
+            .before("start")
+            .step("verify")
+            .after("stop"));
+}
+Task definition = root.build();
 ```
 
-```text
-browser matrix
-├── chrome
-├── firefox
-└── webkit
-```
+A failure in one environment does not cancel the others; the group aggregates the most severe outcome.
 
-## Generated scenarios
-
-Use generated scenarios when plain Java code should create many related actions.
+## Checks that should all run
 
 ```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-var users = List.of("ada", "grace", "linus");
-
-Action spec = Each.sequential("user checks", users,
-        user -> sequential("check " + user)
-                .child(step("load", ctx -> loadUser(user)))
-                .child(step("verify", ctx -> verifyUser(user))))
-        .build();
-```
-
-```text
-user checks
-├── check ada
-│   ├── load
-│   └── verify
-├── check grace
-│   ├── load
-│   └── verify
-└── check linus
-    ├── load
-    └── verify
-```
-
-## Compatibility-style tests
-
-Use a compatibility shape when the same behavior must be checked across versions, configurations, or environments.
-
-```java
-import static org.paramixel.api.action.Scope.scope;
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-var versions = List.of("Java 17", "Java 21", "Java 25");
-
-Action spec = Each.parallel("compatibility matrix", versions,
-        version -> scope(version + " scenario")
-                .before(step("start " + version, ctx -> start(version)))
-                .body(sequential("checks")
-                        .child(step("write", ctx -> write(version)))
-                        .child(step("read", ctx -> read(version))))
-                .after(step("stop " + version, ctx -> stop(version))))
-        .parallelism(3)
-        .build();
-```
-
-```text
-compatibility matrix
-├── Java 17 scenario
-│   ├── before: start Java 17
-│   ├── body: checks
-│   │   ├── write
-│   │   └── read
-│   └── after: stop Java 17
-├── Java 21 scenario
-└── Java 25 scenario
-```
-
-## Failure handling
-
-Use the default dependent sequence when later steps should stop after an earlier failure. Use an independent sequence when all children should run so the result tree can collect every outcome.
-
-```java
-import static org.paramixel.api.action.Sequential.sequential;
-import static org.paramixel.api.action.Step.step;
-
-Action failFast = sequential("checkout")
-        .child(step("create cart", ctx -> createCart()))
-        .child(step("submit payment", ctx -> submitPayment()))
-        .child(step("verify receipt", ctx -> verifyReceipt()))
-        .build();
-
-Action collectAll = sequential("cleanup checks")
+SequentialBuilder definition = Sequential.builder(MySuite.class, "validation")
         .independent()
-        .child(step("delete user", ctx -> deleteUser()))
-        .child(step("delete cart", ctx -> deleteCart()))
-        .child(step("delete invoice", ctx -> deleteInvoice()))
+        .step("checkA")
+        .step("checkB");
+```
+
+`independent()` continues after a failure but still runs one step at a time and still aggregates the failure.
+
+## Polling with a bound
+
+```java
+RepeatBuilder definition = Repeat.builder(MySuite.class, "readiness")
+        .maxIterations(10)
+        .untilPassed()
+        .delay(Backoff.exponential(Duration.ofMillis(100), Duration.ofSeconds(2)))
+        .step("probe");
+```
+
+## Isolated resource access
+
+```java
+Task definition = Parallel.builder(MySuite.class, "matrix", Pool.named("environments"))
+        .step(Sequential.builder(MySuite.class, "group-a").isolated("db").step("seed"))
+        .step(Sequential.builder(MySuite.class, "group-b").isolated("db").step("seed"))
         .build();
 ```
 
-```text
-checkout
-├── create cart
-├── submit payment
-└── verify receipt        (skipped if an earlier dependent child fails)
+Both groups run, but their bodies never overlap.
 
-cleanup checks
-├── delete user
-├── delete cart
-└── delete invoice        (all children are attempted)
-```
+## Fail-fast at the root
+
+`paramixel.failFast=true` stops admitting new root tasks after a root task fails (`FAILED`, which includes a timeout).
+A deliberate skip (`throw skip(...)` or a false `onlyIf` condition) and an assumption abort (`throw abort(...)`)
+are not failures and do not trigger it. Already-running work finishes; roots that are not admitted are `SKIPPED` with an
+explicit `failFast` reason.

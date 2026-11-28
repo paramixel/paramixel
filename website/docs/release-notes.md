@@ -1,49 +1,66 @@
 ---
 title: Release Notes
-description: Current documentation-facing release notes.
+description: Notable changes by release.
 ---
 
 # Release Notes
 
-## 6.2.7
+## 7.0.0
 
-- **Scheduler replaced by a depth-first execution engine** — Actions are compiled into a per-run
-  execution plan before execution starts, and the plan is executed by recursive depth-first descent
-  with a hard concurrency budget. `paramixel.parallelism` now bounds concurrently executing branches
-  (including coordinating nodes that hold resources) rather than only leaf bodies, and there is no
-  work-stealing or ready queue.
-- **`paramixel.scheduler.queue.capacity` removed** — The scheduler ready queue no longer exists, so
-  the property has no effect. Delete the property from build scripts and `paramixel.properties` files; it
-  is now reported once per JVM through `Listener.onWarning`. Use `paramixel.parallelism` to bound
-  concurrency.
-- **`Listener.onWarning(String)` added** — Listeners can receive non-fatal diagnostics that do not
-  fail a run.
-- **Delays occupy their branch** — Inter-iteration `Loop` delays and `Delay` actions now run on the
-  branch that owns them instead of yielding their thread, so they consume concurrency budget while
-  waiting.
-- **`Conditional.reason()` removed** — The configurable skip reason has been removed
-  from `Conditional` and `Conditional.Builder`. When the predicate returns `false`,
-  the skip-status message now includes the conditional's display name. Use a
-  descriptive display name instead of a separate reason message.
+Greenfield refactor. The public action hierarchy was replaced by one immutable `Task` definition.
 
-## 6.2.1
+**Highlights**
 
-- **Bug fix: regex selector matching** — `Selector.packageRegex()`, `Selector.classRegex()`, `Selector.tagRegex()`,
-  and the `paramixel.match.*.regex` configuration keys incorrectly used `Pattern.find()` (substring match) instead of
-  `Pattern.matches()` (full-string match). The `match` in the configuration key names specifies the intended contract;
-  the implementation did not honor it. This is now fixed. Patterns that previously relied on the incorrect substring
-  behavior must be updated with wildcards (e.g., `.*smoke.*`). See
-  [Migration 6.2.x to 6.2.1](./guides/migration-6.2-to-6.2.1) for details.
+- `Task` / `TaskBuilder` replace `Action`, `ActionBuilder`, and the per-shape classes.
+- Fixtures live in the per-scope context: `bind(name, value)` seeds it, `put`/`require`/`find`/`remove` manage it,
+  and `after` hooks release it. The framework never closes a stored value and never probes for `AutoCloseable`.
+- `Parallel.builder(name, Pool.named("..."))` replaces raw string pool identifiers; `Pool` is a value object.
+- `sequential` / `parallel` describe concurrency; `dependent()` / `independent()` describe only failure continuation and
+  exist on sequential builders only.
+- `repeat` (bounded replay) and `RetryPolicy` (bounded re-attempt) are distinct, typed policies.
+- `onlyIf` conditions, `timeout`, `isolated`, `tags`, and reproducible `shuffle` are attributes of any task.
+- A pure compiler validates the plan and aggregates diagnostics before any user code runs.
+- A single-threaded scheduler with a worker pool replaces the previous engine: deterministic depth-first admission,
+  non-blocking waits, explicit permit lifetimes, and deadlock protection.
+- Timeouts are cooperative and reported honestly: a callback that ignores interruption produces a non-quiescent result
+  with withheld cleanup and a non-zero exit code.
+- `CANCELED` is distinct from `ABORTED`, and dependent sequences now stop on any non-passing outcome.
+- Immutable `Result` / `TaskResult` / `PhaseResult` / `Failure` replace mutable descriptors; listeners receive bounded,
+  ordered `TaskEvent`s.
+- `paramixel.failIfNoTests` and `paramixel.failureOnSkip` now default to `true`. An empty discovery's exit code follows
+  `paramixel.failIfNoTests` alone.
+- `paramixel.failFast` triggers only on a `FAILED` root task (timeouts included); deliberate skips, false conditions,
+  and assumption aborts do not stop later roots.
+- The Maven plugin honors `paramixel.properties` and `<properties>` values (including `paramixel.match.*`) for any
+  parameter that is not explicitly set.
+- A timeout or run cancellation runs the `after` callbacks and resource releases of every started descendant, even when
+  the subtree is idle (for example during a retry backoff). A canceled retry or repeat delay ends at once and never
+  starts the next attempt.
+- XML and HTML reports replace characters that XML 1.0 forbids (such as ANSI escape codes in failure messages) with
+  U+FFFD, and an unpaired surrogate in a message no longer prevents a report file from being written.
+- A `@Paramixel.TaskFactory` method or a `@BeforeAll`/`@AfterAll` run hook that returns `null` is reported as a warning
+  naming the method, and the warning is kept in the run diagnostics. A factory builder whose `build()` returns `null`
+  is reported as a `ResolverException` instead.
+- A `@Paramixel.TaskFactory` method may declare one `Configuration` parameter (or none) and receives the run's effective
+  configuration, so configuration can determine the shape of the definition. The parameter is optional and independent of
+  the return type; `@BeforeAll` and `@AfterAll` methods still take no parameters.
+- An invalid `paramixel.workers`, `paramixel.shutdown.graceMillis`, or `paramixel.parallelism` fails a discovery run
+  with `ConfigurationException` before any factory is invoked. A non-positive `paramixel.parallelism` is rejected
+  instead of being raised to one.
+- A false condition's skip reason belongs to its own attempt: a retried task that later passes or fails no longer
+  reports a stale `condition was false` reason.
 
-## 6.0.0 documentation baseline
+**Breaking changes**
 
-These docs reflect the current source tree:
+- The `org.paramixel.api.action` package and the mutable `Descriptor` tree are removed.
+- `Context.instance(Class)` is removed; typed callbacks replaced it, and this release removes those too in favour of
+  identifier-bound hooks that read the context by name.
+- Implicit closing of `AutoCloseable` fixtures is removed.
+- Display paths (console lines, `TaskResult.path()`, `Context.path()`, `TaskEvent.path()`, report `path` fields) separate
+  levels with ` > ` instead of ` / `.
 
-- Java 17+ core API under `org.paramixel.api`.
-- Action trees are composable execution units executed by `Runner`.
-- Configuration uses `paramixel.properties`, JVM system properties, and programmatic `Configuration` objects.
-- Maven plugin artifact is `org.paramixel:maven-plugin` with goal prefix `paramixel` and goal `test`.
-- Gradle usage is via a `JavaExec` task that runs `org.paramixel.api.Runner`.
-- Reports are enabled with `paramixel.report.file`.
+See [Migrating from 6.x](guides/migration-6-to-7).
 
-Migration guides are available for upgrading from 1.x, 2.x, 3.x, 4.x, 5.0.x, and 5.1.x directly to 6.0.0.
+## 6.x
+
+See the versioned documentation for 6.x releases.

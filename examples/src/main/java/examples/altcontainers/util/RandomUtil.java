@@ -1,0 +1,71 @@
+/*
+ * Copyright (c) 2026-present Douglas Hoard
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package examples.altcontainers.util;
+
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * Generates random alphanumeric strings using {@link ThreadLocalRandom} for
+ * thread-safe, contention-free usage in parallel test environments.
+ */
+public class RandomUtil {
+
+    private static final char[] CHARS = new char[62];
+
+    static {
+        var idx = 0;
+        // Digits 0-9
+        for (char c = '0'; c <= '9'; c++) {
+            CHARS[idx++] = c;
+        }
+        // Uppercase A-Z
+        for (char c = 'A'; c <= 'Z'; c++) {
+            CHARS[idx++] = c;
+        }
+        // Lowercase a-z
+        for (char c = 'a'; c <= 'z'; c++) {
+            CHARS[idx++] = c;
+        }
+    }
+
+    private RandomUtil() {
+        // Intentionally empty
+    }
+
+    /**
+     * Generates a random alphanumeric string of the requested length, drawing from
+     * {@code [0-9A-Za-z]}.
+     *
+     * @param length the desired string length; must be positive
+     * @return a random string of exactly {@code length} characters
+     * @throws IllegalArgumentException if {@code length} is not positive
+     */
+    public static String getRandomString(final int length) {
+        if (length <= 0) {
+            throw new IllegalArgumentException("Length must be positive, got: " + length);
+        }
+
+        var buffer = new char[length];
+        final var random = ThreadLocalRandom.current();
+
+        for (int i = 0; i < length; i++) {
+            buffer[i] = CHARS[random.nextInt(62)];
+        }
+
+        return new String(buffer);
+    }
+}

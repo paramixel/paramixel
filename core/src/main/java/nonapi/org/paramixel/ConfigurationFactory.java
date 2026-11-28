@@ -82,6 +82,20 @@ public final class ConfigurationFactory {
     }
 
     /**
+     * Creates a configuration containing only the built-in defaults.
+     *
+     * <p>Neither classpath properties nor JVM system properties are consulted, so the result is the documented
+     * default for every key regardless of the ambient process environment.
+     *
+     * @return a configuration containing only framework defaults
+     */
+    public static Configuration defaults() {
+        var map = new TreeMap<String, String>();
+        configureDefaults(map);
+        return new ConcreteConfiguration(map);
+    }
+
+    /**
      * Creates a configuration from JVM system properties supplemented with built-in defaults.
      *
      * @return a configuration containing system properties and framework defaults
@@ -127,10 +141,16 @@ public final class ConfigurationFactory {
     }
 
     private static void configureDefaults(final TreeMap<String, String> map) {
-        map.putIfAbsent(
-                Configuration.RUNNER_PARALLELISM,
-                String.valueOf(Runtime.getRuntime().availableProcessors()));
+        final var cores = Runtime.getRuntime().availableProcessors();
+        map.putIfAbsent(Configuration.RUNNER_PARALLELISM, String.valueOf(cores));
+        map.putIfAbsent(Configuration.WORKERS, String.valueOf(cores));
+        map.putIfAbsent(Configuration.SHUTDOWN_GRACE_MILLIS, "10000");
+        map.putIfAbsent(Configuration.LISTENER_QUEUE_CAPACITY, "8192");
         map.putIfAbsent(Configuration.FAILURE_ON_ABORT, "true");
+        map.putIfAbsent(Configuration.FAILURE_ON_SKIP, "true");
+        map.putIfAbsent(Configuration.FAIL_IF_NO_TESTS, "true");
+        map.putIfAbsent(Configuration.FAIL_FAST, "false");
+        map.putIfAbsent(Configuration.ANSI, "auto");
     }
 
     /**
@@ -157,7 +177,7 @@ public final class ConfigurationFactory {
         var properties = new Properties();
         try (inputStream) {
             properties.load(inputStream);
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             throw new ConfigurationException(
                     "failed to load default properties resource: " + Configuration.CONFIGURATION_FILE_NAME + " ("
                             + e.getMessage() + ")",

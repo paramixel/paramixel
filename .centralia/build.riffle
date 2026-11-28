@@ -41,9 +41,6 @@ jobs : {
             linux
         ]
         timeout : 1h
-        requires : [
-            /opt/java/21/bin/java
-        ]
         paths : [
             /opt/java/21/bin
         ]
@@ -65,9 +62,6 @@ jobs : {
             linux
         ]
         timeout : 1h
-        requires : [
-            /opt/java/25/bin/java
-        ]
         paths : [
             /opt/java/25/bin
         ]
@@ -89,9 +83,6 @@ jobs : {
             linux
         ]
         timeout : 1h
-        requires : [
-            /opt/java/17/bin/java
-        ]
         paths : [
             /opt/java/17/bin
         ]

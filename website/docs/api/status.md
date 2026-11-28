@@ -1,34 +1,42 @@
 ---
 title: Status
-description: Execution statuses in Paramixel.
+description: Terminal and in-flight kinds, severity ordering, and reasons.
 ---
 
 # Status
 
-`Status` is a value object representing an action or aggregate outcome.
-
-## Values
-
-- `Status.PENDING`
-- `Status.RUNNING`
-- `Status.PASSED`
-- `Status.FAILED`
-- `Status.SKIPPED`
-- `Status.ABORTED`
-
-## Factories
-
 ```java
-Status.failed("message");
-Status.failed("message", throwable);
-Status.skipped("message");
-Status.aborted("message");
+Status status = Status.failed("assertion failed", cause);
+status.kind();        // FAILED
+status.message();     // Optional[assertion failed]
+status.throwable();   // Optional[cause]
 ```
 
-## Predicates
+| Kind | Terminal | Meaning |
+| --- | --- | --- |
+| `PENDING` | no | Compiled but not admitted |
+| `RUNNING` | no | Execution started |
+| `PASSED` | yes | Every required phase succeeded |
+| `FAILED` | yes | Operation, runtime validation, timeout, or finalizer failed |
+| `SKIPPED` | yes | Condition false, dependency unsatisfied, selection, or stop policy |
+| `ABORTED` | yes | Assumption or precondition abort |
+| `CANCELED` | yes | Run cancellation, shutdown, or a descendant canceled by a timeout |
 
-Use `isPending()`, `isRunning()`, `isPassed()`, `isFailed()`, `isSkipped()`, and `isAborted()`.
+`ABORTED` and `CANCELED` are intentionally distinct: an assumption failure is a test verdict, while cancellation means
+the task never produced one.
 
-## Aggregation
+## Severity
 
-`Status.aggregate(List<Descriptor>)` computes aggregate tree status. Failures dominate normal success; skipped and aborted outcomes are represented explicitly and can be promoted to failing exit codes with configuration.
+`Status.mostSevere(collection)` implements `FAILED > CANCELED > ABORTED > SKIPPED > PASSED`. An empty collection
+aggregates to `PASSED`.
+
+## Exceptions and statuses
+
+| Thrown | Recorded as |
+| --- | --- |
+| Any checked exception, `RuntimeException`, assertion failure | `FAILED` |
+| `AbortException.abort(…)` | `ABORTED` |
+| `SkipException.skip(…)` | `SKIPPED` |
+| `FailException.fail(…)` | `FAILED` |
+| Cancellation-driven interruption | `CANCELED` |
+| Timeout expiry | `FAILED` with an explicit timeout reason |

@@ -44,7 +44,7 @@
     </modules>
 
     <properties>
-        <revision>6.2.6-POST</revision>
+        <revision>7.0.0-ALPHA-1</revision>
         <!-- Build settings -->
         <jacoco.skip>false</jacoco.skip>
         <maven.compiler.release>17</maven.compiler.release>
@@ -56,8 +56,8 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <project.reporting.sourceEncoding>UTF-8</project.reporting.sourceEncoding>
         <!-- Dependency versions -->
+        <altcontainers.version>0.5.0</altcontainers.version>
         <assertj-core.version>3.27.7</assertj-core.version>
-        <commons-compress.version>1.28.0</commons-compress.version>
         <junit.version>6.1.3</junit.version>
         <kafka-clients.version>4.4.0</kafka-clients.version>
         <maven.version>3.10.2</maven.version>
@@ -67,11 +67,7 @@
         <pmd.version>7.30.0</pmd.version>
         <jmh.version>1.37</jmh.version>
         <slf4j.version>2.0.20</slf4j.version>
-        <logback.version>1.6.8</logback.version>
-        <testcontainers.version>2.0.5</testcontainers.version>
-        <testcontainers-kafka.version>1.21.4</testcontainers-kafka.version>
-        <testcontainers-mongodb.version>1.21.4</testcontainers-mongodb.version>
-        <testcontainers-nginx.version>1.21.4</testcontainers-nginx.version>
+        <logback.version>1.6.6</logback.version>
 
         <!-- Plugin versions -->
         <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
@@ -161,29 +157,9 @@
                 <version>${assertj-core.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>testcontainers</artifactId>
-                <version>${testcontainers.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>kafka</artifactId>
-                <version>${testcontainers-kafka.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>mongodb</artifactId>
-                <version>${testcontainers-mongodb.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>nginx</artifactId>
-                <version>${testcontainers-nginx.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-compress</artifactId>
-                <version>${commons-compress.version}</version>
+                <groupId>org.altcontainers</groupId>
+                <artifactId>core</artifactId>
+                <version>${altcontainers.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.kafka</groupId>

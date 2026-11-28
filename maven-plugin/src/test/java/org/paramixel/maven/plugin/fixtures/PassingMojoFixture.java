@@ -16,13 +16,13 @@
 
 package org.paramixel.maven.plugin.fixtures;
 
+import org.paramixel.api.Context;
 import org.paramixel.api.Paramixel;
-import org.paramixel.api.action.Action;
-import org.paramixel.api.action.Instance;
-import org.paramixel.api.action.Step;
+import org.paramixel.api.Sequential;
+import org.paramixel.api.Task;
 
 /**
- * Fixture whose action completes successfully, used to verify that the Maven mojo completes without
+ * Fixture whose definition completes successfully, used to verify that the Maven mojo completes without
  * error on a passing execution path.
  */
 public final class PassingMojoFixture {
@@ -30,14 +30,24 @@ public final class PassingMojoFixture {
     private PassingMojoFixture() {}
 
     /**
-     * Creates an instance action that always passes.
+     * Creates a definition that always passes.
      *
-     * @return an {@link Instance} action with the identifier {@code "mojo-pass"}
+     * @return a definition named {@code "mojo-pass"}
      */
-    @Paramixel.Factory
-    public static Action action() {
-        return Instance.builder("mojo-pass", Object::new)
-                .body(Step.of("test", context -> {}))
+    @Paramixel.TaskFactory
+    public static Task task() {
+        return Sequential.builder(PassingMojoFixture.class, "mojo-pass")
+                .step("test")
                 .build();
+    }
+
+    /**
+     * A step that does nothing.
+     *
+     * @param context the execution context
+     */
+    @Paramixel.Id("test")
+    public static void test(final Context context) {
+        // Intentionally empty
     }
 }

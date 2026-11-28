@@ -40,7 +40,7 @@ public final class Version {
 
     private static final String VERSION_PROPERTY = "paramixel.core.version";
 
-    private static final String VERSION = loadVersion(Version::getResourceAsString);
+    private static final String VERSION = loadVersion(Version::openVersionResource);
 
     private Version() {
         // Intentionally empty
@@ -84,19 +84,29 @@ public final class Version {
         return version;
     }
 
-    private static InputStream getResourceAsString(String name) {
-        ClassLoader ctx = Thread.currentThread().getContextClassLoader();
-        if (ctx != null) {
-            InputStream is = ctx.getResourceAsStream(name);
-            if (is != null) {
-                return is;
+    /**
+     * Opens the version resource, preferring this artifact's own class loader.
+     *
+     * <p>The order matters: another artifact on the context class loader can ship a resource with the same name, and
+     * the version must come from the Paramixel core jar that declared this class. The context class loader and the
+     * system class loader are only fallbacks.
+     *
+     * @param name the classpath resource name
+     * @return an open stream, or {@code null} when no class loader can see the resource
+     */
+    private static InputStream openVersionResource(final String name) {
+        var own = Version.class.getClassLoader();
+        if (own != null) {
+            var stream = own.getResourceAsStream(name);
+            if (stream != null) {
+                return stream;
             }
         }
-        ClassLoader def = Version.class.getClassLoader();
-        if (def != null) {
-            InputStream is = def.getResourceAsStream(name);
-            if (is != null) {
-                return is;
+        var context = Thread.currentThread().getContextClassLoader();
+        if (context != null) {
+            var stream = context.getResourceAsStream(name);
+            if (stream != null) {
+                return stream;
             }
         }
         return ClassLoader.getSystemResourceAsStream(name);
