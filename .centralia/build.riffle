@@ -1,9 +1,11 @@
-# Build configuration for Paramixel, mirroring .github/workflows/build.yaml.
+# Build configuration for Paramixel, run by Centralia. It replaces the GitHub
+# Actions build and manual-build workflows this repository used before the move
+# to Centralia; the documentation job from CI is not mirrored.
 #
-# Java is preinstalled on the runner VMs under /opt/java/<N> (17, 21 and 25 are
-# the versions CI covers). "requires" keeps a job queued for a runner that has
-# the JDK, and "paths" puts its bin directory in front of PATH. Centralia does
-# not install or discover tools. The documentation job in CI is not mirrored.
+# Java is preinstalled in the build VM under /opt/java/<N>; 17, 21 and 25 are the
+# versions CI covered. "requires" lists files that must exist inside the VM
+# before the first command runs, and "paths" puts their bin directory in front
+# of PATH. Centralia does not install or discover tools.
 #
 # Validate with:
 #   centralia validate .centralia/build.riffle
@@ -14,7 +16,6 @@ jobs : {
             push
             pull-request
         ]
-        executor : native
         labels : [
             linux
         ]
@@ -39,7 +40,6 @@ jobs : {
             push
             pull-request
         ]
-        executor : native
         labels : [
             linux
         ]
@@ -64,7 +64,6 @@ jobs : {
             push
             pull-request
         ]
-        executor : native
         labels : [
             linux
         ]
@@ -89,7 +88,6 @@ jobs : {
             push
             pull-request
         ]
-        executor : native
         labels : [
             linux
         ]
